@@ -7,6 +7,7 @@ import copy
 
 from particle import Point, Particle
 from distribution import DistPointIsotropic
+from constant import SMALL_KICK
 import rng
 
 
@@ -164,7 +165,7 @@ class Simulator:
             P = self.source.get_particle()
             # Determine cell if not given
             if not P.cell: 
-                P.cell = self.find_cell(P.pos)
+                P.cell = self.find_cell(P)
             self.bank_source.append(P)
 
     # =========================================================================
@@ -245,6 +246,9 @@ class Simulator:
         while P.alive:
             # Record initial parameters
             P.save_previous_state()
+
+            # Get speed and XS (not neeeded for MG mode)
+            P.speed = self.speeds[P.g]
         
             # Collision distance
             d_coll = self.get_collision_distance(P)
@@ -258,14 +262,10 @@ class Simulator:
 
             # Surface hit or collision?
             if d_coll > d_surf:
-                # Surface hit
-                S.hit(P)
-
-                # Get new cell
-                if P.alive:
-                    P.cell = self.find_cell(P.pos)                   
+                # Record surface hit
+                P.surface = S                              
+                self.surface_hit(P)
             else:
-                # Collision
                 self.collision(P)
                             
             # Score tallies
@@ -285,7 +285,19 @@ class Simulator:
     # =========================================================================
     # Particle transports
     # =========================================================================
-    
+
+    def find_cell(self, P):
+        pos = P.pos
+        C = None
+        for cell in self.cells:
+            if cell.test_point(pos):
+                C = cell
+                break
+        if C == None:
+            print("ERROR: A particle is lost at "+str(pos))
+            sys.exit()
+        return C
+        
     def get_collision_distance(self, P):
         xi     = rng.uniform()
         SigmaT = P.cell.material.SigmaT[P.g]
@@ -304,9 +316,6 @@ class Simulator:
         return S, d_surf
 
     def move_particle(self, P, d):
-        # Get speed
-        P.speed = self.speeds[P.g]
-
         # 4D Move
         P.pos  += P.dir*d
         P.time += d/P.speed
@@ -314,6 +323,17 @@ class Simulator:
         # Record distance traveled
         P.distance = d
         
+    def surface_hit(self, P):
+        # Implement BC
+        P.surface.bc(P)
+
+        # Small kick (see constant.py) to make sure crossing
+        self.move_particle(P, SMALL_KICK)
+        
+        # Get new cell
+        if P.alive:
+            P.cell = self.find_cell(P)
+            
     def collision(self, P):
         P.collision = True
         SigmaT = P.cell.material.SigmaT[P.g]
@@ -359,6 +379,35 @@ class Simulator:
         
         # Scatter particle
         self.scatter(P,mu0)
+
+    # Scatter direction with scattering cosine mu
+    def scatter(self, P, mu):
+        # Sample azimuthal direction
+        azi     = 2.0*np.pi*rng.uniform()
+        cos_azi = np.cos(azi)
+        sin_azi = np.sin(azi)
+        Ac      = (1.0 - mu**2)**0.5
+        
+        dir_final = Point(0,0,0)
+    
+        if P.dir.z != 1.0:
+            B = (1.0 - P.dir.z**2)**0.5
+            C = Ac/B
+            
+            dir_final.x = P.dir.x*mu + (P.dir.x*P.dir.z*cos_azi - P.dir.y*sin_azi)*C
+            dir_final.y = P.dir.y*mu + (P.dir.y*P.dir.z*cos_azi + P.dir.x*sin_azi)*C
+            dir_final.z = P.dir.z*mu - cos_azi*Ac*B
+        
+        # If dir = 0i + 0j + k, interchange z and y in the scattering formula
+        else:
+            B = (1.0 - P.dir.y**2)**0.5
+            C = Ac/B
+            
+            dir_final.x = P.dir.x*mu + (P.dir.x*P.dir.y*cos_azi - P.dir.z*sin_azi)*C
+            dir_final.z = P.dir.z*mu + (P.dir.z*P.dir.y*cos_azi + P.dir.x*sin_azi)*C
+            dir_final.y = P.dir.y*mu - cos_azi*Ac*B
+            
+        P.dir.copy(dir_final)        
         
     def collision_fission(self, P):
         SigmaF     = P.cell.material.SigmaF[P.g]
@@ -536,48 +585,3 @@ class Simulator:
 
         # Reset simulation parameters
         self.i_iter = 0
-    
-    
-    # =========================================================================
-    # Misc.
-    # =========================================================================
-    
-    def find_cell(self, pos):
-        C = None
-        for cell in self.cells:
-            if cell.test_point(pos):
-                C = cell
-                break
-        if C == None:
-            print("ERROR: A particle is lost at "+str(pos))
-            sys.exit()
-        return C
-    
-    # Scatter direction with scattering cosine mu
-    def scatter(self, P, mu):
-        # Sample azimuthal direction
-        azi     = 2.0*np.pi*rng.uniform()
-        cos_azi = np.cos(azi)
-        sin_azi = np.sin(azi)
-        Ac      = (1.0 - mu**2)**0.5
-        
-        dir_final = Point(0,0,0)
-    
-        if P.dir.z != 1.0:
-            B = (1.0 - P.dir.z**2)**0.5
-            C = Ac/B
-            
-            dir_final.x = P.dir.x*mu + (P.dir.x*P.dir.z*cos_azi - P.dir.y*sin_azi)*C
-            dir_final.y = P.dir.y*mu + (P.dir.y*P.dir.z*cos_azi + P.dir.x*sin_azi)*C
-            dir_final.z = P.dir.z*mu - cos_azi*Ac*B
-        
-        # If dir = 0i + 0j + k, interchange z and y in the scattering formula
-        else:
-            B = (1.0 - P.dir.y**2)**0.5
-            C = Ac/B
-            
-            dir_final.x = P.dir.x*mu + (P.dir.x*P.dir.y*cos_azi - P.dir.z*sin_azi)*C
-            dir_final.z = P.dir.z*mu + (P.dir.z*P.dir.y*cos_azi + P.dir.x*sin_azi)*C
-            dir_final.y = P.dir.y*mu - cos_azi*Ac*B
-            
-        P.dir.copy(dir_final)

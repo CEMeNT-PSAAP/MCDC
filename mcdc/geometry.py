@@ -1,65 +1,65 @@
 import numpy as np
-
-from constant import small_kick
+from abc import ABC, abstractmethod
 
 
 # =============================================================================
 # Surface
 # =============================================================================
 
-class Surface:
-    def __init__(self, type, BC, ID, name):
-        self.type = type
-        self.ID   = ID
+# Abstract base class
+class Surface(ABC):
+    def __init__(self, type_, bc, id_, name):
+        self.type = type_
+        self.id   = id_
         self.name = name
         
         # Set BC if transmission or vacuum
-        if BC == "transmission":
-            self.BC = self.BC_Transmission()
-        elif BC == "vacuum":
-            self.BC = self.BC_Vacuum()
+        if bc == "transmission":
+            self.bc = self.BCTransmission()
+        elif bc == "vacuum":
+            self.bc = self.BCVacuum()
         else:
-            self.BC = None # reflective and white are defined in child class
+            self.bc = None # reflective and white are defined in child class
 
+    # =========================================================================
+    # Abstract methods
+    # =========================================================================
+    
     # Evaluate if position pos is on the + or - side of the surface
+    @abstractmethod
     def evaluate(self, pos):
-        pass # Defined in child class
+        pass
     
     # Distance for a ray with position pos and direction dir to hit the surface
+    @abstractmethod
     def distance(self, pos, dir):
-        pass # Defined in child class
+        pass
 
     # Dot product of surface normal+ and a ray at pos with direction dir
+    @abstractmethod
     def normal(self, pos, dir):
-        pass # Defined in child class
-
-    # Procedures for particle P hitting the surface
-    def hit(self, P):
-        # Record surface hit
-        P.surface = self
-        
-        # Implement BC
-        self.BC(P)
-
-        # Small kick (see constant.py) to make sure crossing
-        #   TODO: Better idea?
-        P.pos          += P.dir*small_kick
-        P.time         += small_kick/P.speed
-        P.distance     += small_kick
+        pass
 
     # =========================================================================
-    # BC implementations
+    # Boundary Conditions
     # =========================================================================
 
-    class BC_Transmission:
+    class BC(ABC):
+        def __init__(self, type_):
+            self.type = type_        
+        @abstractmethod
+        def __call__(self, P):
+            pass
+            
+    class BCTransmission(BC):
         def __init__(self):
-            self.type = "transmission"
+            Surface.BC.__init__(self, "transmission")
         def __call__(self, P):
             pass
     
-    class BC_Vacuum:
+    class BCVacuum(BC):
         def __init__(self):
-            self.type = 'vacuum'
+            Surface.BC.__init__(self, "vacuum")
         def __call__(self, P):
             P.alive = False
     
@@ -69,13 +69,13 @@ class Surface:
 # =============================================================================
 
 class SurfacePlaneX(Surface):
-    def __init__(self, x0, BC, ID=None, name=None):
-        Surface.__init__(self, "PlaneX", BC, ID, name)
+    def __init__(self, x0, bc, id_=None, name=None):
+        Surface.__init__(self, "PlaneX", bc, id_, name)
         self.x0 = x0
         
         # Set BC if reflective
-        if BC == "reflective":
-            self.BC = self.BC_Reflective()
+        if bc == "reflective":
+            self.bc = self.BCReflective()
         
     def evaluate(self, pos):
         return pos.x - self.x0
@@ -98,9 +98,9 @@ class SurfacePlaneX(Surface):
     # BC implementations
     # =========================================================================
 
-    class BC_Reflective:
+    class BCReflective(Surface.BC):
         def __init__(self):
-            self.type = "reflective"
+            Surface.BC.__init__(self, "reflective")
         def __call__(self, P):
             P.dir.x *= -1
 
@@ -110,8 +110,8 @@ class SurfacePlaneX(Surface):
 # =============================================================================
 
 class Cell:
-    def __init__(self, surfaces, material, ID=None, name=None):
-        self.ID       = ID
+    def __init__(self, surfaces, material, id_=None, name=None):
+        self.id       = id_
         self.name     = name
         self.surfaces = surfaces # 0: surface, 1: sense
         self.material = material
