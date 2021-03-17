@@ -6,7 +6,7 @@ import numpy as np
 # =============================================================================
 
 class Material:
-    def __init__(self,SigmaT,SigmaS,nu,SigmaF):
+    def __init__(self, SigmaT, SigmaS, nu, SigmaF):
         self.SigmaT = SigmaT
         self.nu     = nu
 

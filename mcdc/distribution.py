@@ -1,17 +1,22 @@
 import numpy as np
+from abc import ABC, abstractmethod
 
 import rng
 from particle import Point
 
 
+class Distribution(ABC):
+    @abstractmethod
+    def sample(self):
+        pass
 
-class DistDelta:
+class DistDelta(Distribution):
     def __init__(self, value):
         self.value = value
     def sample(self):
         return self.value
 
-class DistUniform:
+class DistUniform(Distribution):
     def __init__(self, a, b):
         self.a = a
         self.b = b
@@ -19,7 +24,7 @@ class DistUniform:
         xi = rng.uniform()
         return self.a + xi * (self.b - self.a)
 
-class DistPoint:
+class DistPoint(Distribution):
     def __init__(self, x, y, z):
         self.x = x
         self.y = y
@@ -27,7 +32,7 @@ class DistPoint:
     def sample(self):
         return Point(self.x.sample(), self.y.sample(), self.z.sample())
     
-class DistPointIsotropic:
+class DistPointIsotropic(Distribution):
     def sample(self):
         # Sample polar cosine and azimuthal angle uniformly
         mu  = 2.0*rng.uniform() - 1.0

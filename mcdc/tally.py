@@ -1,14 +1,47 @@
 import numpy as np
+from abc import ABC, abstractmethod
 from mpi4py import MPI
 
 from algorithm import binary_search
 
 
 # =============================================================================
+# Filter base abstract classes
+# =============================================================================
+
+class Filter(ABC):
+    @property
+    @abstractmethod
+    def grid(self):
+        pass
+
+    @property
+    @abstractmethod
+    def N_bin(self):
+        pass
+    
+    @abstractmethod
+    def __init__(self, grid):
+        pass
+
+    @abstractmethod
+    def __call__(self, P):
+        pass
+
+class FilterSpatial(Filter):
+    @property
+    @abstractmethod
+    def N_face(self):
+        pass
+
+# =============================================================================
 # Energy filters     
 # =============================================================================
 
-class FilterEnergyGroup:
+class FilterEnergyGroup(Filter):
+    grid  = None
+    N_bin = None
+    
     def __init__(self, grid):
         self.grid  = grid
         self.N_bin = len(grid)
@@ -20,7 +53,10 @@ class FilterEnergyGroup:
 # Angular filters
 # =============================================================================
 
-class FilterPolarCosine:
+class FilterPolarCosine(Filter):
+    grid  = None
+    N_bin = None
+    
     def __init__(self, grid):
         self.grid  = grid
         self.N_bin = len(grid) - 1
@@ -38,7 +74,10 @@ class FilterPolarCosine:
 #     (5) track-length-rate scored at each edge
 #===============================================================================
 
-class FilterTime:
+class FilterTime(Filter):
+    grid  = None
+    N_bin = None
+    
     def __init__(self, grid):
         self.grid  = grid
         self.N_bin = len(grid) - 1
@@ -101,12 +140,16 @@ class FilterTime:
 #     (4) weight scored at each face
 #     (5) track-length-rate scored at each face
 # =============================================================================
-
-class FilterSurface:
+    
+class FilterSurface(FilterSpatial):
+    grid   = None
+    N_bin  = None
+    N_face = None
+    
     def __init__(self, grid):
-        self.grid  = grid
-        self.N_bin = 0
-        self.N_bin = len(grid)
+        self.grid   = grid
+        self.N_bin  = 0
+        self.N_face = len(grid)
             
     def __call__(self, P):
         if P.surface:
@@ -114,7 +157,7 @@ class FilterSurface:
             sense = 0
             if P.surface.evaluate(P.pos):
                 sense = 1
-            faces = np.array([binary_search(P.surface.ID, self.grid) + 1,
+            faces = np.array([binary_search(P.surface.id, self.grid) + 1,
                               sense])
             wgt = [P.wgt]
             TLR = [P.wgt/abs(P.surface.normal(P.pos,P.dir_old))]
@@ -122,18 +165,26 @@ class FilterSurface:
         else:
             return [], [], [], [], []
 
-class FilterCell:
+class FilterCell(FilterSpatial):
+    grid   = None
+    N_bin  = None
+    N_face = None
+    
     def __init__(self, grid):
         self.grid   = grid
         self.N_bin  = len(grid)
         self.N_face = 0
             
     def __call__(self, P):
-        bins = [binary_search(P.cell_old.ID, self.grid) + 1]
+        bins = [binary_search(P.cell_old.id, self.grid) + 1]
         TL   = [P.wgt_old]
         return bins, TL, [], [], []
 
-class FilterPlaneX:
+class FilterPlaneX(FilterSpatial):
+    grid   = None
+    N_bin  = None
+    N_face = None
+    
     def __init__(self, grid):
         self.grid   = grid
         self.N_bin  = len(grid) - 1
@@ -403,7 +454,7 @@ class Tally:
 # Scores
 # =============================================================================
     
-class Score:
+class Score(ABC):
     def __init__(self, name, shape):
         self.name       = name
         self.time_edge  = False
@@ -420,6 +471,10 @@ class Score:
         if MPI.COMM_WORLD.Get_rank() == 0:
             self.mean = np.zeros(shape)
             self.sdev = np.zeros_like(self.mean)
+            
+    @abstractmethod
+    def __call__(self, P, g, n, bin_idx, bin_score):
+        pass
 
 class ScoreFlux(Score):
     def __init__(self, name, shape):

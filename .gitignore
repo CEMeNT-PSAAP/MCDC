@@ -1,0 +1,10 @@
+# Compiled python class
+*.pyc
+
+# Test problem output
+*.h5
+*.png
+*.mp4
+
+# Editor
+.spyproject
