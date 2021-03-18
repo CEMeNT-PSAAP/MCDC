@@ -1,4 +1,4 @@
-def binary_search(val,grids):
+def binary_search(val, grids):
     # Return bin index
     #   val < min(grids) --> -1
     #   val > max(grids) --> # of bins
@@ -15,5 +15,5 @@ def binary_search(val,grids):
     return int(right)
 
 
-def interpolate(x,x1,x2,y1,y2):
-    return (x - x2)/(x1 - x2)*y1 + (x - x1)/(x2 - x1)*y2
+def interpolate(x, x1, x2, y1, y2):
+    return (x-x2)/(x1-x2)*y1 + (x-x1)/(x2-x1)*y2
