@@ -1,8 +1,5 @@
-import sys, os
 import numpy as np
 
-# Get path to mcdc
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.getcwd()))),'mcdc'))
 import mcdc
 
 
