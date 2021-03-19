@@ -1,8 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-import rng
-from particle import Point
+import mcdc.rng as rng
+from mcdc.particle import Point
 
 
 class Distribution(ABC):

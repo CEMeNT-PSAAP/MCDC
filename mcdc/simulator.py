@@ -5,10 +5,10 @@ from mpi4py import MPI
 import h5py
 import copy
 
-from particle import Point, Particle
-from distribution import DistPointIsotropic
-from constant import SMALL_KICK
-import rng
+from mcdc.particle import Point, Particle
+from mcdc.distribution import DistPointIsotropic
+from mcdc.constant import SMALL_KICK
+import mcdc.rng as rng
 
 
 class Simulator:
@@ -321,7 +321,7 @@ class Simulator:
         P.time += d/P.speed
         
         # Record distance traveled
-        P.distance = d
+        P.distance += d
         
     def surface_hit(self, P):
         # Implement BC
