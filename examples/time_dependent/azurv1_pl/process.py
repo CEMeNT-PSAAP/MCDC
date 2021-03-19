@@ -8,7 +8,7 @@ import h5py
 # =============================================================================
 
 # Load grids
-with h5py.File('output_N=100000.h5', 'r') as f:
+with h5py.File('output_N=1.h5', 'r') as f:
     x = f['tally/spatial_grid'][:]
     t = f['tally/time_grid'][:]
 
@@ -66,7 +66,7 @@ for i in range(len(N_hist_list)):
             plt.legend()
             plt.title(r'$\bar{\phi}_i(t=%.1f)$'%t[k+1])
             plt.savefig('phi_edge%i_N=%i.png'%(k+1,N_hist),dpi=1200)
-            plt.show()
+            plt.clf()
                         
             plt.plot(x,phi_face[k],'-ob',label="MC")
             plt.fill_between(x,phi_face[k]-phi_face_sd[k],phi_face[k]+phi_face_sd[k],alpha=0.2,color='b')
@@ -78,7 +78,7 @@ for i in range(len(N_hist_list)):
             plt.legend()
             plt.title(r'$\bar{\phi}_k(x)$, $t_k\in[%.1f,%.1f]$'%(t[k],t[k+1]))
             plt.savefig('phi_face%i_N=%i.png'%(k+1,N_hist),dpi=1200)
-            plt.show()
+            plt.clf()
             
             plt.plot(x_mid,phi[k],'-ob',label="MC")
             plt.fill_between(x_mid,phi[k]-phi_sd[k],phi[k]+phi_sd[k],alpha=0.2,color='b')
@@ -90,7 +90,7 @@ for i in range(len(N_hist_list)):
             plt.legend()
             plt.title(r'$\bar{\phi}_{i,k}$, $t_k\in[%.1f,%.1f]$'%(t[k],t[k+1]))
             plt.savefig('phi%i_N=%i.png'%(k+1,N_hist),dpi=1200)
-            plt.show()
+            plt.clf()
 
 for k in range(K):
     N   = N_hist_list

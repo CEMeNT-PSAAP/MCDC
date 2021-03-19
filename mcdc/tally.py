@@ -2,7 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from mpi4py import MPI
 
-from algorithm import binary_search
+from mcdc.misc import binary_search
 
 
 # =============================================================================

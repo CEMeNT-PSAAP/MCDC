@@ -1,3 +1,6 @@
+# Python packaging
+build
+
 # Compiled python class
 *.pyc
 
