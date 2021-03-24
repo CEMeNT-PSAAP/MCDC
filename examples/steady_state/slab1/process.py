@@ -33,7 +33,7 @@ phi_face_ref = np.append(phi_face_ref, np.exp(-SigmaT2*2.0)*np.exp(-SigmaT3*2.0)
 # =============================================================================
 
 # Cases to process and error container
-N_hist_list = np.logspace(0,5,11).astype(int)
+N_hist_list = np.logspace(0,7,15).astype(int)
 err_phi = []
 err_phi_face = []
 
