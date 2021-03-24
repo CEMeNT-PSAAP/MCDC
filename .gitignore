@@ -9,5 +9,9 @@ build
 *.png
 *.mp4
 
+# Cluster job
+*.out
+*.pbs
+
 # Editor
 .spyproject

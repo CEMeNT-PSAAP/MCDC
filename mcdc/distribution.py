@@ -1,8 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-import mcdc.rng as rng
 from mcdc.particle import Point
+import mcdc.random
 
 
 class Distribution(ABC):
@@ -21,7 +21,7 @@ class DistUniform(Distribution):
         self.a = a
         self.b = b
     def sample(self):
-        xi = rng.uniform()
+        xi = mcdc.random.rng()
         return self.a + xi * (self.b - self.a)
 
 class DistPoint(Distribution):
@@ -35,8 +35,8 @@ class DistPoint(Distribution):
 class DistPointIsotropic(Distribution):
     def sample(self):
         # Sample polar cosine and azimuthal angle uniformly
-        mu  = 2.0*rng.uniform() - 1.0
-        azi = 2.0*np.pi*rng.uniform()
+        mu  = 2.0*mcdc.random.rng() - 1.0
+        azi = 2.0*np.pi*mcdc.random.rng()
 	
         # Convert to Cartesian coordinates
         c = (1.0 - mu**2)**0.5
