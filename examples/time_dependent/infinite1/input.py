@@ -1,4 +1,8 @@
 import numpy as np
+import sys, os
+
+# Get path to mcdc (not necessary if mcdc is installed)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.getcwd()))))
 
 import mcdc
 
@@ -77,7 +81,7 @@ tallies = [T]
 simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies)
 
 # Cases to run
-N_hist_list = np.logspace(0,5,11).astype(int)
+N_hist_list = np.logspace(0,7,15).astype(int)
 
 for N_hist in N_hist_list:
     # Set number of histories

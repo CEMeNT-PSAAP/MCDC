@@ -5,17 +5,18 @@ from mpi4py import MPI
 import h5py
 import copy
 
-from mcdc.particle import Point, Particle
+from mcdc.particle     import Point, Particle
 from mcdc.distribution import DistPointIsotropic
-from mcdc.constant import SMALL_KICK
-import mcdc.rng as rng
+from mcdc.constant     import SMALL_KICK
+from mcdc.random       import RandomLCG
+import mcdc.random
 
 
 class Simulator:
     def __init__(self, speeds, cells, source, N_hist = 1, tallies = [],
                  k_mode = False, k_init = 1.0, N_iter = 1,
                  output = 'output', population_control='simple',
-                 seed = 777):
+                 seed = 1):
 
         # Basic settings
         self.speeds  = speeds  # array of particle MG speeds
@@ -61,7 +62,6 @@ class Simulator:
         self.MPI_hist_end   = 0
 
         # RNG settings
-        #   TODO: use RNG that allows stride for more flexible simulation
         self.seed        = seed
         self.rng_history = []   # rng for each history
         self.rng_popctrl = None # rng for populaton control
@@ -90,20 +90,6 @@ class Simulator:
     # =========================================================================
     
     def run(self):
-        # Prepare RNG child streams
-        #   child streams       --> eigenvalue iterations
-        #   grand child streams --> histories
-        ss = np.random.SeedSequence(self.seed)
-        if self.mode_eigenvalue:
-            # Reserve an additional branch (the last one) for population control
-            self.seed_child  = ss.spawn(self.N_iter+1)
-            
-            # Set RNG for population control
-            seed             = self.seed_child[-1]
-            self.rng_popctrl = np.random.default_rng(seed).uniform
-        else:
-            self.seed_child = ss
-            
         # Initialize source bank (also initialize corresponding history RNGs)
         self.set_initial_source()
             
@@ -161,7 +147,7 @@ class Simulator:
                         
         # Get initial source particles
         for i in range(self.MPI_hist_size):
-            rng.uniform = self.rng_history[i]
+            mcdc.random.rng = self.rng_history[i]
             P = self.source.get_particle()
             # Determine cell if not given
             if not P.cell: 
@@ -173,13 +159,11 @@ class Simulator:
     # =========================================================================
 
     def initialize_rng(self, start, end, N):
-        if self.mode_eigenvalue:
-            seed_grand_child = self.seed_child[self.i_iter].spawn(N)
-        else:
-            seed_grand_child = self.seed_child.spawn(N)
-        
-        self.rng_history = [np.random.default_rng(seed).uniform 
-                            for seed in seed_grand_child[start:end]]
+        i_hist = start
+        while i_hist < end:
+            self.rng_history.append(RandomLCG(self.seed))
+            self.rng_history[-1].init_history(i_hist)
+            i_hist += 1
             
     # =========================================================================
     # SOURCE LOOP
@@ -192,17 +176,19 @@ class Simulator:
             self.bank_history.append(self.bank_source.pop())
             
             # Get the corresponding RNG as well
-            rng.uniform = self.rng_history.pop()
+            mcdc.random.rng = self.rng_history.pop()
             
             # History loop
             self.loop_history()
             
             # Super rough estimate of progress
             #   TODO: A progress bar would be nice?
+            '''
             if self.MPI_rank == 0 and self.mode_fixed_source:
                 prog = (N_init - len(self.bank_source))/N_init*100
                 print('%.2f'%prog,'%')
                 sys.stdout.flush()
+            '''
         
         # Tally source closeout
         for T in self.tallies:
@@ -299,7 +285,7 @@ class Simulator:
         return C
         
     def get_collision_distance(self, P):
-        xi     = rng.uniform()
+        xi     = mcdc.random.rng()
         SigmaT = P.cell.material.SigmaT[P.g]
         d_coll = -np.log(xi)/SigmaT
         return d_coll
@@ -341,7 +327,7 @@ class Simulator:
         SigmaF = P.cell.material.SigmaF_tot[P.g]
         
         # Scattering or absorption?
-        xi = rng.uniform()*SigmaT
+        xi = mcdc.random.rng()*SigmaT
         if SigmaS > xi:
             # Scattering
             self.collision_scattering(P)
@@ -363,7 +349,7 @@ class Simulator:
         G          = len(SigmaS)
         
         # Sample outgoing energy
-        xi  = rng.uniform()*SigmaS_tot
+        xi  = mcdc.random.rng()*SigmaS_tot
         tot = 0.0
         for g_out in range(G):
             tot += SigmaS[g_out][0]
@@ -374,7 +360,7 @@ class Simulator:
         # Sample scattering angle
         if len(SigmaS[g_out]) == 1:
             # Isotropic
-            mu0 = 2.0*rng.uniform() - 1.0;
+            mu0 = 2.0*mcdc.random.rng() - 1.0;
         # TODO: sampling anisotropic scattering with rejection sampling
         
         # Scatter particle
@@ -383,7 +369,7 @@ class Simulator:
     # Scatter direction with scattering cosine mu
     def scatter(self, P, mu):
         # Sample azimuthal direction
-        azi     = 2.0*np.pi*rng.uniform()
+        azi     = 2.0*np.pi*mcdc.random.rng()
         cos_azi = np.cos(azi)
         sin_azi = np.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
@@ -420,13 +406,13 @@ class Simulator:
         
         # Sample number of fission neutrons
         #   in fixed-source, k_eff = 1.0
-        N = floor(nu/self.k_eff + rng.uniform())
+        N = floor(nu/self.k_eff + mcdc.random.rng())
         P.fission_neutrons = N
 
         # Push fission neutrons to bank
         for n in range(N):
             # Sample outgoing energy
-            xi  = rng.uniform()*SigmaF_tot
+            xi  = mcdc.random.rng()*SigmaF_tot
             tot = 0.0
             for g_out in range(G):
                 tot += SigmaF[g_out]
@@ -556,9 +542,11 @@ class Simulator:
             
         # Progress printout
         #   TODO: print in a table format
+        '''
         if self.MPI_rank == 0:
             print(self.i_iter,self.k_eff)
             sys.stdout.flush()
+        '''
 
     def closeout_simulation(self):
         # Save tallies
