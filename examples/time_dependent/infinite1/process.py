@@ -84,7 +84,7 @@ for k in range(K):
 # =============================================================================
 
 # Cases to process and error container
-N_hist_list = np.logspace(0,5,11).astype(int)
+N_hist_list = np.logspace(0,7,15).astype(int)
 err_phi = []
 err_phi_edge = []
 
