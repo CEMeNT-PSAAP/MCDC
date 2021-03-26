@@ -69,7 +69,7 @@ class Surface(ABC):
 # =============================================================================
 
 class SurfacePlaneX(Surface):
-    def __init__(self, x0, bc, id_=None, name=None):
+    def __init__(self, x0, bc='transmission', id_=None, name=None):
         Surface.__init__(self, "PlaneX", bc, id_, name)
         self.x0 = x0
         
