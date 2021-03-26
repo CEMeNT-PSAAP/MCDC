@@ -1,5 +1,7 @@
-# Python packaging
+# setupp.py
 build
+.eggs
+mcdc.egg-info
 
 # Compiled python class
 *.pyc
