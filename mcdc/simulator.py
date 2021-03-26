@@ -1,13 +1,13 @@
 import numpy as np
 import sys
-from math import floor
+from math   import floor
 from mpi4py import MPI
 import h5py
 import copy
 
 from mcdc.particle     import Point, Particle
 from mcdc.distribution import DistPointIsotropic
-from mcdc.constant     import SMALL_KICK
+from mcdc.constant     import SMALL_KICK, LCG_SEED, LCG_STRIDE
 from mcdc.random       import RandomLCG
 import mcdc.random
 
@@ -16,7 +16,7 @@ class Simulator:
     def __init__(self, speeds, cells, source, N_hist = 1, tallies = [],
                  k_mode = False, k_init = 1.0, N_iter = 1,
                  output = 'output', population_control='simple',
-                 seed = 1):
+                 seed = LCG_SEED, stride = LCG_STRIDE):
 
         # Basic settings
         self.speeds  = speeds  # array of particle MG speeds
@@ -26,8 +26,8 @@ class Simulator:
         self.tallies = tallies # list of Tallies (see tally.py)
         self.output  = output  # .h5 output file name
         
-        # Time-dependent mode settings
-        #   TODO: Census and outer census
+        # Population control
+        #   TODO: Inner and outer census
         self.popctrl = population_control # type of popctrl
 
         # Eigenvalue settings
@@ -45,7 +45,6 @@ class Simulator:
         # Particle banks
         #   TODO: use fixed memory allocations with helper indices
         self.bank_stored  = [] # for the next source loop
-        self.bank_survive = [] # for populaton control
         self.bank_source  = [] # for current source loop
         self.bank_history = [] # for current history loop
         self.bank_fission = None # will point to one of the banks
@@ -56,15 +55,16 @@ class Simulator:
         self.MPI_rank  = comm.Get_rank()
         self.MPI_left  = self.MPI_rank - 1
         self.MPI_right = self.MPI_rank + 1
-        # History size and global indices (determined in self.run)
-        self.MPI_hist_size  = 0
-        self.MPI_hist_start = 0
-        self.MPI_hist_end   = 0
+        # Work size and global indices
+        self.MPI_work_size_total = 0
+        self.MPI_work_size       = 0
+        self.MPI_work_start      = 0
+        self.MPI_work_end        = 0
 
         # RNG settings
         self.seed        = seed
+        self.stride      = stride
         self.rng_history = []   # rng for each history
-        self.rng_popctrl = None # rng for populaton control
         
         # Variance Reduction Technique settings
         #   TODO: implicit capture, implicit fission production
@@ -91,9 +91,33 @@ class Simulator:
     
     def run(self):
         # Initialize source bank (also initialize corresponding history RNGs)
-        self.set_initial_source()
-            
-        # Start iteration
+        #self.set_initial_source()
+
+        # Setup RNG
+        mcdc.random.rng = RandomLCG(seed=self.seed, stride=self.stride)
+
+        # =====================================================================
+        # Work setup
+        # =====================================================================
+
+        # Calculate # of work per processor
+        self.MPI_work_size = floor(self.N_hist/self.MPI_size)
+        if self.MPI_rank < self.N_hist%self.MPI_size:
+            self.MPI_work_size += 1
+
+        # Initial total number of work
+        self.MPI_work_size_total = self.N_hist
+
+        # Determine starting and ending work indices
+        buff = np.array([0],dtype=int)
+        MPI.COMM_WORLD.Exscan(np.array(self.MPI_work_size,dtype=int), buff, MPI.SUM)
+        self.MPI_work_start = buff[0]
+        self.MPI_work_end   = buff[0] + self.MPI_work_size
+
+        # =====================================================================
+        # SIMULATION LOOP
+        # =====================================================================
+
         simulation_end = False
         while not simulation_end:
             # To which bank fission neutrons are stored?
@@ -108,22 +132,70 @@ class Simulator:
             # Increment iteration index
             self.i_iter += 1           
             
-            # Any stored bank?
-            if self.bank_stored:
-                self.manage_stored_bank() # also initialize corresponding RNGs
-            
-            # Eigenvalue iteration closeout
+            # Closeout
             if self.mode_eigenvalue: 
-                self.closeout_eigenvalue_iteration()
-
-            # End simulation?
-            if self.mode_eigenvalue and self.i_iter == self.N_iter:
-                simulation_end = True
+                simulation_end = self.closeout_eigenvalue_iteration()
             elif self.mode_fixed_source:
                 simulation_end = True
 
         # Simulation closeout
         self.closeout_simulation()
+
+    # =========================================================================
+    # Closeouts
+    # =========================================================================
+
+    def closeout_eigenvalue_iteration(self):    
+        # Next iteration?
+        if self.i_iter < self.N_iter:
+            simulation_end = False
+
+            # Manage stored bank (also initialize corresponding RNGs)
+            self.manage_stored_bank()
+            
+            # Set stored bank as source bank for the next iteration
+            self.bank_source = self.bank_stored
+            self.bank_stored = []
+
+        else:
+            simulation_end = True
+        
+        # Progress printout
+        #   TODO: print in a table format
+        '''
+        if self.MPI_rank == 0:
+            print(self.i_iter,self.k_eff)
+            sys.stdout.flush()
+        '''
+        return simulation_end 
+
+
+    def closeout_simulation(self):
+        # Save tallies
+        if self.MPI_rank == 0:
+            with h5py.File(self.output+'.h5', 'w') as f:
+                # Tallies
+                for T in self.tallies:
+                    f.create_dataset(T.name+"/energy_grid", data=T.filter_energy.grid)
+                    f.create_dataset(T.name+"/angular_grid", data=T.filter_angular.grid)
+                    f.create_dataset(T.name+"/time_grid", data=T.filter_time.grid)
+                    f.create_dataset(T.name+"/spatial_grid", data=T.filter_spatial.grid)
+                    
+                    # Scores
+                    for S in T.scores:
+                        f.create_dataset(T.name+"/"+S.name+"/mean", data=np.squeeze(S.mean))
+                        f.create_dataset(T.name+"/"+S.name+"/sdev", data=np.squeeze(S.sdev))
+                        S.mean.fill(0.0)
+                        S.sdev.fill(0.0)
+                    
+                # Eigenvalues
+                if self.mode_eigenvalue:
+                    f.create_dataset("keff", data=self.k_mean)
+                    self.k_mean.fill(0.0)
+
+        # Reset simulation parameters
+        self.i_iter = 0
+
 
     # =========================================================================
     # Set initial source (or initial guess for eigenvalue mode)
@@ -161,8 +233,8 @@ class Simulator:
     def initialize_rng(self, start, end, N):
         i_hist = start
         while i_hist < end:
-            self.rng_history.append(RandomLCG(self.seed))
-            self.rng_history[-1].init_history(i_hist)
+            self.rng_history.append(RandomLCG(seed=self.seed_master,
+                                              stride=self.stride, skip=i_hist))
             i_hist += 1
             
     # =========================================================================
@@ -170,22 +242,35 @@ class Simulator:
     # =========================================================================
     
     def loop_source(self):
-        N_init = len(self.bank_source)
-        while self.bank_source:
-            # Get a particle from source bank and put into history bank
-            self.bank_history.append(self.bank_source.pop())
-            
-            # Get the corresponding RNG as well
-            mcdc.random.rng = self.rng_history.pop()
+        # Work index
+        i_work = self.MPI_work_start
+        #while self.bank_source:
+        while i_work < self.MPI_work_end:
+            # Initialize RNG wrt work index
+            mcdc.random.rng.skip_ahead(i_work)
+
+            # Get a source particle and put into history bank
+            if not self.bank_source:
+                # Initial source
+                P = self.source.get_particle()
+                # Determine cell if not given
+                if not P.cell: 
+                    P.cell = self.find_cell(P)
+                self.bank_history.append(P)
+            else:
+                self.bank_history.append(self.bank_source.pop())
             
             # History loop
             self.loop_history()
+
+            # Increment work index
+            i_work += 1
             
             # Super rough estimate of progress
             #   TODO: A progress bar would be nice?
             '''
             if self.MPI_rank == 0 and self.mode_fixed_source:
-                prog = (N_init - len(self.bank_source))/N_init*100
+                prog = (self.N_hist - len(self.bank_source))/self.N_hist*100
                 print('%.2f'%prog,'%')
                 sys.stdout.flush()
             '''
@@ -530,46 +615,3 @@ class Simulator:
     def popctrl_combing(self):
         pass
     
-    # =========================================================================
-    # Closeouts
-    # =========================================================================
-
-    def closeout_eigenvalue_iteration(self):
-        # Set stored bank as source bank for the next iteration?
-        if self.i_iter < self.N_iter:
-            self.bank_source = self.bank_stored
-            self.bank_stored = []
-            
-        # Progress printout
-        #   TODO: print in a table format
-        '''
-        if self.MPI_rank == 0:
-            print(self.i_iter,self.k_eff)
-            sys.stdout.flush()
-        '''
-
-    def closeout_simulation(self):
-        # Save tallies
-        if self.MPI_rank == 0:
-            with h5py.File(self.output+'.h5', 'w') as f:
-                # Tallies
-                for T in self.tallies:
-                    f.create_dataset(T.name+"/energy_grid", data=T.filter_energy.grid)
-                    f.create_dataset(T.name+"/angular_grid", data=T.filter_angular.grid)
-                    f.create_dataset(T.name+"/time_grid", data=T.filter_time.grid)
-                    f.create_dataset(T.name+"/spatial_grid", data=T.filter_spatial.grid)
-                    
-                    # Scores
-                    for S in T.scores:
-                        f.create_dataset(T.name+"/"+S.name+"/mean", data=np.squeeze(S.mean))
-                        f.create_dataset(T.name+"/"+S.name+"/sdev", data=np.squeeze(S.sdev))
-                        S.mean.fill(0.0)
-                        S.sdev.fill(0.0)
-                    
-                # Eigenvalues
-                if self.mode_eigenvalue:
-                    f.create_dataset("keff", data=self.k_mean)
-                    self.k_mean.fill(0.0)
-
-        # Reset simulation parameters
-        self.i_iter = 0
