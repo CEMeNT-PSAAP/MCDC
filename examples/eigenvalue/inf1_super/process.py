@@ -42,7 +42,7 @@ phi_exact = phi_exact/dE*E_mid
 # =============================================================================
 
 # Cases to process and error container
-N_hist_list = np.logspace(2,4,5).astype(int)
+N_hist_list = np.logspace(2,6,9).astype(int)
 err_phi = []
 err_k = []
 
