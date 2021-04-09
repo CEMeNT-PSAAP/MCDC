@@ -1,6 +1,8 @@
-import sys
-sys.path.append('C:\\Users\\Ilham\\iCloudDrive\\Work\\MCDC\\mcdc')
 import numpy as np
+import sys, os
+
+# Get path to mcdc (not necessary if mcdc is installed)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.getcwd()))))
 
 import mcdc
 
@@ -21,7 +23,7 @@ E_mid = 0.5*(E[:-1] + E[1:])
 dE    = E[1:] - E[:-1]
 
 # Augment with uniform leakage XS
-SigmaL  = 0.14 # /cm
+SigmaL  = 0.24 # /cm
 SigmaT += SigmaL
 
 # Set material
@@ -74,10 +76,10 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies, 
-                           k_mode=True, N_iter=110, N_hist=10000)
+                           k_mode=True, N_iter=110)
 
 # Cases to run
-N_hist_list = np.logspace(2,4,5).astype(int)
+N_hist_list = np.logspace(2,6,9).astype(int)
 
 for N_hist in N_hist_list:
     # Set number of histories

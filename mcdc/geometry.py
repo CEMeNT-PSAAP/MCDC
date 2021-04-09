@@ -1,5 +1,6 @@
-import numpy as np
 from abc import ABC, abstractmethod
+
+from mcdc.constant import INF
 
 
 # =============================================================================
@@ -88,7 +89,7 @@ class SurfacePlaneX(Surface):
         dist = (self.x0 - x)/ux;
         
         # Check if particle moves away from the surface
-        if dist < 0.0: return np.inf
+        if dist < 0.0: return INF
         else:          return dist
 
     def normal(self, pos, dir):
