@@ -1,15 +1,18 @@
-import numpy as np
 import sys
-from math   import floor
-from mpi4py import MPI
 import h5py
-import copy
+import numpy as np
 
-from mcdc.particle     import Point, Particle
+from math import floor
+
+import mcdc.random
+import mcdc.mpi
+
+from mcdc.point        import Point
+from mcdc.particle     import Particle
 from mcdc.distribution import DistPointIsotropic
 from mcdc.constant     import SMALL_KICK, LCG_SEED, LCG_STRIDE
 from mcdc.random       import RandomLCG
-import mcdc.random
+from mcdc.popctrl      import PopCtrlSimple, PopCtrlSR, PopCtrlComb
 
 
 class Simulator:
@@ -26,10 +29,6 @@ class Simulator:
         self.tallies = tallies # list of Tallies (see tally.py)
         self.output  = output  # .h5 output file name
         
-        # Population control
-        #   TODO: Inner and outer census
-        self.popctrl = population_control # type of popctrl
-
         # Eigenvalue settings
         #   TODO: alpha eigenvalue
         #   TODO: shannon entropy
@@ -49,74 +48,55 @@ class Simulator:
         self.bank_history = [] # for current history loop
         self.bank_fission = None # will point to one of the banks
         
-        # MPI parameters
-        comm = MPI.COMM_WORLD
-        self.MPI_size  = comm.Get_size()
-        self.MPI_rank  = comm.Get_rank()
-        self.MPI_left  = self.MPI_rank - 1
-        self.MPI_right = self.MPI_rank + 1
-        # Work size and global indices
-        self.MPI_work_size_total = 0
-        self.MPI_work_size       = 0
-        self.MPI_work_start      = 0
-        self.MPI_work_end        = 0
-
         # RNG settings
-        self.seed        = seed
-        self.stride      = stride
-        self.rng_history = []   # rng for each history
+        self.seed   = seed
+        self.stride = stride
         
         # Variance Reduction Technique settings
         #   TODO: implicit capture, implicit fission production
+        self.mode_analog = True
         
+        # Population control
+        #   TODO: Inner and outer census
+        if population_control == 'simple':
+            self.popctrl = PopCtrlSimple()
+        elif population_control == 'split-roulette':
+            self.popctrl = PopCtrlSR()
+        elif population_control == 'comb':
+            self.popctrl = PopCtrlComb()
+        # Check if the chosen population control is appropriate
+        if population_control == 'simple' and not self.mode_analog:
+            print("ERROR: Population control Simple is only applicable for analog simulation ")
+            sys.exit()
+
         # Misc.
         self.isotropic_dir = DistPointIsotropic() # (see distribution.py)
             
         # Eigenvalue-specific tallies
         if self.mode_eigenvalue:
-            if self.MPI_rank == 0:
-                self.k_mean = np.zeros(self.N_iter) # iteration solutions for k
             # Accumulators
             self.nuSigmaF_sum = 0.0
             # MPI buffer
-            self.nuSigmaF_recv = np.array([0.0]) # For MPI reduce
+            self.nuSigmaF_buff = np.array([0.0])
+            # Iteration solution for k
+            if mcdc.mpi.master:
+                self.k_mean = np.zeros(self.N_iter)
             
         # Set tally bins
         for T in tallies:
             T.setup_bins(N_iter) # Allocate tally bins (see tally.py)
-    
+   
+
     # =========================================================================
-    # Run ("main")
+    # Run ("main") --> SIMULATION LOOP
     # =========================================================================
     
     def run(self):
-        # Initialize source bank (also initialize corresponding history RNGs)
-        #self.set_initial_source()
-
         # Setup RNG
         mcdc.random.rng = RandomLCG(seed=self.seed, stride=self.stride)
 
-        # =====================================================================
-        # Work setup
-        # =====================================================================
-
-        # Calculate # of work per processor
-        self.MPI_work_size = floor(self.N_hist/self.MPI_size)
-        if self.MPI_rank < self.N_hist%self.MPI_size:
-            self.MPI_work_size += 1
-
-        # Initial total number of work
-        self.MPI_work_size_total = self.N_hist
-
-        # Determine starting and ending work indices
-        buff = np.array([0],dtype=int)
-        MPI.COMM_WORLD.Exscan(np.array(self.MPI_work_size,dtype=int), buff, MPI.SUM)
-        self.MPI_work_start = buff[0]
-        self.MPI_work_end   = buff[0] + self.MPI_work_size
-
-        # =====================================================================
-        # SIMULATION LOOP
-        # =====================================================================
+        # Distribute work to processors
+        mcdc.mpi.distribute_work(self.N_hist)
 
         simulation_end = False
         while not simulation_end:
@@ -141,29 +121,32 @@ class Simulator:
         # Simulation closeout
         self.closeout_simulation()
 
-    # =========================================================================
-    # Closeouts
-    # =========================================================================
 
     def closeout_eigenvalue_iteration(self):    
         # Next iteration?
         if self.i_iter < self.N_iter:
             simulation_end = False
 
-            # Manage stored bank (also initialize corresponding RNGs)
-            self.manage_stored_bank()
+            # Rebase RNG for population control
+            mcdc.random.rng.skip_ahead(mcdc.mpi.work_size_total, change_base=True)
+
+            # Population control stored bank
+            self.bank_stored = self.popctrl(self.bank_stored, self.N_hist, 
+                                            normalize=True)
             
             # Set stored bank as source bank for the next iteration
             self.bank_source = self.bank_stored
             self.bank_stored = []
 
         else:
+            self.bank_source = []
+            self.bank_stored = []
             simulation_end = True
         
         # Progress printout
-        #   TODO: print in a table format
+        #   TODO: make optional. print in a table format
         '''
-        if self.MPI_rank == 0:
+        if mcdc.mpi.master:
             print(self.i_iter,self.k_eff)
             sys.stdout.flush()
         '''
@@ -172,7 +155,7 @@ class Simulator:
 
     def closeout_simulation(self):
         # Save tallies
-        if self.MPI_rank == 0:
+        if mcdc.mpi.master:
             with h5py.File(self.output+'.h5', 'w') as f:
                 # Tallies
                 for T in self.tallies:
@@ -198,54 +181,13 @@ class Simulator:
 
 
     # =========================================================================
-    # Set initial source (or initial guess for eigenvalue mode)
-    #   Particle sources are evenly distributed to all MPI processors
-    # =========================================================================
-    
-    def set_initial_source(self):
-        # Calculate # of work (source particles or histories) per processor
-        self.MPI_hist_size = floor(self.N_hist/self.MPI_size)
-        if self.MPI_rank < self.N_hist%self.MPI_size:
-            self.MPI_hist_size += 1
-
-        # History global indices
-        buff = np.array([0],dtype=int)
-        MPI.COMM_WORLD.Exscan(np.array(self.MPI_hist_size,dtype=int), buff, MPI.SUM)
-        self.MPI_hist_start = buff[0]
-        self.MPI_hist_end   = buff[0] + self.MPI_hist_size - 1
-        
-        # Initialize history RNGs
-        self.initialize_rng(self.MPI_hist_start, self.MPI_hist_end+1, self.N_hist)
-                        
-        # Get initial source particles
-        for i in range(self.MPI_hist_size):
-            mcdc.random.rng = self.rng_history[i]
-            P = self.source.get_particle()
-            # Determine cell if not given
-            if not P.cell: 
-                P.cell = self.find_cell(P)
-            self.bank_source.append(P)
-
-    # =========================================================================
-    # Initialize history RNGs
-    # =========================================================================
-
-    def initialize_rng(self, start, end, N):
-        i_hist = start
-        while i_hist < end:
-            self.rng_history.append(RandomLCG(seed=self.seed_master,
-                                              stride=self.stride, skip=i_hist))
-            i_hist += 1
-            
-    # =========================================================================
     # SOURCE LOOP
     # =========================================================================
     
     def loop_source(self):
         # Work index
-        i_work = self.MPI_work_start
-        #while self.bank_source:
-        while i_work < self.MPI_work_end:
+        i_work = mcdc.mpi.work_start
+        while i_work < mcdc.mpi.work_end:
             # Initialize RNG wrt work index
             mcdc.random.rng.skip_ahead(i_work)
 
@@ -258,7 +200,7 @@ class Simulator:
                     P.cell = self.find_cell(P)
                 self.bank_history.append(P)
             else:
-                self.bank_history.append(self.bank_source.pop())
+                self.bank_history.append(self.bank_source[i_work-mcdc.mpi.work_start])
             
             # History loop
             self.loop_history()
@@ -267,9 +209,9 @@ class Simulator:
             i_work += 1
             
             # Super rough estimate of progress
-            #   TODO: A progress bar would be nice?
+            #   TODO: Make it optional. A progress bar?
             '''
-            if self.MPI_rank == 0 and self.mode_fixed_source:
+            if mcdc.mpi.master and self.mode_fixed_source:
                 prog = (self.N_hist - len(self.bank_source))/self.N_hist*100
                 print('%.2f'%prog,'%')
                 sys.stdout.flush()
@@ -277,22 +219,34 @@ class Simulator:
         
         # Tally source closeout
         for T in self.tallies:
-            T.closeout_source(self.N_hist, self.i_iter)
+            T.closeout_source(mcdc.mpi.work_size_total, self.i_iter)
 
         # Eigenvalue source closeout
         if self.mode_eigenvalue:
-            # MPI Reduce
-            comm = MPI.COMM_WORLD
-            comm.Allreduce(self.nuSigmaF_sum, self.nuSigmaF_recv, MPI.SUM)
+            # MPI Reduce nuSigmaF
+            mcdc.mpi.allreduce(self.nuSigmaF_sum, self.nuSigmaF_buff)
             
             # Update keff
-            self.k_eff = self.nuSigmaF_recv[0]/self.N_hist
-            if self.MPI_rank == 0:
+            self.k_eff = self.nuSigmaF_buff[0]/mcdc.mpi.work_size_total
+            if mcdc.mpi.master:
                 self.k_mean[self.i_iter] = self.k_eff
                         
             # Reset accumulator
             self.nuSigmaF_sum = 0.0
 
+
+    def find_cell(self, P):
+        pos = P.pos
+        C = None
+        for cell in self.cells:
+            if cell.test_point(pos):
+                C = cell
+                break
+        if C == None:
+            print("ERROR: A particle is lost at "+str(pos))
+            sys.exit()
+        return C
+        
     # =========================================================================
     # HISTORY LOOP
     # =========================================================================
@@ -357,18 +311,6 @@ class Simulator:
     # Particle transports
     # =========================================================================
 
-    def find_cell(self, P):
-        pos = P.pos
-        C = None
-        for cell in self.cells:
-            if cell.test_point(pos):
-                C = cell
-                break
-        if C == None:
-            print("ERROR: A particle is lost at "+str(pos))
-            sys.exit()
-        return C
-        
     def get_collision_distance(self, P):
         xi     = mcdc.random.rng()
         SigmaT = P.cell.material.SigmaT[P.g]
@@ -509,109 +451,3 @@ class Simulator:
             
             # Bank
             self.bank_fission.append(Particle(P.pos, dir, g_out, P.time, P.wgt, P.cell))
-
-    # =========================================================================
-    # Manage stored bank
-    # =========================================================================
-    
-    def manage_stored_bank(self):
-        if self.popctrl == 'simple':
-            self.popctrl_simple()
-        elif self.popctrl == 'split-roulette':
-            self.popctrl_split_roulette()
-        elif self.popctrl == 'combing':
-            self.popctrl_combing()
-            
-    # =========================================================================
-    # Population control: Simple
-    # =========================================================================
-    #  Exactly yields N_hist particles
-    #  but only applicable for uniform weight population 
-    #  (e.g., analog simulations 
-    #         and eigenvalue simulations with implicit fission production)
-    #  TODO: MPI implementation
-    
-    def popctrl_simple(self):           
-        # Sample N_hist surviving particles from stored bank, 
-        #  and store them in surviving bank
-        N_source = len(self.bank_stored)
-        for i in range(self.N_hist):
-            idx = floor(self.rng_popctrl()*N_source)
-            self.bank_survive.append(copy.deepcopy(self.bank_stored[idx]))
-
-        # Switch stored bank and the surviving bank
-        self.bank_stored  = self.bank_survive
-        self.bank_survive = []
-                        
-        # Normalize weight to N_hist if eigenvalue
-        if self.mode_eigenvalue and self.bank_stored[0].wgt != 1.0:
-            for P in self.bank_stored:
-                P.wgt = 1.0
-        
-        # Initialize rng
-        if self.i_iter < self.N_iter:
-            hist_start = 0
-            hist_end   = self.N_hist
-            self.initialize_rng(hist_start, hist_end, self.N_hist)
-    
-    # =========================================================================
-    # Population control: Splitting & roulette 
-    # =========================================================================
-    # On average yields N_hist particles
-    # TODO: MPI implementation
-    
-    def popctrl_split_roulette(self):
-        # Total weight of initial population
-        w_total  = 0.0
-        for P in self.bank_stored:
-            w_total += P.wgt
-            
-        # Individual weight for surviving population
-        w_survive = w_total/self.N_hist
-        
-        # Split & roulette each particle in stored bank
-        #  put surviving particles into surviving bank
-        N_source = len(self.bank_stored)
-        for i in range(N_source):
-            P     = self.bank_stored[i]
-            
-            # Surviving probability
-            prob  = P.wgt/w_survive
-            P.wgt = w_survive
-            
-            # Splitting
-            n_survive = floor(prob)
-            for j in range(n_survive):
-                self.bank_survive.append(copy.deepcopy(P))
-            
-            # Russian roulette
-            prob -= n_survive
-            xi = self.rng_popctrl()
-            if xi < prob:
-                self.bank_survive.append(copy.deepcopy(P))
-
-        # Switch stored bank and the surviving bank
-        self.bank_stored  = self.bank_survive
-        self.bank_survive = []
-                        
-        # Normalize weight to N_hist if eigenvalue
-        N_source     = len(self.bank_stored)
-        w_normalized = self.N_hist/N_source
-        if self.mode_eigenvalue:
-            for P in self.bank_stored:
-                P.wgt = w_normalized
-        
-        # Initialize rng
-        if self.i_iter < self.N_iter:
-            hist_start = 0
-            hist_end   = N_source
-            self.initialize_rng(hist_start, hist_end, N_source)
-
-    # =========================================================================
-    # Population control: Combing
-    # =========================================================================
-    # Exactly yields N_hist particles
-    
-    def popctrl_combing(self):
-        pass
-    

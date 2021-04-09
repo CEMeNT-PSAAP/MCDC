@@ -190,6 +190,8 @@ for N_hist in N_hist_list:
         plt.savefig('phi_convergence.png',dpi=1200)
         plt.clf()
 
+        N   = N_hist_list[:len(err_phi_face)]
+        fac = err_phi_face[-1]/(1/np.sqrt(N[-1]))
         plt.plot(N,err_phi_face,'bo',fillstyle='none')
         plt.plot(N,fac/np.sqrt(N),'r-',label=r'$N^{-1/2}$')
         plt.xscale('log')
@@ -216,6 +218,8 @@ for N_hist in N_hist_list:
         plt.savefig('J_convergence.png',dpi=1200)
         plt.clf()
 
+        N   = N_hist_list[:len(err_J_face)]
+        fac = err_J_face[-1]/(1/np.sqrt(N[-1]))
         plt.plot(N,err_J_face,'bo',fillstyle='none')
         plt.plot(N,fac/np.sqrt(N),'r-',label=r'$N^{-1/2}$')
         plt.xscale('log')
