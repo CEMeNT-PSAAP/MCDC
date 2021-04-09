@@ -20,7 +20,7 @@ E_mid = 0.5*(E[:-1] + E[1:])
 dE    = E[1:] - E[:-1]
 
 # Augment with uniform leakage XS
-SigmaL  = 0.24 # /cm
+SigmaL  = 0.14 # /cm
 SigmaT += SigmaL
 
 # Analytical solution
@@ -42,7 +42,7 @@ phi_exact = phi_exact/dE*E_mid
 # =============================================================================
 
 # Cases to process and error container
-N_hist_list = np.logspace(2,4,5).astype(int)
+N_hist_list = np.logspace(2,6,9).astype(int)
 err_phi = []
 err_k = []
 

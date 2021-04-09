@@ -1,6 +1,8 @@
 import numpy as np
+
 from abc import ABC, abstractmethod
-from mpi4py import MPI
+
+import mcdc.mpi
 
 from mcdc.misc import binary_search
 
@@ -435,14 +437,13 @@ class Tally:
     def closeout_source(self, N_hist, i_iter):
         for S in self.scores:
             # MPI Reduce
-            comm = MPI.COMM_WORLD
-            comm.Reduce(S.sum, S.sum_recv, MPI.SUM, 0)
-            comm.Reduce(S.sq_sum, S.sq_sum_recv, MPI.SUM, 0)
-            S.sum[:]    = S.sum_recv[:]
-            S.sq_sum[:] = S.sq_sum_recv[:]
+            mcdc.mpi.reduce_master(S.sum, S.sum_buff)
+            mcdc.mpi.reduce_master(S.sq_sum, S.sq_sum_buff)
+            S.sum[:]    = S.sum_buff[:]
+            S.sq_sum[:] = S.sq_sum_buff[:]
             
             # Statistics
-            if MPI.COMM_WORLD.Get_rank() == 0:
+            if mcdc.mpi.master:
                 S.mean[i_iter,:] = S.sum/N_hist
                 S.sdev[i_iter,:] = np.sqrt((S.sq_sum/N_hist - np.square(S.mean[i_iter]))/(N_hist-1))
             
@@ -465,10 +466,10 @@ class Score(ABC):
         self.sum    = np.zeros_like(self.bin)
         self.sq_sum = np.zeros_like(self.bin)
         # MPI buffers
-        self.sum_recv    = np.zeros_like(self.bin)
-        self.sq_sum_recv = np.zeros_like(self.bin)
+        self.sum_buff    = np.zeros_like(self.bin)
+        self.sq_sum_buff = np.zeros_like(self.bin)
         # Results
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        if mcdc.mpi.master:
             self.mean = np.zeros(shape)
             self.sdev = np.zeros_like(self.mean)
             

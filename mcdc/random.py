@@ -13,19 +13,21 @@ rng = None # Setup in simulator.py
 class Random(ABC):
     def __init__(self, seed):
         self.seed_master = seed
+        self.seed_base   = seed # For skip ahead
 
     @abstractmethod
-    def skip_ahead(self, skip, change_base=False):
+    def skip_ahead(self, skip, change_base=False, stride=None):
         """
         Skip ahead in the random number sequence
 
         args:
-        skip -- The number of strides to be skipped from the seed_base
+        skip -- The number of strides to be skipped from seed_base
 
         kwargs:
         change_base -- If True, seed_base is updated to the new seed.
-                       This rebasing avoids always skipping from the seed_master 
+                       This rebasing avoids always skipping from seed_master
                        anytime skip_ahead is called. (default: False)
+        stride      -- In not given, self.stride is used. (default: None)
         """
         pass
 
@@ -50,14 +52,14 @@ class RandomLCG(Random):
         self.stride   = stride
         self.norm     = 1/mod
 
-        # Initial seed_base
-        self.seed_base = self.seed_master
-
         # Skip ahead
         self.skip_ahead(skip)
 
-    def skip_ahead(self, skip, change_base=False):
-        n     = skip*self.stride
+    def skip_ahead(self, skip, change_base=False, stride=None):
+        if not stride:
+            stride = self.stride
+    
+        n     = skip*stride
         g     = self.g
         c     = self.c
         g_new = 1
