@@ -23,7 +23,7 @@ E_mid = 0.5*(E[:-1] + E[1:])
 dE    = E[1:] - E[:-1]
 
 # Augment with uniform leakage XS
-SigmaL  = 0.14 # /cm
+SigmaL  = 0.24 # /cm
 SigmaT += SigmaL
 
 # Set material
@@ -76,10 +76,12 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies)
-simulator.set_kmode(N_iter=110, k_init=1.0)
+
+# Set VRT
+simulator.set_vrt(continuous_capture=True,wgt_roulette=0.25)
 
 # Cases to run
-N_hist_list = np.logspace(2,6,9).astype(int)
+N_hist_list = np.logspace(0,7,15).astype(int)
 
 for N_hist in N_hist_list:
     # Set number of histories

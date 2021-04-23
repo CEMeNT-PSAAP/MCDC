@@ -75,8 +75,8 @@ tallies = [T]
 # =============================================================================
 
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies, 
-                           k_mode=True, N_iter=110)
+simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies)
+simulator.set_kmode(N_iter=110, k_init=1.0)
 
 # Cases to run
 N_hist_list = np.logspace(2,6,9).astype(int)
