@@ -3,8 +3,10 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 import mcdc.mpi
+import mcdc.vrt
 
-from mcdc.misc import binary_search
+from mcdc.misc     import binary_search
+from mcdc.constant import EPSILON
 
 
 # =============================================================================
@@ -89,7 +91,8 @@ class FilterTime(Filter):
         k     = binary_search(P.time, self.grid)
         k_old = max(0,binary_search(P.time_old, self.grid))
         speed = P.speed
-        wgt0  = P.wgt_old # weight is not changing (no implicit capture)
+        wgt_init  = P.wgt_old
+        wgt_final = P.wgt
                 
         # Determine bins crossed
         bins  = np.arange(k_old, k+1)
@@ -101,28 +104,48 @@ class FilterTime(Filter):
             if bins[0] == -1 or bins == self.N_bin:
                 return [], [], [], [], []
             else:
-                return bins, [P.distance], [], [], []
+                wgt = wgt_init
+                # Continuous capture?
+                if mcdc.vrt.capture:
+                    SigmaC  = P.cell_old.material.SigmaC[P.g_old]
+                    wgt     = (wgt_init-wgt_final)/(P.distance*SigmaC)
+                return bins, [wgt*P.distance], [], [], []
 
         # Edges hit
         edges = bins[1:] - 1
-            
-        # Scores at each grid
-        wgt = np.ones(len(edges))*wgt0
-        TLR = wgt*speed
-        
-        # Track-length scored in each bin
-        TL = np.zeros(len(bins))
+
+        # Distance traveled in each bin
+        distance = np.zeros(len(bins))
         
         # Partial first bin
-        TL[0] = (self.grid[bins[0]+1] - t_min)*speed*wgt0
+        distance[0] = (self.grid[bins[0]+1]-t_min)*speed
             
         # Partial last bin
-        TL[-1] = (t_max - self.grid[bins[-1]])*speed*wgt0
+        distance[-1] = (t_max-self.grid[bins[-1]])*speed
 
         # Full middle bins
         for i in range(1, len(bins)-1):
-            TL[i] = (self.grid[bins[i]+1] - self.grid[bins[i]])*speed*wgt0
-       
+            distance[i] = (self.grid[bins[i]+1] - self.grid[bins[i]])*speed       
+
+        # Weight at each grid and weight average at each bin
+        wgt     = np.ones(len(edges))*wgt_init
+        wgt_avg = np.ones(len(bins))*wgt_init
+
+        # Continuous capture?
+        if mcdc.vrt.capture:
+            SigmaC = P.cell_old.material.SigmaC[P.g_old]
+            for i in range(len(wgt)):
+                wgt[i] = wgt[i-1]*np.exp(-SigmaC*distance[i])
+            wgt_avg[0]    = (wgt_init-wgt[0])/(distance[0]*SigmaC)
+            wgt_avg[-1]   = (wgt[-1]-wgt_final)/(distance[-1]*SigmaC)
+            wgt_avg[1:-1] = (wgt[:-1]-wgt[1:])/(distance[1:-1]*SigmaC)
+
+        # Track-length-rate scored at each grid
+        TLR = wgt*speed
+        
+        # Track-length scored in each bin
+        TL = distance*wgt_avg        
+
         # Cut outsiders
         if bins[0] == -1:
             bins = bins[1:]
@@ -178,8 +201,13 @@ class FilterCell(FilterSpatial):
         self.N_face = 0
             
     def __call__(self, P):
+        wgt  = p.wgt_old
         bins = [binary_search(P.cell_old.id, self.grid) + 1]
-        TL   = [P.wgt_old]
+        # Continuous capture?
+        if mcdc.vrt.capture:
+            SigmaC  = P.cell_old.material.SigmaC[P.g_old]
+            wgt     = (P.wgt_old-P.wgt)/(P.distance*SigmaC)
+        TL   = [wgt*P.distance]
         return bins, TL, [], [], []
 
 class FilterPlaneX(FilterSpatial):
@@ -197,7 +225,8 @@ class FilterPlaneX(FilterSpatial):
         j     = binary_search(P.pos.x, self.grid)
         j_old = binary_search(P.pos_old.x, self.grid)
         dir   = P.dir_old.x
-        wgt0  = P.wgt_old # weight is not changing (no implicit capture)
+        wgt_init  = P.wgt_old
+        wgt_final = P.wgt
         
         # Go to positive direction?
         go_plus = dir > 0.0        
@@ -214,7 +243,12 @@ class FilterPlaneX(FilterSpatial):
             
         # Only one bin crossed?
         if len(bins) == 1:
-            return bins, [P.distance], [], [], []
+            wgt = wgt_init
+            # Continuous capture?
+            if mcdc.vrt.capture:
+                SigmaC  = P.cell_old.material.SigmaC[P.g_old]
+                wgt     = (wgt_init-wgt_final)/(P.distance*SigmaC)
+            return bins, [wgt*P.distance], [], [], []
 
         # Faces hit (and sense)
         faces = np.zeros([len(bins)-1,2],dtype=int)
@@ -222,22 +256,46 @@ class FilterPlaneX(FilterSpatial):
         if go_plus:
             faces[:,1] = 1
             
-        # Scores at each face
-        wgt = np.ones(len(faces))*wgt0
-        TLR = wgt/abs(dir)
-                
-        # Track-length scored in each bin
-        TL = np.zeros(len(bins))
+        # Distance traveled in each bin
+        distance = np.zeros(len(bins))
         
         # Partial first bin
-        TL[0]  = abs((self.grid[bins[0]+1] - x_min)/dir)*wgt0
+        distance[0]  = abs((self.grid[bins[0]+1] - x_min)/dir)
             
         # Partial last bin
-        TL[-1] = abs((x_max - self.grid[bins[-1]])/dir)*wgt0
+        distance[-1] = abs((x_max - self.grid[bins[-1]])/dir)
 
         # Full middle bins
         for i in range(1, len(bins)-1):
-            TL[i]  = abs((self.grid[bins[i]+1] - self.grid[bins[i]])/dir)*wgt0
+            distance[i]  = abs((self.grid[bins[i]+1] - self.grid[bins[i]])/dir)
+
+        # Weight at each grid and weight average at each bin
+        wgt     = np.ones(len(faces))*wgt_init
+        wgt_avg = np.ones(len(bins))*wgt_init
+        
+        # Continuous capture?
+        if mcdc.vrt.capture:
+            SigmaC = P.cell_old.material.SigmaC[P.g_old]
+            if go_plus:
+                for i in range(len(wgt)):
+                    wgt[i] = wgt[i-1]*np.exp(-SigmaC*distance[i])
+                wgt_leftmost  = wgt_init
+                wgt_rightmost = wgt_final
+            else:
+                shift = 1-len(wgt)
+                for i in range(len(wgt)-1,-1,-1):
+                    wgt[i] = wgt[i+shift]*np.exp(-SigmaC*distance[i+1])
+                wgt_leftmost  = wgt_final
+                wgt_rightmost = wgt_init
+            wgt_avg[0]    = abs(wgt_leftmost-wgt[0])/(distance[0]*SigmaC)
+            wgt_avg[-1]   = abs(wgt[-1]-wgt_rightmost)/(distance[-1]*SigmaC)
+            wgt_avg[1:-1] = abs(wgt[:-1]-wgt[1:])/(distance[1:-1]*SigmaC)
+
+        # Track-length-rate scored at each face
+        TLR = wgt/abs(dir)
+                
+        # Track-length scored in each bin
+        TL = distance*wgt_avg        
 
         # Cut outsider
         if bins[0] == -1:
@@ -298,6 +356,8 @@ class Tally:
             self.filter_spatial = FilterPlaneX(np.array([-np.inf, np.inf]))    
 
     def setup_bins(self, N_iter):
+        self.scores = []
+
         # Shapes
         N_time         = self.filter_time.N_bin
         N_energy       = self.filter_energy.N_bin
@@ -347,7 +407,6 @@ class Tally:
                 S = ScoreCrossingNet(score, shape)
             elif score_name == 'partial_crossing':
                 S = ScoreCrossingPartial(score, shape)
-            self.scores.append(S)
 
             # Set modifiers
             if score_mode == 'face':
@@ -357,6 +416,8 @@ class Tally:
             elif score_name in ['total_crossing', 'net_crossing', 
                                 'partial_crossing']:
                 S.face_cross = True
+            
+            self.scores.append(S)
                     
                     
     def score(self, P):
@@ -365,6 +426,12 @@ class Tally:
             = self.filter_spatial(P)
         time_bins, time_TL, time_edges, time_wgt, time_TLR \
             = self.filter_time(P)
+
+        '''
+        print("particle",P.pos_old.x,P.pos.x,P.wgt_old,P.wgt)
+        print("time filter",time_bins,time_TL,time_edges,time_wgt,time_TLR)
+        print("spatial filter",spatial_bins, spatial_TL, spatial_faces, spatial_wgt, spatial_TLR,sum(spatial_TL))
+        '''
 
         track_length_bins   = []
         track_length_scores = []
@@ -384,25 +451,42 @@ class Tally:
             filter_score = False
             
         while filter_score:
+            # TL score
             track_length_bins.append([time_bins[k],spatial_bins[j]])
-                        
-            if sum_time < sum_spatial:
+
+            # Hit time edge or spatial face or both?
+            hit_time    = False
+            hit_spatial = False
+            diff = sum_time - sum_spatial
+            if abs(diff) < EPSILON:
+                hit_time    = True
+                hit_spatial = True
+            elif diff < 0.0:
+                hit_time = True
+            else:
+                hit_spatial = True
+            
+            # Assign scores
+            if hit_time:
                 score = sum_time-low
-                track_length_scores.append([score])
                 if k < len(time_edges):
                     time_edge_bins.append([time_edges[k],spatial_bins[j]])
                     time_edge_scores.append([time_TLR[k]])
+            if hit_spatial:
+                score = sum_spatial-low
+                if j < len(spatial_faces):
+                    face_cross_bins.append([time_bins[k],spatial_faces[j][0],spatial_faces[j][1]])
+                    face_cross_scores.append([spatial_TLR[j], spatial_wgt[j]])
+            track_length_scores.append([score])
+
+            # Increment
+            if hit_time:
                 k += 1
                 if k < len(time_bins):
                     sum_time += time_TL[k]
                 else:
                     break
-            else:
-                score = sum_spatial-low
-                track_length_scores.append([score])
-                if j < len(spatial_faces):
-                    face_cross_bins.append([time_bins[k],spatial_faces[j][0],spatial_faces[j][1]])
-                    face_cross_scores.append([spatial_TLR[j], spatial_wgt[j]])
+            if hit_spatial:
                 j += 1
                 if j < len(spatial_bins):
                     sum_spatial += spatial_TL[j]
@@ -413,6 +497,16 @@ class Tally:
         # Get energy group and angular bin indices
         g = P.g_old
         n = self.filter_angular(P)
+
+        '''
+        print("TL_bins",track_length_bins)
+        print("TL_scores",track_length_scores)
+        print("face_bins",face_cross_bins)
+        print("face_scores",face_cross_scores)
+        print("time_bins",time_edge_bins)
+        print("time_scores",time_edge_scores)
+        input()
+        '''
 
         for S in self.scores:
             bin_idx   = track_length_bins

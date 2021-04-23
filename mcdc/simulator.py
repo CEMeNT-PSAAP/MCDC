@@ -6,41 +6,58 @@ from math import floor
 
 import mcdc.random
 import mcdc.mpi
+import mcdc.vrt
 
 from mcdc.point        import Point
 from mcdc.particle     import Particle
 from mcdc.distribution import DistPointIsotropic
 from mcdc.constant     import SMALL_KICK, LCG_SEED, LCG_STRIDE
 from mcdc.random       import RandomLCG
-from mcdc.popctrl      import PopCtrlSimple, PopCtrlSR, PopCtrlComb
+from mcdc.popctrl      import PopCtrlSS, PopCtrlSR
 
 
 class Simulator:
-    def __init__(self, speeds, cells, source, N_hist = 1, tallies = [],
+    def __init__(self, speeds, cells, source, tallies = [],
                  k_mode = False, k_init = 1.0, N_iter = 1,
-                 output = 'output', population_control='simple',
+                 population_control='simple',
                  seed = LCG_SEED, stride = LCG_STRIDE):
 
         # Basic settings
-        self.speeds  = speeds  # array of particle MG speeds
-        self.cells   = cells   # list of Cells (see geometry.py)
-        self.source  = source  # Source (see particle.py)
-        self.N_hist  = N_hist  # number of histories
-        self.tallies = tallies # list of Tallies (see tally.py)
-        self.output  = output  # .h5 output file name
+        self.speeds  = speeds   # array of particle MG speeds
+        self.cells   = cells    # list of Cells (see geometry.py)
+        self.source  = source   # Source (see particle.py)
+        self.N_hist  = 1        # number of histories
+        self.tallies = tallies  # list of Tallies (see tally.py)
+        self.output  = "output" # .h5 output file name
         
-        # Eigenvalue settings
-        #   TODO: alpha eigenvalue
-        #   TODO: shannon entropy
-        self.mode_k          = k_mode # k-eigenvalue flag
-        self.mode_eigenvalue = k_mode # eigenvalue flag
-        self.N_iter          = N_iter # number of iterations
-        self.i_iter          = 0      # current iteration index
-        self.k_eff           = k_init # k effective that affects simulation
+        # RNG settings
+        self.seed   = seed
+        self.stride = stride
         
         # Fixed-source mode
-        self.mode_fixed_source = not self.mode_eigenvalue # fixed-source flag
+        self.mode_fixed_source = True # fixed-source flag
 
+        # Eigenvalue settings (see self.k_mode)
+        #   TODO: alpha eigenvalue
+        #   TODO: shannon entropy
+        self.mode_k          = False # k-eigenvalue flag
+        self.mode_eigenvalue = False # eigenvalue flag
+        self.N_iter          = 1     # number of iterations
+        self.i_iter          = 0     # current iteration index
+        self.k_eff           = 1.0   # k effective that affects simulation
+        
+        # Population control settings (see self.set_popctrl)
+        #   TODO: census
+        self.popctrl = PopCtrlSS()
+
+        # Variance Reduction Technique settings
+        #   TODO: implicit fission production
+        self.mode_analog     = True
+        self.vrt_capture     = False
+        self.vrt_fission     = False
+        self.vrt_wgt_roulette  = 0.0
+        self.vrt_wgt_survive = 1.0
+        
         # Particle banks
         #   TODO: use fixed memory allocations with helper indices
         self.bank_stored  = [] # for the next source loop
@@ -48,52 +65,60 @@ class Simulator:
         self.bank_history = [] # for current history loop
         self.bank_fission = None # will point to one of the banks
         
-        # RNG settings
-        self.seed   = seed
-        self.stride = stride
-        
-        # Variance Reduction Technique settings
-        #   TODO: implicit capture, implicit fission production
-        self.mode_analog = True
-        
-        # Population control
-        #   TODO: Inner and outer census
-        if population_control == 'simple':
-            self.popctrl = PopCtrlSimple()
-        elif population_control == 'split-roulette':
-            self.popctrl = PopCtrlSR()
-        elif population_control == 'comb':
-            self.popctrl = PopCtrlComb()
-        # Check if the chosen population control is appropriate
-        if population_control == 'simple' and not self.mode_analog:
-            print("ERROR: Population control Simple is only applicable for analog simulation ")
-            sys.exit()
-
         # Misc.
         self.isotropic_dir = DistPointIsotropic() # (see distribution.py)
             
-        # Eigenvalue-specific tallies
-        if self.mode_eigenvalue:
-            # Accumulators
-            self.nuSigmaF_sum = 0.0
-            # MPI buffer
-            self.nuSigmaF_buff = np.array([0.0])
-            # Iteration solution for k
-            if mcdc.mpi.master:
-                self.k_mean = np.zeros(self.N_iter)
-            
-        # Set tally bins
-        for T in tallies:
-            T.setup_bins(N_iter) # Allocate tally bins (see tally.py)
-   
+
+    def set_kmode(self, N_iter=1, k_init=1.0):
+        self.mode_k          = True
+        self.mode_eigenvalue = True
+        self.N_iter          = N_iter
+        self.k_eff           = k_init
+
+        self.mode_fixed_source = False
+
+        # Mode-specific tallies
+        # Accumulators
+        self.nuSigmaF_sum = 0.0
+        # MPI buffer
+        self.nuSigmaF_buff = np.array([0.0])
+        # Iteration solution for k
+        if mcdc.mpi.master:
+            self.k_mean = np.zeros(self.N_iter)
+
+    def set_popctrl(self, popctrl='simple-sampling'):
+        if popctrl in ['simple-sampling', 'SS']:
+            return
+        elif population_control in ['splitting-roulette', 'SR']:
+            self.popctrl = PopCtrlSR()
+
+    def set_vrt(self, continuous_capture=False, implicit_fission=False,
+                wgt_roulette=0.0, wgt_survive=1.0):
+        if continuous_capture:
+            self.vrt_capture = True
+        if implicit_fission:
+            self.vrt_fission = True
+        self.vrt_wgt_roulette  = wgt_roulette
+        self.vrt_wgt_survive = wgt_survive
+
 
     # =========================================================================
     # Run ("main") --> SIMULATION LOOP
     # =========================================================================
     
     def run(self):
+        # Set tally bins
+        for T in self.tallies:
+            T.setup_bins(self.N_iter) # Allocate tally bins (see tally.py)
+   
         # Setup RNG
         mcdc.random.rng = RandomLCG(seed=self.seed, stride=self.stride)
+
+        # Setup VRT
+        mcdc.vrt.capture     = self.vrt_capture
+        mcdc.vrt.fission     = self.vrt_fission
+        mcdc.vrt.wgt_roulette  = self.vrt_wgt_roulette
+        mcdc.vrt.wgt_survive = self.vrt_wgt_survive
 
         # Distribute work to processors
         mcdc.mpi.distribute_work(self.N_hist)
@@ -285,27 +310,51 @@ class Simulator:
             d_move = min(d_coll, d_surf)
             self.move_particle(P, d_move)
 
-            # Surface hit or collision?
-            if d_coll > d_surf:
+            # Continuous capture?
+            if mcdc.vrt.capture:
+                SigmaC  = P.cell.material.SigmaC[P.g]
+                P.wgt  *= np.exp(-d_move*SigmaC)
+
+            # Collision or surface hit?
+            if d_coll < d_surf:
+                self.collision(P)
+            else:
                 # Record surface hit
                 P.surface = S                              
                 self.surface_hit(P)
-            else:
-                self.collision(P)
-                            
+
             # Score tallies
             for T in self.tallies:
                 T.score(P)
                 
             # Score eigenvalue tallies
             if self.mode_eigenvalue:
+                wgt = P.wgt_old
+                # Continuous capture?
+                if mcdc.vrt.capture:
+                    SigmaC  = P.cell_old.material.SigmaC[P.g_old]
+                    wgt     = (P.wgt_old-P.wgt)/(P.distance*SigmaC)
+
                 nu       = P.cell_old.material.nu[P.g_old]
                 SigmaF   = P.cell_old.material.SigmaF_tot[P.g_old]
                 nuSigmaF = nu*SigmaF
-                self.nuSigmaF_sum += P.wgt_old*P.distance*nuSigmaF
+                self.nuSigmaF_sum += wgt*P.distance*nuSigmaF
             
             # Reset particle record
-            P.reset_record()           
+            P.reset_record()
+
+            # Cutoff?
+            if P.alive and P.wgt <= mcdc.vrt.wgt_roulette:
+                # Russian-roulette
+                p_survive = P.wgt/mcdc.vrt.wgt_survive
+                xi = mcdc.random.rng()
+                if xi < p_survive:
+                    # Survive
+                    P.wgt = mcdc.vrt.wgt_survive
+                else:
+                    # Terminate
+                    P.alive = False
+            
                 
     # =========================================================================
     # Particle transports
@@ -314,6 +363,12 @@ class Simulator:
     def get_collision_distance(self, P):
         xi     = mcdc.random.rng()
         SigmaT = P.cell.material.SigmaT[P.g]
+
+        # Continuous capture?
+        if mcdc.vrt.capture:
+            SigmaC  = P.cell.material.SigmaC[P.g]
+            SigmaT -= SigmaC
+
         d_coll = -np.log(xi)/SigmaT
         return d_coll
 
@@ -350,9 +405,28 @@ class Simulator:
     def collision(self, P):
         P.collision = True
         SigmaT = P.cell.material.SigmaT[P.g]
+        SigmaC = P.cell.material.SigmaC[P.g]
         SigmaS = P.cell.material.SigmaS_tot[P.g]
         SigmaF = P.cell.material.SigmaF_tot[P.g]
         
+        # Continuous capture?
+        if mcdc.vrt.capture:
+            SigmaT -= SigmaC
+
+        # Implicit fission?
+        if mcdc.vrt.fission:
+            # Forced fission
+            self.collision_fission(P)
+            
+            # Revive the current particle and set the post-collision weight
+            P.alive    = True
+            P.wgt_post = P.wgt*(SigmaT-SigmaF)/SigmaT
+            
+            # Modify SigmaT and SigmaF 
+            # to make the following reaction type sampling consistent
+            SigmaT -= SigmaF
+            SigmaF  = 0.0
+
         # Scattering or absorption?
         xi = mcdc.random.rng()*SigmaT
         if SigmaS > xi:
@@ -423,17 +497,34 @@ class Simulator:
         P.dir.copy(dir_final)        
         
     def collision_fission(self, P):
+        # Kill the current particle
+        P.alive = False
+        
         SigmaF     = P.cell.material.SigmaF[P.g]
         SigmaF_tot = P.cell.material.SigmaF_tot[P.g]
         nu         = P.cell.material.nu[P.g]
         G          = len(SigmaF)
+
+        # Implicit fission?
+        iFission = 1.0 # Multiplying factor
+        if mcdc.vrt.fission:
+            SigmaT = P.cell.material.SigmaT[P.g]
+            SigmaC = P.cell.material.SigmaC[P.g]
+            if mcdc.vrt.capture:
+                SigmaT -= SigmaC
+            iFission = SigmaF_tot/SigmaT
         
-        # Kill the current particle
-        P.alive = False
-        
+        # Set fission neutron weight and effective nu
+        if mcdc.vrt.wgt_roulette == 0.0:
+            wgt    = P.wgt*iFission
+            nu_eff = nu
+        else:
+            wgt    = mcdc.vrt.wgt_survive
+            nu_eff = P.wgt/wgt*nu*iFission
+
         # Sample number of fission neutrons
         #   in fixed-source, k_eff = 1.0
-        N = floor(nu/self.k_eff + mcdc.random.rng())
+        N = floor(nu_eff/self.k_eff + mcdc.random.rng())
         P.fission_neutrons = N
 
         # Push fission neutrons to bank
@@ -450,4 +541,4 @@ class Simulator:
             dir = self.isotropic_dir.sample()
             
             # Bank
-            self.bank_fission.append(Particle(P.pos, dir, g_out, P.time, P.wgt, P.cell))
+            self.bank_fission.append(Particle(P.pos, dir, g_out, P.time, wgt, P.cell))

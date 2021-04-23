@@ -48,7 +48,7 @@ def global_idx(N, return_total=False):
         return start, end
     else:
         N_total = bcast(np.array([end], dtype=int), last)
-        return start, end, N_total
+        return start, end, N_total[0]
 
 def global_wgt(w, total_only=True):
     buff = np.array([0], dtype=float)
