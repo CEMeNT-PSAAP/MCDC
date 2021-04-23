@@ -26,6 +26,8 @@ class Particle:
         self.wgt_old  = wgt
         self.cell_old = cell
         
+        self.wgt_post = None # Post-collision
+
         # Particle loop records
         self.distance         = 0.0   # distance traveled during a loop
         self.surface          = None  # surface object hit
@@ -45,6 +47,11 @@ class Particle:
         self.surface          = None
         self.collision        = False
         self.fission_neutrons = 0
+
+        # Post collision weight modification?
+        if self.wgt_post:
+            self.wgt      = self.wgt_post
+            self.wgt_post = None
         
 # =============================================================================
 # Source

@@ -5,6 +5,7 @@ import numpy as np
 SMALL_KICK = 1E-10  # small kick to ensure surface crossing
 INF        = np.inf
 PI         = np.pi
+EPSILON    = 1E-14  # to avoid precision error
 
 # RNG default parameters
 LCG_G      = 2806196910506780709

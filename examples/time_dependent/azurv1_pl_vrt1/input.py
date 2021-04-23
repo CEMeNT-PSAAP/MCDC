@@ -11,22 +11,12 @@ import mcdc
 # Set material XS
 # =============================================================================
 
-with np.load('XS.npz') as data:
-    speeds = data['v']        # cm/s
-    SigmaT = data['SigmaT']   # /cm
-    SigmaS = data['SigmaS']
-    SigmaF = data['SigmaF']
-    nu     = data['nu']
-    E      = data['E']        # eV
-G     = len(speeds)
-E_mid = 0.5*(E[:-1] + E[1:])
-dE    = E[1:] - E[:-1]
+speeds = [1.0]
 
-# Augment with uniform leakage XS
-SigmaL  = 0.14 # /cm
-SigmaT += SigmaL
-
-# Set material
+SigmaT = np.array([1.0])
+nu     = np.array([0.0])
+SigmaF = np.array([[0.0]])
+SigmaS = np.array([[[0.9]]])
 M1 = mcdc.Material(SigmaT,SigmaS,nu,SigmaF)
 
 # =============================================================================
@@ -34,8 +24,8 @@ M1 = mcdc.Material(SigmaT,SigmaS,nu,SigmaF)
 # =============================================================================
 
 # Set surfaces
-S0 = mcdc.SurfacePlaneX(-1E10,"reflective")
-S1 = mcdc.SurfacePlaneX(1E10,"reflective")
+S0 = mcdc.SurfacePlaneX(-15.,"vacuum")
+S1 = mcdc.SurfacePlaneX(15.,"vacuum")
 
 # Set cells
 C1 = mcdc.Cell([[S0,+1],[S1,-1]],M1)
@@ -47,15 +37,15 @@ cells = [C1]
 
 # Position distribution
 pos = mcdc.DistPoint(mcdc.DistDelta(0.0), mcdc.DistDelta(0.0), 
-                     mcdc.DistDelta(0.0))
+                             mcdc.DistDelta(0.0))
 # Direction distribution
 dir = mcdc.DistPointIsotropic()
 
 # Energy group distribution
-g = mcdc.DistDelta(G-1)
+g = mcdc.DistDelta(0)
 
 # Time distribution
-time = mcdc.DistDelta(0.0)
+time= mcdc.DistDelta(0.0)
 
 # Create the source
 Source = mcdc.SourceSimple(pos,dir,g,time,cell=C1)
@@ -64,9 +54,14 @@ Source = mcdc.SourceSimple(pos,dir,g,time,cell=C1)
 # Set filters and tallies
 # =============================================================================
 
-energy_filter = mcdc.FilterEnergyGroup(np.arange(G))
+# Load grids
+grid = np.load('azurv1_pl.npz')
+time_filter = mcdc.FilterTime(grid['t'])
+spatial_filter = mcdc.FilterPlaneX(grid['x'])
 
-T = mcdc.Tally('tally', scores=['flux'], energy_filter=energy_filter)
+T = mcdc.Tally('tally', scores=['flux-edge','flux-face','flux'],
+               spatial_filter=spatial_filter,
+               time_filter=time_filter)
 
 tallies = [T]
 
@@ -75,12 +70,13 @@ tallies = [T]
 # =============================================================================
 
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies, 
-                           k_mode=True, N_iter=110,
-                           population_control='split-roulette')
+simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies)
+
+# Set VRT
+simulator.set_vrt(continuous_capture=True,wgt_cutoff=0.25)
 
 # Cases to run
-N_hist_list = np.logspace(2,6,9).astype(int)
+N_hist_list = np.logspace(0,7,15).astype(int)
 
 for N_hist in N_hist_list:
     # Set number of histories

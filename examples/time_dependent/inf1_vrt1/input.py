@@ -23,7 +23,7 @@ E_mid = 0.5*(E[:-1] + E[1:])
 dE    = E[1:] - E[:-1]
 
 # Augment with uniform leakage XS
-SigmaL  = 0.14 # /cm
+SigmaL  = 0.24 # /cm
 SigmaT += SigmaL
 
 # Set material
@@ -55,7 +55,7 @@ dir = mcdc.DistPointIsotropic()
 g = mcdc.DistDelta(G-1)
 
 # Time distribution
-time = mcdc.DistDelta(0.0)
+time= mcdc.DistUniform(0.0,1E-4)
 
 # Create the source
 Source = mcdc.SourceSimple(pos,dir,g,time,cell=C1)
@@ -64,9 +64,12 @@ Source = mcdc.SourceSimple(pos,dir,g,time,cell=C1)
 # Set filters and tallies
 # =============================================================================
 
+time_filter = mcdc.FilterTime(np.append(np.array(0.0),np.logspace(-7,-4,161)))
 energy_filter = mcdc.FilterEnergyGroup(np.arange(G))
 
-T = mcdc.Tally('tally', scores=['flux'], energy_filter=energy_filter)
+T = mcdc.Tally('tally', scores=['flux', 'flux-edge'],
+               energy_filter=energy_filter,
+               time_filter=time_filter)
 
 tallies = [T]
 
@@ -76,10 +79,12 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies)
-simulator.set_kmode(N_iter=110, k_init=1.0)
+
+# Set VRT
+simulator.set_vrt(continuous_capture=True,wgt_cutoff=0.25)
 
 # Cases to run
-N_hist_list = np.logspace(2,6,9).astype(int)
+N_hist_list = np.logspace(0,7,15).astype(int)
 
 for N_hist in N_hist_list:
     # Set number of histories
