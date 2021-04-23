@@ -26,7 +26,7 @@ class PopCtrl(ABC):
         """
         pass
 
-class PopCtrlSimple(PopCtrl):
+class PopCtrlSS(PopCtrl):
     def __call__(self, bank, N, normalize=False):
         """
         Uniformly sample (in serial) N surviving particles from global bank. 
@@ -119,7 +119,7 @@ class PopCtrlSR(PopCtrl):
         i_start, i_end, N_global = mcdc.mpi.global_idx(N_local, return_total=True)
 
         # Redistribute work
-        mcdc.mpi.distribute_work(N_global[0])
+        mcdc.mpi.distribute_work(N_global)
 
         # Accordingly pass/distribute sampled particles
         bank_final = bank_passing(bank_sample, i_start, i_end)
