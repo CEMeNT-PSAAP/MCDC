@@ -6,7 +6,7 @@ from mcdc.point import Point
 # =============================================================================
 
 class Particle:
-    def __init__(self, pos, dir, g, time, wgt, cell):
+    def __init__(self, pos, dir, g, time, wgt, cell, census_idx):
         # Particle state
         self.pos   = pos  # cm
         self.dir   = dir
@@ -28,11 +28,12 @@ class Particle:
         
         self.wgt_post = None # Post-collision
 
+        # Census
+        self.census_idx = census_idx
+
         # Particle loop records
         self.distance         = 0.0   # distance traveled during a loop
         self.surface          = None  # surface object hit
-        self.collision        = False
-        self.fission_neutrons = 0     # Number of fission neutrons generated
 
     def save_previous_state(self):
         self.pos_old.copy(self.pos)
@@ -45,26 +46,29 @@ class Particle:
     def reset_record(self):
         self.distance         = 0.0
         self.surface          = None
-        self.collision        = False
-        self.fission_neutrons = 0
 
         # Post collision weight modification?
         if self.wgt_post:
             self.wgt      = self.wgt_post
             self.wgt_post = None
+
+    def create_copy(self):
+        return Particle(self.pos, self.dir, self.g, self.time, self.wgt, 
+                        self.cell, self.census_idx)
         
 # =============================================================================
 # Source
 # =============================================================================
 
 class SourceSimple:
-    def __init__(self, pos, dir, g, time, wgt=1.0, cell=None):
+    def __init__(self, pos, dir, g, time, wgt=1.0, cell=None, census_idx=None):
         self.pos  = pos
         self.dir  = dir
         self.g    = g
         self.time = time
         self.wgt  = wgt
         self.cell = cell
+        self.census_idx = census_idx
 
     def get_particle(self):
         pos  = self.pos.sample()
@@ -73,5 +77,6 @@ class SourceSimple:
         time = self.time.sample()
         wgt  = self.wgt
         cell = self.cell
+        census_idx = self.census_idx
         dir.normalize()
-        return Particle(pos, dir, g, time, wgt, cell)
+        return Particle(pos, dir, g, time, wgt, cell, census_idx)

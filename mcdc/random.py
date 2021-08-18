@@ -14,9 +14,13 @@ class Random(ABC):
     def __init__(self, seed):
         self.seed_master = seed
         self.seed_base   = seed # For skip ahead
+        self.seed        = seed
+
+    def rebase(self):
+        self.seed_base = self.seed
 
     @abstractmethod
-    def skip_ahead(self, skip, change_base=False, stride=None):
+    def skip_ahead(self, skip, rebase=False, stride=None):
         """
         Skip ahead in the random number sequence
 
@@ -24,10 +28,10 @@ class Random(ABC):
         skip -- The number of strides to be skipped from seed_base
 
         kwargs:
-        change_base -- If True, seed_base is updated to the new seed.
-                       This rebasing avoids always skipping from seed_master
-                       anytime skip_ahead is called. (default: False)
-        stride      -- In not given, self.stride is used. (default: None)
+        rebase -- If True, seed_base is updated to the new seed.
+                  This rebasing avoids always skipping from seed_master
+                  anytime skip_ahead is called. (default: False)
+        stride -- In not given, self.stride is used. (default: None)
         """
         pass
 
@@ -55,7 +59,7 @@ class RandomLCG(Random):
         # Skip ahead
         self.skip_ahead(skip)
 
-    def skip_ahead(self, skip, change_base=False, stride=None):
+    def skip_ahead(self, skip, rebase=False, stride=None):
         if not stride:
             stride = self.stride
     
@@ -77,8 +81,8 @@ class RandomLCG(Random):
 
         self.seed = (g_new*self.seed_base + c_new ) & self.mod_mask
 
-        if change_base:
-            self.seed_base = self.seed
+        if rebase:
+            self.rebase()
 
     def __call__(self):
         self.seed = (self.g*self.seed + self.c) & self.mod_mask
