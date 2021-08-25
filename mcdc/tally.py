@@ -326,6 +326,10 @@ class Tally:
         self.name        = name
         self.score_names = scores
         self.scores      = []
+        self.filter_flag_time    = False
+        self.filter_flag_angular = False
+        self.filter_flag_energy  = False
+        self.filter_flag_spatial = False
 
         # =====================================================================
         # Set filters
@@ -334,24 +338,28 @@ class Tally:
         # Time filter
         if time_filter:
             self.filter_time = time_filter
+            self.filter_flag_time    = True
         else:
             self.filter_time = FilterTime(np.array([0.0, np.inf]))                
         
         # Angular filter
         if angular_filter:
             self.filter_angular = angular_filter
+            self.filter_flag_angular = True
         else:
             self.filter_angular = FilterPolarCosine(np.array([-1.0, 1.0]))
 
         # Energy filter
         if energy_filter:
             self.filter_energy = energy_filter
+            self.filter_flag_energy  = True
         else:
             self.filter_energy = FilterEnergyGroup(np.array([np.inf]))
             
         # Spatial filter
         if spatial_filter:
             self.filter_spatial = spatial_filter
+            self.filter_flag_spatial = True
         else:
             self.filter_spatial = FilterPlaneX(np.array([-np.inf, np.inf]))    
 
@@ -495,18 +503,8 @@ class Tally:
             low += score
 
         # Get energy group and angular bin indices
-        g = P.g_old
+        g = self.filter_energy(P)
         n = self.filter_angular(P)
-
-        '''
-        print("TL_bins",track_length_bins)
-        print("TL_scores",track_length_scores)
-        print("face_bins",face_cross_bins)
-        print("face_scores",face_cross_scores)
-        print("time_bins",time_edge_bins)
-        print("time_scores",time_edge_scores)
-        input()
-        '''
 
         for S in self.scores:
             bin_idx   = track_length_bins
@@ -528,7 +526,7 @@ class Tally:
             # Reset bin
             S.bin.fill(0.0)
         
-    def closeout_source(self, N_hist, i_iter):
+    def closeout(self, N_hist, i_iter):
         for S in self.scores:
             # MPI Reduce
             mcdc.mpi.reduce_master(S.sum, S.sum_buff)
@@ -536,7 +534,6 @@ class Tally:
             S.sum[:]    = S.sum_buff[:]
             S.sq_sum[:] = S.sq_sum_buff[:]
             
-            # Statistics
             if mcdc.mpi.master:
                 S.mean[i_iter,:] = S.sum/N_hist
                 S.sdev[i_iter,:] = np.sqrt((S.sq_sum/N_hist - np.square(S.mean[i_iter]))/(N_hist-1))

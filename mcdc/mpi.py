@@ -19,66 +19,119 @@ work_size       = None
 work_start      = None
 work_end        = None
 
+# Timer
+Wtime = MPI.Wtime
 
+# Barrier
+Barrier = comm.Barrier
+
+
+# =============================================================================
+# Basic communications
+# =============================================================================
+
+# Point-to-point
 def recv(source):
     return comm.recv(source=source)
-
 def isend(obj, dest):
     return comm.isend(obj, dest)
 
+# Collective
 def bcast(obj, source):
-    return comm.bcast(obj, source)
-
+    result = comm.bcast(obj, source)
+    return result[0]
 def exscan(var, buff):
     comm.Exscan(var, buff, MPI.SUM)
-
 def reduce_master(var, buff):
     comm.Reduce(var, buff, MPI.SUM, 0)
-
 def allreduce(var, buff):
     comm.Allreduce(var, buff, MPI.SUM)
 
-def global_idx(N, return_total=False):
+
+# =============================================================================
+# Indexers
+# =============================================================================
+
+def global_idx(N):
     buff = np.array([0], dtype=int)
     exscan(np.array(N, dtype=int), buff)
     start = buff[0]
     end   = buff[0] + N
+    return start, end
 
-    if not return_total:
-        return start, end
-    else:
-        N_total = bcast(np.array([end], dtype=int), last)
-        return start, end, N_total[0]
-
-def global_wgt(w, total_only=True):
+def global_wgt(W):
     buff = np.array([0], dtype=float)
-    exscan(np.array(w, dtype=float), buff)
+    exscan(np.array(W, dtype=float), buff)
     start = buff[0]
-    end   = buff[0] + w
+    end   = buff[0] + W
+    return start, end
 
-    w_total = bcast(np.array([end], dtype=float), last)
+def work_idx(N):
+    # Evenly distribute elements
+    idx_size = floor(N/size)
 
-    if total_only:
-        return w_total
+    # Starting index (based on even distribution)
+    idx_start = idx_size*rank
+
+    # Count reminder
+    rem = N%size
+
+    # Assign reminder and update starting index
+    if rank < rem:
+        idx_size  += 1
+        idx_start += rank
     else:
-        return start, end, w_total
+        idx_start += rem
 
-def distribute_work(N_work):
+    # Ending work inindex
+    idx_end = idx_start + idx_size
+
+    return idx_start, idx_size, idx_end
+
+def distribute_work(N):
     global work_size_total, work_size, work_start, work_end
 
     # Total # of work
-    work_size_total = N_work
+    work_size_total = N
 
-    # Local # of work
-    work_size = floor(N_work/size)
-    if rank < N_work%size:
-        work_size += 1
+    # Evenly distribute work
+    work_start, work_size, work_end = work_idx(N)
 
-    # Starting and ending work indices
-    work_start, work_end = global_idx(work_size)
-    
 
-def bank_passing(bank, i_start, i_end):
+# =============================================================================
+# Particle bank operations
+# =============================================================================
+
+def total_weight(bank):
+    W_local = np.zeros(1)
+    for P in bank:
+        W_local[0] += P.wgt
+    buff = np.zeros(1)
+    allreduce(W_local, buff)
+    return buff[0]
+
+def normalize_weight(bank, norm):
+    # Get total weight
+    W = total_weight(bank)
+
+    # Normalize weight
+    for P in bank:
+        P.wgt *= norm/W
+
+def bank_passing(bank, redistribute=False):
+    """Romano [2012]'s parallel bank-passing algorithm"""
+    # Starting and ending indices in the global bank_sample
+    N_local = len(bank)
+    i_start, i_end = global_idx(N_local)
+
+    # Redistribute work?
+    if redistribute:
+        # Broadcast total size
+        N = bcast(np.array([i_end], dtype=int), last)
+        
+        # Redistribute work
+        distribute_work(N)
+
     # Need more or less?
     more_left  = i_start < work_start
     less_left  = i_start > work_start
@@ -121,3 +174,32 @@ def bank_passing(bank, i_start, i_end):
     
     return bank
 
+'''
+def statistics(mean, sdev, total, total_sq, N):
+    size  = total.size
+    shape = total.shape
+
+    # Distribute index
+    idx_start, idx_size, idx_end = work_idx(size)
+
+    # Calculate mean and sdev
+    for i in range(idx_start, idx_end):
+        idx = np.unravel_index(i, shape)
+        mean[idx] = total[idx]/N
+        sdev[idx] = np.sqrt((total_sq[idx]/N - np.square(mean[idx]))/(N-1))
+
+def save_hdf5_parallel(file_, name, data):
+    size  = data.size
+    shape = data.shape
+
+    # Create dataset
+    dset = file_.create_dataset(name, shape)
+
+    # Distribute index
+    idx_start, idx_size, idx_end = work_idx(size)
+
+    # Store in HDF5
+    for i in range(idx_start, idx_end):
+        idx = np.unravel_index(i, shape)
+        dset[idx] = data[idx]
+'''

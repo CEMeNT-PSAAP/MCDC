@@ -6,6 +6,28 @@ import numpy as np
 # =============================================================================
 
 class Material:
+    """
+    Class for material filling geometry `Cell` object
+
+    This class is effectively a structure of cross-sections (in multi-
+    group mode).
+
+    Attributes
+    ----------
+    SigmaT : numpy.ndarray (1D)
+        Total cross-section
+    SigmaS_tot : numpy.ndarray (1D)
+        Scattering cross-section
+    SigmaF_tot : numpy.ndarray (1D)
+        Fission cross-section
+    nu : numpy.ndarray (1D)
+        Fission multiplication
+    SigmaS : numpy.ndarray (2D)
+        Differential scattering cross-section
+    SigmaF : numpy.ndarray (2D)
+        Differential fission cross-section
+    """
+
     def __init__(self, SigmaT, SigmaS, nu, SigmaF):
         self.SigmaT = SigmaT
         self.nu     = nu
