@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from mcdc.constant import INF
 
 
@@ -71,7 +73,8 @@ class Surface(ABC):
         """
         Abstract subclass for surface BC implementations
 
-        `BCTransmission` and `BCVacuum` are identical for all surface types.
+        `BCTransmission` and `BCVacuum` are identical for all surface
+        types. `BCReflective` is dependent on the surface type.
         """
 
         def __init__(self, type_):
@@ -94,7 +97,7 @@ class Surface(ABC):
     
     
 # =============================================================================
-# Surface Axis-parallel Plane
+# Axis-aligned Plane Surfaces
 # =============================================================================
 
 class SurfacePlaneX(Surface):
@@ -110,11 +113,11 @@ class SurfacePlaneX(Surface):
         return pos.x - self.x0
 
     def distance(self, pos, dir):
-        x  = pos.x;
-        ux = dir.x;
+        x  = pos.x
+        ux = dir.x
         
         # Calculate distance
-        dist = (self.x0 - x)/ux;
+        dist = (self.x0 - x)/ux
         
         # Check if particle moves away from the surface
         if dist < 0.0: return INF
@@ -133,7 +136,116 @@ class SurfacePlaneX(Surface):
         def __call__(self, P):
             P.dir.x *= -1
 
+class SurfacePlaneZ(Surface):
+    def __init__(self, z0, bc='transmission', id_=None, name=None):
+        Surface.__init__(self, "PlaneZ", bc, id_, name)
+        self.z0 = z0
+        
+        # Set BC if reflective
+        if bc == "reflective":
+            self.bc = self.BCReflective()
+        
+    def evaluate(self, pos):
+        return pos.z - self.z0
 
+    def distance(self, pos, dir):
+        z  = pos.z
+        uz = dir.z
+        
+        # Calculate distance
+        dist = (self.z0 - z)/uz
+        
+        # Check if particle moves away from the surface
+        if dist < 0.0: return INF
+        else:          return dist
+
+    def normal(self, pos, dir):
+        return dir.z
+    
+    # =========================================================================
+    # BC implementations
+    # =========================================================================
+
+    class BCReflective(Surface.BC):
+        def __init__(self):
+            Surface.BC.__init__(self, "reflective")
+        def __call__(self, P):
+            P.dir.z *= -1
+
+# =============================================================================
+# Axis-aligned Infinite Cylinder Surfaces
+# =============================================================================
+
+class SurfaceCylinderZ(Surface):
+    def __init__(self, x0, y0, R, bc='transmission', id_=None, name=None):
+        Surface.__init__(self, "CylinderZ", bc, id_, name)
+        self.x0   = x0
+        self.y0   = y0
+        self.R_sq = R*R
+        
+        # Set BC if reflective
+        if bc == "reflective":
+            self.bc = self.BCReflective()
+        
+    def evaluate(self, pos):
+        x = pos.x - self.x0
+        y = pos.y - self.y0
+        return x*x + y*y - self.R_sq
+
+    def distance(self, pos, dir):
+        x = pos.x - self.x0
+        y = pos.y - self.y0
+
+        # Set quadratic constants
+        a = 1.0 - dir.z*dir.z
+        b = 2*(x*dir.x + y*dir.y)
+        c = x*x + y*y - self.R_sq
+
+        # Calculate determinant
+        D = b*b - 4*a*c
+
+        # Return INF if tangent (D=0) or imaginer roots (D<0)
+        if D <= 0:
+            return INF
+        
+        # Get the roots
+        D_sqrt = np.sqrt(D)
+        root1  = (-b + D_sqrt)/(2*a)
+        root2  = (-b - D_sqrt)/(2*a)
+
+        # Return INF if moving away from surface (root < 0)
+        if root1 < 0: root1 = INF
+        if root2 < 0: root2 = INF
+
+        # Return the smallest root
+        return min(root1, root2)
+
+    def normal(self, pos, dir):
+        # TODO
+        return 1.0
+    
+    # =========================================================================
+    # BC implementations
+    # =========================================================================
+
+    class BCReflective(Surface.BC):
+        def __init__(self):
+            Surface.BC.__init__(self, "reflective")
+        def __call__(self, P):
+            # TODO
+            pass
+
+
+    # =========================================================================
+    # BC implementations
+    # =========================================================================
+
+    class BCReflective(Surface.BC):
+        def __init__(self):
+            Surface.BC.__init__(self, "reflective")
+        def __call__(self, P):
+            # TODO
+            pass
 # =============================================================================
 # Cell
 # =============================================================================

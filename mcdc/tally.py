@@ -177,16 +177,16 @@ class FilterSurface(FilterSpatial):
         self.N_face = len(grid)
             
     def __call__(self, P):
-        if P.surface:
+        if P.surface and P.surface.id:
             # Get sense
             sense = 0
             if P.surface.evaluate(P.pos):
                 sense = 1
-            faces = np.array([binary_search(P.surface.id, self.grid) + 1,
-                              sense])
+            faces = [np.array([binary_search(P.surface.id, self.grid) + 1,
+                              sense])]
             wgt = [P.wgt]
             TLR = [P.wgt/abs(P.surface.normal(P.pos,P.dir_old))]
-            return [], [], faces, wgt, TLR
+            return [0], [0.0], faces, wgt, TLR
         else:
             return [], [], [], [], []
 
@@ -435,12 +435,6 @@ class Tally:
         time_bins, time_TL, time_edges, time_wgt, time_TLR \
             = self.filter_time(P)
 
-        '''
-        print("particle",P.pos_old.x,P.pos.x,P.wgt_old,P.wgt)
-        print("time filter",time_bins,time_TL,time_edges,time_wgt,time_TLR)
-        print("spatial filter",spatial_bins, spatial_TL, spatial_faces, spatial_wgt, spatial_TLR,sum(spatial_TL))
-        '''
-
         track_length_bins   = []
         track_length_scores = []
         face_cross_bins   = []
@@ -645,6 +639,8 @@ class ScoreCrossingTotal(Score):
             j     = bin_idx[i][1]
             wgt   = bin_score[i][1]
             self.bin[k,g,j] += wgt
+            #print("score ",g,wgt)
+            #input()
             
 class ScoreCrossingNet(Score):
     def __init__(self, name, shape):

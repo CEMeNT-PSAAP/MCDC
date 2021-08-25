@@ -352,6 +352,7 @@ class Simulator:
     
     def loop_particle(self, P):
         while P.alive:
+            #print(P.pos, P.wgt)
             # =================================================================
             # Setup
             # =================================================================
@@ -371,6 +372,7 @@ class Simulator:
 
             # Nearest surface and distance to hit
             S, d_surf = self.surface_distance(P)
+            #print("surface ", S.name, d_surf)
 
             # Distance to census
             t_census = self.census_time[P.census_idx]
@@ -396,6 +398,8 @@ class Simulator:
     
             # Move particle
             self.move_particle(P, d_move)
+            #print("In ", P.cell.name) 
+            #print("move to", P.pos, P.wgt)
 
             # Continuous capture?
             if mcdc.vrt.capture:
@@ -409,6 +413,8 @@ class Simulator:
             if event == EVENT_COLLISION:
                 # Sample collision
                 self.collision(P)
+                #print('collide')
+                #input()
 
             elif event == EVENT_SURFACE:
                 # Record surface hit
@@ -416,6 +422,10 @@ class Simulator:
 
                 # Implement surface hit
                 self.surface_hit(P)
+            
+                #print("kicked to", P.pos, P.wgt)
+                #print('surface', P.surface.name)
+                #input()
 
             elif event == EVENT_CENSUS:
                 # Cross the time boundary
