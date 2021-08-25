@@ -9,6 +9,36 @@ from mcdc.constant import INF
 
 # Abstract base class
 class Surface(ABC):
+    """
+    Abstract class for geometry surface
+
+    ...
+
+    Attributes
+    ----------
+    type : str
+        Surface type
+    id : int
+        Surface id
+    name : str
+        Surface name
+    bc : BC
+        Surface boundary condition implementation (ransmission, vacuum,
+        or reflective) which is described in the subclass `BC`
+
+    Abstract Methods
+    ----------------
+    evaluate(pos)
+        Evaluate if position `pos` is on the + or - side of the surface
+    distance(pos, dir)
+        Return the distance for a ray with position `pos` and direction
+        `dir` to hit the surface
+    normal(po, dir)
+        Return dot product of the surface normal+ and a ray at position
+        `pos` with direction `dir`. This is used for some surface 
+        tallies
+    """
+
     def __init__(self, type_, bc, id_, name):
         self.type = type_
         self.id   = id_
@@ -22,21 +52,13 @@ class Surface(ABC):
         else:
             self.bc = None # reflective and white are defined in child class
 
-    # =========================================================================
     # Abstract methods
-    # =========================================================================
-    
-    # Evaluate if position pos is on the + or - side of the surface
     @abstractmethod
     def evaluate(self, pos):
         pass
-    
-    # Distance for a ray with position pos and direction dir to hit the surface
     @abstractmethod
     def distance(self, pos, dir):
         pass
-
-    # Dot product of surface normal+ and a ray at pos with direction dir
     @abstractmethod
     def normal(self, pos, dir):
         pass
@@ -46,6 +68,12 @@ class Surface(ABC):
     # =========================================================================
 
     class BC(ABC):
+        """
+        Abstract subclass for surface BC implementations
+
+        `BCTransmission` and `BCVacuum` are identical for all surface types.
+        """
+
         def __init__(self, type_):
             self.type = type_        
         @abstractmethod
@@ -57,7 +85,7 @@ class Surface(ABC):
             Surface.BC.__init__(self, "transmission")
         def __call__(self, P):
             pass
-    
+
     class BCVacuum(BC):
         def __init__(self):
             Surface.BC.__init__(self, "vacuum")
@@ -111,6 +139,32 @@ class SurfacePlaneX(Surface):
 # =============================================================================
 
 class Cell:
+    """
+    Class for geometry cell
+
+    ...
+
+    Attributes
+    ----------
+    id : int
+        Cell id
+    name : str
+        Cell name
+    name : str
+        Cell name
+    surfaces : list [Surface, int]
+        A 2xN list. The first row is the `Surface` objects bounding the
+        cell. The second row is the sense (+/-) of the corresponding
+        bounding surfaces.
+    material : Material
+        The `Material` object that fills the cell
+
+    Methods
+    ----------------
+    test_point(pos)
+        Test if position `pos` is inside the cell
+    """
+
     def __init__(self, surfaces, material, id_=None, name=None):
         self.id       = id_
         self.name     = name

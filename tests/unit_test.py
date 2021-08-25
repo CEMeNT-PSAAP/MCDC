@@ -72,9 +72,9 @@ def test_RandomLCG_skip_ahead_rebase():
         ans1.append(rng())
 
     # Rebase
-    rng.skip_ahead(3, change_base=True)
-    rng.skip_ahead(1, change_base=True)
-    rng.skip_ahead(0, change_base=True)
+    rng.skip_ahead(3, rebase=True)
+    rng.skip_ahead(1, rebase=True)
+    rng.skip_ahead(0, rebase=True)
     ans2 = []
     for i in range(10):
         ans2.append(rng())

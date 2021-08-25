@@ -1,4 +1,4 @@
-# setupp.py
+# setup.py
 build
 .eggs
 mcdc.egg-info
@@ -6,7 +6,7 @@ mcdc.egg-info
 # Compiled python class
 *.pyc
 
-# Test problem output
+# Example output
 *.h5
 *.png
 *.mp4

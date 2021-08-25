@@ -9,6 +9,7 @@ from mcdc.point    import Point
 
 
 class Distribution(ABC):
+    """Abstract class for random sampling of a distribution"""
     @abstractmethod
     def sample(self):
         pass

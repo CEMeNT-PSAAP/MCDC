@@ -1,6 +1,6 @@
-import sys, os
+import os
+import sys
 
 # Get path to mcdc (not necessary if mcdc is installed)
-sys.path.append(os.path.dirname(os.getcwd()))
-
+sys.path.append('../')
 import mcdc
