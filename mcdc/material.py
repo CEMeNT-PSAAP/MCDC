@@ -16,9 +16,9 @@ class Material:
     ----------
     SigmaT : numpy.ndarray (1D)
         Total cross-section
-    SigmaS_tot : numpy.ndarray (1D)
+    Sigma.tot : numpy.ndarray (1D)
         Scattering cross-section
-    SigmaF_tot : numpy.ndarray (1D)
+    Sigma.tot : numpy.ndarray (1D)
         Fission cross-section
     nu : numpy.ndarray (1D)
         Fission multiplication
@@ -45,3 +45,9 @@ class Material:
         # Matrices
         self.SigmaS = np.swapaxes(SigmaS,0,2) # [ord,out,in] -> [in,out,ord]    
         self.SigmaF = np.swapaxes(SigmaF,0,1) # [out,in]     -> [in,out]
+
+
+def MaterialVoid(G):
+    vec = np.zeros(G)
+    mat = np.zeros([G,G])
+    return Material(vec, mat, vec, mat)
