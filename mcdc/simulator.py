@@ -14,7 +14,7 @@ from mcdc.distribution import DistPointIsotropic
 from mcdc.constant     import SMALL, VERY_SMALL,  LCG_SEED, LCG_STRIDE, INF,\
                               EVENT_COLLISION, EVENT_SURFACE, EVENT_CENSUS
 from mcdc.random       import RandomLCG
-from mcdc.pct      import PCT_SSU, PCT_SRU, PCT_COU, PCT_SSW, PCT_SRW, PCT_COW
+from mcdc.pct          import *
 from mcdc.misc         import binary_search
 
 
@@ -90,18 +90,27 @@ class Simulator:
 
     def set_pct(self, pct='SS-U', census_time=[INF]):
         # Set technique
-        if pct in ['SS-U']:
+        if pct == 'SS-U':
             pass
-        elif pct in ['SR-U']:
+        elif pct == 'SR-U':
             self.pct = PCT_SRU()
-        elif pct in ['CO-U']:
+        elif pct == 'CO-U':
             self.pct = PCT_COU()
-        elif pct in ['SS-W']:
+        elif pct == 'COx-U':
+            self.pct = PCT_COxU()
+        elif pct == 'DD-U':
+            self.pct = PCT_DDU()
+        elif pct == 'DD-Uori':
+            self.pct = PCT_DDUOri()
+        elif pct == 'SS-W':
             self.pct = PCT_SSW()
-        elif pct in ['SR-W']:
+        elif pct == 'SR-W':
             self.pct = PCT_SRW()
-        elif pct in ['CO-W']:
+        elif pct == 'CO-W':
             self.pct = PCT_COW()
+        else:
+            print("ERROR: Unknown PCT "+pct)
+            sys.exit()
 
         # Set census time
         self.census_time = census_time
@@ -119,6 +128,9 @@ class Simulator:
     # =========================================================================
     
     def run(self):
+        # Start timer
+        time = mcdc.mpi.Wtime()
+
         # Set tally bins
         for T in self.tallies:
             T.setup_bins(self.N_iter) # Allocate tally bins (see tally.py)
@@ -152,8 +164,11 @@ class Simulator:
             elif self.mode_fixed_source:
                 simulation_end = self.closeout_fixed_source()
 
+        # Stop timer
+        time = mcdc.mpi.Wtime() - time
+
         # Simulation closeout
-        self.closeout_simulation()
+        self.closeout_simulation(time)
 
     def closeout_eigenvalue_iteration(self):    
         # Tally source closeout
@@ -197,11 +212,11 @@ class Simulator:
         
         # Progress printout
         #   TODO: make optional. print in a table format
-        '''
+        
         if mcdc.mpi.master:
             print(self.i_iter,self.k_eff)
             sys.stdout.flush()
-        '''
+        
         return simulation_end 
 
     def closeout_fixed_source(self):    
@@ -230,7 +245,7 @@ class Simulator:
 
         return simulation_end
 
-    def closeout_simulation(self):
+    def closeout_simulation(self, time):
         # =========================================================================
         # Save tallies to HDF5
         # =========================================================================
@@ -238,6 +253,7 @@ class Simulator:
         #with h5py.File(self.output+'.h5', 'w', driver='mpio', comm=mcdc.mpi.comm) as f:
         if mcdc.mpi.master and self.tallies:
             with h5py.File(self.output+'.h5', 'w') as f:
+                f.create_dataset("runtime",data=np.array([time]))
                 # Tallies
                 for T in self.tallies:
                     if T.filter_flag_energy:
@@ -416,7 +432,7 @@ class Simulator:
 
                 # Implement surface hit
                 self.surface_hit(P)
-
+            
             elif event == EVENT_CENSUS:
                 # Cross the time boundary
                 d = SMALL*P.speed
@@ -447,7 +463,7 @@ class Simulator:
                     wgt     = (P.wgt_old-P.wgt)/(P.distance*SigmaC)
 
                 nu       = P.cell_old.material.nu[P.g_old]
-                SigmaF   = P.cell_old.material.SigmaF_tot[P.g_old]
+                SigmaF   = P.cell_old.material.SigmaF[P.g_old]
                 nuSigmaF = nu*SigmaF
                 self.nuSigmaF_sum += wgt*P.distance*nuSigmaF
             
@@ -492,9 +508,9 @@ class Simulator:
         S     = None
         d_surf = np.inf
         for surf in P.cell.surfaces:
-            d = surf[0].distance(P.pos, P.dir)
+            d = surf.distance(P.pos, P.dir)
             if d < d_surf:
-                S     = surf[0];
+                S     = surf;
                 d_surf = d;
         return S, d_surf
 
@@ -520,8 +536,8 @@ class Simulator:
     def collision(self, P):
         SigmaT = P.cell.material.SigmaT[P.g]
         SigmaC = P.cell.material.SigmaC[P.g]
-        SigmaS = P.cell.material.SigmaS_tot[P.g]
-        SigmaF = P.cell.material.SigmaF_tot[P.g]
+        SigmaS = P.cell.material.SigmaS[P.g]
+        SigmaF = P.cell.material.SigmaF[P.g]
         
         # Continuous capture?
         if mcdc.vrt.capture:
@@ -559,24 +575,21 @@ class Simulator:
         P.alive = False
         
     def collision_scattering(self, P):
-        SigmaS     = P.cell.material.SigmaS[P.g]
-        SigmaS_tot = P.cell.material.SigmaS_tot[P.g]
-        G          = len(SigmaS)
+        SigmaS_diff = P.cell.material.SigmaS_diff[P.g]
+        SigmaS      = P.cell.material.SigmaS[P.g]
+        G           = len(SigmaS_diff)
         
         # Sample outgoing energy
-        xi  = mcdc.random.rng()*SigmaS_tot
+        xi  = mcdc.random.rng()*SigmaS
         tot = 0.0
         for g_out in range(G):
-            tot += SigmaS[g_out][0]
+            tot += SigmaS_diff[g_out]
             if tot > xi:
                 break
         P.g = g_out
         
         # Sample scattering angle
-        if len(SigmaS[g_out]) == 1:
-            # Isotropic
-            mu0 = 2.0*mcdc.random.rng() - 1.0;
-        # TODO: sampling anisotropic scattering with rejection sampling
+        mu0 = 2.0*mcdc.random.rng() - 1.0;
         
         # Scatter particle
         self.scatter(P,mu0)
@@ -614,10 +627,10 @@ class Simulator:
         # Kill the current particle
         P.alive = False
         
-        SigmaF     = P.cell.material.SigmaF[P.g]
-        SigmaF_tot = P.cell.material.SigmaF_tot[P.g]
-        nu         = P.cell.material.nu[P.g]
-        G          = len(SigmaF)
+        SigmaF_diff = P.cell.material.SigmaF_diff[P.g]
+        SigmaF      = P.cell.material.SigmaF[P.g]
+        nu          = P.cell.material.nu[P.g]
+        G           = len(SigmaF_diff)
 
         # Implicit fission?
         iFission = 1.0 # Multiplying factor
@@ -626,7 +639,7 @@ class Simulator:
             SigmaC = P.cell.material.SigmaC[P.g]
             if mcdc.vrt.capture:
                 SigmaT -= SigmaC
-            iFission = SigmaF_tot/SigmaT
+            iFission = SigmaF/SigmaT
         
         # Set fission neutron weight and effective nu
         if mcdc.vrt.wgt_roulette == 0.0:
@@ -643,10 +656,10 @@ class Simulator:
         # Push fission neutrons to bank
         for n in range(N):
             # Sample outgoing energy
-            xi  = mcdc.random.rng()*SigmaF_tot
+            xi  = mcdc.random.rng()*SigmaF
             tot = 0.0
             for g_out in range(G):
-                tot += SigmaF[g_out]
+                tot += SigmaF_diff[g_out]
                 if tot > xi:
                     break
             

@@ -15,10 +15,16 @@ EVENT_COLLISION = 1
 EVENT_SURFACE   = 2
 EVENT_CENSUS    = 3
 
+# Physics
+mass_n = 1.67492749804E-27 # kg
+
+# Unit
+eV_to_J       = 1.60218E-19
+eV_to_speed_n = np.sqrt(eV_to_J*2/mass_n)*100.0 # cm/s
+
 # Misc.
-SMALL      = 1E-10  # to ensure spatial grid crossing
-VERY_SMALL = 1E-15  # to ensure time grid crossing
 INF        = np.inf
 PI         = np.pi
+SMALL      = 1E-10  # to ensure spatial grid crossing
+VERY_SMALL = 1E-15  # to ensure time grid crossing
 EPSILON    = 1E-14  # to avoid precision error in tally filters
-

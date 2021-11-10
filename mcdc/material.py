@@ -7,41 +7,53 @@ import numpy as np
 
 class Material:
     """
-    Class for material filling geometry `Cell` object
+    Material to fill `mcdc.Cell` object
 
-    This class is effectively a structure of cross-sections (in multi-
-    group mode).
+    In multi-group mode, it is a structure of cross-sections.
 
     Attributes
     ----------
     SigmaT : numpy.ndarray (1D)
         Total cross-section
-    SigmaS_tot : numpy.ndarray (1D)
+    SigmaC : numpy.ndarray (1D)
+        Capture cross-section
+    SigmaS : numpy.ndarray (1D)
         Scattering cross-section
-    SigmaF_tot : numpy.ndarray (1D)
+    SigmaF : numpy.ndarray (1D)
         Fission cross-section
     nu : numpy.ndarray (1D)
         Fission multiplication
-    SigmaS : numpy.ndarray (2D)
+    SigmaS_diff : numpy.ndarray (2D)
         Differential scattering cross-section
-    SigmaF : numpy.ndarray (2D)
+    SigmaF_diff : numpy.ndarray (2D)
         Differential fission cross-section
+    G : int
+        Multi-group size
     """
 
-    def __init__(self, SigmaT, SigmaS, nu, SigmaF):
-        self.SigmaT = SigmaT
+    def __init__(self, SigmaC, SigmaS, SigmaF, nu):
+        """
+        Arguments
+        ---------
+        SigmaC : numpy.ndarray (1D)
+            Capture cross-section
+        nu : numpy.ndarray (1D)
+            Fission multiplication
+        SigmaS : numpy.ndarray (2D)
+            Differential scattering cross-section [out][in]
+        SigmaF : numpy.ndarray (2D)
+            Differential fission cross-section [out][in]
+        """
+
+        self.SigmaC = SigmaC
         self.nu     = nu
+        self.G      = len(nu)
 
-        # If only isotropic SigmaS0 is given
-        if SigmaS.ndim == 2: SigmaS = np.expand_dims(SigmaS, axis=0)
-
-        # Total scattering and fission
-        self.SigmaS_tot = np.sum(SigmaS[0],0)
-        self.SigmaF_tot = np.sum(SigmaF,0)
+        # Scattering and fission
+        self.SigmaS = np.sum(SigmaS,0)
+        self.SigmaF = np.sum(SigmaF,0)
+        self.SigmaS_diff = np.swapaxes(SigmaS,0,1) # [out,in] -> [in,out]    
+        self.SigmaF_diff = np.swapaxes(SigmaF,0,1) # [out,in] -> [in,out]
         
-        # Capture
-        self.SigmaC = self.SigmaT - self.SigmaS_tot - self.SigmaF_tot
-            
-        # Matrices
-        self.SigmaS = np.swapaxes(SigmaS,0,2) # [ord,out,in] -> [in,out,ord]    
-        self.SigmaF = np.swapaxes(SigmaF,0,1) # [out,in]     -> [in,out]
+        # Total
+        self.SigmaT = self.SigmaC + self.SigmaS + self.SigmaF
