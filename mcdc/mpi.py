@@ -38,8 +38,7 @@ def isend(obj, dest):
 
 # Collective
 def bcast(obj, source):
-    result = comm.bcast(obj, source)
-    return result[0]
+    return comm.bcast(obj, source)
 def exscan(var, buff):
     comm.Exscan(var, buff, MPI.SUM)
 def reduce_master(var, buff):
@@ -127,7 +126,7 @@ def bank_passing(bank, redistribute=False):
     # Redistribute work?
     if redistribute:
         # Broadcast total size
-        N = bcast(np.array([i_end], dtype=int), last)
+        N = bcast(np.array([i_end], dtype=int), last)[0]
         
         # Redistribute work
         distribute_work(N)
