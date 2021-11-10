@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+import itertools
 
 from mcdc.constant import INF
 
@@ -41,9 +42,11 @@ class Surface(ABC):
         tallies
     """
 
-    def __init__(self, type_, bc, id_, name):
+    _ids = itertools.count(0)
+
+    def __init__(self, type_, bc, name):
         self.type = type_
-        self.id   = id_
+        self.id   = next(self._ids)
         self.name = name
         
         # Set BC if transmission or vacuum
@@ -53,6 +56,12 @@ class Surface(ABC):
             self.bc = self.BCVacuum()
         else:
             self.bc = None # reflective and white are defined in child class
+
+    # Bounding surfaces
+    def __pos__(self):
+        return [self,+1]
+    def __neg__(self):
+        return [self,-1]
 
     # Abstract methods
     @abstractmethod
@@ -101,8 +110,8 @@ class Surface(ABC):
 # =============================================================================
 
 class SurfacePlaneX(Surface):
-    def __init__(self, x0, bc='transmission', id_=None, name=None):
-        Surface.__init__(self, "PlaneX", bc, id_, name)
+    def __init__(self, x0, bc='transmission', name=None):
+        Surface.__init__(self, "PlaneX", bc, name)
         self.x0 = x0
         
         # Set BC if reflective
@@ -137,8 +146,8 @@ class SurfacePlaneX(Surface):
             P.dir.x *= -1
 
 class SurfacePlaneZ(Surface):
-    def __init__(self, z0, bc='transmission', id_=None, name=None):
-        Surface.__init__(self, "PlaneZ", bc, id_, name)
+    def __init__(self, z0, bc='transmission', name=None):
+        Surface.__init__(self, "PlaneZ", bc, name)
         self.z0 = z0
         
         # Set BC if reflective
@@ -177,8 +186,8 @@ class SurfacePlaneZ(Surface):
 # =============================================================================
 
 class SurfaceCylinderZ(Surface):
-    def __init__(self, x0, y0, R, bc='transmission', id_=None, name=None):
-        Surface.__init__(self, "CylinderZ", bc, id_, name)
+    def __init__(self, x0, y0, R, bc='transmission', name=None):
+        Surface.__init__(self, "CylinderZ", bc, name)
         self.x0   = x0
         self.y0   = y0
         self.R_sq = R*R
@@ -252,40 +261,47 @@ class SurfaceCylinderZ(Surface):
 
 class Cell:
     """
-    Class for geometry cell
+    Geometry cell
 
-    ...
+    A cell is defined by its bounding surfaces and filling material
 
     Attributes
     ----------
-    id : int
-        Cell id
-    name : str
-        Cell name
-    name : str
-        Cell name
-    surfaces : list [Surface, int]
-        A 2xN list. The first row is the `Surface` objects bounding the
-        cell. The second row is the sense (+/-) of the corresponding
-        bounding surfaces.
-    material : Material
-        The `Material` object that fills the cell
+    surfaces : list of mcdc.Surface
+        The bounding surfaces
+    senses : list of int
+        The corresponding sense (+/-) of the surface with the same index
+    material : mcdc.Material
+        The `mcdc.Material` object that fills the cell
 
     Methods
-    ----------------
+    -------
     test_point(pos)
         Test if position `pos` is inside the cell
     """
 
-    def __init__(self, surfaces, material, id_=None, name=None):
-        self.id       = id_
-        self.name     = name
-        self.surfaces = surfaces # 0: surface, 1: sense
+    def __init__(self, bounds, material):
+        """
+        Arguments
+        ---------
+        bounds : list of list([mcdc.Surface, int])
+            The first column is the `mcdc.Surface` objects bounding the cell.
+            The second column is the corresponding sense (+/-).
+        material : mcdc.Material
+            The `mcdc.Material` object that fills the cell
+        """
+
+        self.n_surfaces = len(bounds)
+        self.surfaces   = []
+        self.senses     = []
+        for i in range(self.n_surfaces):
+            self.surfaces.append(bounds[i][0])
+            self.senses.append(bounds[i][1])
         self.material = material
 
     # Test if position pos is inside the cell
     def test_point(self, pos):
-        for surface in self.surfaces:
-            if surface[0].evaluate(pos) * surface[1] < 0:
+        for i in range(self.n_surfaces):
+            if self.surfaces[i].evaluate(pos) * self.senses[i] < 0:
                 return False
         return True
