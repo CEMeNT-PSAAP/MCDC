@@ -171,16 +171,18 @@ class FilterSurface(FilterSpatial):
     N_bin  = None
     N_face = None
     
-    def __init__(self, grid):
-        self.grid   = grid
+    def __init__(self, surfaces):
+        self.grid   = [x.id for x in surfaces]
         self.N_bin  = 0
-        self.N_face = len(grid)
+        self.N_face = len(surfaces)
+        
+        self.grid.sort()
             
     def __call__(self, P):
-        if P.surface and P.surface.id:
+        if P.surface and P.surface.id in self.grid:
             # Get sense
             sense = 0
-            if P.surface.evaluate(P.pos):
+            if P.surface.evaluate(P.pos) > 0:
                 sense = 1
             faces = [np.array([binary_search(P.surface.id, self.grid) + 1,
                               sense])]
