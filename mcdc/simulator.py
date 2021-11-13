@@ -19,13 +19,13 @@ from mcdc.misc         import binary_search
 
 
 class Simulator:
-    def __init__(self, speeds, cells, source, tallies = [], N_hist = 1,
+    def __init__(self, speeds, cells, sources, tallies = [], N_hist = 1,
                  seed = LCG_SEED, stride = LCG_STRIDE):
 
         # Basic settings
         self.speeds  = speeds   # array of particle MG speeds
         self.cells   = cells    # list of Cells (see geometry.py)
-        self.source  = source   # Source (see particle.py)
+        self.sources = sources  # list of Sources (see particle.py)
         self.N_hist  = N_hist   # number of histories
         self.tallies = tallies  # list of Tallies (see tally.py)
         self.output  = "output" # .h5 output file name
@@ -137,6 +137,12 @@ class Simulator:
    
         # Setup RNG
         mcdc.random.rng = RandomLCG(seed=self.seed, stride=self.stride)
+
+        # Normalize sources
+        norm = 0.0
+        for s in self.sources: norm += s.prob
+        for s in self.sources: 
+            s.prob /= norm
 
         # Setup VRT
         mcdc.vrt.capture      = self.vrt_capture
@@ -296,8 +302,18 @@ class Simulator:
 
             # Get a source particle and put into history bank
             if not self.bank_source:
+                # Sample source
+                xi = mcdc.random.rng()
+                tot = 0.0
+                source = None
+                for s in self.sources:
+                    tot += s.prob
+                    if xi < tot:
+                        source = s
+                        break
+
                 # Initial source
-                P = self.source.get_particle()
+                P = source.get_particle()
 
                 # Set cell if not given
                 if not P.cell: 

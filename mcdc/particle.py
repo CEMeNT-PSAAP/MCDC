@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from mcdc.point import Point
 
 
@@ -60,8 +62,18 @@ class Particle:
 # Source
 # =============================================================================
 
-class SourceSimple:
-    def __init__(self, pos, dir, g, time, wgt=1.0, cell=None, census_idx=None):
+class Source(ABC):
+    def __init__(self, prob):
+        self.prob = prob
+
+    @abstractmethod
+    def get_particle(self):
+        pass
+
+class SourceSimple(Source):
+    def __init__(self, pos, dir, g, time, prob=1.0, wgt=1.0, cell=None, 
+                 census_idx=None):
+        Source.__init__(self, prob)
         self.pos  = pos
         self.dir  = dir
         self.g    = g

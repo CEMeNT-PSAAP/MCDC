@@ -55,7 +55,8 @@ g = mcdc.DistDelta(0)
 time= mcdc.DistDelta(0.0)
 
 # Create the source
-Source = mcdc.SourceSimple(pos,dir,g,time)
+Src = mcdc.SourceSimple(pos,dir,g,time)
+sources = [Src]
 
 # =============================================================================
 # Set filters and tallies
@@ -79,7 +80,7 @@ tallies = [T1, T2]
 speeds = np.array([1.0])
 
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies, 
+simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
                            N_hist=10000)
 
 # Run
