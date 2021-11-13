@@ -55,7 +55,8 @@ g = mcdc.DistDelta(G-1)
 time = mcdc.DistDelta(0.0)
 
 # Create the source
-Source = mcdc.SourceSimple(pos,dir,g,time,cell=C)
+Src = mcdc.SourceSimple(pos,dir,g,time,cell=C)
+sources = [Src]
 
 # =============================================================================
 # Set filters and tallies
@@ -72,7 +73,7 @@ tallies = [T]
 # =============================================================================
 
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies, 
+simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
                            N_hist=1000)
 
 # Set k-eigenvalue mode parameters

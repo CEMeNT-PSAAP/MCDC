@@ -46,7 +46,8 @@ g = mcdc.DistDelta(0)
 time = mcdc.DistDelta(0.0)
 
 # Create the source
-Source = mcdc.SourceSimple(pos,dir,g,time,cell=C)
+Src = mcdc.SourceSimple(pos,dir,g,time,cell=C)
+sources = [Src]
 
 # =============================================================================
 # Set filters and tallies
@@ -71,7 +72,7 @@ tallies = [T]
 speeds = np.array([1.0])
 
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, Source, tallies=tallies, 
+simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
                            N_hist=10000)
 
 # Set population control and census
