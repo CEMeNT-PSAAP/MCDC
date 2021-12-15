@@ -6,7 +6,6 @@ from math import floor
 
 import mcdc.random
 import mcdc.mpi
-import mcdc.vrt
 
 from mcdc.point        import Point
 from mcdc.particle     import Particle
@@ -19,65 +18,56 @@ from mcdc.misc         import binary_search
 
 
 class Simulator:
-    def __init__(self, speeds, cells, sources, tallies = [], N_hist = 1,
-                 seed = LCG_SEED, stride = LCG_STRIDE):
+    def __init__(self, speeds=[], cells=[], sources=[], tallies=[], N_hist = 0):
 
-        # Basic settings
+        # Basic inputs
+        #   TODO: run in batches
         self.speeds  = speeds   # array of particle MG speeds
         self.cells   = cells    # list of Cells (see geometry.py)
         self.sources = sources  # list of Sources (see particle.py)
-        self.N_hist  = N_hist   # number of histories
         self.tallies = tallies  # list of Tallies (see tally.py)
-        self.output  = "output" # .h5 output file name
+        self.N_hist  = N_hist   # number of histories
+
+        # Output file
+        self.output = "output" # .h5 output file name
         
         # RNG settings
-        self.seed   = seed
-        self.stride = stride
-        
-        # Fixed-source mode
-        self.mode_fixed_source = True # fixed-source flag
+        self.seed   = LCG_SEED
+        self.stride = LCG_STRIDE
 
-        # Eigenvalue settings (see self.k_mode)
+        # Eigenvalue mode settings (see self.set_kmode)
         #   TODO: alpha eigenvalue
         #   TODO: shannon entropy
-        self.mode_k          = False # k-eigenvalue flag
-        self.mode_eigenvalue = False # eigenvalue flag
+        self.mode_eigenvalue = False
+        self.mode_k          = False # k-eigenvalue
+        self.k_eff           = 1.0   # k effective that affects simulation
         self.N_iter          = 1     # number of iterations
         self.i_iter          = 0     # current iteration index
-        self.k_eff           = 1.0   # k effective that affects simulation
         
         # Population control settings (see self.set_pct)
-        #   TODO: census
-        self.pct     = PCT_SSU()
+        self.pct         = PCT_SS()
         self.census_time = [INF]
 
-        # Variance Reduction Technique settings
-        #   TODO: implicit fission production
-        self.mode_analog     = True
-        self.vrt_capture     = False
-        self.vrt_fission     = False
-        self.vrt_wgt_roulette  = 0.0
-        self.vrt_wgt_survive = 1.0
-        
         # Particle banks
         #   TODO: use fixed memory allocations with helper indices
         self.bank_stored  = [] # for the next source loop
         self.bank_source  = [] # for current source loop
         self.bank_history = [] # for current history loop
         self.bank_fission = None # will point to one of the banks
-        
+
+        # Timer
+        self.time_total = 0.0
+
         # Misc.
         self.isotropic_dir = DistPointIsotropic() # (see distribution.py)
         self.parallel_hdf5 = False # TODO
             
 
     def set_kmode(self, N_iter=1, k_init=1.0):
-        self.mode_k          = True
         self.mode_eigenvalue = True
+        self.mode_k          = True
         self.N_iter          = N_iter
         self.k_eff           = k_init
-
-        self.mode_fixed_source = False
 
         # Mode-specific tallies
         # Accumulators
@@ -88,26 +78,18 @@ class Simulator:
         if mcdc.mpi.master:
             self.k_mean = np.zeros(self.N_iter)
 
-    def set_pct(self, pct='SS-U', census_time=[INF]):
+    def set_pct(self, pct='SS', census_time=[INF]):
         # Set technique
-        if pct == 'SS-U':
+        if pct == 'SS':
             pass
-        elif pct == 'SR-U':
-            self.pct = PCT_SRU()
-        elif pct == 'CO-U':
-            self.pct = PCT_COU()
-        elif pct == 'COx-U':
-            self.pct = PCT_COxU()
-        elif pct == 'DD-U':
-            self.pct = PCT_DDU()
-        elif pct == 'DD-Uori':
-            self.pct = PCT_DDUOri()
-        elif pct == 'SS-W':
-            self.pct = PCT_SSW()
-        elif pct == 'SR-W':
-            self.pct = PCT_SRW()
-        elif pct == 'CO-W':
-            self.pct = PCT_COW()
+        elif pct == 'SR':
+            self.pct = PCT_SR()
+        elif pct == 'CO':
+            self.pct = PCT_CO()
+        elif pct == 'COX':
+            self.pct = PCT_COX()
+        elif pct == 'DD':
+            self.pct = PCT_DD()
         else:
             print("ERROR: Unknown PCT "+pct)
             sys.exit()
@@ -115,21 +97,13 @@ class Simulator:
         # Set census time
         self.census_time = census_time
 
-    def set_vrt(self, continuous_capture=False, implicit_fission=False,
-                wgt_roulette=0.0, wgt_survive=1.0):
-        self.vrt_capture = continuous_capture
-        self.vrt_fission = implicit_fission
-        self.vrt_wgt_roulette  = wgt_roulette
-        self.vrt_wgt_survive = wgt_survive
-
-
     # =========================================================================
-    # Run ("main") --> SIMULATION LOOP
+    # Run ("main") -- SIMULATION LOOP
     # =========================================================================
     
     def run(self):
         # Start timer
-        time = mcdc.mpi.Wtime()
+        self.time_total = mcdc.mpi.Wtime()
 
         # Set tally bins
         for T in self.tallies:
@@ -141,140 +115,111 @@ class Simulator:
         # Normalize sources
         norm = 0.0
         for s in self.sources: norm += s.prob
-        for s in self.sources: 
-            s.prob /= norm
+        for s in self.sources: s.prob /= norm
 
-        # Setup VRT
-        mcdc.vrt.capture      = self.vrt_capture
-        mcdc.vrt.fission      = self.vrt_fission
-        mcdc.vrt.wgt_roulette = self.vrt_wgt_roulette
-        mcdc.vrt.wgt_survive  = self.vrt_wgt_survive
+        # Make sure no census time in eigenvalue mode
+        if self.mode_eigenvalue:
+            self.census_time = [INF]
 
         # Distribute work to processors
         mcdc.mpi.distribute_work(self.N_hist)
 
+        # SIMULATION LOOP
         simulation_end = False
         while not simulation_end:
             # To which bank fission neutrons are stored?
-            if self.mode_fixed_source:
-                self.bank_fission = self.bank_history
             if self.mode_eigenvalue:
                 self.bank_fission = self.bank_stored
+            else:
+                self.bank_fission = self.bank_history
            
-            # Source loop
+            # SOURCE LOOP
             self.loop_source()
             
-            # Closeout
-            if self.mode_eigenvalue: 
-                simulation_end = self.closeout_eigenvalue_iteration()
-            elif self.mode_fixed_source:
-                simulation_end = self.closeout_fixed_source()
+            # Tally closeout for eigenvalue mode
+            if self.mode_eigenvalue:
+                for T in self.tallies:
+                    T.closeout(self.N_hist, self.i_iter)
 
-        # Stop timer
-        time = mcdc.mpi.Wtime() - time
+                # MPI Reduce nuSigmaF
+                mcdc.mpi.allreduce(self.nuSigmaF_sum, self.nuSigmaF_buff)
+                
+                # Update keff
+                self.k_eff = self.nuSigmaF_buff[0]/mcdc.mpi.work_size_total
+                if mcdc.mpi.master:
+                    self.k_mean[self.i_iter] = self.k_eff
+                            
+                # Reset accumulator
+                self.nuSigmaF_sum = 0.0
+                
+                # Progress printout
+                #   TODO: print in table format 
+                if mcdc.mpi.master:
+                    print(self.i_iter,self.k_eff)
+                    sys.stdout.flush()
 
-        # Simulation closeout
-        self.closeout_simulation(time)
+            # Simulation end?
+            if self.mode_eigenvalue:
+                self.i_iter += 1
+                if self.i_iter == self.N_iter: simulation_end = True
+            elif not self.bank_stored: simulation_end = True
 
-    def closeout_eigenvalue_iteration(self):    
-        # Tally source closeout
-        for T in self.tallies:
-            T.closeout(self.N_hist, self.i_iter)
+            # Manage particle banks
+            if not simulation_end:
+                if self.mode_eigenvalue:
+                    # Normalize weight
+                    mcdc.mpi.normalize_weight(self.bank_stored, self.N_hist)
 
-        # MPI Reduce nuSigmaF
-        mcdc.mpi.allreduce(self.nuSigmaF_sum, self.nuSigmaF_buff)
-        
-        # Update keff
-        self.k_eff = self.nuSigmaF_buff[0]/mcdc.mpi.work_size_total
-        if mcdc.mpi.master:
-            self.k_mean[self.i_iter] = self.k_eff
-                    
-        # Reset accumulator
-        self.nuSigmaF_sum = 0.0
+                # Rebase RNG for population control
+                mcdc.random.rng.skip_ahead(
+                    mcdc.mpi.work_size_total-mcdc.mpi.work_start, rebase=True)
 
-        # Next iteration?
-        self.i_iter += 1           
-        if self.i_iter < self.N_iter:
-            simulation_end = False
+                # Population control
+                self.bank_stored = self.pct(self.bank_stored, self.N_hist)
 
-            # Normalize weight
-            mcdc.mpi.normalize_weight(self.bank_stored, self.N_hist)
-
-            # Rebase RNG for population control
-            mcdc.random.rng.skip_ahead(mcdc.mpi.work_size_total-mcdc.mpi.work_start,
-                                       rebase=True)
-
-            # Population control stored bank
-            self.bank_stored = self.pct(self.bank_stored, self.N_hist)
-
-            # Set stored bank as source bank for the next iteration
-            self.bank_source = self.bank_stored
-            self.bank_stored = []
-
-        else:
-            self.bank_source = []
-            self.bank_stored = []
-            simulation_end = True
-        
-        # Progress printout
-        #   TODO: make optional. print in a table format
-        
-        if mcdc.mpi.master:
-            print(self.i_iter,self.k_eff)
-            sys.stdout.flush()
-        
-        return simulation_end 
-
-    def closeout_fixed_source(self):    
-        if self.bank_stored:
-            simulation_end = False
-
-            # Rebase RNG for population control
-            mcdc.random.rng.skip_ahead(mcdc.mpi.work_size_total-mcdc.mpi.work_start,
-                                       rebase=True)
-
-            # Population control stored bank
-            self.bank_stored = self.pct(self.bank_stored, self.N_hist)
-
-            # Set stored bank as source bank for the next iteration
-            self.bank_source = self.bank_stored
-            self.bank_stored = []
-
-        else:
-            self.bank_source = []
-            self.bank_stored = []
-            simulation_end = True
-            
-            # Tally closeout
+                # Set stored bank as source bank for the next iteration
+                self.bank_source = self.bank_stored
+                self.bank_stored = []
+            else:
+                self.bank_source = []
+                self.bank_stored = []
+                
+        # Tally closeout for fixed-source mode
+        if not self.mode_eigenvalue:
             for T in self.tallies:
                 T.closeout(self.N_hist, 0)
 
-        return simulation_end
+        # Stop timer
+        self.time_total = mcdc.mpi.Wtime() - self.time_total
 
-    def closeout_simulation(self, time):
-        # =========================================================================
         # Save tallies to HDF5
-        # =========================================================================
-
-        #with h5py.File(self.output+'.h5', 'w', driver='mpio', comm=mcdc.mpi.comm) as f:
         if mcdc.mpi.master and self.tallies:
             with h5py.File(self.output+'.h5', 'w') as f:
-                f.create_dataset("runtime",data=np.array([time]))
+                # Runtime
+                f.create_dataset("runtime",data=np.array([self.time_total]))
+
                 # Tallies
                 for T in self.tallies:
                     if T.filter_flag_energy:
-                        f.create_dataset(T.name+"/energy_grid",data=T.filter_energy.grid)
+                    # Filters
+                        f.create_dataset(T.name+"/energy_grid", 
+                                         data=T.filter_energy.grid)
                     if T.filter_flag_angular:
-                        f.create_dataset(T.name+"/angular_grid",data=T.filter_angular.grid)
+                        f.create_dataset(T.name+"/angular_grid",
+                                         data=T.filter_angular.grid)
                     if T.filter_flag_time:
-                        f.create_dataset(T.name+"/time_grid",data=T.filter_time.grid)
+                        f.create_dataset(T.name+"/time_grid",
+                                         data=T.filter_time.grid)
                     if T.filter_flag_spatial:
-                        f.create_dataset(T.name+"/spatial_grid",data=T.filter_spatial.grid)
+                        f.create_dataset(T.name+"/spatial_grid",
+                                         data=T.filter_spatial.grid)
                     
                     # Scores
                     for S in T.scores:
-                        f.create_dataset(T.name+"/"+S.name+"/mean",data=np.squeeze(S.mean))
-                        f.create_dataset(T.name+"/"+S.name+"/sdev",data=np.squeeze(S.sdev))
+                        f.create_dataset(T.name+"/"+S.name+"/mean",
+                                         data=np.squeeze(S.mean))
+                        f.create_dataset(T.name+"/"+S.name+"/sdev",
+                                         data=np.squeeze(S.sdev))
                         S.mean.fill(0.0)
                         S.sdev.fill(0.0)
                     
@@ -282,10 +227,6 @@ class Simulator:
                 if self.mode_eigenvalue:
                     f.create_dataset("keff",data=self.k_mean)
                     self.k_mean.fill(0.0)
-
-        # Reset simulation parameters
-        self.i_iter = 0
-
 
     # =========================================================================
     # SOURCE LOOP
@@ -311,16 +252,14 @@ class Simulator:
                     if xi < tot:
                         source = s
                         break
-
-                # Initial source
                 P = source.get_particle()
 
                 # Set cell if not given
                 if not P.cell: 
                     self.set_cell(P)
-                # Set census_idx if not given
-                if not P.census_idx:
-                    self.set_census_idx(P)
+                # Set time_idx if not given
+                if not P.time_idx:
+                    self.set_time_idx(P)
 
                 self.bank_history.append(P)
             else:
@@ -328,16 +267,7 @@ class Simulator:
             
             # History loop
             self.loop_history()
-            
-            # Super rough estimate of progress
-            #   TODO: Make it optional. A progress bar?
-            '''
-            if mcdc.mpi.master and self.mode_fixed_source:
-                prog = (i+1)/mcdc.mpi.work_size*100
-                print('%.2f'%prog,'%')
-                sys.stdout.flush()
-            '''
-
+    
     def set_cell(self, P):
         pos = P.pos
         C = None
@@ -351,7 +281,7 @@ class Simulator:
 
         P.cell = C
         
-    def set_census_idx(self, P):
+    def set_time_idx(self, P):
         t = P.time
         idx = binary_search(t, self.census_time) + 1
 
@@ -360,7 +290,8 @@ class Simulator:
             idx = None
         elif P.time == self.census_time[idx]:
             idx += 1
-        P.census_idx = idx
+        P.time_idx = idx
+
 
     # =========================================================================
     # HISTORY LOOP
@@ -405,7 +336,7 @@ class Simulator:
             S, d_surf = self.surface_distance(P)
 
             # Distance to census
-            t_census = self.census_time[P.census_idx]
+            t_census = self.census_time[P.time_idx]
             d_census = P.speed*(t_census - P.time)
 
             # =================================================================
@@ -429,11 +360,6 @@ class Simulator:
             # Move particle
             self.move_particle(P, d_move)
 
-            # Continuous capture?
-            if mcdc.vrt.capture:
-                SigmaC  = P.cell.material.SigmaC[P.g]
-                P.wgt  *= np.exp(-d_move*SigmaC)
-
             # =================================================================
             # Perform event
             # =================================================================    
@@ -455,9 +381,9 @@ class Simulator:
                 self.move_particle(P, d)
 
                 # Increment index
-                P.census_idx += 1
+                P.time_idx += 1
                 # Not final census?
-                if P.census_idx < len(self.census_time):
+                if P.time_idx < len(self.census_time):
                     # Store for next time census
                     self.bank_stored.append(P.create_copy())
                 P.alive = False
@@ -473,10 +399,6 @@ class Simulator:
             # Score eigenvalue tallies
             if self.mode_eigenvalue:
                 wgt = P.wgt_old
-                # Continuous capture?
-                if mcdc.vrt.capture:
-                    SigmaC  = P.cell_old.material.SigmaC[P.g_old]
-                    wgt     = (P.wgt_old-P.wgt)/(P.distance*SigmaC)
 
                 nu       = P.cell_old.material.nu[P.g_old]
                 SigmaF   = P.cell_old.material.SigmaF[P.g_old]
@@ -490,18 +412,6 @@ class Simulator:
             # Reset particle record
             P.reset_record()
 
-            # Cutoff?
-            if P.alive and P.wgt <= mcdc.vrt.wgt_roulette:
-                # Russian-roulette
-                p_survive = P.wgt/mcdc.vrt.wgt_survive
-                xi = mcdc.random.rng()
-                if xi < p_survive:
-                    # Survive
-                    P.wgt = mcdc.vrt.wgt_survive
-                else:
-                    # Terminate
-                    P.alive = False
-            
     # =========================================================================
     # Particle transports
     # =========================================================================
@@ -510,11 +420,6 @@ class Simulator:
         xi     = mcdc.random.rng()
         SigmaT = P.cell.material.SigmaT[P.g]
 
-        # Continuous capture?
-        if mcdc.vrt.capture:
-            SigmaC  = P.cell.material.SigmaC[P.g]
-            SigmaT -= SigmaC
-        
         SigmaT += VERY_SMALL # To ensure non-zero value
         d_coll  = -np.log(xi)/SigmaT
         return d_coll
@@ -555,24 +460,6 @@ class Simulator:
         SigmaS = P.cell.material.SigmaS[P.g]
         SigmaF = P.cell.material.SigmaF[P.g]
         
-        # Continuous capture?
-        if mcdc.vrt.capture:
-            SigmaT -= SigmaC
-
-        # Implicit fission?
-        if mcdc.vrt.fission:
-            # Forced fission
-            self.collision_fission(P)
-            
-            # Revive the current particle and set the post-collision weight
-            P.alive    = True
-            P.wgt_post = P.wgt*(SigmaT-SigmaF)/SigmaT
-            
-            # Modify SigmaT and SigmaF 
-            # to make the following reaction type sampling consistent
-            SigmaT -= SigmaF
-            SigmaF  = 0.0
-
         # Scattering or absorption?
         xi = mcdc.random.rng()*SigmaT
         if SigmaS > xi:
@@ -648,26 +535,9 @@ class Simulator:
         nu          = P.cell.material.nu[P.g]
         G           = len(SigmaF_diff)
 
-        # Implicit fission?
-        iFission = 1.0 # Multiplying factor
-        if mcdc.vrt.fission:
-            SigmaT = P.cell.material.SigmaT[P.g]
-            SigmaC = P.cell.material.SigmaC[P.g]
-            if mcdc.vrt.capture:
-                SigmaT -= SigmaC
-            iFission = SigmaF/SigmaT
-        
-        # Set fission neutron weight and effective nu
-        if mcdc.vrt.wgt_roulette == 0.0:
-            wgt    = P.wgt*iFission
-            nu_eff = nu
-        else:
-            wgt    = mcdc.vrt.wgt_survive
-            nu_eff = P.wgt/wgt*nu*iFission
-
         # Sample number of fission neutrons
         #   in fixed-source, k_eff = 1.0
-        N = floor(nu_eff/self.k_eff + mcdc.random.rng())
+        N = floor(nu/self.k_eff + mcdc.random.rng())
 
         # Push fission neutrons to bank
         for n in range(N):
@@ -683,5 +553,5 @@ class Simulator:
             dir = self.isotropic_dir.sample()
             
             # Bank
-            self.bank_fission.append(Particle(P.pos, dir, g_out, P.time, wgt, 
-                                              P.cell, P.census_idx))
+            self.bank_fission.append(Particle(P.pos, dir, g_out, P.time, P.wgt, 
+                                              P.cell, P.time_idx))

@@ -16,19 +16,19 @@ x_mid = 0.5*(x[:-1]+x[1:])
 
 # Results
 with h5py.File('output.h5', 'r') as f:
-    phi         = f['tally1/flux/mean'][:]/dx
-    phi_sd      = f['tally1/flux/sdev'][:]/dx
-    phi_face    = f['tally1/flux-face/mean'][:]
-    phi_face_sd = f['tally1/flux-face/sdev'][:]
-    J         = f['tally1/current/mean'][:,0]/dx
-    J_sd      = f['tally1/current/sdev'][:,0]/dx
-    J_face    = f['tally1/current-face/mean'][:,0]
-    J_face_sd = f['tally1/current-face/sdev'][:,0]
+    phi         = f['tally1/flux/mean'][:]/dx/2
+    phi_sd      = f['tally1/flux/sdev'][:]/dx/2
+    phi_face    = f['tally1/flux-face/mean'][:]/2
+    phi_face_sd = f['tally1/flux-face/sdev'][:]/2
+    J         = f['tally1/current/mean'][:,0]/dx/2
+    J_sd      = f['tally1/current/sdev'][:,0]/dx/2
+    J_face    = f['tally1/current-face/mean'][:,0]/2
+    J_face_sd = f['tally1/current-face/sdev'][:,0]/2
 
-    leak_left     = f['tally2/partial_crossing/mean'][0,0]
-    leak_left_sd  = f['tally2/partial_crossing/sdev'][0,0]
-    leak_right    = f['tally2/partial_crossing/mean'][1,1]
-    leak_right_sd = f['tally2/partial_crossing/sdev'][1,1]
+    leak_left     = f['tally2/partial_crossing/mean'][0,0]/2
+    leak_left_sd  = f['tally2/partial_crossing/sdev'][0,0]/2
+    leak_right    = f['tally2/partial_crossing/mean'][1,1]/2
+    leak_right_sd = f['tally2/partial_crossing/sdev'][1,1]/2
 
 print("leak left:",leak_left,"+/-",leak_left_sd)
 print("leak right:",leak_right,"+/-",leak_right_sd)
