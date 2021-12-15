@@ -8,7 +8,7 @@ from mcdc.point import Point
 # =============================================================================
 
 class Particle:
-    def __init__(self, pos, dir, g, time, wgt, cell, census_idx):
+    def __init__(self, pos, dir, g, time, wgt, cell, time_idx):
         # Particle state
         self.pos   = pos  # cm
         self.dir   = dir
@@ -31,7 +31,7 @@ class Particle:
         self.wgt_post = None # Post-collision
 
         # Census
-        self.census_idx = census_idx
+        self.time_idx = time_idx
 
         # Particle loop records
         self.distance         = 0.0   # distance traveled during a loop
@@ -56,7 +56,7 @@ class Particle:
 
     def create_copy(self):
         return Particle(self.pos, self.dir, self.g, self.time, self.wgt, 
-                        self.cell, self.census_idx)
+                        self.cell, self.time_idx)
         
 # =============================================================================
 # Source
@@ -72,7 +72,7 @@ class Source(ABC):
 
 class SourceSimple(Source):
     def __init__(self, pos, dir, g, time, prob=1.0, wgt=1.0, cell=None, 
-                 census_idx=None):
+                 time_idx=None):
         Source.__init__(self, prob)
         self.pos  = pos
         self.dir  = dir
@@ -80,7 +80,7 @@ class SourceSimple(Source):
         self.time = time
         self.wgt  = wgt
         self.cell = cell
-        self.census_idx = census_idx
+        self.time_idx = time_idx
 
     def get_particle(self):
         pos  = self.pos.sample()
@@ -89,6 +89,6 @@ class SourceSimple(Source):
         time = self.time.sample()
         wgt  = self.wgt
         cell = self.cell
-        census_idx = self.census_idx
+        time_idx = self.time_idx
         dir.normalize()
-        return Particle(pos, dir, g, time, wgt, cell, census_idx)
+        return Particle(pos, dir, g, time, wgt, cell, time_idx)

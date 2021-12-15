@@ -7,7 +7,7 @@ from math   import floor, ceil
 import mcdc.random
 import mcdc.mpi
 
-from mcdc.mpi      import bank_passing
+from mcdc.mpi      import bank_scanning, bank_passing
 from mcdc.particle import Particle
 from mcdc.misc     import binary_search
 
@@ -44,273 +44,34 @@ class PCT(ABC):
 # Simple Sampling
 # ==============================================================================
 
-class PCT_SSU(PCT):
+class PCT_SS(PCT):
     def __call__(self, bank, M):
-        """Simple Sampling - Uniform"""
+        """Simple Sampling"""
 
-        # Starting and ending of global indices
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
+        # Scan the bank
+        idx_start, N_local, N = bank_scanning(bank)
 
         # Locally count sampled particles
-        sample_count = np.zeros(N_local, dtype=int)
+        count = np.zeros(N_local, dtype=int)
         for i in range(M):
             xi  = mcdc.random.rng()
-            idx = floor(xi*N)
+            idx = floor(xi*N) - idx_start
 
             # Local?
-            if i_start <= idx and idx < i_end:
-                idx_local = idx - i_start
-                sample_count[idx_local] += 1
+            if 0 <= idx and idx < N_local:
+                count[idx] += 1
 
         # Set bank_sample
         bank_sample = []
         w_factor    = N/M
         for i in range(N_local):
-            for j in range(sample_count[i]):
+            for j in range(count[i]):
                 P = bank[i].create_copy()
-                # Set weight
                 P.wgt *= w_factor
                 bank_sample.append(P)
 
         # Skip ahead RNG
         mcdc.random.rng.skip_ahead(M, stride=1, rebase=True)
- 
-        # Accordingly pass/distribute sampled particles
-        return bank_passing(bank_sample)
-
-
-class PCT_SSW(PCT):
-    def __call__(self, bank, M):
-        """Simple Sampling - Weight-based"""
-
-        # Starting and ending indices in the global bank
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
-
-        # Weight CDF
-        w_cdf = np.zeros(N+1)
-        for i in range(N_local):
-            idx = i_start + i
-            w_cdf[idx+1] = w_cdf[idx] + bank[i].wgt
-        for i in range(N - i_end):
-            idx = i_end + i
-            w_cdf[idx+1] = w_cdf[idx]
-        # Parallel reduce
-        buff = np.zeros_like(w_cdf)
-        mcdc.mpi.allreduce(w_cdf, buff)
-        w_cdf = buff
-
-        # Total weight
-        W = w_cdf[-1]
-
-        # Locally count sampled particles
-        sample_count = np.zeros(N_local, dtype=int)
-        for i in range(M):
-            xi  = mcdc.random.rng()
-            wgt = xi*W
-            idx = binary_search(wgt,w_cdf)
-            
-            # Local?
-            if i_start <= idx and idx < i_end:
-                idx_local = idx - i_start
-                sample_count[idx_local] += 1
-
-        # Set bank_sample
-        bank_sample  = []
-        w_prime = W/M
-        for i in range(N_local):
-            for j in range(sample_count[i]):
-                P = bank[i].create_copy()
-                # Set weight
-                P.wgt = w_prime
-                bank_sample.append(P)
-        
-        # Skip ahead RNG
-        mcdc.random.rng.skip_ahead(M, stride=1, rebase=True)
- 
-        # Accordingly pass/distribute sampled particles
-        return bank_passing(bank_sample)
-
-
-# ==============================================================================
-# Duplicate-Discard
-# ==============================================================================
-
-class PCT_DDU(PCT):
-    def __call__(self, bank, M):
-        """Duplicate-Discard - Uniform"""
-
-        # Starting and ending of global indices
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
-
-        # Duplicate or Discard?
-        if M >= N:
-            # =================================================================
-            # Duplicate
-            # =================================================================
-
-            # Copies reserved
-            N_copies = floor(M/N)
-
-            diff = M - N_copies*N
-
-            # Locally count sampled particles
-            sample_count = np.ones(N_local, dtype=int)*N_copies
-            for i in range(diff):
-                xi  = mcdc.random.rng()
-                idx = floor(xi*N)
-
-                # Local?
-                if i_start <= idx and idx < i_end:
-                    idx_local = idx - i_start
-                    sample_count[idx_local] += 1
-
-            # Set bank_sample
-            bank_sample = []
-            w_factor    = N/M
-            for i in range(N_local):
-                for j in range(sample_count[i]):
-                    P = bank[i].create_copy()
-                    # Set weight
-                    P.wgt *= w_factor
-                    bank_sample.append(P)
-        else:
-            # =================================================================
-            # Discard
-            # =================================================================
-
-            diff = N - M
-
-            # Surviving index (for sampling)
-            idx_survive = np.arange(N)
-            s_start     = i_start
-            s_end       = i_end
-
-            # Locally discard particles
-            for i in range(diff):
-                xi    = mcdc.random.rng()
-                idx_s = floor(xi*(N-i))
-                idx   = idx_survive[idx_s]
-
-                # Delete in idx_survive
-                idx_survive = np.delete(idx_survive, idx_s)
-
-                # Change local index?
-                if idx_s < s_start:
-                    s_start -= 1
-                    s_end   -= 1
-                elif idx_s < s_end:
-                    s_end -= 1
-
-            # Set bank_sample
-            bank_sample = []
-            w_factor    = N/M
-            for i in range(s_start,s_end):
-                idx = idx_survive[i]
-                idx_local = idx - i_start
-                P = bank[idx_local].create_copy()
-                # Set weight
-                P.wgt *= w_factor
-                bank_sample.append(P)
-
-        # Skip ahead RNG
-        mcdc.random.rng.skip_ahead(diff, stride=1, rebase=True)
- 
-        # Accordingly pass/distribute sampled particles
-        return bank_passing(bank_sample)
-
-
-class PCT_DDUOri(PCT):
-    def __call__(self, bank, M):
-        """Duplicate-Discard (Original) - Uniform"""
-
-        # Starting and ending of global indices
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
-
-        # Duplicate or Discard?
-        if M >= N:
-            # =================================================================
-            # Duplicate
-            # =================================================================
-
-            diff = M - N
-
-            # Locally count sampled particles
-            sample_count = np.ones(N_local, dtype=int)
-            for i in range(diff):
-                xi  = mcdc.random.rng()
-                idx = floor(xi*N)
-
-                # Local?
-                if i_start <= idx and idx < i_end:
-                    idx_local = idx - i_start
-                    sample_count[idx_local] += 1
-
-            # Set bank_sample
-            bank_sample = []
-            w_factor    = N/M
-            for i in range(N_local):
-                for j in range(sample_count[i]):
-                    P = bank[i].create_copy()
-                    # Set weight
-                    P.wgt *= w_factor
-                    bank_sample.append(P)
-        else:
-            # =================================================================
-            # Discard
-            # =================================================================
-
-            diff = N - M
-
-            # Surviving index (for sampling)
-            idx_survive = np.arange(N)
-            s_start     = i_start
-            s_end       = i_end
-
-            # Locally discard particles
-            for i in range(diff):
-                xi    = mcdc.random.rng()
-                idx_s = floor(xi*(N-i))
-                idx   = idx_survive[idx_s]
-
-                # Delete in idx_survive
-                idx_survive = np.delete(idx_survive, idx_s)
-
-                # Change local index?
-                if idx_s < s_start:
-                    s_start -= 1
-                    s_end   -= 1
-                elif idx_s < s_end:
-                    s_end -= 1
-
-            # Set bank_sample
-            bank_sample = []
-            w_factor    = N/M
-            for i in range(s_start,s_end):
-                idx = idx_survive[i]
-                idx_local = idx - i_start
-                P = bank[idx_local].create_copy()
-                # Set weight
-                P.wgt *= w_factor
-                bank_sample.append(P)
-
-        # Skip ahead RNG
-        mcdc.random.rng.skip_ahead(diff, stride=1, rebase=True)
  
         # Accordingly pass/distribute sampled particles
         return bank_passing(bank_sample)
@@ -320,121 +81,61 @@ class PCT_DDUOri(PCT):
 # Splitting-Roulette
 # =============================================================================
 
-class PCT_SRU(PCT):
+class PCT_SR(PCT):
     def __call__(self, bank, M):
-        """Splitting-Roulette - Uniform"""
+        """Splitting-Roulette"""
 
-        # Starting and ending indices in the global bank
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
+        # Scan the bank
+        idx_start, N_local, N = bank_scanning(bank)
 
         # Set RNG wrt bank index
-        mcdc.random.rng.skip_ahead(i_start, stride=1, rebase=True)
+        mcdc.random.rng.skip_ahead(idx_start, stride=1, rebase=True)
 
-        # Surviving probability
-        ps = float(M)/float(N)
+        # Sampling probability
+        p = float(M)/float(N)
+    
+        # Number of splittings
+        n_split = floor(p)
+    
+        # Roulette surviving probability
+        p_survive = p - n_split
 
-        # Perform split-roulette to all particles in local bank, 
+        # Perform split-roulette to all particles in local bank,
         # and put surviving particles in bank_sample
-        bank_sample  = []
-        idx = 0
+        bank_sample = []
         for P in bank:
-            # Surviving probability and weight
-            prob_survive = ps
-            w_survive    = P.wgt/prob_survive
+            # New weight
+            w_prime = P.wgt/p
 
             # Splitting
-            n_survive = floor(prob_survive)
-            for i in range(n_survive):
+            for i in range(n_split):
                 bank_sample.append(P.create_copy())
-                bank_sample[-1].wgt = w_survive
+                bank_sample[-1].wgt = w_prime
 
             # Russian roulette
-            xi            = mcdc.random.rng()
-            prob_survive -= n_survive
-            if xi < prob_survive:
+            xi = mcdc.random.rng()
+            if xi < p_survive:
                 bank_sample.append(P.create_copy())
-                bank_sample[-1].wgt = w_survive
-            idx +=1
+                bank_sample[-1].wgt = w_prime
 
         # Rebase RNG (skipping the numbers used for popctrl)
-        mcdc.random.rng.skip_ahead(N-i_start, rebase=True, stride=1)
+        mcdc.random.rng.skip_ahead(N-idx_start, rebase=True, stride=1)
 
         # Accordingly pass/distribute sampled particles
-        return bank_passing(bank_sample, redistribute=True)
-
-
-class PCT_SRW(PCT):
-    def __call__(self, bank, M):
-        """Splitting-Roulette - Weight-based"""
-
-        # Starting and ending indices in the global bank
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
-
-        # Set RNG wrt bank index
-        mcdc.random.rng.skip_ahead(i_start, stride=1, rebase=True)
-
-        # Total weight of global bank
-        W_local = np.zeros(1)
-        for P in bank:
-            W_local[0] += P.wgt
-        buff = np.zeros(1)
-        mcdc.mpi.allreduce(W_local, buff)
-        W = buff[0]
-
-        # Surviving weight
-        w_survive = W/M
-
-        # Perform split-roulette to all particles in local bank, 
-        # and put surviving particles in bank_sample
-        bank_sample  = []
-        idx = 0
-        for P in bank:
-            # Surviving probability
-            prob_survive = P.wgt/w_survive
-
-            # Splitting
-            n_survive = floor(prob_survive)
-            for i in range(n_survive):
-                bank_sample.append(P.create_copy())
-                bank_sample[-1].wgt = w_survive
-
-            # Russian roulette
-            xi            = mcdc.random.rng()
-            prob_survive -= n_survive
-            if xi < prob_survive:
-                bank_sample.append(P.create_copy())
-                bank_sample[-1].wgt = w_survive
-            idx +=1
-
-        # Rebase RNG (skipping the numbers used for popctrl)
-        mcdc.random.rng.skip_ahead(N-i_start, rebase=True, stride=1)
-
-        # Accordingly pass/distribute sampled particles
-        return bank_passing(bank_sample, redistribute=True)
+        return bank_passing(bank_sample)
 
 
 # =============================================================================
 # Combing
 # =============================================================================
 
-class PCT_COU(PCT):
+class PCT_CO(PCT):
     def __call__(self, bank, M):
-        """Particle Combing Technique - Uniform"""
+        """Particle Combing Technique"""
 
-        # Starting and ending indices in the global bank
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
+        # Scan the bank
+        idx_start, N_local, N = bank_scanning(bank)
+        idx_end = idx_start + N_local
 
         # Teeth distance
         td = N/M
@@ -444,17 +145,16 @@ class PCT_COU(PCT):
         offset = xi*td
 
         # First hiting tooth
-        tooth_start = ceil((i_start-offset)/td)
+        tooth_start = ceil((idx_start-offset)/td)
 
         # Last hiting tooth
-        tooth_end = floor((i_end-offset)/td) + 1
+        tooth_end = floor((idx_end-offset)/td) + 1
 
         # Locally sample particles from bank
         bank_sample = []
-        idx = 0
         for i in range(tooth_start, tooth_end):
             tooth = i*td+offset
-            idx   = floor(tooth) - i_start
+            idx   = floor(tooth) - idx_start
             P = bank[idx].create_copy()
             # Set weight
             P.wgt *= td
@@ -466,38 +166,39 @@ class PCT_COU(PCT):
         # Accordingly pass/distribute sampled particles
         return bank_passing(bank_sample)
 
-class PCT_COxU(PCT):
+
+# =============================================================================
+# New Combing
+# =============================================================================
+
+class PCT_COX(PCT):
     def __call__(self, bank, M):
-        """New Particle Combing Technique - Uniform"""
+        """New Particle Combing Technique"""
 
-        # Starting and ending indices in the global bank
-        N_local = len(bank)
-        i_start, i_end = mcdc.mpi.global_idx(N_local)
-
-        # Broadcast total size
-        N = mcdc.mpi.bcast(np.array([i_end], dtype=int), mcdc.mpi.last)[0]
+        # Scan the bank
+        idx_start, N_local, N = bank_scanning(bank)
+        idx_end = idx_start + N_local
 
         # Teeth distance
         td = N/M
 
         # First possible hiting tooth index (and set rng base)
-        tooth_start = floor(i_start/N*M) # i_start/td
+        tooth_start = floor(idx_start/td)
         mcdc.random.rng.skip_ahead(tooth_start, stride=1, rebase=True)
 
         # Last possible hiting tooth
-        tooth_end = ceil(i_end/N*M) # i_end/td
+        tooth_end = ceil(idx_end/td)
 
         # Locally sample particles from bank
         bank_sample = []
-        idx = 0
         for i in range(tooth_start, tooth_end):
             # Tooth
             xi    = mcdc.random.rng()
             tooth = (xi+i)*td
 
             # Check if local
-            if tooth >= i_start and tooth < i_end:
-                idx   = floor(tooth) - i_start
+            if tooth >= idx_start and tooth < idx_end:
+                idx   = floor(tooth) - idx_start
                 P = bank[idx].create_copy()
                 # Set weight
                 P.wgt *= td
@@ -509,102 +210,85 @@ class PCT_COxU(PCT):
         # Accordingly pass/distribute sampled particles
         return bank_passing(bank_sample)
 
-class PCT_COW(PCT):
+
+# ==============================================================================
+# Duplicate-Discard
+# ==============================================================================
+
+class PCT_DD(PCT):
     def __call__(self, bank, M):
-        """Particle Combing Technique - Weight-based [Booth 1996]"""
+        """Duplicate-Discard"""
 
-        # Weight CDF
-        N_local = len(bank)
-        w_cdf   = np.zeros(N_local+1)
-        for i in range(N_local):
-            w_cdf[i+1] = w_cdf[i] + bank[i].wgt
+        # Scan the bank
+        idx_start, N_local, N = bank_scanning(bank)
+
+        # Duplicate or Discard?
+        if M >= N:
+            # =================================================================
+            # Duplicate
+            # =================================================================
+
+            # Copies reserved
+            N_copy = floor(M/N)
+
+            N_sample = M - N_copy*N
+
+            # Locally count sampled particles
+            count = np.ones(N_local, dtype=int)*N_copy
+            for i in range(N_sample):
+                xi  = mcdc.random.rng()
+                idx = floor(xi*N) - idx_start
+
+                # Local?
+                if 0 <= idx and idx < N_local:
+                    count[idx] += 1
+
+            # Set bank_sample
+            bank_sample = []
+            w_factor    = N/M
+            for i in range(N_local):
+                for j in range(count[i]):
+                    P = bank[i].create_copy()
+                    P.wgt *= w_factor
+                    bank_sample.append(P)
+        else:
+            # =================================================================
+            # Discard
+            # =================================================================
+
+            N_sample = N - M
+
+            discard_flag = np.full((N,1), False)
+
+            for i in range(N_sample):
+                while True:
+                    # Sample discard index
+                    xi = mcdc.random.rng()
+                    idx = floor(xi*N)
+
+                    # Flag site if not discarded yet
+                    if not discard_flag[idx]:
+                        discard_flag[idx] = True
+                        break
         
-        # Starting and ending weight CDF in the global bank
-        w_start, w_end = mcdc.mpi.global_wgt(w_cdf[-1])
-
-        # Readjust local weight CDF
-        w_cdf += w_start
-
-        # Broadcast total weight
-        W = mcdc.mpi.bcast(np.array([w_end]), mcdc.mpi.last)[0]
-
-        # Teeth distance
-        w_prime = W/M
-
-        # Tooth offset
-        xi       = mcdc.random.rng()
-        w_offset = xi*w_prime
-
-        # First hiting tooth
-        tooth_start = ceil((w_cdf[0]-w_offset)/w_prime)
-
-        # Last hiting tooth
-        tooth_end = floor((w_cdf[-1]-w_offset)/w_prime) + 1
-
-        # Locally sample particles from bank
-        bank_sample = []
-        idx = 0
-        for i in range(tooth_start, tooth_end):
-            wgt = (xi+i)*w_prime
-            idx += binary_search(wgt,w_cdf[idx:])
-            P = bank[idx].create_copy()
-            # Set weight
-            P.wgt = w_prime
-            bank_sample.append(P)
-
-        # Rebase RNG (skipping the numbers used for popctrl)
-        mcdc.random.rng.rebase()
-        
-        # Accordingly pass/distribute sampled particles
-        return bank_passing(bank_sample)
-
-class PCT_COxW(PCT):
-    def __call__(self, bank, M):
-        """New Particle Combing Technique"""
-
-        # Weight CDF
-        N_local = len(bank)
-        w_cdf   = np.zeros(N_local+1)
-        for i in range(N_local):
-            w_cdf[i+1] = w_cdf[i] + bank[i].wgt
-        
-        # Starting and ending weight CDF in the global bank
-        w_start, w_end = mcdc.mpi.global_wgt(w_cdf[-1])
-
-        # Readjust local weight CDF
-        w_cdf += w_start
-
-        # Broadcast total weight
-        W = mcdc.mpi.bcast(np.array([w_end]), mcdc.mpi.last)[0]
-
-        # Teeth distance
-        w_prime = W/M
-
-        # First possible hiting tooth index (and set rng base)
-        tooth_start = floor(w_cdf[0]/w_prime)
-        mcdc.random.rng.skip_ahead(tooth_start, stride=1, rebase=True)
-
-        # Last possible hiting tooth
-        tooth_end = ceil(w_cdf[-1]/w_prime)
-
-        # Locally sample particles from bank
-        bank_sample = []
-        idx = 0
-        for i in range(tooth_start, tooth_end):
-            # Tooth
-            xi  = mcdc.random.rng()
-            wgt = (xi+i)*w_prime
-
-            # Check if local
-            if wgt >= w_cdf[0] and wgt < w_cdf[-1]:
-                idx += binary_search(wgt,w_cdf[idx:])
-                P = bank[idx].create_copy()
-                # Set weight
-                P.wgt = w_prime
-                bank_sample.append(P)
+                    # If the site is already discarded, we resample index.
+                    # In other words, we are performing a rejection sampling.
+    
+            # Copy the un-discarded sites
+            bank_sample = []
+            w_factor    = N/M
+            for i in range(N_local):
+                idx = idx_start + i
+                if not discard_flag[idx]:
+                    P = bank[i].create_copy()
+                    P.wgt *= w_factor
+                    bank_sample.append(P)
             
-        # Rebase RNG (skipping the numbers used for popctrl)
-        mcdc.random.rng.skip_ahead(M-tooth_start, stride=1, rebase=True)
-        
+            # Reset flag
+            for i in range(N): discard_flag[i] = False
+
+        # Skip ahead RNG
+        mcdc.random.rng.skip_ahead(N_sample, stride=1, rebase=True)
+ 
         # Accordingly pass/distribute sampled particles
         return bank_passing(bank_sample)

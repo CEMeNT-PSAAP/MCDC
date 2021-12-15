@@ -17,7 +17,7 @@ master = rank == 0
 work_size_total = None
 work_size       = None
 work_start      = None
-work_end        = None
+work_end        = None # work_start + work_size
 
 # Timer
 Wtime = MPI.Wtime
@@ -37,8 +37,8 @@ def isend(obj, dest):
     return comm.isend(obj, dest)
 
 # Collective
-def bcast(obj, source):
-    return comm.bcast(obj, source)
+def bcast(buff, root):
+    return comm.Bcast(buff, root)
 def exscan(var, buff):
     comm.Exscan(var, buff, MPI.SUM)
 def reduce_master(var, buff):
@@ -65,28 +65,6 @@ def global_wgt(W):
     end   = buff[0] + W
     return start, end
 
-def work_idx(N):
-    # Evenly distribute elements
-    idx_size = floor(N/size)
-
-    # Starting index (based on even distribution)
-    idx_start = idx_size*rank
-
-    # Count reminder
-    rem = N%size
-
-    # Assign reminder and update starting index
-    if rank < rem:
-        idx_size  += 1
-        idx_start += rank
-    else:
-        idx_start += rem
-
-    # Ending work inindex
-    idx_end = idx_start + idx_size
-
-    return idx_start, idx_size, idx_end
-
 def distribute_work(N):
     global work_size_total, work_size, work_start, work_end
 
@@ -94,7 +72,23 @@ def distribute_work(N):
     work_size_total = N
 
     # Evenly distribute work
-    work_start, work_size, work_end = work_idx(N)
+    work_size = floor(N/size)
+
+    # Starting index (based on even distribution)
+    work_start = work_size*rank
+
+    # Count reminder
+    rem = N%size
+
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size  += 1
+        work_start += rank
+    else:
+        work_start += rem
+
+    # Ending work index
+    work_end = work_start + work_size
 
 
 # =============================================================================
@@ -117,29 +111,37 @@ def normalize_weight(bank, norm):
     for P in bank:
         P.wgt *= norm/W
 
-def bank_passing(bank, redistribute=False):
-    """Romano [2012]'s parallel bank-passing algorithm"""
-    # Starting and ending indices in the global bank_sample
-    N_local = len(bank)
-    i_start, i_end = global_idx(N_local)
+def bank_scanning(bank):
+    N_local   = len(bank)
 
-    # Redistribute work?
-    if redistribute:
-        # Broadcast total size
-        N = bcast(np.array([i_end], dtype=int), last)[0]
-        
-        # Redistribute work
-        distribute_work(N)
+    # Starting index
+    buff = np.array([0], dtype=int)
+    exscan(np.array(N_local, dtype=int), buff)
+    idx_start = buff[0]
+
+    # Global size
+    buff[0] += N_local
+    bcast(buff, root=last)
+    N_global = buff[0]
+
+    return idx_start, N_local, N_global
+
+def bank_passing(bank):
+    # Scan the bank
+    idx_start, N_local, N = bank_scanning(bank)
+    idx_end = idx_start + N_local
+
+    distribute_work(N)
 
     # Need more or less?
-    more_left  = i_start < work_start
-    less_left  = i_start > work_start
-    more_right = i_end   > work_end
-    less_right = i_end   < work_end
+    more_left  = idx_start < work_start
+    less_left  = idx_start > work_start
+    more_right = idx_end   > work_end
+    less_right = idx_end   < work_end
 
     # Offside?
-    offside_left  = i_end   <= work_start
-    offside_right = i_start >= work_end
+    offside_left  = idx_end   <= work_start
+    offside_right = idx_start >= work_end
 
     # If offside, need to receive first
     if offside_left:
@@ -153,11 +155,11 @@ def bank_passing(bank, redistribute=False):
 
     # Send
     if more_left:
-        n = work_start - i_start
+        n = work_start - idx_start
         request_left = isend(bank[:n], left)
         bank = bank[n:]
     if more_right:
-        n = i_end - work_end
+        n = idx_end - work_end
         request_right = isend(bank[-n:], right)
         bank = bank[:-n]
 
