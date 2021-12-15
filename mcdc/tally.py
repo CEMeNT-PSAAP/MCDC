@@ -3,7 +3,6 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 import mcdc.mpi
-import mcdc.vrt
 
 from mcdc.misc     import binary_search
 from mcdc.constant import EPSILON
@@ -105,10 +104,6 @@ class FilterTime(Filter):
                 return [], [], [], [], []
             else:
                 wgt = wgt_init
-                # Continuous capture?
-                if mcdc.vrt.capture:
-                    SigmaC  = P.cell_old.material.SigmaC[P.g_old]
-                    wgt     = (wgt_init-wgt_final)/(P.distance*SigmaC)
                 return bins, [wgt*P.distance], [], [], []
 
         # Edges hit
@@ -130,15 +125,6 @@ class FilterTime(Filter):
         # Weight at each grid and weight average at each bin
         wgt     = np.ones(len(edges))*wgt_init
         wgt_avg = np.ones(len(bins))*wgt_init
-
-        # Continuous capture?
-        if mcdc.vrt.capture:
-            SigmaC = P.cell_old.material.SigmaC[P.g_old]
-            for i in range(len(wgt)):
-                wgt[i] = wgt[i-1]*np.exp(-SigmaC*distance[i])
-            wgt_avg[0]    = (wgt_init-wgt[0])/(distance[0]*SigmaC)
-            wgt_avg[-1]   = (wgt[-1]-wgt_final)/(distance[-1]*SigmaC)
-            wgt_avg[1:-1] = (wgt[:-1]-wgt[1:])/(distance[1:-1]*SigmaC)
 
         # Track-length-rate scored at each grid
         TLR = wgt*speed
@@ -205,10 +191,6 @@ class FilterCell(FilterSpatial):
     def __call__(self, P):
         wgt  = p.wgt_old
         bins = [binary_search(P.cell_old.id, self.grid) + 1]
-        # Continuous capture?
-        if mcdc.vrt.capture:
-            SigmaC  = P.cell_old.material.SigmaC[P.g_old]
-            wgt     = (P.wgt_old-P.wgt)/(P.distance*SigmaC)
         TL   = [wgt*P.distance]
         return bins, TL, [], [], []
 
@@ -246,10 +228,6 @@ class FilterPlaneX(FilterSpatial):
         # Only one bin crossed?
         if len(bins) == 1:
             wgt = wgt_init
-            # Continuous capture?
-            if mcdc.vrt.capture:
-                SigmaC  = P.cell_old.material.SigmaC[P.g_old]
-                wgt     = (wgt_init-wgt_final)/(P.distance*SigmaC)
             return bins, [wgt*P.distance], [], [], []
 
         # Faces hit (and sense)
@@ -275,24 +253,6 @@ class FilterPlaneX(FilterSpatial):
         wgt     = np.ones(len(faces))*wgt_init
         wgt_avg = np.ones(len(bins))*wgt_init
         
-        # Continuous capture?
-        if mcdc.vrt.capture:
-            SigmaC = P.cell_old.material.SigmaC[P.g_old]
-            if go_plus:
-                for i in range(len(wgt)):
-                    wgt[i] = wgt[i-1]*np.exp(-SigmaC*distance[i])
-                wgt_leftmost  = wgt_init
-                wgt_rightmost = wgt_final
-            else:
-                shift = 1-len(wgt)
-                for i in range(len(wgt)-1,-1,-1):
-                    wgt[i] = wgt[i+shift]*np.exp(-SigmaC*distance[i+1])
-                wgt_leftmost  = wgt_final
-                wgt_rightmost = wgt_init
-            wgt_avg[0]    = abs(wgt_leftmost-wgt[0])/(distance[0]*SigmaC)
-            wgt_avg[-1]   = abs(wgt[-1]-wgt_rightmost)/(distance[-1]*SigmaC)
-            wgt_avg[1:-1] = abs(wgt[:-1]-wgt[1:])/(distance[1:-1]*SigmaC)
-
         # Track-length-rate scored at each face
         TLR = wgt/abs(dir)
                 
