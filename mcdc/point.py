@@ -26,12 +26,6 @@ class Point:
     def __imul__(self, other):
         return Point(self.x*other, self.y*other, self.z*other)
 
-    # Copy other Point
-    def copy(self, other):
-        self.x = other.x
-        self.y = other.y
-        self.z = other.z
-        
     # Magnitude
     def magnitude(self):
         return np.sqrt(self.x**2 + self.y**2 + self.z**2)
