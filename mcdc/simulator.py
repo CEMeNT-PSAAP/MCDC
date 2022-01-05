@@ -38,13 +38,14 @@ class Simulator:
         self.stride = LCG_STRIDE
 
         # Eigenvalue mode settings (see self.set_kmode)
-        #   TODO: alpha eigenvalue
+        #   TODO: alpha eigenvalue with delayed neutrons
         #   TODO: shannon entropy
         self.mode_eigenvalue = False
-        self.mode_k          = False # k-eigenvalue
         self.k_eff           = 1.0   # k effective that affects simulation
         self.N_iter          = 1     # number of iterations
         self.i_iter          = 0     # current iteration index
+        self.mode_alpha      = False
+        self.alpha_eff       = 0.0   # k effective that affects simulation
         
         # Population control settings (see self.set_pct)
         self.pct         = PCT_CO()
@@ -65,20 +66,27 @@ class Simulator:
         self.parallel_hdf5 = False # TODO
             
 
-    def set_kmode(self, N_iter=1, k_init=1.0):
+    def set_kmode(self, N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
         self.mode_eigenvalue = True
-        self.mode_k          = True
         self.N_iter          = N_iter
         self.k_eff           = k_init
+        self.mode_alpha      = alpha_mode
+        self.alpha_eff       = alpha_init
 
         # Mode-specific tallies
         # Accumulators
         self.nuSigmaF_sum = 0.0
+        if self.mode_alpha:
+            self.ispeed_sum = 0.0
         # MPI buffer
         self.nuSigmaF_buff = np.array([0.0])
-        # Iteration solution for k
+        if self.mode_alpha:
+            self.ispeed_buff = np.array([0.0])
+        # Eigenvalue solution iterate
         if mcdc.mpi.master:
             self.k_mean = np.zeros(self.N_iter)
+            if self.mode_alpha:
+                self.alpha_mean = np.zeros(self.N_iter)
 
     def set_pct(self, pct='CO', census_time=[INF]):
         # Set technique
@@ -156,19 +164,31 @@ class Simulator:
 
                 # MPI Reduce nuSigmaF
                 mcdc.mpi.allreduce(self.nuSigmaF_sum, self.nuSigmaF_buff)
+                if self.mode_alpha:
+                    mcdc.mpi.allreduce(self.ispeed_sum, self.ispeed_buff)
                 
                 # Update keff
                 self.k_eff = self.nuSigmaF_buff[0]/self.N_hist
                 if mcdc.mpi.master:
                     self.k_mean[self.i_iter] = self.k_eff
+                
+                if self.mode_alpha:
+                    self.alpha_eff += (self.k_eff - 1.0)/(self.ispeed_buff[0]/self.N_hist)
+                    if mcdc.mpi.master:
+                        self.alpha_mean[self.i_iter] = self.alpha_eff
                             
                 # Reset accumulator
                 self.nuSigmaF_sum = 0.0
+                if self.mode_alpha:
+                    self.ispeed_sum = 0.0
                 
                 # Progress printout
                 #   TODO: print in table format 
                 if mcdc.mpi.master:
-                    print(self.i_iter,mcdc.mpi.work_size_total,self.k_eff)
+                    if not self.mode_alpha:
+                        print(self.i_iter,mcdc.mpi.work_size_total,self.k_eff)
+                    else:
+                        print(self.i_iter,mcdc.mpi.work_size_total,self.k_eff,self.alpha_eff)
                     sys.stdout.flush()
 
             # Simulation end?
@@ -246,6 +266,9 @@ class Simulator:
                 if self.mode_eigenvalue:
                     f.create_dataset("keff",data=self.k_mean)
                     self.k_mean.fill(0.0)
+                    if self.mode_alpha:
+                        f.create_dataset("alpha_eff",data=self.alpha_mean)
+                        self.alpha_mean.fill(0.0)
 
     # =========================================================================
     # SOURCE LOOP
@@ -428,6 +451,9 @@ class Simulator:
 
                 nuSigmaF = nu*SigmaF
                 self.nuSigmaF_sum += wgt*P.distance*nuSigmaF
+
+                if self.mode_alpha:
+                    self.ispeed_sum += wgt*P.distance/self.speed[P.g_old]
             
             # =================================================================
             # Closeout
@@ -445,6 +471,10 @@ class Simulator:
         SigmaT = P.cell.material.SigmaT[P.g]
 
         SigmaT += VERY_SMALL # To ensure non-zero value
+
+        if self.mode_alpha:
+            SigmaT += abs(self.alpha_eff)/self.speed[P.g]
+
         d_coll  = -np.log(xi)/SigmaT
         return d_coll
 
@@ -483,21 +513,33 @@ class Simulator:
         SigmaC = P.cell.material.SigmaC[P.g]
         SigmaS = P.cell.material.SigmaS[P.g]
         SigmaF = P.cell.material.SigmaF[P.g]
+
+        if self.mode_alpha:
+            SigmaT += abs(self.alpha_eff)/self.speed[P.g]
         
-        # Scattering or absorption?
+        # Sample and then implement reaction type
         xi = mcdc.random.rng()*SigmaT
-        if SigmaS > xi:
+        tot = SigmaS
+        if tot > xi:
             # Scattering
             self.collision_scattering(P)
         else:
-            # Fission or capture?
-            if SigmaS + SigmaF > xi:
+            tot += SigmaF
+            if tot > xi:
                 # Fission
                 self.collision_fission(P)
             else:
-                # Fission
-                # Capture
-                self.collision_capture(P)
+                tot += SigmaC
+                if tot > xi:
+                    # Capture
+                    self.collision_capture(P)
+                else:
+                    # Time-correction
+                    if self.alpha_eff > 0:
+                        P.alive = False
+                    else:
+                        P_out = Particle(P.pos, P.dir, P.g, P.time, P.wgt, P.cell, P.time_idx)
+                        self.bank_history.append(P_out)
     
     def collision_capture(self, P):
         P.alive = False
