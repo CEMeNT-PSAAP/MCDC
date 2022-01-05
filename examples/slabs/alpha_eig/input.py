@@ -78,7 +78,7 @@ simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies,
                            N_hist=1000)
 
 # Set k-eigenvalue mode parameters
-simulator.set_kmode(N_iter=110)
+simulator.set_kmode(N_iter=110, alpha_mode=True)
 
 # Run
 simulator.run()
