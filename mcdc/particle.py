@@ -38,8 +38,8 @@ class Particle:
         self.surface          = None  # surface object hit
 
     def save_previous_state(self):
-        self.pos_old.copy(self.pos)
-        self.dir_old.copy(self.dir)
+        self.pos_old = self.pos
+        self.dir_old = self.dir
         self.g_old    = self.g
         self.time_old = self.time
         self.wgt_old  = self.wgt
