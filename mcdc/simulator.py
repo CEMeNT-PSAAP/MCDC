@@ -18,15 +18,17 @@ from mcdc.misc         import binary_search
 
 
 class Simulator:
-    def __init__(self, speeds=[], cells=[], sources=[], tallies=[], N_hist = 0):
+    def __init__(self, speed=[], cells=[], sources=[], tallies=[], N_hist = 0,
+                 decay=[]):
 
         # Basic inputs
         #   TODO: run in batches
-        self.speeds  = speeds   # array of particle MG speeds
-        self.cells   = cells    # list of Cells (see geometry.py)
-        self.sources = sources  # list of Sources (see particle.py)
-        self.tallies = tallies  # list of Tallies (see tally.py)
-        self.N_hist  = N_hist   # number of histories
+        self.speed  = speed    # array of particle MG speed
+        self.cells   = cells   # list of Cells (see geometry.py)
+        self.sources = sources # list of Sources (see particle.py)
+        self.tallies = tallies # list of Tallies (see tally.py)
+        self.N_hist  = N_hist  # number of histories
+        self.decay  = decay    # array of precursor group decay constants
 
         # Output file
         self.output = "output" # .h5 output file name
@@ -36,16 +38,17 @@ class Simulator:
         self.stride = LCG_STRIDE
 
         # Eigenvalue mode settings (see self.set_kmode)
-        #   TODO: alpha eigenvalue
+        #   TODO: alpha eigenvalue with delayed neutrons
         #   TODO: shannon entropy
         self.mode_eigenvalue = False
-        self.mode_k          = False # k-eigenvalue
         self.k_eff           = 1.0   # k effective that affects simulation
         self.N_iter          = 1     # number of iterations
         self.i_iter          = 0     # current iteration index
+        self.mode_alpha      = False
+        self.alpha_eff       = 0.0   # k effective that affects simulation
         
         # Population control settings (see self.set_pct)
-        self.pct         = PCT_SS()
+        self.pct         = PCT_CO()
         self.census_time = [INF]
 
         # Particle banks
@@ -63,25 +66,34 @@ class Simulator:
         self.parallel_hdf5 = False # TODO
             
 
-    def set_kmode(self, N_iter=1, k_init=1.0):
+    def set_kmode(self, N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
         self.mode_eigenvalue = True
-        self.mode_k          = True
         self.N_iter          = N_iter
         self.k_eff           = k_init
+        self.mode_alpha      = alpha_mode
+        self.alpha_eff       = alpha_init
 
         # Mode-specific tallies
         # Accumulators
         self.nuSigmaF_sum = 0.0
+        if self.mode_alpha:
+            self.ispeed_sum = 0.0
         # MPI buffer
         self.nuSigmaF_buff = np.array([0.0])
-        # Iteration solution for k
+        if self.mode_alpha:
+            self.ispeed_buff = np.array([0.0])
+        # Eigenvalue solution iterate
         if mcdc.mpi.master:
             self.k_mean = np.zeros(self.N_iter)
+            if self.mode_alpha:
+                self.alpha_mean = np.zeros(self.N_iter)
 
-    def set_pct(self, pct='SS', census_time=[INF]):
+    def set_pct(self, pct='CO', census_time=[INF]):
         # Set technique
-        if pct == 'SS':
-            pass
+        if pct == 'None':
+            self.pct = PCT_NONE()
+        elif pct == 'SS':
+            self.pct = PCT_SS()
         elif pct == 'SR':
             self.pct = PCT_SR()
         elif pct == 'CO':
@@ -103,7 +115,16 @@ class Simulator:
     
     def run(self):
         # Start timer
+        self.time_pct   = 0.0
         self.time_total = mcdc.mpi.Wtime()
+
+        # Set group speed and decay constants
+        if len(self.speed) > 0:
+            for c in self.cells:
+                if not c.material.speed: c.material.speed = self.speed
+        if len(self.decay) > 0:
+            for c in self.cells:
+                if not c.material.decay: c.material.decay = self.decay
 
         # Set tally bins
         for T in self.tallies:
@@ -143,19 +164,31 @@ class Simulator:
 
                 # MPI Reduce nuSigmaF
                 mcdc.mpi.allreduce(self.nuSigmaF_sum, self.nuSigmaF_buff)
+                if self.mode_alpha:
+                    mcdc.mpi.allreduce(self.ispeed_sum, self.ispeed_buff)
                 
                 # Update keff
-                self.k_eff = self.nuSigmaF_buff[0]/mcdc.mpi.work_size_total
+                self.k_eff = self.nuSigmaF_buff[0]/self.N_hist
                 if mcdc.mpi.master:
                     self.k_mean[self.i_iter] = self.k_eff
+                
+                if self.mode_alpha:
+                    self.alpha_eff += (self.k_eff - 1.0)/(self.ispeed_buff[0]/self.N_hist)
+                    if mcdc.mpi.master:
+                        self.alpha_mean[self.i_iter] = self.alpha_eff
                             
                 # Reset accumulator
                 self.nuSigmaF_sum = 0.0
+                if self.mode_alpha:
+                    self.ispeed_sum = 0.0
                 
                 # Progress printout
                 #   TODO: print in table format 
                 if mcdc.mpi.master:
-                    print(self.i_iter,self.k_eff)
+                    if not self.mode_alpha:
+                        print(self.i_iter,mcdc.mpi.work_size_total,self.k_eff)
+                    else:
+                        print(self.i_iter,mcdc.mpi.work_size_total,self.k_eff,self.alpha_eff)
                     sys.stdout.flush()
 
             # Simulation end?
@@ -169,14 +202,19 @@ class Simulator:
                 if self.mode_eigenvalue:
                     # Normalize weight
                     mcdc.mpi.normalize_weight(self.bank_stored, self.N_hist)
+                tot = 0.0
+                for P in self.bank_stored:
+                    tot += P.wgt
 
                 # Rebase RNG for population control
                 mcdc.random.rng.skip_ahead(
                     mcdc.mpi.work_size_total-mcdc.mpi.work_start, rebase=True)
 
                 # Population control
+                click = mcdc.mpi.Wtime()
                 self.bank_stored = self.pct(self.bank_stored, self.N_hist)
-
+                self.time_pct += mcdc.mpi.Wtime() - click
+                
                 # Set stored bank as source bank for the next iteration
                 self.bank_source = self.bank_stored
                 self.bank_stored = []
@@ -197,6 +235,7 @@ class Simulator:
             with h5py.File(self.output+'.h5', 'w') as f:
                 # Runtime
                 f.create_dataset("runtime",data=np.array([self.time_total]))
+                f.create_dataset("runtime_pct",data=np.array([self.time_pct]))
 
                 # Tallies
                 for T in self.tallies:
@@ -227,6 +266,9 @@ class Simulator:
                 if self.mode_eigenvalue:
                     f.create_dataset("keff",data=self.k_mean)
                     self.k_mean.fill(0.0)
+                    if self.mode_alpha:
+                        f.create_dataset("alpha_eff",data=self.alpha_mean)
+                        self.alpha_mean.fill(0.0)
 
     # =========================================================================
     # SOURCE LOOP
@@ -323,7 +365,7 @@ class Simulator:
             P.save_previous_state()
 
             # Get speed and XS (not neeeded for MG mode)
-            P.speed = self.speeds[P.g]
+            P.speed = self.speed[P.g]
         
             # =================================================================
             # Get distances to events
@@ -387,7 +429,7 @@ class Simulator:
                     # Store for next time census
                     self.bank_stored.append(P.create_copy())
                 P.alive = False
-
+            
             # =================================================================
             # Scores
             # =================================================================    
@@ -398,12 +440,20 @@ class Simulator:
                 
             # Score eigenvalue tallies
             if self.mode_eigenvalue:
-                wgt = P.wgt_old
+                wgt    = P.wgt_old
+                SigmaF = P.cell_old.material.SigmaF[P.g_old]
+                
+                # nu
+                nu = P.cell_old.material.nu_p[P.g_old]
+                if P.cell_old.material.J > 0:
+                    nu_d = P.cell.material.nu_d[P.g]
+                    nu += sum(nu_d)
 
-                nu       = P.cell_old.material.nu[P.g_old]
-                SigmaF   = P.cell_old.material.SigmaF[P.g_old]
                 nuSigmaF = nu*SigmaF
                 self.nuSigmaF_sum += wgt*P.distance*nuSigmaF
+
+                if self.mode_alpha:
+                    self.ispeed_sum += wgt*P.distance/self.speed[P.g_old]
             
             # =================================================================
             # Closeout
@@ -421,6 +471,10 @@ class Simulator:
         SigmaT = P.cell.material.SigmaT[P.g]
 
         SigmaT += VERY_SMALL # To ensure non-zero value
+
+        if self.mode_alpha:
+            SigmaT += abs(self.alpha_eff)/self.speed[P.g]
+
         d_coll  = -np.log(xi)/SigmaT
         return d_coll
 
@@ -459,34 +513,47 @@ class Simulator:
         SigmaC = P.cell.material.SigmaC[P.g]
         SigmaS = P.cell.material.SigmaS[P.g]
         SigmaF = P.cell.material.SigmaF[P.g]
+
+        if self.mode_alpha:
+            SigmaT += abs(self.alpha_eff)/self.speed[P.g]
         
-        # Scattering or absorption?
+        # Sample and then implement reaction type
         xi = mcdc.random.rng()*SigmaT
-        if SigmaS > xi:
+        tot = SigmaS
+        if tot > xi:
             # Scattering
             self.collision_scattering(P)
         else:
-            # Fission or capture?
-            if SigmaS + SigmaF > xi:
+            tot += SigmaF
+            if tot > xi:
                 # Fission
                 self.collision_fission(P)
             else:
-                # Capture
-                self.collision_capture(P)
+                tot += SigmaC
+                if tot > xi:
+                    # Capture
+                    self.collision_capture(P)
+                else:
+                    # Time-correction
+                    if self.alpha_eff > 0:
+                        P.alive = False
+                    else:
+                        P_out = Particle(P.pos, P.dir, P.g, P.time, P.wgt, P.cell, P.time_idx)
+                        self.bank_history.append(P_out)
     
     def collision_capture(self, P):
         P.alive = False
         
     def collision_scattering(self, P):
-        SigmaS_diff = P.cell.material.SigmaS_diff[P.g]
-        SigmaS      = P.cell.material.SigmaS[P.g]
-        G           = len(SigmaS_diff)
+        # Ger outgoing spectrum
+        chi_s = P.cell.material.chi_s[P.g]
+        G     = P.cell.material.G
         
         # Sample outgoing energy
-        xi  = mcdc.random.rng()*SigmaS
+        xi  = mcdc.random.rng()
         tot = 0.0
         for g_out in range(G):
-            tot += SigmaS_diff[g_out]
+            tot += chi_s[g_out]
             if tot > xi:
                 break
         P.g = g_out
@@ -524,16 +591,22 @@ class Simulator:
             dir_final.z = P.dir.z*mu + (P.dir.z*P.dir.y*cos_azi + P.dir.x*sin_azi)*C
             dir_final.y = P.dir.y*mu - cos_azi*Ac*B
             
-        P.dir.copy(dir_final)        
+        P.dir = dir_final
         
     def collision_fission(self, P):
         # Kill the current particle
         P.alive = False
-        
-        SigmaF_diff = P.cell.material.SigmaF_diff[P.g]
-        SigmaF      = P.cell.material.SigmaF[P.g]
-        nu          = P.cell.material.nu[P.g]
-        G           = len(SigmaF_diff)
+
+        # Get group numbers
+        G = P.cell.material.G
+        J = P.cell.material.J
+
+        # Total nu
+        nu_p = P.cell.material.nu_p[P.g]
+        nu = nu_p
+        if J>0: 
+            nu_d = P.cell.material.nu_d[P.g]
+            nu += sum(nu_d)
 
         # Sample number of fission neutrons
         #   in fixed-source, k_eff = 1.0
@@ -541,17 +614,41 @@ class Simulator:
 
         # Push fission neutrons to bank
         for n in range(N):
+            # Determine if it's prompt or delayed neutrons, 
+            # then get the energy spectrum and decay constant
+            xi  = mcdc.random.rng()*nu
+            tot = nu_p
+            # Prompt?
+            if tot > xi:
+                spectrum = P.cell.material.chi_p[P.g]
+                decay    = INF
+            else:
+                # Which delayed group?
+                for j in range(J):
+                    tot += nu_d[j]
+                    if tot > xi:
+                        spectrum = P.cell.material.chi_d[j]
+                        decay    = P.cell.material.decay[j]
+                        break
+
+            # Sample emission time
+            xi = mcdc.random.rng()
+            t_out = P.time - np.log(xi)/decay
+
             # Sample outgoing energy
-            xi  = mcdc.random.rng()*SigmaF
+            xi  = mcdc.random.rng()
             tot = 0.0
             for g_out in range(G):
-                tot += SigmaF_diff[g_out]
+                tot += spectrum[g_out]
                 if tot > xi:
                     break
-            
+
             # Sample isotropic direction
             dir = self.isotropic_dir.sample()
-            
+           
+            # Create the outgoing particle
+            P_out = Particle(P.pos, dir, g_out, t_out, P.wgt, P.cell, P.time_idx)
+            self.set_time_idx(P_out)
+
             # Bank
-            self.bank_fission.append(Particle(P.pos, dir, g_out, P.time, P.wgt, 
-                                              P.cell, P.time_idx))
+            self.bank_fission.append(P_out)
