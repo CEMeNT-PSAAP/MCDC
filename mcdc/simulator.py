@@ -129,6 +129,9 @@ class Simulator:
         # Set tally bins
         for T in self.tallies:
             T.setup_bins(self.N_iter) # Allocate tally bins (see tally.py)
+
+        # Set pct
+        self.pct.prepare(self.N_hist)
    
         # Setup RNG
         mcdc.random.rng = RandomLCG(seed=self.seed, stride=self.stride)
@@ -312,9 +315,10 @@ class Simulator:
     
     def set_cell(self, P):
         pos = P.pos
+        t = P.time
         C = None
         for cell in self.cells:
-            if cell.test_point(pos):
+            if cell.test_point(pos,t):
                 C = cell
                 break
         if C == None:
@@ -483,7 +487,7 @@ class Simulator:
         S     = None
         d_surf = np.inf
         for surf in P.cell.surfaces:
-            d = surf.distance(P.pos, P.dir)
+            d = surf.distance(P.pos, P.dir, P.time, P.speed)
             if d < d_surf:
                 S     = surf;
                 d_surf = d;

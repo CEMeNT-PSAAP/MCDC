@@ -38,6 +38,21 @@ class PCT(ABC):
         """
 
         pass
+    
+    @abstractmethod
+    def prepare(self, M):
+        """
+        Allocate counters and flags, if needed
+
+        ...
+
+        Parameters
+        ----------
+        M : int
+            Population target size
+        """
+
+        pass
 
 
 # ==============================================================================
@@ -45,6 +60,9 @@ class PCT(ABC):
 # ==============================================================================
 
 class PCT_NONE(PCT):
+    def prepare(self, M):
+        return
+
     def __call__(self, bank, M):
         """No PCT, or  analog, only bank-passing"""
 
@@ -57,6 +75,9 @@ class PCT_NONE(PCT):
 # ==============================================================================
 
 class PCT_SS(PCT):
+    def prepare(self, M):
+        self.count = np.zeros(int(M/mcdc.mpi.size)*10, dtype=int)
+
     def __call__(self, bank, M):
         """Simple Sampling"""
 
@@ -64,23 +85,25 @@ class PCT_SS(PCT):
         idx_start, N_local, N = bank_scanning(bank)
 
         # Locally count sampled particles
-        count = np.zeros(N_local, dtype=int)
         for i in range(M):
             xi  = mcdc.random.rng()
             idx = floor(xi*N) - idx_start
 
             # Local?
             if 0 <= idx and idx < N_local:
-                count[idx] += 1
+                self.count[idx] += 1
 
         # Set bank_sample
         bank_sample = []
         w_factor    = N/M
         for i in range(N_local):
-            for j in range(count[i]):
+            for j in range(self.count[i]):
                 P = bank[i].create_copy()
                 P.wgt *= w_factor
                 bank_sample.append(P)
+
+            # Reset counter
+            self.count[i] = 0
 
         # Skip ahead RNG
         mcdc.random.rng.skip_ahead(M, stride=1, rebase=True)
@@ -94,6 +117,9 @@ class PCT_SS(PCT):
 # =============================================================================
 
 class PCT_SR(PCT):
+    def prepare(self, M):
+        return
+
     def __call__(self, bank, M):
         """Splitting-Roulette"""
 
@@ -142,6 +168,9 @@ class PCT_SR(PCT):
 # =============================================================================
 
 class PCT_CO(PCT):
+    def prepare(self, M):
+        return
+
     def __call__(self, bank, M):
         """Particle Combing Technique"""
 
@@ -184,6 +213,9 @@ class PCT_CO(PCT):
 # =============================================================================
 
 class PCT_COX(PCT):
+    def prepare(self, M):
+        return
+
     def __call__(self, bank, M):
         """New Particle Combing Technique"""
 
@@ -228,6 +260,11 @@ class PCT_COX(PCT):
 # ==============================================================================
 
 class PCT_DD(PCT):
+    def prepare(self, M):
+        self.count = np.zeros(int(M/mcdc.mpi.size)*10, dtype=int)
+        self.discard_flag = np.full((M*10,1), False)
+        return
+
     def __call__(self, bank, M):
         """Duplicate-Discard"""
 
@@ -246,31 +283,34 @@ class PCT_DD(PCT):
             N_sample = M - N_copy*N
 
             # Locally count sampled particles
-            count = np.ones(N_local, dtype=int)*N_copy
+            for i in range(N_local):
+                self.count[i] = N_copy
+
             for i in range(N_sample):
                 xi  = mcdc.random.rng()
                 idx = floor(xi*N) - idx_start
 
                 # Local?
                 if 0 <= idx and idx < N_local:
-                    count[idx] += 1
+                    self.count[idx] += 1
 
             # Set bank_sample
             bank_sample = []
             w_factor    = N/M
             for i in range(N_local):
-                for j in range(count[i]):
+                for j in range(self.count[i]):
                     P = bank[i].create_copy()
                     P.wgt *= w_factor
                     bank_sample.append(P)
+
+                # Reset counter
+                self.count[i] = 0.0
         else:
             # =================================================================
             # Discard
             # =================================================================
 
             N_sample = N - M
-
-            discard_flag = np.full((N,1), False)
 
             for i in range(N_sample):
                 while True:
@@ -279,8 +319,8 @@ class PCT_DD(PCT):
                     idx = floor(xi*N)
 
                     # Flag site if not discarded yet
-                    if not discard_flag[idx]:
-                        discard_flag[idx] = True
+                    if not self.discard_flag[idx]:
+                        self.discard_flag[idx] = True
                         break
         
                     # If the site is already discarded, we resample index.
@@ -291,13 +331,13 @@ class PCT_DD(PCT):
             w_factor    = N/M
             for i in range(N_local):
                 idx = idx_start + i
-                if not discard_flag[idx]:
+                if not self.discard_flag[idx]:
                     P = bank[i].create_copy()
                     P.wgt *= w_factor
                     bank_sample.append(P)
             
             # Reset flag
-            for i in range(N): discard_flag[i] = False
+            for i in range(N): self.discard_flag[i] = False
 
         # Skip ahead RNG
         mcdc.random.rng.skip_ahead(N_sample, stride=1, rebase=True)

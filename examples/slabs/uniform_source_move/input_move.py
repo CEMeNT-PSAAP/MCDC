@@ -1,5 +1,5 @@
 import numpy as np
-import sys
+import sys, os
 
 # Get path to mcdc (not necessary if mcdc is installed)
 sys.path.append('../../../')
@@ -10,16 +10,14 @@ import mcdc
 # Set materials
 # =============================================================================
 
-SigmaC = np.array([0.0])
+SigmaC = np.array([0.1])
 SigmaS = np.array([[0.9]])
-SigmaF = np.array([[0.1]])
-nu     = np.array([6.0])
+SigmaF = np.array([[0.0]])
+nu     = np.array([0.0])
 M1 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
 
-SigmaC = np.array([0.68])
-SigmaS = np.array([[0.2]])
-SigmaF = np.array([[0.12]])
-nu     = np.array([2.5])
+SigmaC = np.array([0.5])
+SigmaS = np.array([[0.5]])
 M2 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
 
 # =============================================================================
@@ -28,8 +26,8 @@ M2 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
 
 # Set surfaces
 S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
-S1 = mcdc.SurfacePlaneX(1.5)
-S2 = mcdc.SurfacePlaneX(2.5, "vacuum")
+S1 = mcdc.MovingSurfacePlaneX(10.0, -0.15, "transmission")
+S2 = mcdc.SurfacePlaneX(11.0, "vacuum")
 
 # Set cells
 C1 = mcdc.Cell([+S0, -S1], M1)
@@ -41,7 +39,7 @@ cells = [C1, C2]
 # =============================================================================
 
 # Position distribution
-pos = mcdc.DistPoint(mcdc.DistUniform(0.0, 2.5), mcdc.DistDelta(0.0), 
+pos = mcdc.DistPoint(mcdc.DistUniform(0.0,10.0), mcdc.DistDelta(0.0), 
                              mcdc.DistDelta(0.0))
 # Direction distribution
 dir = mcdc.DistPointIsotropic()
@@ -50,7 +48,7 @@ dir = mcdc.DistPointIsotropic()
 g = mcdc.DistDelta(0)
 
 # Time distribution
-time = mcdc.DistDelta(0.0)
+time= mcdc.DistUniform(0.0, 40.0)
 
 # Create the source
 Src = mcdc.SourceSimple(pos,dir,g,time)
@@ -60,9 +58,11 @@ sources = [Src]
 # Set filters and tallies
 # =============================================================================
 
-spatial_filter = mcdc.FilterPlaneX(np.array([0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5]))
+spatial_filter = mcdc.FilterPlaneX(np.linspace(0.0, 11.0, 111))
+time_filter = mcdc.FilterTime(np.linspace(0.0, 40.0, 41))
 
-T = mcdc.Tally('tally', scores=['flux-face'], spatial_filter=spatial_filter)
+T = mcdc.Tally('tally', scores=['flux-edge'], 
+               spatial_filter=spatial_filter, time_filter=time_filter)
 
 tallies = [T]
 
@@ -75,11 +75,7 @@ speeds = np.array([1.0])
 
 # Set simulator
 simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
-                           N_hist=1000)
-
-# Set k-eigenvalue mode parameters
-simulator.set_kmode(N_iter=110)
-simulator.set_pct("DD")
+                           N_hist=1000000)
 
 # Run
 simulator.run()
