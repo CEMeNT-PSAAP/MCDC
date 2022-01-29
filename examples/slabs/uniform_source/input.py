@@ -10,17 +10,9 @@ import mcdc
 # Set materials
 # =============================================================================
 
-SigmaC = np.array([1.0])
-SigmaS = np.array([[0.0]])
-SigmaF = np.array([[0.0]])
-nu     = np.array([0.0])
-M1 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
-
-SigmaC = np.array([1.5])
-M2 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
-
-SigmaC = np.array([2.0])
-M3 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
+M1 = mcdc.Material(capture=np.array([1.0]))
+M2 = mcdc.Material(capture=np.array([1.5]))
+M3 = mcdc.Material(capture=np.array([2.0]))
 
 # =============================================================================
 # Set cells
@@ -73,12 +65,9 @@ tallies = [T]
 # Set and run simulator
 # =============================================================================
 
-# Set speed
-speeds = np.array([1.0])
-
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
-                           N_hist=10000)
+simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
+                           N_hist=1E4)
 
 # Run
 simulator.run()

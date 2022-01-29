@@ -6,15 +6,6 @@ mcdc.egg-info
 # Compiled python class
 *.pyc
 
-# Example output
-*.h5
-*.png
-*.mp4
-
-# Cluster job
-*.out
-*.pbs
-
 # Editor
 .spyproject
 *.swp
