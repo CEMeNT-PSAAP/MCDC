@@ -65,13 +65,13 @@ class Surface(ABC):
 
     # Abstract methods
     @abstractmethod
-    def evaluate(self, pos):
+    def evaluate(self, pos, t):
         pass
     @abstractmethod
-    def distance(self, pos, dir):
+    def distance(self, pos, dir, t, speed):
         pass
     @abstractmethod
-    def normal(self, pos, dir):
+    def normal(self, pos, dir, t):
         pass
 
     # =========================================================================
@@ -118,10 +118,10 @@ class SurfacePlaneX(Surface):
         if bc == "reflective":
             self.bc = self.BCReflective()
         
-    def evaluate(self, pos):
+    def evaluate(self, pos, t):
         return pos.x - self.x0
 
-    def distance(self, pos, dir):
+    def distance(self, pos, dir, t, speed):
         x  = pos.x
         ux = dir.x
         
@@ -132,7 +132,7 @@ class SurfacePlaneX(Surface):
         if dist < 0.0: return INF
         else:          return dist
 
-    def normal(self, pos, dir):
+    def normal(self, pos, dir, t):
         return dir.x
     
     # =========================================================================
@@ -145,6 +145,52 @@ class SurfacePlaneX(Surface):
         def __call__(self, P):
             P.dir.x *= -1
 
+class MovingSurfacePlaneX(SurfacePlaneX):
+    def __init__(self, x0, v, bc='transmission', name=None):
+        Surface.__init__(self, "MovingPlaneX", bc, name)
+        self.x0 = x0
+        self.v  = v
+        
+        # Set BC if reflective
+        if bc == "reflective":
+            self.bc = self.BCReflective()
+        
+    def evaluate(self, pos, t):
+        x0 = self.x0 + t*self.v
+        return pos.x - x0
+
+    def distance(self, pos, dir, t, speed):
+        # 1: particle
+        # 2: surface
+
+        x1 = pos.x
+        ux = dir.x
+        v1 = speed
+
+        x2 = self.x0 + t*self.v
+        v2 = self.v
+
+        # Calculate distance
+        dist = v1*(x2 - x1)/(v1*ux-v2)
+        
+        # Check if particle moves away from the surface
+        if dist < 0.0: return INF
+        else:          return dist
+
+    def normal(self, pos, dir, t):
+        return dir.x
+    
+    # =========================================================================
+    # BC implementations
+    # =========================================================================
+
+    class BCReflective(Surface.BC):
+        def __init__(self):
+            Surface.BC.__init__(self, "reflective")
+        def __call__(self, P):
+            P.dir.x *= -1
+
+'''
 class SurfacePlaneZ(Surface):
     def __init__(self, z0, bc='transmission', name=None):
         Surface.__init__(self, "PlaneZ", bc, name)
@@ -180,6 +226,7 @@ class SurfacePlaneZ(Surface):
             Surface.BC.__init__(self, "reflective")
         def __call__(self, P):
             P.dir.z *= -1
+
 
 # =============================================================================
 # Axis-aligned Infinite Cylinder Surfaces
@@ -255,6 +302,8 @@ class SurfaceCylinderZ(Surface):
         def __call__(self, P):
             # TODO
             pass
+
+'''
 # =============================================================================
 # Cell
 # =============================================================================
@@ -300,8 +349,8 @@ class Cell:
         self.material = material
 
     # Test if position pos is inside the cell
-    def test_point(self, pos):
+    def test_point(self, pos, t):
         for i in range(self.n_surfaces):
-            if self.surfaces[i].evaluate(pos) * self.senses[i] < 0:
+            if self.surfaces[i].evaluate(pos,t) * self.senses[i] < 0:
                 return False
         return True

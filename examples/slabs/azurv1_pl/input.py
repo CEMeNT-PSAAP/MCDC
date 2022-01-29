@@ -10,11 +10,10 @@ import mcdc
 # Set materials
 # =============================================================================
 
-SigmaC = np.array([1.0/3.0])
-SigmaS = np.array([[1.0/3.0]])
-SigmaF = np.array([[1.0/3.0]])
-nu     = np.array([2.3])
-M = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
+M = mcdc.Material(capture=np.array([1.0/3.0]),
+                  scatter=np.array([[1.0/3.0]]),
+                  fission=np.array([1.0/3.0]), 
+                  nu_p=np.array([2.3]))
 
 # =============================================================================
 # Set cells
@@ -68,12 +67,9 @@ tallies = [T]
 # Set and run simulator
 # =============================================================================
 
-# Set speed
-speeds = np.array([1.0])
-
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
-                           N_hist=10000)
+simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
+                           N_hist=1E4)
 
 # Set population control and census
 simulator.set_pct(census_time=np.array([20.0]))
