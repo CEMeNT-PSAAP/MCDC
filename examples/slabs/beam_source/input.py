@@ -6,25 +6,15 @@ sys.path.append('../../../')
 
 import mcdc
 
-# =============================================================================
-# Set materials
-# =============================================================================
-
-SigmaC = np.array([1.0])
-SigmaS = np.array([[0.0]])
-SigmaF = np.array([[0.0]])
-nu     = np.array([0.0])
-M1 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
-
-SigmaC = np.array([1.5])
-M2 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
-
-SigmaC = np.array([2.0])
-M3 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
 
 # =============================================================================
 # Set cells
 # =============================================================================
+
+# Set materials
+M1 = mcdc.Material(capture=np.array([1.0]))
+M2 = mcdc.Material(capture=np.array([1.5]))
+M3 = mcdc.Material(capture=np.array([2.0]))
 
 # Set surfaces
 S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
@@ -36,6 +26,7 @@ S3 = mcdc.SurfacePlaneX(6.0, "vacuum")
 C1 = mcdc.Cell([+S0, -S1], M2)
 C2 = mcdc.Cell([+S1, -S2], M3)
 C3 = mcdc.Cell([+S2, -S3], M1)
+
 cells = [C1, C2, C3]
 
 # =============================================================================
@@ -56,6 +47,14 @@ time = mcdc.DistDelta(0.0)
 
 # Create the source
 Src = mcdc.SourceSimple(pos,dir,g,time,cell=C1)
+
+'''
+Src = mcdc.SourceSimple(position = dist_pos,
+                        direction = dist_dir,
+                        energy_group = mcdc.DistDelta(0),
+                        time = mcdc.DistDelta(0.0),
+                        cell=C1)
+'''
 sources = [Src]
 
 # =============================================================================
@@ -67,6 +66,10 @@ spatial_filter = mcdc.FilterPlaneX(np.linspace(0.0, 6.0, 61))
 T = mcdc.Tally('tally', scores=['flux', 'flux-face'], 
                spatial_filter=spatial_filter)
 
+#spatial_mesh = mcdc.MeshCartesian(x=np.linspace(0.0, 6.0, 61))
+#T = mcdc.Tally('tally', scores=['flux', 'flux-face'], 
+#               spatial_filter=spatial_mesh)
+
 tallies = [T]
 
 # =============================================================================
@@ -77,8 +80,8 @@ tallies = [T]
 speeds = np.array([1.0])
 
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
-                           N_hist=10000)
+simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
+                           N_hist=1E5)
 
 # Run
 simulator.run()
