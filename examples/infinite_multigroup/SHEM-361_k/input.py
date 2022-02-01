@@ -43,20 +43,14 @@ cells = [C]
 # Set source
 # =============================================================================
 
-# Position distribution
-pos = mcdc.DistPoint(mcdc.DistDelta(0.0), mcdc.DistDelta(0.0), 
-                     mcdc.DistDelta(0.0))
-# Direction distribution
-dir = mcdc.DistPointIsotropic()
+position = mcdc.DistPoint(mcdc.DistDelta(0.0), mcdc.DistDelta(0.0), 
+                          mcdc.DistDelta(0.0))
 
-# Energy group distribution
-g = mcdc.DistDelta(G-1)
+direction = mcdc.DistPointIsotropic()
 
-# Time distribution
-time = mcdc.DistDelta(0.0)
+Src = mcdc.SourceSimple(position=position, direction=direction,
+                        energy=mcdc.DistDelta(G-1))
 
-# Create the source
-Src = mcdc.SourceSimple(pos,dir,g,time,cell=C)
 sources = [Src]
 
 # =============================================================================

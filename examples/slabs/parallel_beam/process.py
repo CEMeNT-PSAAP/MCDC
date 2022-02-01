@@ -28,6 +28,8 @@ phi_face_ref = np.exp(-SigmaT2*x[1:21])
 phi_face_ref = np.append(phi_face_ref, np.exp(-SigmaT2*2.0)*np.exp(-SigmaT3*x[1:21]))
 phi_face_ref = np.append(phi_face_ref, np.exp(-SigmaT2*2.0)*np.exp(-SigmaT3*2.0)*np.exp(-SigmaT1*x[1:21]))
 
+np.save('phi',phi_ref)
+
 # =============================================================================
 # Plot results
 # =============================================================================

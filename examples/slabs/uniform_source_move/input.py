@@ -10,15 +10,8 @@ import mcdc
 # Set materials
 # =============================================================================
 
-SigmaC = np.array([0.1])
-SigmaS = np.array([[0.9]])
-SigmaF = np.array([[0.0]])
-nu     = np.array([0.0])
-M1 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
-
-SigmaC = np.array([0.5])
-SigmaS = np.array([[0.5]])
-M2 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
+M1 = mcdc.Material(capture=np.array([0.1]), scatter=np.array([[0.9]]))
+M2 = mcdc.Material(capture=np.array([0.5]), scatter=np.array([[0.5]]))
 
 # =============================================================================
 # Set cells
@@ -26,7 +19,7 @@ M2 = mcdc.Material(SigmaC, SigmaS, SigmaF, nu)
 
 # Set surfaces
 S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
-S1 = mcdc.SurfacePlaneX(10.0, "transmission")
+S1 = mcdc.MovingSurfacePlaneX(10.0, -0.15, "transmission")
 S2 = mcdc.SurfacePlaneX(11.0, "vacuum")
 
 # Set cells
@@ -70,12 +63,9 @@ tallies = [T]
 # Set and run simulator
 # =============================================================================
 
-# Set speed
-speeds = np.array([1.0])
-
 # Set simulator
-simulator = mcdc.Simulator(speeds, cells, sources, tallies=tallies, 
-                           N_hist=1000000)
+simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
+                           N_hist=1E5, speed=np.array([1.0]))
 
 # Run
 simulator.run()

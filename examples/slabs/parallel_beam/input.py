@@ -30,31 +30,20 @@ C3 = mcdc.Cell([+S2, -S3], M1)
 cells = [C1, C2, C3]
 
 # =============================================================================
-# Set source
+# Set sources
 # =============================================================================
+# Parallel beam, at x=0, going in the +x direction
+# Source needs to be slightly shifted to the right to make sure it starts in
+# the right cell.
 
-# Position distribution
-pos = mcdc.DistPoint(mcdc.DistDelta(mcdc.constant.SMALL), mcdc.DistDelta(0.0), 
-                             mcdc.DistDelta(0.0))
-# Direction distribution
-dir = mcdc.DistPoint(mcdc.DistDelta(1.0), mcdc.DistDelta(0.0), 
-                             mcdc.DistDelta(0.0))
-# Energy group distribution
-g = mcdc.DistDelta(0)
+position = mcdc.DistPoint(mcdc.DistDelta(1E-10), mcdc.DistDelta(0.0), 
+                          mcdc.DistDelta(0.0))
 
-# Time distribution
-time = mcdc.DistDelta(0.0)
+direction = mcdc.DistPoint(mcdc.DistDelta(1.0), mcdc.DistDelta(0.0), 
+                           mcdc.DistDelta(0.0))
 
-# Create the source
-Src = mcdc.SourceSimple(pos,dir,g,time,cell=C1)
+Src = mcdc.SourceSimple(position=position, direction=direction)
 
-'''
-Src = mcdc.SourceSimple(position = dist_pos,
-                        direction = dist_dir,
-                        energy_group = mcdc.DistDelta(0),
-                        time = mcdc.DistDelta(0.0),
-                        cell=C1)
-'''
 sources = [Src]
 
 # =============================================================================
@@ -66,22 +55,20 @@ spatial_filter = mcdc.FilterPlaneX(np.linspace(0.0, 6.0, 61))
 T = mcdc.Tally('tally', scores=['flux', 'flux-face'], 
                spatial_filter=spatial_filter)
 
-#spatial_mesh = mcdc.MeshCartesian(x=np.linspace(0.0, 6.0, 61))
-#T = mcdc.Tally('tally', scores=['flux', 'flux-face'], 
-#               spatial_filter=spatial_mesh)
-
 tallies = [T]
 
 # =============================================================================
 # Set and run simulator
 # =============================================================================
 
-# Set speed
-speeds = np.array([1.0])
-
 # Set simulator
 simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=1E5)
+                           N_hist=1E4)
+
+window = np.load('phi.npy')
+
+simulator.set_weight_window(x=np.linspace(0.0, 6.0, 61),
+                            window=window)
 
 # Run
 simulator.run()
