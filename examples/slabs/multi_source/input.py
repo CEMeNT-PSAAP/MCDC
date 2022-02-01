@@ -25,8 +25,17 @@ C = mcdc.Cell([+S0, -S1], M)
 cells = [C]
 
 # =============================================================================
-# Set source
+# Set sources
 # =============================================================================
+
+Src1 = mcdc.SourceSimple(position = mcdc.DistPoint(mcdc.DistDelta(1E-10), 
+                                                   mcdc.DistDelta(0.0),
+                                                   mcdc.DistDelta(0.0)),
+                         direction = mcdc.DistPoint(mcdc.DistDelta(1.0), 
+                                                    mcdc.DistDelta(0.0),
+                                                    mcdc.DistDelta(0.0)),
+                         energy = mcdc.DistDelta(0),
+                         time = mcdc.DistDelta(0.0))
 
 # Position distribution
 pos1 = mcdc.DistPoint(mcdc.DistDelta(mcdc.constant.SMALL), mcdc.DistDelta(0.0), 

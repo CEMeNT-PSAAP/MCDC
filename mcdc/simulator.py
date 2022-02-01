@@ -16,6 +16,7 @@ from mcdc.random       import RandomLCG
 from mcdc.pct          import *
 from mcdc.misc         import binary_search
 from mcdc.print        import print_banner
+from mcdc.vrt          import WeightWindow
 
 
 class Simulator:
@@ -53,6 +54,9 @@ class Simulator:
         self.pct         = PCT_CO()
         self.census_time = [INF]
 
+        # Variance reduction settings
+        self.weight_window = WeightWindow()
+
         # Particle banks
         #   TODO: use fixed memory allocations with helper indices
         self.bank_stored  = [] # for the next source loop
@@ -68,6 +72,10 @@ class Simulator:
         self.parallel_hdf5 = False # TODO
             
 
+    # =========================================================================
+    # Feature setters
+    # =========================================================================
+    
     def set_kmode(self, N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
         self.mode_eigenvalue = True
         self.N_iter          = N_iter
@@ -110,6 +118,9 @@ class Simulator:
 
         # Set census time
         self.census_time = census_time
+
+    def set_weight_window(self, x=None, y=None, z=None, t=None, window=None):
+        self.weight_window = WeightWindow(x,y,z,t,window)
 
     # =========================================================================
     # Run ("main") -- SIMULATION LOOP
@@ -324,6 +335,8 @@ class Simulator:
             else:
                 self.bank_history.append(self.bank_source[i])
             
+            #self.weight_window(P, self.bank_history)
+
             # History loop
             self.loop_history()
             
@@ -410,7 +423,7 @@ class Simulator:
             d_census = P.speed*(t_census - P.time)
 
             # =================================================================
-            # Choose event
+            # Get event
             # =================================================================
     
             # Collision, surface hit, or census?
@@ -429,6 +442,38 @@ class Simulator:
     
             # Move particle
             self.move_particle(P, d_move)
+            
+            # =================================================================
+            # Implement surface event
+            # =================================================================    
+            # This needs to be done before track-length tally scoring
+            
+            if event == EVENT_SURFACE:
+                # Record surface hit
+                P.surface = S
+
+                # Implement surface hit
+                self.surface_hit(P)
+
+            # =================================================================
+            # Score track-length tallies
+            # =================================================================
+
+            # TODO: Score track-length tallies
+            #for T in self.tallies_tracklength:
+            #    T.score(P)
+
+            # Score eigenvalue tallies
+            if self.mode_eigenvalue:
+                nu       = P.cell.material.nu_p[P.g]\
+                           + sum(P.cell.material.nu_d[P.g])
+                SigmaF   = P.cell.material.fission[P.g]
+                nuSigmaF = nu*SigmaF
+                self.nuSigmaF_sum += P.wgt*d_move*nuSigmaF
+
+                if self.mode_alpha:
+                    self.ispeed_sum += P.wgt*d_move\
+                                       /P.cell.material.speed[P.g]
 
             # =================================================================
             # Perform event
@@ -437,14 +482,7 @@ class Simulator:
             if event == EVENT_COLLISION:
                 # Sample collision
                 self.collision(P)
-
-            elif event == EVENT_SURFACE:
-                # Record surface hit
-                P.surface = S
-
-                # Implement surface hit
-                self.surface_hit(P)
-            
+ 
             elif event == EVENT_CENSUS:
                 # Cross the time boundary
                 d = SMALL*P.speed
@@ -465,24 +503,14 @@ class Simulator:
             # Score tallies
             for T in self.tallies:
                 T.score(P)
-                
-            # Score eigenvalue tallies
-            if self.mode_eigenvalue:
-                wgt    = P.wgt_old
-                SigmaF = P.cell_old.material.fission[P.g_old]
-                
-                # nu
-                nu = P.cell_old.material.nu_p[P.g_old]
-                if P.cell_old.material.J > 0:
-                    nu_d = P.cell.material.nu_d[P.g]
-                    nu += sum(nu_d)
 
-                nuSigmaF = nu*SigmaF
-                self.nuSigmaF_sum += wgt*P.distance*nuSigmaF
-
-                if self.mode_alpha:
-                    self.ispeed_sum += wgt*P.distance/P.cell.material.speed[P.g_old]
+            # =================================================================
+            # Weight window
+            # =================================================================    
             
+            if P.alive:
+                self.weight_window(P, self.bank_history)
+                
             # =================================================================
             # Closeout
             # =================================================================    
