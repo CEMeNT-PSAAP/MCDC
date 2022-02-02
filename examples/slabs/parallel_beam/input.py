@@ -63,12 +63,12 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=1E4)
+                           N_hist=1E7)
 
 window = np.load('phi.npy')
 
-simulator.set_weight_window(x=np.linspace(0.0, 6.0, 61),
-                            window=window)
+#simulator.set_weight_window(x=np.linspace(0.0, 6.0, 61),
+#                            window=window)
 
 # Run
 simulator.run()
