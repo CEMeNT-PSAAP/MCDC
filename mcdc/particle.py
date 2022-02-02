@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 
-from mcdc.point import Point
+from mcdc.point        import Point
+from mcdc.print        import print_error, print_warning
+
+import mcdc
 
 
 # =============================================================================
@@ -71,24 +74,30 @@ class Source(ABC):
         pass
 
 class SourceSimple(Source):
-    def __init__(self, pos, dir, g, time, prob=1.0, wgt=1.0, cell=None, 
-                 time_idx=None):
+    def __init__(self, position=None, direction=None, energy=None, time=None,
+                 prob=1.0):
+        if position is None or direction is None:
+            print_error("SourceSimple requires at least position and direction")
+
         Source.__init__(self, prob)
-        self.pos  = pos
-        self.dir  = dir
-        self.g    = g
-        self.time = time
-        self.wgt  = wgt
-        self.cell = cell
-        self.time_idx = time_idx
+        self.position  = position
+        self.direction = direction
+        
+        if energy is None:
+            self.energy = mcdc.DistDelta(0)
+        else:
+            self.energy = energy
+
+        if time is None:
+            self.time = mcdc.DistDelta(0.0)
+        else:
+            self.time = time
 
     def get_particle(self):
-        pos  = self.pos.sample()
-        dir  = self.dir.sample()
-        g    = self.g.sample()
+        pos  = self.position.sample()
+        dir  = self.direction.sample()
+        g    = self.energy.sample()
         time = self.time.sample()
-        wgt  = self.wgt
-        cell = self.cell
-        time_idx = self.time_idx
+        wgt  = 1.0
         dir.normalize()
-        return Particle(pos, dir, g, time, wgt, cell, time_idx)
+        return Particle(pos, dir, g, time, wgt, None, None)

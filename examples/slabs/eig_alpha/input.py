@@ -70,7 +70,7 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=5E2)
+                           N_hist=5E2, speed=np.array([1.0]))
 
 # Set k-eigenvalue mode parameters
 simulator.set_kmode(N_iter=20, alpha_mode=True)

@@ -94,6 +94,7 @@ for i in range(40,60):
     J_face_ref[i]   = J3(x[i])
 phi_face_ref[60] = phi3(x[60])
 J_face_ref[60]   = J3(x[60])
+np.save('phi',phi_ref)
 
 # =============================================================================
 # Plot results
