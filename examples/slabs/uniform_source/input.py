@@ -63,9 +63,8 @@ simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies,
                            N_hist=1E6)
 
 window = np.load('phi.npy')
-window = np.ones(60)
-simulator.set_weight_window(x=np.linspace(0.0, 6.0, 61),
-                            window=window)
+#simulator.set_weight_window(x=np.linspace(0.0, 6.0, 61),
+#                            window=window)
 
 # Run
 simulator.run()

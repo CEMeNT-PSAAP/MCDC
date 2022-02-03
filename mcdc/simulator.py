@@ -55,7 +55,7 @@ class Simulator:
         self.census_time = [INF]
 
         # Variance reduction settings
-        self.weight_window = WeightWindow()
+        self.weight_window = None
 
         # Particle banks
         #   TODO: use fixed memory allocations with helper indices
@@ -335,7 +335,8 @@ class Simulator:
             else:
                 self.bank_history.append(self.bank_source[i])
             
-            #self.weight_window(P, self.bank_history)
+            if self.weight_window is not None:
+                self.weight_window(P, self.bank_history)
 
             # History loop
             self.loop_history()
@@ -508,7 +509,7 @@ class Simulator:
             # Weight window
             # =================================================================    
             
-            if P.alive:
+            if P.alive and self.weight_window is not None:
                 self.weight_window(P, self.bank_history)
                 
             # =================================================================

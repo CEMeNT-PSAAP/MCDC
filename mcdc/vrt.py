@@ -59,15 +59,27 @@ class WeightWindow:
         # Weight target
         w_target = self.window[t,x,y,z]
        
-        # Split
-        n_split = floor(P.wgt/w_target)
+        # Surviving probability
+        p = P.wgt/w_target
 
-        # Splitting
-        P.wgt = w_target
-        for i in range(n_split-1):
-            bank.append(P.create_copy())
+        # If above target
+        if p > 1.0:
+            # Keep the original particle
+            P.wgt = w_target
 
-        # Russian roulette
-        xi = mcdc.random.rng()
-        if xi < P.wgt%w_target:
-            bank.append(P.create_copy())
+            # Splitting
+            n_split = floor(p)
+            for i in range(n_split-1):
+                bank.append(P.create_copy())
+
+            # Russian roulette
+            p -= n_split
+            xi = mcdc.random.rng()
+            if xi < p:
+                bank.append(P.create_copy())
+        # Below target
+        else:
+            # Russian roulette
+            xi = mcdc.random.rng()
+            if xi > p:
+                P.alive = False

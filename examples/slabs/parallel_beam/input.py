@@ -4,6 +4,8 @@ import sys
 # Get path to mcdc (not necessary if mcdc is installed)
 sys.path.append('../../../')
 
+from misc import phi
+
 import mcdc
 
 
@@ -63,12 +65,12 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=1E7)
+                           N_hist=1E5)
 
-window = np.load('phi.npy')
+window = phi(3)
 
-#simulator.set_weight_window(x=np.linspace(0.0, 6.0, 61),
-#                            window=window)
+simulator.set_weight_window(x=np.linspace(0.0, 6.0, 4),
+                            window=window)
 
 # Run
 simulator.run()
