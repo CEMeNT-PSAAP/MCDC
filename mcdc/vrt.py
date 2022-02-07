@@ -38,16 +38,13 @@ class WeightWindow:
         else:
             self.z = z
         
-        if window is None:
-            dim = [len(self.t)-1, len(self.x)-1, len(self.y)-1, len(self.z)-1]
-            self.window = np.ones(dim)
-        else:
-            self.window = window
-
-            for ax in ax_expand:
-                self.window = np.expand_dims(self.window, axis=ax)
-
+        self.window = window
+        
         self.window /= np.max(self.window)
+
+        for ax in ax_expand:
+            self.window = np.expand_dims(self.window, axis=ax)
+        
 
     def __call__(self, P, bank):
         # Get index
@@ -56,18 +53,18 @@ class WeightWindow:
         z = binary_search(P.pos.z, self.z)
         t = binary_search(P.time, self.t)
 
-        # Weight target
+        # Target weight
         w_target = self.window[t,x,y,z]
        
         # Surviving probability
         p = P.wgt/w_target
 
+        # Set target weight
+        P.wgt = w_target
+
         # If above target
         if p > 1.0:
-            # Keep the original particle
-            P.wgt = w_target
-
-            # Splitting
+            # Splitting (keep the original particle)
             n_split = floor(p)
             for i in range(n_split-1):
                 bank.append(P.create_copy())
@@ -75,8 +72,9 @@ class WeightWindow:
             # Russian roulette
             p -= n_split
             xi = mcdc.random.rng()
-            if xi < p:
+            if xi <= p:
                 bank.append(P.create_copy())
+
         # Below target
         else:
             # Russian roulette
