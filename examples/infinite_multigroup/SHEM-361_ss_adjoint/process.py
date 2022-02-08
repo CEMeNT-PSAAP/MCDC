@@ -39,12 +39,12 @@ with h5py.File('output.h5', 'r') as f:
     phi = f['tally/flux/mean'][:]
     phi_sd = f['tally/flux/sdev'][:]
     
-plt.plot(E_mid,phi,'-b',label="MC")
-plt.fill_between(E_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
+#plt.plot(E_mid,phi,'-b',label="MC")
+#plt.fill_between(E_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
 plt.plot(E_mid,phi_exact,'--r',label='analytical')
 plt.xscale('log')
 plt.xlabel(r'$E$, eV')
-plt.ylabel(r'$E\phi(E)$')
+plt.ylabel(r'$E\phi^{\dagger}(E)$')
 plt.grid()
 plt.legend()
 plt.show()

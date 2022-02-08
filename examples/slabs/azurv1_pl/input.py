@@ -31,21 +31,15 @@ cells = [C]
 # Set source
 # =============================================================================
 
-# Position distribution
-pos = mcdc.DistPoint(mcdc.DistDelta(0.0), mcdc.DistDelta(0.0), 
-                     mcdc.DistDelta(0.0))
+position = mcdc.DistPoint(mcdc.DistDelta(0.0), mcdc.DistDelta(0.0), 
+                          mcdc.DistDelta(0.0))
 
-# Direction distribution
-dir = mcdc.DistPointIsotropic()
+direction = mcdc.DistPointIsotropic()
 
-# Energy group distribution
-g = mcdc.DistDelta(0)
-
-# Time distribution
 time = mcdc.DistDelta(0.0)
 
-# Create the source
-Src = mcdc.SourceSimple(pos,dir,g,time,cell=C)
+Src = mcdc.SourceSimple(position=position, direction=direction, time=time)
+
 sources = [Src]
 
 # =============================================================================
@@ -53,9 +47,9 @@ sources = [Src]
 # =============================================================================
 
 # Load grids
-grid = np.load('azurv1_pl.npz')
-time_filter = mcdc.FilterTime(grid['t'])
-spatial_filter = mcdc.FilterPlaneX(grid['x'])
+with np.load('azurv1_pl.npz') as f:
+    time_filter = mcdc.FilterTime(f['t'])
+    spatial_filter = mcdc.FilterPlaneX(f['x'])
 
 T = mcdc.Tally('tally', scores=['flux', 'flux-edge', 'flux-face'],
                spatial_filter=spatial_filter,
@@ -69,7 +63,7 @@ tallies = [T]
 
 # Set simulator
 simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=1E4)
+                           N_hist=1E6)
 
 # Set population control and census
 simulator.set_pct(census_time=np.array([20.0]))
