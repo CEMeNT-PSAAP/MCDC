@@ -18,8 +18,8 @@ M3 = mcdc.Material(capture=np.array([2.0]))
 
 # Set surfaces
 S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
-S1 = mcdc.SurfacePlaneX(2.0, "transmission")
-S2 = mcdc.SurfacePlaneX(4.0, "transmission")
+S1 = mcdc.SurfacePlaneX(2.0)
+S2 = mcdc.SurfacePlaneX(4.0)
 S3 = mcdc.SurfacePlaneX(6.0, "vacuum")
 
 # Set cells
@@ -47,13 +47,11 @@ Src = mcdc.SourceSimple(position=position, direction=direction)
 sources = [Src]
 
 # =============================================================================
-# Set filters and tallies
+# Set tallies
 # =============================================================================
 
-spatial_filter = mcdc.FilterPlaneX(np.linspace(0.0, 6.0, 61))
-
-T = mcdc.Tally('tally', scores=['flux', 'flux-face'], 
-               spatial_filter=spatial_filter)
+T = mcdc.Tally('tally', scores=['flux', 'flux-face'],
+               x=np.linspace(0.0, 6.0, 61))
 
 tallies = [T]
 
