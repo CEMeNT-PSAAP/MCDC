@@ -67,7 +67,7 @@ tallies = [T]
 # =============================================================================
 
 # Set simulator
-simulator = mcdc.Simulator(cells, sources, tallies=tallies, N_hist=1E3)
+simulator = mcdc.Simulator(cells, sources, tallies=tallies, N_hist=5E2)
 
 # Run
 simulator.run()
