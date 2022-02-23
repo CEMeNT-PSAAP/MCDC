@@ -19,35 +19,29 @@ class Surface(ABC):
 
     Attributes
     ----------
-    type : str
-        Surface type
     id : int
         Surface id
-    name : str
-        Surface name
     bc : BC
         Surface boundary condition implementation (ransmission, vacuum,
-        or reflective) which is described in the subclass `BC`
+        or reflective) which is described in the subclass BC
 
     Abstract Methods
     ----------------
     evaluate(pos)
-        Evaluate if position `pos` is on the + or - side of the surface
+        Evaluate if position pos is on the + or - side of the surface
     distance(pos, dir)
-        Return the distance for a ray with position `pos` and direction
-        `dir` to hit the surface
-    normal(po, dir)
+        Return the distance for a ray with position pos and direction
+        dir to hit the surface
+    normal(pos, dir)
         Return dot product of the surface normal+ and a ray at position
-        `pos` with direction `dir`. This is used for some surface 
+        pos with direction dir. This is used for some surface 
         tallies
     """
 
     _ids = itertools.count(0)
 
-    def __init__(self, type_, bc, name):
-        self.type = type_
-        self.id   = next(self._ids)
-        self.name = name
+    def __init__(self, bc):
+        self.id = next(self._ids)
         
         # Set BC if transmission or vacuum
         if bc == "transmission":
@@ -82,8 +76,8 @@ class Surface(ABC):
         """
         Abstract subclass for surface BC implementations
 
-        `BCTransmission` and `BCVacuum` are identical for all surface
-        types. `BCReflective` is dependent on the surface type.
+        BCTransmission and BCVacuum are identical for all surface
+        types. BCReflective is dependent on the surface type.
         """
 
         def __init__(self, type_):
@@ -110,9 +104,9 @@ class Surface(ABC):
 # =============================================================================
 
 class SurfacePlaneX(Surface):
-    def __init__(self, x0, bc='transmission', name=None):
-        Surface.__init__(self, "PlaneX", bc, name)
-        self.x0 = x0
+    def __init__(self, x=None, bc='transmission'):
+        Surface.__init__(self, bc)
+        self.x0 = x
         
         # Set BC if reflective
         if bc == "reflective":
@@ -145,9 +139,45 @@ class SurfacePlaneX(Surface):
         def __call__(self, P):
             P.dir.x *= -1
 
+class SurfacePlaneY(Surface):
+    def __init__(self, y=None, bc='transmission'):
+        Surface.__init__(self, bc)
+        self.y0 = y
+        
+        # Set BC if reflective
+        if bc == "reflective":
+            self.bc = self.BCReflective()
+        
+    def evaluate(self, pos, t):
+        return pos.y - self.y0
+
+    def distance(self, pos, dir, t, speed):
+        y  = pos.y
+        uy = dir.y
+        
+        # Calculate distance
+        dist = (self.y0 - y)/uy
+        
+        # Check if particle moves away from the surface
+        if dist < 0.0: return INF
+        else:          return dist
+
+    def normal(self, pos, dir, t):
+        return dir.y
+    
+    # =========================================================================
+    # BC implementations
+    # =========================================================================
+
+    class BCReflective(Surface.BC):
+        def __init__(self):
+            Surface.BC.__init__(self, "reflective")
+        def __call__(self, P):
+            P.dir.x *= -1
+'''
 class MovingSurfacePlaneX(SurfacePlaneX):
-    def __init__(self, x0, v, bc='transmission', name=None):
-        Surface.__init__(self, "MovingPlaneX", bc, name)
+    def __init__(self, x0, v, bc='transmission'):
+        Surface.__init__(self, "MovingPlaneX", bc)
         self.x0 = x0
         self.v  = v
         
@@ -189,8 +219,6 @@ class MovingSurfacePlaneX(SurfacePlaneX):
             Surface.BC.__init__(self, "reflective")
         def __call__(self, P):
             P.dir.x *= -1
-
-'''
 class SurfacePlaneZ(Surface):
     def __init__(self, z0, bc='transmission', name=None):
         Surface.__init__(self, "PlaneZ", bc, name)
@@ -312,40 +340,46 @@ class Cell:
     """
     Geometry cell
 
-    A cell is defined by its bounding surfaces and filling material
+    A cell is defined by its binding surfaces and filling material
 
     Attributes
     ----------
+    id : int
+        Cell id
     surfaces : list of mcdc.Surface
-        The bounding surfaces
+        The surfaces
     senses : list of int
         The corresponding sense (+/-) of the surface with the same index
     material : mcdc.Material
-        The `mcdc.Material` object that fills the cell
+        The mcdc.Material object that fills the cell
 
     Methods
     -------
     test_point(pos)
-        Test if position `pos` is inside the cell
+        Test if position pos is inside the cell
     """
+    
+    _ids = itertools.count(0)
 
-    def __init__(self, bounds, material):
+    def __init__(self, surfaces=None, material=None):
         """
         Arguments
         ---------
-        bounds : list of list([mcdc.Surface, int])
-            The first column is the `mcdc.Surface` objects bounding the cell.
+        surfaces : list of list([mcdc.Surface, int])
+            The first column is the mcdc.Surface objects binding the cell.
             The second column is the corresponding sense (+/-).
         material : mcdc.Material
-            The `mcdc.Material` object that fills the cell
+            The mcdc.Material object that fills the cell
         """
+        
+        self.id = next(self._ids)
 
-        self.n_surfaces = len(bounds)
+        self.n_surfaces = len(surfaces)
         self.surfaces   = []
         self.senses     = []
         for i in range(self.n_surfaces):
-            self.surfaces.append(bounds[i][0])
-            self.senses.append(bounds[i][1])
+            self.surfaces.append(surfaces[i][0])
+            self.senses.append(surfaces[i][1])
         self.material = material
 
     # Test if position pos is inside the cell

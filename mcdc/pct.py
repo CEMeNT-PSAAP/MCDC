@@ -99,7 +99,7 @@ class PCT_SS(PCT):
         for i in range(N_local):
             for j in range(self.count[i]):
                 P = bank[i].create_copy()
-                P.wgt *= w_factor
+                P.weight *= w_factor
                 bank_sample.append(P)
 
             # Reset counter
@@ -143,18 +143,18 @@ class PCT_SR(PCT):
         bank_sample = []
         for P in bank:
             # New weight
-            w_prime = P.wgt/p
+            w_prime = P.weight/p
 
             # Splitting
             for i in range(n_split):
                 bank_sample.append(P.create_copy())
-                bank_sample[-1].wgt = w_prime
+                bank_sample[-1].weight = w_prime
 
             # Russian roulette
             xi = mcdc.random.rng()
             if xi < p_survive:
                 bank_sample.append(P.create_copy())
-                bank_sample[-1].wgt = w_prime
+                bank_sample[-1].weight = w_prime
 
         # Rebase RNG (skipping the numbers used for popctrl)
         mcdc.random.rng.skip_ahead(N-idx_start, rebase=True, stride=1)
@@ -198,7 +198,7 @@ class PCT_CO(PCT):
             idx   = floor(tooth) - idx_start
             P = bank[idx].create_copy()
             # Set weight
-            P.wgt *= td
+            P.weight *= td
             bank_sample.append(P)
 
         # Rebase RNG (skipping the numbers used for popctrl)
@@ -245,7 +245,7 @@ class PCT_COX(PCT):
                 idx   = floor(tooth) - idx_start
                 P = bank[idx].create_copy()
                 # Set weight
-                P.wgt *= td
+                P.weight *= td
                 bank_sample.append(P)
 
         # Skip ahead RNG (skipping the numbers used for popctrl)
@@ -300,7 +300,7 @@ class PCT_DD(PCT):
             for i in range(N_local):
                 for j in range(self.count[i]):
                     P = bank[i].create_copy()
-                    P.wgt *= w_factor
+                    P.weight *= w_factor
                     bank_sample.append(P)
 
                 # Reset counter
@@ -333,7 +333,7 @@ class PCT_DD(PCT):
                 idx = idx_start + i
                 if not self.discard_flag[idx]:
                     P = bank[i].create_copy()
-                    P.wgt *= w_factor
+                    P.weight *= w_factor
                     bank_sample.append(P)
             
             # Reset flag

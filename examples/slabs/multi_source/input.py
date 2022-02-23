@@ -7,14 +7,11 @@ sys.path.append('../../../')
 import mcdc
 
 # =============================================================================
-# Set materials
-# =============================================================================
-
-M = mcdc.Material(capture=np.array([1.0]))
-
-# =============================================================================
 # Set cells
 # =============================================================================
+
+# Set materials
+M = mcdc.Material(capture=np.array([0.5]), scatter=np.array([[1.0]]))
 
 # Set surfaces
 S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
@@ -27,56 +24,25 @@ cells = [C]
 # =============================================================================
 # Set sources
 # =============================================================================
+# Two sources with different probabilities
 
-Src1 = mcdc.SourceSimple(position = mcdc.DistPoint(mcdc.DistDelta(1E-10), 
-                                                   mcdc.DistDelta(0.0),
-                                                   mcdc.DistDelta(0.0)),
-                         direction = mcdc.DistPoint(mcdc.DistDelta(1.0), 
-                                                    mcdc.DistDelta(0.0),
-                                                    mcdc.DistDelta(0.0)),
-                         energy = mcdc.DistDelta(0),
-                         time = mcdc.DistDelta(0.0))
+position1  = mcdc.DistPoint(x=mcdc.DistDelta(1E-10))
+direction1 = mcdc.DistPoint(x=mcdc.DistDelta(1.0))
+Src1 = mcdc.SourceSimple(position=position1, direction=direction1, prob=0.4)
 
-# Position distribution
-pos1 = mcdc.DistPoint(mcdc.DistDelta(mcdc.constant.SMALL), mcdc.DistDelta(0.0), 
-                             mcdc.DistDelta(0.0))
-pos2 = mcdc.DistPoint(mcdc.DistUniform(4.0,5.0), mcdc.DistDelta(0.0), 
-                             mcdc.DistDelta(0.0))
+position2  = mcdc.DistPoint(x=mcdc.DistUniform(4.0,5.0))
+direction2 = mcdc.DistPointIsotropic()
+Src2 = mcdc.SourceSimple(position=position2, direction=direction2, prob=0.6)
 
-# Direction distribution
-dir1 = mcdc.DistPoint(mcdc.DistDelta(1.0), mcdc.DistDelta(0.0), 
-                             mcdc.DistDelta(0.0))
-dir2 = mcdc.DistPointIsotropic()
-
-# Energy group distribution
-g = mcdc.DistDelta(0)
-
-# Time distribution
-time= mcdc.DistDelta(0.0)
-
-# Create the source
-Src1 = mcdc.SourceSimple(pos1,dir1,g,time,prob=0.4)
-Src2 = mcdc.SourceSimple(pos2,dir2,g,time,prob=0.6)
 sources = [Src1, Src2]
-
-# =============================================================================
-# Set filters and tallies
-# =============================================================================
-
-spatial_filter = mcdc.FilterPlaneX(np.linspace(0.0, 6.0, 61))
-
-T = mcdc.Tally('tally', scores=['flux', 'flux-face', 'current', 'current-face'], 
-               spatial_filter=spatial_filter)
-
-tallies = [T]
 
 # =============================================================================
 # Set and run simulator
 # =============================================================================
 
-# Set simulator
-simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=1E4)
+# Set simulator and tally
+simulator = mcdc.Simulator(cells=cells, sources=sources, N_hist=1E4)
+simulator.set_tally(scores=['flux', 'current'], x=np.linspace(0.0, 6.0, 61))
 
 # Run
 simulator.run()
