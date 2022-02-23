@@ -58,7 +58,7 @@ def global_idx(N):
     end   = buff[0] + N
     return start, end
 
-def global_wgt(W):
+def global_weight(W):
     buff = np.array([0], dtype=float)
     exscan(np.array(W, dtype=float), buff)
     start = buff[0]
@@ -98,7 +98,7 @@ def distribute_work(N):
 def total_weight(bank):
     W_local = np.zeros(1)
     for P in bank:
-        W_local[0] += P.wgt
+        W_local[0] += P.weight
     buff = np.zeros(1)
     allreduce(W_local, buff)
     return buff[0]
@@ -109,7 +109,7 @@ def normalize_weight(bank, norm):
 
     # Normalize weight
     for P in bank:
-        P.wgt *= norm/W
+        P.weight *= norm/W
 
 def bank_scanning(bank):
     N_local   = len(bank)
