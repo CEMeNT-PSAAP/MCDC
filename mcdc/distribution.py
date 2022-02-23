@@ -55,7 +55,7 @@ class DistGroup(Distribution):
         return binary_search(xi, self.cdf)
 
 class DistPoint(Distribution):
-    def __init__(self, x, y, z):
+    def __init__(self, x=DistDelta(0.0), y=DistDelta(0.0), z=DistDelta(0.0)):
         self.x = x
         self.y = y
         self.z = z

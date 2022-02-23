@@ -6,10 +6,10 @@ sys.path.append('../../../')
 
 import mcdc
 
-
 # =============================================================================
 # Set cells
 # =============================================================================
+# Three slab layers with different materials
 
 # Set materials
 M1 = mcdc.Material(capture=np.array([1.0]))
@@ -36,32 +36,19 @@ cells = [C1, C2, C3]
 # Source needs to be slightly shifted to the right to make sure it starts in
 # the right cell.
 
-position = mcdc.DistPoint(mcdc.DistDelta(1E-10), mcdc.DistDelta(0.0), 
-                          mcdc.DistDelta(0.0))
-
-direction = mcdc.DistPoint(mcdc.DistDelta(1.0), mcdc.DistDelta(0.0), 
-                           mcdc.DistDelta(0.0))
+position  = mcdc.DistPoint(x=mcdc.DistDelta(1E-10))
+direction = mcdc.DistPoint(x=mcdc.DistDelta(1.0))
 
 Src = mcdc.SourceSimple(position=position, direction=direction)
-
 sources = [Src]
-
-# =============================================================================
-# Set tallies
-# =============================================================================
-
-T = mcdc.Tally('tally', scores=['flux', 'flux-face'],
-               x=np.linspace(0.0, 6.0, 61))
-
-tallies = [T]
 
 # =============================================================================
 # Set and run simulator
 # =============================================================================
 
-# Set simulator
-simulator = mcdc.Simulator(cells=cells, sources=sources, tallies=tallies, 
-                           N_hist=1E7)
+# Set simulator and tally
+simulator = mcdc.Simulator(cells=cells, sources=sources, N_hist=1E4)
+simulator.set_tally(scores=['flux'], x=np.linspace(0.0, 6.0, 61))
 
 # Run
 simulator.run()
