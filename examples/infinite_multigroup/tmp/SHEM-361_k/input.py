@@ -7,9 +7,10 @@ sys.path.append('../../../')
 import mcdc
 
 # =============================================================================
-# Set material XS
+# Set cells
 # =============================================================================
 
+# Set material XS
 with np.load('SHEM-361.npz') as data:
     SigmaC = data['SigmaC']   # /cm
     SigmaS = data['SigmaS']
@@ -20,16 +21,9 @@ with np.load('SHEM-361.npz') as data:
     chi_d  = data['chi_d']
     G      = data['G']
 
-# Augment loss with some leakage XS
-SigmaC *= 1.26
-
 # Set material
 M = mcdc.Material(capture=SigmaC, scatter=SigmaS, fission=SigmaF, nu_p=nu_p,
                   chi_p=chi_p, nu_d=nu_d, chi_d=chi_d)
-
-# =============================================================================
-# Set cells
-# =============================================================================
 
 # Set surfaces
 S0 = mcdc.SurfacePlaneX(-1E10,"reflective")
@@ -43,32 +37,15 @@ cells = [C]
 # Set source
 # =============================================================================
 
-position = mcdc.DistPoint(mcdc.DistDelta(0.0), mcdc.DistDelta(0.0), 
-                          mcdc.DistDelta(0.0))
-
-direction = mcdc.DistPointIsotropic()
-
-Src = mcdc.SourceSimple(position=position, direction=direction,
-                        energy=mcdc.DistDelta(G-1))
-
+Src = mcdc.SourceSimple(group=mcdc.DistDelta(G-1))
 sources = [Src]
-
-# =============================================================================
-# Set filters and tallies
-# =============================================================================
-
-energy_filter = mcdc.FilterEnergyGroup(np.arange(G))
-
-T = mcdc.Tally('tally', scores=['flux'], energy_filter=energy_filter)
-
-tallies = [T]
 
 # =============================================================================
 # Set and run simulator (for each value of N)
 # =============================================================================
 
 # Set simulator
-simulator = mcdc.Simulator(cells, sources, tallies=tallies, N_hist=1E2)
+simulator = mcdc.Simulator(cells, sources, N_hist=1E2)
 simulator.set_kmode(N_iter=20)
 
 # Run

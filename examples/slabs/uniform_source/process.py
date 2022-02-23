@@ -10,7 +10,7 @@ from scipy.integrate import quad
 
 # Load grids
 with h5py.File('output.h5', 'r') as f:
-    x = f['tally/spatial_grid'][:]
+    x = f['tally/grid/x'][:]
 dx    = (x[1]-x[0])
 x_mid = 0.5*(x[:-1]+x[1:])
 
@@ -74,27 +74,16 @@ def J3(x):
 
 phi_ref      = np.zeros(60)
 J_ref        = np.zeros(60)
-phi_face_ref = np.zeros(61)
-J_face_ref   = np.zeros(61)
 
 for i in range(20):
     phi_ref[i]      = quad(phi1,x[i],x[i+1])[0]/dx
     J_ref[i]        = quad(J1,x[i],x[i+1])[0]/dx
-    phi_face_ref[i] = phi1(x[i])
-    J_face_ref[i]   = J1(x[i])
 for i in range(20,40):
     phi_ref[i]      = quad(phi2,x[i],x[i+1])[0]/dx
     J_ref[i]        = quad(J2,x[i],x[i+1])[0]/dx
-    phi_face_ref[i] = phi2(x[i])
-    J_face_ref[i]   = J2(x[i])
 for i in range(40,60):
     phi_ref[i]      = quad(phi3,x[i],x[i+1])[0]/dx
     J_ref[i]        = quad(J3,x[i],x[i+1])[0]/dx
-    phi_face_ref[i] = phi3(x[i])
-    J_face_ref[i]   = J3(x[i])
-phi_face_ref[60] = phi3(x[60])
-J_face_ref[60]   = J3(x[60])
-np.save('phi',phi_ref)
 
 # =============================================================================
 # Plot results
@@ -104,14 +93,10 @@ np.save('phi',phi_ref)
 with h5py.File('output.h5', 'r') as f:
     phi         = f['tally/flux/mean'][:]/dx
     phi_sd      = f['tally/flux/sdev'][:]/dx
-    phi_face    = f['tally/flux-face/mean'][:]
-    phi_face_sd = f['tally/flux-face/sdev'][:]
     J         = f['tally/current/mean'][:,0]/dx
     J_sd      = f['tally/current/sdev'][:,0]/dx
-    J_face    = f['tally/current-face/mean'][:,0]
-    J_face_sd = f['tally/current-face/sdev'][:,0]
 
-# Plot
+# Flux
 plt.plot(x_mid,phi,'-b',label="MC")
 plt.fill_between(x_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
 plt.plot(x_mid,phi_ref,'--r',label="ref.")
@@ -123,18 +108,7 @@ plt.legend()
 plt.title(r'$\bar{\phi}_i$')
 plt.show()
 
-plt.plot(x[:],phi_face,'-b',label="MC")
-plt.fill_between(x[:],phi_face-phi_face_sd,phi_face+phi_face_sd,alpha=0.2,color='b')
-plt.plot(x[:],phi_face_ref,'--r',label="ref.")
-plt.xlabel(r'$x$, cm')
-plt.ylabel('Flux')
-plt.ylim([0.045,0.16])
-plt.grid()
-plt.legend()
-plt.title(r'$\phi(x)$')
-plt.show()
-
-# Solution
+# Current
 plt.plot(x_mid,J,'-b',label="MC")
 plt.fill_between(x_mid,J-J_sd,J+J_sd,alpha=0.2,color='b')
 plt.plot(x_mid,J_ref,'--r',label="ref.")
@@ -144,15 +118,4 @@ plt.ylim([-0.03,0.045])
 plt.grid()
 plt.legend()
 plt.title(r'$\bar{J}_i$')
-plt.show()
-
-plt.plot(x[:],J_face,'-b',label="MC")
-plt.fill_between(x[:],J_face-J_face_sd,J_face+J_face_sd,alpha=0.2,color='b')
-plt.plot(x[:],J_face_ref,'--r',label="ref.")
-plt.xlabel(r'$x$, cm')
-plt.ylabel('Current')
-plt.ylim([-0.03,0.045])
-plt.grid()
-plt.legend()
-plt.title(r'$J(x)$')
 plt.show()
