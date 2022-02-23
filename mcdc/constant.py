@@ -14,6 +14,7 @@ LCG_C_B05  = 0
 EVENT_COLLISION = 1
 EVENT_SURFACE   = 2
 EVENT_CENSUS    = 3
+EVENT_MESH      = 4
 
 # Physics
 mass_n = 1.67492749804E-27 # kg

@@ -173,9 +173,7 @@ class SurfacePlaneY(Surface):
         def __init__(self):
             Surface.BC.__init__(self, "reflective")
         def __call__(self, P):
-            P.dir.y *= -1
-
-
+            P.dir.x *= -1
 '''
 class MovingSurfacePlaneX(SurfacePlaneX):
     def __init__(self, x0, v, bc='transmission'):
