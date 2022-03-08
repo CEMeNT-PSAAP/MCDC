@@ -36,6 +36,8 @@ class Material:
     fission : numpy.ndarray (1D)
         Fission cross-section [/cm]
 
+    nu_s : numpy.ndarray (1D)
+        Scattering multiplication
     nu_p : numpy.ndarray (1D)
         Prompt fission neutron yield
     nu_d : numpy.ndarray (2D)
@@ -50,7 +52,8 @@ class Material:
     """
 
     def __init__(self, capture=None, scatter=None, fission=None, nu_p=None, 
-                 nu_d=None, chi_p=None, chi_d=None, speed=None, decay=None):
+                 nu_d=None, chi_p=None, chi_d=None, nu_s=None, speed=None,
+                 decay=None):
         """
         Arguments
         ---------
@@ -63,6 +66,8 @@ class Material:
         *At least capture, scatter, or fission cross-section needs to be 
         provided.
 
+        nu_s : numpy.ndarray (1D)
+            Scattering multiplication.
         nu_p : numpy.ndarray (1D)
             Prompt fission neutron yield.
         nu_d : numpy.ndarray (2D)
@@ -118,6 +123,12 @@ class Material:
         else:
             self.fission = np.zeros(self.G)
         
+        # Scattering multiplication
+        if nu_s is None:
+            self.nu_s = np.ones(self.G)
+        else:
+            self.nu_s = nu_s
+
         # Fission productions
         if fission is not None:
             if nu_p is None and nu_d is None:
@@ -164,7 +175,7 @@ class Material:
             # Normalize
             for dg in range(self.J):
                 if np.sum(chi_d[dg,:]) > 0.0:
-                    chi_d[dg,:] /= np.sum(chi_d[dg,:])
+                    self.chi_d[dg,:] /= np.sum(chi_d[dg,:])
 
         # Get speed
         if speed is not None:
