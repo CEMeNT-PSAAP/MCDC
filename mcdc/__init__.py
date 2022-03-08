@@ -1,6 +1,8 @@
-from mcdc.material     import * 
-from mcdc.particle     import *
-from mcdc.geometry     import *
-from mcdc.distribution import *
-from mcdc.tally        import *
-from mcdc.simulator    import *
+# TODO: multiple tallies, various tally mesh-type
+from mcdc.class_.material     import Material 
+from mcdc.class_.geometry     import *
+from mcdc.class_.distribution import *
+from mcdc.class_.source       import SourceSimple
+
+from mcdc.setter import *
+from mcdc.main   import run

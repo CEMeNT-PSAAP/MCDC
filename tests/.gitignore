@@ -1,9 +1,0 @@
-# Output
-*.h5
-*.png
-*.mp4
-
-# Cluster job
-*.out
-*.pbs
-

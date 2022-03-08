@@ -16,11 +16,11 @@ M = mcdc.Material(capture=np.array([0.2]), scatter=np.array([[0.8]]))
 M_barrier = mcdc.Material(capture=np.array([1.0]), scatter=np.array([[4.0]]))
 
 # Set surfaces
-Sx1 = mcdc.SurfacePlaneX(0.0, "vacuum")
+Sx1 = mcdc.SurfacePlaneX(0.0,  "reflective")
 Sx2 = mcdc.SurfacePlaneX(10.0)
 Sx3 = mcdc.SurfacePlaneX(12.0)
 Sx4 = mcdc.SurfacePlaneX(20.0, "vacuum")
-Sy1 = mcdc.SurfacePlaneY(0.0, "vacuum")
+Sy1 = mcdc.SurfacePlaneY(0.0,  "reflective")
 Sy2 = mcdc.SurfacePlaneY(10.0)
 Sy3 = mcdc.SurfacePlaneY(20.0, "vacuum")
 
@@ -44,14 +44,12 @@ Src = mcdc.SourceSimple(position=position, direction=direction)
 sources = [Src]
 
 # =============================================================================
-# Set and run simulator
+# Set problem and tally, and then run mcdc
 # =============================================================================
 
-# Set simulator and tally
-simulator = mcdc.Simulator(cells=cells, sources=sources, N_hist=1E8)
-simulator.set_tally(scores=['flux'], 
+mcdc.set_problem(cells, sources, N_hist=1E3)
+mcdc.set_tally(scores=['flux'], x=np.linspace(0.0, 6.0, 61))
+mcdc.set_tally(scores=['flux'], 
                     x=np.linspace(0.0, 20.0, 41), y=np.linspace(0.0, 20.0, 41))
-simulator.implicit_capture = True
-
-# Run
-simulator.run()
+mcdc.set_implicit_capture(True)
+mcdc.run()

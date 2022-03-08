@@ -34,17 +34,12 @@ Src = mcdc.SourceSimple(position=position, direction=direction, time=time)
 sources = [Src]
 
 # =============================================================================
-# Set and run simulator
+# Set problem and tally, and then run mcdc
 # =============================================================================
 
-# Set simulator
-simulator = mcdc.Simulator(cells=cells, sources=sources, N_hist=1E4)
+mcdc.set_problem(cells, sources, N_hist=1E3)
 f = np.load('azurv1_pl.npz')
-simulator.set_tally(scores=['flux'], x=f['x'], t=f['t'])
-f.close()
-
-# Set population control and census
-simulator.set_pct(census_time=np.array([20.0]))
-
-# Run
-simulator.run()
+mcdc.set_tally(scores=['flux'], x=f['x'], t=f['t'])
+# TODO: use time boundary instead
+mcdc.set_population_control(census_time=np.array([20.0]))
+mcdc.run()
