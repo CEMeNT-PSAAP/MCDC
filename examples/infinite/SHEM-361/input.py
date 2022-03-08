@@ -10,36 +10,41 @@ import mcdc
 # Set cells
 # =============================================================================
 
-# Set materials
-M = mcdc.Material(capture=np.array([0.5]), scatter=np.array([[1.0]]))
+# Set material XS
+with np.load('SHEM-361.npz') as data:
+    SigmaC = data['SigmaC']   # /cm
+    SigmaS = data['SigmaS']
+    SigmaF = data['SigmaF']
+    nu_p   = data['nu_p']
+    nu_d   = data['nu_d']
+    chi_p  = data['chi_p']
+    chi_d  = data['chi_d']
+    G      = data['G']
+
+SigmaC *= 2.0
+
+# Set material
+M = mcdc.Material(capture=SigmaC, scatter=SigmaS, fission=SigmaF, nu_p=nu_p,
+                  chi_p=chi_p, nu_d=nu_d, chi_d=chi_d)
 
 # Set surfaces
-S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
-S1 = mcdc.SurfacePlaneX(6.0, "vacuum")
+S0 = mcdc.SurfacePlaneX(-1E10,"reflective")
+S1 = mcdc.SurfacePlaneX(1E10,"reflective")
 
 # Set cells
 C = mcdc.Cell([+S0, -S1], M)
 cells = [C]
 
 # =============================================================================
-# Set sources
+# Set source
 # =============================================================================
-# Two sources with different probabilities
 
-position1  = mcdc.DistPoint(x=mcdc.DistDelta(1E-10))
-direction1 = mcdc.DistPoint(x=mcdc.DistDelta(1.0))
-Src1 = mcdc.SourceSimple(position=position1, direction=direction1, prob=0.4)
-
-position2  = mcdc.DistPoint(x=mcdc.DistUniform(4.0,5.0))
-direction2 = mcdc.DistPointIsotropic()
-Src2 = mcdc.SourceSimple(position=position2, direction=direction2, prob=0.6)
-
-sources = [Src1, Src2]
+Src = mcdc.SourceSimple(group=mcdc.DistUniformInt(0,G))
+sources = [Src]
 
 # =============================================================================
 # Set problem and tally, and then run mcdc
 # =============================================================================
 
-mcdc.set_problem(cells, sources, N_hist=1E4)
-mcdc.set_tally(scores=['flux', 'current'], x=np.linspace(0.0, 6.0, 61))
+mcdc.set_problem(cells, sources, N_hist=1E3)
 mcdc.run()

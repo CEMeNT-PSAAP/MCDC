@@ -1,8 +1,6 @@
-import numpy as np
-
-from mpi4py import MPI
-from math   import floor
-
+from   math   import floor
+from   mpi4py import MPI
+import numpy  as     np
 
 # Communication parameters
 comm   = MPI.COMM_WORLD
