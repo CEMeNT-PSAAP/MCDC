@@ -193,6 +193,9 @@ def surface_crossing(P):
 #==============================================================================
 
 def collision(P):
+    # Kill the current particle
+    P.alive = False
+
     SigmaT = P.cell.material.total[P.group]
     SigmaC = P.cell.material.capture[P.group]
     SigmaS = P.cell.material.scatter[P.group]
@@ -231,7 +234,7 @@ def collision(P):
 #==============================================================================
 
 def capture(P):
-    P.alive = False
+    pass
 
 #==============================================================================
 # Scattering
@@ -240,55 +243,64 @@ def capture(P):
 def scattering(P):
     # Ger outgoing spectrum
     chi_s = P.cell.material.chi_s[P.group]
+    nu_s  = P.cell.material.nu_s[P.group]
     G     = P.cell.material.G
-    
-    # Sample outgoing energy
-    xi  = mcdc.rng()
-    tot = 0.0
-    for g_out in range(G):
-        tot += chi_s[g_out]
-        if tot > xi:
-            break
-    P.group = g_out
-    
-    # Sample scattering angle
-    mu = 2.0*mcdc.rng() - 1.0;
-    
-    # Sample azimuthal direction
-    azi     = 2.0*np.pi*mcdc.rng()
-    cos_azi = np.cos(azi)
-    sin_azi = np.sin(azi)
-    Ac      = (1.0 - mu**2)**0.5
 
-    ux = P.direction.x
-    uy = P.direction.y
-    uz = P.direction.z
-    
-    if uz != 1.0:
-        B = (1.0 - P.direction.z**2)**0.5
-        C = Ac/B
+    N = floor(P.weight*nu_s + mcdc.rng())
+
+    for n in range(N):
+        # Create copy
+        P_new = P.copy()
+        P_new.weight = 1.0
+
+        # Sample outgoing energy
+        xi  = mcdc.rng()
+        tot = 0.0
+        for g_out in range(G):
+            tot += chi_s[g_out]
+            if tot > xi:
+                break
+        P_new.group = g_out
         
-        P.direction.x = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
-        P.direction.y = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
-        P.direction.z = uz*mu - cos_azi*Ac*B
-    
-    # If dir = 0i + 0j + k, interchange z and y in the scattering formula
-    else:
-        B = (1.0 - uy**2)**0.5
-        C = Ac/B
+        # Sample scattering angle
+        # TODO: anisotropic scattering
+        mu = 2.0*mcdc.rng() - 1.0;
         
-        P.direction.x = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
-        P.direction.z = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
-        P.direction.y = uy*mu - cos_azi*Ac*B
+        # Sample azimuthal direction
+        azi     = 2.0*np.pi*mcdc.rng()
+        cos_azi = np.cos(azi)
+        sin_azi = np.sin(azi)
+        Ac      = (1.0 - mu**2)**0.5
+
+        ux = P_new.direction.x
+        uy = P_new.direction.y
+        uz = P_new.direction.z
+        
+        if uz != 1.0:
+            B = (1.0 - P.direction.z**2)**0.5
+            C = Ac/B
+            
+            P_new.direction.x = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
+            P_new.direction.y = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
+            P_new.direction.z = uz*mu - cos_azi*Ac*B
+        
+        # If dir = 0i + 0j + k, interchange z and y in the scattering formula
+        else:
+            B = (1.0 - uy**2)**0.5
+            C = Ac/B
+            
+            P_new.direction.x = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
+            P_new.direction.z = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
+            P_new.direction.y = uy*mu - cos_azi*Ac*B
+        
+        # Bank
+        mcdc.bank_history.append(P_new)
         
 #==============================================================================
 # Fission
 #==============================================================================
 
 def fission(P):
-    # Kill the current particle
-    P.alive = False
-
     # Get group numbers
     G = P.cell.material.G
     J = P.cell.material.J
