@@ -9,3 +9,6 @@ mcdc.egg-info
 # Editor
 .spyproject
 *.swp
+
+# Misc.
+tmp

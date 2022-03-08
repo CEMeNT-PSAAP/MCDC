@@ -43,12 +43,9 @@ Src = mcdc.SourceSimple(position=position, direction=direction)
 sources = [Src]
 
 # =============================================================================
-# Set and run simulator
+# Set problem and tally, and then run mcdc
 # =============================================================================
 
-# Set simulator and tally
-simulator = mcdc.Simulator(cells=cells, sources=sources, N_hist=1E4)
-simulator.set_tally(scores=['flux'], x=np.linspace(0.0, 6.0, 61))
-
-# Run
-simulator.run()
+mcdc.set_problem(cells, sources, N_hist=1E4)
+mcdc.set_tally(scores=['flux'], x=np.linspace(0.0, 6.0, 61))
+mcdc.run()
