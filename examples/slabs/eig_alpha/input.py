@@ -37,17 +37,12 @@ Src = mcdc.SourceSimple(position=position, direction=direction)
 sources = [Src]
 
 # =============================================================================
-# Set and run simulator
+# Set problem and tally, and then run mcdc
 # =============================================================================
 
-# Set simulator
-simulator = mcdc.Simulator(cells=cells, sources=sources, N_hist=5E2)
+mcdc.set_problem(cells, sources, N_hist=5E3)
+mcdc.set_kmode(N_iter=40, alpha_mode=True)
 x_grid = np.array([0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 
                    1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
-simulator.set_tally(scores=['flux'], x=x_grid)
-
-# Set k-eigenvalue mode parameters
-simulator.set_kmode(N_iter=30, alpha_mode=True)
-
-# Run
-simulator.run()
+mcdc.set_tally(scores=['flux'], x=x_grid)
+mcdc.run()

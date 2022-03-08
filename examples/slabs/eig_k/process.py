@@ -26,7 +26,7 @@ with h5py.File('output.h5', 'r') as f:
     
 # Get average
 N_passive = 10
-N_active = 20
+N_active = 30
 phi_avg = np.zeros_like(phi[0])
 phi_sd  = np.zeros_like(phi[0])
 k_avg = 0.0
