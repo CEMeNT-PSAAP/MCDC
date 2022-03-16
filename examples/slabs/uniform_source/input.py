@@ -12,37 +12,34 @@ import mcdc
 # Three slab layers with different materials
 
 # Set materials
-M1 = mcdc.Material(capture=np.array([1.0]))
-M2 = mcdc.Material(capture=np.array([1.5]))
-M3 = mcdc.Material(capture=np.array([2.0]))
+m1 = mcdc.material(capture=np.array([1.0]))
+m2 = mcdc.material(capture=np.array([1.5]))
+m3 = mcdc.material(capture=np.array([2.0]))
 
 # Set surfaces
-S0 = mcdc.SurfacePlaneX(0.0, "vacuum")
-S1 = mcdc.SurfacePlaneX(2.0)
-S2 = mcdc.SurfacePlaneX(4.0)
-S3 = mcdc.SurfacePlaneX(6.0, "vacuum")
+s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
+s2 = mcdc.surface('plane-x', x=2.0)
+s3 = mcdc.surface('plane-x', x=4.0)
+s4 = mcdc.surface('plane-x', x=6.0, bc="vacuum")
 
 # Set cells
-C1 = mcdc.Cell([+S0, -S1], M2)
-C2 = mcdc.Cell([+S1, -S2], M3)
-C3 = mcdc.Cell([+S2, -S3], M1)
-cells = [C1, C2, C3]
+c1 = mcdc.cell([+s1, -s2], m2)
+c2 = mcdc.cell([+s2, -s3], m3)
+c3 = mcdc.cell([+s3, -s4], m1)
+
+cells = [c1, c2, c3]
 
 # =============================================================================
 # Set source
 # =============================================================================
 # Uniform isotropic source throughout the medium
 
-position  = mcdc.DistPoint(x=mcdc.DistUniform(0.0,6.0))
-direction = mcdc.DistPointIsotropic()
-
-Src = mcdc.SourceSimple(position=position, direction=direction)
-sources = [Src]
+source = mcdc.source(x=[0.0, 6.0], isotropic=True)
 
 # =============================================================================
 # Set problem and tally, and then run mcdc
 # =============================================================================
 
-mcdc.set_problem(cells, sources, N_hist=1E4)
+mcdc.set_problem(cells, source, N_hist=1E4)
 mcdc.set_tally(scores=['flux', 'current'], x=np.linspace(0.0, 6.0, 61))
 mcdc.run()

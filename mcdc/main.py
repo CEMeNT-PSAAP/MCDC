@@ -22,6 +22,10 @@ def run():
     simulation_end = False
     iter_idx = 0
     while not simulation_end:
+        # Rebase rng skip_ahead seed
+        mcdc.rng.skip_ahead(mcdc.mpi.work_start, rebase=True)
+
+        # Loop over particel sources
         loop_source()
         
         # Tally closeout for eigenvalue mode
@@ -101,11 +105,6 @@ def run():
 def prepare():
     print_msg(" Preparing...")
 
-    # Normalize sources
-    norm = 0.0
-    for s in mcdc.sources: norm += s.prob
-    for s in mcdc.sources: s.prob /= norm
-        
     # Tally
     if mcdc.tally is None:
         mcdc.tally = Tally('tally', ['flux'])

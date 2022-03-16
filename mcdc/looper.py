@@ -10,17 +10,16 @@ import mcdc.global_ as mcdc
 # =========================================================================
 
 def loop_source():
-    # Rebase rng skip_ahead seed
-    mcdc.rng.skip_ahead(mcdc.mpi.work_start, rebase=True)
-
-    # Loop over sources
+    # Loop over particle sources
     for work_idx in range(mcdc.mpi.work_size):
         # Initialize RNG wrt work index
         mcdc.rng.skip_ahead(work_idx)
 
         # Get a source particle and put into history bank
         if not mcdc.bank_source:
-            P = kernel.get_source()
+            P = mcdc.source.get_particle()
+            kernel.set_cell(P)
+            kernel.set_census_time_idx(P)
         else:
             P = mcdc.bank_source[work_idx]
         mcdc.bank_history.append(P)
@@ -29,26 +28,20 @@ def loop_source():
         if mcdc.weight_window is not None:
             mcdc.weight_window(P, mcdc.bank_history)
 
-        # History loop
-        loop_history()
+        # Run particle source and secondaries
+        while mcdc.bank_history:
+            # Get particle from history bank
+            P = mcdc.bank_history.pop()
+            
+            # Particle loop
+            loop_particle(P)
+
+        # Tally history closeout
+        mcdc.tally.closeout_history()
         
         # Progress printout
         print_progress(work_idx)
 
-# =========================================================================
-# History loop
-# =========================================================================
-
-def loop_history():
-    while mcdc.bank_history:
-        # Get particle from history bank
-        P = mcdc.bank_history.pop()
-        
-        # Particle loop
-        loop_particle(P)
-
-    # Tally history closeout
-    mcdc.tally.closeout_history()
         
 # =========================================================================
 # Particle loop
