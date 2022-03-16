@@ -2,16 +2,17 @@ from   math  import floor
 import numpy as     np
 
 from mcdc.class_.particle import *
+from mcdc.class_.point    import Point
 from mcdc.constant        import *
 
 # Get mcdc global variables/objects
 import mcdc.global_ as mcdc
 
 #==============================================================================
-# Isotropic direction
+# Random sampling
 #==============================================================================
     
-def isotropic_direction():
+def sample_isotropic_direction():
     # Sample polar cosine and azimuthal angle uniformly
     mu  = 2.0*mcdc.rng() - 1.0
     azi = 2.0*PI*mcdc.rng()
@@ -23,39 +24,29 @@ def isotropic_direction():
     x = mu
     return Point(x, y, z)
 
-#==============================================================================
-# Get source
-#==============================================================================
+def sample_uniform(a, b):
+    return a + mcdc.rng() * (b - a)
 
-def get_source():
-    # Sample source
-    xi = mcdc.rng()
+def sample_discrete(p):
     tot = 0.0
-    source = None
-    for s in mcdc.sources:
-        tot += s.prob
-        if xi < tot:
-            source = s
-            break
-    P = source.get_particle()
-    set_cell(P)
-    set_census_time_idx(P)
-    return P
+    xi  = mcdc.rng()
+    for i in range(p.shape[0]):
+        tot += p[i]
+        if tot > xi:
+            return i
 
 #==============================================================================
 # Set cell
 #==============================================================================
 
 def set_cell(P):
-    cell     = None
-    position = P.position
-    time     = P.time
+    cell = None
     for C in mcdc.cells:
-        if C.test_point(position,time):
+        if C.test_point(P):
             cell = C
             break
     if cell == None:
-        print_error("A particle is lost at "+str(position))
+        print_error("A particle is lost at "+str(P.position))
         sys.exit()
     P.cell = cell
 
@@ -125,8 +116,7 @@ def surface_distance(P):
     surface  = None
     distance = np.inf
     for S in P.cell.surfaces:
-        speed = P.cell.material.speed[P.group]
-        d = S.distance(P.position, P.direction, P.time, speed)
+        d = S.distance(P)
         if d < distance:
             surface  = S
             distance = d
@@ -179,7 +169,7 @@ def move_particle(P, distance):
 
 def surface_crossing(P):
     # Implement BC
-    P.surface.bc(P)
+    P.surface.apply_bc(P)
 
     # Small kick to make sure crossing
     move_particle(P, PRECISION)
@@ -206,11 +196,12 @@ def collision(P):
         SigmaT += Sigma_alpha
 
     if mcdc.settings.implicit_capture:
-        capture = SigmaC
         if mcdc.settings.mode_alpha:
-            capture += Sigma_alpha
-        P.weight *= (SigmaT-capture)/SigmaT
-        SigmaT -= capture
+            P.weight *= (SigmaT-SigmaC-Sigma_alpha)/SigmaT
+            SigmaT   -= (capture + abs(Sigma_alpha))
+        else:
+            P.weight *= (SigmaT-SigmaC)/SigmaT
+            SigmaT   -= SigmaC
 
     # Sample collision type
     xi = mcdc.rng()*SigmaT
@@ -246,12 +237,20 @@ def scattering(P):
     nu_s  = P.cell.material.nu_s[P.group]
     G     = P.cell.material.G
 
-    N = floor(P.weight*nu_s + mcdc.rng())
+    # Get effective and new weight
+    if mcdc.settings.implicit_capture:
+        weight_eff = 1.0
+        weight_new = P.weight
+    else:
+        weight_eff = P.weight
+        weight_new = 1.0
+
+    N = floor(weight_eff*nu_s + mcdc.rng())
 
     for n in range(N):
         # Create copy
         P_new = P.copy()
-        P_new.weight = 1.0
+        P_new.weight = weight_new
 
         # Sample outgoing energy
         xi  = mcdc.rng()
@@ -304,7 +303,7 @@ def fission(P):
     # Get group numbers
     G = P.cell.material.G
     J = P.cell.material.J
-
+    
     # Total nu
     nu_p = P.cell.material.nu_p[P.group]
     nu = nu_p
@@ -312,15 +311,23 @@ def fission(P):
         nu_d = P.cell.material.nu_d[P.group]
         nu += sum(nu_d)
 
+    # Get effective and new weight
+    if mcdc.settings.implicit_capture:
+        weight_eff = 1.0
+        weight_new = P.weight
+    else:
+        weight_eff = P.weight
+        weight_new = 1.0
+
     # Sample number of fission neutrons
     #   in fixed-source, k_eff = 1.0
-    N = floor(P.weight*nu/mcdc.global_tally.k_eff + mcdc.rng())
+    N = floor(weight_eff*nu/mcdc.global_tally.k_eff + mcdc.rng())
 
     # Push fission neutrons to bank
     for n in range(N):
         # Create copy
         P_new = P.copy()
-        P_new.weight = 1.0
+        P_new.weight = weight_new
 
         # Determine if it's prompt or delayed neutrons, 
         # then get the energy spectrum and decay constant
@@ -358,7 +365,7 @@ def fission(P):
         P_new.group = g_out
 
         # Sample isotropic direction
-        P_new.direction = isotropic_direction()
+        P_new.direction = sample_isotropic_direction()
 
         # Bank
         mcdc.bank_fission.append(P_new)
@@ -369,7 +376,7 @@ def fission(P):
 
 def time_reaction(P):
     if mcdc.global_tally.alpha_eff > 0:
-        P.alive = False
+        pass # Already killed
     else:
         P_new = Particle.copy()
         mcdc.bank_history.append(P_new)

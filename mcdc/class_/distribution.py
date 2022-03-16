@@ -2,9 +2,9 @@ from   abc   import ABC, abstractmethod
 from   math  import floor
 import numpy as     np
 
-from   mcdc.class_.particle import Point
-from   mcdc.constant        import PI
-import mcdc.kernel          as     kernel
+from   mcdc.class_.point import Point
+from   mcdc.constant     import PI
+import mcdc.kernel       as     kernel
 
 # Get mcdc global variables/objects
 import mcdc.global_ as mcdc
