@@ -1,3 +1,4 @@
+import numba as nb
 import numpy as np
 
 from   mcdc.class_.popctrl import PCT_None
@@ -8,12 +9,12 @@ from   mcdc.class_.random  import RandomLCG
 #==============================================================================
 # Problem definition
 #==============================================================================
-# TODO: use fixed memory allocations with helper indices
 
-cells   = []
-sources = []
-tally   = None
-
+materials = []
+surfaces  = []
+cells     = []
+source    = None
+tally     = None
 
 #==============================================================================
 # Particle banks
@@ -45,8 +46,8 @@ class Settings:
         self.mode_alpha      = False
 
         # Variance reduction technique
-        self.implicit_capture   = False
-        self.weight_window      = False
+        self.implicit_capture = False
+        self.weight_window    = False
 
         # Time census
         self.census_time = [INF]

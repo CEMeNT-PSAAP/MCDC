@@ -11,33 +11,28 @@ import mcdc
 # =============================================================================
 
 # Set materials
-M = mcdc.Material(capture=np.array([1.0/3.0]), scatter=np.array([[1.0/3.0]]),
+m = mcdc.material(capture=np.array([1.0/3.0]), scatter=np.array([[1.0/3.0]]),
                   fission=np.array([1.0/3.0]), nu_p=np.array([2.3]))
 
 # Set surfaces
-S0 = mcdc.SurfacePlaneX(-1E10, "reflective")
-S1 = mcdc.SurfacePlaneX(1E10, "reflective")
+s1 = mcdc.surface('plane-x', x=-1E10, bc="reflective")
+s2 = mcdc.surface('plane-x', x=1E10,  bc="reflective")
 
 # Set cells
-C = mcdc.Cell([+S0, -S1], M)
-cells = [C]
+c = mcdc.cell([+s1, -s2], m)
+cells = [c]
 
 # =============================================================================
 # Set source
 # =============================================================================
 
-position  = mcdc.DistPoint()
-direction = mcdc.DistPointIsotropic()
-time      = mcdc.DistDelta(0.0)
-
-Src = mcdc.SourceSimple(position=position, direction=direction, time=time)
-sources = [Src]
+source = mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
 
 # =============================================================================
 # Set problem and tally, and then run mcdc
 # =============================================================================
 
-mcdc.set_problem(cells, sources, N_hist=1E3)
+mcdc.set_problem(cells, source, N_hist=1E3)
 f = np.load('azurv1_pl.npz')
 mcdc.set_tally(scores=['flux'], x=f['x'], t=f['t'])
 # TODO: use time boundary instead
