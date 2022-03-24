@@ -1,13 +1,17 @@
 import numpy as np
-import sys
+
+# Disable Numba-JIT for pure Python mode
+from numba import config
+config.DISABLE_JIT = True
 
 # Get path to mcdc (not necessary if mcdc is installed)
+import sys
 sys.path.append('../../../')
 
 import mcdc
 
 # =============================================================================
-# Set cells
+# Set model
 # =============================================================================
 
 # Set materials
@@ -22,23 +26,27 @@ s2 = mcdc.surface('plane-x', x=1.5)
 s3 = mcdc.surface('plane-x', x=2.5, bc="vacuum")
 
 # Set cells
-c1 = mcdc.cell([+s1, -s2], m1)
-c2 = mcdc.cell([+s2, -s3], m2)
-cells = [c1, c2]
+mcdc.cell([+s1, -s2], m1)
+mcdc.cell([+s2, -s3], m2)
 
 # =============================================================================
 # Set source
 # =============================================================================
 
-source = mcdc.source(x=[0.0, 2.5], isotropic=True)
+mcdc.source(x=[0.0, 2.5], isotropic=True)
 
 # =============================================================================
-# Set problem and tally, and then run mcdc
+# Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.set_problem(cells, source, N_hist=5E3)
-mcdc.set_kmode(N_iter=40)
+# Tally
 x_grid = np.array([0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 
                    1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
-mcdc.set_tally(scores=['flux'], x=x_grid)
+mcdc.tally(scores=['flux'], x=x_grid)
+
+# Setting
+mcdc.setting(N_hist=5E3)
+mcdc.eigenmode(N_iter=40, alpha_mode=True)
+
+# Run
 mcdc.run()
