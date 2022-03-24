@@ -1,27 +1,15 @@
-from   numba              import int64, float64
-from   numba.experimental import jitclass
-import numpy              as     np
-
 # TODO: anisotropic scattering
 
-spec = [('ID',      int64),
-        ('G',       int64),
-        ('J',       int64),
-        ('speed',   float64[:]),
-        ('decay',   float64[:]),
-        ('total',   float64[:]),
-        ('capture', float64[:]),
-        ('scatter', float64[:]),
-        ('fission', float64[:]),
-        ('nu_s',    float64[:]),
-        ('nu_f',    float64[:]),
-        ('nu_p',    float64[:]),
-        ('nu_d',    float64[:,:]),
-        ('nu_d',    float64[:,:]),
-        ('chi_s',   float64[:,:]),
-        ('chi_p',   float64[:,:]),
-        ('chi_d',   float64[:,:])]
-@jitclass(spec)
+from numba              import int64, float64, config
+from numba.experimental import jitclass
+
+@jitclass([('ID', int64), ('G', int64), ('J', int64), ('speed', float64[:]),
+           ('decay', float64[:]), ('total', float64[:]),
+           ('capture', float64[:]), ('scatter', float64[:]),
+           ('fission', float64[:]), ('nu_s', float64[:]), ('nu_f', float64[:]),
+           ('nu_p', float64[:]), ('nu_d', float64[:,:]), ('nu_d', float64[:,:]),
+           ('chi_s', float64[:,:]), ('chi_p', float64[:,:]),
+           ('chi_d', float64[:,:])])
 class Material:
     """
     Attributes
@@ -83,3 +71,8 @@ class Material:
         self.chi_s   = chi_s
         self.chi_p   = chi_p
         self.chi_d   = chi_d
+
+if not config.DISABLE_JIT:
+    type_material = Material.class_type.instance_type
+else:
+    type_material = None

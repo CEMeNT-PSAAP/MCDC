@@ -1,27 +1,18 @@
-from mcdc.class_.point import Point
+# TODO: quadric surface
+# TODO: implement inheritance/absract jitclass if already supported
+
+from numba              import int64, float64, boolean, config
+from numba.experimental import jitclass
+
+from mcdc.class_.point import Point, type_point
 from mcdc.constant     import INF
 
+@jitclass([('ID', int64), ('vacuum', float64), ('reflective', boolean),
+          ('A', float64), ('B', float64), ('C', float64), ('D', float64),
+          ('n', type_point)])
 class Surface:
-    # TODO: quadric surface
     """
     General surface: Ax + By + Cz + D = 0
-    ...
-
-    Attributes
-    ----------
-    ID : int
-        Surface ID
-    type : int
-        Surface type. Will be reimplemented with abstractmethod once it is
-        supported by Numba
-    vacuum : bool
-        Vaccum boundary?
-    reflective : bool
-        Reflecting boundary?
-    A, B, C, D : double
-        Surface coefficients
-    n : Point
-        Normal direction
     """
 
     def __init__(self, ID, vacuum, reflective, A, B, C, D):
@@ -91,10 +82,16 @@ class Surface:
         P.direction.y = uy - c*ny
         P.direction.z = uz - c*nz
 
+if not config.DISABLE_JIT:
+    type_surface = Surface.class_type.instance_type
+else:
+    type_surface = None
+
+# User's python interface
 class SurfaceHandle:
     def __init__(self, surface):
         self.surface = surface
     def __pos__(self):
-        return [self.surface,+1]
+        return [self.surface,+1.0]
     def __neg__(self):
-        return [self.surface,-1]
+        return [self.surface,-1.0]
