@@ -39,10 +39,22 @@ def bcast(buff, root):
     return comm.Bcast(buff, root)
 def exscan(var, buff):
     comm.Exscan(var, buff, MPI.SUM)
-def reduce_master(var, buff):
+def reduce_master(var):
+    var = np.array(var) # Anticipating Python-converted Numba types
+    buff = np.zeros_like(var)
     comm.Reduce(var, buff, MPI.SUM, 0)
-def allreduce(var, buff):
+    if buff.shape == ():
+        return buff
+    else:
+        return buff[:]
+def allreduce(var):
+    var = np.array(var) # Anticipating Python-converted Numba types
+    buff = np.zeros_like(var)
     comm.Allreduce(var, buff, MPI.SUM)
+    if buff.shape == ():
+        return buff
+    else:
+        return buff[:]
 
 
 # =============================================================================
@@ -97,9 +109,7 @@ def total_weight(bank):
     W_local = np.zeros(1)
     for P in bank:
         W_local[0] += P.weight
-    buff = np.zeros(1)
-    allreduce(W_local, buff)
-    return buff[0]
+    return allreduce(W_local)[0]
 
 def normalize_weight(bank, norm):
     # Get total weight

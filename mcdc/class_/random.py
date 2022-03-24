@@ -1,84 +1,70 @@
-from abc           import ABC, abstractmethod
-from mcdc.constant import LCG_G, LCG_C, LCG_MOD, LCG_STRIDE, LCG_SEED
+from   numba              import int64, config, uint64
+from   numba.experimental import jitclass
+import numpy              as     np
 
-# =============================================================================
-# Random Number Generator
-# =============================================================================
-
-class Random(ABC):
-    def __init__(self, seed):
+# Linear Congruential Generator
+#   [F. B. Brown 1994, "Random Number Generation with Arbitrary Strides]
+@jitclass([('seed_master', int64), ('seed_base', int64), ('seed', int64),
+           ('g', int64), ('c', int64), ('mod', uint64), ('stride', int64)])
+class Random:
+    def __init__(self):
+        seed = 1 
         self.seed_master = seed
         self.seed_base   = seed # For skip ahead
         self.seed        = seed
+        self.g           = 2806196910506780709
+        self.c           = 1
+        self.mod         = 2**63
+        self.stride      = 152917
+
+    def set_seed(self, seed):
+        self.seed_master = seed
+        self.seed_base   = seed
+        self.seed        = seed
+
+    def set_stride(self, stride):
+        self.stride = stride
 
     def rebase(self):
         self.seed_base = self.seed
 
-    @abstractmethod
-    def skip_ahead(self, skip, rebase=False, stride=None):
-        """
-        Skip ahead in the random number sequence
+    def skip_ahead_strides(self, skip):
+        self._skip_ahead(skip, self.stride)
 
-        args:
-        skip -- The number of strides to be skipped from seed_base
+    def skip_ahead(self, skip):
+        self._skip_ahead(skip, 1)
 
-        kwargs:
-        rebase -- If True, seed_base is updated to the new seed.
-                  This rebasing avoids always skipping from seed_master
-                  anytime skip_ahead is called. (default: False)
-        stride -- In not given, self.stride is used. (default: None)
-        """
-        pass
+    def _skip_ahead(self, skip, stride):
+        n        = skip*stride
+        g        = self.g
+        c        = self.c
+        g_new    = 1
+        c_new    = 0
+        mod      = self.mod
+        mod_mask = mod - 1
 
-    @abstractmethod
-    def __call__(self):
-        """
-        Return the next random number from the current seed
-        """
-        pass
-
-
-# Linear Congruential Generator
-#   [F. B. Brown 1994, "Random Number Generation with Arbitrary Strides]
-class RandomLCG(Random):
-    def __init__(self, seed=LCG_SEED, g=LCG_G, c=LCG_C, mod=LCG_MOD, 
-                 stride=LCG_STRIDE, skip=0):
-        Random.__init__(self, seed)
-        self.g        = g
-        self.c        = c
-        self.mod      = mod
-        self.mod_mask = mod - 1
-        self.stride   = stride
-        self.norm     = 1/mod
-
-        # Skip ahead
-        self.skip_ahead(skip)
-
-    def skip_ahead(self, skip, rebase=False, stride=None):
-        if not stride:
-            stride = self.stride
-    
-        n     = skip*stride
-        g     = self.g
-        c     = self.c
-        g_new = 1
-        c_new = 0
-
-        n = n & self.mod_mask
+        n = n & mod_mask
         while n > 0:
             if n & 1:
-                g_new = g_new*g       & self.mod_mask
-                c_new = (c_new*g + c) & self.mod_mask
+                g_new = g_new*g       & mod_mask
+                c_new = (c_new*g + c) & mod_mask
 
-            c = (g+1)*c & self.mod_mask
-            g = g*g     & self.mod_mask
+            c = (g+1)*c & mod_mask
+            g = g*g     & mod_mask
             n >>= 1
 
-        self.seed = (g_new*self.seed_base + c_new ) & self.mod_mask
+        self.seed = (g_new*self.seed_base + c_new ) & mod_mask
 
-        if rebase:
-            self.rebase()
+    def random(self):
+        g        = self.g
+        c        = self.c
+        mod      = self.mod
+        mod_mask = mod - 1
 
-    def __call__(self):
-        self.seed = (self.g*self.seed + self.c) & self.mod_mask
-        return self.seed*self.norm
+        self.seed = (g*self.seed + c) & mod_mask
+        return np.float64(self.seed/mod)
+
+if not config.DISABLE_JIT:
+    type_random = Random.class_type.instance_type
+else:
+    type_random = None
