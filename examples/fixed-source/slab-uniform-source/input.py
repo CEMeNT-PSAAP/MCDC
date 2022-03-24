@@ -1,13 +1,17 @@
 import numpy as np
-import sys
+
+# Disable Numba-JIT for pure Python mode
+from numba import config
+config.DISABLE_JIT = True
 
 # Get path to mcdc (not necessary if mcdc is installed)
+import sys
 sys.path.append('../../../')
 
 import mcdc
 
 # =============================================================================
-# Set cells
+# Set model
 # =============================================================================
 # Three slab layers with different materials
 
@@ -23,25 +27,25 @@ s3 = mcdc.surface('plane-x', x=4.0)
 s4 = mcdc.surface('plane-x', x=6.0, bc="vacuum")
 
 # Set cells
-c1 = mcdc.cell([+s1, -s2], m2)
-c2 = mcdc.cell([+s2, -s3], m3)
-c3 = mcdc.cell([+s3, -s4], m1)
-
-cells = [c1, c2, c3]
+mcdc.cell([+s1, -s2], m2)
+mcdc.cell([+s2, -s3], m3)
+mcdc.cell([+s3, -s4], m1)
 
 # =============================================================================
-# Set sources
+# Set source
 # =============================================================================
-# Parallel beam, at x=0, going in the +x direction
-# Source needs to be slightly shifted to the right to make sure it starts in
-# the right cell.
+# Uniform isotropic source throughout the medium
 
-source = mcdc.source(point=[1E-10,0.0,0.0], direction=[1.0,0.0,0.0])
+mcdc.source(x=[0.0, 6.0], isotropic=True)
 
 # =============================================================================
-# Set problem and tally, and then run mcdc
+# Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.set_problem(cells, source, N_hist=1E4)
-mcdc.set_tally(scores=['flux'], x=np.linspace(0.0, 6.0, 61))
+mcdc.tally(scores=['flux', 'current'], x=np.linspace(0.0, 6.0, 61))
+
+# Setting
+mcdc.setting(N_hist=1E4)
+
+# Run
 mcdc.run()

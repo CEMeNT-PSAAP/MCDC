@@ -1,17 +1,13 @@
-from   numba              import float64
+from   numba              import float64, config
 from   numba.experimental import jitclass
 import numpy              as     np
 
-spec = [('x', float64), ('y', float64), ('z', float64)]
-@jitclass(spec)
+@jitclass([('x', float64), ('y', float64), ('z', float64)])
 class Point:
     def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
-
-    def __str__(self):
-        return "(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
 
     # Magnitude
     def magnitude(self):
@@ -27,3 +23,12 @@ class Point:
     # Create copy
     def copy(self):
         return Point(self.x, self.y, self.z)
+
+    # Print
+    def print_(self):
+        print("(", self.x, self.y, self.z, ")")
+
+if not config.DISABLE_JIT:
+    type_point = Point.class_type.instance_type
+else:
+    type_point = None

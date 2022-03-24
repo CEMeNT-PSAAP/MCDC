@@ -1,132 +1,112 @@
-from   abc   import ABC, abstractmethod
-import numpy as     np
+from   numba              import int64, float64, boolean, types, njit, config
+from   numba.experimental import jitclass
+import numpy              as     np
 
-from   mcdc.class_.mesh import Mesh
-import mcdc.mpi         as mpi
-from   mcdc.print_ import print_error
+from mcdc.class_.mesh  import Mesh, type_mesh
+from mcdc.class_.score import ScoreFlux, ScoreCurrent, ScoreEddington,\
+                              type_score_flux, type_score_current,\
+                              type_score_eddington
 
-# Get mcdc global variables/objects
-import mcdc.global_ as mcdc
+#==============================================================================
+# Tally
+#==============================================================================
+# TODO: implement inheritance/absract jitclass if already supported
 
+@jitclass([('flux', boolean), ('current', boolean), ('eddington', boolean), 
+           ('mesh', type_mesh), ('score_flux', type_score_flux),
+           ('score_current', type_score_current), 
+           ('score_eddington', type_score_eddington)])
 class Tally:
-    def __init__(self, name, scores, x=None, y=None, z=None, t=None):
-        self.name = name
+    def __init__(self):
+        # Score flags
+        self.flux      = False
+        self.current   = False
+        self.eddington = False
 
-        # Set score
-        for s in scores:
-            if s not in ['flux', 'current', 'eddington']:
-                print_error("Unknown tally score %s"%s)
-        self.score_name = scores
+        # Uninitialized
+        #self.mesh
+        #self.score_flux     
+        #self.score_current  
+        #self.score_eddington
 
-        # Set mesh
-        self.mesh = Mesh(x,y,z,t)
-
-    def allocate_bins(self):
+    def allocate_bins(self, Ng, N_iter):
         Nt = self.mesh.Nt
         Nx = self.mesh.Nx
         Ny = self.mesh.Ny
         Nz = self.mesh.Nz
-        Ng = mcdc.cells[0].material.G
-        N_iter = mcdc.settings.N_iter
 
-        shape = [N_iter, Nt, Ng, Nx, Ny, Nz]
-        self.scores = []
-        for s in self.score_name:
-            if s == 'flux':
-                self.scores.append(ScoreFlux(shape))
-            elif s == 'current':
-                self.scores.append(ScoreCurrent(shape))
-            elif s == 'eddington':
-                self.scores.append(ScoreEddington(shape))
+        if self.flux:
+            shape = (N_iter, Nt, Ng, Nx, Ny, Nz)
+            result_bin = np.zeros(shape, dtype=np.float64)
+            self.score_flux = ScoreFlux(result_bin)
+        if self.current:
+            shape = (N_iter, Nt, Ng, Nx, Ny, Nz, 3)
+            result_bin = np.zeros(shape, dtype=np.float64)
+            self.score_current = ScoreCurrent(result_bin)
+        if self.eddington:
+            shape = (N_iter, Nt, Ng, Nx, Ny, Nz, 6)
+            result_bin = np.zeros(shape, dtype=np.float64)
+            self.score_eddington = ScoreEddington(result_bin)
 
     def score(self, P, d_move):
         # Get indices
         t, x, y, z = self.mesh.get_index(P)
 
-        # Get current index
-        for S in self.scores:
-            S(t, x, y, z, d_move, P)
+        # Score
+        if self.flux:
+            self.score_flux.accumulate(t,x,y,z,d_move,P)
+        if self.current:
+            self.score_current.accumulate(t,x,y,z,d_move,P)
+        if self.eddington:
+            self.score_eddington.accumulate(t,x,y,z,d_move,P)
    
     def closeout_history(self):
-        for S in self.scores:
-            # Accumulate sums of history
-            S.sum    += S.bin
-            S.sum_sq += np.square(S.bin)
-        
-            # Reset bin
-            S.bin.fill(0.0)
+        if self.flux:
+            closeout_history(self.score_flux)
+        if self.current:
+            closeout_history(self.score_current)
+        if self.eddington:
+            closeout_history(self.score_eddington)
     
-    def closeout(self, N_hist, i_iter):
-        for S in self.scores:
-            # MPI Reduce
-            mpi.reduce_master(S.sum, S.sum_buff)
-            mpi.reduce_master(S.sum_sq, S.sum_sq_buff)
-            S.sum[:]    = S.sum_buff[:]
-            S.sum_sq[:] = S.sum_sq_buff[:]
-            
-            # Store results
-            if mpi.master:
-                S.mean[i_iter,:] = S.sum/N_hist
-                S.sdev[i_iter,:] = np.sqrt((S.sum_sq/N_hist 
-                                            - np.square(S.mean[i_iter]))\
-                                           /(N_hist-1))
-            
-            # Reset history sums
-            S.sum.fill(0.0)
-            S.sum_sq.fill(0.0)
-        
+@njit
+def closeout_history(score):
+    # Accumulate sums of history
+    score.sum_   += score.bin_
+    score.sum_sq += np.square(score.bin_)
 
-class Score(ABC):
-    def __init__(self, shape, name):
-        self.name = name
+    # Reset bin
+    score.bin_.fill(0.0)
 
-        # History accumulator
-        self.bin = np.zeros(shape[1:]) # Skip the N_iter
+if not config.DISABLE_JIT:
+    type_tally = Tally.class_type.instance_type
+else:
+    type_tally = None
 
-        # Sums of history
-        self.sum    = np.zeros_like(self.bin)
-        self.sum_sq = np.zeros_like(self.bin)
-        
-        # MPI buffers
-        self.sum_buff    = np.zeros_like(self.bin)
-        self.sum_sq_buff = np.zeros_like(self.bin)
-        
-        # Results
-        if mpi.master:
-            self.mean = np.zeros(shape)
-            self.sdev = np.zeros_like(self.mean)
+#==============================================================================
+# Global tally (for eigenvalue mode)
+#==============================================================================
+# TODO: alpha eigenvalue with delayed neutrons
+# TODO: shannon entropy
 
-    @abstractmethod
-    def __call__(self, t, x, y, z, distance, P):
-        pass
+@jitclass([('k_eff', float64), ('alpha_eff', float64),
+           ('nuSigmaF', float64), ('inverse_speed', float64),
+           ('k_iterate', float64[:]), ('alpha_iterate', float64[:])])
+class TallyGlobal:
+    def __init__(self):
+        # Effective eigenvalue
+        self.k_eff     = 1.0
+        self.alpha_eff = 0.0
 
-class ScoreFlux(Score):
-    def __init__(self, shape):
-        Score.__init__(self, shape, 'flux')
-    def __call__(self, t, x, y, z, distance, P):
-        flux = distance*P.weight
-        self.bin[t, P.group, x, y, z] += flux
+        # Accumulator
+        self.nuSigmaF      = 0.0
+        self.inverse_speed = 0.0
 
-class ScoreCurrent(Score):
-    def __init__(self, shape):
-        Score.__init__(self, shape+[3], 'current')
-    def __call__(self, t, x, y, z, distance, P):
-        flux = distance*P.weight
-        self.bin[t, P.group, x, y, z, 0] += flux*P.direction.x
-        self.bin[t, P.group, x, y, z, 1] += flux*P.direction.y
-        self.bin[t, P.group, x, y, z, 2] += flux*P.direction.z
+    def allocate(self, N_iter):
+        # Eigenvalue solution iterate
+        self.k_iterate     = np.zeros(N_iter)
+        self.alpha_iterate = np.zeros(N_iter)
 
-class ScoreEddington(Score):
-    def __init__(self, shape):
-        Score.__init__(self, shape+[6], 'eddington')
-    def __call__(self, t, x, y, z, distance, P):
-        flux = distance*P.weight
-        ux = P.direction.x
-        uy = P.direction.y
-        uz = P.direction.z
-        self.bin[t, P.group, x, y, z, 0] += flux*ux*ux
-        self.bin[t, P.group, x, y, z, 1] += flux*ux*uy
-        self.bin[t, P.group, x, y, z, 2] += flux*ux*uz
-        self.bin[t, P.group, x, y, z, 3] += flux*uy*uy
-        self.bin[t, P.group, x, y, z, 4] += flux*uy*uz
-        self.bin[t, P.group, x, y, z, 5] += flux*uz*uz
+if not config.DISABLE_JIT:
+    type_tally_global = TallyGlobal.class_type.instance_type
+else:
+    type_tally_global = None

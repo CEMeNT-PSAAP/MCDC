@@ -1,21 +1,18 @@
-from   math  import floor
+from   numba import njit
 import numpy as     np
 
-from mcdc.class_.particle import *
-from mcdc.class_.point    import Point
-from mcdc.constant        import *
-
-# Get mcdc global variables/objects
-import mcdc.global_ as mcdc
+from mcdc.class_.point import Point
+from mcdc.constant     import *
 
 #==============================================================================
 # Random sampling
 #==============================================================================
-    
-def sample_isotropic_direction():
+
+@njit
+def sample_isotropic_direction(rng):
     # Sample polar cosine and azimuthal angle uniformly
-    mu  = 2.0*mcdc.rng() - 1.0
-    azi = 2.0*PI*mcdc.rng()
+    mu  = 2.0*rng.random() - 1.0
+    azi = 2.0*PI*rng.random()
 
     # Convert to Cartesian coordinates
     c = (1.0 - mu**2)**0.5
@@ -24,12 +21,14 @@ def sample_isotropic_direction():
     x = mu
     return Point(x, y, z)
 
-def sample_uniform(a, b):
-    return a + mcdc.rng() * (b - a)
+@njit
+def sample_uniform(a, b, rng):
+    return a + rng.random() * (b - a)
 
-def sample_discrete(p):
+@njit
+def sample_discrete(p, rng):
     tot = 0.0
-    xi  = mcdc.rng()
+    xi  = rng.random()
     for i in range(p.shape[0]):
         tot += p[i]
         if tot > xi:
@@ -39,48 +38,39 @@ def sample_discrete(p):
 # Set cell
 #==============================================================================
 
-def set_cell(P):
-    cell = None
+@njit
+def set_cell(P, mcdc):
+    found = False
     for C in mcdc.cells:
         if C.test_point(P):
-            cell = C
+            P.cell = C
+            found = True
             break
-    if cell == None:
-        print_error("A particle is lost at "+str(P.position))
-        sys.exit()
-    P.cell = cell
-
-# TODO: Redesign time census so that only one is relevant at each source loop
-def set_census_time_idx(P):
-    t = P.time
-    idx = binary_search(t, mcdc.settings.census_time) + 1
-
-    if idx == len(mcdc.settings.census_time):
+    if not found:
+        print("A particle is lost")
         P.alive = False
-        idx = None
-    elif P.time == mcdc.settings.census_time[idx]:
-        idx += 1
-    P.idx_census_time = idx
 
 #==============================================================================
 # Move to event
 #==============================================================================
 
-def move_to_event(P):
+@njit
+def move_to_event(P, mcdc):
     # Get speed
     P.speed = P.cell.material.speed[P.group]
 
     # Get distances to events
-    d_collision        = collision_distance(P)
+    d_collision        = collision_distance(P, mcdc)
     surface, d_surface = surface_distance(P)
+    d_time_boundary    = P.speed*(mcdc.setting.time_boundary - P.time)
     d_mesh             = mcdc.tally.mesh.distance(P)
-    d_census           = census_distance(P)
 
     # Determine event
-    event, distance = determine_event(d_collision, d_surface, d_mesh, d_census)
+    event, distance = determine_event(d_collision, d_surface, d_time_boundary,
+                                      d_mesh)
 
     # Score tracklength tallies
-    score_tracklength(P, distance)
+    score_tracklength(P, distance, mcdc)
 
     # Add a small-kick to ensure mesh crossing
     if event == EVENT_MESH:
@@ -95,7 +85,8 @@ def move_to_event(P):
 
     return event
 
-def collision_distance(P):
+@njit
+def collision_distance(P, mcdc):
     # Get total XS
     SigmaT = P.cell.material.total[P.group]
 
@@ -104,14 +95,15 @@ def collision_distance(P):
         return INF
 
     # Time absorption?
-    if mcdc.settings.mode_alpha:
-        SigmaT += abs(mcdc.global_tally.alpha_eff)/P.speed
+    if mcdc.setting.mode_alpha:
+        SigmaT += np.absolute(mcdc.tally_global.alpha_eff)/P.speed
 
     # Sample collision distance
-    xi     = mcdc.rng()
+    xi     = mcdc.rng.random()
     distance  = -np.log(xi)/SigmaT
     return distance
-    
+
+@njit
 def surface_distance(P):
     surface  = None
     distance = np.inf
@@ -122,40 +114,38 @@ def surface_distance(P):
             distance = d
     return surface, distance
 
-def census_distance(P):
-    t_census = mcdc.settings.census_time[P.idx_census_time]
-    distance = P.speed*(t_census - P.time)
-    return distance
-
-def determine_event(d_collision, d_surface, d_mesh, d_census):
+@njit
+def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
     event  = EVENT_COLLISION
     distance = d_collision
     if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
-    if distance > d_census:
-        event  = EVENT_CENSUS
-        distance = d_census
+    if distance > d_time_boundary:
+        event = EVENT_TIME_BOUNDARY
+        distance = d_time_boundary
     if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
     return event, distance
 
-def score_tracklength(P, distance):
+@njit
+def score_tracklength(P, distance, mcdc):
     mcdc.tally.score(P, distance)
 
     # Score eigenvalue tallies
-    if mcdc.settings.mode_eigenvalue:
+    if mcdc.setting.mode_eigenvalue:
         nu       = P.cell.material.nu_p[P.group]\
                    + sum(P.cell.material.nu_d[P.group])
         SigmaF   = P.cell.material.fission[P.group]
         nuSigmaF = nu*SigmaF
-        mcdc.global_tally.nuSigmaF_sum += P.weight*distance*nuSigmaF
+        mcdc.tally_global.nuSigmaF += P.weight*distance*nuSigmaF
 
-        if mcdc.settings.mode_alpha:
-            mcdc.global_tally.ispeed_sum += P.weight*distance\
+        if mcdc.setting.mode_alpha:
+            mcdc.tally_global.inverse_speed += P.weight*distance\
                                        /P.cell.material.speed[P.group]
 
+@njit
 def move_particle(P, distance):
     P.position.x += P.direction.x*distance
     P.position.y += P.direction.y*distance
@@ -167,7 +157,8 @@ def move_particle(P, distance):
 # Surface crossing
 #==============================================================================
 
-def surface_crossing(P):
+@njit
+def surface_crossing(P, mcdc):
     # Implement BC
     P.surface.apply_bc(P)
 
@@ -176,13 +167,14 @@ def surface_crossing(P):
  
     # Set new cell
     if P.alive:
-        set_cell(P)
+        set_cell(P, mcdc)
 
 #==============================================================================
 # Collision
 #==============================================================================
 
-def collision(P):
+@njit
+def collision(P, mcdc):
     # Kill the current particle
     P.alive = False
 
@@ -191,20 +183,20 @@ def collision(P):
     SigmaS = P.cell.material.scatter[P.group]
     SigmaF = P.cell.material.fission[P.group]
 
-    if mcdc.settings.mode_alpha:
-        Sigma_alpha = abs(mcdc.global_tally.alpha_eff)/P.speed
+    if mcdc.setting.mode_alpha:
+        Sigma_alpha = np.absolute(mcdc.tally_global.alpha_eff)/P.speed
         SigmaT += Sigma_alpha
 
-    if mcdc.settings.implicit_capture:
-        if mcdc.settings.mode_alpha:
+    if mcdc.setting.implicit_capture:
+        if mcdc.setting.mode_alpha:
             P.weight *= (SigmaT-SigmaC-Sigma_alpha)/SigmaT
-            SigmaT   -= (capture + abs(Sigma_alpha))
+            SigmaT   -= (SigmaC + Sigma_alpha)
         else:
             P.weight *= (SigmaT-SigmaC)/SigmaT
             SigmaT   -= SigmaC
 
     # Sample collision type
-    xi = mcdc.rng()*SigmaT
+    xi = mcdc.rng.random()*SigmaT
     tot = SigmaS
     if tot > xi:
         event = EVENT_SCATTERING
@@ -224,28 +216,30 @@ def collision(P):
 # Capture
 #==============================================================================
 
-def capture(P):
+@njit
+def capture(P, mcdc):
     pass
 
 #==============================================================================
 # Scattering
 #==============================================================================
 
-def scattering(P):
+@njit
+def scattering(P, mcdc):
     # Ger outgoing spectrum
     chi_s = P.cell.material.chi_s[P.group]
     nu_s  = P.cell.material.nu_s[P.group]
     G     = P.cell.material.G
 
     # Get effective and new weight
-    if mcdc.settings.implicit_capture:
+    if mcdc.setting.implicit_capture:
         weight_eff = 1.0
         weight_new = P.weight
     else:
         weight_eff = P.weight
         weight_new = 1.0
 
-    N = floor(weight_eff*nu_s + mcdc.rng())
+    N = np.int64(np.floor(weight_eff*nu_s + mcdc.rng.random()))
 
     for n in range(N):
         # Create copy
@@ -253,7 +247,7 @@ def scattering(P):
         P_new.weight = weight_new
 
         # Sample outgoing energy
-        xi  = mcdc.rng()
+        xi  = mcdc.rng.random()
         tot = 0.0
         for g_out in range(G):
             tot += chi_s[g_out]
@@ -263,10 +257,10 @@ def scattering(P):
         
         # Sample scattering angle
         # TODO: anisotropic scattering
-        mu = 2.0*mcdc.rng() - 1.0;
+        mu = 2.0*mcdc.rng.random() - 1.0;
         
         # Sample azimuthal direction
-        azi     = 2.0*np.pi*mcdc.rng()
+        azi     = 2.0*np.pi*mcdc.rng.random()
         cos_azi = np.cos(azi)
         sin_azi = np.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
@@ -293,13 +287,14 @@ def scattering(P):
             P_new.direction.y = uy*mu - cos_azi*Ac*B
         
         # Bank
-        mcdc.bank_history.append(P_new)
+        mcdc.bank.history.append(P_new)
         
 #==============================================================================
 # Fission
 #==============================================================================
 
-def fission(P):
+@njit
+def fission(P, mcdc):
     # Get group numbers
     G = P.cell.material.G
     J = P.cell.material.J
@@ -312,7 +307,7 @@ def fission(P):
         nu += sum(nu_d)
 
     # Get effective and new weight
-    if mcdc.settings.implicit_capture:
+    if mcdc.setting.implicit_capture:
         weight_eff = 1.0
         weight_new = P.weight
     else:
@@ -321,7 +316,8 @@ def fission(P):
 
     # Sample number of fission neutrons
     #   in fixed-source, k_eff = 1.0
-    N = floor(weight_eff*nu/mcdc.global_tally.k_eff + mcdc.rng())
+    N = np.int64(np.floor(weight_eff*nu/mcdc.tally_global.k_eff 
+                          + mcdc.rng.random()))
 
     # Push fission neutrons to bank
     for n in range(N):
@@ -331,7 +327,7 @@ def fission(P):
 
         # Determine if it's prompt or delayed neutrons, 
         # then get the energy spectrum and decay constant
-        xi  = mcdc.rng()*nu
+        xi  = mcdc.rng.random()*nu
         tot = nu_p
         # Prompt?
         if tot > xi:
@@ -346,17 +342,15 @@ def fission(P):
                     break
 
             # Sample emission time
-            xi = mcdc.rng()
+            xi = mcdc.rng.random()
             P_new.time = P.time - np.log(xi)/decay
 
-            # Skip if it's beyond final census time
-            if P_new.time > mcdc.settings.census_time[-1]:
+            # Skip if it's beyond time boundary
+            if P_new.time > mcdc.setting.time_boundary:
                 continue
-            else:
-                set_census_time_idx(P_new)
 
         # Sample outgoing energy
-        xi  = mcdc.rng()
+        xi  = mcdc.rng.random()
         tot = 0.0
         for g_out in range(G):
             tot += spectrum[g_out]
@@ -365,52 +359,44 @@ def fission(P):
         P_new.group = g_out
 
         # Sample isotropic direction
-        P_new.direction = sample_isotropic_direction()
+        P_new.direction = sample_isotropic_direction(mcdc.rng)
 
         # Bank
-        mcdc.bank_fission.append(P_new)
+        mcdc.bank.fission.append(P_new)
 
 #==============================================================================
 # Time reaction
 #==============================================================================
 
-def time_reaction(P):
-    if mcdc.global_tally.alpha_eff > 0:
+@njit
+def time_reaction(P, mcdc):
+    if mcdc.tally_global.alpha_eff > 0:
         pass # Already killed
     else:
-        P_new = Particle.copy()
-        mcdc.bank_history.append(P_new)
+        P_new = P.copy()
+        mcdc.bank.history.append(P_new)
 
 #==============================================================================
-# Time census
+# Time boundary
 #==============================================================================
 
-def event_census(P):
-    # Cross the time boundary
-    d = PRECISION*P.speed
-    move_particle(P, d)
-
-    # Increment index
-    P.idx_census_time += 1
-    # Not final census?
-    if P.idx_census_time < len(mcdc.settings.census_time):
-        # Store for next time census
-        bank_stored.append(P.copy())
+@njit
+def time_boundary(P, mcdc):
     P.alive = False
 
 #==============================================================================
 # Miscellany
 #==============================================================================
 
+@njit
 def binary_search(val, grid):
     """
-    Binary search that returns the bin index of a value `val` given
-    grid `grid`
+    Binary search that returns the bin index of a value val given grid grid
     
     Some special cases:
-        `val` < min(`grid`)  --> -1
-        `val` > max(`grid`)  --> size of bins
-        `val` = a grid point --> bin location whose upper bound is `val`
+        val < min(grid)  --> -1
+        val > max(grid)  --> size of bins
+        val = a grid point --> bin location whose upper bound is val
                                  (-1 if val = min(grid)
     """
     

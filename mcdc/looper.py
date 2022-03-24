@@ -1,82 +1,90 @@
+from   numba import njit, objmode
+
 from   mcdc.constant import *
 import mcdc.kernel   as     kernel
+import mcdc.mpi      as     mpi
 from   mcdc.print_   import print_progress
-
-# Get mcdc global variables/objects
-import mcdc.global_ as mcdc
 
 # =========================================================================
 # Source loop
 # =========================================================================
 
-def loop_source():
+@njit
+def loop_source(mcdc):
+    # Rebase rng skip_ahead seed
+    mcdc.rng.skip_ahead_strides(mpi.work_start)
+    mcdc.rng.rebase()
+
     # Loop over particle sources
-    for work_idx in range(mcdc.mpi.work_size):
+    for work_idx in range(mpi.work_size):
         # Initialize RNG wrt work index
-        mcdc.rng.skip_ahead(work_idx)
+        mcdc.rng.skip_ahead_strides(work_idx)
 
         # Get a source particle and put into history bank
-        if not mcdc.bank_source:
-            P = mcdc.source.get_particle()
-            kernel.set_cell(P)
-            kernel.set_census_time_idx(P)
+        if not mcdc.bank.source:
+            P = mcdc.source.get_particle(mcdc)
+            kernel.set_cell(P, mcdc)
         else:
-            P = mcdc.bank_source[work_idx]
-        mcdc.bank_history.append(P)
+            P = mcdc.bank.source[work_idx]
+        mcdc.bank.history.append(P)
 
         # Apply weight window
-        if mcdc.weight_window is not None:
-            mcdc.weight_window(P, mcdc.bank_history)
+        if mcdc.setting.weight_window:
+            mcdc.weight_window.apply_(P, mcdc)
 
-        # Run particle source and secondaries
-        while mcdc.bank_history:
+        # Run source particle and secondaries
+        while mcdc.bank.history:
             # Get particle from history bank
-            P = mcdc.bank_history.pop()
+            P = mcdc.bank.history.pop()
             
             # Particle loop
-            loop_particle(P)
+            loop_particle(P, mcdc)
 
         # Tally history closeout
         mcdc.tally.closeout_history()
         
         # Progress printout
-        print_progress(work_idx)
+        if mcdc.setting.progress_bar:
+            with objmode():
+                print_progress(work_idx)
 
         
 # =========================================================================
 # Particle loop
 # =========================================================================
 
-def loop_particle(P):
+@njit
+def loop_particle(P, mcdc):
     while P.alive:
         # Determine and move to event
-        event = kernel.move_to_event(P)
+        event = kernel.move_to_event(P, mcdc)
 
         # Perform event
         if event != EVENT_MESH:
             # Surface crossing
             if event == EVENT_SURFACE:
-                kernel.surface_crossing(P)
+                kernel.surface_crossing(P, mcdc)
 
             # Collision
             elif event == EVENT_COLLISION:
                 # Get collision type
-                event = kernel.collision(P)
+                event = kernel.collision(P, mcdc)
 
                 # Perform collision
                 if event == EVENT_CAPTURE:
-                    kernel.capture(P)
+                    kernel.capture(P, mcdc)
                 elif event == EVENT_SCATTERING:
-                    kernel.scattering(P)
+                    kernel.scattering(P, mcdc)
                 elif event == EVENT_FISSION:
-                    kernel.fission(P)
+                    kernel.fission(P, mcdc)
                 elif event == EVENT_TIME_REACTION:
-                    kernel.time_reaction(P)
+                    kernel.time_reaction(P, mcdc)
 
-            # Time census
-            elif event == EVENT_CENSUS:
-                kernel.event_census(P)
-        
+            # Time boundary
+            elif event == EVENT_TIME_BOUNDARY:
+                kernel.time_boundary(P, mcdc)
+
+
         # Apply weight window
-        if P.alive and mcdc.weight_window is not None:
-            kernel.weight_window(P, mcdc.bank_history)
+        if mcdc.setting.weight_window:
+            mcdc.weight_window.apply_(P, mcdc)

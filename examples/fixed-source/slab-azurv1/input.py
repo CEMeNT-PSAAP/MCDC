@@ -1,13 +1,17 @@
 import numpy as np
-import sys
+
+# Disable Numba-JIT for pure Python mode
+from numba import config
+config.DISABLE_JIT = True
 
 # Get path to mcdc (not necessary if mcdc is installed)
+import sys
 sys.path.append('../../../')
 
 import mcdc
 
 # =============================================================================
-# Set cells
+# Set model
 # =============================================================================
 
 # Set materials
@@ -19,22 +23,24 @@ s1 = mcdc.surface('plane-x', x=-1E10, bc="reflective")
 s2 = mcdc.surface('plane-x', x=1E10,  bc="reflective")
 
 # Set cells
-c = mcdc.cell([+s1, -s2], m)
-cells = [c]
+mcdc.cell([+s1, -s2], m)
 
 # =============================================================================
 # Set source
 # =============================================================================
 
-source = mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
+mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
 
 # =============================================================================
-# Set problem and tally, and then run mcdc
+# Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.set_problem(cells, source, N_hist=1E3)
+# Tally
 f = np.load('azurv1_pl.npz')
-mcdc.set_tally(scores=['flux'], x=f['x'], t=f['t'])
-# TODO: use time boundary instead
-mcdc.set_population_control(census_time=np.array([20.0]))
+mcdc.tally(scores=['flux'], x=f['x'], t=f['t'])
+
+# Setting
+mcdc.setting(N_hist=1E3, time_boundary=20.0)
+
+# Run
 mcdc.run()
