@@ -206,27 +206,73 @@ def surface(type_, **kw):
         else:
             print_error("Unsupported surface boundary condition: "+bc)
     # Type
-    # Ax + By + Cz + D = 0
-    A = 0.0; B = 0.0; C = 0.0; D = 0.0
+    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
+    A = 0.0; B = 0.0; C = 0.0; D = 0.0; E = 0.0
+    F = 0.0; G = 0.0; H = 0.0; I = 0.0; J = 0.0
     if type_ == 'plane-x':
-        A = 1.0
-        D = -kw.get('x')
+        G = 1.0
+        J = -kw.get('x')
     elif type_ == 'plane-y':
-        B = 1.0
-        D = -kw.get('y')
+        H = 1.0
+        J = -kw.get('y')
     elif type_ == 'plane-z':
-        C = 1.0
-        D = -kw.get['z']
+        I = 1.0
+        J = -kw.get['z']
     elif type_ == 'plane':
-        A = -kw.get('A')
-        B = -kw.get('B')
-        C = -kw.get('C')
-        D = -kw.get('D')
+        G = kw.get('A')
+        H = kw.get('B')
+        I = kw.get('C')
+        J = kw.get('D')
+    elif type_ == 'cylinder-x':
+        y, z = kw.get('center')[:]
+        r    = kw.get('radius')
+        B = 1.0
+        C = 1.0
+        H = -2.0*y
+        I = -2.0*z
+        J = y**2 + z**2 - r**2
+    elif type_ == 'cylinder-y':
+        x, z = kw.get('center')[:]
+        r    = kw.get('radius')
+        A = 1.0
+        C = 1.0
+        G = -2.0*x
+        I = -2.0*z
+        J = x**2 + z**2 - r**2
+    elif type_ == 'cylinder-z':
+        x, y = kw.get('center')[:]
+        r    = kw.get('radius')
+        A = 1.0
+        B = 1.0
+        G = -2.0*x
+        H = -2.0*y
+        J = x**2 + y**2 - r**2
+    elif type_ == 'sphere':
+        x, y, z = kw.get('center')[:]
+        r       = kw.get('radius')
+        A = 1.0
+        B = 1.0
+        C = 1.0
+        G = -2.0*x
+        H = -2.0*y
+        I = -2.0*z
+        J = x**2 + y**2 + z**2 - r**2
+    elif type_ == 'quadric':
+        A = kw.get('A')
+        B = kw.get('B')
+        C = kw.get('C')
+        D = kw.get('D')
+        E = kw.get('E')
+        F = kw.get('F')
+        G = kw.get('G')
+        H = kw.get('H')
+        I = kw.get('I')
+        J = kw.get('J')
     else:
         print_error("Unsupported surface type: "+type_)
 
     # Create object
-    S = Surface(surface_ID, vacuum, reflective, A, B, C, D)
+    S = Surface(surface_ID, vacuum, reflective, A, B, C, D, E, F, G, H, I, J)
     mcdc.global_.surfaces.append(S)
     return SurfaceHandle(S)
 
