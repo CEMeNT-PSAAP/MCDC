@@ -56,8 +56,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
         Precursor group decay constant [/s]
     *speed and decay are optional. By default, values for speed and decay 
     are one and infinite, respectively. Universal speed and decay can be 
-    provided through `mcdc.set_universal_speed` and 
-    `mcdc.set_universal_decay`.
+    provided through mcdc.set_universal_speed and mcdc.set_universal_decay.
     """
 
     # ID
@@ -217,7 +216,7 @@ def surface(type_, **kw):
         J = -kw.get('y')
     elif type_ == 'plane-z':
         I = 1.0
-        J = -kw.get['z']
+        J = -kw.get('z')
     elif type_ == 'plane':
         G = kw.get('A')
         H = kw.get('B')

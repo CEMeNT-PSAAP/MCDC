@@ -47,7 +47,7 @@ def set_cell(P, mcdc):
             found = True
             break
     if not found:
-        print("A particle is lost")
+        print("A particle is lost at (",P.position.x,P.position.y,P.position.z,")")
         P.alive = False
 
 #==============================================================================
@@ -166,7 +166,7 @@ def surface_crossing(P, mcdc):
     move_particle(P, PRECISION)
  
     # Set new cell
-    if P.alive:
+    if P.alive and not P.surface.reflective:
         set_cell(P, mcdc)
 
 #==============================================================================
