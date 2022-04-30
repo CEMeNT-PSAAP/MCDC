@@ -58,11 +58,11 @@ def run():
     if not mcdc.setting.mode_eigenvalue:
         tally_closeout()
 
-    # Generate output file
-    generate_hdf5()
-    
     # Stop timer
     mcdc.runtime_total = mpi.Wtime() - mcdc.runtime_total
+    
+    # Generate output file
+    generate_hdf5()
     
     print_runtime()
 
@@ -177,10 +177,10 @@ def generate_hdf5():
 
             # Tally
             T = mcdc.tally
-            f.create_dataset("tally/grid/t", data=T.mesh.t)
-            f.create_dataset("tally/grid/x", data=T.mesh.x)
-            f.create_dataset("tally/grid/y", data=T.mesh.y)
-            f.create_dataset("tally/grid/z", data=T.mesh.z)
+            f.create_dataset("tally/grid/t", data=T.mesh.t())
+            f.create_dataset("tally/grid/x", data=T.mesh.x())
+            f.create_dataset("tally/grid/y", data=T.mesh.y())
+            f.create_dataset("tally/grid/z", data=T.mesh.z())
             
             # Scores
             if T.flux:

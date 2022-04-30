@@ -1,8 +1,14 @@
 import numpy as np
 
+import sys
+
+N_hist = int(sys.argv[1])
+dijit  = eval(sys.argv[2])
+output = sys.argv[3]
+
 # Disable Numba-JIT for pure Python mode
 from numba import config
-config.DISABLE_JIT = True
+config.DISABLE_JIT = dijit
 
 # Get path to mcdc (not necessary if mcdc is installed)
 import sys
@@ -36,11 +42,10 @@ mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
 # =============================================================================
 
 # Tally
-f = np.load('azurv1_pl.npz')
-mcdc.tally(scores=['flux'], x=f['x'], t=f['t'])
+mcdc.tally(scores=['flux'], x=[-20.5, 20.5, 201], t=[0.0, 20.0, 20])
 
 # Setting
-mcdc.setting(N_hist=1E3, time_boundary=20.0)
+mcdc.setting(N_hist=N_hist, time_boundary=20.0, progress_bar=False, output=output)
 
 # Run
 mcdc.run()

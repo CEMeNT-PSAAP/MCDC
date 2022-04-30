@@ -9,7 +9,7 @@ import h5py
 # =============================================================================
 
 # Load grids
-with h5py.File('output.h5', 'r') as f:
+with h5py.File('output_p0.h5', 'r') as f:
     x = f['tally/grid/x'][:]
     t = f['tally/grid/t'][:]
 
@@ -28,7 +28,7 @@ phi_ref = data['phi']
 # Animate results
 # =============================================================================
 
-with h5py.File('output.h5', 'r') as f:
+with h5py.File('output_p0.h5', 'r') as f:
     phi         = f['tally/flux/mean'][:]/dx
     phi_sd      = f['tally/flux/sdev'][:]/dx
 for k in range(K):

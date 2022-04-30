@@ -45,7 +45,7 @@ mcdc.source(point=[1E-10,0.0,0.0], direction=[1.0,0.0,0.0])
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux'], x=np.linspace(0.0, 6.0, 61))
+mcdc.tally(scores=['flux'], x=[0.0, 6.0, 60])
 
 # Setting
 mcdc.setting(N_hist=1E4)

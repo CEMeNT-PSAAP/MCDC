@@ -43,8 +43,7 @@ mcdc.source(x=[0.0, 5.0], y=[0.0, 5.0], isotropic=True)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=['flux'], x=np.linspace(0.0, 20.0, 41), 
-                            y=np.linspace(0.0, 20.0, 41))
+mcdc.tally(scores=['flux'], x=[0.0, 20.0, 40], y=[0.0, 20.0, 40])
 
 # Setting
 mcdc.setting(N_hist=1E3, implicit_capture=True)
