@@ -40,9 +40,7 @@ mcdc.source(x=[0.0, 2.5], isotropic=True)
 # =============================================================================
 
 # Tally
-x_grid = np.array([0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 
-                   1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
-mcdc.tally(scores=['flux'], x=x_grid)
+mcdc.tally(scores=['flux'], x=[0.0, 2.5, 50])
 
 # Setting
 mcdc.setting(N_hist=5E3)

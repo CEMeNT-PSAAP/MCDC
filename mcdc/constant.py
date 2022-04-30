@@ -1,4 +1,4 @@
-import numpy as np
+import math
 
 # Events
 EVENT_COLLISION     = 1
@@ -12,7 +12,7 @@ EVENT_TIME_REACTION = 8
 EVENT_TIME_BOUNDARY = 9
 
 # Misc.
-INF       = np.inf
-PI        = np.pi
+INF       = 1E10
+PI        = math.acos(-1.0)
 EPSILON   = 1E-15 # To ensure non-zero value
-PRECISION = 1E-10 # Used in surface crossing
+PRECISION = 1E-8 # Used in surface crossing

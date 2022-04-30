@@ -1,5 +1,6 @@
-from   numba import njit
-import numpy as     np
+import math
+
+from numba import njit
 
 from mcdc.class_.point import Point
 from mcdc.constant     import *
@@ -16,8 +17,8 @@ def sample_isotropic_direction(rng):
 
     # Convert to Cartesian coordinates
     c = (1.0 - mu**2)**0.5
-    y = np.cos(azi)*c
-    z = np.sin(azi)*c
+    y = math.cos(azi)*c
+    z = math.sin(azi)*c
     x = mu
     return Point(x, y, z)
 
@@ -96,17 +97,17 @@ def collision_distance(P, mcdc):
 
     # Time absorption?
     if mcdc.setting.mode_alpha:
-        SigmaT += np.absolute(mcdc.tally_global.alpha_eff)/P.speed
+        SigmaT += abs(mcdc.tally_global.alpha_eff)/P.speed
 
     # Sample collision distance
     xi     = mcdc.rng.random()
-    distance  = -np.log(xi)/SigmaT
+    distance  = -math.log(xi)/SigmaT
     return distance
 
 @njit
 def surface_distance(P):
     surface  = None
-    distance = np.inf
+    distance = INF
     for S in P.cell.surfaces:
         d = S.distance(P)
         if d < distance:
@@ -184,7 +185,7 @@ def collision(P, mcdc):
     SigmaF = P.cell.material.fission[P.group]
 
     if mcdc.setting.mode_alpha:
-        Sigma_alpha = np.absolute(mcdc.tally_global.alpha_eff)/P.speed
+        Sigma_alpha = abs(mcdc.tally_global.alpha_eff)/P.speed
         SigmaT += Sigma_alpha
 
     if mcdc.setting.implicit_capture:
@@ -239,7 +240,7 @@ def scattering(P, mcdc):
         weight_eff = P.weight
         weight_new = 1.0
 
-    N = np.int64(np.floor(weight_eff*nu_s + mcdc.rng.random()))
+    N = int(math.floor(weight_eff*nu_s + mcdc.rng.random()))
 
     for n in range(N):
         # Create copy
@@ -260,9 +261,9 @@ def scattering(P, mcdc):
         mu = 2.0*mcdc.rng.random() - 1.0;
         
         # Sample azimuthal direction
-        azi     = 2.0*np.pi*mcdc.rng.random()
-        cos_azi = np.cos(azi)
-        sin_azi = np.sin(azi)
+        azi     = 2.0*PI*mcdc.rng.random()
+        cos_azi = math.cos(azi)
+        sin_azi = math.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
 
         ux = P_new.direction.x
@@ -316,7 +317,7 @@ def fission(P, mcdc):
 
     # Sample number of fission neutrons
     #   in fixed-source, k_eff = 1.0
-    N = np.int64(np.floor(weight_eff*nu/mcdc.tally_global.k_eff 
+    N = int(math.floor(weight_eff*nu/mcdc.tally_global.k_eff 
                           + mcdc.rng.random()))
 
     # Push fission neutrons to bank
@@ -343,7 +344,7 @@ def fission(P, mcdc):
 
             # Sample emission time
             xi = mcdc.rng.random()
-            P_new.time = P.time - np.log(xi)/decay
+            P_new.time = P.time - math.log(xi)/decay
 
             # Skip if it's beyond time boundary
             if P_new.time > mcdc.setting.time_boundary:
@@ -388,6 +389,7 @@ def time_boundary(P, mcdc):
 # Miscellany
 #==============================================================================
 
+'''
 @njit
 def binary_search(val, grid):
     """
@@ -408,3 +410,4 @@ def binary_search(val, grid):
         if grid[mid] < val: left = mid + 1
         else:            right = mid - 1
     return int(right)
+'''
