@@ -31,13 +31,16 @@ class Tally:
         # Mesh crossing
         self.crossing    = False
         self.crossing_x  = False
+        self.crossing_t  = False
         self.flux_x      = False
+        self.flux_t      = False
         self.current_x   = False
 
         # Uninitialized
         #self.mesh
         #self.score_flux     
         #self.score_flux_x
+        #self.score_flux_t
         #self.score_current  
         #self.score_current_x
         #self.score_eddington
@@ -63,6 +66,9 @@ class Tally:
         if self.flux_x:
             shape = (N_iter, Ng, Nt, Nx+1, Ny, Nz)
             self.score_flux_x = ScoreFlux(shape)
+        if self.flux_t:
+            shape = (N_iter, Ng, Nt+1, Nx, Ny, Nz)
+            self.score_flux_t = ScoreFlux(shape)
         if self.current_x:
             shape = (N_iter, Ng, Nt, Nx+1, Ny, Nz, 3)
             self.score_current_x = ScoreCurrent(shape)
@@ -73,6 +79,9 @@ class Tally:
         if self.flux_x or self.current_x:
             self.crossing = True
             self.crossing_x = True
+        if self.flux_t:
+            self.crossing = True
+            self.crossing_t = True
 
     def score_tracklength(self, P, d_move):
         # Get indices
@@ -101,6 +110,16 @@ class Tally:
         if self.current_x:
             self.score_current_x.accumulate(g,t,x,y,z,flux,P)
 
+    def score_crossing_t(self, P, t, x, y, z):
+        # Get indices
+        g  = P.group
+        t += 1
+
+        # Score
+        flux = P.weight*P.cell.material.speed[g]
+        if self.flux_t:
+            self.score_flux_t.accumulate(g,t,x,y,z,flux,P)
+
     def closeout_history(self):
         # Tracklength
         if self.flux:
@@ -113,6 +132,8 @@ class Tally:
         # Mesh crossing
         if self.flux_x:
             closeout_history(self.score_flux_x)
+        if self.flux_t:
+            closeout_history(self.score_flux_t)
         if self.current_x:
             closeout_history(self.score_current_x)
     
