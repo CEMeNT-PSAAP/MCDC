@@ -371,6 +371,10 @@ def tally(scores, x=None, y=None, z=None, t=None):
             T.current = True
         elif s == 'eddington':
             T.eddington = True
+        elif s == 'flux-x':
+            T.flux_x = True
+        elif s == 'current-x':
+            T.current_x = True
         else:
             print_error("Unknown tally score %s"%s)
     mesh = set_mesh(x,y,z,t)
