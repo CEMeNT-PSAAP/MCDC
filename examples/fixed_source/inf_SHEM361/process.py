@@ -8,15 +8,12 @@ import h5py
 # =============================================================================
 
 # Load XS
-data       = np.load('SHEM-361.npz')
-SigmaT     = data['SigmaT']
-nuSigmaF   = data['nuSigmaF_p']
-SigmaS     = data['SigmaS']
-SigmaF     = data['SigmaF']
-nu_d       = data['nu_d']
-E          = data['E']
-
-SigmaT += data['SigmaC']*1.0
+with np.load('SHEM-361.npz') as data:
+    data     = np.load('SHEM-361.npz')
+    SigmaT   = data['SigmaT'] + data['SigmaC']
+    nuSigmaF = data['nuSigmaF']
+    SigmaS   = data['SigmaS']
+    E        = data['E']
 
 G = len(SigmaT)
 E_mid = 0.5*(E[1:]+E[:-1])

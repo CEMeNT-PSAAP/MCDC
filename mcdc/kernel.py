@@ -80,9 +80,10 @@ def move_to_event(P, mcdc):
     # Record surface if crossed
     if event == EVENT_SURFACE:
         P.surface = surface
+        # Also mesh crossing?
         if d_surface == d_mesh and not surface.reflective:
             event = EVENT_SURFACE_N_MESH
-
+    
     return event
 
 @njit
@@ -118,15 +119,15 @@ def surface_distance(P):
 def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
     event  = EVENT_COLLISION
     distance = d_collision
+    if distance > d_time_boundary:
+        event = EVENT_TIME_BOUNDARY
+        distance = d_time_boundary
     if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
     if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
-    if distance > d_time_boundary:
-        event = EVENT_TIME_BOUNDARY
-        distance = d_time_boundary
     return event, distance
 
 @njit
@@ -384,6 +385,9 @@ def time_reaction(P, mcdc):
 def time_boundary(P, mcdc):
     P.alive = False
 
+    # Check if mesh crossing occured
+    mesh_crossing(P, mcdc)
+
 #==============================================================================
 # Mesh crossing
 #==============================================================================
@@ -404,12 +408,17 @@ def mesh_crossing(P, mcdc):
 
         # Determine which mesh is crossed
         crossing_x = False
+        crossing_t = False
         if x1 != x2:
             crossing_x = True
-            
+        if t1 != t2:
+            crossing_t = True
+
         # Score on tally
         if crossing_x and mcdc.tally.crossing_x:
             mcdc.tally.score_crossing_x(P, t1, x1, y1, z1)
+        if crossing_t and mcdc.tally.crossing_t:
+            mcdc.tally.score_crossing_t(P, t1, x1, y1, z1)
 
 #==============================================================================
 # Miscellany

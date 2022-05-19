@@ -2,12 +2,13 @@ import h5py
 import numba as nb
 import numpy as np
 
-from   mcdc.class_.particle import type_particle
-from   mcdc.class_.popctrl  import PCT_CO
-from   mcdc.looper          import loop_source
-import mcdc.mpi             as     mpi
-from   mcdc.print_          import print_banner, print_msg, print_runtime,\
-                                   print_progress_eigenvalue
+import mcdc.mpi as mpi
+
+from mcdc.class_.particle import type_particle
+from mcdc.class_.popctrl  import PCT_CO
+from mcdc.looper          import loop_source
+from mcdc.print_          import print_banner, print_msg, print_runtime,\
+                                 print_progress_eigenvalue
 
 # Get mcdc global variables as "mcdc"
 import mcdc.global_ as mcdc_
@@ -101,6 +102,8 @@ def tally_closeout():
         score_closeout(mcdc.tally.score_eddington)
     if mcdc.tally.flux_x:
         score_closeout(mcdc.tally.score_flux_x)
+    if mcdc.tally.flux_t:
+        score_closeout(mcdc.tally.score_flux_t)
     if mcdc.tally.current_x:
         score_closeout(mcdc.tally.score_current_x)
 
@@ -221,6 +224,13 @@ def generate_hdf5():
                                  data=np.squeeze(T.score_flux_x.sdev))
                 T.score_flux_x.mean.fill(0.0)
                 T.score_flux_x.sdev.fill(0.0)
+            if T.flux_t:
+                f.create_dataset("tally/flux-t/mean",
+                                 data=np.squeeze(T.score_flux_t.mean))
+                f.create_dataset("tally/flux-t/sdev",
+                                 data=np.squeeze(T.score_flux_t.sdev))
+                T.score_flux_t.mean.fill(0.0)
+                T.score_flux_t.sdev.fill(0.0)
             if T.current_x:
                 f.create_dataset("tally/current-x/mean",
                                  data=np.squeeze(T.score_current_x.mean))
