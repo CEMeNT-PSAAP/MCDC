@@ -118,15 +118,15 @@ def surface_distance(P):
 def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
     event  = EVENT_COLLISION
     distance = d_collision
+    if distance > d_time_boundary:
+        event = EVENT_TIME_BOUNDARY
+        distance = d_time_boundary
     if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
     if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
-    if distance > d_time_boundary:
-        event = EVENT_TIME_BOUNDARY
-        distance = d_time_boundary
     return event, distance
 
 @njit
