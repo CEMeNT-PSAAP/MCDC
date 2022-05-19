@@ -1,5 +1,6 @@
-from   numba import njit
-import numpy as     np
+import math
+
+from numba import njit
 
 from mcdc.class_.point import Point
 from mcdc.constant     import *
@@ -16,8 +17,8 @@ def sample_isotropic_direction(rng):
 
     # Convert to Cartesian coordinates
     c = (1.0 - mu**2)**0.5
-    y = np.cos(azi)*c
-    z = np.sin(azi)*c
+    y = math.cos(azi)*c
+    z = math.sin(azi)*c
     x = mu
     return Point(x, y, z)
 
@@ -47,7 +48,7 @@ def set_cell(P, mcdc):
             found = True
             break
     if not found:
-        print("A particle is lost")
+        print("A particle is lost at (",P.position.x,P.position.y,P.position.z,")")
         P.alive = False
 
 #==============================================================================
@@ -70,11 +71,8 @@ def move_to_event(P, mcdc):
                                       d_mesh)
 
     # Score tracklength tallies
-    score_tracklength(P, distance, mcdc)
-
-    # Add a small-kick to ensure mesh crossing
-    if event == EVENT_MESH:
-        distance += PRECISION
+    if mcdc.tally.tracklength:
+        score_tracklength(P, distance, mcdc)
 
     # Move particle
     move_particle(P, distance)
@@ -82,6 +80,8 @@ def move_to_event(P, mcdc):
     # Record surface if crossed
     if event == EVENT_SURFACE:
         P.surface = surface
+        if d_surface == d_mesh and not surface.reflective:
+            event = EVENT_SURFACE_N_MESH
 
     return event
 
@@ -96,17 +96,17 @@ def collision_distance(P, mcdc):
 
     # Time absorption?
     if mcdc.setting.mode_alpha:
-        SigmaT += np.absolute(mcdc.tally_global.alpha_eff)/P.speed
+        SigmaT += abs(mcdc.tally_global.alpha_eff)/P.speed
 
     # Sample collision distance
     xi     = mcdc.rng.random()
-    distance  = -np.log(xi)/SigmaT
+    distance  = -math.log(xi)/SigmaT
     return distance
 
 @njit
 def surface_distance(P):
     surface  = None
-    distance = np.inf
+    distance = INF
     for S in P.cell.surfaces:
         d = S.distance(P)
         if d < distance:
@@ -121,17 +121,17 @@ def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
     if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
-    if distance > d_time_boundary:
-        event = EVENT_TIME_BOUNDARY
-        distance = d_time_boundary
     if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
+    if distance > d_time_boundary:
+        event = EVENT_TIME_BOUNDARY
+        distance = d_time_boundary
     return event, distance
 
 @njit
 def score_tracklength(P, distance, mcdc):
-    mcdc.tally.score(P, distance)
+    mcdc.tally.score_tracklength(P, distance)
 
     # Score eigenvalue tallies
     if mcdc.setting.mode_eigenvalue:
@@ -166,7 +166,7 @@ def surface_crossing(P, mcdc):
     move_particle(P, PRECISION)
  
     # Set new cell
-    if P.alive:
+    if P.alive and not P.surface.reflective:
         set_cell(P, mcdc)
 
 #==============================================================================
@@ -184,7 +184,7 @@ def collision(P, mcdc):
     SigmaF = P.cell.material.fission[P.group]
 
     if mcdc.setting.mode_alpha:
-        Sigma_alpha = np.absolute(mcdc.tally_global.alpha_eff)/P.speed
+        Sigma_alpha = abs(mcdc.tally_global.alpha_eff)/P.speed
         SigmaT += Sigma_alpha
 
     if mcdc.setting.implicit_capture:
@@ -239,7 +239,7 @@ def scattering(P, mcdc):
         weight_eff = P.weight
         weight_new = 1.0
 
-    N = np.int64(np.floor(weight_eff*nu_s + mcdc.rng.random()))
+    N = int(math.floor(weight_eff*nu_s + mcdc.rng.random()))
 
     for n in range(N):
         # Create copy
@@ -260,9 +260,9 @@ def scattering(P, mcdc):
         mu = 2.0*mcdc.rng.random() - 1.0;
         
         # Sample azimuthal direction
-        azi     = 2.0*np.pi*mcdc.rng.random()
-        cos_azi = np.cos(azi)
-        sin_azi = np.sin(azi)
+        azi     = 2.0*PI*mcdc.rng.random()
+        cos_azi = math.cos(azi)
+        sin_azi = math.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
 
         ux = P_new.direction.x
@@ -316,7 +316,7 @@ def fission(P, mcdc):
 
     # Sample number of fission neutrons
     #   in fixed-source, k_eff = 1.0
-    N = np.int64(np.floor(weight_eff*nu/mcdc.tally_global.k_eff 
+    N = int(math.floor(weight_eff*nu/mcdc.tally_global.k_eff 
                           + mcdc.rng.random()))
 
     # Push fission neutrons to bank
@@ -343,7 +343,7 @@ def fission(P, mcdc):
 
             # Sample emission time
             xi = mcdc.rng.random()
-            P_new.time = P.time - np.log(xi)/decay
+            P_new.time = P.time - math.log(xi)/decay
 
             # Skip if it's beyond time boundary
             if P_new.time > mcdc.setting.time_boundary:
@@ -385,9 +385,37 @@ def time_boundary(P, mcdc):
     P.alive = False
 
 #==============================================================================
+# Mesh crossing
+#==============================================================================
+
+@njit
+def mesh_crossing(P, mcdc):
+    if not mcdc.tally.crossing:
+        # Small-kick to ensure crossing
+        move_particle(P, PRECISION)
+    else:
+        # Use small-kick back and forth to determine which mesh is crossed
+        # First, backward small-kick
+        move_particle(P, -PRECISION)
+        t1, x1, y1, z1 = mcdc.tally.mesh.get_index(P)
+        # Then, double forward small-kick
+        move_particle(P, 2*PRECISION)
+        t2, x2, y2, z2 = mcdc.tally.mesh.get_index(P)
+
+        # Determine which mesh is crossed
+        crossing_x = False
+        if x1 != x2:
+            crossing_x = True
+            
+        # Score on tally
+        if crossing_x and mcdc.tally.crossing_x:
+            mcdc.tally.score_crossing_x(P, t1, x1, y1, z1)
+
+#==============================================================================
 # Miscellany
 #==============================================================================
 
+'''
 @njit
 def binary_search(val, grid):
     """
@@ -408,3 +436,4 @@ def binary_search(val, grid):
         if grid[mid] < val: left = mid + 1
         else:            right = mid - 1
     return int(right)
+'''

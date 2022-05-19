@@ -59,32 +59,39 @@ def loop_particle(P, mcdc):
         # Determine and move to event
         event = kernel.move_to_event(P, mcdc)
 
-        # Perform event
-        if event != EVENT_MESH:
-            # Surface crossing
-            if event == EVENT_SURFACE:
-                kernel.surface_crossing(P, mcdc)
+        # Surface crossing
+        if event == EVENT_SURFACE:
+            kernel.surface_crossing(P, mcdc)
 
-            # Collision
-            elif event == EVENT_COLLISION:
-                # Get collision type
-                event = kernel.collision(P, mcdc)
+        # Mesh crossing
+        elif event == EVENT_MESH:
+            kernel.mesh_crossing(P, mcdc)
 
-                # Perform collision
-                if event == EVENT_CAPTURE:
-                    kernel.capture(P, mcdc)
-                elif event == EVENT_SCATTERING:
-                    kernel.scattering(P, mcdc)
-                elif event == EVENT_FISSION:
-                    kernel.fission(P, mcdc)
-                elif event == EVENT_TIME_REACTION:
-                    kernel.time_reaction(P, mcdc)
+        # Surface and mesh crossing
+        elif event == EVENT_SURFACE_N_MESH:
+            kernel.surface_crossing(P, mcdc)
+            kernel.move_particle(P, -PRECISION)
+            kernel.mesh_crossing(P, mcdc)
 
-            # Time boundary
-            elif event == EVENT_TIME_BOUNDARY:
-                kernel.time_boundary(P, mcdc)
+        # Collision
+        elif event == EVENT_COLLISION:
+            # Get collision type
+            event = kernel.collision(P, mcdc)
 
-
+            # Perform collision
+            if event == EVENT_CAPTURE:
+                kernel.capture(P, mcdc)
+            elif event == EVENT_SCATTERING:
+                kernel.scattering(P, mcdc)
+            elif event == EVENT_FISSION:
+                kernel.fission(P, mcdc)
+            elif event == EVENT_TIME_REACTION:
+                kernel.time_reaction(P, mcdc)
+        
+        # Time boundary
+        elif event == EVENT_TIME_BOUNDARY:
+            kernel.time_boundary(P, mcdc)
+       
         # Apply weight window
         if mcdc.setting.weight_window:
             mcdc.weight_window.apply_(P, mcdc)

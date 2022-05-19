@@ -56,8 +56,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
         Precursor group decay constant [/s]
     *speed and decay are optional. By default, values for speed and decay 
     are one and infinite, respectively. Universal speed and decay can be 
-    provided through `mcdc.set_universal_speed` and 
-    `mcdc.set_universal_decay`.
+    provided through mcdc.set_universal_speed and mcdc.set_universal_decay.
     """
 
     # ID
@@ -217,7 +216,7 @@ def surface(type_, **kw):
         J = -kw.get('y')
     elif type_ == 'plane-z':
         I = 1.0
-        J = -kw.get['z']
+        J = -kw.get('z')
     elif type_ == 'plane':
         G = kw.get('A')
         H = kw.get('B')
@@ -372,11 +371,17 @@ def tally(scores, x=None, y=None, z=None, t=None):
             T.current = True
         elif s == 'eddington':
             T.eddington = True
+        elif s == 'flux-x':
+            T.flux_x = True
+        elif s == 'current-x':
+            T.current_x = True
         else:
             print_error("Unknown tally score %s"%s)
     mesh = set_mesh(x,y,z,t)
     T.mesh = mesh
 
+# TODO: non-uniform mesh
+'''
 def set_mesh(x, y, z, t):
     if x is None:
         x = np.array([-INF,INF])
@@ -395,6 +400,30 @@ def set_mesh(x, y, z, t):
     else:
         t = t
     return Mesh(x,y,z,t)
+'''
+
+def set_mesh(x, y, z, t):
+    x0 = -INF; dx = 2*INF; Nx = 1
+    y0 = -INF; dy = 2*INF; Ny = 1
+    z0 = -INF; dz = 2*INF; Nz = 1
+    t0 = -INF; dt = 2*INF; Nt = 1
+    if x is not None:
+        x0 = x[0]
+        dx = (x[1] - x[0])/x[2]
+        Nx = x[2]
+    if y is not None:
+        y0 = y[0]
+        dy = (y[1] - y[0])/y[2]
+        Ny = y[2]
+    if z is not None:
+        z0 = z[0]
+        dz = (z[1] - z[0])/z[2]
+        Nz = z[2]
+    if t is not None:
+        t0 = t[0]
+        dt = (t[1] - t[0])/t[2]
+        Nt = t[2]
+    return Mesh(x0, dx, Nx, y0, dy, Ny, z0, dz, Nz, t0, dt, Nt)
 
 #==============================================================================
 # Setting
@@ -418,7 +447,7 @@ def setting(**kw):
 
     # Output .h5 file name
     if output is not None:
-        S.output = output
+        S.output_name = output
 
     # RNG seed and stride
     if seed is not None:

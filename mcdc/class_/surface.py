@@ -106,7 +106,6 @@ class Surface:
         n  = self.normal(P)
         c  = 2.0*(n.x*ux + n.y*uy + n.z*uz) # 2.0*self.normal_component(P)
                                             # to avoid repeating normalization
-
         P.direction.x = ux - c*n.x
         P.direction.y = uy - c*n.y
         P.direction.z = uz - c*n.z
