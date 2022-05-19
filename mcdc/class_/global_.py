@@ -24,6 +24,7 @@ from mcdc.class_.wwindow  import WeightWindow, type_weight_window
            ('bank', type_bank),
            ('weight_window', type_weight_window),
            ('runtime_total', float64),
+           ('runtime_pct', float64),
            ('i_iter', int64),
            ('N_work', int64),
            ('master', boolean)])

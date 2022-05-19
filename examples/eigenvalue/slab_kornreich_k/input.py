@@ -40,11 +40,11 @@ mcdc.source(x=[0.0, 2.5], isotropic=True)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux'], x=[0.0, 2.5, 50])
+mcdc.tally(scores=['flux-x'], x=[0.0, 2.5, 50])
 
 # Setting
-mcdc.setting(N_hist=5E3)
-mcdc.eigenmode(N_iter=40)
+mcdc.setting(N_hist=1E2)
+mcdc.eigenmode(N_iter=20)
 
 # Run
 mcdc.run()

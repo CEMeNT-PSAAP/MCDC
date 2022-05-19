@@ -7,6 +7,7 @@ from mcdc.class_.material import Material
 from mcdc.class_.mesh     import Mesh
 from mcdc.class_.point    import Point
 from mcdc.class_.popctrl  import *
+from mcdc.print_          import print_error
 from mcdc.class_.source   import Source
 from mcdc.class_.surface  import Surface, SurfaceHandle
 from mcdc.class_.tally    import Tally
@@ -375,6 +376,8 @@ def tally(scores, x=None, y=None, z=None, t=None):
             T.flux_x = True
         elif s == 'current-x':
             T.current_x = True
+        elif s == 'flux-t':
+            T.flux_t = True
         else:
             print_error("Unknown tally score %s"%s)
     mesh = set_mesh(x,y,z,t)
@@ -478,11 +481,14 @@ def universal_decay(decay):
 def eigenmode(N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
     # Get object
     S = mcdc.global_.setting
+    T = mcdc.global_.tally
     GT = mcdc.global_.tally_global
 
     S.N_iter          = N_iter
     S.mode_eigenvalue = True
     S.mode_alpha      = alpha_mode
+
+    T.tracklength = True
 
     GT.k_eff     = k_init
     GT.alpha_eff = alpha_init
