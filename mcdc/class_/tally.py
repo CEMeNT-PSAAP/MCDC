@@ -18,15 +18,28 @@ from mcdc.class_.score import ScoreFlux, ScoreCurrent, ScoreEddington,\
            ('score_eddington', type_score_eddington)])
 class Tally:
     def __init__(self):
+        # ===========
         # Score flags
-        self.flux      = False
-        self.current   = False
-        self.eddington = False
+        # ===========
+
+        # Tracklength
+        self.tracklength = False
+        self.flux        = False
+        self.current     = False
+        self.eddington   = False
+
+        # Mesh crossing
+        self.crossing    = False
+        self.crossing_x  = False
+        self.flux_x      = False
+        self.current_x   = False
 
         # Uninitialized
         #self.mesh
         #self.score_flux     
+        #self.score_flux_x
         #self.score_current  
+        #self.score_current_x
         #self.score_eddington
 
     def allocate_bins(self, Ng, N_iter):
@@ -35,38 +48,73 @@ class Tally:
         Ny = self.mesh.Ny
         Nz = self.mesh.Nz
 
+        # Tracklength
         if self.flux:
-            shape = (N_iter, Nt, Ng, Nx, Ny, Nz)
-            result_bin = np.zeros(shape, dtype=np.float64)
-            self.score_flux = ScoreFlux(result_bin)
+            shape = (N_iter, Ng, Nt, Nx, Ny, Nz)
+            self.score_flux = ScoreFlux(shape)
         if self.current:
-            shape = (N_iter, Nt, Ng, Nx, Ny, Nz, 3)
-            result_bin = np.zeros(shape, dtype=np.float64)
-            self.score_current = ScoreCurrent(result_bin)
+            shape = (N_iter, Ng, Nt, Nx, Ny, Nz, 3)
+            self.score_current = ScoreCurrent(shape)
         if self.eddington:
-            shape = (N_iter, Nt, Ng, Nx, Ny, Nz, 6)
-            result_bin = np.zeros(shape, dtype=np.float64)
-            self.score_eddington = ScoreEddington(result_bin)
+            shape = (N_iter, Ng, Nt, Nx, Ny, Nz, 6)
+            self.score_eddington = ScoreEddington(shape)
 
-    def score(self, P, d_move):
+        # Mesh crossing
+        if self.flux_x:
+            shape = (N_iter, Ng, Nt, Nx+1, Ny, Nz)
+            self.score_flux_x = ScoreFlux(shape)
+        if self.current_x:
+            shape = (N_iter, Ng, Nt, Nx+1, Ny, Nz, 3)
+            self.score_current_x = ScoreCurrent(shape)
+
+        # Set flags
+        if self.flux or self.current or self.eddington:
+            self.tracklength = True
+        if self.flux_x or self.current_x:
+            self.crossing = True
+            self.crossing_x = True
+
+    def score_tracklength(self, P, d_move):
         # Get indices
+        g = P.group
         t, x, y, z = self.mesh.get_index(P)
 
         # Score
+        flux = d_move*P.weight
         if self.flux:
-            self.score_flux.accumulate(t,x,y,z,d_move,P)
+            self.score_flux.accumulate(g,t,x,y,z,flux,P)
         if self.current:
-            self.score_current.accumulate(t,x,y,z,d_move,P)
+            self.score_current.accumulate(g,t,x,y,z,flux,P)
         if self.eddington:
-            self.score_eddington.accumulate(t,x,y,z,d_move,P)
-   
+            self.score_eddington.accumulate(g,t,x,y,z,flux,P)
+
+    def score_crossing_x(self, P, t, x, y, z):
+        # Get indices
+        g = P.group
+        if P.direction.x > 0.0:
+            x += 1
+
+        # Score
+        flux = P.weight/abs(P.direction.x)
+        if self.flux_x:
+            self.score_flux_x.accumulate(g,t,x,y,z,flux,P)
+        if self.current_x:
+            self.score_current_x.accumulate(g,t,x,y,z,flux,P)
+
     def closeout_history(self):
+        # Tracklength
         if self.flux:
             closeout_history(self.score_flux)
         if self.current:
             closeout_history(self.score_current)
         if self.eddington:
             closeout_history(self.score_eddington)
+
+        # Mesh crossing
+        if self.flux_x:
+            closeout_history(self.score_flux_x)
+        if self.current_x:
+            closeout_history(self.score_current_x)
     
 @njit
 def closeout_history(score):

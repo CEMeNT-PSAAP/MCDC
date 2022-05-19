@@ -29,6 +29,9 @@ from mcdc.class_.wwindow  import WeightWindow, type_weight_window
            ('master', boolean)])
 class Global:
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         # Model
         self.materials = List.empty_list(type_material)
         self.surfaces  = List.empty_list(type_surface)
@@ -53,6 +56,7 @@ class Global:
 
         # Runtime
         self.runtime_total = 0.0
+        self.runtime_pct   = 0.0
 
         # Indices
         self.i_iter = 0

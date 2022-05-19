@@ -71,11 +71,8 @@ def move_to_event(P, mcdc):
                                       d_mesh)
 
     # Score tracklength tallies
-    score_tracklength(P, distance, mcdc)
-
-    # Add a small-kick to ensure mesh crossing
-    if event == EVENT_MESH:
-        distance += PRECISION
+    if mcdc.tally.tracklength:
+        score_tracklength(P, distance, mcdc)
 
     # Move particle
     move_particle(P, distance)
@@ -83,6 +80,8 @@ def move_to_event(P, mcdc):
     # Record surface if crossed
     if event == EVENT_SURFACE:
         P.surface = surface
+        if d_surface == d_mesh and not surface.reflective:
+            event = EVENT_SURFACE_N_MESH
 
     return event
 
@@ -122,17 +121,17 @@ def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
     if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
-    if distance > d_time_boundary:
-        event = EVENT_TIME_BOUNDARY
-        distance = d_time_boundary
     if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
+    if distance > d_time_boundary:
+        event = EVENT_TIME_BOUNDARY
+        distance = d_time_boundary
     return event, distance
 
 @njit
 def score_tracklength(P, distance, mcdc):
-    mcdc.tally.score(P, distance)
+    mcdc.tally.score_tracklength(P, distance)
 
     # Score eigenvalue tallies
     if mcdc.setting.mode_eigenvalue:
@@ -384,6 +383,33 @@ def time_reaction(P, mcdc):
 @njit
 def time_boundary(P, mcdc):
     P.alive = False
+
+#==============================================================================
+# Mesh crossing
+#==============================================================================
+
+@njit
+def mesh_crossing(P, mcdc):
+    if not mcdc.tally.crossing:
+        # Small-kick to ensure crossing
+        move_particle(P, PRECISION)
+    else:
+        # Use small-kick back and forth to determine which mesh is crossed
+        # First, backward small-kick
+        move_particle(P, -PRECISION)
+        t1, x1, y1, z1 = mcdc.tally.mesh.get_index(P)
+        # Then, double forward small-kick
+        move_particle(P, 2*PRECISION)
+        t2, x2, y2, z2 = mcdc.tally.mesh.get_index(P)
+
+        # Determine which mesh is crossed
+        crossing_x = False
+        if x1 != x2:
+            crossing_x = True
+            
+        # Score on tally
+        if crossing_x and mcdc.tally.crossing_x:
+            mcdc.tally.score_crossing_x(P, t1, x1, y1, z1)
 
 #==============================================================================
 # Miscellany

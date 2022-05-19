@@ -14,9 +14,6 @@ import mcdc.global_ as mcdc_
 mcdc = mcdc_.global_
 
 def run():
-    # Start timer
-    mcdc.runtime_total = mpi.Wtime()
-
     # Print banner and configuration
     print_banner()
     if nb.config.DISABLE_JIT:
@@ -32,6 +29,9 @@ def run():
     # Run
     print_msg(" Now running TNT...")
     
+    # Start timer
+    mcdc.runtime_total = mpi.Wtime()
+
     # SIMULATION LOOP
     simulation_end = False
     while not simulation_end:
@@ -52,7 +52,10 @@ def run():
 
         # Manage particle banks
         if not simulation_end:
+            t = mpi.Wtime()
             manage_particle_banks()
+            t = mpi.Wtime() - t
+            mcdc.runtime_pct += t
             
     # Fixed-source mode closeout
     if not mcdc.setting.mode_eigenvalue:
@@ -65,6 +68,8 @@ def run():
     generate_hdf5()
     
     print_runtime()
+
+    mcdc.reset()
 
 def prepare():
     print_msg("\n Preparing...")
@@ -94,6 +99,10 @@ def tally_closeout():
         score_closeout(mcdc.tally.score_current)
     if mcdc.tally.eddington:
         score_closeout(mcdc.tally.score_eddington)
+    if mcdc.tally.flux_x:
+        score_closeout(mcdc.tally.score_flux_x)
+    if mcdc.tally.current_x:
+        score_closeout(mcdc.tally.score_current_x)
 
 def score_closeout(score):
     N_hist = mcdc.setting.N_hist
@@ -174,6 +183,7 @@ def generate_hdf5():
         with h5py.File(mcdc.setting.output_name+'.h5', 'w') as f:
             # Runtime
             f.create_dataset("runtime",data=np.array([mcdc.runtime_total]))
+            f.create_dataset("runtime_pct",data=np.array([mcdc.runtime_pct]))
 
             # Tally
             T = mcdc.tally
@@ -204,6 +214,20 @@ def generate_hdf5():
                                  data=np.squeeze(T.score_eddington.sdev))
                 T.score_eddington.mean.fill(0.0)
                 T.score_eddington.sdev.fill(0.0)
+            if T.flux_x:
+                f.create_dataset("tally/flux-x/mean",
+                                 data=np.squeeze(T.score_flux_x.mean))
+                f.create_dataset("tally/flux-x/sdev",
+                                 data=np.squeeze(T.score_flux_x.sdev))
+                T.score_flux_x.mean.fill(0.0)
+                T.score_flux_x.sdev.fill(0.0)
+            if T.current_x:
+                f.create_dataset("tally/current-x/mean",
+                                 data=np.squeeze(T.score_current_x.mean))
+                f.create_dataset("tally/current-x/sdev",
+                                 data=np.squeeze(T.score_current_x.sdev))
+                T.score_current_x.mean.fill(0.0)
+                T.score_current_x.sdev.fill(0.0)
                 
             # Eigenvalues
             if mcdc.setting.mode_eigenvalue:
