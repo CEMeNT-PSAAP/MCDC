@@ -7,10 +7,13 @@ import h5py
 # Reference solution
 # =============================================================================
 
+x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6, 
+              1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
+dx = x[1:] - x[:-1]
 k_exact = 1.28657
 phi_exact = np.array([1, 1.417721, 1.698988, 1.903163, 2.03435, 2.092069, 2.075541, 1.984535, 1.818753, 1.574144, 1.199995, 0.9532296, 0.7980474, 0.6788441, 0.5823852, 0.5020479, 0.4337639, 0.3747058, 0.3226636, 0.2755115, 0.228371])
 tmp = 0.5*(phi_exact[1:] + phi_exact[:-1])
-phi_exact /= np.sum(tmp)
+phi_exact /= np.sum(tmp*dx)
 
 # =============================================================================
 # Plot results
@@ -23,6 +26,8 @@ with h5py.File('output.h5', 'r') as f:
     phi = f['tally/flux/mean'][:]
     k   = f['keff'][:]
     x_mid = 0.5*(x[:-1]+x[1:])
+x = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6, 
+              1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
     
 # Get average
 N_passive = 10
@@ -32,7 +37,7 @@ phi_sd  = np.zeros_like(phi[0])
 k_avg = 0.0
 k_sd  = 0.0
 for i in range(N_passive,len(phi)): 
-    phi_avg += phi[i][:]/dx
+    phi_avg += phi[i][:]
     phi_sd  += np.square(phi[i][:])
     k_avg += k[i]
     k_sd  += k[i]**2
@@ -55,6 +60,9 @@ plt.ylabel(r'$k$')
 plt.grid()
 plt.legend()
 plt.show()
+
+phi_avg /= dx
+phi_sd  /= dx
 
 plt.plot(x_mid,phi_avg,'-ob',fillstyle='none',label="MC")
 plt.fill_between(x_mid,phi_avg-phi_sd,phi_avg+phi_sd,alpha=0.2,color='b')

@@ -13,7 +13,7 @@ from mcdc.class_.surface import type_surface
            ('cell', type_cell), ('surface', type_surface)])
 class Particle:
     def __init__(self, position, direction, group, time, weight):
-        self.position  = position  # cm
+        self.position  = position # cm
         self.direction = direction
         self.group     = group
         self.time      = time # s
