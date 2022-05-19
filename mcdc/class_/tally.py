@@ -15,7 +15,13 @@ from mcdc.class_.score import ScoreFlux, ScoreCurrent, ScoreEddington,\
 @jitclass([('flux', boolean), ('current', boolean), ('eddington', boolean), 
            ('mesh', type_mesh), ('score_flux', type_score_flux),
            ('score_current', type_score_current), 
-           ('score_eddington', type_score_eddington)])
+           ('score_eddington', type_score_eddington),
+           ('tracklength', boolean), ('crossing', boolean),
+           ('crossing_x', boolean), ('crossing_t', boolean), 
+           ('flux_x', boolean), ('flux_t', boolean), ('current_x', boolean),
+           ('score_flux_x', type_score_flux),
+           ('score_flux_t', type_score_flux),
+           ('score_current_x', type_score_current)])
 class Tally:
     def __init__(self):
         # ===========
