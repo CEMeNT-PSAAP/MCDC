@@ -91,7 +91,7 @@ def loop_particle(P, mcdc):
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:
             kernel.time_boundary(P, mcdc)
-       
+    
         # Apply weight window
         if mcdc.setting.weight_window:
             mcdc.weight_window.apply_(P, mcdc)

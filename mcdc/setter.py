@@ -7,6 +7,7 @@ from mcdc.class_.material import Material
 from mcdc.class_.mesh     import Mesh
 from mcdc.class_.point    import Point
 from mcdc.class_.popctrl  import *
+from mcdc.print_          import print_error
 from mcdc.class_.source   import Source
 from mcdc.class_.surface  import Surface, SurfaceHandle
 from mcdc.class_.tally    import Tally
@@ -375,6 +376,8 @@ def tally(scores, x=None, y=None, z=None, t=None):
             T.flux_x = True
         elif s == 'current-x':
             T.current_x = True
+        elif s == 'flux-t':
+            T.flux_t = True
         else:
             print_error("Unknown tally score %s"%s)
     mesh = set_mesh(x,y,z,t)

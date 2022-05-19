@@ -36,7 +36,8 @@ mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux'], x=[-20.5, 20.5, 201], t=[0.0, 20.0, 20])
+mcdc.tally(scores=['flux', 'flux-x', 'flux-t'], 
+           x=[-20.5, 20.5, 201], t=[0.0, 20.0, 20])
 
 # Setting
 mcdc.setting(N_hist=1E3, time_boundary=20.0)
