@@ -481,11 +481,14 @@ def universal_decay(decay):
 def eigenmode(N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
     # Get object
     S = mcdc.global_.setting
+    T = mcdc.global_.tally
     GT = mcdc.global_.tally_global
 
     S.N_iter          = N_iter
     S.mode_eigenvalue = True
     S.mode_alpha      = alpha_mode
+
+    T.tracklength = True
 
     GT.k_eff     = k_init
     GT.alpha_eff = alpha_init
