@@ -13,6 +13,8 @@ from mcdc.class_.tally    import Tally, TallyGlobal, type_tally,\
                                  type_tally_global
 from mcdc.class_.wwindow  import WeightWindow, type_weight_window
 
+from mcdc.type_ import particle
+
 @jitclass([('materials', types.ListType(type_material)),
            ('surfaces', types.ListType(type_surface)),
            ('cells', types.ListType(type_cell)),
@@ -37,7 +39,7 @@ class Global:
         self.materials = List.empty_list(type_material)
         self.surfaces  = List.empty_list(type_surface)
         self.cells     = List.empty_list(type_cell)
-        self.source    = Source()
+        self.sources   = List.empty_list(type_source)
 
         # Setting
         self.setting = Setting()

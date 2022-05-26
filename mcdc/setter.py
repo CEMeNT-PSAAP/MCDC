@@ -20,9 +20,6 @@ import mcdc.global_ as mcdc
 # Material
 #==============================================================================
 
-material_ID    = -1
-material_count = itertools.count(0)
-
 def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None, 
              chi_p=None, chi_d=None, nu_s=None, speed=None, decay=None):
     """
@@ -61,8 +58,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     """
 
     # ID
-    global material_ID
-    material_ID = next(material_count)
+    material_ID = len(mcdc.global_.materials)
 
     # Energy group size
     if capture is not None:
@@ -186,13 +182,9 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
 # Surface
 #==============================================================================
 
-surface_ID    = -1
-surface_count = itertools.count(0)
-
 def surface(type_, **kw):
     # ID
-    global surface_ID
-    surface_ID = next(surface_count)
+    surface_ID = len(mcdc.global_.surfaces)
 
     # Boundary condition
     vacuum     = False
@@ -280,13 +272,9 @@ def surface(type_, **kw):
 # Cell
 #==============================================================================
 
-cell_ID    = -1
-cell_count = itertools.count(0)
-
 def cell(surfaces_senses, material):
     # ID
-    global cell_ID
-    cell_ID = next(cell_count)
+    cell_ID = len(mcdc.global_.cells)
 
     # Surfaces and senses
     surfaces = List()
@@ -307,6 +295,13 @@ def cell(surfaces_senses, material):
 #==============================================================================
 
 def source(**kw):
+    # ID
+    source_ID = len(mcdc.global_.sources)
+
+    # Create object
+    S = Source()
+    S.ID = source_ID
+
     point     = kw.get('point') # Point source
     x         = kw.get('x')     # Box source
     y         = kw.get('y')
@@ -315,16 +310,13 @@ def source(**kw):
     direction = kw.get('direction') # Mono-directional
     energy    = kw.get('energy')
     time      = kw.get('time')
-
-    # Get object
-    S = mcdc.global_.source
+    prob      = kw.get('prob')
 
     # Set position
     if point is not None:
-        x = point[0]
-        y = point[1]
-        z = point[2]
-        S.position = Point(x,y,z)
+        S.position_x = point[0]
+        S.position_y = point[1]
+        S.position_z = point[2]
     else:
         S.flag_box = True
         box = []
@@ -355,6 +347,12 @@ def source(**kw):
     # Set time
     if time is not None:
         S.time = time
+
+    # Probability
+    if prob is not None:
+        S.prob = prob
+    
+    mcdc.global_.sources.append(S)
 
 #==============================================================================
 # Tally
@@ -440,6 +438,7 @@ def setting(**kw):
     implicit_capture = kw.get('implicit_capture')
     time_boundary = kw.get('time_boundary')
     progress_bar  = kw.get('progress_bar')
+    Nmax          = kw.get('max_per_hist')
 
     # Get object
     S = mcdc.global_.setting
@@ -469,6 +468,9 @@ def setting(**kw):
     # Progress bar
     if progress_bar is not None:
         S.progress_bar = progress_bar
+
+    if Nmax is not None:
+        S.Nmax = Nmax
     
 def universal_speed(speed):
     for C in mcdc.global_.cells:

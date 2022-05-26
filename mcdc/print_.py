@@ -1,18 +1,11 @@
-from numba import njit
-
 import mcdc.mpi as mpi
 import sys
-
-# Get mcdc global variables as "mcdc"
-import mcdc.global_ as mcdc_
-mcdc = mcdc_.global_
 
 def print_msg(msg):
     if mpi.master:
         print(msg)
         sys.stdout.flush()
 
-@njit
 def print_error(msg):
     if mpi.master:
         print("ERROR: %s\n"%msg)
@@ -42,7 +35,7 @@ def print_progress(work_idx):
         sys.stdout.write(" [%-28s] %d%%" % ('='*int(perc*28), perc*100.0))
         sys.stdout.flush()
 
-def print_progress_eigenvalue():
+def print_progress_eigenvalue(mcdc):
     if mpi.master:
         i_iter = mcdc.i_iter
         k_eff = mcdc.tally_global.k_eff
@@ -56,7 +49,7 @@ def print_progress_eigenvalue():
             print(" %-4i %.5f %.3e"%(i_iter+1,k_eff,alpha_eff))
         sys.stdout.flush()
 
-def print_runtime():
+def print_runtime(mcdc):
     total = mcdc.runtime_total
     if mpi.master:
         if total >= 24*60*60:
@@ -68,3 +61,18 @@ def print_runtime():
         else:
             print(' Total runtime: %.2f seconds\n'%total)
         sys.stdout.flush()
+
+def print_bank(bank, show_content=False):
+    tag       = bank['tag']
+    size      = bank['size']
+    max_size  = bank['max_size']
+    particles = bank['particles']
+
+    print('\n=============')
+    print('Particle bank')
+    print('  tag  :', tag)
+    print('  size :', size, 'of', max_size)
+    if show_content and size > 0:
+        for i in range(size):
+            print(' ',particles[i])
+    print('\n')

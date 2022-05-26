@@ -1,15 +1,17 @@
 import math
+import numba as nb
 
-from numba import njit
+import mcdc.type_ as type_
 
 from mcdc.class_.point import Point
 from mcdc.constant     import *
+from mcdc.print_       import print_error
 
 #==============================================================================
 # Random sampling
 #==============================================================================
 
-@njit
+@nb.njit
 def sample_isotropic_direction(rng):
     # Sample polar cosine and azimuthal angle uniformly
     mu  = 2.0*rng.random() - 1.0
@@ -20,13 +22,13 @@ def sample_isotropic_direction(rng):
     y = math.cos(azi)*c
     z = math.sin(azi)*c
     x = mu
-    return Point(x, y, z)
+    return x, y, z
 
-@njit
+@nb.njit
 def sample_uniform(a, b, rng):
     return a + rng.random() * (b - a)
 
-@njit
+@nb.njit
 def sample_discrete(p, rng):
     tot = 0.0
     xi  = rng.random()
@@ -36,35 +38,58 @@ def sample_discrete(p, rng):
             return i
 
 #==============================================================================
+# Particle bank operations
+#==============================================================================
+
+@nb.njit
+def add_particle(P, bank):
+    if bank['size'] == bank['max_size']:
+        with nb.objmode():
+            print_error('Particle bank "'+bank['tag']+
+                        '" exceeds its maximum size.')
+    bank['particles'][bank['size']] = P
+    bank['size'] += 1
+
+@nb.njit
+def pop_particle(bank):
+    if bank['size'] == 0:
+        with nb.objmode():
+            print_error('Particle bank "'+bank['tag']+'" is empty.')
+    bank['size'] -= 1
+    P = bank['particles'][bank['size']]
+    return P.copy()
+
+#==============================================================================
 # Set cell
 #==============================================================================
 
-@njit
+@nb.njit
 def set_cell(P, mcdc):
     found = False
     for C in mcdc.cells:
         if C.test_point(P):
-            P.cell = C
+            P['cell_ID'] = C.ID
             found = True
+
+            # Set particle speed
+            P['speed'] = C.material.speed[P['group']]
+
             break
     if not found:
-        print("A particle is lost at (",P.position.x,P.position.y,P.position.z,")")
-        P.alive = False
+        print("A particle is lost at (",P['position']['x'],P['position']['y'],P['position']['z'],")")
+        P['alive'] = False
 
 #==============================================================================
 # Move to event
 #==============================================================================
 
-@njit
+@nb.njit
 def move_to_event(P, mcdc):
-    # Get speed
-    P.speed = P.cell.material.speed[P.group]
-
     # Get distances to events
     d_collision        = collision_distance(P, mcdc)
-    surface, d_surface = surface_distance(P)
-    d_time_boundary    = P.speed*(mcdc.setting.time_boundary - P.time)
-    d_mesh             = mcdc.tally.mesh.distance(P)
+    surface, d_surface = surface_distance(P, mcdc)
+    d_mesh             = mcdc.tally.mesh.distance(P, mcdc)
+    d_time_boundary    = P['speed']*(mcdc.setting.time_boundary - P['time'])
 
     # Determine event
     event, distance = determine_event(d_collision, d_surface, d_time_boundary,
@@ -79,17 +104,19 @@ def move_to_event(P, mcdc):
 
     # Record surface if crossed
     if event == EVENT_SURFACE:
-        P.surface = surface
+        P['surface_ID'] = surface.ID
         # Also mesh crossing?
         if d_surface == d_mesh and not surface.reflective:
             event = EVENT_SURFACE_N_MESH
+    else:
+        P['surface_ID'] = -1
     
     return event
 
-@njit
+@nb.njit
 def collision_distance(P, mcdc):
-    # Get total XS
-    SigmaT = P.cell.material.total[P.group]
+    # Get total cross-section
+    SigmaT = mcdc.cells[P['cell_ID']].material.total[P['group']]
 
     # Vacuum material?
     if SigmaT == 0.0:
@@ -97,25 +124,27 @@ def collision_distance(P, mcdc):
 
     # Time absorption?
     if mcdc.setting.mode_alpha:
-        SigmaT += abs(mcdc.tally_global.alpha_eff)/P.speed
+        SigmaT += abs(mcdc.tally_global.alpha_eff)/P['speed']
 
     # Sample collision distance
     xi     = mcdc.rng.random()
     distance  = -math.log(xi)/SigmaT
     return distance
 
-@njit
-def surface_distance(P):
+@nb.njit
+def surface_distance(P, mcdc):
     surface  = None
     distance = INF
-    for S in P.cell.surfaces:
+
+    cell = mcdc.cells[P['cell_ID']]
+    for S in cell.surfaces:
         d = S.distance(P)
         if d < distance:
             surface  = S
             distance = d
     return surface, distance
 
-@njit
+@nb.njit
 def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
     event  = EVENT_COLLISION
     distance = d_collision
@@ -130,71 +159,77 @@ def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
         distance = d_mesh
     return event, distance
 
-@njit
+@nb.njit
 def score_tracklength(P, distance, mcdc):
     mcdc.tally.score_tracklength(P, distance)
 
     # Score eigenvalue tallies
     if mcdc.setting.mode_eigenvalue:
-        nu       = P.cell.material.nu_p[P.group]\
-                   + sum(P.cell.material.nu_d[P.group])
-        SigmaF   = P.cell.material.fission[P.group]
+        material = mcdc.cells[P['cell_ID']].material
+        g        = P['group']
+        weight   = P['weight']
+        nu       = material.nu_p[g]\
+                   + sum(material.nu_d[g])
+        SigmaF   = material.fission[g]
         nuSigmaF = nu*SigmaF
-        mcdc.tally_global.nuSigmaF += P.weight*distance*nuSigmaF
+        mcdc.tally_global.nuSigmaF += weight*distance*nuSigmaF
 
         if mcdc.setting.mode_alpha:
-            mcdc.tally_global.inverse_speed += P.weight*distance\
-                                       /P.cell.material.speed[P.group]
+            mcdc.tally_global.inverse_speed += weight*distance/P['speed']
 
-@njit
+@nb.njit
 def move_particle(P, distance):
-    P.position.x += P.direction.x*distance
-    P.position.y += P.direction.y*distance
-    P.position.z += P.direction.z*distance
-    P.time       += distance/P.speed
+    P['position']['x'] += P['direction']['x']*distance
+    P['position']['y'] += P['direction']['y']*distance
+    P['position']['z'] += P['direction']['z']*distance
+    P['time']          += distance/P['speed']
 
 
 #==============================================================================
 # Surface crossing
 #==============================================================================
 
-@njit
+@nb.njit
 def surface_crossing(P, mcdc):
     # Implement BC
-    P.surface.apply_bc(P)
+    surface = mcdc.surfaces[P['surface_ID']]
+    surface.apply_bc(P)
 
     # Small kick to make sure crossing
     move_particle(P, PRECISION)
  
     # Set new cell
-    if P.alive and not P.surface.reflective:
+    if P['alive'] and not surface.reflective:
         set_cell(P, mcdc)
 
 #==============================================================================
 # Collision
 #==============================================================================
 
-@njit
+@nb.njit
 def collision(P, mcdc):
     # Kill the current particle
-    P.alive = False
+    P['alive'] = False
 
-    SigmaT = P.cell.material.total[P.group]
-    SigmaC = P.cell.material.capture[P.group]
-    SigmaS = P.cell.material.scatter[P.group]
-    SigmaF = P.cell.material.fission[P.group]
+    # Get the reaction cross-sections
+    material = mcdc.cells[P['cell_ID']].material
+    g        = P['group']
+    SigmaT   = material.total[g]
+    SigmaC   = material.capture[g]
+    SigmaS   = material.scatter[g]
+    SigmaF   = material.fission[g]
 
     if mcdc.setting.mode_alpha:
-        Sigma_alpha = abs(mcdc.tally_global.alpha_eff)/P.speed
+        Sigma_alpha = abs(mcdc.tally_global.alpha_eff)/P['speed']
         SigmaT += Sigma_alpha
 
     if mcdc.setting.implicit_capture:
         if mcdc.setting.mode_alpha:
-            P.weight *= (SigmaT-SigmaC-Sigma_alpha)/SigmaT
-            SigmaT   -= (SigmaC + Sigma_alpha)
+            P['weight'] *= (SigmaT-SigmaC-Sigma_alpha)/SigmaT
+            SigmaT      -= (SigmaC + Sigma_alpha)
         else:
-            P.weight *= (SigmaT-SigmaC)/SigmaT
-            SigmaT   -= SigmaC
+            P['weight'] *= (SigmaT-SigmaC)/SigmaT
+            SigmaT      -= SigmaC
 
     # Sample collision type
     xi = mcdc.rng.random()*SigmaT
@@ -217,7 +252,7 @@ def collision(P, mcdc):
 # Capture
 #==============================================================================
 
-@njit
+@nb.njit
 def capture(P, mcdc):
     pass
 
@@ -225,27 +260,32 @@ def capture(P, mcdc):
 # Scattering
 #==============================================================================
 
-@njit
+@nb.njit
 def scattering(P, mcdc):
-    # Ger outgoing spectrum
-    chi_s = P.cell.material.chi_s[P.group]
-    nu_s  = P.cell.material.nu_s[P.group]
-    G     = P.cell.material.G
+    # Get outgoing spectrum
+    material = mcdc.cells[P['cell_ID']].material
+    g        = P['group']
+    chi_s    = material.chi_s[g]
+    nu_s     = material.nu_s[g]
+    G        = material.G
 
     # Get effective and new weight
     if mcdc.setting.implicit_capture:
         weight_eff = 1.0
-        weight_new = P.weight
+        weight_new = P['weight']
     else:
-        weight_eff = P.weight
+        weight_eff = P['weight']
         weight_new = 1.0
 
     N = int(math.floor(weight_eff*nu_s + mcdc.rng.random()))
 
     for n in range(N):
-        # Create copy
+        # Copy particle (need to revive)
         P_new = P.copy()
-        P_new.weight = weight_new
+        P_new['alive'] = True
+
+        # Set weight
+        P_new['weight'] = weight_new
 
         # Sample outgoing energy
         xi  = mcdc.rng.random()
@@ -254,7 +294,8 @@ def scattering(P, mcdc):
             tot += chi_s[g_out]
             if tot > xi:
                 break
-        P_new.group = g_out
+        P_new['group'] = g_out
+        P_new['speed'] = material.speed[g_out]
         
         # Sample scattering angle
         # TODO: anisotropic scattering
@@ -266,53 +307,54 @@ def scattering(P, mcdc):
         sin_azi = math.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
 
-        ux = P_new.direction.x
-        uy = P_new.direction.y
-        uz = P_new.direction.z
+        ux = P_new['direction']['x']
+        uy = P_new['direction']['y']
+        uz = P_new['direction']['z']
         
         if uz != 1.0:
-            B = (1.0 - P.direction.z**2)**0.5
+            B = (1.0 - P['direction']['z']**2)**0.5
             C = Ac/B
             
-            P_new.direction.x = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
-            P_new.direction.y = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
-            P_new.direction.z = uz*mu - cos_azi*Ac*B
+            P_new['direction']['x'] = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
+            P_new['direction']['y'] = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
+            P_new['direction']['z'] = uz*mu - cos_azi*Ac*B
         
         # If dir = 0i + 0j + k, interchange z and y in the scattering formula
         else:
             B = (1.0 - uy**2)**0.5
             C = Ac/B
             
-            P_new.direction.x = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
-            P_new.direction.z = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
-            P_new.direction.y = uy*mu - cos_azi*Ac*B
+            P_new['direction']['x'] = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
+            P_new['direction']['z'] = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
+            P_new['direction']['y'] = uy*mu - cos_azi*Ac*B
         
         # Bank
-        mcdc.bank.history.append(P_new)
+        add_particle(P_new, mcdc.bank_history)
         
 #==============================================================================
 # Fission
 #==============================================================================
 
-@njit
+@nb.njit
 def fission(P, mcdc):
-    # Get group numbers
-    G = P.cell.material.G
-    J = P.cell.material.J
-    
-    # Total nu
-    nu_p = P.cell.material.nu_p[P.group]
-    nu = nu_p
+    # Get constants
+    material = mcdc.cells[P['cell_ID']].material
+    G        = material.G
+    J        = material.J
+    g        = P['group']
+    weight   = P['weight']
+    nu_p     = material.nu_p[g]
+    nu       = nu_p
     if J>0: 
-        nu_d = P.cell.material.nu_d[P.group]
-        nu += sum(nu_d)
+        nu_d  = material.nu_d[g]
+        nu   += sum(nu_d)
 
     # Get effective and new weight
     if mcdc.setting.implicit_capture:
         weight_eff = 1.0
-        weight_new = P.weight
+        weight_new = weight
     else:
-        weight_eff = P.weight
+        weight_eff = weight
         weight_new = 1.0
 
     # Sample number of fission neutrons
@@ -322,9 +364,12 @@ def fission(P, mcdc):
 
     # Push fission neutrons to bank
     for n in range(N):
-        # Create copy
+        # Copy particle (need to revive)
         P_new = P.copy()
-        P_new.weight = weight_new
+        P_new['alive'] = True
+
+        # Set weight
+        P_new['weight'] = weight_new
 
         # Determine if it's prompt or delayed neutrons, 
         # then get the energy spectrum and decay constant
@@ -332,22 +377,22 @@ def fission(P, mcdc):
         tot = nu_p
         # Prompt?
         if tot > xi:
-            spectrum = P.cell.material.chi_p[P.group]
+            spectrum = material.chi_p[g]
         else:
             # Which delayed group?
             for j in range(J):
                 tot += nu_d[j]
                 if tot > xi:
-                    spectrum = P.cell.material.chi_d[j]
-                    decay    = P.cell.material.decay[j]
+                    spectrum = material.chi_d[j]
+                    decay    = material.decay[j]
                     break
 
             # Sample emission time
             xi = mcdc.rng.random()
-            P_new.time = P.time - math.log(xi)/decay
+            P_new['time'] = P['time'] - math.log(xi)/decay
 
             # Skip if it's beyond time boundary
-            if P_new.time > mcdc.setting.time_boundary:
+            if P_new['time'] > mcdc.setting.time_boundary:
                 continue
 
         # Sample outgoing energy
@@ -357,19 +402,21 @@ def fission(P, mcdc):
             tot += spectrum[g_out]
             if tot > xi:
                 break
-        P_new.group = g_out
+        P_new['group'] = g_out
+        P_new['speed'] = material.speed[g_out]
 
         # Sample isotropic direction
-        P_new.direction = sample_isotropic_direction(mcdc.rng)
+        P_new['direction']['x'], P_new['direction']['y'], \
+        P_new['direction']['z'] = sample_isotropic_direction(mcdc.rng)
 
         # Bank
-        mcdc.bank.fission.append(P_new)
+        add_particle(P_new, mcdc.bank_fission)
 
 #==============================================================================
 # Time reaction
 #==============================================================================
 
-@njit
+@nb.njit
 def time_reaction(P, mcdc):
     if mcdc.tally_global.alpha_eff > 0:
         pass # Already killed
@@ -381,9 +428,9 @@ def time_reaction(P, mcdc):
 # Time boundary
 #==============================================================================
 
-@njit
+@nb.njit
 def time_boundary(P, mcdc):
-    P.alive = False
+    P['alive'] = False
 
     # Check if mesh crossing occured
     mesh_crossing(P, mcdc)
@@ -392,7 +439,7 @@ def time_boundary(P, mcdc):
 # Mesh crossing
 #==============================================================================
 
-@njit
+@nb.njit
 def mesh_crossing(P, mcdc):
     if not mcdc.tally.crossing:
         # Small-kick to ensure crossing
@@ -425,7 +472,7 @@ def mesh_crossing(P, mcdc):
 #==============================================================================
 
 '''
-@njit
+@nb.njit
 def binary_search(val, grid):
     """
     Binary search that returns the bin index of a value val given grid grid
