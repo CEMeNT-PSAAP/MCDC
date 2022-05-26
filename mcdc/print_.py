@@ -25,7 +25,7 @@ def print_banner():
         +" | |\/| | |   /_  / | | | |    \n"\
         +" | |  | | |___ / /| |_| | |___ \n"\
         +" |_|  |_|\____|// |____/ \____|\n"
-        print(banner)
+        print(repr(banner))
         sys.stdout.flush()
 
 def print_progress(work_idx):
