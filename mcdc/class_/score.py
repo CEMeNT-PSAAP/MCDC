@@ -35,9 +35,9 @@ class ScoreCurrent:
         set_bins(self, shape)
 
     def accumulate(self, g, t, x, y, z, flux, P):
-        self.bin_[g, t, x, y, z, 0] += flux*P['direction']['x']
-        self.bin_[g, t, x, y, z, 1] += flux*P['direction']['y']
-        self.bin_[g, t, x, y, z, 2] += flux*P['direction']['z']
+        self.bin_[g, t, x, y, z, 0] += flux*P['ux']
+        self.bin_[g, t, x, y, z, 1] += flux*P['uy']
+        self.bin_[g, t, x, y, z, 2] += flux*P['uz']
 
 @jitclass(spec_score)
 class ScoreEddington:
@@ -45,9 +45,9 @@ class ScoreEddington:
         set_bins(self, shape)
 
     def accumulate(self, g, t, x, y, z, flux, P):
-        ux = P['direction']['x']
-        uy = P['direction']['y']
-        uz = P['direction']['z']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
         self.bin_[g, t, x, y, z, 0] += flux*ux*ux
         self.bin_[g, t, x, y, z, 1] += flux*ux*uy
         self.bin_[g, t, x, y, z, 2] += flux*ux*uz

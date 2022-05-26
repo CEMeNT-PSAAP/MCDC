@@ -36,11 +36,13 @@ class Surface:
             self.linear = True
             self.n      = Point(G,H,I)
             self.n.normalize()
+        else:
+            self.linear = False
             
     def evaluate(self, P):
-        x = P['position']['x']
-        y = P['position']['y']
-        z = P['position']['z']
+        x = P['x']
+        y = P['y']
+        z = P['z']
         
         G = self.G
         H = self.H
@@ -74,9 +76,9 @@ class Surface:
         G = self.G
         H = self.H
         I = self.I
-        x = P['position']['x']
-        y = P['position']['y']
-        z = P['position']['z']
+        x = P['x']
+        y = P['y']
+        z = P['z']
         
         dx = 2*A*x + D*y + E*z + G
         dy = 2*B*y + D*x + F*z + H
@@ -87,9 +89,9 @@ class Surface:
         return n
         
     def normal_component(self, P):
-        ux = P['direction']['x']
-        uy = P['direction']['y']
-        uz = P['direction']['z']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
         n  = self.normal(P)        
         return n.x*ux + n.y*uy + n.z*uz
 
@@ -100,23 +102,20 @@ class Surface:
             self.reflect(P)
 
     def reflect(self, P):
-        ux = P['direction']['x']
-        uy = P['direction']['y']
-        uz = P['direction']['z']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
         n  = self.normal(P)
         c  = 2.0*(n.x*ux + n.y*uy + n.z*uz) # 2.0*self.normal_component(P)
                                             # to avoid repeating normalization
-        P['direction']['x'] = ux - c*n.x
-        P['direction']['y'] = uy - c*n.y
-        P['direction']['z'] = uz - c*n.z
+        P['ux'] = ux - c*n.x
+        P['uy'] = uy - c*n.y
+        P['uz'] = uz - c*n.z
     
     def distance(self, P):
-        x  = P['position']['x']
-        y  = P['position']['y']
-        z  = P['position']['z']
-        ux = P['direction']['x']
-        uy = P['direction']['y']
-        uz = P['direction']['z']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
 
         G  = self.G
         H  = self.H
@@ -128,6 +127,10 @@ class Surface:
             if distance < 0.0: return INF
             else:              return distance
             
+        x  = P['x']
+        y  = P['y']
+        z  = P['z']
+
         A  = self.A
         B  = self.B
         C  = self.C

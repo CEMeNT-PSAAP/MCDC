@@ -1,3 +1,5 @@
+import pstats, cProfile, io, numpy as np
+
 def profile(fnc):
     """A decorator that uses cProfile to profile a function"""
 

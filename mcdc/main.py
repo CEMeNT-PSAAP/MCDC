@@ -11,11 +11,13 @@ from mcdc.constant        import *
 from mcdc.looper          import loop_source
 from mcdc.print_          import print_banner, print_msg, print_runtime,\
                                  print_progress_eigenvalue
+from mcdc.util            import profile
 
 # Get mcdc global variables as "mcdc"
 import mcdc.global_ as mcdc_
 mcdc = mcdc_.global_
 
+#@profile
 def run():
     # Print banner and configuration
     print_banner()

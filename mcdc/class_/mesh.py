@@ -81,20 +81,20 @@ class Mesh():
     
     # TODO: scalar index for tally (tally index would be [g,t,x,y,z])
     def get_index(self, P):
-        t = math.floor((P['time']       - self.t0)/self.dt)
-        x = math.floor((P['position']['x'] - self.x0)/self.dx)
-        y = math.floor((P['position']['y'] - self.y0)/self.dy)
-        z = math.floor((P['position']['z'] - self.z0)/self.dz)
+        t = math.floor((P['time'] - self.t0)/self.dt)
+        x = math.floor((P['x']    - self.x0)/self.dx)
+        y = math.floor((P['y']    - self.y0)/self.dy)
+        z = math.floor((P['z']    - self.z0)/self.dz)
         return t, x, y, z
 
     # TODO: add mesh indices to Particle
     def distance(self, P, mcdc):
-        x  = P['position']['x']
-        y  = P['position']['y']
-        z  = P['position']['z']
-        ux = P['direction']['x']
-        uy = P['direction']['y']
-        uz = P['direction']['z']
+        x  = P['x']
+        y  = P['y']
+        z  = P['z']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
         t  = P['time']
         v  = P['speed']
 
