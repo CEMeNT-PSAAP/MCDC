@@ -3,8 +3,8 @@ from   math  import floor, ceil
 import numba as     nb
 import numpy as     np
 
-from   mcdc.class_.particle import type_particle
-import mcdc.mpi as mpi
+import mcdc.mpi     as mpi
+import mcdc.kernel  as kernel
 
 # Get mcdc global variables as "mcdc"
 import mcdc.global_ as mcdc_
@@ -18,7 +18,7 @@ class PCT(ABC):
     """Abstract class for Population Control Technique (PCT)"""
 
     @abstractmethod
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_soure):
         """
         Return a controlled particle bank based on the given initial
         bank `bank` and the population target `M`
@@ -62,7 +62,7 @@ class PCT_None(PCT):
     def prepare(self, M):
         return
 
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_soure):
         """No PCT, or  analog, only bank-passing"""
 
         # Accordingly pass/distribute sampled particles
@@ -80,7 +80,7 @@ class PCT_SS(PCT):
     def prepare(self, M):
         self.count = np.zeros(int(M/mpi.size)*10, dtype=int)
 
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_soure):
         """Simple Sampling"""
 
         # Scan the bank
@@ -125,7 +125,7 @@ class PCT_SR(PCT):
     def prepare(self, M):
         return
 
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_soure):
         """Splitting-Roulette"""
 
         # Scan the bank
@@ -179,11 +179,11 @@ class PCT_CO(PCT):
     def prepare(self, M):
         return
 
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_source):
         """Particle Combing Technique"""
 
         # Scan the bank
-        idx_start, N_local, N = mpi.bank_scanning(bank)
+        idx_start, N_local, N = mpi.bank_scanning(bank_census)
         idx_end = idx_start + N_local
 
         # Teeth distance
@@ -199,18 +199,18 @@ class PCT_CO(PCT):
         # Last hiting tooth
         tooth_end = floor((idx_end-offset)/td) + 1
 
-        # Locally sample particles from bank
-        bank_sample = nb.typed.List.empty_list(type_particle)
+        # Locally sample particles from census bank
+        bank_source['size'] = 0
         for i in range(tooth_start, tooth_end):
             tooth = i*td+offset
             idx   = floor(tooth) - idx_start
-            P = bank[idx].copy()
+            P = bank_census['particles'][idx].copy()
             # Set weight
-            P.weight *= td
-            bank_sample.append(P)
+            P['weight'] *= td
+            kernel.add_particle(P, bank_source)
 
         # Accordingly pass/distribute sampled particles
-        return mpi.bank_passing(bank_sample)
+        #return mpi.bank_passing(bank_sample)
 
 
 # =============================================================================
@@ -224,7 +224,7 @@ class PCT_COX(PCT):
     def prepare(self, M):
         return
 
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_soure):
         """New Particle Combing Technique"""
 
         # Scan the bank
@@ -277,7 +277,7 @@ class PCT_DD(PCT):
         self.discard_flag = np.full((M*10,1), False)
         return
 
-    def __call__(self, bank, M):
+    def __call__(self, bank_census, M, bank_soure):
         """Duplicate-Discard"""
 
         # Scan the bank

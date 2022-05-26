@@ -1,12 +1,14 @@
-# TODO: implement inheritance/absract jitclass if already supported
+import numpy as np
 
-from   numba              import float64, boolean, config
-from   numba.experimental import jitclass
-import numpy              as     np
+from numba              import float64, boolean, config
+from numba.experimental import jitclass
 
-from   mcdc.class_.particle import Particle
-from   mcdc.class_.point    import Point, type_point
-import mcdc.kernel          as     kernel
+import mcdc.kernel as kernel
+import mcdc.type_  as type_
+
+from mcdc.class_.particle import Particle
+from mcdc.class_.point    import Point, type_point
+
 
 @jitclass([('flag_box', boolean), ('box', float64[:]), 
            ('position', type_point), ('flag_isotropic', boolean),
@@ -16,11 +18,17 @@ class Source:
     def __init__(self):
         self.flag_box       = False
         self.box            = np.zeros(6, dtype=np.float64)
-        self.position       = Point(0.0, 0.0, 0.0)
+        self.position_x     = 0.0
+        self.position_y     = 0.0
+        self.position_z     = 0.0
         self.flag_isotropic = True
-        self.direction      = Point(1.0, 0.0, 0.0)
+        self.direction_x    = 1.0
+        self.direction_y    = 0.0
+        self.direction_z    = 0.0
         self.energy         = np.ones(1, dtype=np.float64)
         self.time           = np.zeros(2, dtype=np.float64)
+        self.prob           = 1.0
+        self.ID             = -1
     
     def get_particle(self, mcdc):
         # Position
@@ -28,21 +36,34 @@ class Source:
             x = kernel.sample_uniform(self.box[0],self.box[1], mcdc.rng)
             y = kernel.sample_uniform(self.box[2],self.box[3], mcdc.rng)
             z = kernel.sample_uniform(self.box[4],self.box[5], mcdc.rng)
-            position = Point(x,y,z)
         else:
-            position = self.position.copy()
+            x = self.position_x
+            y = self.position_y
+            z = self.position_z
 
         # Direction
         if self.flag_isotropic:
-            direction = kernel.sample_isotropic_direction(mcdc.rng)
+            ux, uy, uz = kernel.sample_isotropic_direction(mcdc.rng)
         else:
-            direction = self.direction.copy()
+            ux = self.direction_x
+            uy = self.direction_y
+            uz = self.direction_z
 
         # Energy and time
-        energy    = kernel.sample_discrete(self.energy, mcdc.rng)
-        time      = kernel.sample_uniform(self.time[0], self.time[1], mcdc.rng)
+        energy = kernel.sample_discrete(self.energy, mcdc.rng)
+        time   = kernel.sample_uniform(self.time[0], self.time[1], mcdc.rng)
 
-        return Particle(position, direction, energy, time, 1.0)
+        P = type_.make_particle()
+        P['position']['x']  = x
+        P['position']['y']  = y
+        P['position']['z']  = z
+        P['direction']['x'] = ux
+        P['direction']['y'] = uy
+        P['direction']['z'] = uz
+        P['group']          = energy
+        P['time']           = time
+
+        return P
 
 if not config.DISABLE_JIT:
     type_source = Source.class_type.instance_type
