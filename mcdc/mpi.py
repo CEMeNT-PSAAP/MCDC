@@ -107,8 +107,8 @@ def distribute_work(N):
 
 def total_weight(bank):
     W_local = np.zeros(1)
-    for P in bank:
-        W_local[0] += P.weight
+    for i in range(bank['size']):
+        W_local[0] += bank['particles'][i]['weight']
     return allreduce(W_local)[0]
 
 def normalize_weight(bank, norm):
@@ -116,11 +116,11 @@ def normalize_weight(bank, norm):
     W = total_weight(bank)
 
     # Normalize weight
-    for P in bank:
-        P.weight *= norm/W
+    for P in bank['particles']:
+        P['weight'] *= norm/W
 
 def bank_scanning(bank):
-    N_local   = len(bank)
+    N_local = bank['size']
 
     # Starting index
     buff = np.array([0], dtype=int)
