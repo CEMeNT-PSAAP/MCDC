@@ -91,11 +91,11 @@ class Tally:
 
     def score_tracklength(self, P, d_move):
         # Get indices
-        g = P.group
+        g = P['group']
         t, x, y, z = self.mesh.get_index(P)
 
         # Score
-        flux = d_move*P.weight
+        flux = d_move*P['weight']
         if self.flux:
             self.score_flux.accumulate(g,t,x,y,z,flux,P)
         if self.current:
@@ -105,12 +105,12 @@ class Tally:
 
     def score_crossing_x(self, P, t, x, y, z):
         # Get indices
-        g = P.group
-        if P.direction.x > 0.0:
+        g = P['group']
+        if P['direction']['x'] > 0.0:
             x += 1
 
         # Score
-        flux = P.weight/abs(P.direction.x)
+        flux = P['weight']/abs(P['direction']['x'])
         if self.flux_x:
             self.score_flux_x.accumulate(g,t,x,y,z,flux,P)
         if self.current_x:
@@ -118,11 +118,11 @@ class Tally:
 
     def score_crossing_t(self, P, t, x, y, z):
         # Get indices
-        g  = P.group
+        g  = P['group']
         t += 1
 
         # Score
-        flux = P.weight*P.cell.material.speed[g]
+        flux = P['weight']*P['speed']
         if self.flux_t:
             self.score_flux_t.accumulate(g,t,x,y,z,flux,P)
 

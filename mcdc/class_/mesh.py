@@ -26,21 +26,21 @@ class Mesh():
     
     # TODO: scalar index for tally (tally index would be [g,t,x,y,z])
     def get_index(self, P):
-        t = kernel.binary_search(P.time, self.t)
-        x = kernel.binary_search(P.position.x, self.x)
-        y = kernel.binary_search(P.position.y, self.y)
-        z = kernel.binary_search(P.position.z, self.z)
+        t = kernel.binary_search(P['time'], self.t)
+        x = kernel.binary_search(P['position']['x'], self.x)
+        y = kernel.binary_search(P['position']['y'], self.y)
+        z = kernel.binary_search(P['position']['z'], self.z)
         return t, x, y, z
 
     # TODO: add mesh indices to Particle
     def distance(self, P):
-        x = P.position.x
-        y = P.position.y
-        z = P.position.z
-        ux = P.direction.x
-        uy = P.direction.y
-        uz = P.direction.z
-        t = P.time
+        x = P['position']['x']
+        y = P['position']['y']
+        z = P['position']['z']
+        ux = P['direction']['x']
+        uy = P['direction']['y']
+        uz = P['direction']['z']
+        t = P['time']
         v = P.speed
 
         d = INF
@@ -81,22 +81,22 @@ class Mesh():
     
     # TODO: scalar index for tally (tally index would be [g,t,x,y,z])
     def get_index(self, P):
-        t = math.floor((P.time       - self.t0)/self.dt)
-        x = math.floor((P.position.x - self.x0)/self.dx)
-        y = math.floor((P.position.y - self.y0)/self.dy)
-        z = math.floor((P.position.z - self.z0)/self.dz)
+        t = math.floor((P['time']       - self.t0)/self.dt)
+        x = math.floor((P['position']['x'] - self.x0)/self.dx)
+        y = math.floor((P['position']['y'] - self.y0)/self.dy)
+        z = math.floor((P['position']['z'] - self.z0)/self.dz)
         return t, x, y, z
 
     # TODO: add mesh indices to Particle
-    def distance(self, P):
-        x = P.position.x
-        y = P.position.y
-        z = P.position.z
-        ux = P.direction.x
-        uy = P.direction.y
-        uz = P.direction.z
-        t = P.time
-        v = P.speed
+    def distance(self, P, mcdc):
+        x  = P['position']['x']
+        y  = P['position']['y']
+        z  = P['position']['z']
+        ux = P['direction']['x']
+        uy = P['direction']['y']
+        uz = P['direction']['z']
+        t  = P['time']
+        v  = P['speed']
 
         d = INF
         d = min(d, self._distance_search(x, ux, self.x0, self.dx))

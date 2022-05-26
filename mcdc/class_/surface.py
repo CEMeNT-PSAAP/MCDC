@@ -38,9 +38,9 @@ class Surface:
             self.n.normalize()
             
     def evaluate(self, P):
-        x = P.position.x
-        y = P.position.y
-        z = P.position.z
+        x = P['position']['x']
+        y = P['position']['y']
+        z = P['position']['z']
         
         G = self.G
         H = self.H
@@ -74,9 +74,9 @@ class Surface:
         G = self.G
         H = self.H
         I = self.I
-        x = P.position.x
-        y = P.position.y
-        z = P.position.z
+        x = P['position']['x']
+        y = P['position']['y']
+        z = P['position']['z']
         
         dx = 2*A*x + D*y + E*z + G
         dy = 2*B*y + D*x + F*z + H
@@ -87,36 +87,36 @@ class Surface:
         return n
         
     def normal_component(self, P):
-        ux = P.direction.x
-        uy = P.direction.y
-        uz = P.direction.z
+        ux = P['direction']['x']
+        uy = P['direction']['y']
+        uz = P['direction']['z']
         n  = self.normal(P)        
         return n.x*ux + n.y*uy + n.z*uz
 
     def apply_bc(self, P):
         if self.vacuum:
-            P.alive = False
+            P['alive'] = False
         elif self.reflective:
             self.reflect(P)
 
     def reflect(self, P):
-        ux = P.direction.x
-        uy = P.direction.y
-        uz = P.direction.z
+        ux = P['direction']['x']
+        uy = P['direction']['y']
+        uz = P['direction']['z']
         n  = self.normal(P)
         c  = 2.0*(n.x*ux + n.y*uy + n.z*uz) # 2.0*self.normal_component(P)
                                             # to avoid repeating normalization
-        P.direction.x = ux - c*n.x
-        P.direction.y = uy - c*n.y
-        P.direction.z = uz - c*n.z
+        P['direction']['x'] = ux - c*n.x
+        P['direction']['y'] = uy - c*n.y
+        P['direction']['z'] = uz - c*n.z
     
     def distance(self, P):
-        x  = P.position.x
-        y  = P.position.y
-        z  = P.position.z
-        ux = P.direction.x
-        uy = P.direction.y
-        uz = P.direction.z
+        x  = P['position']['x']
+        y  = P['position']['y']
+        z  = P['position']['z']
+        ux = P['direction']['x']
+        uy = P['direction']['y']
+        uz = P['direction']['z']
 
         G  = self.G
         H  = self.H

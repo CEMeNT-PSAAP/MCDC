@@ -30,6 +30,9 @@ class Setting:
         self.parallel_hdf5 = False # TODO
         self.output_name   = 'output' # .h5 output file name
         self.progress_bar  = True
+        self.Nmax          = 50
+        self.Nmax_census   = 5
+        self.Nmax_source   = 2
 
 if not config.DISABLE_JIT:
     type_setting = Setting.class_type.instance_type

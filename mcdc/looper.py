@@ -1,15 +1,17 @@
-from   numba import njit, objmode
+import numba as nb
+import numpy as np
 
-from   mcdc.constant import *
-import mcdc.kernel   as     kernel
-import mcdc.mpi      as     mpi
-from   mcdc.print_   import print_progress
+import mcdc.kernel as kernel
+import mcdc.mpi    as mpi
+
+from mcdc.constant import *
+from mcdc.print_   import print_progress, print_bank
 
 # =========================================================================
 # Source loop
 # =========================================================================
 
-@njit
+@nb.njit
 def loop_source(mcdc):
     # Rebase rng skip_ahead seed
     mcdc.rng.skip_ahead_strides(mpi.work_start)
@@ -21,21 +23,32 @@ def loop_source(mcdc):
         mcdc.rng.skip_ahead_strides(work_idx)
 
         # Get a source particle and put into history bank
-        if not mcdc.bank.source:
-            P = mcdc.source.get_particle(mcdc)
+        if mcdc.bank_source['size'] == 0:
+            # Sample source
+            if len(mcdc.sources) > 1:
+                xi  = mcdc.rng.random()
+                tot = 0.0
+                for S in mcdc.sources:
+                    tot += S.prob
+                    if tot >= xi:
+                        break
+            else:
+                S = mcdc.sources[0]
+            P = S.get_particle(mcdc)
             kernel.set_cell(P, mcdc)
         else:
-            P = mcdc.bank.source[work_idx]
-        mcdc.bank.history.append(P)
+            P = mcdc.bank_source['particles'][work_idx]
+        kernel.add_particle(P, mcdc.bank_history)
 
-        # Apply weight window
-        if mcdc.setting.weight_window:
-            mcdc.weight_window.apply_(P, mcdc)
-
-        # Run source particle and secondaries
-        while mcdc.bank.history:
+        # Run the source particle and its secondaries
+        # (until history bank is exhausted)
+        while mcdc.bank_history['size'] > 0:
             # Get particle from history bank
-            P = mcdc.bank.history.pop()
+            P = kernel.pop_particle(mcdc.bank_history)
+
+            # Apply weight window
+            if mcdc.setting.weight_window:
+                mcdc.weight_window.apply_(P, mcdc)
             
             # Particle loop
             loop_particle(P, mcdc)
@@ -45,7 +58,7 @@ def loop_source(mcdc):
         
         # Progress printout
         if mcdc.setting.progress_bar:
-            with objmode():
+            with nb.objmode():
                 print_progress(work_idx)
 
         
@@ -53,9 +66,9 @@ def loop_source(mcdc):
 # Particle loop
 # =========================================================================
 
-@njit
+@nb.njit
 def loop_particle(P, mcdc):
-    while P.alive:
+    while P['alive']:
         # Determine and move to event
         event = kernel.move_to_event(P, mcdc)
 
@@ -69,9 +82,9 @@ def loop_particle(P, mcdc):
 
         # Surface and mesh crossing
         elif event == EVENT_SURFACE_N_MESH:
-            kernel.surface_crossing(P, mcdc)
-            kernel.move_particle(P, -PRECISION)
             kernel.mesh_crossing(P, mcdc)
+            kernel.move_particle(P, -PRECISION)
+            kernel.surface_crossing(P, mcdc)
 
         # Collision
         elif event == EVENT_COLLISION:

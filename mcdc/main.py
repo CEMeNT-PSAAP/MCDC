@@ -2,10 +2,12 @@ import h5py
 import numba as nb
 import numpy as np
 
-import mcdc.mpi as mpi
+import mcdc.mpi   as mpi
+import mcdc.type_ as type_
 
 from mcdc.class_.particle import type_particle
 from mcdc.class_.popctrl  import PCT_CO
+from mcdc.constant        import *
 from mcdc.looper          import loop_source
 from mcdc.print_          import print_banner, print_msg, print_runtime,\
                                  print_progress_eigenvalue
@@ -43,13 +45,14 @@ def run():
         if mcdc.setting.mode_eigenvalue:
             tally_closeout()
             tally_global_closeout()
-            print_progress_eigenvalue()
+            print_progress_eigenvalue(mcdc)
 
         # Simulation end?
         if mcdc.setting.mode_eigenvalue:
             mcdc.i_iter += 1
             if mcdc.i_iter == mcdc.setting.N_iter: simulation_end = True
-        elif not mcdc.bank.stored: simulation_end = True
+        elif mcdc.bank_census['size'] == 0: 
+            simulation_end = True
 
         # Manage particle banks
         if not simulation_end:
@@ -68,7 +71,7 @@ def run():
     # Generate output file
     generate_hdf5()
     
-    print_runtime()
+    print_runtime(mcdc)
 
     mcdc.reset()
 
@@ -78,14 +81,33 @@ def prepare():
     # Tally
     mcdc.tally.allocate_bins(mcdc.cells[0].material.G, mcdc.setting.N_iter)
 
-    # To which bank fission neutrons are stored?
+    # Create particle banks
+    Nmax = mcdc.setting.Nmax
+    Nmax_census = mcdc.setting.Nmax_census
+    Nmax_source = mcdc.setting.Nmax_source
+    mcdc.bank_history = type_.make_bank('history', Nmax)
     if mcdc.setting.mode_eigenvalue:
-        mcdc.bank.fission = mcdc.bank.stored
+        mcdc.bank_census  = type_.make_bank('census', 
+                                            mcdc.setting.N_hist*Nmax_census)
+        mcdc.bank_source  = type_.make_bank('source', 
+                                            mcdc.setting.N_hist*Nmax_source)
+        mcdc.bank_fission = mcdc.bank_census
+    else:
+        mcdc.bank_census  = type_.make_bank('census', 0)
+        mcdc.bank_source  = type_.make_bank('source', 0)
+        mcdc.bank_fission = mcdc.bank_history
 
     # Population control
     if mcdc_.population_control is None:
         mcdc_.population_control = PCT_CO()
     mcdc_.population_control.prepare(mcdc.setting.N_hist)
+
+    # Normalize source probabilities
+    tot = 0.0
+    for S in mcdc.sources:
+        tot += S.prob
+    for S in mcdc.sources:
+        S.prob /= tot
 
     # Distribute work to processors
     mpi.distribute_work(mcdc.setting.N_hist)
@@ -155,26 +177,23 @@ def tally_global_closeout():
 def manage_particle_banks():
     if mcdc.setting.mode_eigenvalue:
         # Normalize weight
-        mpi.normalize_weight(mcdc.bank.stored, mcdc.setting.N_hist)
+        mpi.normalize_weight(mcdc.bank_census, mcdc.setting.N_hist)
 
     # Rebase RNG for population control
     mcdc.rng.skip_ahead_strides(mpi.work_size_total-mpi.work_start)
     mcdc.rng.rebase()
 
     # Population control
-    mcdc.bank.stored = \
-        mcdc_.population_control(mcdc.bank.stored, mcdc.setting.N_hist)
+    mcdc_.population_control(mcdc.bank_census, mcdc.setting.N_hist, 
+                             mcdc.bank_source)
     mcdc.rng.rebase()
     
     # Update MPI-related global variables
     mcdc.N_work = mpi.work_size
     mcdc.master = mpi.master
 
-    # Set stored bank as source bank for the next iteration
-    mcdc.bank.source = mcdc.bank.stored
-    mcdc.bank.stored = nb.typed.List.empty_list(type_particle)
-    if mcdc.setting.mode_eigenvalue:
-        mcdc.bank.fission = mcdc.bank.stored
+    # Zero out census bank
+    mcdc.bank_census['size'] = 0
 
 def generate_hdf5():
     msg = " Generating tally HDF5 files..."
