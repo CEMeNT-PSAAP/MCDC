@@ -106,11 +106,11 @@ class Tally:
     def score_crossing_x(self, P, t, x, y, z):
         # Get indices
         g = P['group']
-        if P['direction']['x'] > 0.0:
+        if P['ux'] > 0.0:
             x += 1
 
         # Score
-        flux = P['weight']/abs(P['direction']['x'])
+        flux = P['weight']/abs(P['ux'])
         if self.flux_x:
             self.score_flux_x.accumulate(g,t,x,y,z,flux,P)
         if self.current_x:

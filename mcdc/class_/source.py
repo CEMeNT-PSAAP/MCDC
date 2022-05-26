@@ -54,14 +54,14 @@ class Source:
         time   = kernel.sample_uniform(self.time[0], self.time[1], mcdc.rng)
 
         P = type_.make_particle()
-        P['position']['x']  = x
-        P['position']['y']  = y
-        P['position']['z']  = z
-        P['direction']['x'] = ux
-        P['direction']['y'] = uy
-        P['direction']['z'] = uz
-        P['group']          = energy
-        P['time']           = time
+        P['x']     = x
+        P['y']     = y
+        P['z']     = z
+        P['ux']    = ux
+        P['uy']    = uy
+        P['uz']    = uz
+        P['group'] = energy
+        P['time']  = time
 
         return P
 

@@ -179,10 +179,10 @@ def score_tracklength(P, distance, mcdc):
 
 @nb.njit
 def move_particle(P, distance):
-    P['position']['x'] += P['direction']['x']*distance
-    P['position']['y'] += P['direction']['y']*distance
-    P['position']['z'] += P['direction']['z']*distance
-    P['time']          += distance/P['speed']
+    P['x']    += P['ux']*distance
+    P['y']    += P['uy']*distance
+    P['z']    += P['uz']*distance
+    P['time'] += distance/P['speed']
 
 
 #==============================================================================
@@ -307,26 +307,26 @@ def scattering(P, mcdc):
         sin_azi = math.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
 
-        ux = P_new['direction']['x']
-        uy = P_new['direction']['y']
-        uz = P_new['direction']['z']
+        ux = P_new['ux']
+        uy = P_new['uy']
+        uz = P_new['uz']
         
         if uz != 1.0:
-            B = (1.0 - P['direction']['z']**2)**0.5
+            B = (1.0 - P['uz']**2)**0.5
             C = Ac/B
             
-            P_new['direction']['x'] = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
-            P_new['direction']['y'] = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
-            P_new['direction']['z'] = uz*mu - cos_azi*Ac*B
+            P_new['ux'] = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
+            P_new['uy'] = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
+            P_new['uz'] = uz*mu - cos_azi*Ac*B
         
         # If dir = 0i + 0j + k, interchange z and y in the scattering formula
         else:
             B = (1.0 - uy**2)**0.5
             C = Ac/B
             
-            P_new['direction']['x'] = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
-            P_new['direction']['z'] = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
-            P_new['direction']['y'] = uy*mu - cos_azi*Ac*B
+            P_new['ux'] = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
+            P_new['uz'] = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
+            P_new['uy'] = uy*mu - cos_azi*Ac*B
         
         # Bank
         add_particle(P_new, mcdc.bank_history)
@@ -406,8 +406,8 @@ def fission(P, mcdc):
         P_new['speed'] = material.speed[g_out]
 
         # Sample isotropic direction
-        P_new['direction']['x'], P_new['direction']['y'], \
-        P_new['direction']['z'] = sample_isotropic_direction(mcdc.rng)
+        P_new['ux'], P_new['uy'], P_new['uz'] = \
+                sample_isotropic_direction(mcdc.rng)
 
         # Bank
         add_particle(P_new, mcdc.bank_fission)

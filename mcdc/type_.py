@@ -11,29 +11,28 @@ bool_   = np.bool_
 # Particle
 # ==============================================================================
 
-point = np.dtype([('x', float64), ('y', float64), ('z', float64)])
-
-particle = np.dtype([('position', point), ('direction', point), 
-                     ('group', uint64), ('time', float64), ('weight', float64),
-                     ('alive', bool_), ('speed', float64), ('cell_ID', int64), 
+particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
+                     ('ux', float64), ('uy', float64), ('uz', float64),
+                     ('time', float64), ('speed', float64), ('group', uint64),
+                     ('weight', float64), ('alive', bool_), ('cell_ID', int64), 
                      ('surface_ID', int64)])
 
 @nb.njit
 def make_particle():
     P = np.zeros(1, dtype=particle)[0]
-    P['position']['x']  = 0.0
-    P['position']['y']  = 0.0
-    P['position']['z']  = 0.0
-    P['direction']['x'] = 1.0
-    P['direction']['y'] = 0.0
-    P['direction']['z'] = 0.0
-    P['group']          = 0
-    P['time']           = 0.0
-    P['weight']         = 1.0
-    P['alive']          = True
-    P['speed']          = 1.0
-    P['cell_ID']        = -1
-    P['surface_ID']     = -1
+    P['x']          = 0.0
+    P['y']          = 0.0
+    P['z']          = 0.0
+    P['ux']         = 0.0
+    P['uy']         = 0.0
+    P['uz']         = 0.0
+    P['group']      = 0
+    P['time']       = 0.0
+    P['weight']     = 1.0
+    P['alive']      = True
+    P['speed']      = 1.0
+    P['cell_ID']    = -1
+    P['surface_ID'] = -1
     return P
 
 # ==============================================================================
