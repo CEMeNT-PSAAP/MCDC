@@ -54,7 +54,7 @@ source = mcdc.source(energy=np.ones(G))
 mcdc.tally(scores=['flux'])
 
 # Setting
-mcdc.setting(N_hist=1E3)
+mcdc.setting(N_hist=1.7E2)
 
 # Run
 mcdc.run()

@@ -45,7 +45,7 @@ mcdc.source(x=[0.0, 6.0], isotropic=True)
 mcdc.tally(scores=['flux', 'current', 'flux-x', 'current-x'], x=[0.0, 6.0, 60])
 
 # Setting
-mcdc.setting(N_hist=1E4)
+mcdc.setting(N_hist=3E3)
 
 # Run
 mcdc.run()

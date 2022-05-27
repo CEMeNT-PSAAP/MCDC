@@ -6,7 +6,7 @@ config.DISABLE_JIT = True
 
 # Get path to mcdc (not necessary if mcdc is installed)
 import sys
-sys.path.append('../../../')
+sys.path.append('../../../../')
 
 import mcdc
 
@@ -49,7 +49,7 @@ mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 mcdc.tally(scores=['flux', 'current', 'flux-x', 'current-x'], x=[0.0, 8.0, 40])
 
 # Setting
-mcdc.setting(N_hist=1E4)
+mcdc.setting(N_hist=8E3)
 
 # Run
 mcdc.run()
