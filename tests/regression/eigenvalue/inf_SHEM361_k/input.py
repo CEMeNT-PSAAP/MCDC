@@ -53,7 +53,7 @@ mcdc.tally(scores=['flux'])
 
 # Setting
 mcdc.setting(N_hist=1E2)
-mcdc.eigenmode(N_iter=20)
+mcdc.eigenmode(N_iter=5)
 
 # Run
 mcdc.run()
