@@ -54,6 +54,7 @@ mcdc.tally(scores=['flux'])
 # Setting
 mcdc.setting(N_hist=1E2)
 mcdc.eigenmode(N_iter=5)
+mcdc.population_control('combing')
 
 # Run
 mcdc.run()
