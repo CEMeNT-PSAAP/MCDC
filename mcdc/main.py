@@ -5,19 +5,19 @@ import numpy as np
 import mcdc.mpi   as mpi
 import mcdc.type_ as type_
 
-from mcdc.class_.particle import type_particle
-from mcdc.class_.popctrl  import PCT_CO
-from mcdc.constant        import *
-from mcdc.looper          import loop_source
-from mcdc.print_          import print_banner, print_msg, print_runtime,\
-                                 print_progress_eigenvalue
+from mcdc.constant import *
+from mcdc.looper   import loop_simulation
+from mcdc.print_   import print_banner, print_msg, print_runtime
+from mcdc.util     import profile
 
-# Get mcdc global variables as "mcdc"
+# Get input_card and set global variables as "mcdc"
 import mcdc.global_ as mcdc_
-mcdc = mcdc_.global_
+input_card = mcdc_.input_card
+mcdc       = mcdc_.global_
 
+#@profile
 def run():
-    # Print banner and configuration
+    # Print banner and hardware configuration
     print_banner()
     if nb.config.DISABLE_JIT:
         print_msg("           Mode | Python")
@@ -26,242 +26,169 @@ def run():
     print_msg("  MPI Processes | %i"%mpi.size)
     print_msg(" OpenMP Threads | 1") # TODO
 
-    # Preparation (memory allocation, etc)
+    # Preparation:
+    #   process input cards, make types, and allocate global variables
+    print_msg("\n Preparing...")
     prepare()
+    input_card.reset()
     
     # Run
     print_msg(" Now running TNT...")
+    mcdc['runtime_total'] = mpi.Wtime()
+    loop_simulation(mcdc)
+    mcdc['runtime_total'] = mpi.Wtime() - mcdc['runtime_total']
     
-    # Start timer
-    mcdc.runtime_total = mpi.Wtime()
-
-    # SIMULATION LOOP
-    simulation_end = False
-    while not simulation_end:
-        # Loop over source particles
-        loop_source(mcdc)
-        
-        # Eigenvalue mode generation closeout
-        if mcdc.setting.mode_eigenvalue:
-            tally_closeout()
-            tally_global_closeout()
-            print_progress_eigenvalue(mcdc)
-
-        # Simulation end?
-        if mcdc.setting.mode_eigenvalue:
-            mcdc.i_iter += 1
-            if mcdc.i_iter == mcdc.setting.N_iter: simulation_end = True
-        elif mcdc.bank_census['size'] == 0: 
-            simulation_end = True
-
-        # Manage particle banks
-        if not simulation_end:
-            t = mpi.Wtime()
-            manage_particle_banks()
-            t = mpi.Wtime() - t
-            mcdc.runtime_pct += t
-            
-    # Fixed-source mode closeout
-    if not mcdc.setting.mode_eigenvalue:
-        tally_closeout()
-
-    # Stop timer
-    mcdc.runtime_total = mpi.Wtime() - mcdc.runtime_total
-    
-    # Generate output file
+    # Output: generate hdf5 output file
+    if mcdc['setting']['progress_bar']: print_msg('')
+    print_msg(" Generating tally HDF5 files...")
     generate_hdf5()
-    
+
+    # Closout
     print_runtime(mcdc)
 
-    mcdc.reset()
-
 def prepare():
-    print_msg("\n Preparing...")
+    global mcdc
 
-    # Tally
-    mcdc.tally.allocate_bins(mcdc.cells[0].material.G, mcdc.setting.N_iter)
+    # Some numbers
+    G           = input_card.materials[0]['G']
+    J           = input_card.materials[0]['J']
+    N_materials = len(input_card.materials)
+    N_surfaces  = len(input_card.surfaces)
+    N_cells     = len(input_card.cells)
+    N_sources   = len(input_card.sources)
+    N_iter      = input_card.setting['N_iter']
+    N_hist      = input_card.setting['N_hist']
+    # Derived numbers
+    Nmax_surfaces = 0
+    for cell in input_card.cells:
+        Nmax_surfaces = max(Nmax_surfaces, cell['N_surfaces'])
 
-    # Create particle banks
-    Nmax = mcdc.setting.Nmax
-    Nmax_census = mcdc.setting.Nmax_census
-    Nmax_source = mcdc.setting.Nmax_source
-    mcdc.bank_history = type_.make_bank('history', Nmax)
-    if mcdc.setting.mode_eigenvalue:
-        mcdc.bank_census  = type_.make_bank('census', 
-                                            mcdc.setting.N_hist*Nmax_census)
-        mcdc.bank_source  = type_.make_bank('source', 
-                                            mcdc.setting.N_hist*Nmax_source)
-        mcdc.bank_fission = mcdc.bank_census
-    else:
-        mcdc.bank_census  = type_.make_bank('census', 0)
-        mcdc.bank_source  = type_.make_bank('source', 0)
-        mcdc.bank_fission = mcdc.bank_history
+    # Make types
+    type_.make_type_material(G,J)
+    type_.make_type_cell(Nmax_surfaces)
+    type_.make_type_source(G)
+    type_.make_type_tally(input_card.tally, G, N_iter)
+    type_.make_type_technique(input_card.technique)
+    type_.make_type_global(input_card)
 
-    # Population control
-    if mcdc_.population_control is None:
-        mcdc_.population_control = PCT_CO()
-    mcdc_.population_control.prepare(mcdc.setting.N_hist)
+    # The global variable container
+    mcdc = np.zeros(1, dtype=type_.global_)[0]
+    
+    # Material
+    for i in range(N_materials):
+        for name in type_.material.names:
+            mcdc['materials'][i][name] = input_card.materials[i][name]
+    
+    # Surface
+    for i in range(N_surfaces):
+        for name in type_.surface.names:
+            mcdc['surfaces'][i][name] = input_card.surfaces[i][name]
+    
+    # Cell
+    for i in range(N_cells):
+        for name in type_.cell.names:
+            mcdc['cells'][i][name] = input_card.cells[i][name]
 
+    # Source
+    for i in range(N_sources):
+        for name in type_.source.names:
+            mcdc['sources'][i][name] = input_card.sources[i][name]
     # Normalize source probabilities
     tot = 0.0
-    for S in mcdc.sources:
-        tot += S.prob
-    for S in mcdc.sources:
-        S.prob /= tot
+    for S in mcdc['sources']:
+        tot += S['prob']
+    for S in mcdc['sources']:
+        S['prob'] /= tot
 
-    # Distribute work to processors
-    mpi.distribute_work(mcdc.setting.N_hist)
-    mcdc.N_work = mpi.work_size
-    mcdc.master = mpi.master
+    # Tally
+    for name in type_.tally.names:
+        if name not in ['score', 'mesh']:
+            mcdc['tally'][name] = input_card.tally[name]
+    # Set mesh
+    mcdc['tally']['mesh']['x'] = input_card.tally['mesh']['x']
+    mcdc['tally']['mesh']['y'] = input_card.tally['mesh']['y']
+    mcdc['tally']['mesh']['z'] = input_card.tally['mesh']['z']
+    mcdc['tally']['mesh']['t'] = input_card.tally['mesh']['t']
 
-
-def tally_closeout():
-    if mcdc.tally.flux:
-        score_closeout(mcdc.tally.score_flux)
-    if mcdc.tally.current:
-        score_closeout(mcdc.tally.score_current)
-    if mcdc.tally.eddington:
-        score_closeout(mcdc.tally.score_eddington)
-    if mcdc.tally.flux_x:
-        score_closeout(mcdc.tally.score_flux_x)
-    if mcdc.tally.flux_t:
-        score_closeout(mcdc.tally.score_flux_t)
-    if mcdc.tally.current_x:
-        score_closeout(mcdc.tally.score_current_x)
-
-def score_closeout(score):
-    N_hist = mcdc.setting.N_hist
-    i_iter = mcdc.i_iter
-
-    # MPI Reduce
-    score.sum_[:]   = mpi.reduce_master(score.sum_)
-    score.sum_sq[:] = mpi.reduce_master(score.sum_sq)
+    # Setting
+    for name in type_.setting.names:
+        mcdc['setting'][name] = input_card.setting[name]
+    # Check if time boundary matches the final tally mesh time grid
+    if mcdc['setting']['time_boundary'] > mcdc['tally']['mesh']['t'][-1]:
+        mcdc['setting']['time_boundary'] = mcdc['tally']['mesh']['t'][-1]
     
-    # Store results
-    score.mean[i_iter,:] = score.sum_/N_hist
-    score.sdev[i_iter,:] = np.sqrt((score.sum_sq/N_hist 
-                                - np.square(score.mean[i_iter]))\
-                               /(N_hist-1))
-    
-    # Reset history sums
-    score.sum_.fill(0.0)
-    score.sum_sq.fill(0.0)
+    # Technique
+    for name in type_.technique.names:
+        if name not in ['ww_mesh']:
+            mcdc['technique'][name] = input_card.technique[name]
+    # Set weight window mesh
+    if input_card.technique['weight_window']:
+        mcdc['technique']['ww_mesh']['x'] = input_card.technique['ww_mesh']['x']
+        mcdc['technique']['ww_mesh']['y'] = input_card.technique['ww_mesh']['y']
+        mcdc['technique']['ww_mesh']['z'] = input_card.technique['ww_mesh']['z']
+        mcdc['technique']['ww_mesh']['t'] = input_card.technique['ww_mesh']['t']
 
-def tally_global_closeout():
-    N_hist = mcdc.setting.N_hist
-    i_iter = mcdc.i_iter
+    # Global tally
+    mcdc['k_eff']     = 1.0
+    mcdc['alpha_eff'] = 0.0
+    if mcdc['setting']['mode_eigenvalue']:
+        mcdc['k_eff']     = mcdc['setting']['k_init']
+        mcdc['k_iterate'] = np.zeros(N_iter, dtype=np.float64)
+        if mcdc['setting']['mode_alpha']:
+            mcdc['alpha_eff']     = mcdc['setting']['alpha_init']
+            mcdc['alpha_iterate'] = np.zeros(N_iter, dtype=np.float64)
 
-    # MPI reduce
-    mcdc.tally_global.nuSigmaF = mpi.allreduce(mcdc.tally_global.nuSigmaF)
-    if mcdc.setting.mode_alpha:
-        mcdc.tally_global.inverse_speed = \
-            mpi.allreduce(mcdc.tally_global.inverse_speed)
-    
-    # Update and store k_eff
-    mcdc.tally_global.k_eff = mcdc.tally_global.nuSigmaF/N_hist
-    mcdc.tally_global.k_iterate[i_iter] = mcdc.tally_global.k_eff
-    
-    # Update and store alpha_eff
-    if mcdc.setting.mode_alpha:
-        k_eff         = mcdc.tally_global.k_eff
-        inverse_speed = mcdc.tally_global.inverse_speed/N_hist
-
-        mcdc.tally_global.alpha_eff += (k_eff - 1.0)/inverse_speed
-        mcdc.tally_global.alpha_iterate[i_iter] = mcdc.tally_global.alpha_eff
-                
-    # Reset accumulators
-    mcdc.tally_global.nuSigmaF = 0.0
-    if mcdc.setting.mode_alpha:
-        mcdc.tally_global.inverse_speed = 0.0        
-
-def manage_particle_banks():
-    if mcdc.setting.mode_eigenvalue:
-        # Normalize weight
-        mpi.normalize_weight(mcdc.bank_census, mcdc.setting.N_hist)
-
-    # Rebase RNG for population control
-    mcdc.rng.skip_ahead_strides(mpi.work_size_total-mpi.work_start)
-    mcdc.rng.rebase()
+    # RNG seed and stride
+    mcdc['rng_seed_base'] = mcdc['setting']['rng_seed']
+    mcdc['rng_seed']      = mcdc['setting']['rng_seed']
+    mcdc['rng_g']         = 2806196910506780709
+    mcdc['rng_c']         = 1
+    mcdc['rng_mod']       = 2**63
+    mcdc['rng_stride']    = mcdc['setting']['rng_stride']
 
     # Population control
-    mcdc_.population_control(mcdc.bank_census, mcdc.setting.N_hist, 
-                             mcdc.bank_source)
-    mcdc.rng.rebase()
-    
-    # Update MPI-related global variables
-    mcdc.N_work = mpi.work_size
-    mcdc.master = mpi.master
+    # TODO
+    '''
+    if mcdc['technique']['population_control']:
+        pct = mcdc['technique']['pct']
+        if pct == PCT_SS:
+            mcdc['pct_count'] = np.zeros(int(M/mpi.size)*10, dtype=int)
+        elif pct == PCT_DD:
+            mcdc['pct_count']    = np.zeros(int(M/mpi.size)*10, dtype=int)
+            self.discard_flag = np.full((M*10,1), False)
+    '''
 
-    # Zero out census bank
-    mcdc.bank_census['size'] = 0
+    # Distribute work to processors
+    mpi.distribute_work(N_hist)
 
 def generate_hdf5():
-    msg = " Generating tally HDF5 files..."
-    if mcdc.setting.progress_bar: msg = "\n" + msg
-    print_msg(msg)
-
     # Save tallies to HDF5
     if mpi.master:
-        with h5py.File(mcdc.setting.output_name+'.h5', 'w') as f:
+        with h5py.File(mcdc['setting']['output_name']+'.h5', 'w') as f:
             # Runtime
-            f.create_dataset("runtime",data=np.array([mcdc.runtime_total]))
-            f.create_dataset("runtime_pct",data=np.array([mcdc.runtime_pct]))
+            f.create_dataset("runtime",data=np.array([mcdc['runtime_total']]))
 
             # Tally
-            T = mcdc.tally
-            f.create_dataset("tally/grid/t", data=T.mesh.t())
-            f.create_dataset("tally/grid/x", data=T.mesh.x())
-            f.create_dataset("tally/grid/y", data=T.mesh.y())
-            f.create_dataset("tally/grid/z", data=T.mesh.z())
+            T = mcdc['tally']
+            f.create_dataset("tally/grid/t", data=T['mesh']['t'])
+            f.create_dataset("tally/grid/x", data=T['mesh']['x'])
+            f.create_dataset("tally/grid/y", data=T['mesh']['y'])
+            f.create_dataset("tally/grid/z", data=T['mesh']['z'])
             
             # Scores
-            if T.flux:
-                f.create_dataset("tally/flux/mean",
-                                 data=np.squeeze(T.score_flux.mean))
-                f.create_dataset("tally/flux/sdev",
-                                 data=np.squeeze(T.score_flux.sdev))
-                T.score_flux.mean.fill(0.0)
-                T.score_flux.sdev.fill(0.0)
-            if T.current:
-                f.create_dataset("tally/current/mean",
-                                 data=np.squeeze(T.score_current.mean))
-                f.create_dataset("tally/current/sdev",
-                                 data=np.squeeze(T.score_current.sdev))
-                T.score_current.mean.fill(0.0)
-                T.score_current.sdev.fill(0.0)
-            if T.eddington:
-                f.create_dataset("tally/eddington/mean",
-                                 data=np.squeeze(T.score_eddington.mean))
-                f.create_dataset("tally/eddington/sdev",
-                                 data=np.squeeze(T.score_eddington.sdev))
-                T.score_eddington.mean.fill(0.0)
-                T.score_eddington.sdev.fill(0.0)
-            if T.flux_x:
-                f.create_dataset("tally/flux-x/mean",
-                                 data=np.squeeze(T.score_flux_x.mean))
-                f.create_dataset("tally/flux-x/sdev",
-                                 data=np.squeeze(T.score_flux_x.sdev))
-                T.score_flux_x.mean.fill(0.0)
-                T.score_flux_x.sdev.fill(0.0)
-            if T.flux_t:
-                f.create_dataset("tally/flux-t/mean",
-                                 data=np.squeeze(T.score_flux_t.mean))
-                f.create_dataset("tally/flux-t/sdev",
-                                 data=np.squeeze(T.score_flux_t.sdev))
-                T.score_flux_t.mean.fill(0.0)
-                T.score_flux_t.sdev.fill(0.0)
-            if T.current_x:
-                f.create_dataset("tally/current-x/mean",
-                                 data=np.squeeze(T.score_current_x.mean))
-                f.create_dataset("tally/current-x/sdev",
-                                 data=np.squeeze(T.score_current_x.sdev))
-                T.score_current_x.mean.fill(0.0)
-                T.score_current_x.sdev.fill(0.0)
+            for name in T['score'].dtype.names:
+                name_h5 = name.replace('_','-')
+                f.create_dataset("tally/"+name_h5+"/mean",
+                                 data=np.squeeze(T['score'][name]['mean']))
+                f.create_dataset("tally/"+name_h5+"/sdev",
+                                 data=np.squeeze(T['score'][name]['sdev']))
+                T['score'][name]['mean'].fill(0.0)
+                T['score'][name]['sdev'].fill(0.0)
                 
             # Eigenvalues
-            if mcdc.setting.mode_eigenvalue:
-                f.create_dataset("keff",data=mcdc.tally_global.k_iterate)
-                mcdc.tally_global.k_iterate.fill(0.0)
-                if mcdc.setting.mode_alpha:
-                    f.create_dataset("alpha_eff",data=mcdc.tally_global.alpha_iterate)
-                    mcdc.tally_global.alpha_iterate.fill(0.0)
+            if mcdc['setting']['mode_eigenvalue']:
+                f.create_dataset("keff",data=mcdc['k_iterate'])
+                mcdc['k_iterate'].fill(0.0)
+                if mcdc['setting']['mode_alpha']:
+                    f.create_dataset("alpha_eff",data=mcdc['alpha_iterate'])
+                    mcdc['alpha_iterate'].fill(0.0)
