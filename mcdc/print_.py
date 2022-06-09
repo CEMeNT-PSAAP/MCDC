@@ -20,11 +20,11 @@ def print_warning(msg):
 def print_banner():
     if mpi.master:
         banner = "\n"\
-        +"  __  __  ____  __ ____   ____ \n"\
-        +" |  \/  |/ ___|/ /_  _ \ / ___|\n"\
-        +" | |\/| | |   /_  / | | | |    \n"\
-        +" | |  | | |___ / /| |_| | |___ \n"\
-        +" |_|  |_|\____|// |____/ \____|\n"
+        +r"  __  __  ____  __ ____   ____ "+"\n"\
+        +r" |  \/  |/ ___|/ /_  _ \ / ___|"+"\n"\
+        +r" | |\/| | |   /_  / | | | |    "+"\n"\
+        +r" | |  | | |___ / /| |_| | |___ "+"\n"\
+        +r" |_|  |_|\____|// |____/ \____|"+"\n"
         print(banner)
         sys.stdout.flush()
 
@@ -37,20 +37,20 @@ def print_progress(work_idx):
 
 def print_progress_eigenvalue(mcdc):
     if mpi.master:
-        i_iter = mcdc.i_iter
-        k_eff = mcdc.tally_global.k_eff
-        alpha_eff = mcdc.tally_global.alpha_eff
+        i_iter = mcdc['i_iter']
+        k_eff = mcdc['k_eff']
+        alpha_eff = mcdc['alpha_eff']
 
         sys.stdout.write('\r')
         sys.stdout.write("\033[K")
-        if not mcdc.setting.mode_alpha:
+        if not mcdc['setting']['mode_alpha']:
             print(" %-4i %.5f"%(i_iter+1,k_eff))
         else:
             print(" %-4i %.5f %.3e"%(i_iter+1,k_eff,alpha_eff))
         sys.stdout.flush()
 
 def print_runtime(mcdc):
-    total = mcdc.runtime_total
+    total = mcdc['runtime_total']
     if mpi.master:
         if total >= 24*60*60:
             print(' Total runtime: %.2f days\n'%(total/24/60/60))

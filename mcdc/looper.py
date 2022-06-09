@@ -5,7 +5,40 @@ import mcdc.kernel as kernel
 import mcdc.mpi    as mpi
 
 from mcdc.constant import *
-from mcdc.print_   import print_progress, print_bank
+from mcdc.print_   import print_progress, print_progress_eigenvalue
+
+# =========================================================================
+# Simulation loop
+# =========================================================================
+
+@nb.njit
+def loop_simulation(mcdc):
+    simulation_end = False
+    while not simulation_end:
+        # Loop over source particles
+        loop_source(mcdc)
+        
+        # Eigenvalue mode generation closeout
+        if mcdc['setting']['mode_eigenvalue']:
+            kernel.tally_closeout(mcdc)
+            with nb.objmode():
+                print_progress_eigenvalue(mcdc)
+
+        # Simulation end?
+        if mcdc['setting']['mode_eigenvalue']:
+            mcdc['i_iter'] += 1
+            if mcdc['i_iter'] == mcdc['setting']['N_iter']: simulation_end = True
+        elif mcdc['bank_census']['size'] == 0: 
+            simulation_end = True
+
+        # Manage particle banks
+        if not simulation_end:
+            kernel.manage_particle_banks(mcdc)
+            
+    # Fixed-source mode closeout
+    if not mcdc['setting']['mode_eigenvalue']:
+        kernel.tally_closeout(mcdc)
+
 
 # =========================================================================
 # Source loop
@@ -14,51 +47,49 @@ from mcdc.print_   import print_progress, print_bank
 @nb.njit
 def loop_source(mcdc):
     # Rebase rng skip_ahead seed
-    mcdc.rng.skip_ahead_strides(mpi.work_start)
-    mcdc.rng.rebase()
+    kernel.rng_skip_ahead_strides(mpi.work_start, mcdc)
+    kernel.rng_rebase(mcdc)
 
     # Loop over particle sources
     for work_idx in range(mpi.work_size):
         # Initialize RNG wrt work index
-        mcdc.rng.skip_ahead_strides(work_idx)
+        kernel.rng_skip_ahead_strides(work_idx, mcdc)
 
         # Get a source particle and put into history bank
-        if mcdc.bank_source['size'] == 0:
+        if mcdc['bank_source']['size'] == 0:
             # Sample source
-            if len(mcdc.sources) > 1:
-                xi  = mcdc.rng.random()
-                tot = 0.0
-                for S in mcdc.sources:
-                    tot += S.prob
-                    if tot >= xi:
-                        break
-            else:
-                S = mcdc.sources[0]
-            P = S.get_particle(mcdc)
+            xi  = kernel.rng(mcdc)
+            tot = 0.0
+            for S in mcdc['sources']:
+                tot += S['prob']
+                if tot >= xi:
+                    break
+            P = kernel.source_particle(S, mcdc)
             kernel.set_cell(P, mcdc)
         else:
-            P = mcdc.bank_source['particles'][work_idx]
-        kernel.add_particle(P, mcdc.bank_history)
+            P = mcdc['bank_source']['particles'][work_idx]
+        kernel.add_particle(P, mcdc['bank_history'])
 
         # Run the source particle and its secondaries
         # (until history bank is exhausted)
-        while mcdc.bank_history['size'] > 0:
+        while mcdc['bank_history']['size'] > 0:
             # Get particle from history bank
-            P = kernel.pop_particle(mcdc.bank_history)
+            P = kernel.pop_particle(mcdc['bank_history'])
 
             # Apply weight window
-            if mcdc.setting.weight_window:
-                mcdc.weight_window.apply_(P, mcdc)
+            if mcdc['technique']['weight_window']:
+                print('here')
+                kernel.weight_window(P, mcdc)
             
             # Particle loop
             loop_particle(P, mcdc)
 
         # Tally history closeout
-        mcdc.tally.closeout_history()
+        kernel.tally_closeout_history(mcdc)
         
         # Progress printout
-        if mcdc.setting.progress_bar:
-            with nb.objmode():
+        if mcdc['setting']['progress_bar']:
+            with nb.objmode(): 
                 print_progress(work_idx)
 
         
@@ -106,5 +137,5 @@ def loop_particle(P, mcdc):
             kernel.time_boundary(P, mcdc)
     
         # Apply weight window
-        if mcdc.setting.weight_window:
-            mcdc.weight_window.apply_(P, mcdc)
+        if mcdc['technique']['weight_window']:
+            kernel.weight_window(P, mcdc)

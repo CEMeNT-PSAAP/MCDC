@@ -40,11 +40,12 @@ mcdc.source(x=[0.0, 2.5], isotropic=True)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux-x'], x=[0.0, 2.5, 50])
+mcdc.tally(scores=['flux-x'], x=np.linspace(0.0, 2.5, 51))
 
 # Setting
 mcdc.setting(N_hist=1E2)
 mcdc.eigenmode(N_iter=10)
+mcdc.population_control('combing')
 
 # Run
 mcdc.run()
