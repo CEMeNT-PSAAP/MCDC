@@ -1,6 +1,4 @@
-from mcdc.class_.global_ import Global
+from mcdc.class_ import InputCard
 
-global_            = Global()
-population_control = None
-
-# We separate population_control as it is pure Python (not Numba)
+global_    = None # Will be set in main.py, based on type_.global_
+input_card = InputCard()

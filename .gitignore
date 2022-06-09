@@ -20,4 +20,4 @@ mcdc.egg-info
 *.pbs
 
 # Misc.
-tmp
+tmp*

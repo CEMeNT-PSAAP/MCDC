@@ -20,9 +20,9 @@ E_mid = 0.5*(E[1:]+E[:-1])
 dE    = E[1:]-E[:-1]
 
 A = np.diag(SigmaT) - SigmaS - nuSigmaF
-Q = np.ones(G)
+Q = np.ones(G)/G
 
-phi_exact = np.linalg.solve(A,Q)/G
+phi_exact = np.linalg.solve(A,Q)
 
 # =============================================================================
 # Plot results
@@ -32,7 +32,10 @@ phi_exact = np.linalg.solve(A,Q)/G
 with h5py.File('output.h5', 'r') as f:
     phi = f['tally/flux/mean'][:]
     phi_sd = f['tally/flux/sdev'][:]
-    
+   
+phi       *= E_mid/dE
+phi_sd    *= E_mid/dE
+phi_exact *= E_mid/dE
 plt.plot(E_mid,phi,'-b',label="MC")
 plt.fill_between(E_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
 plt.plot(E_mid,phi_exact,'--r',label='analytical')
