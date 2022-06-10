@@ -1,9 +1,5 @@
 import numpy as np
 
-# Disable Numba-JIT for pure Python mode
-from numba import config
-config.DISABLE_JIT = True
-
 # Get path to mcdc (not necessary if mcdc is installed)
 import sys
 sys.path.append('../../../../')

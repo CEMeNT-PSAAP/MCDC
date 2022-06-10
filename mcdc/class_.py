@@ -1,6 +1,6 @@
 import numpy as np
 
-from mcdc.constant import INF, PCT_CO
+from mcdc.constant import INF
 
 class InputCard:
     def __init__(self):
@@ -46,7 +46,6 @@ class InputCard:
                           'implicit_capture'   : False,
                           'population_control' : False,
                           'weight_window'      : False,
-                          'pct'                : PCT_CO,
                           'ww'                 : np.ones([1,1,1,1]), 
                           'ww_mesh'            : {'x' : np.array([-INF, INF]),
                                                   'y' : np.array([-INF, INF]),

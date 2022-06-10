@@ -13,13 +13,6 @@ EVENT_TIME_REACTION  = 8
 EVENT_TIME_BOUNDARY  = 9
 EVENT_SURFACE_N_MESH = 24
 
-# Population Control Techniques
-PCT_SS  = 1
-PCT_SR  = 2
-PCT_CO  = 3
-PCT_COX = 4
-PCT_DD  = 5
-
 # Misc.
 INF       = 1E10
 PI        = math.acos(-1.0)
