@@ -21,3 +21,4 @@ mcdc.egg-info
 
 # Misc.
 tmp*
+*.core

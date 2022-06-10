@@ -146,21 +146,10 @@ def prepare():
     mcdc['rng_mod']       = 2**63
     mcdc['rng_stride']    = mcdc['setting']['rng_stride']
 
-    # Population control
-    # TODO
-    '''
-    if mcdc['technique']['population_control']:
-        pct = mcdc['technique']['pct']
-        if pct == PCT_SS:
-            mcdc['pct_count'] = np.zeros(int(M/mpi.size)*10, dtype=int)
-        elif pct == PCT_DD:
-            mcdc['pct_count']    = np.zeros(int(M/mpi.size)*10, dtype=int)
-            self.discard_flag = np.full((M*10,1), False)
-    '''
-
-    # Distribute work to processors
-    mpi.distribute_work(N_hist)
-
+    # Set MPI parameters
+    mcdc['mpi_size'] = mpi.size
+    mcdc['mpi_rank'] = mpi.rank
+    
 def generate_hdf5():
     # Save tallies to HDF5
     if mpi.master:

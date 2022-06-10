@@ -212,9 +212,6 @@ def make_type_technique(card):
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('weight_window', bool_)]
 
-    # Population control
-    struct += [('pct', int64)]
-
     # Weight window
     # Mesh
     mesh, Nx, Ny, Nz, Nt = make_type_mesh(card['ww_mesh'])
@@ -274,4 +271,9 @@ def make_type_global(card):
                         ('nuSigmaF', float64),
                         ('inverse_speed', float64),
                         ('runtime_total', float64),
-                        ('i_iter', int64)])
+                        ('i_iter', int64),
+                        ('mpi_size', uint64),
+                        ('mpi_rank', uint64),
+                        ('mpi_work_start', uint64),
+                        ('mpi_work_size', uint64),
+                        ('mpi_work_size_total', uint64)])

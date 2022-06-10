@@ -482,21 +482,9 @@ def weighted_emission(flag):
     card = mcdc.input_card.technique
     card['weighted_emission'] = flag
 
-def population_control(pct):
+def population_control():
     card = mcdc.input_card.technique
     card['population_control'] = True
-
-    # Set technique
-    if pct in ['SS', 'simple-sampling']:
-        card['pct'] = PCT_SS
-    elif pct in ['SR', 'splitting-roulette']:
-        card['pct'] = PCT_SR
-    elif pct in ['CO', 'combing']:
-        card['pct'] = PCT_CO
-    elif pct in ['COX', 'combing-modified']:
-        card['pct'] = PCT_COX
-    elif pct in ['DD', 'duplicate-discard']:
-        card['pct'] = PCT_DD
 
 def weight_window(x=None, y=None, z=None, t=None, window=None):
     card = mcdc.input_card.technique
