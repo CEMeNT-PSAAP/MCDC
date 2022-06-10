@@ -152,11 +152,11 @@ def pop_particle(bank):
 def manage_particle_banks(mcdc):
     if mcdc['setting']['mode_eigenvalue']:
         # Normalize weight
-        with nb.objmode():
-            mpi.normalize_weight(mcdc['bank_census'], mcdc['setting']['N_hist'])
+        normalize_weight(mcdc['bank_census'], mcdc['setting']['N_hist'])
 
-    # Rebase RNG for population control
-    rng_skip_ahead_strides(mpi.work_size_total-mpi.work_start, mcdc)
+    # Sync RNG
+    skip = mcdc['mpi_work_size_total']-mcdc['mpi_work_start']
+    rng_skip_ahead_strides(skip, mcdc)
     rng_rebase(mcdc)
 
     # Population control
@@ -167,10 +167,12 @@ def manage_particle_banks(mcdc):
         # TODO: Swap??
         # Swap census and source bank
         for i in range(mcdc['bank_census']['size']):
-            mcdc['bank_source']['particles'][i] = copy(mcdc['bank_census']['particles'][i])
-            mcdc['bank_source']['size'] = mcdc['bank_census']['size']
-    
-    # TODO: MPI rebalance
+            mcdc['bank_source']['particles'][i] = \
+                    copy(mcdc['bank_census']['particles'][i])
+        mcdc['bank_source']['size'] = mcdc['bank_census']['size']
+
+    # MPI rebalance
+    bank_rebalance(mcdc)
     
     # Zero out census bank
     mcdc['bank_census']['size'] = 0
@@ -180,12 +182,7 @@ def population_control(mcdc):
     bank_census = mcdc['bank_census']
     M           = mcdc['setting']['N_hist']
     bank_source = mcdc['bank_source']
-    if mcdc['technique']['pct'] == PCT_CO:
-        pct_CO(bank_census, M, bank_source, mcdc)
-    # TODO: Add other pcts
-
-@nb.njit
-def pct_CO(bank_census, M, bank_source, mcdc):
+    
     # Scan the bank
     idx_start, N_local, N = bank_scanning(bank_census)
     idx_end = idx_start + N_local
@@ -226,11 +223,109 @@ def bank_scanning(bank):
     # Global size
     buff[0] += N_local
     with nb.objmode():
-        mpi.bcast(buff, root=mpi.last)
+        mpi.bcast(buff, root=mpi.size-1)
     N_global = buff[0]
 
     return idx_start, N_local, N_global
 
+@nb.njit
+def normalize_weight(bank, norm):
+    # Get total weight
+    W = total_weight(bank)
+
+    # Normalize weight
+    for P in bank['particles']:
+        P['weight'] *= norm/W
+
+@nb.njit
+def total_weight(bank):
+    W_local = np.zeros(1)
+    for i in range(bank['size']):
+        W_local[0] += bank['particles'][i]['weight']
+    with nb.objmode(buff = 'float64'):
+        buff = mpi.allreduce(W_local)[0]
+    return buff
+
+@nb.njit
+def bank_rebalance(mcdc):
+    # Scan the bank
+    idx_start, N_local, N = bank_scanning(mcdc['bank_source'])
+    idx_end = idx_start + N_local
+
+    distribute_work(N, mcdc)
+
+    # TODO
+    '''
+    # Need more or less?
+    more_left  = idx_start < work_start
+    less_left  = idx_start > work_start
+    more_right = idx_end   > work_end
+    less_right = idx_end   < work_end
+
+    # Offside?
+    offside_left  = idx_end   <= work_start
+    offside_right = idx_start >= work_end
+
+    # If offside, need to receive first
+    if offside_left:
+        # Receive from right
+        bank.extend(recv(right))
+        less_right = False
+    if offside_right:
+        # Receive from left
+        bank[0:0] = recv(left)
+        less_left = False
+
+    # Send
+    if more_left:
+        n = work_start - idx_start
+        request_left = isend(bank[:n], left)
+        bank = bank[n:]
+    if more_right:
+        n = idx_end - work_end
+        request_right = isend(bank[-n:], right)
+        bank = bank[:-n]
+
+    # Receive
+    if less_left:
+        bank[0:0] = recv(left)
+    if less_right: 
+        bank.extend(recv(right))
+
+    # Wait unti sent massage is received
+    if more_left : request_left.Wait()
+    if more_right: request_right.Wait()
+    
+    return bank
+    '''
+
+@nb.njit
+def distribute_work(N, mcdc):
+    size = mcdc['mpi_size']
+    rank = mcdc['mpi_rank']
+
+    # Total # of work
+    work_size_total = N
+
+    # Evenly distribute work
+    work_size = math.floor(N/size)
+
+    # Starting index (based on even distribution)
+    work_start = work_size*rank
+
+    # Count reminder
+    rem = N%size
+
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size  += 1
+        work_start += rank
+    else:
+        work_start += rem
+
+    mcdc['mpi_work_start']      = work_start
+    mcdc['mpi_work_size']       = work_size
+    mcdc['mpi_work_size_total'] = work_size_total
 
 #==============================================================================
 # Getters
@@ -539,8 +634,8 @@ def tally_closeout_history(mcdc):
 @nb.njit
 def score_closeout_history(score):
     # Accumulate sums of history
-    score['sum']    += score['bin']
-    score['sum_sq'] += np.square(score['bin'])
+    score['sum'][:]    += score['bin']
+    score['sum_sq'][:] += np.square(score['bin'])
 
     # Reset bin
     score['bin'].fill(0.0)

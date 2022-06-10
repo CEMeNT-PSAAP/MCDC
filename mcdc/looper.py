@@ -2,7 +2,6 @@ import numba as nb
 import numpy as np
 
 import mcdc.kernel as kernel
-import mcdc.mpi    as mpi
 
 from mcdc.constant import *
 from mcdc.print_   import print_progress, print_progress_eigenvalue
@@ -13,6 +12,9 @@ from mcdc.print_   import print_progress, print_progress_eigenvalue
 
 @nb.njit
 def loop_simulation(mcdc):
+    # Distribute work to processors
+    kernel.distribute_work(mcdc['setting']['N_hist'], mcdc)
+
     simulation_end = False
     while not simulation_end:
         # Loop over source particles
@@ -47,11 +49,14 @@ def loop_simulation(mcdc):
 @nb.njit
 def loop_source(mcdc):
     # Rebase rng skip_ahead seed
-    kernel.rng_skip_ahead_strides(mpi.work_start, mcdc)
+    kernel.rng_skip_ahead_strides(mcdc['mpi_work_start'], mcdc)
     kernel.rng_rebase(mcdc)
 
+    # Progress bar indicator
+    N_prog = 0
+    
     # Loop over particle sources
-    for work_idx in range(mpi.work_size):
+    for work_idx in range(mcdc['mpi_work_size']):
         # Initialize RNG wrt work index
         kernel.rng_skip_ahead_strides(work_idx, mcdc)
 
@@ -78,7 +83,6 @@ def loop_source(mcdc):
 
             # Apply weight window
             if mcdc['technique']['weight_window']:
-                print('here')
                 kernel.weight_window(P, mcdc)
             
             # Particle loop
@@ -88,9 +92,11 @@ def loop_source(mcdc):
         kernel.tally_closeout_history(mcdc)
         
         # Progress printout
-        if mcdc['setting']['progress_bar']:
+        percent = (work_idx+1.0)/mcdc['mpi_work_size']
+        if mcdc['setting']['progress_bar'] and int(percent*100.0) > N_prog:
+            N_prog += 1
             with nb.objmode(): 
-                print_progress(work_idx)
+                print_progress(percent)
 
         
 # =========================================================================
