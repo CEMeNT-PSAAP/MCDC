@@ -28,11 +28,10 @@ def print_banner():
         print(banner)
         sys.stdout.flush()
 
-def print_progress(work_idx):
+def print_progress(percent):
     if mpi.master:
-        perc = (work_idx+1.0)/mpi.work_size
         sys.stdout.write('\r')
-        sys.stdout.write(" [%-28s] %d%%" % ('='*int(perc*28), perc*100.0))
+        sys.stdout.write(" [%-28s] %d%%" % ('='*int(percent*28), percent*100.0))
         sys.stdout.flush()
 
 def print_progress_eigenvalue(mcdc):
