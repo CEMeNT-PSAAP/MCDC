@@ -3,7 +3,7 @@ import argparse
 parser = argparse.ArgumentParser(description='MC/DC: Monte Carlo Dynamic Code')
 parser.add_argument('--mode', type=str, help='run mode', 
                     choices=['python', 'numba'], default='python')
-args = parser.parse_args()
+args, unargs = parser.parse_known_args()
 
 # Set mode
 from numba import config

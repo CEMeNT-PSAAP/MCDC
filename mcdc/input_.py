@@ -448,7 +448,7 @@ def setting(**kw):
 
     # Output .h5 file name
     if output is not None:
-        card['output_name'] = output
+        card['output'] = output
 
     # Progress bar
     if progress_bar is not None:
