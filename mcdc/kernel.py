@@ -1,7 +1,7 @@
 import math
 
 from mpi4py import MPI
-from numba  import njit, objmode, literal_unroll, typeof
+from numba  import njit, objmode, literal_unroll
 
 import mcdc.type_ as type_
 
