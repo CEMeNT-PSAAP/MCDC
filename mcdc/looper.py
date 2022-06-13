@@ -1,5 +1,6 @@
-import numba as nb
 import numpy as np
+
+from numba import njit, objmode
 
 import mcdc.kernel as kernel
 
@@ -10,7 +11,7 @@ from mcdc.print_   import print_progress, print_progress_eigenvalue
 # Simulation loop
 # =========================================================================
 
-@nb.njit
+@njit
 def loop_simulation(mcdc):
     # Distribute work to processors
     kernel.distribute_work(mcdc['setting']['N_hist'], mcdc)
@@ -23,7 +24,7 @@ def loop_simulation(mcdc):
         # Eigenvalue mode generation closeout
         if mcdc['setting']['mode_eigenvalue']:
             kernel.tally_closeout(mcdc)
-            with nb.objmode():
+            with objmode():
                 print_progress_eigenvalue(mcdc)
 
         # Simulation end?
@@ -46,7 +47,7 @@ def loop_simulation(mcdc):
 # Source loop
 # =========================================================================
 
-@nb.njit
+@njit
 def loop_source(mcdc):
     # Rebase rng skip_ahead seed
     kernel.rng_skip_ahead_strides(mcdc['mpi_work_start'], mcdc)
@@ -95,7 +96,7 @@ def loop_source(mcdc):
         percent = (work_idx+1.0)/mcdc['mpi_work_size']
         if mcdc['setting']['progress_bar'] and int(percent*100.0) > N_prog:
             N_prog += 1
-            with nb.objmode(): 
+            with objmode(): 
                 print_progress(percent)
 
         
@@ -103,7 +104,7 @@ def loop_source(mcdc):
 # Particle loop
 # =========================================================================
 
-@nb.njit
+@njit
 def loop_particle(P, mcdc):
     while P['alive']:
         # Determine and move to event
