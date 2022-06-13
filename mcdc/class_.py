@@ -39,7 +39,7 @@ class InputCard:
                           'rng_stride'         : 152917,
                           'k_init'             : 1.0,
                           'alpha_init'         : 0.0,
-                          'output_name'        : 'output',
+                          'output'             : 'output',
                           'progress_bar'       : True}
         self.technique = {'tag'                : 'Technique', 
                           'weighted_emission'  : True,

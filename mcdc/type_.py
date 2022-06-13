@@ -1,6 +1,8 @@
+import math
 import numpy as np
-import numba as nb
 import sys
+
+from mpi4py import MPI
 
 float64 = np.float64
 int64   = np.int64
@@ -16,43 +18,6 @@ particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
                      ('time', float64), ('speed', float64), ('group', uint64),
                      ('weight', float64), ('alive', bool_), ('cell_ID', uint64), 
                      ('surface_ID', int64)])
-
-@nb.njit
-def make_particle():
-    P = np.zeros(1, dtype=particle)[0]
-    P['x']          = 0.0
-    P['y']          = 0.0
-    P['z']          = 0.0
-    P['ux']         = 0.0
-    P['uy']         = 0.0
-    P['uz']         = 0.0
-    P['group']      = 0
-    P['time']       = 0.0
-    P['weight']     = 1.0
-    P['alive']      = True
-    P['speed']      = 1.0
-    P['cell_ID']    = -1
-    P['surface_ID'] = -1
-    return P
-
-@nb.jit
-def copy(P):
-    P_new = np.zeros(1, dtype=particle)[0]
-    P_new['x']          = P['x']         
-    P_new['y']          = P['y']         
-    P_new['z']          = P['z']         
-    P_new['ux']         = P['ux']        
-    P_new['uy']         = P['uy']        
-    P_new['uz']         = P['uz']        
-    P_new['group']      = P['group']     
-    P_new['time']       = P['time']      
-    P_new['weight']     = P['weight']    
-    P_new['alive']      = P['alive']     
-    P_new['speed']      = P['speed']     
-    P_new['cell_ID']    = P['cell_ID']   
-    P_new['surface_ID'] = P['surface_ID']
-    return P_new
-
 
 # ==============================================================================
 # Particle bank
@@ -198,7 +163,7 @@ setting = np.dtype([('N_hist', uint64), ('N_iter', uint64),
                     ('time_boundary', float64),
                     ('rng_seed', int64), ('rng_stride', int64),
                     ('k_init', float64), ('alpha_init', float64),
-                    ('output_name', 'U10'), ('progress_bar', bool_)])
+                    ('output', 'U20'), ('progress_bar', bool_)])
 
 # ==============================================================================
 # Technique
@@ -242,8 +207,9 @@ def make_type_global(card):
     # Particle bank types
     bank_history = particle_bank(100)
     if card.setting['mode_eigenvalue']:
-        bank_census  = particle_bank(5*N_hist)
-        bank_source  = particle_bank(5*N_hist)
+        N_work = math.ceil(N_hist/MPI.COMM_WORLD.Get_size())
+        bank_census  = particle_bank(5*N_work)
+        bank_source  = particle_bank(5*N_work)
     else:
         bank_census  = particle_bank(0)
         bank_source  = particle_bank(0)
@@ -272,8 +238,9 @@ def make_type_global(card):
                         ('inverse_speed', float64),
                         ('runtime_total', float64),
                         ('i_iter', int64),
-                        ('mpi_size', uint64),
-                        ('mpi_rank', uint64),
-                        ('mpi_work_start', uint64),
-                        ('mpi_work_size', uint64),
-                        ('mpi_work_size_total', uint64)])
+                        ('mpi_size', int64),
+                        ('mpi_rank', int64),
+                        ('mpi_master', bool_),
+                        ('mpi_work_start', int64),
+                        ('mpi_work_size', int64),
+                        ('mpi_work_size_total', int64)])
