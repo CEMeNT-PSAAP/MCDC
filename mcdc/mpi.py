@@ -25,29 +25,6 @@ def recv(source):
 def isend(obj, dest):
     return comm.isend(obj, dest)
 
-# Collective
-def bcast(buff, root):
-    return comm.Bcast(buff, root)
-def exscan(var, buff):
-    comm.Exscan(var, buff, MPI.SUM)
-def reduce_master(var):
-    var = np.array(var) # Anticipating Python-converted Numba types
-    buff = np.zeros_like(var)
-    comm.Reduce(var, buff, MPI.SUM, 0)
-    if buff.shape == ():
-        return buff
-    else:
-        return buff[:]
-def allreduce(var):
-    var = np.array(var) # Anticipating Python-converted Numba types
-    buff = np.zeros_like(var)
-    comm.Allreduce(var, buff, MPI.SUM)
-    if buff.shape == ():
-        return buff
-    else:
-        return buff[:]
-
-
 # =============================================================================
 # Indexers
 # =============================================================================
