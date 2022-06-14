@@ -69,9 +69,23 @@ python input.py
 
 An example to set up a multigroup (neutron energy and delayed precursor) material is provided in `MCDC/example/fixed_source/td_inf_SHEM361`.
 
+### Output
+
+MC/DC simulation results are stored in [HDF5 format](https://www.hdfgroup.org/solutions/hdf5/), which can be processed using [H5Py](https://www.h5py.org/) (default file name: `output.h5`) as follows:
+
+```python
+import h5py
+
+with h5py.File('output.h5', 'r') as f:
+    x      = f['tally/grid/x'][:]
+    t      = f['tally/grid/t'][:]
+    phi    = f['tally/flux/mean'][:]
+    phi_sd = f['tally/flux/sdev'][:]
+```
+
 ### Numba mode
 
-MC/DC supports transport kernel acceleration via [Numba](https://numba.readthedocs.io/en/stable/index.html)'s Just-in-Time compilation (currently only the CPU implementation). Running in Numba mode takes an *overhead* of about 15 to 80 seconds depending on the physics/features simulated; however, once compiled, the simulation runs MUCH faster than running in the Python mode.
+MC/DC supports transport kernel acceleration via [Numba](https://numba.readthedocs.io/en/stable/index.html)'s Just-in-Time compilation (currently only the CPU implementation). Running in Numba mode takes an *overhead* of about 15 to 80 seconds depending on the physics/features simulated; however, once compiled, the simulation runs MUCH faster than the Python mode.
 
 To run in the Numba mode:
 
