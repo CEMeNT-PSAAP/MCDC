@@ -3,8 +3,10 @@ build
 .eggs
 mcdc.egg-info
 
-# Compiled python class
+# Python cache
 *.pyc
+*.nbc
+*.nbi
 
 # Editor
 .spyproject

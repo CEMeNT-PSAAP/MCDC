@@ -1,8 +1,8 @@
 import h5py
-import numba as nb
 import numpy as np
 
-import mcdc.mpi   as mpi
+from mpi4py import MPI
+
 import mcdc.type_ as type_
 
 from mcdc.constant import *
@@ -19,35 +19,28 @@ mcdc       = mcdc_.global_
 def run():
     # Print banner and hardware configuration
     print_banner()
-    if nb.config.DISABLE_JIT:
-        print_msg("           Mode | Python")
-    else:
-        print_msg("           Mode | Numba")
-    print_msg("  MPI Processes | %i"%mpi.size)
-    print_msg(" OpenMP Threads | 1") # TODO
 
     # Preparation:
     #   process input cards, make types, and allocate global variables
-    print_msg("\n Preparing...")
     prepare()
     input_card.reset()
     
     # Run
     print_msg(" Now running TNT...")
-    mcdc['runtime_total'] = mpi.Wtime()
+    mcdc['runtime_total'] = MPI.Wtime()
     loop_simulation(mcdc)
-    mcdc['runtime_total'] = mpi.Wtime() - mcdc['runtime_total']
+    mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
     
     # Output: generate hdf5 output file
-    if mcdc['setting']['progress_bar']: print_msg('')
-    print_msg(" Generating tally HDF5 files...")
-    generate_hdf5()
+    if mcdc['mpi_master']: generate_hdf5()
 
     # Closout
     print_runtime(mcdc)
 
 def prepare():
     global mcdc
+    
+    print_msg("\n Preparing...")
 
     # Some numbers
     G           = input_card.materials[0]['G']
@@ -147,37 +140,39 @@ def prepare():
     mcdc['rng_stride']    = mcdc['setting']['rng_stride']
 
     # Set MPI parameters
-    mcdc['mpi_size'] = mpi.size
-    mcdc['mpi_rank'] = mpi.rank
+    mcdc['mpi_size']   = MPI.COMM_WORLD.Get_size()
+    mcdc['mpi_rank']   = MPI.COMM_WORLD.Get_rank()
+    mcdc['mpi_master'] = mcdc['mpi_rank'] == 0
     
 def generate_hdf5():
-    # Save tallies to HDF5
-    if mpi.master:
-        with h5py.File(mcdc['setting']['output_name']+'.h5', 'w') as f:
-            # Runtime
-            f.create_dataset("runtime",data=np.array([mcdc['runtime_total']]))
+    if mcdc['setting']['progress_bar']: print_msg('')
+    print_msg(" Generating tally HDF5 files...")
 
-            # Tally
-            T = mcdc['tally']
-            f.create_dataset("tally/grid/t", data=T['mesh']['t'])
-            f.create_dataset("tally/grid/x", data=T['mesh']['x'])
-            f.create_dataset("tally/grid/y", data=T['mesh']['y'])
-            f.create_dataset("tally/grid/z", data=T['mesh']['z'])
+    with h5py.File(mcdc['setting']['output']+'.h5', 'w') as f:
+        # Runtime
+        f.create_dataset("runtime",data=np.array([mcdc['runtime_total']]))
+
+        # Tally
+        T = mcdc['tally']
+        f.create_dataset("tally/grid/t", data=T['mesh']['t'])
+        f.create_dataset("tally/grid/x", data=T['mesh']['x'])
+        f.create_dataset("tally/grid/y", data=T['mesh']['y'])
+        f.create_dataset("tally/grid/z", data=T['mesh']['z'])
+        
+        # Scores
+        for name in T['score'].dtype.names:
+            name_h5 = name.replace('_','-')
+            f.create_dataset("tally/"+name_h5+"/mean",
+                             data=np.squeeze(T['score'][name]['mean']))
+            f.create_dataset("tally/"+name_h5+"/sdev",
+                             data=np.squeeze(T['score'][name]['sdev']))
+            T['score'][name]['mean'].fill(0.0)
+            T['score'][name]['sdev'].fill(0.0)
             
-            # Scores
-            for name in T['score'].dtype.names:
-                name_h5 = name.replace('_','-')
-                f.create_dataset("tally/"+name_h5+"/mean",
-                                 data=np.squeeze(T['score'][name]['mean']))
-                f.create_dataset("tally/"+name_h5+"/sdev",
-                                 data=np.squeeze(T['score'][name]['sdev']))
-                T['score'][name]['mean'].fill(0.0)
-                T['score'][name]['sdev'].fill(0.0)
-                
-            # Eigenvalues
-            if mcdc['setting']['mode_eigenvalue']:
-                f.create_dataset("keff",data=mcdc['k_iterate'])
-                mcdc['k_iterate'].fill(0.0)
-                if mcdc['setting']['mode_alpha']:
-                    f.create_dataset("alpha_eff",data=mcdc['alpha_iterate'])
-                    mcdc['alpha_iterate'].fill(0.0)
+        # Eigenvalues
+        if mcdc['setting']['mode_eigenvalue']:
+            f.create_dataset("keff",data=mcdc['k_iterate'])
+            mcdc['k_iterate'].fill(0.0)
+            if mcdc['setting']['mode_alpha']:
+                f.create_dataset("alpha_eff",data=mcdc['alpha_iterate'])
+                mcdc['alpha_iterate'].fill(0.0)

@@ -1,9 +1,5 @@
 import numpy as np
 
-# Get path to mcdc (not necessary if mcdc is installed)
-import sys
-sys.path.append('../../../../')
-
 import mcdc
 
 # =============================================================================

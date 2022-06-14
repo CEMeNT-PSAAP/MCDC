@@ -1,41 +1,52 @@
-import mcdc.mpi as mpi
+import numba as nb
 import sys
 
+from mpi4py import MPI
+master = MPI.COMM_WORLD.Get_rank() == 0
+
 def print_msg(msg):
-    if mpi.master:
+    if master:
         print(msg)
         sys.stdout.flush()
 
 def print_error(msg):
-    if mpi.master:
+    if master:
         print("ERROR: %s\n"%msg)
         sys.stdout.flush()
         sys.exit()
 
 def print_warning(msg):
-    if mpi.master:
+    if master:
         print("Warning: %s\n"%msg)
         sys.stdout.flush()
 
 def print_banner():
-    if mpi.master:
+    size = MPI.COMM_WORLD.Get_size()
+    if master:
         banner = "\n"\
         +r"  __  __  ____  __ ____   ____ "+"\n"\
         +r" |  \/  |/ ___|/ /_  _ \ / ___|"+"\n"\
         +r" | |\/| | |   /_  / | | | |    "+"\n"\
         +r" | |  | | |___ / /| |_| | |___ "+"\n"\
-        +r" |_|  |_|\____|// |____/ \____|"+"\n"
+        +r" |_|  |_|\____|// |____/ \____|"+"\n"\
+        + "\n"
+        if nb.config.DISABLE_JIT:
+            banner += "           Mode | Python\n"
+        else:
+            banner += "           Mode | Numba\n"
+        banner     += "  MPI Processes | %i\n"%size
+        banner     += " OpenMP Threads | 1"
         print(banner)
         sys.stdout.flush()
 
 def print_progress(percent):
-    if mpi.master:
+    if master:
         sys.stdout.write('\r')
         sys.stdout.write(" [%-28s] %d%%" % ('='*int(percent*28), percent*100.0))
         sys.stdout.flush()
 
 def print_progress_eigenvalue(mcdc):
-    if mpi.master:
+    if master:
         i_iter = mcdc['i_iter']
         k_eff = mcdc['k_eff']
         alpha_eff = mcdc['alpha_eff']
@@ -50,7 +61,7 @@ def print_progress_eigenvalue(mcdc):
 
 def print_runtime(mcdc):
     total = mcdc['runtime_total']
-    if mpi.master:
+    if master:
         if total >= 24*60*60:
             print(' Total runtime: %.2f days\n'%(total/24/60/60))
         elif total >= 60*60:
