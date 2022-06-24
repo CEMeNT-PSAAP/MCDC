@@ -48,6 +48,7 @@ def prepare():
     N_materials = len(input_card.materials)
     N_surfaces  = len(input_card.surfaces)
     N_cells     = len(input_card.cells)
+    N_universes = len(input_card.universes)
     N_sources   = len(input_card.sources)
     N_iter      = input_card.setting['N_iter']
     N_hist      = input_card.setting['N_hist']
@@ -55,10 +56,22 @@ def prepare():
     Nmax_surfaces = 0
     for cell in input_card.cells:
         Nmax_surfaces = max(Nmax_surfaces, cell['N_surfaces'])
+    Nmax_cells    = 0
+    for universe in input_card.universes:
+        Nmax_cells = max(Nmax_cells, universe['N_cells'])
+
+    # Default universe card if not given
+    if N_universes == 0:
+        Nmax_cells  = N_cells
+        N_universes = 1
+        card = {'ID' : 0, 'N_cells' : N_cells, 'cell_IDs' : np.arange(N_cells)}
+        input_card.universes.append(card)
 
     # Make types
     type_.make_type_material(G,J)
     type_.make_type_cell(Nmax_surfaces)
+    type_.make_type_universe(Nmax_cells)
+    type_.make_type_lattice(input_card.lattice)
     type_.make_type_source(G)
     type_.make_type_tally(input_card.tally, G, N_iter)
     type_.make_type_technique(input_card.technique)
@@ -81,6 +94,21 @@ def prepare():
     for i in range(N_cells):
         for name in type_.cell.names:
             mcdc['cells'][i][name] = input_card.cells[i][name]
+
+    # Universe
+    for i in range(N_universes):
+        for name in type_.universe.names:
+            mcdc['universes'][i][name] = input_card.universes[i][name]
+
+    # Lattice
+    for name in type_.lattice.names:
+        if name not in ['mesh']:
+            mcdc['lattice'][name] = input_card.lattice[name]
+    # Set mesh
+    mcdc['lattice']['mesh']['x'] = input_card.lattice['mesh']['x']
+    mcdc['lattice']['mesh']['y'] = input_card.lattice['mesh']['y']
+    mcdc['lattice']['mesh']['z'] = input_card.lattice['mesh']['z']
+    mcdc['lattice']['mesh']['t'] = input_card.lattice['mesh']['t']
 
     # Source
     for i in range(N_sources):

@@ -37,7 +37,7 @@ x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6,
 mcdc.tally(scores=['flux-x'], x=x)
 
 # Setting
-mcdc.setting(N_hist=1E5)
+mcdc.setting(N_hist=1E5, progress_bar=False)
 mcdc.eigenmode(N_iter=1050)
 mcdc.population_control()
 
