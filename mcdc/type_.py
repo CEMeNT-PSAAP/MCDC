@@ -17,7 +17,10 @@ particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
                      ('ux', float64), ('uy', float64), ('uz', float64),
                      ('time', float64), ('speed', float64), ('group', uint64),
                      ('weight', float64), ('alive', bool_), ('cell_ID', uint64), 
-                     ('surface_ID', int64)])
+                     ('surface_ID', int64),
+                     ('universe_ID', int64),
+                     ('shift_x', float64), ('shift_y', float64),
+                     ('shift_z', float64), ('shift_t', float64)])
 
 # ==============================================================================
 # Particle bank
@@ -70,6 +73,38 @@ def make_type_cell(N_surfaces):
                      ('material_ID', uint64)])
 
 # ==============================================================================
+# Universe
+# ==============================================================================
+
+universe = None
+def make_type_universe(N_cells):
+    global universe
+
+    universe = np.dtype([('ID', uint64),
+                         ('N_cells', uint64),
+                         ('cell_IDs', uint64, (N_cells,))])
+
+# ==============================================================================
+# Lattice
+# ==============================================================================
+
+lattice = None
+def make_type_lattice(card):
+    global lattice
+
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card['mesh'])
+
+    lattice = np.dtype([('mesh', mesh), 
+                        ('universe_IDs', int64, (Nt, Nx, Ny, Nz)),
+                        ('reflective_x-', bool_),
+                        ('reflective_x+', bool_),
+                        ('reflective_y-', bool_),
+                        ('reflective_y+', bool_),
+                        ('reflective_z-', bool_),
+                        ('reflective_z+', bool_)])
+
+# ==============================================================================
 # Source
 # ==============================================================================
 
@@ -92,19 +127,18 @@ def make_type_source(G):
 tally = None
 score_list = ('flux', 'flux_x', 'flux_t', 
               'current', 'current_x', 'current_t',
-              'eddington', 'eddington_x', 'eddington_t')
-
-def make_type_mesh(card):
-    Nx = len(card['x']) - 1
-    Ny = len(card['y']) - 1
-    Nz = len(card['z']) - 1
-    Nt = len(card['t']) - 1
-    return  np.dtype([('x', float64, (Nx+1,)), ('y', float64, (Ny+1,)),
-                      ('z', float64, (Nz+1,)), ('t', float64, (Nt+1,))]),\
-            Nx, Ny, Nz, Nt
+              'eddington', 'eddington_x', 'eddington_t',
+              'fission')
 
 def make_type_tally(card, Ng, N_iter):
     global tally
+    
+    def make_type_score(shape):
+        return np.dtype([('bin', float64, shape),
+                         ('sum', float64, shape),
+                         ('sum_sq', float64, shape),
+                         ('mean', float64, (N_iter,*shape)), 
+                         ('sdev', float64, (N_iter,*shape))])
 
     # Estimator flags
     struct = [('tracklength', bool_), ('crossing', bool_), 
@@ -113,14 +147,6 @@ def make_type_tally(card, Ng, N_iter):
     # Mesh
     mesh, Nx, Ny, Nz, Nt = make_type_mesh(card['mesh'])
     struct += [('mesh', mesh)]
-
-    # Score type generator
-    def score(shape):
-        return np.dtype([('bin', float64, shape),
-                         ('sum', float64, shape),
-                         ('sum_sq', float64, shape),
-                         ('mean', float64, (N_iter,*shape)), 
-                         ('sdev', float64, (N_iter,*shape))])
 
     # Scores and shapes
     scores_shapes = [
@@ -132,7 +158,8 @@ def make_type_tally(card, Ng, N_iter):
                      ['current_t', (Ng, Nt+1, Nx, Ny, Nz, 3)],
                      ['eddington', (Ng, Nt, Nx, Ny, Nz, 6)],
                      ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
-                     ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)]
+                     ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)],
+                     ['fission', (Ng, Nt, Nx, Ny, Nz)]
                     ]
 
     # Add score flags to structure
@@ -147,7 +174,7 @@ def make_type_tally(card, Ng, N_iter):
         shape = scores_shapes[i][1]
         if not card[name]:
             shape = (0,)*len(shape)
-        scores_struct += [(name, score(shape))]
+        scores_struct += [(name, make_type_score(shape))]
     scores = np.dtype(scores_struct)
     struct += [('score', scores)]
    
@@ -200,12 +227,13 @@ def make_type_global(card):
     N_surfaces  = len(card.surfaces)
     N_cells     = len(card.cells)
     N_sources   = len(card.sources)
+    N_universes = len(card.universes)
     N_hist      = card.setting['N_hist']
     N_iter      = card.setting['N_iter']
     if not card.setting['mode_eigenvalue']: N_iter = 0
 
     # Particle bank types
-    bank_history = particle_bank(100)
+    bank_history = particle_bank(10000)
     if card.setting['mode_eigenvalue']:
         N_work = math.ceil(N_hist/MPI.COMM_WORLD.Get_size())
         bank_census  = particle_bank(5*N_work)
@@ -217,6 +245,8 @@ def make_type_global(card):
     global_ = np.dtype([('materials', material, (N_materials,)),
                         ('surfaces', surface, (N_surfaces,)),
                         ('cells', cell, (N_cells,)),
+                        ('universes', universe, (N_universes,)),
+                        ('lattice', lattice),
                         ('sources', source, (N_sources,)),
                         ('tally', tally),
                         ('setting', setting),
@@ -244,3 +274,16 @@ def make_type_global(card):
                         ('mpi_work_start', int64),
                         ('mpi_work_size', int64),
                         ('mpi_work_size_total', int64)])
+
+# ==============================================================================
+# Util
+# ==============================================================================
+
+def make_type_mesh(card):
+    Nx = len(card['x']) - 1
+    Ny = len(card['y']) - 1
+    Nz = len(card['z']) - 1
+    Nt = len(card['t']) - 1
+    return  np.dtype([('x', float64, (Nx+1,)), ('y', float64, (Ny+1,)),
+                      ('z', float64, (Nz+1,)), ('t', float64, (Nt+1,))]),\
+            Nx, Ny, Nz, Nt

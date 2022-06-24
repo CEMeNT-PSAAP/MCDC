@@ -71,7 +71,7 @@ def loop_source(mcdc):
                 if tot >= xi:
                     break
             P = kernel.source_particle(S, mcdc)
-            kernel.set_cell(P, mcdc)
+            kernel.set_universe(P, mcdc)
         else:
             P = mcdc['bank_source']['particles'][work_idx]
         kernel.add_particle(P, mcdc['bank_history'])
@@ -110,22 +110,8 @@ def loop_particle(P, mcdc):
         # Determine and move to event
         event = kernel.move_to_event(P, mcdc)
 
-        # Surface crossing
-        if event == EVENT_SURFACE:
-            kernel.surface_crossing(P, mcdc)
-
-        # Mesh crossing
-        elif event == EVENT_MESH:
-            kernel.mesh_crossing(P, mcdc)
-
-        # Surface and mesh crossing
-        elif event == EVENT_SURFACE_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
-            kernel.move_particle(P, -PRECISION)
-            kernel.surface_crossing(P, mcdc)
-
         # Collision
-        elif event == EVENT_COLLISION:
+        if event == EVENT_COLLISION:
             # Get collision type
             event = kernel.collision(P, mcdc)
 
@@ -139,10 +125,34 @@ def loop_particle(P, mcdc):
             elif event == EVENT_TIME_REACTION:
                 kernel.time_reaction(P, mcdc)
         
+        # Mesh crossing
+        elif event == EVENT_MESH:
+            kernel.mesh_crossing(P, mcdc)
+
+        # Surface crossing
+        elif event == EVENT_SURFACE:
+            kernel.surface_crossing(P, mcdc)
+
+        # Lattice crossing
+        elif event == EVENT_LATTICE:
+            kernel.lattice_crossing(P, mcdc)
+    
+        # Surface and mesh crossing
+        elif event == EVENT_SURFACE_N_MESH:
+            kernel.mesh_crossing(P, mcdc)
+            kernel.move_particle(P, -PRECISION)
+            kernel.surface_crossing(P, mcdc)
+
+        # Lattice and mesh crossing
+        elif event == EVENT_LATTICE_N_MESH:
+            kernel.mesh_crossing(P, mcdc)
+            kernel.move_particle(P, -PRECISION)
+            kernel.lattice_crossing(P, mcdc)
+
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:
             kernel.time_boundary(P, mcdc)
-    
+
         # Apply weight window
         if mcdc['technique']['weight_window']:
             kernel.weight_window(P, mcdc)

@@ -2,6 +2,7 @@ import numpy as np
 
 from mcdc.class_   import SurfaceHandle
 from mcdc.constant import *
+from mcdc.print_   import print_error
 
 # Get mcdc global variables/objects
 import mcdc.global_ as mcdc
@@ -137,9 +138,12 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
                 if np.sum(card['chi_p'][g,:]) > 0.0:
                     card['chi_p'][g,:] /= np.sum(card['chi_p'][g,:])
     if nu_d is not None:
-        if chi_d is None:
-            print_error("Need to supply chi_d if nu_d is provided")
-        card['chi_d'][:,:] = np.swapaxes(chi_d, 0, 1)[:,:] # [gout,dg] -> [dg,gout]
+        if G == 1:
+            card['chi_d'][:,:] = np.ones([J,G])
+        else:
+            if chi_d is None:
+                print_error("Need to supply chi_d if nu_d is provided")
+            card['chi_d'][:,:] = np.swapaxes(chi_d, 0, 1)[:,:] # [gout,dg] -> [dg,gout]
         # Normalize
         for dg in range(J):
             if np.sum(card['chi_d'][dg,:]) > 0.0:
@@ -296,6 +300,76 @@ def cell(surfaces_flags, material):
     mcdc.input_card.cells.append(card)
     return card
 
+# =============================================================================
+# Universe
+# =============================================================================
+
+def universe(cells):
+    N_cells = len(cells)
+
+    # Set default card values (c.f. type_.py)
+    card             = {}
+    card['tag']      = 'Universe'
+    card['ID']       = len(mcdc.input_card.universes)
+    card['N_cells']  = N_cells
+    card['cell_IDs'] = np.zeros(N_cells, dtype=int)
+
+    # Cells
+    for i in range(N_cells):
+        card['cell_IDs'][i] = cells[i]['ID']
+
+    # Push card
+    mcdc.input_card.universes.append(card)
+    return card
+
+#==============================================================================
+# Lattice
+#==============================================================================
+
+def lattice(x=None, y=None, z=None, t=None, universes=None, 
+            bc_x_plus=None, bc_x_minus=None, bc_y_plus=None, bc_y_minus=None,
+            bc_z_plus=None, bc_z_minus=None):
+    card = mcdc.input_card.lattice
+
+    # Set mesh
+    if x is not None: card['mesh']['x'] = x
+    if y is not None: card['mesh']['y'] = y
+    if z is not None: card['mesh']['z'] = z
+    if t is not None: card['mesh']['t'] = t
+
+    # Set universe IDs
+    universe_IDs = np.array(universes, dtype=np.int64)
+    ax_expand = []
+    if t is None:
+        ax_expand.append(0)
+    if x is None:
+        ax_expand.append(1)
+    if y is None:
+        ax_expand.append(2)
+    if z is None:
+        ax_expand.append(3)
+    for ax in ax_expand:
+        universe_IDs = np.expand_dims(universe_IDs, axis=ax)
+    tmp = np.transpose(universe_IDs)
+    tmp = np.flip(tmp, axis=2)
+    card['universe_IDs'] = np.flip(tmp, axis=3)
+
+    # Set BC
+    if bc_x_plus == 'reflective':
+        card['reflective_x+'] = True
+    if bc_x_minus == 'reflective':
+        card['reflective_x-'] = True
+    if bc_y_plus == 'reflective':
+        card['reflective_y+'] = True
+    if bc_y_minus == 'reflective':
+        card['reflective_y-'] = True
+    if bc_z_plus == 'reflective':
+        card['reflective_z+'] = True
+    if bc_z_minus == 'reflective':
+        card['reflective_z-'] = True
+
+    return card
+
 # ==============================================================================
 # Source
 # ==============================================================================
@@ -370,7 +444,7 @@ def source(**kw):
     # Set probability
     if prob is not None:
         card['prob'] = prob
-   
+
     # Push card
     mcdc.input_card.sources.append(card)
     return card
@@ -403,11 +477,13 @@ def tally(scores, x=None, y=None, z=None, t=None):
             card['current_x'] = True
         elif s == 'flux-t':
             card['flux_t'] = True
+        elif s == 'fission':
+            card['fission'] = True
         else:
             print_error("Unknown tally score %s"%s)
 
     # Set estimator flags
-    if card['flux'] or card['current'] or card['eddington']:
+    if card['flux'] or card['current'] or card['eddington'] or card['fission']:
         card['tracklength'] = True
     if card['flux_x'] or card['current_x'] or card['eddington_x']:
         card['crossing'] = True; card['crossing_x'] = True
@@ -514,7 +590,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None):
     return card
 
 # ==============================================================================
-# Misc.
+# Util
 # ==============================================================================
 
 def print_card(card):
