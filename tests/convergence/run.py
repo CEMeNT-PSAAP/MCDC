@@ -6,7 +6,7 @@ cases  = ['slab_parallel_beam', 'slab_uniform_source', 'slab_reed',
           'inf_SHEM361', 'td_slab_azurv1']
 caseks = ['k_slab_kornreich', 'k_inf_SHEM361']
 N_proc = int(sys.argv[1])
-N_max  = 10
+N_max  = 7
 
 for case in cases:
     os.chdir(r"./"+case)
@@ -17,7 +17,6 @@ for case in cases:
 
 for case in caseks:
     os.chdir(r"./"+case)
-    #os.system("srun -n %i python input.py --mode=numba"%(N_proc))
-    os.system("python input.py --mode=numba")
+    os.system("srun -n %i python input.py --mode=numba"%(N_proc))
     os.system("python process.py")
     os.chdir(r"..")

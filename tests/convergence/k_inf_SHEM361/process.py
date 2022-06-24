@@ -49,7 +49,6 @@ N_passive = 50
 
 for N_active in N_active_list:
     N_active = int(N_active)
-    print(N_active)
     phi_avg = np.zeros_like(phi[0])
     k_avg = 0.0
     for i in range(N_passive, N_active): 
@@ -75,7 +74,6 @@ plt.legend()
 plt.grid()
 plt.title('flux')
 plt.savefig('flux.png')
-plt.show()
 plt.clf()
 
 line = 1.0/np.sqrt(N_active_list)
@@ -90,5 +88,4 @@ plt.legend()
 plt.grid()
 plt.title('keff')
 plt.savefig('keff.png')
-plt.show()
 plt.clf()

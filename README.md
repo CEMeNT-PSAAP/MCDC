@@ -70,8 +70,8 @@ If we save the input script above as `input.py`, we can run it as follows:
 python input.py
 ```
 
-An example to set up a multigroup (neutron energy and delayed precursor) 
-material is provided in `MCDC/example/fixed_source/td_inf_SHEM361`.
+An example to set up a multigroup (in energy and delayed precursor) 
+material is provided in `MCDC/example/fixed_source/td_slab_SHEM361`.
 
 ### Output
 

@@ -13,7 +13,7 @@ mcdc.egg-info
 *.swp
 
 # Output
-*.h5
+output*.h5
 *.png
 *.mp4
 
