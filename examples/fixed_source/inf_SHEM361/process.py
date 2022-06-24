@@ -36,9 +36,9 @@ with h5py.File('output.h5', 'r') as f:
 phi       *= E_mid/dE
 phi_sd    *= E_mid/dE
 phi_exact *= E_mid/dE
-plt.plot(E_mid,phi,'-b',label="MC")
-plt.fill_between(E_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
-plt.plot(E_mid,phi_exact,'--r',label='analytical')
+plt.step(E_mid,phi,'-b',where='mid',label="MC")
+plt.fill_between(E_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b',step='mid')
+plt.step(E_mid,phi_exact,'--r',where='mid',label='analytical')
 plt.xscale('log')
 plt.xlabel(r'$E$, eV')
 plt.ylabel(r'$E\phi(E)$')

@@ -135,6 +135,9 @@ def source_particle(source, rng):
 
 @njit
 def add_particle(P, bank):
+    if bank['size'] == bank['particles'].shape[0]:
+        with objmode():
+            print_error('Particle bank is full.')
     bank['particles'][bank['size']] = P
     bank['size'] += 1
 
@@ -142,7 +145,7 @@ def add_particle(P, bank):
 def pop_particle(bank):
     if bank['size'] == 0:
         with objmode():
-            print_error('Particle bank "'+bank['tag']+'" is empty.')
+            print_error('Particle bank is empty.')
     bank['size'] -= 1
     P = bank['particles'][bank['size']]
     return copy_particle(P)
@@ -357,38 +360,52 @@ def distribute_work(N, mcdc):
 @njit
 def make_particle():
     P = np.zeros(1, dtype=type_.particle)[0]
-    P['x']          = 0.0
-    P['y']          = 0.0
-    P['z']          = 0.0
-    P['ux']         = 0.0
-    P['uy']         = 0.0
-    P['uz']         = 0.0
-    P['group']      = 0
-    P['time']       = 0.0
-    P['weight']     = 1.0
-    P['alive']      = True
-    P['speed']      = 1.0
-    P['cell_ID']    = -1
-    P['surface_ID'] = -1
+    P['x']           = 0.0
+    P['y']           = 0.0
+    P['z']           = 0.0
+    P['ux']          = 0.0
+    P['uy']          = 0.0
+    P['uz']          = 0.0
+    P['group']       = 0
+    P['time']        = 0.0
+    P['weight']      = 1.0
+    P['alive']       = True
+    P['speed']       = 1.0
+    P['cell_ID']     = -1
+    P['surface_ID']  = -1
+    P['universe_ID'] = -1
+    P['shift_x']     = 0.0
+    P['shift_y']     = 0.0
+    P['shift_z']     = 0.0
+    P['shift_t']     = 0.0
     return P
 
 @njit
 def copy_particle(P):
     P_new = np.zeros(1, dtype=type_.particle)[0]
-    P_new['x']          = P['x']         
-    P_new['y']          = P['y']         
-    P_new['z']          = P['z']         
-    P_new['ux']         = P['ux']        
-    P_new['uy']         = P['uy']        
-    P_new['uz']         = P['uz']        
-    P_new['group']      = P['group']     
-    P_new['time']       = P['time']      
-    P_new['weight']     = P['weight']    
-    P_new['alive']      = P['alive']     
-    P_new['speed']      = P['speed']     
-    P_new['cell_ID']    = P['cell_ID']   
-    P_new['surface_ID'] = P['surface_ID']
+    P_new['x']           = P['x']         
+    P_new['y']           = P['y']         
+    P_new['z']           = P['z']         
+    P_new['ux']          = P['ux']        
+    P_new['uy']          = P['uy']        
+    P_new['uz']          = P['uz']        
+    P_new['group']       = P['group']     
+    P_new['time']        = P['time']      
+    P_new['weight']      = P['weight']    
+    P_new['alive']       = P['alive']     
+    P_new['speed']       = P['speed']     
+    P_new['cell_ID']     = P['cell_ID']   
+    P_new['surface_ID']  = P['surface_ID']
+    P_new['universe_ID'] = P['universe_ID']
+    P_new['shift_x']     = P['shift_x']
+    P_new['shift_y']     = P['shift_y']
+    P_new['shift_z']     = P['shift_z']
+    P_new['shift_t']     = P['shift_t']
     return P_new
+
+@njit
+def get_universe(P, mcdc):
+    return mcdc['universes'][P['universe_ID']]
 
 @njit
 def get_cell(P, mcdc):
@@ -407,12 +424,39 @@ def move_particle(P, distance):
     P['time'] += distance/P['speed']
 
 #==============================================================================
+# Universe operations
+#==============================================================================
+
+@njit
+def set_universe(P, mcdc):
+    # Get lattice and mesh
+    lattice = mcdc['lattice']
+    mesh    = lattice['mesh']
+
+    # Get mesh index
+    t, x, y, z = mesh_get_index(P, mesh)
+
+    # Set universe
+    P['universe_ID'] = lattice['universe_IDs'][t,x,y,z]
+
+    # Set particle shift
+    P['shift_x'] = -0.5*(mesh['x'][x] + mesh['x'][x+1])
+    P['shift_y'] = -0.5*(mesh['y'][y] + mesh['y'][y+1])
+    P['shift_z'] = -0.5*(mesh['z'][z] + mesh['z'][z+1])
+    P['shift_t'] = -0.5*(mesh['t'][t] + mesh['t'][t+1])
+
+    # Set cell
+    set_cell(P, mcdc)
+
+#==============================================================================
 # Cell operations
 #==============================================================================
 
 @njit
 def set_cell(P, mcdc):
-    for cell in mcdc['cells']:
+    universe = get_universe(P, mcdc)
+    for cell_ID in universe['cell_IDs']:
+        cell = mcdc['cells'][cell_ID]
         if cell_check(P, cell, mcdc):
             # Set cell ID
             P['cell_ID'] = cell['ID']
@@ -445,9 +489,9 @@ Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
 
 @njit
 def surface_evaluate(P, surface):
-    x = P['x']
-    y = P['y']
-    z = P['z']
+    x = P['x'] + P['shift_x']
+    y = P['y'] + P['shift_y']
+    z = P['z'] + P['shift_z']
     
     G = surface['G']
     H = surface['H']
@@ -501,9 +545,9 @@ def surface_normal(P, surface):
     G = surface['G']
     H = surface['H']
     I = surface['I']
-    x = P['x']
-    y = P['y']
-    z = P['z']
+    x = P['x'] + P['shift_x']
+    y = P['y'] + P['shift_y']
+    z = P['z'] + P['shift_z']
     
     dx = 2*A*x + D*y + E*z + G
     dy = 2*B*y + D*x + F*z + H
@@ -536,9 +580,9 @@ def surface_distance(P, surface):
         if distance < 0.0: return INF
         else:              return distance
         
-    x  = P['x']
-    y  = P['y']
-    z  = P['z']
+    x  = P['x'] + P['shift_x']
+    y  = P['y'] + P['shift_y']
+    z  = P['z'] + P['shift_z']
 
     A  = surface['A']
     B  = surface['B']
@@ -603,7 +647,8 @@ def mesh_get_index(P, mesh):
 
 @njit
 def score_tracklength(P, distance, mcdc):
-    tally = mcdc['tally']
+    tally    = mcdc['tally']
+    material = get_material(P, mcdc)
 
     # Get indices
     g = P['group']
@@ -617,11 +662,12 @@ def score_tracklength(P, distance, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current'])
     if tally['eddington']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington'])
+    if tally['fission']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission'])
 
     # Score eigenvalue tallies
     if mcdc['setting']['mode_eigenvalue']:
-        material = get_material(P, mcdc)
-        g        = P['group']
         weight   = P['weight']
         nu       = material['nu_p'][g]\
                    + sum(material['nu_d'][g])
@@ -776,12 +822,25 @@ def move_to_event(P, mcdc):
     # Get distances to events
     d_collision           = distance_to_collision(P, mcdc)
     d_surface, surface_ID = distance_to_nearest_surface(P, mcdc)
-    d_mesh                = distance_to_mesh(P, mcdc)
+    d_mesh                = distance_to_mesh(P, mcdc['tally']['mesh'])
+    d_lattice             = distance_to_mesh(P, mcdc['lattice']['mesh'])
     d_time_boundary       = P['speed']*(mcdc['setting']['time_boundary'] - P['time'])
 
     # Determine event
-    event, distance = determine_event(d_collision, d_surface, d_time_boundary,
-                                      d_mesh)
+    event    = EVENT_COLLISION
+    distance = d_collision
+    if distance > d_time_boundary + PRECISION:
+        event = EVENT_TIME_BOUNDARY
+        distance = d_time_boundary
+    if distance > d_surface + PRECISION:
+        event  = EVENT_SURFACE
+        distance = d_surface
+    if distance > d_lattice + PRECISION:
+        event  = EVENT_LATTICE
+        distance = d_lattice
+    if distance > d_mesh + PRECISION:
+        event  = EVENT_MESH
+        distance = d_mesh
 
     # Score tracklength tallies
     if mcdc['tally']['tracklength']:
@@ -799,6 +858,10 @@ def move_to_event(P, mcdc):
             event = EVENT_SURFACE_N_MESH
     else:
         P['surface_ID'] = -1
+
+    # Lattice and mesh?
+    if event == EVENT_LATTICE and d_lattice == d_mesh:
+        event = EVENT_LATTICE_N_MESH
     
     return event
 
@@ -836,7 +899,7 @@ def distance_to_nearest_surface(P, mcdc):
     return distance, surface_ID
 
 @njit
-def distance_to_mesh(P, mcdc):
+def distance_to_mesh(P, mesh):
     x  = P['x']
     y  = P['y']
     z  = P['z']
@@ -846,29 +909,12 @@ def distance_to_mesh(P, mcdc):
     t  = P['time']
     v  = P['speed']
 
-    mesh = mcdc['tally']['mesh']
-
     d = INF
     d = min(d, mesh_distance_search(x, ux, mesh['x']))
     d = min(d, mesh_distance_search(y, uy, mesh['y']))
     d = min(d, mesh_distance_search(z, uz, mesh['z']))
     d = min(d, mesh_distance_search(t, 1.0/v, mesh['t']))
     return d
-
-@njit
-def determine_event(d_collision, d_surface, d_time_boundary, d_mesh):
-    event  = EVENT_COLLISION
-    distance = d_collision
-    if distance > d_time_boundary:
-        event = EVENT_TIME_BOUNDARY
-        distance = d_time_boundary
-    if distance > d_surface:
-        event  = EVENT_SURFACE
-        distance = d_surface
-    if distance > d_mesh:
-        event  = EVENT_MESH
-        distance = d_mesh
-    return event, distance
 
 #==============================================================================
 # Surface crossing
@@ -886,6 +932,105 @@ def surface_crossing(P, mcdc):
     # Set new cell
     if P['alive'] and not surface['reflective']:
         set_cell(P, mcdc)
+
+#==============================================================================
+# Mesh crossing
+#==============================================================================
+
+@njit
+def mesh_crossing(P, mcdc):
+    if not mcdc['tally']['crossing']:
+        # Small-kick to ensure crossing
+        move_particle(P, PRECISION)
+    else:
+        # Use small-kick back and forth to determine which mesh is crossed
+        # First, backward small-kick
+        move_particle(P, -PRECISION)
+        t1, x1, y1, z1 = mesh_get_index(P, mcdc['tally']['mesh'])
+        # Then, double forward small-kick
+        move_particle(P, 2*PRECISION)
+        t2, x2, y2, z2 = mesh_get_index(P, mcdc['tally']['mesh'])
+
+        # Determine which mesh is crossed
+        crossing_x = False
+        crossing_t = False
+        if x1 != x2:
+            crossing_x = True
+        if t1 != t2:
+            crossing_t = True
+
+        # Score on tally
+        if crossing_x and mcdc['tally']['crossing_x']:
+            score_crossing_x(P, t1, x1, y1, z1, mcdc)
+        if crossing_t and mcdc['tally']['crossing_t']:
+            score_crossing_t(P, t1, x1, y1, z1, mcdc)
+
+#==============================================================================
+# Lattice crossing
+#==============================================================================
+
+@njit 
+def lattice_crossing(P, mcdc):
+    lattice = mcdc['lattice']
+    mesh    = lattice['mesh']
+
+    # Small kick to make sure crossing
+    move_particle(P, PRECISION)
+
+    # Apply BC if crossed
+    reflected = False
+    if P['x'] < mesh['x'][0]:
+        if lattice['reflective_x-']:
+            reflected = True
+            move_particle(P, -PRECISION)
+            P['ux'] *= -1
+            move_particle(P, PRECISION)
+        else:
+            P['alive'] = False
+    elif P['x'] > mesh['x'][-1]:
+        if lattice['reflective_x+']:
+            reflected = True
+            move_particle(P, -PRECISION)
+            P['ux'] *= -1
+            move_particle(P, PRECISION)
+        else:
+            P['alive'] = False
+    elif P['y'] < mesh['y'][0]:
+        if lattice['reflective_y-']:
+            reflected = True
+            move_particle(P, -PRECISION)
+            P['uy'] *= -1
+            move_particle(P, PRECISION)
+        else:
+            P['alive'] = False
+    elif P['y'] > mesh['y'][-1]:
+        if lattice['reflective_y+']:
+            reflected = True
+            move_particle(P, -PRECISION)
+            P['uy'] *= -1
+            move_particle(P, PRECISION)
+        else:
+            P['alive'] = False
+    elif P['z'] < mesh['z'][0]:
+        if lattice['reflective_z-']:
+            reflected = True
+            move_particle(P, -PRECISION)
+            P['uz'] *= -1
+            move_particle(P, PRECISION)
+        else:
+            P['alive'] = False
+    elif P['z'] > mesh['z'][-1]:
+        if lattice['reflective_z+']:
+            reflected = True
+            move_particle(P, -PRECISION)
+            P['uz'] *= -1
+            move_particle(P, PRECISION)
+        else:
+            P['alive'] = False
+
+    # Set new universe
+    if P['alive'] and not reflected:
+        set_universe(P, mcdc)
 
 #==============================================================================
 # Collision
@@ -1120,38 +1265,6 @@ def time_boundary(P, mcdc):
 
     # Check if mesh crossing occured
     mesh_crossing(P, mcdc)
-
-#==============================================================================
-# Mesh crossing
-#==============================================================================
-
-@njit
-def mesh_crossing(P, mcdc):
-    if not mcdc['tally']['crossing']:
-        # Small-kick to ensure crossing
-        move_particle(P, PRECISION)
-    else:
-        # Use small-kick back and forth to determine which mesh is crossed
-        # First, backward small-kick
-        move_particle(P, -PRECISION)
-        t1, x1, y1, z1 = mesh_get_index(P, mcdc['tally']['mesh'])
-        # Then, double forward small-kick
-        move_particle(P, 2*PRECISION)
-        t2, x2, y2, z2 = mesh_get_index(P, mcdc['tally']['mesh'])
-
-        # Determine which mesh is crossed
-        crossing_x = False
-        crossing_t = False
-        if x1 != x2:
-            crossing_x = True
-        if t1 != t2:
-            crossing_t = True
-
-        # Score on tally
-        if crossing_x and mcdc['tally']['crossing_x']:
-            score_crossing_x(P, t1, x1, y1, z1, mcdc)
-        if crossing_t and mcdc['tally']['crossing_t']:
-            score_crossing_t(P, t1, x1, y1, z1, mcdc)
 
 #==============================================================================
 # Move to event

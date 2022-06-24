@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 from scipy.integrate import quad
-
+import sys
 
 # =============================================================================
 # Reference solution
@@ -70,16 +70,16 @@ def f_phi_x(x):
         return phi4(x)
     return phi5(x)
 
-with h5py.File('output_1000000.h5', 'r') as f:
+with h5py.File('output_1000.h5', 'r') as f:
     x     = f['tally/grid/x'][:]
     dx    = (x[1]-x[0])
     x_mid = 0.5*(x[:-1]+x[1:])
 
 phi_ref   = np.zeros_like(x_mid)
-phi_x_ref = np.zeros_like(x)
+phi_x_ref = np.zeros_like(x_mid)
 
-for i in range(len(x)):
-    phi_x_ref[i] = f_phi_x(x[i])
+for i in range(len(x_mid)):
+    phi_x_ref[i] = f_phi_x(x[i+1])
 
 for i in range(len(x_mid)):
     phi_ref[i] = f_phi(x[i], x[i+1])
@@ -88,53 +88,44 @@ for i in range(len(x_mid)):
 # Plot results
 # =============================================================================
 
-error = []
-N_hist_list = np.logspace(3, 10, 15)
+error   = []
+error_x = []
+N_max = int(sys.argv[1])
+N_hist_list = np.logspace(3, N_max, (N_max-3)*2+1)
 
 for N_hist in N_hist_list:
     # Get results
     with h5py.File('output_%i.h5'%int(N_hist), 'r') as f:
         phi      = f['tally/flux/mean'][:]/dx*101.
-        phi_sd   = f['tally/flux/sdev'][:]/dx*101.
         phi_x    = f['tally/flux-x/mean'][1:]*101.
-        phi_x_sd = f['tally/flux-x/sdev'][1:]*101.
 
     error.append(np.linalg.norm((phi - phi_ref)/phi_ref))
+    error_x.append(np.linalg.norm((phi_x - phi_x_ref)/phi_x_ref))
 
-    # Flux - spatial average
-    '''
-    plt.plot(x_mid,phi,'-b',label="MC")
-    plt.fill_between(x_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
-    plt.plot(x_mid,phi_ref,'--r',label="ref.")
-    plt.xlabel(r'$x$, cm')
-    plt.ylabel('Flux')
-    plt.grid()
-    plt.legend()
-    plt.title(r'$\bar{\phi}_i$')
-    plt.show()
-    '''
-
-    # Flux - spatial grid
-    '''
-    plt.plot(x[1:],phi_x,'-b',label="MC")
-    plt.fill_between(x[1:],phi_x-phi_x_sd,phi_x+phi_x_sd,alpha=0.2,color='b')
-    plt.plot(x[:],phi_x_ref,'--r',label="ref.")
-    plt.xlabel(r'$x$, cm')
-    plt.ylabel('Flux')
-    plt.grid()
-    plt.legend()
-    plt.title(r'$\phi(x)$')
-    plt.show()
-    '''
-plt.figure(figsize=(4, 3))
 line = 1.0/np.sqrt(N_hist_list)
-line *= error[7]/line[7]
+line *= error[N_max-3]/line[N_max-3]
 plt.plot(N_hist_list, error, 'bo', fillstyle='none')
 plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
 plt.yscale('log')
-plt.ylabel('2-norm of flux relative error')
+plt.ylabel('2-norm of relative error')
 plt.xlabel(r'# of histories, $N$')
 plt.legend()
 plt.grid()
-plt.show()
+plt.title('flux')
+plt.savefig('flux.png')
+plt.clf()
+
+line = 1.0/np.sqrt(N_hist_list)
+line *= error_x[N_max-3]/line[N_max-3]
+plt.plot(N_hist_list, error_x, 'bo', fillstyle='none')
+plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.xscale('log')
+plt.yscale('log')
+plt.ylabel('2-norm of relative error')
+plt.xlabel(r'# of histories, $N$')
+plt.legend()
+plt.grid()
+plt.title('flux_x')
+plt.savefig('flux_x.png')
+plt.clf()

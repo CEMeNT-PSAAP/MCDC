@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 from scipy.integrate import quad
+import sys
 
 
 # =============================================================================
@@ -74,33 +75,37 @@ def J3(x):
 
 phi_ref      = np.zeros(60)
 J_ref        = np.zeros(60)
-phi_face_ref = np.zeros(61)
-J_face_ref   = np.zeros(61)
+phi_x_ref = np.zeros(61)
+J_x_ref   = np.zeros(61)
 
 for i in range(20):
     phi_ref[i]      = quad(phi1,x[i],x[i+1])[0]/dx
     J_ref[i]        = quad(J1,x[i],x[i+1])[0]/dx
-    phi_face_ref[i] = phi1(x[i])
-    J_face_ref[i]   = J1(x[i])
+    phi_x_ref[i] = phi1(x[i])
+    J_x_ref[i]   = J1(x[i])
 for i in range(20,40):
     phi_ref[i]      = quad(phi2,x[i],x[i+1])[0]/dx
     J_ref[i]        = quad(J2,x[i],x[i+1])[0]/dx
-    phi_face_ref[i] = phi2(x[i])
-    J_face_ref[i]   = J2(x[i])
+    phi_x_ref[i] = phi2(x[i])
+    J_x_ref[i]   = J2(x[i])
 for i in range(40,60):
     phi_ref[i]      = quad(phi3,x[i],x[i+1])[0]/dx
     J_ref[i]        = quad(J3,x[i],x[i+1])[0]/dx
-    phi_face_ref[i] = phi3(x[i])
-    J_face_ref[i]   = J3(x[i])
-phi_face_ref[60] = phi3(x[60])
-J_face_ref[60]   = J3(x[60])
+    phi_x_ref[i] = phi3(x[i])
+    J_x_ref[i]   = J3(x[i])
+phi_x_ref[60] = phi3(x[60])
+J_x_ref[60]   = J3(x[60])
 
 # =============================================================================
 # Plot results
 # =============================================================================
 
-error = []
-N_hist_list = np.logspace(3, 10, 15)
+error    = []
+error_x  = []
+error_J  = []
+error_Jx = []
+N_max = int(sys.argv[1])
+N_hist_list = np.logspace(3, N_max, (N_max-3)*2+1)
 
 for N_hist in N_hist_list:
     # Get results
@@ -115,16 +120,62 @@ for N_hist in N_hist_list:
         J_x_sd   = f['tally/current-x/sdev'][:,0]
     
     error.append(np.linalg.norm((phi - phi_ref)/phi_ref))
+    error_x.append(np.linalg.norm((phi_x - phi_x_ref)/phi_x_ref))
+    error_J.append(np.linalg.norm((J - J_ref)/J_ref))
+    error_Jx.append(np.linalg.norm((J_x - J_x_ref)/J_x_ref))
 
 line = 1.0/np.sqrt(N_hist_list)
-line *= error[7]/line[7]
+line *= error[N_max-3]/line[N_max-3]
 plt.plot(N_hist_list, error, 'bo', fillstyle='none')
 plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
 plt.yscale('log')
-plt.title(r'$\bar{\phi}_i$')
-plt.ylabel('Flux 2-norm error')
-plt.xlabel('# of histories')
+plt.ylabel('2-norm of relative error')
+plt.xlabel(r'# of histories, $N$')
 plt.legend()
 plt.grid()
-plt.show()
+plt.title('flux')
+plt.savefig('flux.png')
+plt.clf()
+
+line = 1.0/np.sqrt(N_hist_list)
+line *= error_x[N_max-3]/line[N_max-3]
+plt.plot(N_hist_list, error_x, 'bo', fillstyle='none')
+plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.xscale('log')
+plt.yscale('log')
+plt.ylabel('2-norm of relative error')
+plt.xlabel(r'# of histories, $N$')
+plt.legend()
+plt.grid()
+plt.title('flux_x')
+plt.savefig('flux_x.png')
+plt.clf()
+
+line = 1.0/np.sqrt(N_hist_list)
+line *= error_J[N_max-3]/line[N_max-3]
+plt.plot(N_hist_list, error_J, 'bo', fillstyle='none')
+plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.xscale('log')
+plt.yscale('log')
+plt.ylabel('2-norm of relative error')
+plt.xlabel(r'# of histories, $N$')
+plt.legend()
+plt.grid()
+plt.title('current')
+plt.savefig('current.png')
+plt.clf()
+
+line = 1.0/np.sqrt(N_hist_list)
+line *= error_Jx[N_max-3]/line[N_max-3]
+plt.plot(N_hist_list, error_Jx, 'bo', fillstyle='none')
+plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.xscale('log')
+plt.yscale('log')
+plt.ylabel('2-norm of relative error')
+plt.xlabel(r'# of histories, $N$')
+plt.legend()
+plt.grid()
+plt.title('current_x')
+plt.savefig('current_x.png')
+plt.clf()
