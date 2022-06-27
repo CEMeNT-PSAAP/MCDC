@@ -11,6 +11,8 @@ class InputCard:
         self.surfaces  = []
         self.cells     = []
         self.universes = []
+        self.sources   = []
+
         self.lattice   = {'tag'           : 'Lattice',
                           'universe_IDs'  : np.array([[[[0]]]]),
                           'mesh'          : {'x' : np.array([-INF, INF]),
@@ -23,7 +25,7 @@ class InputCard:
                           'reflective_y+' : False,
                           'reflective_z-' : False,
                           'reflective_z+' : False}
-        self.sources   = []
+
         self.tally     = {'tag'         : 'Tally',
                           'tracklength' : False,
                           'flux'        : False,
@@ -39,22 +41,29 @@ class InputCard:
                           'eddington_x' : False,
                           'eddington_t' : False,
                           'fission'     : False,
+                          'density'     : False,
+                          'density_t'     : False,
                           'mesh'        : {'x' : np.array([-INF, INF]),
                                            'y' : np.array([-INF, INF]),
                                            'z' : np.array([-INF, INF]),
                                            't' : np.array([-INF, INF])}}
-        self.setting   = {'tag'                : 'Setting',
-                          'N_hist'             : 0,
-                          'N_iter'             : 1,
-                          'mode_eigenvalue'    : False,
-                          'mode_alpha'         : False,
-                          'time_boundary'      : INF,
-                          'rng_seed'           : 1,
-                          'rng_stride'         : 152917,
-                          'k_init'             : 1.0,
-                          'alpha_init'         : 0.0,
-                          'output'             : 'output',
-                          'progress_bar'       : True}
+
+        self.setting   = {'tag'                 : 'Setting',
+                          'N_hist'              : 0,
+                          'N_iter'              : 1,
+                          'mode_eigenvalue'     : False,
+                          'mode_alpha'          : False,
+                          'time_boundary'       : INF,
+                          'rng_seed'            : 1,
+                          'rng_stride'          : 152917,
+                          'k_init'              : 1.0,
+                          'alpha_init'          : 0.0,
+                          'output'              : 'output',
+                          'progress_bar'        : True,
+                          'gyration_all'        : False,
+                          'gyration_infinite_z' : False,
+                          'gyration_only_x'     : False}
+
         self.technique = {'tag'                : 'Technique', 
                           'weighted_emission'  : True,
                           'implicit_capture'   : False,

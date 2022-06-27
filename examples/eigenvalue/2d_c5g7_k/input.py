@@ -26,6 +26,7 @@ mat_mox7  = set_mat(lib['mox7'])
 mat_mox87 = set_mat(lib['mox87'])
 mat_gt    = set_mat(lib['gt'])
 mat_fc    = set_mat(lib['fc'])
+mat_cr    = set_mat(lib['cr'])
 mat_mod   = set_mat(lib['mod'])
 
 # Pin cells
@@ -40,6 +41,7 @@ mox7 = mcdc.cell([-cy], mat_mox7)
 mox8 = mcdc.cell([-cy], mat_mox87)
 gt   = mcdc.cell([-cy], mat_gt)
 fc   = mcdc.cell([-cy], mat_fc)
+cr   = mcdc.cell([-cy], mat_cr)
 moo  = mcdc.cell([-cy], mat_mod)
 mod  = mcdc.cell([+cy], mat_mod)
 # Universes
@@ -49,10 +51,12 @@ m = mcdc.universe([mox7, mod])['ID']
 n = mcdc.universe([mox8, mod])['ID']
 g = mcdc.universe([gt, mod])['ID']
 f = mcdc.universe([fc, mod])['ID']
+c = mcdc.universe([cr, mod])['ID']
 w = mcdc.universe([moo, mod])['ID']
 # Assembly lattice
-grid = np.linspace(-pitch*17*3/2, pitch*17*3/2, 17*3+1)
-mcdc.lattice(x=grid, y=grid, 
+x_grid = np.linspace(0.0, pitch*17*3, 17*3+1)
+y_grid = np.linspace(-pitch*17*3, 0.0, 17*3+1)
+mcdc.lattice(x=x_grid, y=y_grid, 
              universes=[[u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
                         [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
                         [u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u,l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
@@ -111,7 +115,7 @@ mcdc.lattice(x=grid, y=grid,
 # =============================================================================
 # Uniform in energy
 
-source = mcdc.source(x=[-pitch*17*2/2, pitch*17*2/2], y=[-pitch*17*2/2, pitch*17*2/2], 
+source = mcdc.source(x=[0.0, pitch*17*2], y=[-pitch*17*2, 0.0], 
                      energy=np.ones(7))
 
 # =============================================================================
@@ -119,11 +123,11 @@ source = mcdc.source(x=[-pitch*17*2/2, pitch*17*2/2], y=[-pitch*17*2/2, pitch*17
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['fission'], x=grid, y=grid)
+mcdc.tally(scores=['flux'], x=x_grid, y=y_grid)
 
 # Setting
 mcdc.setting(N_hist=1E4)
-mcdc.eigenmode(N_iter=20)
+mcdc.eigenmode(N_iter=20, gyration_radius='infinite-z')
 mcdc.population_control()
 
 # Run

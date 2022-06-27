@@ -128,7 +128,8 @@ tally = None
 score_list = ('flux', 'flux_x', 'flux_t', 
               'current', 'current_x', 'current_t',
               'eddington', 'eddington_x', 'eddington_t',
-              'fission')
+              'fission', 
+              'density', 'density_t')
 
 def make_type_tally(card, Ng, N_iter):
     global tally
@@ -159,7 +160,9 @@ def make_type_tally(card, Ng, N_iter):
                      ['eddington', (Ng, Nt, Nx, Ny, Nz, 6)],
                      ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
                      ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)],
-                     ['fission', (Ng, Nt, Nx, Ny, Nz)]
+                     ['fission', (Ng, Nt, Nx, Ny, Nz)],
+                     ['density', (Ng, Nt, Nx, Ny, Nz)],
+                     ['density_t', (Ng, Nt+1, Nx, Ny, Nz)]
                     ]
 
     # Add score flags to structure
@@ -262,6 +265,10 @@ def make_type_global(card):
                         ('rng_stride', int64),
                         ('k_eff', float64),
                         ('k_iterate', float64, (N_iter,)),
+                        ('gyration_radius', float64, (N_iter,)),
+                        ('gyration_all', bool_),
+                        ('gyration_infinite_z', bool_),
+                        ('gyration_only_x', bool_),
                         ('alpha_eff', float64),
                         ('alpha_iterate', float64, (N_iter,)),
                         ('nuSigmaF', float64),
