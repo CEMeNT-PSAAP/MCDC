@@ -50,13 +50,14 @@ def print_progress_eigenvalue(mcdc):
         i_iter = mcdc['i_iter']
         k_eff = mcdc['k_eff']
         alpha_eff = mcdc['alpha_eff']
+        rg        = mcdc['gyration_radius'][i_iter]
 
         sys.stdout.write('\r')
         sys.stdout.write("\033[K")
         if not mcdc['setting']['mode_alpha']:
-            print(" %-4i %.5f"%(i_iter+1,k_eff))
+            print(" %-4i  %.5f  %.3f"%(i_iter+1,k_eff,rg))
         else:
-            print(" %-4i %.5f %.3e"%(i_iter+1,k_eff,alpha_eff))
+            print(" %-4i  %.5f  %.3e  %.3f"%(i_iter+1,k_eff,alpha_eff,rg))
         sys.stdout.flush()
 
 def print_runtime(mcdc):
