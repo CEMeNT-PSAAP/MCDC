@@ -30,7 +30,8 @@ def loop_simulation(mcdc):
         # Simulation end?
         if mcdc['setting']['mode_eigenvalue']:
             mcdc['i_iter'] += 1
-            if mcdc['i_iter'] == mcdc['setting']['N_iter']: simulation_end = True
+            if mcdc['i_iter'] == mcdc['setting']['N_iter']: 
+                simulation_end = True
         elif mcdc['bank_census']['size'] == 0: 
             simulation_end = True
 

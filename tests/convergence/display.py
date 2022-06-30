@@ -1,11 +1,19 @@
 import os, glob
-
-cases  = ['slab_parallel_beam', 'slab_uniform_source', 'slab_reed', 
-          'inf_SHEM361', 'td_slab_azurv1']
-
-for case in cases:
-    os.chdir(r"./"+case)
+'''
+# Fixed source
+for task in os.scandir('./fixed_source'):
+    print(task)
+    os.chdir(task)
     for name in glob.glob("*.png"):
-        print(case,name)
+        print(name)
         os.system("display %s"%name)
-    os.chdir(r"..")
+    os.chdir(r"../..")
+'''
+# Eigenvalue
+for task in os.scandir('./eigenvalue'):
+    print(task)
+    os.chdir(task)
+    for name in glob.glob("*.png"):
+        print(name)
+        os.system("display %s"%name)
+    os.chdir(r"../..")

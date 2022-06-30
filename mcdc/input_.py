@@ -479,15 +479,19 @@ def tally(scores, x=None, y=None, z=None, t=None):
             card['flux_t'] = True
         elif s == 'fission':
             card['fission'] = True
+        elif s == 'density':
+            card['density'] = True
+        elif s == 'density-t':
+            card['density_t'] = True
         else:
             print_error("Unknown tally score %s"%s)
 
     # Set estimator flags
-    if card['flux'] or card['current'] or card['eddington'] or card['fission']:
+    if card['flux'] or card['current'] or card['eddington'] or card['fission'] or card['density']:
         card['tracklength'] = True
     if card['flux_x'] or card['current_x'] or card['eddington_x']:
         card['crossing'] = True; card['crossing_x'] = True
-    if card['flux_t'] or card['current_t'] or card['eddington_t']:
+    if card['flux_t'] or card['current_t'] or card['eddington_t'] or card['density_t']:
         card['crossing'] = True; card['crossing_t'] = True
 
     return card
@@ -530,7 +534,8 @@ def setting(**kw):
     if progress_bar is not None:
         card['progress_bar'] = progress_bar
 
-def eigenmode(N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
+def eigenmode(N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0,
+              gyration_radius='all'):
     # Update setting card
     card                    = mcdc.input_card.setting
     card['N_iter']          = N_iter
@@ -538,12 +543,19 @@ def eigenmode(N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0):
     card['mode_alpha']      = alpha_mode
     card['k_init']          = k_init
     card['alpha_init']      = alpha_init
+    # Gyration radius setup
+    if gyration_radius == 'all':
+        card['gyration_all'] = True
+    elif gyration_radius == 'infinite-z':
+        card['gyration_infinite_z'] = True
+    elif gyration_radius == 'only-x':
+        card['gyration_only_x'] = True
+    else:
+        print_error("Unknown gyration radius type")
 
     # Update tally card
     card                = mcdc.input_card.tally
     card['tracklength'] = True
-
-    return card
 
 # ==============================================================================
 # Technique
