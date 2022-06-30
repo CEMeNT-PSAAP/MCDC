@@ -574,6 +574,10 @@ def population_control():
     card = mcdc.input_card.technique
     card['population_control'] = True
 
+def branchless_collision():
+    card = mcdc.input_card.technique
+    card['branchless_collision'] = True
+
 def weight_window(x=None, y=None, z=None, t=None, window=None):
     card = mcdc.input_card.technique
     card['weight_window'] = True

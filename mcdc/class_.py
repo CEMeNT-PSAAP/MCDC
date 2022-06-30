@@ -64,16 +64,17 @@ class InputCard:
                           'gyration_infinite_z' : False,
                           'gyration_only_x'     : False}
 
-        self.technique = {'tag'                : 'Technique', 
-                          'weighted_emission'  : True,
-                          'implicit_capture'   : False,
-                          'population_control' : False,
-                          'weight_window'      : False,
-                          'ww'                 : np.ones([1,1,1,1]), 
-                          'ww_mesh'            : {'x' : np.array([-INF, INF]),
-                                                  'y' : np.array([-INF, INF]),
-                                                  'z' : np.array([-INF, INF]),
-                                                  't' : np.array([-INF, INF])}}
+        self.technique = {'tag'                  : 'Technique', 
+                          'weighted_emission'    : True,
+                          'implicit_capture'     : False,
+                          'population_control'   : False,
+                          'branchless_collision' : False,
+                          'weight_window'        : False,
+                          'ww'                   : np.ones([1,1,1,1]), 
+                          'ww_mesh'              : {'x' : np.array([-INF, INF]),
+                                                    'y' : np.array([-INF, INF]),
+                                                    'z' : np.array([-INF, INF]),
+                                                    't' : np.array([-INF, INF])}}
 
 class SurfaceHandle:
     def __init__(self, card):

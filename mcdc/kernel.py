@@ -825,17 +825,17 @@ def tally_closeout(mcdc):
         # Distance RMS
         rms_local = np.zeros(1, np.float64)
         rms       = np.zeros(1, np.float64)
-        if mcdc['gyration_all']:
+        if mcdc['setting']['gyration_all']:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
                                  (P['z'] - com_z)**2)*P['weight']
-        elif mcdc['gyration_infinite_z']:
+        elif mcdc['setting']['gyration_infinite_z']:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
                                 *P['weight']
-        elif mcdc['gyration_only_x']:
+        elif mcdc['setting']['gyration_only_x']:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
@@ -1307,6 +1307,79 @@ def time_reaction(P, mcdc):
         pass # Already killed
     else:
         add_particle(copy_particle(P), mcdc['bank_history'])
+
+#==============================================================================
+# Branchless collision
+#==============================================================================
+
+@njit
+def branchless_collision(P, mcdc):
+    # Data
+    material = get_material(P, mcdc)
+    w        = P['weight']
+    g        = P['group']
+    SigmaT   = material['total'][g]
+    SigmaF   = material['fission'][g]
+    SigmaS   = material['scatter'][g]
+    nu_s     = material['nu_s'][g]
+    nu_p     = material['nu_p'][g]
+    nu_d     = material['nu_d'][g]
+    J        = material['J']
+    G        = material['G']
+
+    # Total nu fission
+    nu = nu_p
+    for j in range(J):
+        nu += nu_d[j]
+
+    # Set weight
+    n_scatter    = nu_s*SigmaS
+    n_fission    = nu*SigmaF
+    n_total      = n_fission + n_scatter
+    P['weight'] *= n_total/SigmaT
+
+    # Set spectrum and decay rate
+    fission = True
+    prompt  = True
+    if rng(mcdc) < n_scatter/n_total:
+        fission  = False
+        spectrum = material['chi_s'][g]
+    else:
+        xi  = rng(mcdc)*nu
+        tot = nu_p
+        if xi < tot:
+            spectrum = material['chi_p'][g]
+        else:
+            prompt = False
+            for j in range(J):
+                tot += nu_d[j]
+                if xi < tot:
+                    spectrum = material['chi_d'][j]
+                    decay    = material['decay'][j]
+                    break
+
+    # Set time
+    if not prompt:
+        xi = rng(mcdc)
+        P['time'] -= math.log(xi)/decay
+
+        # Kill if it's beyond time boundary
+        if P['time'] > mcdc['setting']['time_boundary']:
+            P['alive'] = False
+            return
+    
+    # Set energy
+    xi  = rng(mcdc)
+    tot = 0.0
+    for g_out in range(G):
+        tot += spectrum[g_out]
+        if tot > xi:
+            P['group'] = g_out
+            P['speed'] = material['speed'][g_out]
+            break
+
+    # Set direction (TODO: anisotropic scattering)
+    P['ux'], P['uy'], P['uz'] = sample_isotropic_direction(mcdc)
 
 #==============================================================================
 # Time boundary

@@ -64,7 +64,7 @@ plt.xlabel('Iteration #')
 plt.ylabel(r'$k$')
 plt.grid()
 ax2 = plt.gca().twinx()
-p4, = ax2.plot(np.arange(1,N_iter+1),rg,'m.-',label='GyRad')
+p4, = ax2.plot(np.arange(1,N_iter+1),rg,'-.m',label='GyRad')
 plt.ylabel(r'Gyration radius [cm]')
 lines = [p1, p2, p3, p4]
 plt.legend(lines, [l.get_label() for l in lines])

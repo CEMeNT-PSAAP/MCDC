@@ -193,6 +193,8 @@ setting = np.dtype([('N_hist', uint64), ('N_iter', uint64),
                     ('time_boundary', float64),
                     ('rng_seed', int64), ('rng_stride', int64),
                     ('k_init', float64), ('alpha_init', float64),
+                    ('gyration_all', bool_), ('gyration_infinite_z', bool_),
+                    ('gyration_only_x', bool_),
                     ('output', 'U20'), ('progress_bar', bool_)])
 
 # ==============================================================================
@@ -205,7 +207,8 @@ def make_type_technique(card):
     global technique
 
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
-              ('population_control', bool_), ('weight_window', bool_)]
+              ('population_control', bool_), ('branchless_collision', bool_),
+              ('weight_window', bool_)]
 
     # Weight window
     # Mesh
@@ -266,9 +269,6 @@ def make_type_global(card):
                         ('k_eff', float64),
                         ('k_iterate', float64, (N_iter,)),
                         ('gyration_radius', float64, (N_iter,)),
-                        ('gyration_all', bool_),
-                        ('gyration_infinite_z', bool_),
-                        ('gyration_only_x', bool_),
                         ('alpha_eff', float64),
                         ('alpha_iterate', float64, (N_iter,)),
                         ('nuSigmaF', float64),
