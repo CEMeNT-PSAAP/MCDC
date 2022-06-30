@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 from scipy.integrate import quad
+import sys
+
+output = sys.argv[1]
 
 # =============================================================================
 # Reference solution (not accurate enough for N_hist > 1E7)
@@ -68,7 +71,7 @@ def f_phi_x(x):
         return phi4(x)
     return phi5(x)
 
-with h5py.File('output.h5', 'r') as f:
+with h5py.File(output, 'r') as f:
     x     = f['tally/grid/x'][:]
     dx    = (x[1]-x[0])
     x_mid = 0.5*(x[:-1]+x[1:])
@@ -83,11 +86,11 @@ for i in range(len(x_mid)):
     phi_ref[i] = f_phi(x[i], x[i+1])
 
 # =============================================================================
-# Plot
+# Plot results
 # =============================================================================
 
-# Load output
-with h5py.File('output.h5', 'r') as f:
+# Get results
+with h5py.File(output, 'r') as f:
     # Note the spatial (dx) and source strength (100+1) normalization
     phi      = f['tally/flux/mean'][:]/dx*101.
     phi_sd   = f['tally/flux/sdev'][:]/dx*101.
