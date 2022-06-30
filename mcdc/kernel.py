@@ -1242,62 +1242,60 @@ def fission(P, mcdc):
         weight_eff = 1.0
         weight_new = weight
 
-    # Sample number of fission neutrons
-    #   in fixed-source, k_eff = 1.0
-    N = int(math.floor(weight_eff*nu/mcdc['k_eff'] + rng(mcdc)))
+    # Sample prompt and delayed neutrons
+    for jj in range(J+1):
+        prompt = jj == 0
+        j      = jj - 1
 
-    # Push fission neutrons to bank
-    for n in range(N):
-        # Copy particle (need to revive)
-        P_new = copy_particle(P)
-        P_new['alive'] = True
-
-        # Set weight
-        P_new['weight'] = weight_new
-
-        # Determine if it's prompt or delayed neutrons, 
-        # then get the energy spectrum and decay constant
-        xi  = rng(mcdc)*nu
-        tot = nu_p
-        # Prompt?
-        if tot > xi:
+        # Get data (average emission number, spectrum, decay rate)
+        if prompt:
+            nu       = nu_p
             spectrum = material['chi_p'][g]
         else:
-            # Which delayed group?
-            for j in range(J):
-                tot += nu_d[j]
-                if tot > xi:
-                    spectrum = material['chi_d'][j]
-                    decay    = material['decay'][j]
-                    break
+            nu       = nu_d[j]
+            spectrum = material['chi_d'][j]
+            decay    = material['decay'][j]
+
+        # Sample number of fission neutrons
+        N = int(math.floor(weight_eff*nu + rng(mcdc)))
+
+        # Push fission neutrons to bank
+        for n in range(N):
+            # Copy particle (need to revive)
+            P_new = copy_particle(P)
+            P_new['alive'] = True
+
+            # Set weight
+            P_new['weight'] = weight_new
 
             # Sample emission time
-            xi = rng(mcdc)
-            P_new['time'] = P['time'] - math.log(xi)/decay
+            if not prompt:
+                xi = rng(mcdc)
+                P_new['time'] = P['time'] - math.log(xi)/decay
 
-            # Skip if it's beyond time boundary
-            if P_new['time'] > mcdc['setting']['time_boundary']:
-                continue
+                # Skip if it's beyond time boundary
+                if P_new['time'] > mcdc['setting']['time_boundary']:
+                    continue
 
-        # Sample outgoing energy
-        xi  = rng(mcdc)
-        tot = 0.0
-        for g_out in range(G):
-            tot += spectrum[g_out]
-            if tot > xi:
-                break
-        P_new['group'] = g_out
-        P_new['speed'] = material['speed'][g_out]
+            # Sample outgoing energy
+            xi  = rng(mcdc)
+            tot = 0.0
+            for g_out in range(G):
+                tot += spectrum[g_out]
+                if tot > xi:
+                    break
+            P_new['group'] = g_out
+            P_new['speed'] = material['speed'][g_out]
 
-        # Sample isotropic direction
-        P_new['ux'], P_new['uy'], P_new['uz'] = \
-                sample_isotropic_direction(mcdc)
+            # Sample isotropic direction
+            P_new['ux'], P_new['uy'], P_new['uz'] = \
+                    sample_isotropic_direction(mcdc)
 
-        # Bank
-        if mcdc['setting']['mode_eigenvalue']:
-            add_particle(P_new, mcdc['bank_census'])
-        else:
-            add_particle(P_new, mcdc['bank_history'])
+            # Bank
+            if mcdc['setting']['mode_eigenvalue']:
+                add_particle(P_new, mcdc['bank_census'])
+            else:
+                add_particle(P_new, mcdc['bank_history'])
 
 #==============================================================================
 # Time reaction

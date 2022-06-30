@@ -37,7 +37,7 @@ material = None
 def make_type_material(G,J):
     global material
     material = np.dtype([('ID', uint64),
-                         ('G', uint64), ('J', uint64),
+                         ('G', int64), ('J', int64),
                          ('speed', float64, (G,)), ('decay', float64, (J,)),
                          ('total', float64, (G,)), ('capture', float64, (G,)),
                          ('scatter', float64, (G,)), ('fission', float64, (G,)),

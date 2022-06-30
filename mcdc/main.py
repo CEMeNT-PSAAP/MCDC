@@ -28,8 +28,8 @@ def run():
     # Run
     print_msg(" Now running TNT...")
     if mcdc['setting']['mode_eigenvalue']:
-        print_msg(" #     k-eig    GyRad.")
-        print_msg(" ====  ======   ======")
+        print_msg("\n #     k-eig    GyRad.")
+        print_msg(  " ====  =======  ======")
     mcdc['runtime_total'] = MPI.Wtime()
     loop_simulation(mcdc)
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
