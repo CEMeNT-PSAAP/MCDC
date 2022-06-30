@@ -162,13 +162,6 @@ def prepare():
         if mcdc['setting']['mode_alpha']:
             mcdc['alpha_eff']     = mcdc['setting']['alpha_init']
             mcdc['alpha_iterate'] = np.zeros(N_iter, dtype=np.float64)
-        # Gyration radius type
-        if input_card.setting['gyration_all']:
-            mcdc['gyration_all'] = True
-        elif input_card.setting['gyration_infinite_z']:
-            mcdc['gyration_infinite_z'] = True
-        elif input_card.setting['gyration_only_x']:
-            mcdc['gyration_only_x'] = True
 
     # RNG seed and stride
     mcdc['rng_seed_base'] = mcdc['setting']['rng_seed']

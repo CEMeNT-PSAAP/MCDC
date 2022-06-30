@@ -113,18 +113,22 @@ def loop_particle(P, mcdc):
 
         # Collision
         if event == EVENT_COLLISION:
-            # Get collision type
-            event = kernel.collision(P, mcdc)
+            # Branchless collision?
+            if mcdc['technique']['branchless_collision']:
+                kernel.branchless_collision(P, mcdc)
+            else:
+                # Get collision type
+                event = kernel.collision(P, mcdc)
 
-            # Perform collision
-            if event == EVENT_CAPTURE:
-                kernel.capture(P, mcdc)
-            elif event == EVENT_SCATTERING:
-                kernel.scattering(P, mcdc)
-            elif event == EVENT_FISSION:
-                kernel.fission(P, mcdc)
-            elif event == EVENT_TIME_REACTION:
-                kernel.time_reaction(P, mcdc)
+                # Perform collision
+                if event == EVENT_CAPTURE:
+                    kernel.capture(P, mcdc)
+                elif event == EVENT_SCATTERING:
+                    kernel.scattering(P, mcdc)
+                elif event == EVENT_FISSION:
+                    kernel.fission(P, mcdc)
+                elif event == EVENT_TIME_REACTION:
+                    kernel.time_reaction(P, mcdc)
         
         # Mesh crossing
         elif event == EVENT_MESH:
