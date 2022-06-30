@@ -27,6 +27,9 @@ def run():
     
     # Run
     print_msg(" Now running TNT...")
+    if mcdc['setting']['mode_eigenvalue']:
+        print_msg("\n #     k-eig    GyRad.")
+        print_msg(  " ====  =======  ======")
     mcdc['runtime_total'] = MPI.Wtime()
     loop_simulation(mcdc)
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
@@ -155,9 +158,17 @@ def prepare():
     if mcdc['setting']['mode_eigenvalue']:
         mcdc['k_eff']     = mcdc['setting']['k_init']
         mcdc['k_iterate'] = np.zeros(N_iter, dtype=np.float64)
+        mcdc['gyration_radius'] = np.zeros(N_iter, dtype=np.float64)
         if mcdc['setting']['mode_alpha']:
             mcdc['alpha_eff']     = mcdc['setting']['alpha_init']
             mcdc['alpha_iterate'] = np.zeros(N_iter, dtype=np.float64)
+        # Gyration radius type
+        if input_card.setting['gyration_all']:
+            mcdc['gyration_all'] = True
+        elif input_card.setting['gyration_infinite_z']:
+            mcdc['gyration_infinite_z'] = True
+        elif input_card.setting['gyration_only_x']:
+            mcdc['gyration_only_x'] = True
 
     # RNG seed and stride
     mcdc['rng_seed_base'] = mcdc['setting']['rng_seed']
@@ -200,7 +211,9 @@ def generate_hdf5():
         # Eigenvalues
         if mcdc['setting']['mode_eigenvalue']:
             f.create_dataset("keff",data=mcdc['k_iterate'])
+            f.create_dataset("gyration_radius",data=mcdc['gyration_radius'])
             mcdc['k_iterate'].fill(0.0)
+            mcdc['gyration_radius'].fill(0.0)
             if mcdc['setting']['mode_alpha']:
                 f.create_dataset("alpha_eff",data=mcdc['alpha_iterate'])
                 mcdc['alpha_iterate'].fill(0.0)

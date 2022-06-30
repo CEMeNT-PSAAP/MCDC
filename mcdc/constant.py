@@ -18,4 +18,4 @@ EVENT_LATTICE_N_MESH = 104
 # Misc.
 INF       = 1E10
 PI        = math.acos(-1.0)
-PRECISION = 1E-8  # Used in surface crossing
+PRECISION = 1E-6  # Used in surface crossing

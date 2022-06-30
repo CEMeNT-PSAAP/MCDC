@@ -608,7 +608,7 @@ def surface_distance(P, surface):
     else:
         # Get the roots
         denom = 2.0*a
-        sqrt  = np.sqrt(determinant)
+        sqrt  = math.sqrt(determinant)
         root_1 = (-b + sqrt)/denom
         root_2 = (-b - sqrt)/denom
         
@@ -665,6 +665,9 @@ def score_tracklength(P, distance, mcdc):
     if tally['fission']:
         flux *= material['fission'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['fission'])
+    if tally['density']:
+        flux /= material['speed'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['density'])
 
     # Score eigenvalue tallies
     if mcdc['setting']['mode_eigenvalue']:
@@ -698,7 +701,8 @@ def score_crossing_x(P, t, x, y, z, mcdc):
 
 @njit
 def score_crossing_t(P, t, x, y, z, mcdc):
-    tally = mcdc['tally']
+    tally    = mcdc['tally']
+    material = get_material(P, mcdc)
     
     # Get indices
     g  = P['group']
@@ -712,6 +716,9 @@ def score_crossing_t(P, t, x, y, z, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current_t'])
     if tally['eddington_t']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_t'])
+    if tally['density_t']:
+        flux /= material['speed'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['density_t'])
 
 @njit
 def score_flux(g, t, x, y, z, flux, score):
@@ -791,6 +798,54 @@ def tally_closeout(mcdc):
         mcdc['nuSigmaF'] = 0.0
         if mcdc['setting']['mode_alpha']:
             mcdc['inverse_speed'] = 0.0        
+
+        # =====================================================================
+        # Gyration radius
+        # =====================================================================
+        
+        # Center of mass
+        N_local     = mcdc['bank_census']['size']
+        total_local = np.zeros(4, np.float64) # [x,y,z,W]
+        total       = np.zeros(4, np.float64)
+        for i in range(N_local):
+            P = mcdc['bank_census']['particles'][i]
+            total_local[0] += P['x']*P['weight']
+            total_local[1] += P['y']*P['weight']
+            total_local[2] += P['z']*P['weight']
+            total_local[3] += P['weight']
+        # MPI Allreduce
+        with objmode():
+            MPI.COMM_WORLD.Allreduce(total_local, total, MPI.SUM)
+        # COM
+        W     = total[3]
+        com_x = total[0]/W
+        com_y = total[1]/W
+        com_z = total[2]/W
+    
+        # Distance RMS
+        rms_local = np.zeros(1, np.float64)
+        rms       = np.zeros(1, np.float64)
+        if mcdc['gyration_all']:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
+                                 (P['z'] - com_z)**2)*P['weight']
+        elif mcdc['gyration_infinite_z']:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
+                                *P['weight']
+        elif mcdc['gyration_only_x']:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
+        # MPI Allreduce
+        with objmode():
+            MPI.COMM_WORLD.Allreduce(rms_local, rms, MPI.SUM)
+        rms = math.sqrt(rms[0]/W)
+        
+        # Gyration radius
+        mcdc['gyration_radius'][i_iter] = rms
 
 @njit
 def score_closeout(score, N_hist, i_iter, mcdc):
@@ -1187,62 +1242,60 @@ def fission(P, mcdc):
         weight_eff = 1.0
         weight_new = weight
 
-    # Sample number of fission neutrons
-    #   in fixed-source, k_eff = 1.0
-    N = int(math.floor(weight_eff*nu/mcdc['k_eff'] + rng(mcdc)))
+    # Sample prompt and delayed neutrons
+    for jj in range(J+1):
+        prompt = jj == 0
+        j      = jj - 1
 
-    # Push fission neutrons to bank
-    for n in range(N):
-        # Copy particle (need to revive)
-        P_new = copy_particle(P)
-        P_new['alive'] = True
-
-        # Set weight
-        P_new['weight'] = weight_new
-
-        # Determine if it's prompt or delayed neutrons, 
-        # then get the energy spectrum and decay constant
-        xi  = rng(mcdc)*nu
-        tot = nu_p
-        # Prompt?
-        if tot > xi:
+        # Get data (average emission number, spectrum, decay rate)
+        if prompt:
+            nu       = nu_p
             spectrum = material['chi_p'][g]
         else:
-            # Which delayed group?
-            for j in range(J):
-                tot += nu_d[j]
-                if tot > xi:
-                    spectrum = material['chi_d'][j]
-                    decay    = material['decay'][j]
-                    break
+            nu       = nu_d[j]
+            spectrum = material['chi_d'][j]
+            decay    = material['decay'][j]
+
+        # Sample number of fission neutrons
+        N = int(math.floor(weight_eff*nu + rng(mcdc)))
+
+        # Push fission neutrons to bank
+        for n in range(N):
+            # Copy particle (need to revive)
+            P_new = copy_particle(P)
+            P_new['alive'] = True
+
+            # Set weight
+            P_new['weight'] = weight_new
 
             # Sample emission time
-            xi = rng(mcdc)
-            P_new['time'] = P['time'] - math.log(xi)/decay
+            if not prompt:
+                xi = rng(mcdc)
+                P_new['time'] = P['time'] - math.log(xi)/decay
 
-            # Skip if it's beyond time boundary
-            if P_new['time'] > mcdc['setting']['time_boundary']:
-                continue
+                # Skip if it's beyond time boundary
+                if P_new['time'] > mcdc['setting']['time_boundary']:
+                    continue
 
-        # Sample outgoing energy
-        xi  = rng(mcdc)
-        tot = 0.0
-        for g_out in range(G):
-            tot += spectrum[g_out]
-            if tot > xi:
-                break
-        P_new['group'] = g_out
-        P_new['speed'] = material['speed'][g_out]
+            # Sample outgoing energy
+            xi  = rng(mcdc)
+            tot = 0.0
+            for g_out in range(G):
+                tot += spectrum[g_out]
+                if tot > xi:
+                    break
+            P_new['group'] = g_out
+            P_new['speed'] = material['speed'][g_out]
 
-        # Sample isotropic direction
-        P_new['ux'], P_new['uy'], P_new['uz'] = \
-                sample_isotropic_direction(mcdc)
+            # Sample isotropic direction
+            P_new['ux'], P_new['uy'], P_new['uz'] = \
+                    sample_isotropic_direction(mcdc)
 
-        # Bank
-        if mcdc['setting']['mode_eigenvalue']:
-            add_particle(P_new, mcdc['bank_census'])
-        else:
-            add_particle(P_new, mcdc['bank_history'])
+            # Bank
+            if mcdc['setting']['mode_eigenvalue']:
+                add_particle(P_new, mcdc['bank_census'])
+            else:
+                add_particle(P_new, mcdc['bank_history'])
 
 #==============================================================================
 # Time reaction
