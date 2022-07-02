@@ -34,8 +34,9 @@ def run():
     loop_simulation(mcdc)
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
     
-    # Output: generate hdf5 output file
-    if mcdc['mpi_master']: generate_hdf5()
+    # Output: generate hdf5 output files
+    if mcdc['mpi_master']:
+        generate_hdf5()
 
     # Closout
     print_runtime(mcdc)
@@ -175,10 +176,10 @@ def prepare():
     mcdc['mpi_size']   = MPI.COMM_WORLD.Get_size()
     mcdc['mpi_rank']   = MPI.COMM_WORLD.Get_rank()
     mcdc['mpi_master'] = mcdc['mpi_rank'] == 0
-    
+
 def generate_hdf5():
     if mcdc['setting']['progress_bar']: print_msg('')
-    print_msg(" Generating tally HDF5 files...")
+    print_msg(" Generating output HDF5 files...")
 
     with h5py.File(mcdc['setting']['output']+'.h5', 'w') as f:
         # Runtime
