@@ -15,7 +15,13 @@ EVENT_LATTICE        = 10
 EVENT_SURFACE_N_MESH = 24
 EVENT_LATTICE_N_MESH = 104
 
+# Mesh crossing flags
+MESH_X = 0
+MESH_Y = 1
+MESH_Z = 2
+MESH_T = 3
+
 # Misc.
-INF       = 1E10
-PI        = math.acos(-1.0)
-PRECISION = 1E-6  # Used in surface crossing
+INF   = 1E10
+PI    = math.acos(-1.0)
+SHIFT = 1E-10 # For particle geometry (surface and mesh) shifts

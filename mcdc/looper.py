@@ -20,7 +20,7 @@ def loop_simulation(mcdc):
     while not simulation_end:
         # Loop over source particles
         loop_source(mcdc)
-        
+
         # Eigenvalue mode generation closeout
         if mcdc['setting']['mode_eigenvalue']:
             kernel.tally_closeout(mcdc)
@@ -32,13 +32,14 @@ def loop_simulation(mcdc):
             mcdc['i_iter'] += 1
             if mcdc['i_iter'] == mcdc['setting']['N_iter']: 
                 simulation_end = True
+
         elif mcdc['bank_census']['size'] == 0: 
             simulation_end = True
 
         # Manage particle banks
         if not simulation_end:
             kernel.manage_particle_banks(mcdc)
-            
+
     # Fixed-source mode closeout
     if not mcdc['setting']['mode_eigenvalue']:
         kernel.tally_closeout(mcdc)
@@ -109,7 +110,8 @@ def loop_source(mcdc):
 def loop_particle(P, mcdc):
     while P['alive']:
         # Determine and move to event
-        event = kernel.move_to_event(P, mcdc)
+        kernel.move_to_event(P, mcdc)
+        event = P['event']
 
         # Collision
         if event == EVENT_COLLISION:
@@ -129,7 +131,7 @@ def loop_particle(P, mcdc):
                     kernel.fission(P, mcdc)
                 elif event == EVENT_TIME_REACTION:
                     kernel.time_reaction(P, mcdc)
-        
+
         # Mesh crossing
         elif event == EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)
@@ -145,13 +147,11 @@ def loop_particle(P, mcdc):
         # Surface and mesh crossing
         elif event == EVENT_SURFACE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            kernel.move_particle(P, -PRECISION)
             kernel.surface_crossing(P, mcdc)
 
         # Lattice and mesh crossing
         elif event == EVENT_LATTICE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            kernel.move_particle(P, -PRECISION)
             kernel.lattice_crossing(P, mcdc)
 
         # Time boundary

@@ -374,6 +374,7 @@ def make_particle():
     P['cell_ID']     = -1
     P['surface_ID']  = -1
     P['universe_ID'] = -1
+    P['event']       = -1
     P['shift_x']     = 0.0
     P['shift_y']     = 0.0
     P['shift_z']     = 0.0
@@ -397,6 +398,7 @@ def copy_particle(P):
     P_new['cell_ID']     = P['cell_ID']   
     P_new['surface_ID']  = P['surface_ID']
     P_new['universe_ID'] = P['universe_ID']
+    P_new['event']       = P['event']
     P_new['shift_x']     = P['shift_x']
     P_new['shift_y']     = P['shift_y']
     P_new['shift_z']     = P['shift_z']
@@ -422,6 +424,22 @@ def move_particle(P, distance):
     P['y']    += P['uy']*distance
     P['z']    += P['uz']*distance
     P['time'] += distance/P['speed']
+
+@njit
+def shift_particle(P, shift):
+    if P['ux'] > 0.0:
+        P['x'] += shift
+    else:
+        P['x'] -= shift
+    if P['uy'] > 0.0:
+        P['y'] += shift
+    else:
+        P['y'] -= shift
+    if P['uz'] > 0.0:
+        P['z'] += shift
+    else:
+        P['z'] -= shift
+    P['time'] += shift
 
 #==============================================================================
 # Universe operations
@@ -532,6 +550,32 @@ def surface_reflect(P, surface):
     P['uz'] = uz - c*nz
 
 @njit
+def surface_shift(P, surface):
+    ux = P['ux']
+    uy = P['uy']
+    uz = P['uz']
+
+    # Get surface normal
+    nx, ny, nz = surface_normal(P, surface)
+
+    # The shift
+    shift_x = nx*SHIFT
+    shift_y = ny*SHIFT
+    shift_z = nz*SHIFT
+
+    # Get dot product to determine shift sign
+    dot = ux*nx + uy*ny + uz*nz
+
+    if dot > 0.0:
+        P['x'] += shift_x
+        P['y'] += shift_y
+        P['z'] += shift_z
+    else:
+        P['x'] -= shift_x
+        P['y'] -= shift_y
+        P['z'] -= shift_z
+
+@njit
 def surface_normal(P, surface):
     if surface['linear']:
         return surface['nx'], surface['ny'], surface['nz']
@@ -640,6 +684,49 @@ def mesh_get_index(P, mesh):
     y = binary_search(P['y'],    mesh['y'])
     z = binary_search(P['z'],    mesh['z'])
     return t, x, y, z
+
+@njit
+def mesh_crossing_evaluate(P, mesh):
+    # Shift backward
+    shift_particle(P, -SHIFT)
+    t1, x1, y1, z1 = mesh_get_index(P, mesh)
+   
+    # Double shift forward
+    shift_particle(P, 2*SHIFT)
+    t2, x2, y2, z2 = mesh_get_index(P, mesh)
+
+    # Return particle to initial position
+    shift_particle(P, -SHIFT)
+    
+    # Determine dimension crossed
+    if x1 != x2:
+        return x1, y1, z1, t1, MESH_X
+    elif y1 != y2:
+        return x1, y1, z1, t1, MESH_Y
+    elif z1 != z2:
+        return x1, y1, z1, t1, MESH_Z
+    elif t1 != t2:
+        return x1, y1, z1, t1, MESH_T
+
+@njit 
+def mesh_crossing_shift(P, flag):
+    if flag == MESH_X:
+        if P['ux'] > 0.0:
+            P['x'] += SHIFT
+        else:
+            P['x'] -= SHIFT
+    elif flag == MESH_Y:
+        if P['uy'] > 0.0:
+            P['y'] += SHIFT
+        else:
+            P['y'] -= SHIFT
+    elif flag == MESH_Z:
+        if P['uz'] > 0.0:
+            P['z'] += SHIFT
+        else:
+            P['z'] -= SHIFT
+    elif flag == MESH_T:
+        P['time'] += SHIFT
 
 #==============================================================================
 # Tally operations
@@ -884,16 +971,16 @@ def move_to_event(P, mcdc):
     # Determine event
     event    = EVENT_COLLISION
     distance = d_collision
-    if distance > d_time_boundary + PRECISION:
+    if distance > d_time_boundary:
         event = EVENT_TIME_BOUNDARY
         distance = d_time_boundary
-    if distance > d_surface + PRECISION:
+    if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
-    if distance > d_lattice + PRECISION:
+    if distance > d_lattice:
         event  = EVENT_LATTICE
         distance = d_lattice
-    if distance > d_mesh + PRECISION:
+    if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
 
@@ -918,7 +1005,8 @@ def move_to_event(P, mcdc):
     if event == EVENT_LATTICE and d_lattice == d_mesh:
         event = EVENT_LATTICE_N_MESH
     
-    return event
+    # Assign event
+    P['event'] = event
 
 @njit
 def distance_to_collision(P, mcdc):
@@ -981,8 +1069,8 @@ def surface_crossing(P, mcdc):
     surface = mcdc['surfaces'][P['surface_ID']]
     surface_bc(P, surface)
 
-    # Small kick to make sure crossing
-    move_particle(P, PRECISION)
+    # Small shift to ensure crossing
+    surface_shift(P, surface)
  
     # Set new cell
     if P['alive'] and not surface['reflective']:
@@ -994,31 +1082,22 @@ def surface_crossing(P, mcdc):
 
 @njit
 def mesh_crossing(P, mcdc):
-    if not mcdc['tally']['crossing']:
-        # Small-kick to ensure crossing
-        move_particle(P, PRECISION)
-    else:
-        # Use small-kick back and forth to determine which mesh is crossed
-        # First, backward small-kick
-        move_particle(P, -PRECISION)
-        t1, x1, y1, z1 = mesh_get_index(P, mcdc['tally']['mesh'])
-        # Then, double forward small-kick
-        move_particle(P, 2*PRECISION)
-        t2, x2, y2, z2 = mesh_get_index(P, mcdc['tally']['mesh'])
+    mesh = mcdc['tally']['mesh']
 
-        # Determine which mesh is crossed
-        crossing_x = False
-        crossing_t = False
-        if x1 != x2:
-            crossing_x = True
-        if t1 != t2:
-            crossing_t = True
+    # Determine which dimension is crossed
+    x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
 
+    # Shift particle if surface and lattice are not crossed as well
+    if P['event'] == EVENT_MESH:
+        mesh_crossing_shift(P, flag)
+
+    # Tally mesh crossing
+    if mcdc['tally']['crossing']:
         # Score on tally
-        if crossing_x and mcdc['tally']['crossing_x']:
-            score_crossing_x(P, t1, x1, y1, z1, mcdc)
-        if crossing_t and mcdc['tally']['crossing_t']:
-            score_crossing_t(P, t1, x1, y1, z1, mcdc)
+        if flag == MESH_X and mcdc['tally']['crossing_x']:
+            score_crossing_x(P, t, x, y, z, mcdc)
+        if flag == MESH_T and mcdc['tally']['crossing_t']:
+            score_crossing_t(P, t, x, y, z, mcdc)
 
 #==============================================================================
 # Lattice crossing
@@ -1029,59 +1108,53 @@ def lattice_crossing(P, mcdc):
     lattice = mcdc['lattice']
     mesh    = lattice['mesh']
 
-    # Small kick to make sure crossing
-    move_particle(P, PRECISION)
+    # Determine which dimension is crossed
+    x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
 
     # Apply BC if crossed
     reflected = False
-    if P['x'] < mesh['x'][0]:
-        if lattice['reflective_x-']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['ux'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['x'] > mesh['x'][-1]:
-        if lattice['reflective_x+']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['ux'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['y'] < mesh['y'][0]:
-        if lattice['reflective_y-']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uy'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['y'] > mesh['y'][-1]:
-        if lattice['reflective_y+']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uy'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['z'] < mesh['z'][0]:
-        if lattice['reflective_z-']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uz'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['z'] > mesh['z'][-1]:
-        if lattice['reflective_z+']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uz'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
+    if flag == MESH_X:
+        if x == 0 and P['ux'] < 0.0:
+            if lattice['reflective_x-']:
+                reflected = True
+                P['ux'] *= -1
+            else:
+                P['alive'] = False
+        elif x == len(mesh['x'])-2 and P['ux'] > 0.0:
+            if lattice['reflective_x+']:
+                reflected = True
+                P['ux'] *= -1
+            else:
+                P['alive'] = False
+    elif flag == MESH_Y:
+        if y == 0 and P['uy'] < 0.0:
+            if lattice['reflective_y-']:
+                reflected = True
+                P['uy'] *= -1
+            else:
+                P['alive'] = False
+        elif y == len(mesh['y'])-2 and P['uy'] > 0.0:
+            if lattice['reflective_y+']:
+                reflected = True
+                P['uy'] *= -1
+            else:
+                P['alive'] = False
+    elif flag == MESH_Z:
+        if z == 0 and P['uz'] < 0.0:
+            if lattice['reflective_z-']:
+                reflected = True
+                P['uz'] *= -1
+            else:
+                P['alive'] = False
+        elif z == len(mesh['z'])-2 and P['uz'] > 0.0:
+            if lattice['reflective_z+']:
+                reflected = True
+                P['uz'] *= -1
+            else:
+                P['alive'] = False
+
+    # Shift particle
+    mesh_crossing_shift(P, flag)
 
     # Set new universe
     if P['alive'] and not reflected:

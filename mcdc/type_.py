@@ -17,8 +17,8 @@ particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
                      ('ux', float64), ('uy', float64), ('uz', float64),
                      ('time', float64), ('speed', float64), ('group', uint64),
                      ('weight', float64), ('alive', bool_), ('cell_ID', uint64), 
-                     ('surface_ID', int64),
-                     ('universe_ID', int64),
+                     ('surface_ID', int64), ('universe_ID', int64), 
+                     ('event', int64),
                      ('shift_x', float64), ('shift_y', float64),
                      ('shift_z', float64), ('shift_t', float64)])
 
