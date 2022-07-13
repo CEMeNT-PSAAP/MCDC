@@ -1,5 +1,5 @@
 import os, glob
-'''
+
 # Fixed source
 for task in os.scandir('./fixed_source'):
     print(task)
@@ -8,7 +8,7 @@ for task in os.scandir('./fixed_source'):
         print(name)
         os.system("display %s"%name)
     os.chdir(r"../..")
-'''
+
 # Eigenvalue
 for task in os.scandir('./eigenvalue'):
     print(task)

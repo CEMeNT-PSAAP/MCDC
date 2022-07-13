@@ -14,7 +14,7 @@ for task in os.scandir('./fixed_source'):
         os.system("srun -n %i python input.py --mode=numba %i"%(N_proc,N_hist))
     os.system("python process.py %i"%N_max)
     os.chdir(r"../..")
-
+'''
 # Eigenvalue
 for task in os.scandir('./eigenvalue'):
     print(task)
@@ -22,3 +22,4 @@ for task in os.scandir('./eigenvalue'):
     os.system("srun -n %i python input.py --mode=numba"%(N_proc))
     os.system("python process.py")
     os.chdir(r"../..")
+'''

@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import h5py
 import sys
 
+output = sys.argv[1]
+
 # =============================================================================
 # Reference solution
 # =============================================================================
@@ -23,7 +25,7 @@ phi_exact /= np.sum(tmp*dx)
 # =============================================================================
 
 # Results
-with h5py.File('output.h5', 'r') as f:
+with h5py.File(output, 'r') as f:
     x       = f['tally/grid/x'][:]
     dx      = x[1:] - x[:-1]
     phi_avg = f['tally/flux-x/mean'][:]

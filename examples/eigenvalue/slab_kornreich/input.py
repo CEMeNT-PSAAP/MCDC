@@ -39,8 +39,8 @@ x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6,
 mcdc.tally(scores=['flux-x'], x=x)
 
 # Setting
-mcdc.setting(N_hist=1E3)
-mcdc.eigenmode(N_iter=30, gyration_radius='only-x')
+mcdc.setting(N_particle=1E3)
+mcdc.eigenmode(N_inactive=10, N_active=20, gyration_radius='only-x')
 
 # Run
 mcdc.run()

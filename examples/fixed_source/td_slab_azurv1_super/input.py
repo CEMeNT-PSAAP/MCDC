@@ -35,7 +35,7 @@ mcdc.tally(scores=['flux', 'flux-x', 'flux-t'],
            t=np.linspace(0.0, 20.0, 21))
 
 # Setting
-mcdc.setting(N_hist=1E3)
+mcdc.setting(N_particle=1E3)
 
 # Run
 mcdc.run()

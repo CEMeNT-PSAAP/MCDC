@@ -37,29 +37,15 @@ if phi_exact[0] < 0.0:
 
 # Results
 with h5py.File('output.h5', 'r') as f:
-    phi    = f['tally/flux/mean'][:]
-    phi_sd = f['tally/flux/sdev'][:]
-    k      = f['keff'][:]
+    phi_avg = f['tally/flux/mean'][:]
+    phi_sd  = f['tally/flux/sdev'][:]
+    k       = f['k_cycle'][:]
+    k_avg   = f['k_mean'][()]
+    k_sd    = f['k_sdev'][()]
 
-# Get average and stdv over the active iterations
-N_passive = 10
-N_active = 10
-phi_avg = np.zeros_like(phi[0])
-phi_sd  = np.zeros_like(phi[0])
-k_avg = 0.0
-k_sd  = 0.0
-for i in range(N_passive,len(phi)): 
-    phi_avg += phi[i][:]
-    phi_sd  += np.square(phi[i][:])
-    k_avg += k[i]
-    k_sd  += k[i]**2
-phi_avg /= N_active
-phi_sd  = np.sqrt((phi_sd/N_active - np.square(phi_avg))/(N_active-1))
 norm = np.sum(phi_avg)
 phi_avg = phi_avg/norm/dE*E_mid
 phi_sd  = phi_sd/norm/dE*E_mid
-k_avg /= N_active    
-k_sd  = np.sqrt((k_sd/N_active - np.square(k_avg))/(N_active-1))
     
 # Plot
 N_iter = len(k)

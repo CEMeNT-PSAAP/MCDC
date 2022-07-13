@@ -3,7 +3,7 @@ import sys
 
 import mcdc
 
-N_hist = int(sys.argv[2])
+N_particle = int(sys.argv[2])
 
 # =============================================================================
 # Set model
@@ -41,7 +41,7 @@ mcdc.tally(scores=['flux', 'current', 'flux-x', 'current-x'],
            x=np.linspace(0.0, 6.0, 61))
 
 # Setting
-mcdc.setting(N_hist=N_hist, output='output_'+str(N_hist), progress_bar=False)
+mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle), progress_bar=False)
 
 # Run
 mcdc.run()

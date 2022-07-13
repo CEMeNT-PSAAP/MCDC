@@ -39,25 +39,47 @@ def print_banner():
         print(banner)
         sys.stdout.flush()
 
-def print_progress(percent):
+def print_progress(percent, mcdc):
     if master:
         sys.stdout.write('\r')
-        sys.stdout.write(" [%-28s] %d%%" % ('='*int(percent*28), percent*100.0))
+        if not mcdc['setting']['mode_eigenvalue']:
+            sys.stdout.write(" [%-28s] %d%%" % ('='*int(percent*28), percent*100.0))
+        else:
+            if mcdc['setting']['gyration_radius']:
+                sys.stdout.write(" [%-40s] %d%%" % ('='*int(percent*40), percent*100.0))
+            else:
+                sys.stdout.write(" [%-32s] %d%%" % ('='*int(percent*32), percent*100.0))
         sys.stdout.flush()
+
+def print_header_eigenvalue(mcdc):
+    if master:
+        if mcdc['setting']['gyration_radius']:
+            print("\n #     k        GyRad.  k (avg)            ")
+            print(  " ====  =======  ======  ===================")
+        else:
+            print("\n #     k        k (avg)            ")
+            print(  " ====  =======  ===================")
 
 def print_progress_eigenvalue(mcdc):
     if master:
-        i_iter = mcdc['i_iter']
-        k_eff = mcdc['k_eff']
-        alpha_eff = mcdc['alpha_eff']
-        rg        = mcdc['gyration_radius'][i_iter]
+        i_cycle = mcdc['i_cycle']
+        k_eff   = mcdc['k_eff']
+        k_avg   = mcdc['k_avg_running']
+        k_sdv   = mcdc['k_sdv_running']
+        gr      = mcdc['gyration_radius'][i_cycle]
 
         sys.stdout.write('\r')
         sys.stdout.write("\033[K")
-        if not mcdc['setting']['mode_alpha']:
-            print(" %-4i  %.5f  %.3f"%(i_iter+1,k_eff,rg))
+        if mcdc['setting']['gyration_radius']:
+            if not mcdc['cycle_active']:
+                print(" %-4i  %.5f  %6.2f"%(i_cycle+1,k_eff,gr))
+            else:
+                print(" %-4i  %.5f  %6.2f  %.5f +/- %.5f"%(i_cycle+1,k_eff,gr,k_avg,k_sdv))
         else:
-            print(" %-4i  %.5f  %.3e  %.3f"%(i_iter+1,k_eff,alpha_eff,rg))
+            if not mcdc['cycle_active']:
+                print(" %-4i  %.5f"%(i_cycle+1,k_eff))
+            else:
+                print(" %-4i  %.5f  %.5f +/- %.5f"%(i_cycle+1,k_eff,k_avg,k_sdv))
         sys.stdout.flush()
 
 def print_runtime(mcdc):

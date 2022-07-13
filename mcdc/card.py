@@ -1,6 +1,6 @@
 import numpy as np
 
-from mcdc.constant import INF
+from mcdc.constant import INF, GR_ALL
 
 class InputCard:
     def __init__(self):
@@ -29,40 +29,59 @@ class InputCard:
         self.tally = {'tag'         : 'Tally',
                       'tracklength' : False,
                       'flux'        : False,
+                      'fission'     : False,
+                      'density'     : False,
                       'current'     : False,
                       'eddington'   : False,
                       'crossing'    : False,
                       'crossing_x'  : False,
-                      'crossing_t'  : False,
                       'flux_x'      : False,
-                      'flux_t'      : False,
+                      'density_x'   : False,
+                      'fission_x'   : False,
                       'current_x'   : False,
-                      'current_t'   : False,
                       'eddington_x' : False,
-                      'eddington_t' : False,
-                      'fission'     : False,
-                      'density'     : False,
+                      'crossing_y'  : False,
+                      'flux_y'      : False,
+                      'density_y'   : False,
+                      'fission_y'   : False,
+                      'current_y'   : False,
+                      'eddington_y' : False,
+                      'crossing_z'  : False,
+                      'flux_z'      : False,
+                      'density_z'   : False,
+                      'fission_z'   : False,
+                      'current_z'   : False,
+                      'eddington_z' : False,
+                      'crossing_t'  : False,
+                      'flux_t'      : False,
                       'density_t'   : False,
+                      'fission_t'   : False,
+                      'current_t'   : False,
+                      'eddington_t' : False,
                       'mesh'        : {'x' : np.array([-INF, INF]),
                                        'y' : np.array([-INF, INF]),
                                        'z' : np.array([-INF, INF]),
                                        't' : np.array([-INF, INF])}}
 
-        self.setting = {'tag'                 : 'Setting',
-                        'N_hist'              : 0,
-                        'N_iter'              : 1,
-                        'mode_eigenvalue'     : False,
-                        'mode_alpha'          : False,
-                        'time_boundary'       : INF,
-                        'rng_seed'            : 1,
-                        'rng_stride'          : 152917,
-                        'k_init'              : 1.0,
-                        'alpha_init'          : 0.0,
-                        'output'              : 'output',
-                        'progress_bar'        : True,
-                        'gyration_all'        : False,
-                        'gyration_infinite_z' : False,
-                        'gyration_only_x'     : False}
+        self.setting = {'tag'                  : 'Setting',
+                        'N_particle'           : 0,
+                        'N_inactive'           : 0,
+                        'N_active'             : 0,
+                        'N_cycle'              : 0,
+                        'mode_eigenvalue'      : False,
+                        'time_boundary'        : INF,
+                        'rng_seed'             : 1,
+                        'rng_stride'           : 152917,
+                        'rng_g'                : 2806196910506780709,
+                        'rng_c'                : 1,
+                        'rng_mod'              : 2**63,
+                        'k_init'               : 1.0,
+                        'output'               : 'output',
+                        'progress_bar'         : True,
+                        'gyration_radius'      : False,
+                        'gyration_radius_type' : GR_ALL,
+                        'filed_source'         : False,
+                        'source_file'          : ''}
 
         self.technique = {'tag'                  : 'Technique', 
                           'weighted_emission'    : True,
@@ -74,7 +93,10 @@ class InputCard:
                           'ww_mesh'              : {'x' : np.array([-INF, INF]),
                                                     'y' : np.array([-INF, INF]),
                                                     'z' : np.array([-INF, INF]),
-                                                    't' : np.array([-INF, INF])}}
+                                                    't' : np.array([-INF, INF])},
+                          'IC_generator'         : False,
+                          'IC_tmax'              : INF,
+                          'IC_N'                 : 0}
 
 class SurfaceHandle:
     def __init__(self, card):
