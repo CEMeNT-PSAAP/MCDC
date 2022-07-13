@@ -30,8 +30,8 @@ def sample_isotropic_direction(mcdc):
 def sample_uniform(a, b, mcdc):
     return a + rng(mcdc) * (b - a)
 
-@njit
 # TODO: use cummulative density function and binary search
+@njit
 def sample_discrete(p, mcdc):
     tot = 0.0
     xi  = rng(mcdc)
@@ -43,7 +43,8 @@ def sample_discrete(p, mcdc):
 #==============================================================================
 # Random number generator operations
 #==============================================================================
-    
+# TODO: make g, c, and mod constants
+
 @njit
 def rng_rebase(mcdc):
     mcdc['rng_seed_base'] = mcdc['rng_seed']
@@ -59,11 +60,11 @@ def rng_skip_ahead(n, mcdc):
 @njit
 def rng_skip_ahead_(n, mcdc):
     seed_base = mcdc['rng_seed_base']
-    g         = int(mcdc['rng_g'])
-    c         = int(mcdc['rng_c'])
+    g         = int(mcdc['setting']['rng_g'])
+    c         = int(mcdc['setting']['rng_c'])
     g_new     = 1
     c_new     = 0
-    mod       = int(mcdc['rng_mod'])
+    mod       = int(mcdc['setting']['rng_mod'])
     mod_mask  = int(mod - 1)
     
     n = n & mod_mask
@@ -81,9 +82,9 @@ def rng_skip_ahead_(n, mcdc):
 @njit
 def rng(mcdc):
     seed     = int(mcdc['rng_seed'])
-    g        = int(mcdc['rng_g'])
-    c        = int(mcdc['rng_c'])
-    mod      = int(mcdc['rng_mod'])
+    g        = int(mcdc['setting']['rng_g'])
+    c        = int(mcdc['setting']['rng_c'])
+    mod      = int(mcdc['setting']['rng_mod'])
     mod_mask = int(mod - 1)
 
     mcdc['rng_seed'] = (g*int(seed) + c) & mod_mask
@@ -154,7 +155,7 @@ def pop_particle(bank):
 def manage_particle_banks(mcdc):
     if mcdc['setting']['mode_eigenvalue']:
         # Normalize weight
-        normalize_weight(mcdc['bank_census'], mcdc['setting']['N_hist'])
+        normalize_weight(mcdc['bank_census'], mcdc['setting']['N_particle'])
 
     # Sync RNG
     skip = mcdc['mpi_work_size_total']-mcdc['mpi_work_start']
@@ -182,7 +183,7 @@ def manage_particle_banks(mcdc):
 @njit
 def population_control(mcdc):
     bank_census = mcdc['bank_census']
-    M           = mcdc['setting']['N_hist']
+    M           = mcdc['setting']['N_particle']
     bank_source = mcdc['bank_source']
     
     # Scan the bank
@@ -353,6 +354,70 @@ def distribute_work(N, mcdc):
     mcdc['mpi_work_size']       = work_size
     mcdc['mpi_work_size_total'] = work_size_total
 
+# TODO
+'''
+@njit
+def bank_IC(P, mcdc):
+    material = get_material(P, mcdc)
+    g        = P['group']
+    J        = material['J']
+    G        = material['G']
+    nu_d     = material['nu_d'][g]/mcdc['k_eff']
+    SigmaT   = material['total'][g]
+    SigmaF   = material['fission'][g]
+    decay    = material['decay']
+    v        = P['speed']
+    weight   = P['weight']
+
+    flux = weight/SigmaT
+    
+    # Sample prompt neutron
+    prob = flux/v/mcdc['IC_n_total']
+    if rng(mcdc) < prob:
+        P_new           = copy_particle(P)
+        P_new['time']   = 0.0
+        P_new['weight'] = 1.0
+        add_particle(P_new, mcdc['bank_IC'])
+        mcdc['IC_counter_p'] += 1
+        mcdc['IC_fission']   += SigmaF*v
+
+    # Sample delayed neutrons
+    tmax = mcdc['setting']['IC_tmax']
+    for j in range(J):
+        prob = flux*nu_d[j]*SigmaF/decay[j]/mcdc['IC_n_total']\
+               *(1.0 - math.exp(-decay[j]*tmax))
+        if rng(mcdc) < prob:
+            P_new           = copy_particle(P)
+            P_new['weight'] = 1.0
+
+            # Rejection-sample emission time
+            while True:
+                xi   = rng(mcdc)
+                time = -math.log(xi)/decay[j]
+                # Accept if it's inside maximum time
+                if time < tmax:
+                    break
+            P_new['time'] = time
+
+            # Sample energy
+            spectrum = material['chi_d'][j]
+            xi       = rng(mcdc)
+            tot      = 0.0
+            for g_out in range(G):
+                tot += spectrum[g_out]
+                if tot > xi:
+                    break
+            P_new['group'] = g_out
+            P_new['speed'] = material['speed'][g_out]
+
+            # Sample isotropic direction
+            P_new['ux'], P_new['uy'], P_new['uz'] = \
+                    sample_isotropic_direction(mcdc)
+            
+            add_particle(P_new, mcdc['bank_IC'])
+            mcdc['IC_counter_d'][j] += 1
+'''
+
 #==============================================================================
 # Particle operations
 #==============================================================================
@@ -374,6 +439,7 @@ def make_particle():
     P['cell_ID']     = -1
     P['surface_ID']  = -1
     P['universe_ID'] = -1
+    P['event']       = -1
     P['shift_x']     = 0.0
     P['shift_y']     = 0.0
     P['shift_z']     = 0.0
@@ -397,6 +463,7 @@ def copy_particle(P):
     P_new['cell_ID']     = P['cell_ID']   
     P_new['surface_ID']  = P['surface_ID']
     P_new['universe_ID'] = P['universe_ID']
+    P_new['event']       = P['event']
     P_new['shift_x']     = P['shift_x']
     P_new['shift_y']     = P['shift_y']
     P_new['shift_z']     = P['shift_z']
@@ -422,6 +489,22 @@ def move_particle(P, distance):
     P['y']    += P['uy']*distance
     P['z']    += P['uz']*distance
     P['time'] += distance/P['speed']
+
+@njit
+def shift_particle(P, shift):
+    if P['ux'] > 0.0:
+        P['x'] += shift
+    else:
+        P['x'] -= shift
+    if P['uy'] > 0.0:
+        P['y'] += shift
+    else:
+        P['y'] -= shift
+    if P['uz'] > 0.0:
+        P['z'] += shift
+    else:
+        P['z'] -= shift
+    P['time'] += shift
 
 #==============================================================================
 # Universe operations
@@ -471,7 +554,7 @@ def set_cell(P, mcdc):
 
 @njit
 def cell_check(P, cell, mcdc):
-    for i in range(cell['N_surfaces']):
+    for i in range(cell['N_surface']):
         surface = mcdc['surfaces'][cell['surface_IDs'][i]]
         result  = surface_evaluate(P, surface)
         if cell['positive_flags'][i]:
@@ -530,6 +613,32 @@ def surface_reflect(P, surface):
     P['ux'] = ux - c*nx
     P['uy'] = uy - c*ny
     P['uz'] = uz - c*nz
+
+@njit
+def surface_shift(P, surface):
+    ux = P['ux']
+    uy = P['uy']
+    uz = P['uz']
+
+    # Get surface normal
+    nx, ny, nz = surface_normal(P, surface)
+
+    # The shift
+    shift_x = nx*SHIFT
+    shift_y = ny*SHIFT
+    shift_z = nz*SHIFT
+
+    # Get dot product to determine shift sign
+    dot = ux*nx + uy*ny + uz*nz
+
+    if dot > 0.0:
+        P['x'] += shift_x
+        P['y'] += shift_y
+        P['z'] += shift_z
+    else:
+        P['x'] -= shift_x
+        P['y'] -= shift_y
+        P['z'] -= shift_z
 
 @njit
 def surface_normal(P, surface):
@@ -641,6 +750,49 @@ def mesh_get_index(P, mesh):
     z = binary_search(P['z'],    mesh['z'])
     return t, x, y, z
 
+@njit
+def mesh_crossing_evaluate(P, mesh):
+    # Shift backward
+    shift_particle(P, -SHIFT)
+    t1, x1, y1, z1 = mesh_get_index(P, mesh)
+   
+    # Double shift forward
+    shift_particle(P, 2*SHIFT)
+    t2, x2, y2, z2 = mesh_get_index(P, mesh)
+
+    # Return particle to initial position
+    shift_particle(P, -SHIFT)
+    
+    # Determine dimension crossed
+    if x1 != x2:
+        return x1, y1, z1, t1, MESH_X
+    elif y1 != y2:
+        return x1, y1, z1, t1, MESH_Y
+    elif z1 != z2:
+        return x1, y1, z1, t1, MESH_Z
+    elif t1 != t2:
+        return x1, y1, z1, t1, MESH_T
+
+@njit 
+def mesh_crossing_shift(P, flag):
+    if flag == MESH_X:
+        if P['ux'] > 0.0:
+            P['x'] += SHIFT
+        else:
+            P['x'] -= SHIFT
+    elif flag == MESH_Y:
+        if P['uy'] > 0.0:
+            P['y'] += SHIFT
+        else:
+            P['y'] -= SHIFT
+    elif flag == MESH_Z:
+        if P['uz'] > 0.0:
+            P['z'] += SHIFT
+        else:
+            P['z'] -= SHIFT
+    elif flag == MESH_T:
+        P['time'] += SHIFT
+
 #==============================================================================
 # Tally operations
 #==============================================================================
@@ -658,32 +810,21 @@ def score_tracklength(P, distance, mcdc):
     flux = distance*P['weight']
     if tally['flux']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux'])
-    if tally['current']:
-        score_current(g, t, x, y, z, flux, P, tally['score']['current'])
-    if tally['eddington']:
-        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington'])
     if tally['fission']:
         flux *= material['fission'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['fission'])
     if tally['density']:
         flux /= material['speed'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['density'])
-
-    # Score eigenvalue tallies
-    if mcdc['setting']['mode_eigenvalue']:
-        weight   = P['weight']
-        nu       = material['nu_p'][g]\
-                   + sum(material['nu_d'][g])
-        SigmaF   = material['fission'][g]
-        nuSigmaF = nu*SigmaF
-        mcdc['nuSigmaF'] += weight*distance*nuSigmaF
-
-        if mcdc['setting']['mode_alpha']:
-            mcdc['inverse_speed'] += weight*distance/P['speed']
+    if tally['current']:
+        score_current(g, t, x, y, z, flux, P, tally['score']['current'])
+    if tally['eddington']:
+        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington'])
 
 @njit
 def score_crossing_x(P, t, x, y, z, mcdc):
-    tally = mcdc['tally']
+    tally    = mcdc['tally']
+    material = get_material(P, mcdc)
 
     # Get indices
     g = P['group']
@@ -694,10 +835,66 @@ def score_crossing_x(P, t, x, y, z, mcdc):
     flux = P['weight']/abs(P['ux'])
     if tally['flux_x']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_x'])
+    if tally['fission_x']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_x'])
+    if tally['density_x']:
+        flux /= material['speed'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['density_x'])
     if tally['current_x']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_x'])
     if tally['eddington_x']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_x'])
+
+@njit
+def score_crossing_y(P, t, x, y, z, mcdc):
+    tally    = mcdc['tally']
+    material = get_material(P, mcdc)
+
+    # Get indices
+    g = P['group']
+    if P['uy'] > 0.0:
+        y += 1
+
+    # Score
+    flux = P['weight']/abs(P['ux'])
+    if tally['flux_y']:
+        score_flux(g, t, x, y, z, flux, tally['score']['flux_y'])
+    if tally['fission_y']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_y'])
+    if tally['density_y']:
+        flux /= material['speed'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['density_y'])
+    if tally['current_y']:
+        score_current(g, t, x, y, z, flux, P, tally['score']['current_y'])
+    if tally['eddington_y']:
+        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_y'])
+
+@njit
+def score_crossing_z(P, t, x, y, z, mcdc):
+    tally    = mcdc['tally']
+    material = get_material(P, mcdc)
+
+    # Get indices
+    g = P['group']
+    if P['uz'] > 0.0:
+        z += 1
+
+    # Score
+    flux = P['weight']/abs(P['ux'])
+    if tally['flux_z']:
+        score_flux(g, t, x, y, z, flux, tally['score']['flux_z'])
+    if tally['fission_z']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_z'])
+    if tally['density_z']:
+        flux /= material['speed'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['density_z'])
+    if tally['current_z']:
+        score_current(g, t, x, y, z, flux, P, tally['score']['current_z'])
+    if tally['eddington_z']:
+        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_z'])
 
 @njit
 def score_crossing_t(P, t, x, y, z, mcdc):
@@ -712,13 +909,16 @@ def score_crossing_t(P, t, x, y, z, mcdc):
     flux = P['weight']*P['speed']
     if tally['flux_t']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_t'])
+    if tally['fission_t']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_t'])
+    if tally['density_t']:
+        flux /= material['speed'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['density_t'])
     if tally['current_t']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_t'])
     if tally['eddington_t']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_t'])
-    if tally['density_t']:
-        flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['density_t'])
 
 @njit
 def score_flux(g, t, x, y, z, flux, score):
@@ -743,21 +943,46 @@ def score_eddington(g, t, x, y, z, flux, P, score):
     score['bin'][g, t, x, y, z, 5] += flux*uz*uz
 
 @njit
+def score_closeout_history(score, mcdc):
+    # Normalize if eigenvalue mode
+    if mcdc['setting']['mode_eigenvalue']:
+        score['bin'][:] /= mcdc['setting']['N_particle']
+
+    # Accumulate score and square of score into mean and sdev
+    score['mean'][:] += score['bin']
+    score['sdev'][:] += np.square(score['bin'])
+
+    # Reset bin
+    score['bin'].fill(0.0)
+
+@njit
+def score_closeout(score, mcdc):
+    N_history = mcdc['setting']['N_particle']
+    if mcdc['setting']['mode_eigenvalue']:
+        N_history = mcdc['setting']['N_active']
+
+    # MPI Reduce
+    buff    = np.zeros_like(score['mean'])
+    buff_sq = np.zeros_like(score['sdev'])
+    with objmode():
+        MPI.COMM_WORLD.Reduce(np.array(score['mean']), buff, MPI.SUM, 0)
+        MPI.COMM_WORLD.Reduce(np.array(score['sdev']), buff_sq, MPI.SUM, 0)
+    score['mean'][:] = buff
+    score['sdev'][:] = buff_sq
+    
+    # Store results
+    score['mean'][:] = score['mean']/N_history
+    score['sdev'][:] = \
+            np.sqrt((score['sdev']/N_history - np.square(score['mean']))\
+            /(N_history-1))
+
+@njit
 def tally_closeout_history(mcdc):
     tally = mcdc['tally']
 
     for name in literal_unroll(score_list):
         if tally[name]:
-            score_closeout_history(tally['score'][name])
-
-@njit
-def score_closeout_history(score):
-    # Accumulate sums of history
-    score['sum'][:]    += score['bin']
-    score['sum_sq'][:] += np.square(score['bin'])
-
-    # Reset bin
-    score['bin'].fill(0.0)
+            score_closeout_history(tally['score'][name], mcdc)
 
 @njit
 def tally_closeout(mcdc):
@@ -765,109 +990,155 @@ def tally_closeout(mcdc):
 
     for name in literal_unroll(score_list):
         if tally[name]:
-            score_closeout(tally['score'][name], mcdc['setting']['N_hist'], mcdc['i_iter'], mcdc)
+            score_closeout(tally['score'][name], mcdc)
 
-    # Global tally
-    N_hist = mcdc['setting']['N_hist']
-    i_iter = mcdc['i_iter']
-
-    if mcdc['setting']['mode_eigenvalue']:
-        # MPI Allreduce
-        buff1 = np.zeros(1, np.float64)
-        buff2 = np.zeros(1, np.float64)
-        with objmode():
-            MPI.COMM_WORLD.Allreduce(np.array([mcdc['nuSigmaF']]), buff1, MPI.SUM)
-            if mcdc['setting']['mode_alpha']:
-                MPI.COMM_WORLD.Allreduce(np.array([mcdc['inverse_speed']]), buff2, MPI.SUM)
-        mcdc['nuSigmaF'] = buff1[0]
-        mcdc['inverse_speed'] = buff2[0]
-        
-        # Update and store k_eff
-        mcdc['k_eff'] = mcdc['nuSigmaF']/N_hist
-        mcdc['k_iterate'][i_iter] = mcdc['k_eff']
-        
-        # Update and store alpha_eff
-        if mcdc['setting']['mode_alpha']:
-            k_eff         = mcdc['k_eff']
-            inverse_speed = mcdc['inverse_speed']/N_hist
-
-            mcdc['alpha_eff'] += (k_eff - 1.0)/inverse_speed
-            mcdc['alpha_iterate'][i_iter] = mcdc['alpha_eff']
-                    
-        # Reset accumulators
-        mcdc['nuSigmaF'] = 0.0
-        if mcdc['setting']['mode_alpha']:
-            mcdc['inverse_speed'] = 0.0        
-
-        # =====================================================================
-        # Gyration radius
-        # =====================================================================
-        
-        # Center of mass
-        N_local     = mcdc['bank_census']['size']
-        total_local = np.zeros(4, np.float64) # [x,y,z,W]
-        total       = np.zeros(4, np.float64)
-        for i in range(N_local):
-            P = mcdc['bank_census']['particles'][i]
-            total_local[0] += P['x']*P['weight']
-            total_local[1] += P['y']*P['weight']
-            total_local[2] += P['z']*P['weight']
-            total_local[3] += P['weight']
-        # MPI Allreduce
-        with objmode():
-            MPI.COMM_WORLD.Allreduce(total_local, total, MPI.SUM)
-        # COM
-        W     = total[3]
-        com_x = total[0]/W
-        com_y = total[1]/W
-        com_z = total[2]/W
-    
-        # Distance RMS
-        rms_local = np.zeros(1, np.float64)
-        rms       = np.zeros(1, np.float64)
-        if mcdc['gyration_all']:
-            for i in range(N_local):
-                P = mcdc['bank_census']['particles'][i]
-                rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
-                                 (P['z'] - com_z)**2)*P['weight']
-        elif mcdc['gyration_infinite_z']:
-            for i in range(N_local):
-                P = mcdc['bank_census']['particles'][i]
-                rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
-                                *P['weight']
-        elif mcdc['gyration_only_x']:
-            for i in range(N_local):
-                P = mcdc['bank_census']['particles'][i]
-                rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
-        # MPI Allreduce
-        with objmode():
-            MPI.COMM_WORLD.Allreduce(rms_local, rms, MPI.SUM)
-        rms = math.sqrt(rms[0]/W)
-        
-        # Gyration radius
-        mcdc['gyration_radius'][i_iter] = rms
+#==============================================================================
+# Global tally operations
+#==============================================================================
 
 @njit
-def score_closeout(score, N_hist, i_iter, mcdc):
-    # MPI Reduce
-    buff    = np.zeros_like(score['sum'])
-    buff_sq = np.zeros_like(score['sum_sq'])
-    with objmode():
-        MPI.COMM_WORLD.Reduce(np.array(score['sum']), buff, MPI.SUM, 0)
-        MPI.COMM_WORLD.Reduce(np.array(score['sum_sq']), buff_sq, MPI.SUM, 0)
-    score['sum'][:]    = buff
-    score['sum_sq'][:] = buff_sq
-    
-    # Store results
-    score['mean'][i_iter,:] = score['sum']/N_hist
-    score['sdev'][i_iter,:] = np.sqrt((score['sum_sq']/N_hist 
-                                - np.square(score['mean'][i_iter]))\
-                               /(N_hist-1))
-    
-    # Reset history sums
-    score['sum'].fill(0.0)
-    score['sum_sq'].fill(0.0)
+def global_tally(P, distance, mcdc):
+    tally    = mcdc['tally']
+    material = get_material(P, mcdc)
 
+    # Parameters
+    flux     = distance*P['weight']
+    g        = P['group']
+    nu       = material['nu_p'][g] + sum(material['nu_d'][g])
+    SigmaF   = material['fission'][g]
+    nuSigmaF = nu*SigmaF
+
+    mcdc['fission_production'] += flux*nuSigmaF
+
+    # TODO
+    '''
+    if mcdc['setting']['generate_IC'] and mcdc['2nd_last_iteration']:
+        J     = material['J']
+        nu_d  = material['nu_d'][g]/mcdc['k_eff']
+        decay = material['decay']
+
+        # Prompt
+        IC_n_total = 1.0/P['speed']
+        # Delayed
+        tmax = mcdc['setting']['IC_tmax']
+        for j in range(J):
+            IC_n_total += nu_d[j]*SigmaF/decay[j]\
+                          *(1.0 - math.exp(-decay[j]*tmax))
+        # Finalize
+        IC_n_total *= flux
+        mcdc['IC_n_total'] += IC_n_total
+    '''
+
+@njit
+def global_tally_closeout_history(mcdc):
+    N_particle = mcdc['setting']['N_particle']
+
+    if mcdc['setting']['mode_eigenvalue']:
+        i_cycle = mcdc['i_cycle']
+
+        # MPI Allreduce
+        buff1 = np.zeros(1, np.float64)
+        buff3 = np.zeros(1, np.float64)
+        with objmode():
+            MPI.COMM_WORLD.Allreduce(np.array([mcdc['fission_production']]), buff1, MPI.SUM)
+            # TODO
+            '''
+            if mcdc['setting']['generate_IC'] and mcdc['2nd_last_iteration']:
+                MPI.COMM_WORLD.Allreduce(np.array([mcdc['IC_n_total']]), buff2, MPI.SUM)
+            '''
+        mcdc['fission_production'] = buff1[0]
+        #mcdc['IC_n_total']    = buff2[0]/N_particle
+        
+        # Update and store k_eff
+        mcdc['k_eff'] = mcdc['fission_production']/N_particle
+        mcdc['k_cycle'][i_cycle] = mcdc['k_eff']
+       
+        # Accumulate running average
+        if mcdc['cycle_active']:
+            mcdc['k_avg'] += mcdc['k_eff']
+            mcdc['k_sdv'] += mcdc['k_eff']*mcdc['k_eff']
+
+            N = 1 + mcdc['i_cycle'] - mcdc['setting']['N_inactive']
+            mcdc['k_avg_running'] = mcdc['k_avg']/N
+            if N == 1:
+                mcdc['k_sdv_running'] = 0.0
+            else:
+                mcdc['k_sdv_running'] = \
+                        math.sqrt((mcdc['k_sdv']/N - mcdc['k_avg_running']**2)\
+                        /(N-1))
+
+        # Reset accumulators
+        mcdc['fission_production'] = 0.0
+
+        # =====================================================================
+        # Gyration radius
+        # =====================================================================
+        
+        if mcdc['setting']['gyration_radius']:
+            # Center of mass
+            N_local     = mcdc['bank_census']['size']
+            total_local = np.zeros(4, np.float64) # [x,y,z,W]
+            total       = np.zeros(4, np.float64)
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                total_local[0] += P['x']*P['weight']
+                total_local[1] += P['y']*P['weight']
+                total_local[2] += P['z']*P['weight']
+                total_local[3] += P['weight']
+            # MPI Allreduce
+            with objmode():
+                MPI.COMM_WORLD.Allreduce(total_local, total, MPI.SUM)
+            # COM
+            W     = total[3]
+            com_x = total[0]/W
+            com_y = total[1]/W
+            com_z = total[2]/W
+        
+            # Distance RMS
+            rms_local = np.zeros(1, np.float64)
+            rms       = np.zeros(1, np.float64)
+            gr_type = mcdc['setting']['gyration_radius_type']
+            if gr_type == GR_ALL:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
+                                     (P['z'] - com_z)**2)*P['weight']
+            elif gr_type == GR_INFINITE_X:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['y'] - com_y)**2 + (P['z'] - com_z)**2)\
+                                    *P['weight']
+            elif gr_type == GR_INFINITE_Y:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['x'] - com_x)**2 + (P['z'] - com_z)**2)\
+                                    *P['weight']
+            elif gr_type == GR_INFINITE_Z:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
+                                    *P['weight']
+            elif gr_type == GR_ONLY_X:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
+            elif gr_type == GR_ONLY_Y:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['y'] - com_y)**2)*P['weight']
+            elif gr_type == GR_ONLY_Z:
+                for i in range(N_local):
+                    P = mcdc['bank_census']['particles'][i]
+                    rms_local[0] += ((P['z'] - com_z)**2)*P['weight']
+
+            # MPI Allreduce
+            with objmode():
+                MPI.COMM_WORLD.Allreduce(rms_local, rms, MPI.SUM)
+            rms = math.sqrt(rms[0]/W)
+            
+            # Gyration radius
+            mcdc['gyration_radius'][i_cycle] = rms
+            
 #==============================================================================
 # Move to event
 #==============================================================================
@@ -884,22 +1155,24 @@ def move_to_event(P, mcdc):
     # Determine event
     event    = EVENT_COLLISION
     distance = d_collision
-    if distance > d_time_boundary + PRECISION:
+    if distance > d_time_boundary:
         event = EVENT_TIME_BOUNDARY
         distance = d_time_boundary
-    if distance > d_surface + PRECISION:
+    if distance > d_surface:
         event  = EVENT_SURFACE
         distance = d_surface
-    if distance > d_lattice + PRECISION:
+    if distance > d_lattice:
         event  = EVENT_LATTICE
         distance = d_lattice
-    if distance > d_mesh + PRECISION:
+    if distance > d_mesh:
         event  = EVENT_MESH
         distance = d_mesh
 
     # Score tracklength tallies
-    if mcdc['tally']['tracklength']:
+    if mcdc['tally']['tracklength'] and mcdc['cycle_active']:
         score_tracklength(P, distance, mcdc)
+    if mcdc['setting']['mode_eigenvalue']:
+        global_tally(P, distance, mcdc)
 
     # Move particle
     move_particle(P, distance)
@@ -918,7 +1191,8 @@ def move_to_event(P, mcdc):
     if event == EVENT_LATTICE and d_lattice == d_mesh:
         event = EVENT_LATTICE_N_MESH
     
-    return event
+    # Assign event
+    P['event'] = event
 
 @njit
 def distance_to_collision(P, mcdc):
@@ -929,10 +1203,6 @@ def distance_to_collision(P, mcdc):
     # Vacuum material?
     if SigmaT == 0.0:
         return INF
-
-    # Time absorption?
-    if mcdc['setting']['mode_alpha']:
-        SigmaT += abs(mcdc['alpha_eff'])/P['speed']
 
     # Sample collision distance
     xi     = rng(mcdc)
@@ -945,7 +1215,7 @@ def distance_to_nearest_surface(P, mcdc):
     distance   = INF
 
     cell = get_cell(P, mcdc)
-    for i in range(cell['N_surfaces']):
+    for i in range(cell['N_surface']):
         surface = mcdc['surfaces'][cell['surface_IDs'][i]]
         d = surface_distance(P, surface)
         if d < distance:
@@ -981,8 +1251,8 @@ def surface_crossing(P, mcdc):
     surface = mcdc['surfaces'][P['surface_ID']]
     surface_bc(P, surface)
 
-    # Small kick to make sure crossing
-    move_particle(P, PRECISION)
+    # Small shift to ensure crossing
+    surface_shift(P, surface)
  
     # Set new cell
     if P['alive'] and not surface['reflective']:
@@ -994,31 +1264,26 @@ def surface_crossing(P, mcdc):
 
 @njit
 def mesh_crossing(P, mcdc):
-    if not mcdc['tally']['crossing']:
-        # Small-kick to ensure crossing
-        move_particle(P, PRECISION)
-    else:
-        # Use small-kick back and forth to determine which mesh is crossed
-        # First, backward small-kick
-        move_particle(P, -PRECISION)
-        t1, x1, y1, z1 = mesh_get_index(P, mcdc['tally']['mesh'])
-        # Then, double forward small-kick
-        move_particle(P, 2*PRECISION)
-        t2, x2, y2, z2 = mesh_get_index(P, mcdc['tally']['mesh'])
+    mesh = mcdc['tally']['mesh']
 
-        # Determine which mesh is crossed
-        crossing_x = False
-        crossing_t = False
-        if x1 != x2:
-            crossing_x = True
-        if t1 != t2:
-            crossing_t = True
+    # Determine which dimension is crossed
+    x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
 
+    # Shift particle if surface and lattice are not crossed as well
+    if P['event'] == EVENT_MESH:
+        mesh_crossing_shift(P, flag)
+
+    # Tally mesh crossing
+    if mcdc['tally']['crossing'] and mcdc['cycle_active']:
         # Score on tally
-        if crossing_x and mcdc['tally']['crossing_x']:
-            score_crossing_x(P, t1, x1, y1, z1, mcdc)
-        if crossing_t and mcdc['tally']['crossing_t']:
-            score_crossing_t(P, t1, x1, y1, z1, mcdc)
+        if flag == MESH_X and mcdc['tally']['crossing_x']:
+            score_crossing_x(P, t, x, y, z, mcdc)
+        if flag == MESH_Y and mcdc['tally']['crossing_y']:
+            score_crossing_y(P, t, x, y, z, mcdc)
+        if flag == MESH_Z and mcdc['tally']['crossing_z']:
+            score_crossing_z(P, t, x, y, z, mcdc)
+        if flag == MESH_T and mcdc['tally']['crossing_t']:
+            score_crossing_t(P, t, x, y, z, mcdc)
 
 #==============================================================================
 # Lattice crossing
@@ -1029,59 +1294,53 @@ def lattice_crossing(P, mcdc):
     lattice = mcdc['lattice']
     mesh    = lattice['mesh']
 
-    # Small kick to make sure crossing
-    move_particle(P, PRECISION)
+    # Determine which dimension is crossed
+    x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
 
     # Apply BC if crossed
     reflected = False
-    if P['x'] < mesh['x'][0]:
-        if lattice['reflective_x-']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['ux'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['x'] > mesh['x'][-1]:
-        if lattice['reflective_x+']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['ux'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['y'] < mesh['y'][0]:
-        if lattice['reflective_y-']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uy'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['y'] > mesh['y'][-1]:
-        if lattice['reflective_y+']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uy'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['z'] < mesh['z'][0]:
-        if lattice['reflective_z-']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uz'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
-    elif P['z'] > mesh['z'][-1]:
-        if lattice['reflective_z+']:
-            reflected = True
-            move_particle(P, -PRECISION)
-            P['uz'] *= -1
-            move_particle(P, PRECISION)
-        else:
-            P['alive'] = False
+    if flag == MESH_X:
+        if x == 0 and P['ux'] < 0.0:
+            if lattice['reflective_x-']:
+                reflected = True
+                P['ux'] *= -1
+            else:
+                P['alive'] = False
+        elif x == len(mesh['x'])-2 and P['ux'] > 0.0:
+            if lattice['reflective_x+']:
+                reflected = True
+                P['ux'] *= -1
+            else:
+                P['alive'] = False
+    elif flag == MESH_Y:
+        if y == 0 and P['uy'] < 0.0:
+            if lattice['reflective_y-']:
+                reflected = True
+                P['uy'] *= -1
+            else:
+                P['alive'] = False
+        elif y == len(mesh['y'])-2 and P['uy'] > 0.0:
+            if lattice['reflective_y+']:
+                reflected = True
+                P['uy'] *= -1
+            else:
+                P['alive'] = False
+    elif flag == MESH_Z:
+        if z == 0 and P['uz'] < 0.0:
+            if lattice['reflective_z-']:
+                reflected = True
+                P['uz'] *= -1
+            else:
+                P['alive'] = False
+        elif z == len(mesh['z'])-2 and P['uz'] > 0.0:
+            if lattice['reflective_z+']:
+                reflected = True
+                P['uz'] *= -1
+            else:
+                P['alive'] = False
+
+    # Shift particle
+    mesh_crossing_shift(P, flag)
 
     # Set new universe
     if P['alive'] and not reflected:
@@ -1104,17 +1363,9 @@ def collision(P, mcdc):
     SigmaS   = material['scatter'][g]
     SigmaF   = material['fission'][g]
 
-    if mcdc['setting']['mode_alpha']:
-        Sigma_alpha = abs(mcdc['alpha_eff'])/P['speed']
-        SigmaT += Sigma_alpha
-
     if mcdc['technique']['implicit_capture']:
-        if mcdc['setting']['mode_alpha']:
-            P['weight'] *= (SigmaT-SigmaC-Sigma_alpha)/SigmaT
-            SigmaT      -= (SigmaC + Sigma_alpha)
-        else:
-            P['weight'] *= (SigmaT-SigmaC)/SigmaT
-            SigmaT      -= SigmaC
+        P['weight'] *= (SigmaT-SigmaC)/SigmaT
+        SigmaT      -= SigmaC
 
     # Sample collision type
     xi = rng(mcdc)*SigmaT
@@ -1126,11 +1377,7 @@ def collision(P, mcdc):
         if tot > xi:
             event = EVENT_FISSION
         else:
-            tot += SigmaC
-            if tot > xi:
-                event = EVENT_CAPTURE
-            else:
-                event = EVENT_TIME_REACTION
+            event = EVENT_CAPTURE
     return event
 
 #==============================================================================
@@ -1214,7 +1461,7 @@ def scattering(P, mcdc):
             P_new['uy'] = uy*mu - cos_azi*Ac*B
         
         # Bank
-        add_particle(P_new, mcdc['bank_history'])
+        add_particle(P_new, mcdc['bank_active'])
         
 #==============================================================================
 # Fission
@@ -1257,7 +1504,7 @@ def fission(P, mcdc):
             decay    = material['decay'][j]
 
         # Sample number of fission neutrons
-        N = int(math.floor(weight_eff*nu + rng(mcdc)))
+        N = int(math.floor(weight_eff*nu/mcdc['k_eff'] + rng(mcdc)))
 
         # Push fission neutrons to bank
         for n in range(N):
@@ -1271,7 +1518,7 @@ def fission(P, mcdc):
             # Sample emission time
             if not prompt:
                 xi = rng(mcdc)
-                P_new['time'] = P['time'] - math.log(xi)/decay
+                P_new['time'] -= math.log(xi)/decay
 
                 # Skip if it's beyond time boundary
                 if P_new['time'] > mcdc['setting']['time_boundary']:
@@ -1295,18 +1542,80 @@ def fission(P, mcdc):
             if mcdc['setting']['mode_eigenvalue']:
                 add_particle(P_new, mcdc['bank_census'])
             else:
-                add_particle(P_new, mcdc['bank_history'])
+                add_particle(P_new, mcdc['bank_active'])
 
 #==============================================================================
-# Time reaction
+# Branchless collision
 #==============================================================================
 
 @njit
-def time_reaction(P, mcdc):
-    if mcdc['alpha_eff'] > 0:
-        pass # Already killed
+def branchless_collision(P, mcdc):
+    # Data
+    material = get_material(P, mcdc)
+    w        = P['weight']
+    g        = P['group']
+    SigmaT   = material['total'][g]
+    SigmaF   = material['fission'][g]
+    SigmaS   = material['scatter'][g]
+    nu_s     = material['nu_s'][g]
+    nu_p     = material['nu_p'][g]/mcdc['k_eff']
+    nu_d     = material['nu_d'][g]/mcdc['k_eff']
+    J        = material['J']
+    G        = material['G']
+
+    # Total nu fission
+    nu = nu_p
+    for j in range(J):
+        nu += nu_d[j]
+
+    # Set weight
+    n_scatter    = nu_s*SigmaS
+    n_fission    = nu*SigmaF
+    n_total      = n_fission + n_scatter
+    P['weight'] *= n_total/SigmaT
+
+    # Set spectrum and decay rate
+    fission = True
+    prompt  = True
+    if rng(mcdc) < n_scatter/n_total:
+        fission  = False
+        spectrum = material['chi_s'][g]
     else:
-        add_particle(copy_particle(P), mcdc['bank_history'])
+        xi  = rng(mcdc)*nu
+        tot = nu_p
+        if xi < tot:
+            spectrum = material['chi_p'][g]
+        else:
+            prompt = False
+            for j in range(J):
+                tot += nu_d[j]
+                if xi < tot:
+                    spectrum = material['chi_d'][j]
+                    decay    = material['decay'][j]
+                    break
+
+    # Set time
+    if not prompt:
+        xi = rng(mcdc)
+        P['time'] -= math.log(xi)/decay
+
+        # Kill if it's beyond time boundary
+        if P['time'] > mcdc['setting']['time_boundary']:
+            P['alive'] = False
+            return
+    
+    # Set energy
+    xi  = rng(mcdc)
+    tot = 0.0
+    for g_out in range(G):
+        tot += spectrum[g_out]
+        if tot > xi:
+            P['group'] = g_out
+            P['speed'] = material['speed'][g_out]
+            break
+
+    # Set direction (TODO: anisotropic scattering)
+    P['ux'], P['uy'], P['uz'] = sample_isotropic_direction(mcdc)
 
 #==============================================================================
 # Time boundary
@@ -1342,13 +1651,13 @@ def weight_window(P, mcdc):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split-1):
-            add_particle(copy_particle(P), mcdc['bank_history'])
+            add_particle(copy_particle(P), mcdc['bank_active'])
 
         # Russian roulette
         p -= n_split
         xi = rng(mcdc)
         if xi <= p:
-            add_particle(copy_particle(P), mcdc['bank_history'])
+            add_particle(copy_particle(P), mcdc['bank_active'])
 
     # Below target
     else:

@@ -15,12 +15,14 @@ bool_   = np.bool_
 
 particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
                      ('ux', float64), ('uy', float64), ('uz', float64),
-                     ('time', float64), ('speed', float64), ('group', uint64),
-                     ('weight', float64), ('alive', bool_), ('cell_ID', uint64), 
-                     ('surface_ID', int64),
-                     ('universe_ID', int64),
+                     ('time', float64), 
+                     ('group', uint64), ('speed', float64),
+                     ('weight', float64), 
+                     ('alive', bool_), 
+                     ('cell_ID', uint64), ('universe_ID', int64),
                      ('shift_x', float64), ('shift_y', float64),
-                     ('shift_z', float64), ('shift_t', float64)])
+                     ('shift_z', float64), ('shift_t', float64),
+                     ('event', int64), ('surface_ID', int64)])
 
 # ==============================================================================
 # Particle bank
@@ -63,13 +65,13 @@ surface = np.dtype([('ID', uint64),
 # ==============================================================================
 
 cell = None
-def make_type_cell(N_surfaces):
+def make_type_cell(N_surface):
     global cell
 
     cell = np.dtype([('ID', uint64),
-                     ('N_surfaces', uint64),
-                     ('surface_IDs', uint64, (N_surfaces,)),
-                     ('positive_flags', bool_, (N_surfaces,)),
+                     ('N_surface', uint64),
+                     ('surface_IDs', uint64, (N_surface,)),
+                     ('positive_flags', bool_, (N_surface,)),
                      ('material_ID', uint64)])
 
 # ==============================================================================
@@ -77,12 +79,12 @@ def make_type_cell(N_surfaces):
 # ==============================================================================
 
 universe = None
-def make_type_universe(N_cells):
+def make_type_universe(N_cell):
     global universe
 
     universe = np.dtype([('ID', uint64),
-                         ('N_cells', uint64),
-                         ('cell_IDs', uint64, (N_cells,))])
+                         ('N_cell', uint64),
+                         ('cell_IDs', uint64, (N_cell,))])
 
 # ==============================================================================
 # Lattice
@@ -125,44 +127,62 @@ def make_type_source(G):
 # ==============================================================================
 
 tally = None
-score_list = ('flux', 'flux_x', 'flux_t', 
-              'current', 'current_x', 'current_t',
-              'eddington', 'eddington_x', 'eddington_t',
-              'fission', 
-              'density', 'density_t')
 
-def make_type_tally(card, Ng, N_iter):
+# Score lists
+score_tl_list = ('flux',   'current',   'eddington',   'fission',   'density')
+score_x_list  = ('flux_x', 'current_x', 'eddington_x', 'fission_x', 'density_x')
+score_y_list  = ('flux_y', 'current_y', 'eddington_y', 'fission_y', 'density_y')
+score_z_list  = ('flux_z', 'current_z', 'eddington_z', 'fission_z', 'density_z')
+score_t_list  = ('flux_t', 'current_t', 'eddington_t', 'fission_t', 'density_t')
+
+score_list = score_tl_list + score_x_list + score_y_list + score_z_list\
+                           + score_t_list
+
+def make_type_tally(card):
     global tally
-    
+ 
     def make_type_score(shape):
         return np.dtype([('bin', float64, shape),
-                         ('sum', float64, shape),
-                         ('sum_sq', float64, shape),
-                         ('mean', float64, (N_iter,*shape)), 
-                         ('sdev', float64, (N_iter,*shape))])
+                         ('mean', float64, shape),
+                         ('sdev', float64, shape)])
 
     # Estimator flags
     struct = [('tracklength', bool_), ('crossing', bool_), 
-              ('crossing_x', bool_), ('crossing_t', bool_)]
+              ('crossing_x', bool_), ('crossing_y', bool_), 
+              ('crossing_z', bool_), ('crossing_t', bool_)]
 
     # Mesh
-    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card['mesh'])
+    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card.tally['mesh'])
     struct += [('mesh', mesh)]
 
     # Scores and shapes
+    Ng = card.materials[0]['G']
     scores_shapes = [
-                     ['flux', (Ng, Nt, Nx, Ny, Nz)],
-                     ['flux_x', (Ng, Nt, Nx+1, Ny, Nz)],
-                     ['flux_t', (Ng, Nt+1, Nx, Ny, Nz)],
-                     ['current', (Ng, Nt, Nx, Ny, Nz, 3)],
-                     ['current_x', (Ng, Nt, Nx+1, Ny, Nz, 3)],
-                     ['current_t', (Ng, Nt+1, Nx, Ny, Nz, 3)],
-                     ['eddington', (Ng, Nt, Nx, Ny, Nz, 6)],
+                     ['flux',        (Ng, Nt, Nx, Ny, Nz)],
+                     ['fission',     (Ng, Nt, Nx, Ny, Nz)],
+                     ['density',     (Ng, Nt, Nx, Ny, Nz)],
+                     ['current',     (Ng, Nt, Nx, Ny, Nz, 3)],
+                     ['eddington',   (Ng, Nt, Nx, Ny, Nz, 6)],
+                     ['flux_x',      (Ng, Nt, Nx+1, Ny, Nz)],
+                     ['fission_x',   (Ng, Nt, Nx+1, Ny, Nz)],
+                     ['density_x',   (Ng, Nt, Nx+1, Ny, Nz)],
+                     ['current_x',   (Ng, Nt, Nx+1, Ny, Nz, 3)],
                      ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
+                     ['flux_y',      (Ng, Nt, Nx, Ny+1, Nz)],
+                     ['fission_y',   (Ng, Nt, Nx, Ny+1, Nz)],
+                     ['density_y',   (Ng, Nt, Nx, Ny+1, Nz)],
+                     ['current_y',   (Ng, Nt, Nx, Ny+1, Nz, 3)],
+                     ['eddington_y', (Ng, Nt, Nx, Ny+1, Nz, 6)],
+                     ['flux_z',      (Ng, Nt, Nx, Ny, Nz+1)],
+                     ['fission_z',   (Ng, Nt, Nx, Ny, Nz+1)],
+                     ['density_z',   (Ng, Nt, Nx, Ny, Nz+1)],
+                     ['current_z',   (Ng, Nt, Nx, Ny, Nz+1, 3)],
+                     ['eddington_z', (Ng, Nt, Nx, Ny, Nz+1, 6)],
+                     ['flux_t',      (Ng, Nt+1, Nx, Ny, Nz)],
+                     ['fission_t',   (Ng, Nt+1, Nx, Ny, Nz)],
+                     ['density_t',   (Ng, Nt+1, Nx, Ny, Nz)],
+                     ['current_t',   (Ng, Nt+1, Nx, Ny, Nz, 3)],
                      ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)],
-                     ['fission', (Ng, Nt, Nx, Ny, Nz)],
-                     ['density', (Ng, Nt, Nx, Ny, Nz)],
-                     ['density_t', (Ng, Nt+1, Nx, Ny, Nz)]
                     ]
 
     # Add score flags to structure
@@ -175,7 +195,7 @@ def make_type_tally(card, Ng, N_iter):
     for i in range(len(scores_shapes)):
         name  = scores_shapes[i][0]
         shape = scores_shapes[i][1]
-        if not card[name]:
+        if not card.tally[name]:
             shape = (0,)*len(shape)
         scores_struct += [(name, make_type_score(shape))]
     scores = np.dtype(scores_struct)
@@ -188,12 +208,15 @@ def make_type_tally(card, Ng, N_iter):
 # Setting
 # ==============================================================================
 
-setting = np.dtype([('N_hist', uint64), ('N_iter', uint64),
-                    ('mode_eigenvalue', bool_), ('mode_alpha', bool_),
-                    ('time_boundary', float64),
+setting = np.dtype([('N_particle', uint64), ('N_inactive', uint64),
+                    ('N_active', uint64), ('N_cycle', uint64),
                     ('rng_seed', int64), ('rng_stride', int64),
-                    ('k_init', float64), ('alpha_init', float64),
-                    ('output', 'U20'), ('progress_bar', bool_)])
+                    ('rng_g', int64), ('rng_c', int64), ('rng_mod', uint64),
+                    ('time_boundary', float64),
+                    ('mode_eigenvalue', bool_), ('k_init', float64),
+                    ('gyration_radius', bool_), ('gyration_radius_type', int64),
+                    ('output', 'U20'), ('progress_bar', bool_),
+                    ('filed_source', bool_), ('source_file', 'U20')])
 
 # ==============================================================================
 # Technique
@@ -204,16 +227,35 @@ technique = None
 def make_type_technique(card):
     global technique
 
+    # Technique flags
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
-              ('population_control', bool_), ('weight_window', bool_)]
+              ('population_control', bool_), ('branchless_collision', bool_),
+              ('weight_window', bool_), ('IC_generator', bool_)]
 
+    # =========================================================================
     # Weight window
+    # =========================================================================
+
     # Mesh
-    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card['ww_mesh'])
+    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card.technique['ww_mesh'])
     struct += [('ww_mesh', mesh)]
+    
     # Window
     struct += [('ww', float64, (Nt, Nx, Ny, Nz))]
 
+    # =========================================================================
+    # IC generator
+    # =========================================================================
+    
+    J    = card.materials[0]['J']
+    bank = particle_bank(card.technique['IC_N'])
+
+    struct += [('IC_tmax', float64), ('IC_stot', float64),
+               ('IC_counter_p', int64), ('IC_counter_d', int64, (J,)),
+               ('IC_fission', float64), ('IC_bank', bank)]
+
+
+    # Finalize technique type
     technique = np.dtype(struct)
 
 # ==============================================================================
@@ -226,61 +268,60 @@ def make_type_global(card):
     global global_
 
     # Some numbers
-    N_materials = len(card.materials)
-    N_surfaces  = len(card.surfaces)
-    N_cells     = len(card.cells)
-    N_sources   = len(card.sources)
-    N_universes = len(card.universes)
-    N_hist      = card.setting['N_hist']
-    N_iter      = card.setting['N_iter']
-    if not card.setting['mode_eigenvalue']: N_iter = 0
+    N_material = len(card.materials)
+    N_surface  = len(card.surfaces)
+    N_cell     = len(card.cells)
+    N_source   = len(card.sources)
+    N_universe = len(card.universes)
+    N_particle = card.setting['N_particle']
+    N_cycle    = card.setting['N_cycle']
+    J          = card.materials[0]['J']
+    N_work     = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
-    bank_history = particle_bank(10000)
+    bank_active = particle_bank(1000)
     if card.setting['mode_eigenvalue']:
-        N_work = math.ceil(N_hist/MPI.COMM_WORLD.Get_size())
-        bank_census  = particle_bank(5*N_work)
-        bank_source  = particle_bank(5*N_work)
+        bank_census  = particle_bank(2*N_work)
+        bank_source  = particle_bank(2*N_work)
     else:
-        bank_census  = particle_bank(0)
-        bank_source  = particle_bank(0)
+        bank_census = particle_bank(0)
+        bank_source = particle_bank(0)
+    if card.setting['filed_source']:
+        bank_source = particle_bank(N_work)
 
-    global_ = np.dtype([('materials', material, (N_materials,)),
-                        ('surfaces', surface, (N_surfaces,)),
-                        ('cells', cell, (N_cells,)),
-                        ('universes', universe, (N_universes,)),
+    # GLobal type
+    global_ = np.dtype([('materials', material, (N_material,)),
+                        ('surfaces', surface, (N_surface,)),
+                        ('cells', cell, (N_cell,)),
+                        ('universes', universe, (N_universe,)),
                         ('lattice', lattice),
-                        ('sources', source, (N_sources,)),
+                        ('sources', source, (N_source,)),
                         ('tally', tally),
                         ('setting', setting),
                         ('technique', technique),
-                        ('bank_history', bank_history),
+                        ('bank_active', bank_active),
                         ('bank_census', bank_census),
                         ('bank_source', bank_source),
                         ('rng_seed_base', int64),
                         ('rng_seed', int64),
-                        ('rng_g', int64),
-                        ('rng_c', int64),
-                        ('rng_mod', uint64),
                         ('rng_stride', int64),
                         ('k_eff', float64),
-                        ('k_iterate', float64, (N_iter,)),
-                        ('gyration_radius', float64, (N_iter,)),
-                        ('gyration_all', bool_),
-                        ('gyration_infinite_z', bool_),
-                        ('gyration_only_x', bool_),
-                        ('alpha_eff', float64),
-                        ('alpha_iterate', float64, (N_iter,)),
-                        ('nuSigmaF', float64),
-                        ('inverse_speed', float64),
-                        ('runtime_total', float64),
-                        ('i_iter', int64),
+                        ('k_cycle', float64, (N_cycle,)),
+                        ('k_avg', float64),
+                        ('k_sdv', float64),
+                        ('k_avg_running', float64),
+                        ('k_sdv_running', float64),
+                        ('gyration_radius', float64, (N_cycle,)),
+                        ('i_cycle', int64),
+                        ('cycle_active', bool_),
+                        ('fission_production', float64),
                         ('mpi_size', int64),
                         ('mpi_rank', int64),
                         ('mpi_master', bool_),
                         ('mpi_work_start', int64),
                         ('mpi_work_size', int64),
-                        ('mpi_work_size_total', int64)])
+                        ('mpi_work_size_total', int64),
+                        ('runtime_total', float64)])
 
 # ==============================================================================
 # Util

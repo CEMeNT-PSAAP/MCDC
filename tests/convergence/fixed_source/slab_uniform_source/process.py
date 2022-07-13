@@ -105,11 +105,11 @@ error_x  = []
 error_J  = []
 error_Jx = []
 N_max = int(sys.argv[1])
-N_hist_list = np.logspace(3, N_max, (N_max-3)*2+1)
+N_particle_list = np.logspace(3, N_max, (N_max-3)*2+1)
 
-for N_hist in N_hist_list:
+for N_particle in N_particle_list:
     # Get results
-    with h5py.File('output_%i.h5'%int(N_hist), 'r') as f:
+    with h5py.File('output_%i.h5'%int(N_particle), 'r') as f:
         phi      = f['tally/flux/mean'][:]/dx
         phi_sd   = f['tally/flux/sdev'][:]/dx
         phi_x    = f['tally/flux-x/mean'][:]
@@ -124,10 +124,10 @@ for N_hist in N_hist_list:
     error_J.append(np.linalg.norm((J - J_ref)/J_ref))
     error_Jx.append(np.linalg.norm((J_x - J_x_ref)/J_x_ref))
 
-line = 1.0/np.sqrt(N_hist_list)
+line = 1.0/np.sqrt(N_particle_list)
 line *= error[N_max-3]/line[N_max-3]
-plt.plot(N_hist_list, error, 'bo', fillstyle='none')
-plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.plot(N_particle_list, error, 'bo', fillstyle='none')
+plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
 plt.yscale('log')
 plt.ylabel('2-norm of relative error')
@@ -138,10 +138,10 @@ plt.title('flux')
 plt.savefig('flux.png')
 plt.clf()
 
-line = 1.0/np.sqrt(N_hist_list)
+line = 1.0/np.sqrt(N_particle_list)
 line *= error_x[N_max-3]/line[N_max-3]
-plt.plot(N_hist_list, error_x, 'bo', fillstyle='none')
-plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.plot(N_particle_list, error_x, 'bo', fillstyle='none')
+plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
 plt.yscale('log')
 plt.ylabel('2-norm of relative error')
@@ -152,10 +152,10 @@ plt.title('flux_x')
 plt.savefig('flux_x.png')
 plt.clf()
 
-line = 1.0/np.sqrt(N_hist_list)
+line = 1.0/np.sqrt(N_particle_list)
 line *= error_J[N_max-3]/line[N_max-3]
-plt.plot(N_hist_list, error_J, 'bo', fillstyle='none')
-plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.plot(N_particle_list, error_J, 'bo', fillstyle='none')
+plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
 plt.yscale('log')
 plt.ylabel('2-norm of relative error')
@@ -166,10 +166,10 @@ plt.title('current')
 plt.savefig('current.png')
 plt.clf()
 
-line = 1.0/np.sqrt(N_hist_list)
+line = 1.0/np.sqrt(N_particle_list)
 line *= error_Jx[N_max-3]/line[N_max-3]
-plt.plot(N_hist_list, error_Jx, 'bo', fillstyle='none')
-plt.plot(N_hist_list, line, 'r--', label=r'$N^{-0.5}$')
+plt.plot(N_particle_list, error_Jx, 'bo', fillstyle='none')
+plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
 plt.yscale('log')
 plt.ylabel('2-norm of relative error')
