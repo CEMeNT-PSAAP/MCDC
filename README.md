@@ -70,8 +70,9 @@ If we save the input script above as `input.py`, we can run it as follows:
 python input.py
 ```
 
-An example to set up a multigroup (in energy and delayed precursor) 
-material is provided in `MCDC/example/fixed_source/td_slab_SHEM361`.
+Examples to set up multigroup (in energy and delayed precursor) 
+materials are provided in `MCDC/example/fixed_source/td_slab_SHEM361` and 
+`MCDC/example/eigenvalue/2d_c5g7`.
 
 ### Output
 
