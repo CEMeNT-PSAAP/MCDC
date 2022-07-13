@@ -1,6 +1,9 @@
 import numpy as np
+import sys
 
 import mcdc
+
+N_active = int(sys.argv[2])
 
 # =============================================================================
 # Set model
@@ -37,8 +40,8 @@ x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6,
 mcdc.tally(scores=['flux-x'], x=x)
 
 # Setting
-mcdc.setting(N_hist=1E5, progress_bar=False)
-mcdc.eigenmode(N_iter=1050)
+mcdc.setting(N_particle=1E3, progress_bar=False, output='output_'+str(N_active))
+mcdc.eigenmode(N_inactive=50, N_active=N_active, gyration_radius='only-x')
 mcdc.population_control()
 
 # Run

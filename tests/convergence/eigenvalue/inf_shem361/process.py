@@ -28,8 +28,8 @@ k_ref = w[0]
 phi_ref = v[:,0]
 if phi_ref[0] < 0.0:
     phi_ref *= -1
-    phi_ref[:] /= np.sum(phi_ref[:])
-    phi_ref = phi_ref/dE*E_mid
+phi_ref[:] /= np.sum(phi_ref[:])
+phi_ref = phi_ref/dE*E_mid
 
 # =============================================================================
 # Plot results

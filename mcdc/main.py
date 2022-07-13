@@ -3,11 +3,13 @@ import numpy as np
 
 from mpi4py import MPI
 
+import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
 from mcdc.looper   import loop_simulation
-from mcdc.print_   import print_banner, print_msg, print_runtime
+from mcdc.print_   import print_banner, print_msg, print_runtime,\
+                          print_header_eigenvalue
 from mcdc.util     import profile
 
 # Get input_card and set global variables as "mcdc"
@@ -28,15 +30,13 @@ def run():
     # Run
     print_msg(" Now running TNT...")
     if mcdc['setting']['mode_eigenvalue']:
-        print_msg("\n #     k-eig    GyRad.")
-        print_msg(  " ====  =======  ======")
+        print_header_eigenvalue(mcdc)
     mcdc['runtime_total'] = MPI.Wtime()
     loop_simulation(mcdc)
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
     
     # Output: generate hdf5 output files
-    if mcdc['mpi_master']:
-        generate_hdf5()
+    generate_hdf5()
 
     # Closout
     print_runtime(mcdc)
@@ -46,78 +46,108 @@ def prepare():
     
     print_msg("\n Preparing...")
 
+    # =========================================================================
     # Some numbers
-    G           = input_card.materials[0]['G']
-    J           = input_card.materials[0]['J']
-    N_materials = len(input_card.materials)
-    N_surfaces  = len(input_card.surfaces)
-    N_cells     = len(input_card.cells)
-    N_universes = len(input_card.universes)
-    N_sources   = len(input_card.sources)
-    N_iter      = input_card.setting['N_iter']
-    N_hist      = input_card.setting['N_hist']
-    # Derived numbers
-    Nmax_surfaces = 0
-    for cell in input_card.cells:
-        Nmax_surfaces = max(Nmax_surfaces, cell['N_surfaces'])
-    Nmax_cells    = 0
-    for universe in input_card.universes:
-        Nmax_cells = max(Nmax_cells, universe['N_cells'])
+    # =========================================================================
 
-    # Default universe card if not given
-    if N_universes == 0:
-        Nmax_cells  = N_cells
-        N_universes = 1
-        card = {'ID' : 0, 'N_cells' : N_cells, 'cell_IDs' : np.arange(N_cells)}
+    G          = input_card.materials[0]['G']
+    J          = input_card.materials[0]['J']
+    N_material = len(input_card.materials)
+    N_surface  = len(input_card.surfaces)
+    N_cell     = len(input_card.cells)
+    N_universe = len(input_card.universes)
+    N_source   = len(input_card.sources)
+    N_particle = input_card.setting['N_particle']
+    N_cycle    = input_card.setting['N_cycle']
+    # Derived numbers
+    Nmax_surface = 0
+    Nmax_cell    = 0
+    for cell in input_card.cells:
+        Nmax_surface = max(Nmax_surface, cell['N_surface'])
+    for universe in input_card.universes:
+        Nmax_cell = max(Nmax_cell, universe['N_cell'])
+
+    # =========================================================================
+    # Default cards, if not given
+    # =========================================================================
+
+    # Universe
+    if N_universe == 0:
+        Nmax_cell  = N_cell
+        N_universe = 1
+        card = {'ID' : 0, 'N_cell' : N_cell, 'cell_IDs' : np.arange(N_cell)}
         input_card.universes.append(card)
 
+    # =========================================================================
     # Make types
+    # =========================================================================
+
     type_.make_type_material(G,J)
-    type_.make_type_cell(Nmax_surfaces)
-    type_.make_type_universe(Nmax_cells)
+    type_.make_type_cell(Nmax_surface)
+    type_.make_type_universe(Nmax_cell)
     type_.make_type_lattice(input_card.lattice)
     type_.make_type_source(G)
-    type_.make_type_tally(input_card.tally, G, N_iter)
-    type_.make_type_technique(input_card.technique)
+    type_.make_type_tally(input_card)
+    type_.make_type_technique(input_card)
     type_.make_type_global(input_card)
-
+    
     # The global variable container
     mcdc = np.zeros(1, dtype=type_.global_)[0]
-    
-    # Material
-    for i in range(N_materials):
+
+    # =========================================================================
+    # Materials
+    # =========================================================================
+
+    for i in range(N_material):
         for name in type_.material.names:
             mcdc['materials'][i][name] = input_card.materials[i][name]
     
-    # Surface
-    for i in range(N_surfaces):
+    # =========================================================================
+    # Surfaces
+    # =========================================================================
+
+    for i in range(N_surface):
         for name in type_.surface.names:
             mcdc['surfaces'][i][name] = input_card.surfaces[i][name]
     
-    # Cell
-    for i in range(N_cells):
+    # =========================================================================
+    # Cells
+    # =========================================================================
+
+    for i in range(N_cell):
         for name in type_.cell.names:
             mcdc['cells'][i][name] = input_card.cells[i][name]
 
-    # Universe
-    for i in range(N_universes):
+    # =========================================================================
+    # Universes
+    # =========================================================================
+
+    for i in range(N_universe):
         for name in type_.universe.names:
             mcdc['universes'][i][name] = input_card.universes[i][name]
 
+    # =========================================================================
     # Lattice
+    # =========================================================================
+
     for name in type_.lattice.names:
         if name not in ['mesh']:
             mcdc['lattice'][name] = input_card.lattice[name]
+    
     # Set mesh
     mcdc['lattice']['mesh']['x'] = input_card.lattice['mesh']['x']
     mcdc['lattice']['mesh']['y'] = input_card.lattice['mesh']['y']
     mcdc['lattice']['mesh']['z'] = input_card.lattice['mesh']['z']
     mcdc['lattice']['mesh']['t'] = input_card.lattice['mesh']['t']
 
+    # =========================================================================
     # Source
-    for i in range(N_sources):
+    # =========================================================================
+
+    for i in range(N_source):
         for name in type_.source.names:
             mcdc['sources'][i][name] = input_card.sources[i][name]
+    
     # Normalize source probabilities
     tot = 0.0
     for S in mcdc['sources']:
@@ -125,27 +155,41 @@ def prepare():
     for S in mcdc['sources']:
         S['prob'] /= tot
 
-    # Tally
+    # =========================================================================
+    # Source
+    # =========================================================================
+
     for name in type_.tally.names:
         if name not in ['score', 'mesh']:
             mcdc['tally'][name] = input_card.tally[name]
+    
     # Set mesh
     mcdc['tally']['mesh']['x'] = input_card.tally['mesh']['x']
     mcdc['tally']['mesh']['y'] = input_card.tally['mesh']['y']
     mcdc['tally']['mesh']['z'] = input_card.tally['mesh']['z']
     mcdc['tally']['mesh']['t'] = input_card.tally['mesh']['t']
 
+    # =========================================================================
     # Setting
+    # =========================================================================
+
     for name in type_.setting.names:
         mcdc['setting'][name] = input_card.setting[name]
+
     # Check if time boundary matches the final tally mesh time grid
     if mcdc['setting']['time_boundary'] > mcdc['tally']['mesh']['t'][-1]:
         mcdc['setting']['time_boundary'] = mcdc['tally']['mesh']['t'][-1]
     
+    # =========================================================================
     # Technique
+    # =========================================================================
+
     for name in type_.technique.names:
-        if name not in ['ww_mesh']:
+        if name not in ['ww_mesh', 
+                        'IC_stot', 'IC_counter_p', 'IC_counter_d', 
+                        'IC_fission', 'IC_bank']:
             mcdc['technique'][name] = input_card.technique[name]
+
     # Set weight window mesh
     if input_card.technique['weight_window']:
         mcdc['technique']['ww_mesh']['x'] = input_card.technique['ww_mesh']['x']
@@ -153,23 +197,19 @@ def prepare():
         mcdc['technique']['ww_mesh']['z'] = input_card.technique['ww_mesh']['z']
         mcdc['technique']['ww_mesh']['t'] = input_card.technique['ww_mesh']['t']
 
+    # =========================================================================
     # Global tally
-    mcdc['k_eff']     = 1.0
-    mcdc['alpha_eff'] = 0.0
-    if mcdc['setting']['mode_eigenvalue']:
-        mcdc['k_eff']     = mcdc['setting']['k_init']
-        mcdc['k_iterate'] = np.zeros(N_iter, dtype=np.float64)
-        mcdc['gyration_radius'] = np.zeros(N_iter, dtype=np.float64)
-        if mcdc['setting']['mode_alpha']:
-            mcdc['alpha_eff']     = mcdc['setting']['alpha_init']
-            mcdc['alpha_iterate'] = np.zeros(N_iter, dtype=np.float64)
+    # =========================================================================
+
+    mcdc['k_eff']     = mcdc['setting']['k_init']
+
+    # =========================================================================
+    # Misc.
+    # =========================================================================
 
     # RNG seed and stride
     mcdc['rng_seed_base'] = mcdc['setting']['rng_seed']
     mcdc['rng_seed']      = mcdc['setting']['rng_seed']
-    mcdc['rng_g']         = 2806196910506780709
-    mcdc['rng_c']         = 1
-    mcdc['rng_mod']       = 2**63
     mcdc['rng_stride']    = mcdc['setting']['rng_stride']
 
     # Set MPI parameters
@@ -177,37 +217,72 @@ def prepare():
     mcdc['mpi_rank']   = MPI.COMM_WORLD.Get_rank()
     mcdc['mpi_master'] = mcdc['mpi_rank'] == 0
 
+    # Distribute work to processors
+    kernel.distribute_work(mcdc['setting']['N_particle'], mcdc)
+
+    # Set source bank if using filed source
+    if mcdc['setting']['filed_source']:
+        start = mcdc['mpi_work_start']
+        end   = start + mcdc['mpi_work_size']
+        # Load particles from file
+        with h5py.File(mcdc['setting']['source_file'], 'r') as f:
+            particles = f['IC/particles'][start:end]
+        for P in particles:
+            kernel.add_particle(P, mcdc['bank_source'])
+
+    # Activate tally scoring for fixed-source
+    if not mcdc['setting']['mode_eigenvalue']:
+        mcdc['cycle_active'] = True
+
 def generate_hdf5():
-    if mcdc['setting']['progress_bar']: print_msg('')
-    print_msg(" Generating output HDF5 files...")
+    # TODO: Gather and reduce IC bank
+    '''
+    if mcdc['setting']['generate_IC']:
+        size = mcdc['bank_IC']['size']
+        particles  = MPI.COMM_WORLD.gather(mcdc['bank_IC']['particles'][:size])
+        N_prompt   = MPI.COMM_WORLD.reduce(mcdc['IC_counter_p'])
+        N_delayed  = MPI.COMM_WORLD.reduce(mcdc['IC_counter_d'])
+        IC_fission = MPI.COMM_WORLD.reduce(mcdc['IC_fission'])
+    '''
 
-    with h5py.File(mcdc['setting']['output']+'.h5', 'w') as f:
-        # Runtime
-        f.create_dataset("runtime",data=np.array([mcdc['runtime_total']]))
+    if mcdc['mpi_master']:
+        if mcdc['setting']['progress_bar']: print_msg('')
+        print_msg(" Generating output HDF5 files...")
 
-        # Tally
-        T = mcdc['tally']
-        f.create_dataset("tally/grid/t", data=T['mesh']['t'])
-        f.create_dataset("tally/grid/x", data=T['mesh']['x'])
-        f.create_dataset("tally/grid/y", data=T['mesh']['y'])
-        f.create_dataset("tally/grid/z", data=T['mesh']['z'])
-        
-        # Scores
-        for name in T['score'].dtype.names:
-            name_h5 = name.replace('_','-')
-            f.create_dataset("tally/"+name_h5+"/mean",
-                             data=np.squeeze(T['score'][name]['mean']))
-            f.create_dataset("tally/"+name_h5+"/sdev",
-                             data=np.squeeze(T['score'][name]['sdev']))
-            T['score'][name]['mean'].fill(0.0)
-            T['score'][name]['sdev'].fill(0.0)
+        with h5py.File(mcdc['setting']['output']+'.h5', 'w') as f:
+            # Runtime
+            f.create_dataset("runtime",data=np.array([mcdc['runtime_total']]))
+
+            # Tally
+            T = mcdc['tally']
+            f.create_dataset("tally/grid/t", data=T['mesh']['t'])
+            f.create_dataset("tally/grid/x", data=T['mesh']['x'])
+            f.create_dataset("tally/grid/y", data=T['mesh']['y'])
+            f.create_dataset("tally/grid/z", data=T['mesh']['z'])
             
-        # Eigenvalues
-        if mcdc['setting']['mode_eigenvalue']:
-            f.create_dataset("keff",data=mcdc['k_iterate'])
-            f.create_dataset("gyration_radius",data=mcdc['gyration_radius'])
-            mcdc['k_iterate'].fill(0.0)
-            mcdc['gyration_radius'].fill(0.0)
-            if mcdc['setting']['mode_alpha']:
-                f.create_dataset("alpha_eff",data=mcdc['alpha_iterate'])
-                mcdc['alpha_iterate'].fill(0.0)
+            # Scores
+            for name in T['score'].dtype.names:
+                if mcdc['tally'][name]:
+                    name_h5 = name.replace('_','-')
+                    f.create_dataset("tally/"+name_h5+"/mean",
+                                     data=np.squeeze(T['score'][name]['mean']))
+                    f.create_dataset("tally/"+name_h5+"/sdev",
+                                     data=np.squeeze(T['score'][name]['sdev']))
+                
+            # Eigenvalues
+            if mcdc['setting']['mode_eigenvalue']:
+                f.create_dataset("k_cycle",data=mcdc['k_cycle'])
+                f.create_dataset("k_mean",data=mcdc['k_avg_running'])
+                f.create_dataset("k_sdev",data=mcdc['k_sdv_running'])
+                if mcdc['setting']['gyration_radius']:
+                    f.create_dataset("gyration_radius",data=mcdc['gyration_radius'])
+
+            # TODO: IC
+            '''
+            if mcdc['setting']['generate_IC']:
+                particles = np.concatenate(particles[:])
+                f.create_dataset("IC/particles",data=np.array(particles))
+                f.create_dataset("IC/N_prompt",data=np.array([N_prompt]))
+                f.create_dataset("IC/N_delayed",data=np.array([N_delayed])) 
+                f.create_dataset("IC/fission",data=np.array([IC_fission])) 
+            '''
