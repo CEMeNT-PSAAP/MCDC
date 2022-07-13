@@ -7,7 +7,7 @@ import sys
 output = sys.argv[1]
 
 # =============================================================================
-# Reference solution (not accurate enough for N_hist > 1E7)
+# Reference solution (not accurate enough for N_particle > 1E7)
 # =============================================================================
 
 def phi1(x):

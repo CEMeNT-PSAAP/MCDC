@@ -43,8 +43,8 @@ source = mcdc.source(energy=np.ones(G)) # Arbitrary
 mcdc.tally(scores=['flux'])
 
 # Setting
-mcdc.setting(N_hist=1E2)
-mcdc.eigenmode(N_iter=20)
+mcdc.setting(N_particle=1E2)
+mcdc.eigenmode(N_inactive=10, N_active=10)
 mcdc.population_control()
 
 # Run

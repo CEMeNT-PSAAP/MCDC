@@ -1,6 +1,9 @@
+import h5py
 import numpy as np
 
-from mcdc.class_   import SurfaceHandle
+import mcdc.type_ as type_
+
+from mcdc.card     import SurfaceHandle
 from mcdc.constant import *
 from mcdc.print_   import print_error
 
@@ -277,19 +280,19 @@ def surface(type_, **kw):
 # =============================================================================
 
 def cell(surfaces_flags, material):
-    N_surfaces = len(surfaces_flags)
+    N_surface = len(surfaces_flags)
 
     # Set default card values (c.f. type_.py)
     card                   = {}
     card['tag']            = 'Cell'
     card['ID']             = len(mcdc.input_card.cells)
-    card['N_surfaces']     = N_surfaces
-    card['surface_IDs']    = np.zeros(N_surfaces, dtype=int)
-    card['positive_flags'] = np.zeros(N_surfaces, dtype=bool)
+    card['N_surface']     = N_surface
+    card['surface_IDs']    = np.zeros(N_surface, dtype=int)
+    card['positive_flags'] = np.zeros(N_surface, dtype=bool)
     card['material_ID']    = 0
 
     # Surfaces and flags
-    for i in range(N_surfaces):
+    for i in range(N_surface):
         card['surface_IDs'][i]    = surfaces_flags[i][0]['ID']
         card['positive_flags'][i] = surfaces_flags[i][1]
 
@@ -305,17 +308,17 @@ def cell(surfaces_flags, material):
 # =============================================================================
 
 def universe(cells):
-    N_cells = len(cells)
+    N_cell = len(cells)
 
     # Set default card values (c.f. type_.py)
     card             = {}
     card['tag']      = 'Universe'
     card['ID']       = len(mcdc.input_card.universes)
-    card['N_cells']  = N_cells
-    card['cell_IDs'] = np.zeros(N_cells, dtype=int)
+    card['N_cell']  = N_cell
+    card['cell_IDs'] = np.zeros(N_cell, dtype=int)
 
     # Cells
-    for i in range(N_cells):
+    for i in range(N_cell):
         card['cell_IDs'][i] = cells[i]['ID']
 
     # Push card
@@ -465,34 +468,30 @@ def tally(scores, x=None, y=None, z=None, t=None):
 
     # Set score flags
     for s in scores:
-        if s == 'flux':
-            card['flux'] = True
-        elif s == 'current':
-            card['current'] = True
-        elif s == 'eddington':
-            card['eddington'] = True
-        elif s == 'flux-x':
-            card['flux_x'] = True
-        elif s == 'current-x':
-            card['current_x'] = True
-        elif s == 'flux-t':
-            card['flux_t'] = True
-        elif s == 'fission':
-            card['fission'] = True
-        elif s == 'density':
-            card['density'] = True
-        elif s == 'density-t':
-            card['density_t'] = True
-        else:
+        found = False
+        for score_name in type_.score_list:
+            if s.replace('-','_') == score_name:
+                card[score_name] = True
+                found = True
+                break
+        if not found:
             print_error("Unknown tally score %s"%s)
 
     # Set estimator flags
-    if card['flux'] or card['current'] or card['eddington'] or card['fission'] or card['density']:
-        card['tracklength'] = True
-    if card['flux_x'] or card['current_x'] or card['eddington_x']:
-        card['crossing'] = True; card['crossing_x'] = True
-    if card['flux_t'] or card['current_t'] or card['eddington_t'] or card['density_t']:
-        card['crossing'] = True; card['crossing_t'] = True
+    for score_name in type_.score_tl_list:
+        if card[score_name]:
+            card['tracklength'] = True
+            break
+    for score_name in type_.score_x_list:
+        if card[score_name]:
+            card['crossing'] = True
+            card['crossing_x'] = True
+            break
+    for score_name in type_.score_t_list:
+        if card[score_name]:
+            card['crossing'] = True
+            card['crossing_t'] = True
+            break
 
     return card
 
@@ -502,19 +501,21 @@ def tally(scores, x=None, y=None, z=None, t=None):
 
 def setting(**kw):
     # Get keyword arguments
-    N_hist           = kw.get('N_hist')
-    time_boundary    = kw.get('time_boundary')
-    rng_seed         = kw.get('rng_seed')
-    rng_stride       = kw.get('rng_stride')
-    output           = kw.get('output')
-    progress_bar     = kw.get('progress_bar')
+    N_particle    = kw.get('N_particle')
+    time_boundary = kw.get('time_boundary')
+    rng_seed      = kw.get('rng_seed')
+    rng_stride    = kw.get('rng_stride')
+    output        = kw.get('output')
+    progress_bar  = kw.get('progress_bar')
+    k_eff         = kw.get('k_eff')
+    source_file   = kw.get('source_file')
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
 
-    # Number of histories
-    if N_hist is not None:
-        card['N_hist'] = int(N_hist)
+    # Number of particles
+    if N_particle is not None:
+        card['N_particle'] = int(N_particle)
 
     # Time boundary
     if time_boundary is not None:
@@ -534,24 +535,55 @@ def setting(**kw):
     if progress_bar is not None:
         card['progress_bar'] = progress_bar
 
-def eigenmode(N_iter=1, k_init=1.0, alpha_mode=False, alpha_init=0.0,
-              gyration_radius='all'):
+    # k effective
+    if k_eff is not None:
+        card['k_init'] = k_eff
+
+    # IC source?
+    if source_file is not None:
+        card['filed_source'] = True
+        card['source_file']  = source_file
+
+        # Set N_particle
+        with h5py.File('IC.h5', 'r') as f:
+            Np = f['IC/N_prompt'][0]
+            Nd = f['IC/N_delayed'][0]
+            N_partice = Np + np.sum(Nd)
+        card['N_particle'] = N_particle
+
+def eigenmode(N_inactive=0, N_active=0, k_init=1.0, 
+              gyration_radius=None, generate_IC=False, IC_tmax=INF):
     # Update setting card
     card                    = mcdc.input_card.setting
-    card['N_iter']          = N_iter
+    card['N_inactive']      = N_inactive
+    card['N_active']        = N_active
+    card['N_cycle']         = N_inactive + N_active
     card['mode_eigenvalue'] = True
-    card['mode_alpha']      = alpha_mode
     card['k_init']          = k_init
-    card['alpha_init']      = alpha_init
+
     # Gyration radius setup
-    if gyration_radius == 'all':
-        card['gyration_all'] = True
-    elif gyration_radius == 'infinite-z':
-        card['gyration_infinite_z'] = True
-    elif gyration_radius == 'only-x':
-        card['gyration_only_x'] = True
-    else:
-        print_error("Unknown gyration radius type")
+    if gyration_radius is not None:
+        card['gyration_radius'] = True
+        if gyration_radius == 'all':
+            card['gyration_radius_type'] = GR_ALL
+        elif gyration_radius == 'infinite-x':
+            card['gyration_radius_type'] = GR_INFINITE_X
+        elif gyration_radius == 'infinite-y':
+            card['gyration_radius_type'] = GR_INFINITE_Y
+        elif gyration_radius == 'infinite-z':
+            card['gyration_radius_type'] = GR_INFINITE_Z
+        elif gyration_radius == 'only-x':
+            card['gyration_radius_type'] = GR_ONLY_X
+        elif gyration_radius == 'only-y':
+            card['gyration_radius_type'] = GR_ONLY_Y
+        elif gyration_radius == 'only-z':
+            card['gyration_radius_type'] = GR_ONLY_Z
+        else:
+            print_error("Unknown gyration radius type")
+
+    # Generate IC?
+    card['generate_IC'] = generate_IC
+    card['IC_tmax']     = IC_tmax
 
     # Update tally card
     card                = mcdc.input_card.tally
@@ -573,6 +605,10 @@ def weighted_emission(flag):
 def population_control():
     card = mcdc.input_card.technique
     card['population_control'] = True
+
+def branchless_collision():
+    card = mcdc.input_card.technique
+    card['branchless_collision'] = True
 
 def weight_window(x=None, y=None, z=None, t=None, window=None):
     card = mcdc.input_card.technique
