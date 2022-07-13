@@ -34,6 +34,7 @@ def print_banner():
             banner += "           Mode | Python\n"
         else:
             banner += "           Mode | Numba\n"
+        banner     += "      Algorithm | History-based\n"
         banner     += "  MPI Processes | %i\n"%size
         banner     += " OpenMP Threads | 1"
         print(banner)
