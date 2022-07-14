@@ -2,7 +2,7 @@
 
 ![mcdc_logo v1](https://user-images.githubusercontent.com/26186244/173467190-74d9b09a-ef7d-4f0e-8bdf-4a076de7c43c.svg)
 
-*Please Note that this project is in the early stages of devlopment (not even an alpha)* That being said enjoy!
+*Please Note that this project is in the early stages of devlopment (not even an alpha).* That being said enjoy!
 
 MC/DC is a performant, scalable, and machine-portable Python-based Monte Carlo 
 neutron transport software currently developed in the Center for Exascale Monte 
@@ -111,10 +111,8 @@ python input.py --mode=numba
 
 MC/DC supports parallel simulation via 
 [MPI4Py](https://mpi4py.readthedocs.io/en/stable/). As an example, to run on 36 
-processes with [SLURM](https://slurm.schedmd.com/documentation.html):
+processes in Numba mode with [SLURM](https://slurm.schedmd.com/documentation.html):
 
 ```bash
-srun -n 36 python input.py
+srun -n 36 python input.py --mode=numba
 ```
-
-The MPI parallel simulation can be run both in Python and Numba mode.
