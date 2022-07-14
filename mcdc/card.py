@@ -95,8 +95,8 @@ class InputCard:
                                                     'z' : np.array([-INF, INF]),
                                                     't' : np.array([-INF, INF])},
                           'IC_generator'         : False,
-                          'IC_tmax'              : INF,
-                          'IC_N'                 : 0}
+                          'IC_Nn'                : 0,
+                          'IC_Np'                : 0}
 
 class SurfaceHandle:
     def __init__(self, card):

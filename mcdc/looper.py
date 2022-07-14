@@ -17,7 +17,7 @@ def loop_simulation(mcdc):
     while not simulation_end:
         # Loop over source particles
         loop_source(mcdc)
-
+        
         # Eigenvalue cycle closeout
         if mcdc['setting']['mode_eigenvalue']:
             # Tally history closeout
@@ -29,16 +29,15 @@ def loop_simulation(mcdc):
             with objmode():
                 print_progress_eigenvalue(mcdc)
 
+            # Manage particle banks
+            kernel.manage_particle_banks(mcdc)
+
             # Cycle management
             mcdc['i_cycle'] += 1
             if mcdc['i_cycle'] == mcdc['setting']['N_cycle']: 
                 simulation_end = True
             elif mcdc['i_cycle'] >= mcdc['setting']['N_inactive']:
                 mcdc['cycle_active'] = True
-
-            # Manage particle banks
-            if not simulation_end:
-                kernel.manage_particle_banks(mcdc)
 
         # Fixed-source closeout
         else:
@@ -119,11 +118,9 @@ def loop_particle(P, mcdc):
 
         # Collision
         if event == EVENT_COLLISION:
-            # TODO: Generate IC?
-            '''
-            if mcdc['technique']['IC_generator']:
+            # Generate IC?
+            if mcdc['technique']['IC_generator'] and mcdc['cycle_active']:
                 kernel.bank_IC(P, mcdc)
-            '''
 
             # Branchless collision?
             if mcdc['technique']['branchless_collision']:
