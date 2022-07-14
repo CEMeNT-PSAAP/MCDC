@@ -539,7 +539,8 @@ def setting(**kw):
     if k_eff is not None:
         card['k_init'] = k_eff
 
-    # IC source?
+    # TODO: IC source?
+    '''
     if source_file is not None:
         card['filed_source'] = True
         card['source_file']  = source_file
@@ -550,9 +551,9 @@ def setting(**kw):
             Nd = f['IC/N_delayed'][0]
             N_partice = Np + np.sum(Nd)
         card['N_particle'] = N_particle
+    '''
 
-def eigenmode(N_inactive=0, N_active=0, k_init=1.0, 
-              gyration_radius=None, generate_IC=False, IC_tmax=INF):
+def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None):
     # Update setting card
     card                    = mcdc.input_card.setting
     card['N_inactive']      = N_inactive
@@ -580,10 +581,6 @@ def eigenmode(N_inactive=0, N_active=0, k_init=1.0,
             card['gyration_radius_type'] = GR_ONLY_Z
         else:
             print_error("Unknown gyration radius type")
-
-    # Generate IC?
-    card['generate_IC'] = generate_IC
-    card['IC_tmax']     = IC_tmax
 
     # Update tally card
     card                = mcdc.input_card.tally
@@ -636,6 +633,12 @@ def weight_window(x=None, y=None, z=None, t=None, window=None):
     card['ww'] = window
 
     return card
+
+def IC_generator(N_neutron=0, N_precursor=0):
+    card = mcdc.input_card.technique
+    card['IC_generator'] = True
+    card['IC_Nn']        = int(N_neutron)
+    card['IC_Np']        = int(N_precursor)
 
 # ==============================================================================
 # Util
