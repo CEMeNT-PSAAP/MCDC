@@ -186,8 +186,9 @@ def prepare():
 
     for name in type_.technique.names:
         if name not in ['ww_mesh', 
-                        'IC_stot', 'IC_counter_p', 'IC_counter_d', 
-                        'IC_fission', 'IC_bank']:
+                        'IC_bank_neutron', 'IC_bank_precursor',
+                        'IC_bank_neutron_local', 'IC_bank_precursor_local',
+                        'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set weight window mesh
@@ -220,7 +221,8 @@ def prepare():
     # Distribute work to processors
     kernel.distribute_work(mcdc['setting']['N_particle'], mcdc)
 
-    # Set source bank if using filed source
+    # TODO: Set source bank if using filed source
+    '''
     if mcdc['setting']['filed_source']:
         start = mcdc['mpi_work_start']
         end   = start + mcdc['mpi_work_size']
@@ -229,6 +231,7 @@ def prepare():
             particles = f['IC/particles'][start:end]
         for P in particles:
             kernel.add_particle(P, mcdc['bank_source'])
+    '''
 
     # Activate tally scoring for fixed-source
     if not mcdc['setting']['mode_eigenvalue']:
@@ -236,15 +239,6 @@ def prepare():
 
 def generate_hdf5():
     # TODO: Gather and reduce IC bank
-    '''
-    if mcdc['setting']['generate_IC']:
-        size = mcdc['bank_IC']['size']
-        particles  = MPI.COMM_WORLD.gather(mcdc['bank_IC']['particles'][:size])
-        N_prompt   = MPI.COMM_WORLD.reduce(mcdc['IC_counter_p'])
-        N_delayed  = MPI.COMM_WORLD.reduce(mcdc['IC_counter_d'])
-        IC_fission = MPI.COMM_WORLD.reduce(mcdc['IC_fission'])
-    '''
-
     if mcdc['mpi_master']:
         if mcdc['setting']['progress_bar']: print_msg('')
         print_msg(" Generating output HDF5 files...")
@@ -277,12 +271,9 @@ def generate_hdf5():
                 if mcdc['setting']['gyration_radius']:
                     f.create_dataset("gyration_radius",data=mcdc['gyration_radius'])
 
-            # TODO: IC
-            '''
-            if mcdc['setting']['generate_IC']:
-                particles = np.concatenate(particles[:])
-                f.create_dataset("IC/particles",data=np.array(particles))
-                f.create_dataset("IC/N_prompt",data=np.array([N_prompt]))
-                f.create_dataset("IC/N_delayed",data=np.array([N_delayed])) 
-                f.create_dataset("IC/fission",data=np.array([IC_fission])) 
-            '''
+            # IC generator
+            if mcdc['technique']['IC_generator']:
+                Nn = mcdc['technique']['IC_bank_neutron']['size']
+                Np = mcdc['technique']['IC_bank_neutron']['size']
+                f.create_dataset("IC/neutron",data=mcdc['technique']['IC_bank_neutron']['content'][:Nn])
+                f.create_dataset("IC/precursor",data=mcdc['technique']['IC_bank_precursor']['content'][:Np])
