@@ -24,6 +24,13 @@ particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
                      ('shift_z', float64), ('shift_t', float64),
                      ('event', int64), ('surface_ID', int64)])
 
+# Records
+neutron   = np.dtype([('x', float64), ('y', float64), ('z', float64),
+                      ('ux', float64), ('uy', float64), ('uz', float64),
+                      ('group', uint64), ('weight', float64)])
+precursor = np.dtype([('x', float64), ('y', float64), ('z', float64),
+                      ('group', uint64), ('weight', float64)])
+
 # ==============================================================================
 # Particle bank
 # ==============================================================================
@@ -246,14 +253,25 @@ def make_type_technique(card):
     # =========================================================================
     # IC generator
     # =========================================================================
-    
-    J    = card.materials[0]['J']
-    bank = particle_bank(card.technique['IC_N'])
+   
+    # Banks
+    #   We need local banks to ensure reproducibility regardless of # of MPIs
+    Nn = int(card.technique['IC_Nn']*1.25)
+    Np = int(card.technique['IC_Np']*1.25)
+    Nn_local = int(Nn/card.setting['N_active']*2)
+    Np_local = int(Np/card.setting['N_active']*2)
+    bank_neutron   = np.dtype([('content', neutron, (Nn,)), ('size', int64)])
+    bank_precursor = np.dtype([('content', precursor, (Np,)), ('size', int64)])
+    bank_neutron_local   = np.dtype([('content', neutron, (Nn_local,)), ('size', int64)])
+    bank_precursor_local = np.dtype([('content', precursor, (Np_local,)), ('size', int64)])
 
-    struct += [('IC_tmax', float64), ('IC_stot', float64),
-               ('IC_counter_p', int64), ('IC_counter_d', int64, (J,)),
-               ('IC_fission', float64), ('IC_bank', bank)]
-
+    struct += [('IC_Nn', int64), ('IC_Np', int64),
+               ('IC_bank_neutron', bank_neutron), 
+               ('IC_bank_precursor', bank_precursor),
+               ('IC_bank_neutron_local', bank_neutron_local), 
+               ('IC_bank_precursor_local', bank_precursor_local),
+               ('IC_tally_n', float64), ('IC_tally_C', float64),
+               ('IC_n_eff', float64), ('IC_C_eff', float64)]
 
     # Finalize technique type
     technique = np.dtype(struct)
@@ -314,7 +332,7 @@ def make_type_global(card):
                         ('gyration_radius', float64, (N_cycle,)),
                         ('i_cycle', int64),
                         ('cycle_active', bool_),
-                        ('fission_production', float64),
+                        ('global_tally_nuSigmaF', float64),
                         ('mpi_size', int64),
                         ('mpi_rank', int64),
                         ('mpi_master', bool_),

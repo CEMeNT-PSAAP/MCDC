@@ -180,6 +180,50 @@ def manage_particle_banks(mcdc):
     # Zero out census bank
     mcdc['bank_census']['size'] = 0
 
+    # Manage IC bank
+    if mcdc['technique']['IC_generator'] and mcdc['cycle_active']:
+        buff_n = np.zeros(mcdc['technique']['IC_bank_neutron_local']['content'].shape[0], 
+                          dtype=type_.neutron)
+        buff_p = np.zeros(mcdc['technique']['IC_bank_precursor_local']['content'].shape[0], 
+                          dtype=type_.precursor)
+
+        with objmode(Nn='int64', Np='int64'):
+            # Create MPI-supported numpy object
+            Nn = mcdc['technique']['IC_bank_neutron_local']['size']
+            Np = mcdc['technique']['IC_bank_precursor_local']['size']
+        
+            neutrons   = MPI.COMM_WORLD.gather(
+                    mcdc['technique']['IC_bank_neutron_local']['content'][:Nn])
+            precursors = MPI.COMM_WORLD.gather(
+                    mcdc['technique']['IC_bank_precursor_local']['content'][:Np])
+
+            if mcdc['mpi_master']:
+                neutrons   = np.concatenate(neutrons[:])
+                precursors = np.concatenate(precursors[:])
+
+                # Set output buffer
+                Nn = neutrons.shape[0]
+                Np = precursors.shape[0]
+                for i in range(Nn):
+                    buff_n[i] = neutrons[i]
+                for i in range(Np):
+                    buff_p[i] = precursors[i]
+    
+        # Set global bank from buffer
+        if mcdc['mpi_master']:
+            start_n = mcdc['technique']['IC_bank_neutron']['size']
+            start_p = mcdc['technique']['IC_bank_precursor']['size']
+            mcdc['technique']['IC_bank_neutron']['size']   += Nn
+            mcdc['technique']['IC_bank_precursor']['size'] += Np
+            for i in range(Nn):
+                mcdc['technique']['IC_bank_neutron']['content'][start_n+i] = buff_n[i]
+            for i in range(Np):
+                mcdc['technique']['IC_bank_precursor']['content'][start_p+i] = buff_p[i]
+
+        # Reset local banks
+        mcdc['technique']['IC_bank_neutron_local']['size'] = 0
+        mcdc['technique']['IC_bank_precursor_local']['size'] = 0
+
 @njit
 def population_control(mcdc):
     bank_census = mcdc['bank_census']
@@ -354,69 +398,76 @@ def distribute_work(N, mcdc):
     mcdc['mpi_work_size']       = work_size
     mcdc['mpi_work_size_total'] = work_size_total
 
-# TODO
-'''
 @njit
 def bank_IC(P, mcdc):
     material = get_material(P, mcdc)
-    g        = P['group']
-    J        = material['J']
-    G        = material['G']
-    nu_d     = material['nu_d'][g]/mcdc['k_eff']
-    SigmaT   = material['total'][g]
-    SigmaF   = material['fission'][g]
-    decay    = material['decay']
-    v        = P['speed']
-    weight   = P['weight']
 
-    flux = weight/SigmaT
-    
-    # Sample prompt neutron
-    prob = flux/v/mcdc['IC_n_total']
-    if rng(mcdc) < prob:
-        P_new           = copy_particle(P)
-        P_new['time']   = 0.0
-        P_new['weight'] = 1.0
-        add_particle(P_new, mcdc['bank_IC'])
-        mcdc['IC_counter_p'] += 1
-        mcdc['IC_fission']   += SigmaF*v
+    # Neutron weight
+    g      = P['group']
+    SigmaT = material['total'][g]
+    weight = P['weight']
+    flux   = weight/SigmaT
+    v      = P['speed']
+    wn     = flux/v
 
-    # Sample delayed neutrons
-    tmax = mcdc['setting']['IC_tmax']
+    # Precursor weight
+    J      = material['J']
+    nu_d   = material['nu_d'][g]
+    SigmaF = material['fission'][g]
+    decay  = material['decay']
+    total  = 0.0
     for j in range(J):
-        prob = flux*nu_d[j]*SigmaF/decay[j]/mcdc['IC_n_total']\
-               *(1.0 - math.exp(-decay[j]*tmax))
-        if rng(mcdc) < prob:
-            P_new           = copy_particle(P)
-            P_new['weight'] = 1.0
+        total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
+    wp = flux*total
 
-            # Rejection-sample emission time
-            while True:
-                xi   = rng(mcdc)
-                time = -math.log(xi)/decay[j]
-                # Accept if it's inside maximum time
-                if time < tmax:
-                    break
-            P_new['time'] = time
+    # Neutron target weight
+    Nn       = mcdc['technique']['IC_Nn']
+    tally_n  = mcdc['technique']['IC_n_eff']
+    wn_prime = tally_n/Nn
+    
+    # Precursor target weight
+    Np       = mcdc['technique']['IC_Np']
+    tally_C  = mcdc['technique']['IC_C_eff']
+    wp_prime = tally_C/Np
 
-            # Sample energy
-            spectrum = material['chi_d'][j]
-            xi       = rng(mcdc)
-            tot      = 0.0
-            for g_out in range(G):
-                tot += spectrum[g_out]
-                if tot > xi:
-                    break
-            P_new['group'] = g_out
-            P_new['speed'] = material['speed'][g_out]
+    # Sampling probabilities
+    N  = mcdc['setting']['N_active']
+    Pn = wn/wn_prime/N
+    Pp = wp/wp_prime/N
 
-            # Sample isotropic direction
-            P_new['ux'], P_new['uy'], P_new['uz'] = \
-                    sample_isotropic_direction(mcdc)
-            
-            add_particle(P_new, mcdc['bank_IC'])
-            mcdc['IC_counter_d'][j] += 1
-'''
+    # Sample neutron
+    if rng(mcdc) < Pn:
+        idx     = mcdc['technique']['IC_bank_neutron_local']['size']
+        neutron = mcdc['technique']['IC_bank_neutron_local']['content'][idx]
+        neutron['x']      = P['x']
+        neutron['y']      = P['y']
+        neutron['z']      = P['z']
+        neutron['ux']     = P['ux']
+        neutron['uy']     = P['uy']
+        neutron['uz']     = P['uz']
+        neutron['group']  = P['group']
+        neutron['weight'] = wn_prime
+        mcdc['technique']['IC_bank_neutron_local']['size'] += 1
+    
+    # Sample precursor
+    if rng(mcdc) < Pp:
+        idx       = mcdc['technique']['IC_bank_precursor_local']['size']
+        precursor = mcdc['technique']['IC_bank_precursor_local']['content'][idx]
+        precursor['x']      = P['x']
+        precursor['y']      = P['y']
+        precursor['z']      = P['z']
+        precursor['weight'] = wp_prime
+
+        # Sample group
+        xi    = rng(mcdc)*total
+        total = 0.0
+        for j in range(J):
+            total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
+            if total > xi:
+                break
+        precursor['group'] = j
+
+        mcdc['technique']['IC_bank_precursor_local']['size'] += 1
 
 #==============================================================================
 # Particle operations
@@ -1008,136 +1059,132 @@ def global_tally(P, distance, mcdc):
     SigmaF   = material['fission'][g]
     nuSigmaF = nu*SigmaF
 
-    mcdc['fission_production'] += flux*nuSigmaF
+    mcdc['global_tally_nuSigmaF'] += flux*nuSigmaF
 
-    # TODO
-    '''
-    if mcdc['setting']['generate_IC'] and mcdc['2nd_last_iteration']:
+    # IC generator tally
+    if mcdc['technique']['IC_generator']:
+        # Neutron
+        v     = P['speed']
+        mcdc['technique']['IC_tally_n'] += flux/v
+
+        # Precursor
         J     = material['J']
-        nu_d  = material['nu_d'][g]/mcdc['k_eff']
+        nu_d  = material['nu_d'][g]
         decay = material['decay']
-
-        # Prompt
-        IC_n_total = 1.0/P['speed']
-        # Delayed
-        tmax = mcdc['setting']['IC_tmax']
+        total = 0.0
         for j in range(J):
-            IC_n_total += nu_d[j]*SigmaF/decay[j]\
-                          *(1.0 - math.exp(-decay[j]*tmax))
-        # Finalize
-        IC_n_total *= flux
-        mcdc['IC_n_total'] += IC_n_total
-    '''
+            total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
+        mcdc['technique']['IC_tally_C'] += flux*total
 
 @njit
 def global_tally_closeout_history(mcdc):
     N_particle = mcdc['setting']['N_particle']
 
-    if mcdc['setting']['mode_eigenvalue']:
-        i_cycle = mcdc['i_cycle']
+    i_cycle = mcdc['i_cycle']
 
+    # MPI Allreduce
+    buff_nuSigmaF = np.zeros(1, np.float64)
+    buff_IC_n = np.zeros(1, np.float64)
+    buff_IC_C = np.zeros(1, np.float64)
+    with objmode():
+        MPI.COMM_WORLD.Allreduce(np.array([mcdc['global_tally_nuSigmaF']]), buff_nuSigmaF, MPI.SUM)
+        if mcdc['technique']['IC_generator']:
+            MPI.COMM_WORLD.Allreduce(np.array([mcdc['technique']['IC_tally_n']]), buff_IC_n, MPI.SUM)
+            MPI.COMM_WORLD.Allreduce(np.array([mcdc['technique']['IC_tally_C']]), buff_IC_C, MPI.SUM)
+    
+    # Update and store k_eff
+    mcdc['k_eff'] = buff_nuSigmaF[0]/N_particle
+    mcdc['k_cycle'][i_cycle] = mcdc['k_eff']
+    mcdc['technique']['IC_n_eff'] = buff_IC_n[0]
+    mcdc['technique']['IC_C_eff'] = buff_IC_C[0]
+   
+    # Accumulate running average
+    if mcdc['cycle_active']:
+        mcdc['k_avg'] += mcdc['k_eff']
+        mcdc['k_sdv'] += mcdc['k_eff']*mcdc['k_eff']
+
+        N = 1 + mcdc['i_cycle'] - mcdc['setting']['N_inactive']
+        mcdc['k_avg_running'] = mcdc['k_avg']/N
+        if N == 1:
+            mcdc['k_sdv_running'] = 0.0
+        else:
+            mcdc['k_sdv_running'] = \
+                    math.sqrt((mcdc['k_sdv']/N - mcdc['k_avg_running']**2)\
+                    /(N-1))
+
+    # Reset accumulators
+    mcdc['global_tally_nuSigmaF']   = 0.0
+    mcdc['technique']['IC_tally_n'] = 0.0
+    mcdc['technique']['IC_tally_C'] = 0.0
+
+    # =====================================================================
+    # Gyration radius
+    # =====================================================================
+    
+    if mcdc['setting']['gyration_radius']:
+        # Center of mass
+        N_local     = mcdc['bank_census']['size']
+        total_local = np.zeros(4, np.float64) # [x,y,z,W]
+        total       = np.zeros(4, np.float64)
+        for i in range(N_local):
+            P = mcdc['bank_census']['particles'][i]
+            total_local[0] += P['x']*P['weight']
+            total_local[1] += P['y']*P['weight']
+            total_local[2] += P['z']*P['weight']
+            total_local[3] += P['weight']
         # MPI Allreduce
-        buff1 = np.zeros(1, np.float64)
-        buff3 = np.zeros(1, np.float64)
         with objmode():
-            MPI.COMM_WORLD.Allreduce(np.array([mcdc['fission_production']]), buff1, MPI.SUM)
-            # TODO
-            '''
-            if mcdc['setting']['generate_IC'] and mcdc['2nd_last_iteration']:
-                MPI.COMM_WORLD.Allreduce(np.array([mcdc['IC_n_total']]), buff2, MPI.SUM)
-            '''
-        mcdc['fission_production'] = buff1[0]
-        #mcdc['IC_n_total']    = buff2[0]/N_particle
-        
-        # Update and store k_eff
-        mcdc['k_eff'] = mcdc['fission_production']/N_particle
-        mcdc['k_cycle'][i_cycle] = mcdc['k_eff']
-       
-        # Accumulate running average
-        if mcdc['cycle_active']:
-            mcdc['k_avg'] += mcdc['k_eff']
-            mcdc['k_sdv'] += mcdc['k_eff']*mcdc['k_eff']
-
-            N = 1 + mcdc['i_cycle'] - mcdc['setting']['N_inactive']
-            mcdc['k_avg_running'] = mcdc['k_avg']/N
-            if N == 1:
-                mcdc['k_sdv_running'] = 0.0
-            else:
-                mcdc['k_sdv_running'] = \
-                        math.sqrt((mcdc['k_sdv']/N - mcdc['k_avg_running']**2)\
-                        /(N-1))
-
-        # Reset accumulators
-        mcdc['fission_production'] = 0.0
-
-        # =====================================================================
-        # Gyration radius
-        # =====================================================================
-        
-        if mcdc['setting']['gyration_radius']:
-            # Center of mass
-            N_local     = mcdc['bank_census']['size']
-            total_local = np.zeros(4, np.float64) # [x,y,z,W]
-            total       = np.zeros(4, np.float64)
+            MPI.COMM_WORLD.Allreduce(total_local, total, MPI.SUM)
+        # COM
+        W     = total[3]
+        com_x = total[0]/W
+        com_y = total[1]/W
+        com_z = total[2]/W
+    
+        # Distance RMS
+        rms_local = np.zeros(1, np.float64)
+        rms       = np.zeros(1, np.float64)
+        gr_type = mcdc['setting']['gyration_radius_type']
+        if gr_type == GR_ALL:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
-                total_local[0] += P['x']*P['weight']
-                total_local[1] += P['y']*P['weight']
-                total_local[2] += P['z']*P['weight']
-                total_local[3] += P['weight']
-            # MPI Allreduce
-            with objmode():
-                MPI.COMM_WORLD.Allreduce(total_local, total, MPI.SUM)
-            # COM
-            W     = total[3]
-            com_x = total[0]/W
-            com_y = total[1]/W
-            com_z = total[2]/W
-        
-            # Distance RMS
-            rms_local = np.zeros(1, np.float64)
-            rms       = np.zeros(1, np.float64)
-            gr_type = mcdc['setting']['gyration_radius_type']
-            if gr_type == GR_ALL:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
-                                     (P['z'] - com_z)**2)*P['weight']
-            elif gr_type == GR_INFINITE_X:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['y'] - com_y)**2 + (P['z'] - com_z)**2)\
-                                    *P['weight']
-            elif gr_type == GR_INFINITE_Y:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['x'] - com_x)**2 + (P['z'] - com_z)**2)\
-                                    *P['weight']
-            elif gr_type == GR_INFINITE_Z:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
-                                    *P['weight']
-            elif gr_type == GR_ONLY_X:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
-            elif gr_type == GR_ONLY_Y:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['y'] - com_y)**2)*P['weight']
-            elif gr_type == GR_ONLY_Z:
-                for i in range(N_local):
-                    P = mcdc['bank_census']['particles'][i]
-                    rms_local[0] += ((P['z'] - com_z)**2)*P['weight']
+                rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
+                                 (P['z'] - com_z)**2)*P['weight']
+        elif gr_type == GR_INFINITE_X:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['y'] - com_y)**2 + (P['z'] - com_z)**2)\
+                                *P['weight']
+        elif gr_type == GR_INFINITE_Y:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['x'] - com_x)**2 + (P['z'] - com_z)**2)\
+                                *P['weight']
+        elif gr_type == GR_INFINITE_Z:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
+                                *P['weight']
+        elif gr_type == GR_ONLY_X:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
+        elif gr_type == GR_ONLY_Y:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['y'] - com_y)**2)*P['weight']
+        elif gr_type == GR_ONLY_Z:
+            for i in range(N_local):
+                P = mcdc['bank_census']['particles'][i]
+                rms_local[0] += ((P['z'] - com_z)**2)*P['weight']
 
-            # MPI Allreduce
-            with objmode():
-                MPI.COMM_WORLD.Allreduce(rms_local, rms, MPI.SUM)
-            rms = math.sqrt(rms[0]/W)
-            
-            # Gyration radius
-            mcdc['gyration_radius'][i_cycle] = rms
+        # MPI Allreduce
+        with objmode():
+            MPI.COMM_WORLD.Allreduce(rms_local, rms, MPI.SUM)
+        rms = math.sqrt(rms[0]/W)
+        
+        # Gyration radius
+        mcdc['gyration_radius'][i_cycle] = rms
             
 #==============================================================================
 # Move to event
