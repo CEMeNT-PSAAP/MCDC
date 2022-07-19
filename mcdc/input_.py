@@ -508,6 +508,7 @@ def setting(**kw):
     output        = kw.get('output')
     progress_bar  = kw.get('progress_bar')
     k_eff         = kw.get('k_eff')
+    bank_max      = kw.get('bank_max')
     source_file   = kw.get('source_file')
 
     # Check if setting card has been initialized
@@ -538,6 +539,10 @@ def setting(**kw):
     # k effective
     if k_eff is not None:
         card['k_init'] = k_eff
+
+    # Maximum active bank size
+    if bank_max is not None:
+        card['bank_max'] = int(bank_max)
 
     # TODO: IC source?
     '''

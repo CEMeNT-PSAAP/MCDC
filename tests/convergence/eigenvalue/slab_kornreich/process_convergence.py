@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
+import sys
 
+N_min = int(sys.argv[1])
+N_max = int(sys.argv[2])
 
 # =============================================================================
 # Reference solution
@@ -25,34 +28,30 @@ phi_ref /= np.sum(tmp*dx)
 
 error   = []
 error_k = []
-N_active_list = np.logspace(2, 3, 11)
-
-# Results
-with h5py.File('output.h5', 'r') as f:
-    phi = f['tally/flux-x/mean'][:]
-    k   = f['keff'][:]
-    
-# Get average and stdv over the active iterations
-N_passive = 50
-
+N_active_list = np.logspace(N_min, N_max, (N_max-N_min)*4+1)
+ 
 for N_active in N_active_list:
-    N_active = int(N_active)
-    phi_avg = np.zeros_like(phi[0])
-    k_avg = 0.0
-    for i in range(N_passive, N_active): 
-        phi_avg += phi[i][:]
-        k_avg += k[i]
-    phi_avg /= N_active    
+    # Results
+    with h5py.File('output_convergence_%i.h5'%int(N_active), 'r') as f:
+        x       = f['tally/grid/x'][:]
+        dx      = x[1:] - x[:-1]
+        phi_avg = f['tally/flux-x/mean'][:]
+        phi_sd  = f['tally/flux-x/sdev'][:]
+        k       = f['k_cycle'][:]
+        k_avg   = f['k_mean'][()]
+        k_sd    = f['k_sdev'][()]
+        rg      = f['gyration_radius'][:]
+
     tmp = 0.5*(phi_avg[1:] + phi_avg[:-1])
     norm = np.sum(tmp*dx)
     phi_avg /= norm
-    k_avg /= N_active    
-    
+    phi_sd /= norm
+
     error.append(np.linalg.norm((phi_avg - phi_ref)/phi_ref))
     error_k.append(np.linalg.norm((k_avg - k_ref)/k_ref))
 
 line = 1.0/np.sqrt(N_active_list)
-line *= error[5]/line[5]
+line *= error[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_active_list, error, 'bo', fillstyle='none')
 plt.plot(N_active_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
@@ -66,7 +65,7 @@ plt.savefig('flux.png')
 plt.clf()
 
 line = 1.0/np.sqrt(N_active_list)
-line *= error_k[5]/line[5]
+line *= error_k[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_active_list, error_k, 'bo', fillstyle='none')
 plt.plot(N_active_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')

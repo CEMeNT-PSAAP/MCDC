@@ -75,6 +75,7 @@ class InputCard:
                         'rng_g'                : 2806196910506780709,
                         'rng_c'                : 1,
                         'rng_mod'              : 2**63,
+                        'bank_max'             : 100,
                         'k_init'               : 1.0,
                         'output'               : 'output',
                         'progress_bar'         : True,
