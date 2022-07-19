@@ -3,13 +3,15 @@ import matplotlib.pyplot as plt
 import h5py
 import sys
 
+N_min = int(sys.argv[1])
+N_max = int(sys.argv[2])
 
 # =============================================================================
 # Reference solution (SS)
 # =============================================================================
 
 # Load grids
-with h5py.File('output_1000.h5', 'r') as f:
+with h5py.File('output_convergence_1000.h5', 'r') as f:
     x = f['tally/grid/x'][:]
     t = f['tally/grid/t'][:]
 
@@ -31,11 +33,10 @@ phi_ref = data['phi']
 error   = []
 error_x = []
 error_t = []
-N_max = int(sys.argv[1])
-N_particle_list = np.logspace(3, N_max, (N_max-3)*2+1)
+N_particle_list = np.logspace(N_min, N_max, (N_max-N_min)*2+1)
 
 for N_particle in N_particle_list:
-    with h5py.File('output_%i.h5'%int(N_particle), 'r') as f:
+    with h5py.File('output_convergence_%i.h5'%int(N_particle), 'r') as f:
         phi      = f['tally/flux/mean'][:]
         phi_x    = f['tally/flux-x/mean'][:]
         phi_t    = f['tally/flux-t/mean'][:]
@@ -51,7 +52,7 @@ for N_particle in N_particle_list:
     error_t.append(np.linalg.norm(phi_t - phi_t_ref))
 
 line = 1.0/np.sqrt(N_particle_list)
-line *= error[N_max-3]/line[N_max-3]
+line *= error[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_particle_list, error, 'bo', fillstyle='none')
 plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
@@ -65,7 +66,7 @@ plt.savefig('flux.png')
 plt.clf()
 
 line = 1.0/np.sqrt(N_particle_list)
-line *= error_x[N_max-3]/line[N_max-3]
+line *= error_x[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_particle_list, error_x, 'bo', fillstyle='none')
 plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
@@ -79,7 +80,7 @@ plt.savefig('flux_x.png')
 plt.clf()
 
 line = 1.0/np.sqrt(N_particle_list)
-line *= error_t[N_max-3]/line[N_max-3]
+line *= error_t[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_particle_list, error_t, 'bo', fillstyle='none')
 plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')

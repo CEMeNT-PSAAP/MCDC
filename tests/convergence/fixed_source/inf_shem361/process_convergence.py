@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import h5py
 import sys
 
+N_min = int(sys.argv[1])
+N_max = int(sys.argv[2])
 
 # =============================================================================
 # Reference solution
@@ -30,18 +32,17 @@ phi_ref = np.linalg.solve(A,Q)*E_mid/dE
 # =============================================================================
 
 error   = []
-N_max = int(sys.argv[1])
-N_particle_list = np.logspace(3, N_max, (N_max-3)*2+1)
+N_particle_list = np.logspace(N_min, N_max, (N_max-N_min)*2+1)
 
 for N_particle in N_particle_list:
     # Results
-    with h5py.File('output_%i.h5'%int(N_particle), 'r') as f:
+    with h5py.File('output_convergence_%i.h5'%int(N_particle), 'r') as f:
         phi = f['tally/flux/mean'][:]*E_mid/dE
     
     error.append(np.linalg.norm((phi - phi_ref)/phi_ref))
 
 line = 1.0/np.sqrt(N_particle_list)
-line *= error[N_max-3]/line[N_max-3]
+line *= error[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_particle_list, error, 'bo', fillstyle='none')
 plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
