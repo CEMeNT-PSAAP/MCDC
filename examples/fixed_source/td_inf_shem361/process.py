@@ -36,7 +36,7 @@ SigmaT += SigmaL
 
 # Time grid
 N = 100
-t = np.logspace(-10,2,N)
+t = np.logspace(-10,0,N)
 
 # Matrix and RHS source
 A = np.zeros([G+J, G+J])

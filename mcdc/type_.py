@@ -219,10 +219,10 @@ setting = np.dtype([('N_particle', uint64), ('N_inactive', uint64),
                     ('N_active', uint64), ('N_cycle', uint64),
                     ('rng_seed', int64), ('rng_stride', int64),
                     ('rng_g', int64), ('rng_c', int64), ('rng_mod', uint64),
-                    ('time_boundary', float64),
+                    ('time_boundary', float64), ('bank_max', int64),
                     ('mode_eigenvalue', bool_), ('k_init', float64),
                     ('gyration_radius', bool_), ('gyration_radius_type', int64),
-                    ('output', 'U20'), ('progress_bar', bool_),
+                    ('output', 'U30'), ('progress_bar', bool_),
                     ('filed_source', bool_), ('source_file', 'U20')])
 
 # ==============================================================================
@@ -256,10 +256,13 @@ def make_type_technique(card):
    
     # Banks
     #   We need local banks to ensure reproducibility regardless of # of MPIs
-    Nn = int(card.technique['IC_Nn']*1.25)
-    Np = int(card.technique['IC_Np']*1.25)
-    Nn_local = int(Nn/card.setting['N_active']*2)
-    Np_local = int(Np/card.setting['N_active']*2)
+    if card.technique['IC_generator']:
+        Nn = int(card.technique['IC_Nn']*1.25)
+        Np = int(card.technique['IC_Np']*1.25)
+        Nn_local = int(Nn/card.setting['N_active']*2)
+        Np_local = int(Np/card.setting['N_active']*2)
+    else:
+        Nn = 0; Np = 0; Nn_local = 0; Np_local = 0
     bank_neutron   = np.dtype([('content', neutron, (Nn,)), ('size', int64)])
     bank_precursor = np.dtype([('content', precursor, (Np,)), ('size', int64)])
     bank_neutron_local   = np.dtype([('content', neutron, (Nn_local,)), ('size', int64)])
@@ -293,11 +296,12 @@ def make_type_global(card):
     N_universe = len(card.universes)
     N_particle = card.setting['N_particle']
     N_cycle    = card.setting['N_cycle']
+    N_bank_max = card.setting['bank_max']
     J          = card.materials[0]['J']
     N_work     = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
-    bank_active = particle_bank(1000)
+    bank_active = particle_bank(N_bank_max)
     if card.setting['mode_eigenvalue']:
         bank_census  = particle_bank(2*N_work)
         bank_source  = particle_bank(2*N_work)
