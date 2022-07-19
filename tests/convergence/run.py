@@ -2,24 +2,33 @@ import numpy as np
 import os
 import sys
 
-# Parameters
-N_proc = int(sys.argv[1])
-N_max  = 7
+if len(sys.argv) > 1:
+    N_proc = int(sys.argv[1])
+else:
+    N_proc = 1
 
 # Fixed source
+N_min = 3
+N_max = 7
 for task in os.scandir('./fixed_source'):
-    print(task)
     os.chdir(task)
-    for N_hist in np.logspace(3, N_max, (N_max-3)*2+1):
-        os.system("srun -n %i python input.py --mode=numba %i"%(N_proc,N_hist))
-    os.system("python process.py %i"%N_max)
+    for N_hist in np.logspace(N_min, N_max, (N_max-N_min)*2+1):
+        print(task, N_hist)
+        if N_proc == 1:
+            os.system("python input.py --mode=numba %i convergence"%(N_hist))
+        else:
+            os.system("srun -n %i python input.py --mode=numba %i convergence"%(N_proc,N_hist))
     os.chdir(r"../..")
-'''
+
 # Eigenvalue
+N_min = 1
+N_max = 3
 for task in os.scandir('./eigenvalue'):
-    print(task)
     os.chdir(task)
-    os.system("srun -n %i python input.py --mode=numba"%(N_proc))
-    os.system("python process.py")
+    for N_hist in np.logspace(N_min, N_max, (N_max-N_min)*4+1):
+        print(task, N_hist)
+        if N_proc == 1:
+            os.system("python input.py --mode=numba %i convergence"%(N_hist))
+        else:
+            os.system("srun -n %i python input.py --mode=numba %i convergence"%(N_proc,N_hist))
     os.chdir(r"../..")
-'''

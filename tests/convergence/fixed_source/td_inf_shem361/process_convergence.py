@@ -3,7 +3,10 @@ import matplotlib.pyplot as plt
 import h5py
 from scipy.linalg import expm
 import matplotlib.animation as animation
+import sys
 
+N_min = int(sys.argv[1])
+N_max = int(sys.argv[2])
 
 # =============================================================================
 # Reference solution
@@ -86,22 +89,24 @@ phi_ref = PHI[:,:G]
 
 error   = []
 error_n = []
-N_max = int(sys.argv[1])
-N_particle_list = np.logspace(3, N_max, (N_max-3)*2+1)
+N_particle_list = np.logspace(N_min, N_max, (N_max-N_min)*2+1)
 
 for N_particle in N_particle_list:
-    with h5py.File('output_%i.h5'%int(N_particle), 'r') as f:
+    with h5py.File('output_convergence_%i.h5'%int(N_particle), 'r') as f:
         phi = f['tally/flux-t/mean'][:]
     n_tot = np.zeros_like(n_ref)
     for n in range(N):
         n_tot[n] = sum(np.divide(phi[:,n+1],v))
     phi = phi[:,1:]
+
+    phi = np.transpose(phi)
+    n_tot = np.transpose(n_tot)
    
     error.append(np.linalg.norm((phi - phi_ref)/phi_ref))
     error_n.append(np.linalg.norm((n_tot - n_ref)/n_ref))
 
 line = 1.0/np.sqrt(N_particle_list)
-line *= error[N_max-3]/line[N_max-3]
+line *= error[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_particle_list, error, 'bo', fillstyle='none')
 plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')
@@ -115,7 +120,7 @@ plt.savefig('flux_t.png')
 plt.clf()
 
 line = 1.0/np.sqrt(N_particle_list)
-line *= error_n[N_max-3]/line[N_max-3]
+line *= error_n[N_max-N_min]/line[N_max-N_min]
 plt.plot(N_particle_list, error_n, 'bo', fillstyle='none')
 plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
 plt.xscale('log')

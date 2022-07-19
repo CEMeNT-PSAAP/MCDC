@@ -4,6 +4,7 @@ import sys
 import mcdc
 
 N_particle = int(sys.argv[2])
+tag        = sys.argv[3]
 
 # =============================================================================
 # Set model
@@ -11,7 +12,7 @@ N_particle = int(sys.argv[2])
 
 # Set materials
 m = mcdc.material(capture=np.array([1.0/3.0]), scatter=np.array([[1.0/3.0]]),
-                  fission=np.array([1.0/3.0]), nu_p=np.array([1.7]))
+                  fission=np.array([1.0/3.0]), nu_p=np.array([2.3]))
 
 # Set surfaces
 s1 = mcdc.surface('plane-x', x=-1E10, bc="reflective")
@@ -36,7 +37,8 @@ mcdc.tally(scores=['flux', 'flux-x', 'flux-t'],
            t=np.linspace(0.0, 20.0, 21))
 
 # Setting
-mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle), progress_bar=False)
+mcdc.setting(N_particle=N_particle, output='output_'+tag+'_'+str(N_particle), 
+             progress_bar=False)
 
 # Run
 mcdc.run()
