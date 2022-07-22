@@ -402,6 +402,10 @@ def distribute_work(N, mcdc):
 def bank_IC(P, mcdc):
     material = get_material(P, mcdc)
 
+    #==========================================================================
+    # Neutron
+    #==========================================================================
+
     # Neutron weight
     g      = P['group']
     SigmaT = material['total'][g]
@@ -410,31 +414,15 @@ def bank_IC(P, mcdc):
     v      = P['speed']
     wn     = flux/v
 
-    # Precursor weight
-    J      = material['J']
-    nu_d   = material['nu_d'][g]
-    SigmaF = material['fission'][g]
-    decay  = material['decay']
-    total  = 0.0
-    for j in range(J):
-        total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
-    wp = flux*total
-
     # Neutron target weight
     Nn       = mcdc['technique']['IC_Nn']
     tally_n  = mcdc['technique']['IC_n_eff']
     wn_prime = tally_n/Nn
     
-    # Precursor target weight
-    Np       = mcdc['technique']['IC_Np']
-    tally_C  = mcdc['technique']['IC_C_eff']
-    wp_prime = tally_C/Np
-
-    # Sampling probabilities
+    # Sampling probability
     N  = mcdc['setting']['N_active']
     Pn = wn/wn_prime/N
-    Pp = wp/wp_prime/N
-
+    
     # Sample neutron
     if rng(mcdc) < Pn:
         idx     = mcdc['technique']['IC_bank_neutron_local']['size']
@@ -449,6 +437,32 @@ def bank_IC(P, mcdc):
         neutron['weight'] = wn_prime
         mcdc['technique']['IC_bank_neutron_local']['size'] += 1
     
+    #==========================================================================
+    # Precursor
+    #==========================================================================
+
+    # Sample precursor?
+    Np = mcdc['technique']['IC_Np']
+    if Np == 0:
+        return
+
+    # Precursor weight
+    J      = material['J']
+    nu_d   = material['nu_d'][g]
+    SigmaF = material['fission'][g]
+    decay  = material['decay']
+    total  = 0.0
+    for j in range(J):
+        total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
+    wp = flux*total
+
+    # Precursor target weight
+    tally_C  = mcdc['technique']['IC_C_eff']
+    wp_prime = tally_C/Np
+
+    # Sampling probability
+    Pp = wp/wp_prime/N
+
     # Sample precursor
     if rng(mcdc) < Pp:
         idx       = mcdc['technique']['IC_bank_precursor_local']['size']
@@ -998,6 +1012,12 @@ def score_closeout_history(score, mcdc):
     # Normalize if eigenvalue mode
     if mcdc['setting']['mode_eigenvalue']:
         score['bin'][:] /= mcdc['setting']['N_particle']
+        
+        # MPI Reduce
+        buff = np.zeros_like(score['bin'])
+        with objmode():
+            MPI.COMM_WORLD.Reduce(np.array(score['bin']), buff, MPI.SUM, 0)
+        score['bin'][:] = buff
 
     # Accumulate score and square of score into mean and sdev
     score['mean'][:] += score['bin']
@@ -1009,23 +1029,25 @@ def score_closeout_history(score, mcdc):
 @njit
 def score_closeout(score, mcdc):
     N_history = mcdc['setting']['N_particle']
+
     if mcdc['setting']['mode_eigenvalue']:
         N_history = mcdc['setting']['N_active']
-
-    # MPI Reduce
-    buff    = np.zeros_like(score['mean'])
-    buff_sq = np.zeros_like(score['sdev'])
-    with objmode():
-        MPI.COMM_WORLD.Reduce(np.array(score['mean']), buff, MPI.SUM, 0)
-        MPI.COMM_WORLD.Reduce(np.array(score['sdev']), buff_sq, MPI.SUM, 0)
-    score['mean'][:] = buff
-    score['sdev'][:] = buff_sq
-    
+    else:
+        # MPI Reduce
+        buff    = np.zeros_like(score['mean'])
+        buff_sq = np.zeros_like(score['sdev'])
+        with objmode():
+            MPI.COMM_WORLD.Reduce(np.array(score['mean']), buff, MPI.SUM, 0)
+            MPI.COMM_WORLD.Reduce(np.array(score['sdev']), buff_sq, MPI.SUM, 0)
+        score['mean'][:] = buff
+        score['sdev'][:] = buff_sq
+   
     # Store results
     score['mean'][:] = score['mean']/N_history
     score['sdev'][:] = \
             np.sqrt((score['sdev']/N_history - np.square(score['mean']))\
             /(N_history-1))
+    
 
 @njit
 def tally_closeout_history(mcdc):
