@@ -257,10 +257,10 @@ def make_type_technique(card):
     # Banks
     #   We need local banks to ensure reproducibility regardless of # of MPIs
     if card.technique['IC_generator']:
-        Nn = int(card.technique['IC_Nn']*1.25)
-        Np = int(card.technique['IC_Np']*1.25)
-        Nn_local = int(Nn/card.setting['N_active']*2)
-        Np_local = int(Np/card.setting['N_active']*2)
+        Nn = int(card.technique['IC_Nn']*1.2)
+        Np = int(card.technique['IC_Np']*1.2)
+        Nn_local = Nn#int(Nn/card.setting['N_active'])
+        Np_local = Np#int(Np/card.setting['N_active'])
     else:
         Nn = 0; Np = 0; Nn_local = 0; Np_local = 0
     bank_neutron   = np.dtype([('content', neutron, (Nn,)), ('size', int64)])
@@ -269,12 +269,12 @@ def make_type_technique(card):
     bank_precursor_local = np.dtype([('content', precursor, (Np_local,)), ('size', int64)])
 
     struct += [('IC_Nn', int64), ('IC_Np', int64),
-               ('IC_bank_neutron', bank_neutron), 
-               ('IC_bank_precursor', bank_precursor),
+               ('IC_tally_n', float64), ('IC_tally_C', float64),
+               ('IC_n_eff', float64), ('IC_C_eff', float64),
                ('IC_bank_neutron_local', bank_neutron_local), 
                ('IC_bank_precursor_local', bank_precursor_local),
-               ('IC_tally_n', float64), ('IC_tally_C', float64),
-               ('IC_n_eff', float64), ('IC_C_eff', float64)]
+               ('IC_bank_neutron', bank_neutron), 
+               ('IC_bank_precursor', bank_precursor)]
 
     # Finalize technique type
     technique = np.dtype(struct)
