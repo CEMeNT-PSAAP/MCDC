@@ -279,25 +279,36 @@ def surface(type_, **kw):
 # Cell
 # =============================================================================
 
-def cell(surfaces_flags, material):
+def cell(surfaces_flags, fill, lattice_center=None):
     N_surface = len(surfaces_flags)
 
     # Set default card values (c.f. type_.py)
     card                   = {}
     card['tag']            = 'Cell'
     card['ID']             = len(mcdc.input_card.cells)
-    card['N_surface']     = N_surface
+    card['N_surface']      = N_surface
     card['surface_IDs']    = np.zeros(N_surface, dtype=int)
     card['positive_flags'] = np.zeros(N_surface, dtype=bool)
     card['material_ID']    = 0
+    card['lattice']        = False
+    card['lattice_ID']     = 0
+    card['lattice_center'] = np.array([0.0, 0.0, 0.0])
 
     # Surfaces and flags
     for i in range(N_surface):
         card['surface_IDs'][i]    = surfaces_flags[i][0]['ID']
         card['positive_flags'][i] = surfaces_flags[i][1]
 
-    # Material
-    card['material_ID'] = material['ID']
+    # Lattice cell?
+    if fill['tag'] == 'Lattice':
+        card['lattice']    = True
+        card['lattice_ID'] = fill['ID']
+        if lattice_center is not None:
+            card['lattice_center'] = np.array(lattice_center)
+    
+    # Material cell
+    else:
+        card['material_ID'] = fill['ID']
     
     # Push card
     mcdc.input_card.cells.append(card)
@@ -307,14 +318,17 @@ def cell(surfaces_flags, material):
 # Universe
 # =============================================================================
 
-def universe(cells):
+def universe(cells, root=False):
     N_cell = len(cells)
 
     # Set default card values (c.f. type_.py)
-    card             = {}
-    card['tag']      = 'Universe'
+    if not root:
+        card        = {}
+        card['tag'] = 'Universe'
+    else:
+        card = mcdc.input_card.universes[0]
     card['ID']       = len(mcdc.input_card.universes)
-    card['N_cell']  = N_cell
+    card['N_cell']   = N_cell
     card['cell_IDs'] = np.zeros(N_cell, dtype=int)
 
     # Cells
@@ -322,55 +336,58 @@ def universe(cells):
         card['cell_IDs'][i] = cells[i]['ID']
 
     # Push card
-    mcdc.input_card.universes.append(card)
+    if not root:
+        mcdc.input_card.universes.append(card)
+
     return card
 
 #==============================================================================
 # Lattice
 #==============================================================================
 
-def lattice(x=None, y=None, z=None, t=None, universes=None, 
-            bc_x_plus=None, bc_x_minus=None, bc_y_plus=None, bc_y_minus=None,
-            bc_z_plus=None, bc_z_minus=None):
-    card = mcdc.input_card.lattice
-
+def lattice(x=None, y=None, z=None, universes=None):
+    # Set default card values (c.f. type_.py)
+    card                 = {}
+    card['tag']          = 'Lattice'
+    card['ID']           = len(mcdc.input_card.lattices)
+    card['mesh']         = {'x0' : -INF, 'dx' : 2*INF, 'Nx' : 1,
+                            'y0' : -INF, 'dy' : 2*INF, 'Ny' : 1,
+                            'z0' : -INF, 'dz' : 2*INF, 'Nz' : 1}
+    card['universe_IDs'] = np.array([[[[0]]]])
+        
     # Set mesh
-    if x is not None: card['mesh']['x'] = x
-    if y is not None: card['mesh']['y'] = y
-    if z is not None: card['mesh']['z'] = z
-    if t is not None: card['mesh']['t'] = t
+    if x is not None: 
+        card['mesh']['x0'] = x[0]
+        card['mesh']['dx'] = x[1]
+        card['mesh']['Nx'] = x[2]
+    if y is not None: 
+        card['mesh']['y0'] = y[0]
+        card['mesh']['dy'] = y[1]
+        card['mesh']['Ny'] = y[2]
+    if z is not None: 
+        card['mesh']['z0'] = z[0]
+        card['mesh']['dz'] = z[1]
+        card['mesh']['Nz'] = z[2]
 
     # Set universe IDs
-    universe_IDs = np.array(universes, dtype=np.int64)
+    universe_IDs = np.array(universes, dtype=np.int64) 
     ax_expand = []
-    if t is None:
-        ax_expand.append(0)
     if x is None:
-        ax_expand.append(1)
-    if y is None:
         ax_expand.append(2)
+    if y is None:
+        ax_expand.append(1)
     if z is None:
-        ax_expand.append(3)
+        ax_expand.append(0)
     for ax in ax_expand:
         universe_IDs = np.expand_dims(universe_IDs, axis=ax)
+
+    # Change indexing structure: [z(flip), y(flip), x] --> [x, y, z]
     tmp = np.transpose(universe_IDs)
-    tmp = np.flip(tmp, axis=2)
-    card['universe_IDs'] = np.flip(tmp, axis=3)
+    tmp = np.flip(tmp, axis=1)
+    card['universe_IDs'] = np.flip(tmp, axis=2)
 
-    # Set BC
-    if bc_x_plus == 'reflective':
-        card['reflective_x+'] = True
-    if bc_x_minus == 'reflective':
-        card['reflective_x-'] = True
-    if bc_y_plus == 'reflective':
-        card['reflective_y+'] = True
-    if bc_y_minus == 'reflective':
-        card['reflective_y-'] = True
-    if bc_z_plus == 'reflective':
-        card['reflective_z+'] = True
-    if bc_z_minus == 'reflective':
-        card['reflective_z-'] = True
-
+    # Push card
+    mcdc.input_card.lattices.append(card)
     return card
 
 # ==============================================================================

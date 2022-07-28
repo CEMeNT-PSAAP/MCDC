@@ -7,7 +7,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.looper   import loop_simulation
+from mcdc.looper   import loop_main
 from mcdc.print_   import print_banner, print_msg, print_runtime,\
                           print_header_eigenvalue
 from mcdc.util     import profile
@@ -32,7 +32,7 @@ def run():
     if mcdc['setting']['mode_eigenvalue']:
         print_header_eigenvalue(mcdc)
     mcdc['runtime_total'] = MPI.Wtime()
-    loop_simulation(mcdc)
+    loop_main(mcdc)
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
     
     # Output: generate hdf5 output files
@@ -56,6 +56,7 @@ def prepare():
     N_surface  = len(input_card.surfaces)
     N_cell     = len(input_card.cells)
     N_universe = len(input_card.universes)
+    N_lattice  = len(input_card.lattices)
     N_source   = len(input_card.sources)
     N_particle = input_card.setting['N_particle']
     N_cycle    = input_card.setting['N_cycle']
@@ -71,12 +72,12 @@ def prepare():
     # Default cards, if not given
     # =========================================================================
 
-    # Universe
-    if N_universe == 0:
-        Nmax_cell  = N_cell
-        N_universe = 1
-        card = {'ID' : 0, 'N_cell' : N_cell, 'cell_IDs' : np.arange(N_cell)}
-        input_card.universes.append(card)
+    # Default root universe
+    if N_universe == 1:
+        Nmax_cell        = N_cell
+        card             = input_card.universes[0]
+        card['N_cell']   = N_cell
+        card['cell_IDs'] = np.arange(N_cell)
 
     # =========================================================================
     # Make types
@@ -85,7 +86,7 @@ def prepare():
     type_.make_type_material(G,J)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)
-    type_.make_type_lattice(input_card.lattice)
+    type_.make_type_lattice(input_card.lattices)
     type_.make_type_source(G)
     type_.make_type_tally(input_card)
     type_.make_type_technique(input_card)
@@ -127,18 +128,27 @@ def prepare():
             mcdc['universes'][i][name] = input_card.universes[i][name]
 
     # =========================================================================
-    # Lattice
+    # Lattices
     # =========================================================================
 
-    for name in type_.lattice.names:
-        if name not in ['mesh']:
-            mcdc['lattice'][name] = input_card.lattice[name]
-    
-    # Set mesh
-    mcdc['lattice']['mesh']['x'] = input_card.lattice['mesh']['x']
-    mcdc['lattice']['mesh']['y'] = input_card.lattice['mesh']['y']
-    mcdc['lattice']['mesh']['z'] = input_card.lattice['mesh']['z']
-    mcdc['lattice']['mesh']['t'] = input_card.lattice['mesh']['t']
+    for i in range(N_lattice):
+        # Mesh
+        mcdc['lattices'][i]['mesh']['x0'] = input_card.lattices[i]['mesh']['x0']
+        mcdc['lattices'][i]['mesh']['dx'] = input_card.lattices[i]['mesh']['dx']
+        mcdc['lattices'][i]['mesh']['Nx'] = input_card.lattices[i]['mesh']['Nx']
+        mcdc['lattices'][i]['mesh']['y0'] = input_card.lattices[i]['mesh']['y0']
+        mcdc['lattices'][i]['mesh']['dy'] = input_card.lattices[i]['mesh']['dy']
+        mcdc['lattices'][i]['mesh']['Ny'] = input_card.lattices[i]['mesh']['Ny']
+        mcdc['lattices'][i]['mesh']['z0'] = input_card.lattices[i]['mesh']['z0']
+        mcdc['lattices'][i]['mesh']['dz'] = input_card.lattices[i]['mesh']['dz']
+        mcdc['lattices'][i]['mesh']['Nz'] = input_card.lattices[i]['mesh']['Nz']
+
+        # Universe IDs
+        Nx = input_card.lattices[i]['mesh']['Nx']
+        Ny = input_card.lattices[i]['mesh']['Ny']
+        Nz = input_card.lattices[i]['mesh']['Nz']
+        mcdc['lattices'][i]['universe_IDs'][:Nx,:Ny,:Nz] =\
+            input_card.lattices[i]['universe_IDs']
 
     # =========================================================================
     # Source

@@ -15,16 +15,13 @@ bool_   = np.bool_
 
 particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
                      ('ux', float64), ('uy', float64), ('uz', float64),
-                     ('time', float64), 
-                     ('group', uint64), ('speed', float64),
-                     ('weight', float64), 
-                     ('alive', bool_), 
-                     ('cell_ID', uint64), ('universe_ID', int64),
-                     ('shift_x', float64), ('shift_y', float64),
-                     ('shift_z', float64), ('shift_t', float64),
-                     ('event', int64), ('surface_ID', int64)])
+                     ('time', float64), ('group', uint64), ('speed', float64),
+                     ('weight', float64), ('alive', bool_),
+                     ('material_ID', int64), ('cell_ID', int64), 
+                     ('surface_ID', int64), ('translation', float64, (3,)),
+                     ('event', int64)])
 
-# Records
+# Records (for IC generator, )
 neutron   = np.dtype([('x', float64), ('y', float64), ('z', float64),
                       ('ux', float64), ('uy', float64), ('uz', float64),
                       ('group', uint64), ('weight', float64)])
@@ -45,7 +42,7 @@ def particle_bank(max_size):
 material = None
 def make_type_material(G,J):
     global material
-    material = np.dtype([('ID', uint64),
+    material = np.dtype([('ID', int64),
                          ('G', int64), ('J', int64),
                          ('speed', float64, (G,)), ('decay', float64, (J,)),
                          ('total', float64, (G,)), ('capture', float64, (G,)),
@@ -59,7 +56,7 @@ def make_type_material(G,J):
 # Surface
 # ==============================================================================
 
-surface = np.dtype([('ID', uint64), 
+surface = np.dtype([('ID', int64), 
                     ('vacuum', bool_), ('reflective', bool_),
                     ('A', float64), ('B', float64), ('C', float64), 
                     ('D', float64), ('E', float64), ('F', float64), 
@@ -72,46 +69,52 @@ surface = np.dtype([('ID', uint64),
 # ==============================================================================
 
 cell = None
-def make_type_cell(N_surface):
+def make_type_cell(Nmax_surface):
     global cell
 
-    cell = np.dtype([('ID', uint64),
-                     ('N_surface', uint64),
-                     ('surface_IDs', uint64, (N_surface,)),
-                     ('positive_flags', bool_, (N_surface,)),
-                     ('material_ID', uint64)])
+    cell = np.dtype([('ID', int64),
+                     ('N_surface', int64),
+                     ('surface_IDs', int64, (Nmax_surface,)),
+                     ('positive_flags', bool_, (Nmax_surface,)),
+                     ('material_ID', int64),
+                     ('lattice', bool_), ('lattice_ID', int64),
+                     ('lattice_center', float64, (3,))])
 
 # ==============================================================================
 # Universe
 # ==============================================================================
 
 universe = None
-def make_type_universe(N_cell):
+def make_type_universe(Nmax_cell):
     global universe
 
-    universe = np.dtype([('ID', uint64),
-                         ('N_cell', uint64),
-                         ('cell_IDs', uint64, (N_cell,))])
+    universe = np.dtype([('ID', int64),
+                         ('N_cell', int64),
+                         ('cell_IDs', int64, (Nmax_cell,))])
 
 # ==============================================================================
 # Lattice
 # ==============================================================================
 
+mesh_uniform = np.dtype([('x0', float64), ('dx', float64), ('Nx', int64),
+                         ('y0', float64), ('dy', float64), ('Ny', int64),
+                         ('z0', float64), ('dz', float64), ('Nz', int64)])
+
 lattice = None
-def make_type_lattice(card):
+def make_type_lattice(cards):
     global lattice
 
-    # Mesh
-    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card['mesh'])
+    # Max dimensional grids
+    Nmax_x = 0
+    Nmax_y = 0
+    Nmax_z = 0
+    for card in cards:
+        Nmax_x = max(Nmax_x, card['mesh']['Nx'])
+        Nmax_y = max(Nmax_y, card['mesh']['Ny'])
+        Nmax_z = max(Nmax_z, card['mesh']['Nz'])
 
-    lattice = np.dtype([('mesh', mesh), 
-                        ('universe_IDs', int64, (Nt, Nx, Ny, Nz)),
-                        ('reflective_x-', bool_),
-                        ('reflective_x+', bool_),
-                        ('reflective_y-', bool_),
-                        ('reflective_y+', bool_),
-                        ('reflective_z-', bool_),
-                        ('reflective_z+', bool_)])
+    lattice = np.dtype([('mesh', mesh_uniform),
+                        ('universe_IDs', int64, (Nmax_x, Nmax_y, Nmax_z))])
 
 # ==============================================================================
 # Source
@@ -120,7 +123,7 @@ def make_type_lattice(card):
 source = None
 def make_type_source(G):
     global source
-    source = np.dtype([('ID', uint64),
+    source = np.dtype([('ID', int64),
                        ('box', bool_), ('isotropic', bool_),
                        ('x', float64), ('y', float64), ('z', float64),
                        ('box_x', float64, (2,)), ('box_y', float64, (2,)), 
@@ -215,8 +218,8 @@ def make_type_tally(card):
 # Setting
 # ==============================================================================
 
-setting = np.dtype([('N_particle', uint64), ('N_inactive', uint64),
-                    ('N_active', uint64), ('N_cycle', uint64),
+setting = np.dtype([('N_particle', int64), ('N_inactive', int64),
+                    ('N_active', int64), ('N_cycle', int64),
                     ('rng_seed', int64), ('rng_stride', int64),
                     ('rng_g', int64), ('rng_c', int64), ('rng_mod', uint64),
                     ('time_boundary', float64), ('bank_max', int64),
@@ -294,6 +297,7 @@ def make_type_global(card):
     N_cell     = len(card.cells)
     N_source   = len(card.sources)
     N_universe = len(card.universes)
+    N_lattice  = len(card.lattices)
     N_particle = card.setting['N_particle']
     N_cycle    = card.setting['N_cycle']
     N_bank_max = card.setting['bank_max']
@@ -316,7 +320,7 @@ def make_type_global(card):
                         ('surfaces', surface, (N_surface,)),
                         ('cells', cell, (N_cell,)),
                         ('universes', universe, (N_universe,)),
-                        ('lattice', lattice),
+                        ('lattices', lattice, (N_lattice,)),
                         ('sources', source, (N_source,)),
                         ('tally', tally),
                         ('setting', setting),
