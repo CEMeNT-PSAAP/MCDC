@@ -8,11 +8,11 @@ from mcdc.constant import *
 from mcdc.print_   import print_progress, print_progress_eigenvalue
 
 # =========================================================================
-# Simulation loop
+# Main loop
 # =========================================================================
 
 @njit
-def loop_simulation(mcdc):
+def loop_main(mcdc):
     simulation_end = False
     while not simulation_end:
         # Loop over source particles
@@ -47,9 +47,9 @@ def loop_simulation(mcdc):
     kernel.tally_closeout(mcdc)    
 
 
-# =========================================================================
+# =============================================================================
 # Source loop
-# =========================================================================
+# =============================================================================
 
 @njit
 def loop_source(mcdc):
@@ -65,7 +65,11 @@ def loop_source(mcdc):
         # Initialize RNG wrt work index
         kernel.rng_skip_ahead_strides(work_idx, mcdc)
 
+        # =====================================================================
         # Get a source particle and put into active bank
+        # =====================================================================
+
+        # Get from fixed-source?
         if mcdc['bank_source']['size'] == 0:
             # Sample source
             xi  = kernel.rng(mcdc)
@@ -75,13 +79,23 @@ def loop_source(mcdc):
                 if tot >= xi:
                     break
             P = kernel.source_particle(S, mcdc)
-            kernel.set_universe(P, mcdc)
+
+            # Find and set cell
+            trans        = np.zeros(3)
+            P['cell_ID'] = kernel.get_particle_cell(P, 0, trans, mcdc)
+
+        # Get from source bank
         else:
             P = mcdc['bank_source']['particles'][work_idx]
+
+        # Add the source particle into the active bank
         kernel.add_particle(P, mcdc['bank_active'])
 
+        # =====================================================================
         # Run the source particle and its secondaries
-        # (until active bank is exhausted)
+        # =====================================================================
+        
+        # Loop until active bank is exhausted
         while mcdc['bank_active']['size'] > 0:
             # Get particle from active bank
             P = kernel.pop_particle(mcdc['bank_active'])
@@ -93,7 +107,11 @@ def loop_source(mcdc):
             # Particle loop
             loop_particle(P, mcdc)
 
-        # Tally history closeout
+        # =====================================================================
+        # Closeout
+        # =====================================================================
+
+        # Tally history closeout for fixed-source simulation
         if not mcdc['setting']['mode_eigenvalue']:
             kernel.tally_closeout_history(mcdc)
         
@@ -149,7 +167,7 @@ def loop_particle(P, mcdc):
 
         # Lattice crossing
         elif event == EVENT_LATTICE:
-            kernel.lattice_crossing(P, mcdc)
+            kernel.shift_particle(P, SHIFT)
     
         # Surface and mesh crossing
         elif event == EVENT_SURFACE_N_MESH:
@@ -159,7 +177,7 @@ def loop_particle(P, mcdc):
         # Lattice and mesh crossing
         elif event == EVENT_LATTICE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            kernel.lattice_crossing(P, mcdc)
+            kernel.shift_particle(P, SHIFT)
 
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:

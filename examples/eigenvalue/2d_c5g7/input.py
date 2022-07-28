@@ -4,7 +4,7 @@ import numpy as np
 import mcdc
 
 # =============================================================================
-# Set material
+# Materials
 # =============================================================================
 
 # Load material data
@@ -18,7 +18,9 @@ def set_mat(mat):
                          nu_p    = mat['nu_p'][:], 
                          nu_d    = mat['nu_d'][:], 
                          chi_p   = mat['chi_p'][:], 
-                         chi_d   = mat['chi_d'][:])
+                         chi_d   = mat['chi_d'][:],
+                         speed   = mat['speed'],
+                         decay   = mat['decay'])
 mat_uo2   = set_mat(lib['uo2'])
 mat_mox43 = set_mat(lib['mox43'])
 mat_mox7  = set_mat(lib['mox7'])
@@ -46,12 +48,8 @@ mox8 = mcdc.cell([-cy], mat_mox87)
 gt   = mcdc.cell([-cy], mat_gt)
 fc   = mcdc.cell([-cy], mat_fc)
 cr   = mcdc.cell([-cy], mat_cr)
-moo  = mcdc.cell([-cy], mat_mod)
 mod  = mcdc.cell([+cy], mat_mod)
-
-# =============================================================================
-# Lattice
-# =============================================================================
+modi = mcdc.cell([-cy], mat_mod) # For all-water lattice
 
 # Universes
 u = mcdc.universe([uo2, mod])['ID']
@@ -61,64 +59,96 @@ n = mcdc.universe([mox8, mod])['ID']
 g = mcdc.universe([gt, mod])['ID']
 f = mcdc.universe([fc, mod])['ID']
 c = mcdc.universe([cr, mod])['ID']
-w = mcdc.universe([moo, mod])['ID']
+w = mcdc.universe([modi, mod])['ID']
 
-# Assembly lattice
-x_grid = np.linspace(0.0, pitch*17*3, 17*3+1)
-y_grid = np.linspace(-pitch*17*3, 0.0, 17*3+1)
-mcdc.lattice(x=x_grid, y=y_grid, 
-             universes=[[u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u,l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,g,u,u,u,u,u,u,u,u,u,g,u,u,u,l,m,m,g,m,n,n,n,n,n,n,n,m,g,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,m,n,n,n,n,n,n,n,n,n,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,g,u,u,g,u,u,g,u,u,g,u,u,g,u,u,l,m,g,n,n,g,n,n,g,n,n,g,n,n,g,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,g,u,u,g,u,u,f,u,u,g,u,u,g,u,u,l,m,g,n,n,g,n,n,f,n,n,g,n,n,g,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,g,u,u,g,u,u,g,u,u,g,u,u,g,u,u,l,m,g,n,n,g,n,n,g,n,n,g,n,n,g,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,m,n,n,n,n,n,n,n,n,n,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,g,u,u,u,u,u,u,u,u,u,g,u,u,u,l,m,m,g,m,n,n,n,n,n,n,n,m,g,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u,l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l,u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,g,m,n,n,n,n,n,n,n,m,g,m,m,l,u,u,u,g,u,u,u,u,u,u,u,u,u,g,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,m,n,n,n,n,n,n,n,n,n,m,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,g,n,n,g,n,n,g,n,n,g,n,n,g,m,l,u,u,g,u,u,g,u,u,g,u,u,g,u,u,g,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,g,n,n,g,n,n,f,n,n,g,n,n,g,m,l,u,u,g,u,u,g,u,u,f,u,u,g,u,u,g,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,g,n,n,g,n,n,g,n,n,g,n,n,g,m,l,u,u,g,u,u,g,u,u,g,u,u,g,u,u,g,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,m,n,n,n,n,n,n,n,n,n,m,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,g,m,n,n,n,n,n,n,n,m,g,m,m,l,u,u,u,g,u,u,u,u,u,u,u,u,u,g,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l,u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w],
-                        [w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w,w]],
-             bc_x_minus='reflective', bc_y_plus='reflective')
+# =============================================================================
+# Assemblies
+# =============================================================================
+
+# Lattices
+lattice_uo2 = mcdc.lattice(x=[-pitch*17/2, pitch, 17], 
+                           y=[-pitch*17/2, pitch, 17],
+                           universes=[[u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u],
+                                      [u,u,u,g,u,u,u,u,u,u,u,u,u,g,u,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,g,u,u,g,u,u,g,u,u,g,u,u,g,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,g,u,u,g,u,u,f,u,u,g,u,u,g,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,g,u,u,g,u,u,g,u,u,g,u,u,g,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,u,g,u,u,u,u,u,u,u,u,u,g,u,u,u],
+                                      [u,u,u,u,u,g,u,u,g,u,u,g,u,u,u,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u],
+                                      [u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u]])
+
+lattice_mox = mcdc.lattice(x=[-pitch*17/2, pitch, 17], 
+                           y=[-pitch*17/2, pitch, 17],
+                           universes=[[l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l],
+                                      [l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l],
+                                      [l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l],
+                                      [l,m,m,g,m,n,n,n,n,n,n,n,m,g,m,m,l],
+                                      [l,m,m,m,n,n,n,n,n,n,n,n,n,m,m,m,l],
+                                      [l,m,g,n,n,g,n,n,g,n,n,g,n,n,g,m,l],
+                                      [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l],
+                                      [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l],
+                                      [l,m,g,n,n,g,n,n,f,n,n,g,n,n,g,m,l],
+                                      [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l],
+                                      [l,m,m,n,n,n,n,n,n,n,n,n,n,n,m,m,l],
+                                      [l,m,g,n,n,g,n,n,g,n,n,g,n,n,g,m,l],
+                                      [l,m,m,m,n,n,n,n,n,n,n,n,n,m,m,m,l],
+                                      [l,m,m,g,m,n,n,n,n,n,n,n,m,g,m,m,l],
+                                      [l,m,m,m,m,g,m,m,g,m,m,g,m,m,m,m,l],
+                                      [l,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,l],
+                                      [l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l]])
+
+lattice_mod = mcdc.lattice(x=[-pitch*17/2, pitch*17, 1], 
+                           y=[-pitch*17/2, pitch*17, 1],
+                           universes=[[w]])
+
+# Assembly cells
+# Surfaces
+x0 = mcdc.surface('plane-x', x=-pitch*17/2)
+x1 = mcdc.surface('plane-x', x=pitch*17/2)
+y0 = mcdc.surface('plane-y', y=-pitch*17/2)
+y1 = mcdc.surface('plane-y', y=pitch*17/2)
+# Cells
+assembly_uo2 = mcdc.cell([+x0, -x1, +y0, -y1], lattice_uo2)
+assembly_mox = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mox)
+assembly_mod = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mod)
+
+# Set assemblies in their respective universes
+u_ = mcdc.universe([assembly_uo2])['ID']
+m_ = mcdc.universe([assembly_mox])['ID']
+w_ = mcdc.universe([assembly_mod])['ID']
+
+# =============================================================================
+# Root universe: core
+# =============================================================================
+
+# Lattice
+lattice_core = mcdc.lattice(x=[-pitch*17*3/2, pitch*17, 3], 
+                            y=[-pitch*17*3/2, pitch*17, 3],
+                            universes=[[u_,m_,w_],
+                                       [m_,u_,w_],
+                                       [w_,w_,w_]])
+
+# Core cell
+# Surfaces
+x0_ = mcdc.surface('plane-x', x=0.0,         bc='reflective')
+x1_ = mcdc.surface('plane-x', x=pitch*17*3,  bc='vacuum')
+y0_ = mcdc.surface('plane-y', y=-pitch*17*3, bc='vacuum')
+y1_ = mcdc.surface('plane-y', y=0.0,         bc='reflective')
+# Cell
+core = mcdc.cell([+x0_, -x1_, +y0_, -y1_], lattice_core, 
+                 lattice_center=[pitch*17*3/2, -pitch*17*3/2, 0.0])
+
+# Root universe
+mcdc.universe([core], root=True)
 
 # =============================================================================
 # Set source
@@ -133,6 +163,8 @@ source = mcdc.source(x=[0.0, pitch*17*2], y=[-pitch*17*2, 0.0],
 # =============================================================================
 
 # Tally
+x_grid = np.linspace(0.0, pitch*17*3, 17*3+1)
+y_grid = np.linspace(-pitch*17*3, 0.0, 17*3+1)
 mcdc.tally(scores=['flux'], x=x_grid, y=y_grid)
 
 # Setting
