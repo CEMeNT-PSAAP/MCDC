@@ -55,7 +55,7 @@ source      = mcdc.source(energy=energy)
 mcdc.tally(scores=['flux-t'], t=np.insert(np.logspace(-10,0,100), 0, 0.0))
 
 # Setting
-mcdc.setting(N_particle=1E2)
+mcdc.setting(N_particle=1E2, bank_max=1000)
 
 # Run
 mcdc.run()

@@ -10,21 +10,15 @@ class InputCard:
         self.materials = []
         self.surfaces  = []
         self.cells     = []
-        self.universes = []
+        self.universes = [{}]
+        self.lattices  = []
         self.sources   = []
 
-        self.lattice = {'tag'           : 'Lattice',
-                        'universe_IDs'  : np.array([[[[0]]]]),
-                        'mesh'          : {'x' : np.array([-INF, INF]),
-                                          'y' : np.array([-INF, INF]),
-                                          'z' : np.array([-INF, INF]),
-                                          't' : np.array([-1E-15, INF])},
-                        'reflective_x-' : False,
-                        'reflective_x+' : False,
-                        'reflective_y-' : False,
-                        'reflective_y+' : False,
-                        'reflective_z-' : False,
-                        'reflective_z+' : False}
+        # Root universe
+        self.universes[0] = {'tag'      : 'Universe', 
+                             'ID'       : 0, 
+                             'N_cell'   : 0, 
+                             'cell_IDs' : np.array(0)}
 
         self.tally = {'tag'         : 'Tally',
                       'tracklength' : False,
