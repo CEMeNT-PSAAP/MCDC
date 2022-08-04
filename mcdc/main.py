@@ -117,7 +117,11 @@ def prepare():
 
     for i in range(N_cell):
         for name in type_.cell.names:
-            mcdc['cells'][i][name] = input_card.cells[i][name]
+            if name in ['surface_IDs', 'positive_flags']:
+                N = mcdc['cells'][i]['N_surface']
+                mcdc['cells'][i][name][:N] = input_card.cells[i][name]
+            else:
+                mcdc['cells'][i][name] = input_card.cells[i][name]
 
     # =========================================================================
     # Universes
@@ -125,7 +129,11 @@ def prepare():
 
     for i in range(N_universe):
         for name in type_.universe.names:
-            mcdc['universes'][i][name] = input_card.universes[i][name]
+            if name in ['cell_IDs']:
+                N = mcdc['universes'][i]['N_cell']
+                mcdc['universes'][i][name][:N] = input_card.universes[i][name]
+            else:
+                mcdc['universes'][i][name] = input_card.universes[i][name]
 
     # =========================================================================
     # Lattices

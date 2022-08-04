@@ -760,7 +760,12 @@ def mesh_distance_search(value, direction, grid):
     idx = binary_search(value, grid)
     if direction > 0.0:
         idx += 1
+    if idx == -1: idx += 1
+    if idx == len(grid): idx -= 1
     dist = (grid[idx] - value)/direction
+    # Moving away from mesh?
+    if dist < 0.0:
+        dist = INF
     return dist
 
 @njit
@@ -776,11 +781,22 @@ def mesh_uniform_distance_search(value, direction, x0, dx):
 
 @njit
 def mesh_get_index(P, mesh):
+    # Check if outside grid
+    outside = False
+
+    if P['time'] < mesh['t'][0] or P['time'] > mesh['t'][-1] or\
+       P['x'] < mesh['x'][0] or P['x'] > mesh['x'][-1] or\
+       P['y'] < mesh['y'][0] or P['y'] > mesh['y'][-1] or\
+       P['z'] < mesh['z'][0] or P['z'] > mesh['z'][-1]:
+        outside = True
+        return -1, -1, -1, -1, outside
+
+
     t = binary_search(P['time'], mesh['t'])
     x = binary_search(P['x'],    mesh['x'])
     y = binary_search(P['y'],    mesh['y'])
     z = binary_search(P['z'],    mesh['z'])
-    return t, x, y, z
+    return t, x, y, z, outside
 
 @njit
 def mesh_uniform_get_index(P, mesh, trans):
@@ -796,11 +812,11 @@ def mesh_uniform_get_index(P, mesh, trans):
 def mesh_crossing_evaluate(P, mesh):
     # Shift backward
     shift_particle(P, -SHIFT)
-    t1, x1, y1, z1 = mesh_get_index(P, mesh)
+    t1, x1, y1, z1, outside = mesh_get_index(P, mesh)
    
     # Double shift forward
     shift_particle(P, 2*SHIFT)
-    t2, x2, y2, z2 = mesh_get_index(P, mesh)
+    t2, x2, y2, z2, outside = mesh_get_index(P, mesh)
 
     # Return particle to initial position
     shift_particle(P, -SHIFT)
@@ -826,18 +842,25 @@ def score_tracklength(P, distance, mcdc):
 
     # Get indices
     g = P['group']
-    t, x, y, z = mesh_get_index(P, tally['mesh'])
+    t, x, y, z, outside = mesh_get_index(P, tally['mesh'])
+
+    # Outside grid?
+    if outside:
+        return
 
     # Score
     flux = distance*P['weight']
     if tally['flux']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux'])
-    if tally['fission']:
-        flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission'])
     if tally['density']:
         flux /= material['speed'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['density'])
+    if tally['fission']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission'])
+    if tally['total']:
+        flux *= material['total'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['total'])
     if tally['current']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current'])
     if tally['eddington']:
@@ -857,12 +880,15 @@ def score_crossing_x(P, t, x, y, z, mcdc):
     flux = P['weight']/abs(P['ux'])
     if tally['flux_x']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_x'])
-    if tally['fission_x']:
-        flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_x'])
     if tally['density_x']:
         flux /= material['speed'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['density_x'])
+    if tally['fission_x']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_x'])
+    if tally['total_x']:
+        flux *= material['total'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['total_x'])
     if tally['current_x']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_x'])
     if tally['eddington_x']:
@@ -882,12 +908,15 @@ def score_crossing_y(P, t, x, y, z, mcdc):
     flux = P['weight']/abs(P['ux'])
     if tally['flux_y']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_y'])
-    if tally['fission_y']:
-        flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_y'])
     if tally['density_y']:
         flux /= material['speed'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['density_y'])
+    if tally['fission_y']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_y'])
+    if tally['total_y']:
+        flux *= material['total'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['total_y'])
     if tally['current_y']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_y'])
     if tally['eddington_y']:
@@ -907,12 +936,15 @@ def score_crossing_z(P, t, x, y, z, mcdc):
     flux = P['weight']/abs(P['ux'])
     if tally['flux_z']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_z'])
-    if tally['fission_z']:
-        flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_z'])
     if tally['density_z']:
         flux /= material['speed'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['density_z'])
+    if tally['fission_z']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_z'])
+    if tally['total_z']:
+        flux *= material['total'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['total_z'])
     if tally['current_z']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_z'])
     if tally['eddington_z']:
@@ -931,12 +963,15 @@ def score_crossing_t(P, t, x, y, z, mcdc):
     flux = P['weight']*P['speed']
     if tally['flux_t']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_t'])
-    if tally['fission_t']:
-        flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_t'])
     if tally['density_t']:
         flux /= material['speed'][g]
         score_flux(g, t, x, y, z, flux, tally['score']['density_t'])
+    if tally['fission_t']:
+        flux *= material['fission'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['fission_t'])
+    if tally['total_t']:
+        flux *= material['total'][g]
+        score_flux(g, t, x, y, z, flux, tally['score']['total_t'])
     if tally['current_t']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_t'])
     if tally['eddington_t']:
@@ -1706,7 +1741,7 @@ def time_boundary(P, mcdc):
 @njit
 def weight_window(P, mcdc):
     # Get indices
-    t, x, y, z = mesh_get_index(P, mcdc['technique']['ww_mesh'])
+    t, x, y, z, outside = mesh_get_index(P, mcdc['technique']['ww_mesh'])
 
     # Target weight
     w_target = mcdc['technique']['ww'][t,x,y,z]
