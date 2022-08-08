@@ -44,7 +44,7 @@ mcdc.tally(scores=['flux'])
 
 # Setting
 mcdc.setting(N_particle=1E2)
-mcdc.eigenmode(N_inactive=10, N_active=10)
+mcdc.eigenmode(N_inactive=10, N_active=20)
 mcdc.population_control()
 
 # Run

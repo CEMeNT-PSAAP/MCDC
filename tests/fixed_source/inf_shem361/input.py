@@ -13,7 +13,8 @@ tag        = sys.argv[3]
 
 # Load material data
 with np.load('SHEM-361.npz') as data:
-    SigmaC = data['SigmaC']   # /cm
+    SigmaT = data['SigmaT']   # /cm
+    SigmaC = data['SigmaC']
     SigmaS = data['SigmaS']
     SigmaF = data['SigmaF']
     nu_p   = data['nu_p']
@@ -21,8 +22,14 @@ with np.load('SHEM-361.npz') as data:
     chi_p  = data['chi_p']
     chi_d  = data['chi_d']
     G      = data['G']
-
-SigmaC *= 2.0 # augment capture to achieve subcriticality
+    v      = data['v']
+    lamd   = data['lamd']
+# Buckling and leakage XS to make the problem subcritical
+R      = 10.0 # Sub
+B_sq   = (np.pi/R)**2
+D      = 1/(3*SigmaT)
+SigmaL = D*B_sq
+SigmaC += SigmaL
 
 # Set material
 m = mcdc.material(capture=SigmaC, scatter=SigmaS, fission=SigmaF, nu_p=nu_p,

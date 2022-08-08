@@ -115,18 +115,20 @@ def source_particle(source, rng):
         uz = source['uz']
 
     # Energy and time
-    group = sample_discrete(source['group'], rng)
-    time  = sample_uniform(source['time'][0], source['time'][1], rng)
+    g = sample_discrete(source['group'], rng)
+    t = sample_uniform(source['time'][0], source['time'][1], rng)
 
-    P          = make_particle()
-    P['x']     = x
-    P['y']     = y
-    P['z']     = z
-    P['ux']    = ux
-    P['uy']    = uy
-    P['uz']    = uz
-    P['group'] = group
-    P['time']  = time
+    # Make and return particle
+    P       = np.zeros(1, dtype=type_.particle_record)[0]
+    P['x']  = x
+    P['y']  = y
+    P['z']  = z
+    P['t']  = t
+    P['ux'] = ux
+    P['uy'] = uy
+    P['uz'] = uz
+    P['g']  = g
+    P['w']  = 1.0
 
     return P
 
@@ -136,20 +138,48 @@ def source_particle(source, rng):
 
 @njit
 def add_particle(P, bank):
+    # Check if bank is full
     if bank['size'] == bank['particles'].shape[0]:
         with objmode():
             print_error('Particle bank is full.')
+
+    # Set particle
     bank['particles'][bank['size']] = P
+
+    # Increment size
     bank['size'] += 1
 
 @njit
-def pop_particle(bank):
+def get_particle(bank):
+    # Check if bank is empty
     if bank['size'] == 0:
         with objmode():
             print_error('Particle bank is empty.')
+
+    # Decrement size
     bank['size'] -= 1
-    P = bank['particles'][bank['size']]
-    return copy_particle(P)
+
+    # Create in-flight particle
+    P = np.zeros(1, dtype=type_.particle)[0]
+
+    # Set attribute
+    P_rec = bank['particles'][bank['size']]
+    P['x']  = P_rec['x']
+    P['y']  = P_rec['y']
+    P['z']  = P_rec['z']
+    P['t']  = P_rec['t']
+    P['ux'] = P_rec['ux']
+    P['uy'] = P_rec['uy']
+    P['uz'] = P_rec['uz']
+    P['g']  = P_rec['g']
+    P['w']  = P_rec['w']
+
+    # Set default IDs and event
+    P['material_ID'] = -1
+    P['cell_ID']     = -1
+    P['surface_ID']  = -1
+    P['event']       = -1
+    return P
 
 @njit
 def manage_particle_banks(mcdc):
@@ -254,7 +284,7 @@ def population_control(mcdc):
         idx   = math.floor(tooth) - idx_start
         P = copy_particle(bank_census['particles'][idx])
         # Set weight
-        P['weight'] *= td
+        P['w'] *= td
         add_particle(P, bank_source)
 
 @njit
@@ -282,14 +312,14 @@ def normalize_weight(bank, norm):
 
     # Normalize weight
     for P in bank['particles']:
-        P['weight'] *= norm/W
+        P['w'] *= norm/W
 
 @njit
 def total_weight(bank):
     # Local total weight
     W_local = np.zeros(1)
     for i in range(bank['size']):
-        W_local[0] += bank['particles'][i]['weight']
+        W_local[0] += bank['particles'][i]['w']
     
     # MPI Allreduce
     buff = np.zeros(1, np.float64)
@@ -323,7 +353,7 @@ def bank_rebalance(mcdc):
 
     # MPI nearest-neighbor send/receive
     buff = np.zeros(mcdc['bank_source']['particles'].shape[0], 
-                    dtype=type_.particle)
+                    dtype=type_.particle_record)
 
     with objmode(size='int64'):
         # Create MPI-supported numpy object
@@ -407,11 +437,11 @@ def bank_IC(P, mcdc):
     #==========================================================================
 
     # Neutron weight
-    g      = P['group']
+    g      = P['g']
     SigmaT = material['total'][g]
-    weight = P['weight']
+    weight = P['w']
     flux   = weight/SigmaT
-    v      = P['speed']
+    v      = get_particle_speed(P, mcdc)
     wn     = flux/v
 
     # Neutron target weight
@@ -427,14 +457,14 @@ def bank_IC(P, mcdc):
     if rng(mcdc) < Pn:
         idx     = mcdc['technique']['IC_bank_neutron_local']['size']
         neutron = mcdc['technique']['IC_bank_neutron_local']['content'][idx]
-        neutron['x']      = P['x']
-        neutron['y']      = P['y']
-        neutron['z']      = P['z']
-        neutron['ux']     = P['ux']
-        neutron['uy']     = P['uy']
-        neutron['uz']     = P['uz']
-        neutron['group']  = P['group']
-        neutron['weight'] = wn_prime
+        neutron['x']  = P['x']
+        neutron['y']  = P['y']
+        neutron['z']  = P['z']
+        neutron['ux'] = P['ux']
+        neutron['uy'] = P['uy']
+        neutron['uz'] = P['uz']
+        neutron['g']  = P['g']
+        neutron['w']  = wn_prime
         mcdc['technique']['IC_bank_neutron_local']['size'] += 1
     
     #==========================================================================
@@ -470,7 +500,7 @@ def bank_IC(P, mcdc):
         precursor['x']      = P['x']
         precursor['y']      = P['y']
         precursor['z']      = P['z']
-        precursor['weight'] = wp_prime
+        precursor['w'] = wp_prime
 
         # Sample group
         xi    = rng(mcdc)*total
@@ -479,7 +509,7 @@ def bank_IC(P, mcdc):
             total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
             if total > xi:
                 break
-        precursor['group'] = j
+        precursor['g'] = j
 
         mcdc['technique']['IC_bank_precursor_local']['size'] += 1
 
@@ -488,55 +518,11 @@ def bank_IC(P, mcdc):
 #==============================================================================
 
 @njit
-def make_particle():
-    P = np.zeros(1, dtype=type_.particle)[0]
-    P['x']           = 0.0
-    P['y']           = 0.0
-    P['z']           = 0.0
-    P['ux']          = 0.0
-    P['uy']          = 0.0
-    P['uz']          = 0.0
-    P['time']        = 0.0
-    P['group']       = 0
-    P['speed']       = 1.0
-    P['weight']      = 1.0
-    P['alive']       = True
-    P['material_ID'] = -1
-    P['cell_ID']     = -1
-    P['surface_ID']  = -1
-    P['event']       = -1
-    P['translation'][0] = 0.0
-    P['translation'][1] = 0.0
-    P['translation'][2] = 0.0
-    return P
-
-@njit
-def copy_particle(P):
-    P_new = np.zeros(1, dtype=type_.particle)[0]
-    P_new['x']              = P['x']         
-    P_new['y']              = P['y']         
-    P_new['z']              = P['z']         
-    P_new['ux']             = P['ux']        
-    P_new['uy']             = P['uy']        
-    P_new['uz']             = P['uz']        
-    P_new['time']           = P['time']      
-    P_new['group']          = P['group']     
-    P_new['speed']          = P['speed']     
-    P_new['weight']         = P['weight']    
-    P_new['alive']          = P['alive']     
-    P_new['material_ID']    = P['material_ID']   
-    P_new['cell_ID']        = P['cell_ID']   
-    P_new['surface_ID']     = P['surface_ID']
-    P_new['event']          = P['event']
-    P_new['translation'][:] = P['translation']
-    return P_new 
-
-@njit
-def move_particle(P, distance):
-    P['x']    += P['ux']*distance
-    P['y']    += P['uy']*distance
-    P['z']    += P['uz']*distance
-    P['time'] += distance/P['speed']
+def move_particle(P, distance, mcdc):
+    P['x'] += P['ux']*distance
+    P['y'] += P['uy']*distance
+    P['z'] += P['uz']*distance
+    P['t'] += distance/get_particle_speed(P, mcdc)
 
 @njit
 def shift_particle(P, shift):
@@ -552,7 +538,7 @@ def shift_particle(P, shift):
         P['z'] += shift
     else:
         P['z'] -= shift
-    P['time'] += shift
+    P['t'] += shift
 
 @njit
 def get_particle_cell(P, universe_ID, trans, mcdc):
@@ -568,8 +554,26 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
 
     # Particle is not found
     print("A particle is lost at (",P['x'],P['y'],P['z'],")")
-    P['alive'] = False
+    P['w'] = 0.0
     return -1
+
+@njit
+def get_particle_speed(P, mcdc):
+    return mcdc['materials'][P['material_ID']]['speed'][P['g']]
+
+@njit
+def copy_particle(P):
+    P_new = np.zeros(1, dtype=type_.particle_record)[0]
+    P_new['x']  = P['x']         
+    P_new['y']  = P['y']         
+    P_new['z']  = P['z']         
+    P_new['t']  = P['t']         
+    P_new['ux'] = P['ux']        
+    P_new['uy'] = P['uy']        
+    P_new['uz'] = P['uz']        
+    P_new['g']  = P['g']     
+    P_new['w']  = P['w']     
+    return P_new
 
 #==============================================================================
 # Cell operations
@@ -619,7 +623,7 @@ def surface_evaluate(P, surface, trans):
 @njit
 def surface_bc(P, surface, trans):
     if surface['vacuum']:
-        P['alive'] = False
+        P['w'] = 0.0
     elif surface['reflective']:
         surface_reflect(P, surface, trans)
 
@@ -784,7 +788,7 @@ def mesh_get_index(P, mesh):
     # Check if outside grid
     outside = False
 
-    if P['time'] < mesh['t'][0] or P['time'] > mesh['t'][-1] or\
+    if P['t'] < mesh['t'][0] or P['t'] > mesh['t'][-1] or\
        P['x'] < mesh['x'][0] or P['x'] > mesh['x'][-1] or\
        P['y'] < mesh['y'][0] or P['y'] > mesh['y'][-1] or\
        P['z'] < mesh['z'][0] or P['z'] > mesh['z'][-1]:
@@ -792,7 +796,7 @@ def mesh_get_index(P, mesh):
         return -1, -1, -1, -1, outside
 
 
-    t = binary_search(P['time'], mesh['t'])
+    t = binary_search(P['t'], mesh['t'])
     x = binary_search(P['x'],    mesh['x'])
     y = binary_search(P['y'],    mesh['y'])
     z = binary_search(P['z'],    mesh['z'])
@@ -841,7 +845,7 @@ def score_tracklength(P, distance, mcdc):
     material = mcdc['materials'][P['material_ID']]
 
     # Get indices
-    g = P['group']
+    g = P['g']
     t, x, y, z, outside = mesh_get_index(P, tally['mesh'])
 
     # Outside grid?
@@ -849,7 +853,7 @@ def score_tracklength(P, distance, mcdc):
         return
 
     # Score
-    flux = distance*P['weight']
+    flux = distance*P['w']
     if tally['flux']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux'])
     if tally['density']:
@@ -872,12 +876,12 @@ def score_crossing_x(P, t, x, y, z, mcdc):
     material = mcdc['materials'][P['material_ID']]
 
     # Get indices
-    g = P['group']
+    g = P['g']
     if P['ux'] > 0.0:
         x += 1
 
     # Score
-    flux = P['weight']/abs(P['ux'])
+    flux = P['w']/abs(P['ux'])
     if tally['flux_x']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_x'])
     if tally['density_x']:
@@ -900,12 +904,12 @@ def score_crossing_y(P, t, x, y, z, mcdc):
     material = mcdc['materials'][P['material_ID']]
 
     # Get indices
-    g = P['group']
+    g = P['g']
     if P['uy'] > 0.0:
         y += 1
 
     # Score
-    flux = P['weight']/abs(P['ux'])
+    flux = P['w']/abs(P['ux'])
     if tally['flux_y']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_y'])
     if tally['density_y']:
@@ -928,12 +932,12 @@ def score_crossing_z(P, t, x, y, z, mcdc):
     material = mcdc['materials'][P['material_ID']]
 
     # Get indices
-    g = P['group']
+    g = P['g']
     if P['uz'] > 0.0:
         z += 1
 
     # Score
-    flux = P['weight']/abs(P['ux'])
+    flux = P['w']/abs(P['ux'])
     if tally['flux_z']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_z'])
     if tally['density_z']:
@@ -956,11 +960,11 @@ def score_crossing_t(P, t, x, y, z, mcdc):
     material = mcdc['materials'][P['material_ID']]
     
     # Get indices
-    g  = P['group']
+    g  = P['g']
     t += 1
 
     # Score
-    flux = P['weight']*P['speed']
+    flux = P['w']*material['speed'][g]
     if tally['flux_t']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_t'])
     if tally['density_t']:
@@ -1067,8 +1071,8 @@ def global_tally(P, distance, mcdc):
     material = mcdc['materials'][P['material_ID']]
 
     # Parameters
-    flux     = distance*P['weight']
-    g        = P['group']
+    flux     = distance*P['w']
+    g        = P['g']
     nu       = material['nu_p'][g] + sum(material['nu_d'][g])
     SigmaF   = material['fission'][g]
     nuSigmaF = nu*SigmaF
@@ -1078,7 +1082,7 @@ def global_tally(P, distance, mcdc):
     # IC generator tally
     if mcdc['technique']['IC_generator']:
         # Neutron
-        v     = P['speed']
+        v     = get_particle_speed(P, mcdc)
         mcdc['technique']['IC_tally_n'] += flux/v
 
         # Precursor
@@ -1142,10 +1146,10 @@ def global_tally_closeout_history(mcdc):
         total       = np.zeros(4, np.float64)
         for i in range(N_local):
             P = mcdc['bank_census']['particles'][i]
-            total_local[0] += P['x']*P['weight']
-            total_local[1] += P['y']*P['weight']
-            total_local[2] += P['z']*P['weight']
-            total_local[3] += P['weight']
+            total_local[0] += P['x']*P['w']
+            total_local[1] += P['y']*P['w']
+            total_local[2] += P['z']*P['w']
+            total_local[3] += P['w']
         # MPI Allreduce
         with objmode():
             MPI.COMM_WORLD.Allreduce(total_local, total, MPI.SUM)
@@ -1163,34 +1167,34 @@ def global_tally_closeout_history(mcdc):
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2 +\
-                                 (P['z'] - com_z)**2)*P['weight']
+                                 (P['z'] - com_z)**2)*P['w']
         elif gr_type == GR_INFINITE_X:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['y'] - com_y)**2 + (P['z'] - com_z)**2)\
-                                *P['weight']
+                                *P['w']
         elif gr_type == GR_INFINITE_Y:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['x'] - com_x)**2 + (P['z'] - com_z)**2)\
-                                *P['weight']
+                                *P['w']
         elif gr_type == GR_INFINITE_Z:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
                 rms_local[0] += ((P['x'] - com_x)**2 + (P['y'] - com_y)**2)\
-                                *P['weight']
+                                *P['w']
         elif gr_type == GR_ONLY_X:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
-                rms_local[0] += ((P['x'] - com_x)**2)*P['weight']
+                rms_local[0] += ((P['x'] - com_x)**2)*P['w']
         elif gr_type == GR_ONLY_Y:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
-                rms_local[0] += ((P['y'] - com_y)**2)*P['weight']
+                rms_local[0] += ((P['y'] - com_y)**2)*P['w']
         elif gr_type == GR_ONLY_Z:
             for i in range(N_local):
                 P = mcdc['bank_census']['particles'][i]
-                rms_local[0] += ((P['z'] - com_z)**2)*P['weight']
+                rms_local[0] += ((P['z'] - com_z)**2)*P['w']
 
         # MPI Allreduce
         with objmode():
@@ -1215,10 +1219,11 @@ def move_to_event(P, mcdc):
     d_boundary, event_boundary = distance_to_boundary(P, mcdc)
 
     # Distance to tally mesh
-    d_mesh = distance_to_mesh(P, mcdc['tally']['mesh'])
+    d_mesh = distance_to_mesh(P, mcdc['tally']['mesh'], mcdc)
 
     # Distance to time boundary
-    d_time_boundary = P['speed']*(mcdc['setting']['time_boundary'] - P['time'])
+    speed = get_particle_speed(P, mcdc)
+    d_time_boundary = speed*(mcdc['setting']['time_boundary'] - P['t'])
 
     # Distance to collision
     d_collision = distance_to_collision(P, mcdc)
@@ -1267,13 +1272,13 @@ def move_to_event(P, mcdc):
         global_tally(P, distance, mcdc)
 
     # Move particle
-    move_particle(P, distance)
+    move_particle(P, distance, mcdc)
 
 @njit
 def distance_to_collision(P, mcdc):
     # Get total cross-section
     material = mcdc['materials'][P['material_ID']]
-    SigmaT   = material['total'][P['group']]
+    SigmaT   = material['total'][P['g']]
 
     # Vacuum material?
     if SigmaT == 0.0:
@@ -1349,8 +1354,6 @@ def distance_to_boundary(P, mcdc):
         else:
             # Material cell found, set material_ID
             P['material_ID'] = cell['material_ID']
-            # Also particle speed
-            P['speed'] = mcdc['materials'][P['material_ID']]['speed'][P['group']]
             break
 
     return distance, event
@@ -1386,15 +1389,15 @@ def distance_to_lattice(P, lattice, trans):
     return d
 
 @njit
-def distance_to_mesh(P, mesh):
+def distance_to_mesh(P, mesh, mcdc):
     x  = P['x']
     y  = P['y']
     z  = P['z']
+    t  = P['t']
     ux = P['ux']
     uy = P['uy']
     uz = P['uz']
-    t  = P['time']
-    v  = P['speed']
+    v  = get_particle_speed(P, mcdc)
 
     d = INF
     d = min(d, mesh_distance_search(x, ux, mesh['x']))
@@ -1419,7 +1422,7 @@ def surface_crossing(P, mcdc):
     surface_shift(P, surface, trans)
  
     # Check new cell?
-    if P['alive'] and not surface['reflective']:
+    if P['w'] > 0.0 and not surface['reflective']:
         cell  = mcdc['cells'][P['cell_ID']]
         if not cell_check(P, cell, trans, mcdc):
             trans = np.zeros(3)
@@ -1458,19 +1461,16 @@ def mesh_crossing(P, mcdc):
 
 @njit
 def collision(P, mcdc):
-    # Kill the current particle
-    P['alive'] = False
-
     # Get the reaction cross-sections
     material = mcdc['materials'][P['material_ID']]
-    g        = P['group']
+    g        = P['g']
     SigmaT   = material['total'][g]
     SigmaC   = material['capture'][g]
     SigmaS   = material['scatter'][g]
     SigmaF   = material['fission'][g]
 
     if mcdc['technique']['implicit_capture']:
-        P['weight'] *= (SigmaT-SigmaC)/SigmaT
+        P['w'] *= (SigmaT-SigmaC)/SigmaT
         SigmaT      -= SigmaC
 
     # Sample collision type
@@ -1492,6 +1492,9 @@ def collision(P, mcdc):
 
 @njit
 def capture(P, mcdc):
+    # Kill the current particle
+    P['w'] = 0.0
+
     pass
 
 #==============================================================================
@@ -1502,29 +1505,37 @@ def capture(P, mcdc):
 def scattering(P, mcdc):
     # Get outgoing spectrum
     material = mcdc['materials'][P['material_ID']]
-    g        = P['group']
+    g        = P['g']
     chi_s    = material['chi_s'][g]
     nu_s     = material['nu_s'][g]
     G        = material['G']
 
     # Get effective and new weight
-    weight = P['weight']
     if mcdc['technique']['weighted_emission']:
-        weight_eff = weight
+        weight_eff = P['w']
         weight_new = 1.0
     else:
         weight_eff = 1.0
-        weight_new = weight
+        weight_new = P['w']
 
+    # Kill the current particle
+    P['w'] = 0.0
+
+    # Get number of secondaries
     N = int(math.floor(weight_eff*nu_s + rng(mcdc)))
 
     for n in range(N):
-        # Copy particle (need to revive)
-        P_new = copy_particle(P)
-        P_new['alive'] = True
+        # Create new particle
+        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+
+        # Copy relevant attributes
+        P_new['x'] = P['x']         
+        P_new['y'] = P['y']         
+        P_new['z'] = P['z']         
+        P_new['t'] = P['t']      
 
         # Set weight
-        P_new['weight'] = weight_new
+        P_new['w'] = weight_new
 
         # Sample outgoing energy
         xi  = rng(mcdc)
@@ -1533,8 +1544,7 @@ def scattering(P, mcdc):
             tot += chi_s[g_out]
             if tot > xi:
                 break
-        P_new['group'] = g_out
-        P_new['speed'] = material['speed'][g_out]
+        P_new['g'] = g_out
         
         # Sample scattering angle
         mu = 2.0*rng(mcdc) - 1.0;
@@ -1545,9 +1555,9 @@ def scattering(P, mcdc):
         sin_azi = math.sin(azi)
         Ac      = (1.0 - mu**2)**0.5
 
-        ux = P_new['ux']
-        uy = P_new['uy']
-        uz = P_new['uz']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
         
         if uz != 1.0:
             B = (1.0 - P['uz']**2)**0.5
@@ -1565,7 +1575,7 @@ def scattering(P, mcdc):
             P_new['ux'] = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
             P_new['uz'] = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
             P_new['uy'] = uy*mu - cos_azi*Ac*B
-        
+
         # Bank
         add_particle(P_new, mcdc['bank_active'])
         
@@ -1579,8 +1589,7 @@ def fission(P, mcdc):
     material = mcdc['materials'][P['material_ID']]
     G        = material['G']
     J        = material['J']
-    g        = P['group']
-    weight   = P['weight']
+    g        = P['g']
     nu_p     = material['nu_p'][g]
     nu       = nu_p
     if J>0: 
@@ -1589,11 +1598,14 @@ def fission(P, mcdc):
 
     # Get effective and new weight
     if mcdc['technique']['weighted_emission']:
-        weight_eff = weight
+        weight_eff = P['w']
         weight_new = 1.0
     else:
         weight_eff = 1.0
-        weight_new = weight
+        weight_new = P['w']
+
+    # Kill the current particle
+    P['w'] = 0.0
 
     # Sample prompt and delayed neutrons
     for jj in range(J+1):
@@ -1614,20 +1626,25 @@ def fission(P, mcdc):
 
         # Push fission neutrons to bank
         for n in range(N):
-            # Copy particle (need to revive)
-            P_new = copy_particle(P)
-            P_new['alive'] = True
+            # Create new particle
+            P_new = np.zeros(1, dtype=type_.particle_record)[0]
+
+            # Copy relevant attributes
+            P_new['x'] = P['x']         
+            P_new['y'] = P['y']         
+            P_new['z'] = P['z']         
+            P_new['t'] = P['t']      
 
             # Set weight
-            P_new['weight'] = weight_new
+            P_new['w'] = weight_new
 
             # Sample emission time
             if not prompt:
                 xi = rng(mcdc)
-                P_new['time'] -= math.log(xi)/decay
+                P_new['t'] -= math.log(xi)/decay
 
                 # Skip if it's beyond time boundary
-                if P_new['time'] > mcdc['setting']['time_boundary']:
+                if P_new['t'] > mcdc['setting']['time_boundary']:
                     continue
 
             # Sample outgoing energy
@@ -1637,8 +1654,7 @@ def fission(P, mcdc):
                 tot += spectrum[g_out]
                 if tot > xi:
                     break
-            P_new['group'] = g_out
-            P_new['speed'] = material['speed'][g_out]
+            P_new['g'] = g_out
 
             # Sample isotropic direction
             P_new['ux'], P_new['uy'], P_new['uz'] = \
@@ -1658,8 +1674,8 @@ def fission(P, mcdc):
 def branchless_collision(P, mcdc):
     # Data
     material = mcdc['materials'][P['material_ID']]
-    w        = P['weight']
-    g        = P['group']
+    w        = P['w']
+    g        = P['g']
     SigmaT   = material['total'][g]
     SigmaF   = material['fission'][g]
     SigmaS   = material['scatter'][g]
@@ -1678,7 +1694,7 @@ def branchless_collision(P, mcdc):
     n_scatter    = nu_s*SigmaS
     n_fission    = nu*SigmaF
     n_total      = n_fission + n_scatter
-    P['weight'] *= n_total/SigmaT
+    P['w'] *= n_total/SigmaT
 
     # Set spectrum and decay rate
     fission = True
@@ -1703,11 +1719,11 @@ def branchless_collision(P, mcdc):
     # Set time
     if not prompt:
         xi = rng(mcdc)
-        P['time'] -= math.log(xi)/decay
+        P['t'] -= math.log(xi)/decay
 
         # Kill if it's beyond time boundary
-        if P['time'] > mcdc['setting']['time_boundary']:
-            P['alive'] = False
+        if P['t'] > mcdc['setting']['time_boundary']:
+            P['w'] = 0.0
             return
     
     # Set energy
@@ -1716,8 +1732,7 @@ def branchless_collision(P, mcdc):
     for g_out in range(G):
         tot += spectrum[g_out]
         if tot > xi:
-            P['group'] = g_out
-            P['speed'] = material['speed'][g_out]
+            P['g'] = g_out
             break
 
     # Set direction (TODO: anisotropic scattering)
@@ -1729,7 +1744,7 @@ def branchless_collision(P, mcdc):
 
 @njit
 def time_boundary(P, mcdc):
-    P['alive'] = False
+    P['w'] = 0.0
 
     # Check if mesh crossing occured
     mesh_crossing(P, mcdc)
@@ -1747,10 +1762,10 @@ def weight_window(P, mcdc):
     w_target = mcdc['technique']['ww'][t,x,y,z]
    
     # Surviving probability
-    p = P.weight/w_target
+    p = P['w']/w_target
 
     # Set target weight
-    P.weight = w_target
+    P['w'] = w_target
 
     # If above target
     if p > 1.0:
@@ -1770,7 +1785,7 @@ def weight_window(P, mcdc):
         # Russian roulette
         xi = rng(mcdc)
         if xi > p:
-            P.alive = False
+            P['w'] = 0.0
 
 #==============================================================================
 # Miscellany
