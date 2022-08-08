@@ -13,27 +13,35 @@ bool_   = np.bool_
 # Particle
 # ==============================================================================
 
-particle = np.dtype([('x', float64), ('y', float64), ('z', float64),
-                     ('ux', float64), ('uy', float64), ('uz', float64),
-                     ('time', float64), ('group', uint64), ('speed', float64),
-                     ('weight', float64), ('alive', bool_),
-                     ('material_ID', int64), ('cell_ID', int64), 
-                     ('surface_ID', int64), ('translation', float64, (3,)),
-                     ('event', int64)])
+# Particle (in-flight)
+particle = np.dtype([
+    ('x', float64), ('y', float64), ('z', float64), ('t', float64),
+    ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
+    ('w', float64),
+    ('material_ID', int64), ('cell_ID', int64), 
+    ('surface_ID', int64), ('translation', float64, (3,)),
+    ('event', int64)])
+
+# Particle record (in-bank)
+particle_record = np.dtype([
+    ('x', float64), ('y', float64), ('z', float64), ('t', float64),
+    ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
+    ('w', float64)])
 
 # Records (for IC generator, )
 neutron   = np.dtype([('x', float64), ('y', float64), ('z', float64),
                       ('ux', float64), ('uy', float64), ('uz', float64),
-                      ('group', uint64), ('weight', float64)])
+                      ('g', uint64), ('w', float64)])
 precursor = np.dtype([('x', float64), ('y', float64), ('z', float64),
-                      ('group', uint64), ('weight', float64)])
+                      ('g', uint64), ('w', float64)])
 
 # ==============================================================================
 # Particle bank
 # ==============================================================================
 
 def particle_bank(max_size):
-    return np.dtype([('particles', particle, (max_size,)), ('size', int64)])
+    return np.dtype([('particles', particle_record, (max_size,)), 
+                     ('size', int64)])
 
 # ==============================================================================
 # Material
