@@ -15,8 +15,6 @@ with h5py.File('output.h5', 'r') as f:
     phi_sd = f['tally/flux/sdev'][:]
     fis_avg= f['tally/fission/mean'][:]
     fis_sd = f['tally/fission/sdev'][:]
-    tot_avg= f['tally/total/mean'][:]
-    tot_sd = f['tally/total/sdev'][:]
     k      = f['k_cycle'][:]
     k_avg  = f['k_mean'][()]
     k_sd   = f['k_sdev'][()]
@@ -34,8 +32,6 @@ phi_avg = phi_avg/norm/dV
 phi_sd  = phi_sd/norm/dV
 fis_avg = fis_avg/norm/dV
 fis_sd  = fis_sd/norm/dV
-tot_avg = tot_avg/norm/dV
-tot_sd  = tot_sd/norm/dV
 
 phi_fast    = np.zeros_like(phi_avg[0])
 phi_thermal = np.zeros_like(phi_avg[0])
@@ -43,8 +39,6 @@ phi_fast_sd    = np.zeros_like(phi_avg[0])
 phi_thermal_sd = np.zeros_like(phi_avg[0])
 fis_    = np.zeros_like(phi_avg[0])
 fis__sd = np.zeros_like(phi_avg[0])
-tot_    = np.zeros_like(phi_avg[0])
-tot__sd = np.zeros_like(phi_avg[0])
 
 for i in range(5):
     phi_fast    += phi_avg[i]
@@ -58,10 +52,6 @@ for i in range(7):
     fis_    += fis_avg[i]
     fis__sd += np.square(fis_sd[i])
 fis__sd = np.sqrt(fis__sd)
-for i in range(7):
-    tot_    += tot_avg[i]
-    tot__sd += np.square(tot_sd[i])
-tot__sd = np.sqrt(tot__sd)
 
 print('k = %.5f +- %.5f'%(k_avg,k_sd))
 
@@ -87,11 +77,9 @@ X,Z = np.meshgrid(z_mid, x_mid)
 phi_fast_xz = np.sum(phi_fast, axis=1)
 phi_thermal_xz = np.sum(phi_thermal, axis=1)
 fis_xz = np.sum(fis_, axis=1)
-tot_xz = np.sum(tot_, axis=1)
 phi_fast_xz_sd = np.sqrt(np.sum(np.square(phi_fast_sd), axis=1))/phi_fast_xz
 phi_thermal_xz_sd = np.sqrt(np.sum(np.square(phi_thermal_sd), axis=1))/phi_thermal_xz
 fis_xz_sd = np.sqrt(np.sum(np.square(fis__sd), axis=1))/fis_xz
-tot_xz_sd = np.sqrt(np.sum(np.square(tot__sd), axis=1))/tot_xz
 
 plt.pcolormesh(Z,X,phi_fast_xz,shading='nearest')
 plt.colorbar()
@@ -147,34 +135,14 @@ plt.ylabel(r'$z$ [cm]')
 plt.title(r'Fission rate stdev')
 plt.show()
 
-plt.pcolormesh(Z,X,tot_xz,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$z$ [cm]')
-plt.title(r'Interaction rate')
-plt.show()
-
-plt.pcolormesh(Z,X,tot_xz_sd,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$z$ [cm]')
-plt.title(r'Interaction rate stdev')
-plt.show()
-
 # X-Y plane
 Y,X = np.meshgrid(x_mid, x_mid)
 phi_fast_xy = np.sum(phi_fast, axis=2)
 phi_thermal_xy = np.sum(phi_thermal, axis=2)
 fis_xy = np.sum(fis_, axis=2)
-tot_xy = np.sum(tot_, axis=2)
 phi_fast_xy_sd = np.sqrt(np.sum(np.square(phi_fast_sd), axis=2))/phi_fast_xy
 phi_thermal_xy_sd = np.sqrt(np.sum(np.square(phi_thermal_sd), axis=2))/phi_thermal_xy
 fis_xy_sd = np.sqrt(np.sum(np.square(fis__sd), axis=2))/fis_xy
-tot_xy_sd = np.sqrt(np.sum(np.square(tot__sd), axis=2))/tot_xy
 
 plt.pcolormesh(X,Y,phi_fast_xy,shading='nearest')
 plt.colorbar()
@@ -230,25 +198,6 @@ plt.ylabel(r'$y$ [cm]')
 plt.title(r'Fission rate stdev')
 plt.show()
 
-plt.pcolormesh(X,Y,tot_xy,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Interaction rate')
-plt.show()
-
-plt.pcolormesh(X,Y,tot_xy_sd,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Interaction rate stdev')
-plt.show()
-
-
 
 '''
 # Mesh grid
@@ -266,83 +215,8 @@ fill[int(Nx/2):,int(Ny/2):,:] = True
 norm = colors.Normalize()
 phi_fast = cm.viridis(norm(phi_fast))
 
-print('DONNNEEEEEE')
 ax = plt.figure().add_subplot(projection='3d')
 ax.voxels(X, Y, Z, fill, facecolors=phi_fast)
 ax.set(xlabel='x (cm)', ylabel='y (cm)', zlabel='z (cm)')
 plt.show()
-
-
-plt.pcolormesh(X,Y,phi_fast,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Fast neutron flux')
-plt.show()
-
-plt.pcolormesh(X,Y,phi_fast_sd,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Fast neutron flux stdev')
-plt.show()
-
-plt.pcolormesh(X,Y,phi_thermal,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Thermal neutron flux')
-plt.show()
-
-plt.pcolormesh(X,Y,phi_thermal_sd,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Thermal neutron flux stdev')
-plt.show()
-
-plt.pcolormesh(X,Y,tot_,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Interaction rate')
-plt.show()
-
-plt.pcolormesh(X,Y,tot__sd,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Interaction rate stdev')
-plt.show()
-
-plt.pcolormesh(X,Y,fis_,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Fission rate')
-plt.show()
-
-plt.pcolormesh(X,Y,fis__sd,shading='nearest')
-plt.colorbar()
-ax = plt.gca()
-ax.set_aspect('equal')
-plt.xlabel(r'$x$ [cm]')
-plt.ylabel(r'$y$ [cm]')
-plt.title(r'Fission rate stdev')
-plt.show()
-
 '''
