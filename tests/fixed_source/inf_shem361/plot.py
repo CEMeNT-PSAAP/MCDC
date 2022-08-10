@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import h5py
 import sys
 
-N_min = int(sys.argv[1])
-N_max = int(sys.argv[2])
+output = sys.argv[1]
 
 # =============================================================================
 # Reference solution
@@ -36,27 +35,18 @@ phi_ref = np.linalg.solve(A,Q)*E_mid/dE
 # Plot results
 # =============================================================================
 
-error   = []
-N_particle_list = np.logspace(N_min, N_max, (N_max-N_min)*2+1)
+# Get results
+with h5py.File(output, 'r') as f:
+    phi      = f['tally/flux/mean'][:]/dE*E_mid
+    phi_sd   = f['tally/flux/sdev'][:]/dE*E_mid
 
-for N_particle in N_particle_list:
-    # Results
-    with h5py.File('output_convergence_%i.h5'%int(N_particle), 'r') as f:
-        phi = f['tally/flux/mean'][:]*E_mid/dE
-    
-    error.append(np.linalg.norm((phi - phi_ref)/phi_ref))
-
-line = 1.0/np.sqrt(N_particle_list)
-line *= error[N_max-N_min]/line[N_max-N_min]
-plt.plot(N_particle_list, error, 'bo', fillstyle='none')
-plt.plot(N_particle_list, line, 'r--', label=r'$N^{-0.5}$')
+# Flux
+plt.step(E_mid,phi,'-b',label="MC",where='mid')
+plt.fill_between(E_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b',step='mid')
+plt.step(E_mid,phi_ref,'--r',label='analytical',where='mid')
 plt.xscale('log')
-plt.yscale('log')
-plt.ylabel('2-norm of relative error')
-plt.xlabel(r'# of histories, $N$')
-plt.legend()
+plt.xlabel(r'$E$, eV')
+plt.ylabel(r'$E\phi(E)$')
 plt.grid()
-plt.title('flux')
-plt.savefig('flux.png')
-plt.clf()
-
+plt.legend()
+plt.show()
