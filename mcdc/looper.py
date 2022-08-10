@@ -80,10 +80,6 @@ def loop_source(mcdc):
                     break
             P = kernel.source_particle(S, mcdc)
 
-            # Find and set cell
-            trans        = np.zeros(3)
-            P['cell_ID'] = kernel.get_particle_cell(P, 0, trans, mcdc)
-
         # Get from source bank
         else:
             P = mcdc['bank_source']['particles'][work_idx]
@@ -98,7 +94,7 @@ def loop_source(mcdc):
         # Loop until active bank is exhausted
         while mcdc['bank_active']['size'] > 0:
             # Get particle from active bank
-            P = kernel.pop_particle(mcdc['bank_active'])
+            P = kernel.get_particle(mcdc['bank_active'])
 
             # Apply weight window
             if mcdc['technique']['weight_window']:
@@ -129,11 +125,16 @@ def loop_source(mcdc):
 
 @njit
 def loop_particle(P, mcdc):
-    while P['alive']:
+    while P['w'] > 0.0:
+        # Find cell from root universe if unknown
+        if P['cell_ID'] == -1:
+            trans        = np.zeros(3)
+            P['cell_ID'] = kernel.get_particle_cell(P, 0, trans, mcdc)
+
         # Determine and move to event
         kernel.move_to_event(P, mcdc)
         event = P['event']
-
+        
         # Collision
         if event == EVENT_COLLISION:
             # Generate IC?
