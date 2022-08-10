@@ -69,8 +69,9 @@ def print_progress_eigenvalue(mcdc):
         k_sdv   = mcdc['k_sdv_running']
         gr      = mcdc['gyration_radius'][i_cycle]
 
-        sys.stdout.write('\r')
-        sys.stdout.write("\033[K")
+        if mcdc['setting']['progress_bar']:
+            sys.stdout.write('\r')
+            sys.stdout.write("\033[K")
         if mcdc['setting']['gyration_radius']:
             if not mcdc['cycle_active']:
                 print(" %-4i  %.5f  %6.2f"%(i_cycle+1,k_eff,gr))

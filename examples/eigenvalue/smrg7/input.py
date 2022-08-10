@@ -318,7 +318,7 @@ mcdc.universe([core, barrel, water, vessel], root=True)
 # Uniform in energy
 
 source = mcdc.source(x=[-pitch*17*7/2, pitch*17*7/2], y=[-pitch*17*7/2, pitch*17*7/2], 
-                     energy=np.ones(7))
+                     z=[-100.0, 100.0], energy=np.ones(7))
 
 # =============================================================================
 # Set tally and parameter, and then run mcdc
@@ -327,12 +327,12 @@ source = mcdc.source(x=[-pitch*17*7/2, pitch*17*7/2], y=[-pitch*17*7/2, pitch*17
 # Tally
 x_grid = np.linspace(-pitch*17*9/2, pitch*17*9/2, 17*9+1)
 y_grid = np.linspace(-pitch*17*9/2, pitch*17*9/2, 17*9+1)
-z_grid = np.linspace(-100, 100, 51)#208)
+z_grid = np.linspace(-130, 130, 131)
 mcdc.tally(scores=['flux', 'fission'], x=x_grid, y=y_grid, z=z_grid)
 
 # Setting
-mcdc.setting(N_particle=1E6, progress_bar=False)
-mcdc.eigenmode(N_inactive=100, N_active=300, gyration_radius='infinite-z')
+mcdc.setting(N_particle=1E2)
+mcdc.eigenmode(N_inactive=10, N_active=30, gyration_radius='all')
 mcdc.population_control()
 
 # Run
