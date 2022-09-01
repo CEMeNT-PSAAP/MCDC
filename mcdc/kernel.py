@@ -593,18 +593,27 @@ def cell_check(P, cell, trans, mcdc):
 #==============================================================================
 # Surface operations
 #==============================================================================
-# Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
+# Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
+#   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
 
 @njit
 def surface_evaluate(P, surface, trans):
     x = P['x'] + trans[0]
     y = P['y'] + trans[1]
     z = P['z'] + trans[2]
+    t = P['t']
     
     G = surface['G']
     H = surface['H']
     I = surface['I']
-    J = surface['J']
+
+    # Get time indices
+    idx = binary_search(t, surface['t'][:surface['N_slice']+1])
+
+    # Get constant
+    J0 = surface['J'][idx][0]
+    J1 = surface['J'][idx][1]
+    J = J0 + J1*(t-surface['t'][idx])
 
     result = G*x + H*y + I*z + J
     
@@ -640,7 +649,7 @@ def surface_reflect(P, surface, trans):
     P['uz'] = uz - c*nz
 
 @njit
-def surface_shift(P, surface, trans):
+def surface_shift(P, surface, trans, mcdc):
     ux = P['ux']
     uy = P['uy']
     uz = P['uz']
@@ -654,7 +663,13 @@ def surface_shift(P, surface, trans):
     shift_z = nz*SHIFT
 
     # Get dot product to determine shift sign
-    dot = ux*nx + uy*ny + uz*nz
+    if surface['linear']:
+        idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
+        J1  = surface['J'][idx][1]
+        v   = get_particle_speed(P, mcdc)
+        dot = ux*nx + uy*ny + uz*nz + J1/v
+    else:
+        dot = ux*nx + uy*ny + uz*nz
 
     if dot > 0.0:
         P['x'] += shift_x
@@ -699,7 +714,7 @@ def surface_normal_component(P, surface, trans):
     return nx*ux + ny*uy + nz*uz
 
 @njit
-def surface_distance(P, surface, trans):
+def surface_distance(P, surface, trans, mcdc):
     ux = P['ux']
     uy = P['uy']
     uz = P['uz']
@@ -707,12 +722,30 @@ def surface_distance(P, surface, trans):
     G  = surface['G']
     H  = surface['H']
     I  = surface['I']
-
+    
     if surface['linear']:
-        distance = -surface_evaluate(P, surface, trans)/(G*ux + H*uy + I*uz)
+        idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
+        J1  = surface['J'][idx][1]
+        v   = get_particle_speed(P, mcdc)
+
+        surface_move = False
+        t_max        = surface['t'][idx+1]
+        d_max        = (t_max - P['t'])*v
+
+        distance = -surface_evaluate(P, surface, trans)\
+                    /(G*ux + H*uy + I*uz + J1/v)
+        
+        # Go beyond current movement slice?
+        if distance > d_max:
+            distance = d_max
+            surface_move = True
+        elif distance < 0 and idx < surface['N_slice']-1:
+            distance = d_max
+            surface_move = True
+
         # Moving away from the surface
-        if distance < 0.0: return INF
-        else:              return distance
+        if distance < 0.0: return INF, surface_move
+        else:              return distance, surface_move
         
     x  = P['x'] + trans[0] 
     y  = P['y'] + trans[1] 
@@ -738,7 +771,7 @@ def surface_distance(P, surface, trans):
     # Roots are identical: tangent
     # ==> return huge number
     if determinant <= 0.0:
-        return INF
+        return INF, surface_move
     else:
         # Get the roots
         denom = 2.0*a
@@ -751,7 +784,7 @@ def surface_distance(P, surface, trans):
         if root_2 < 0.0: root_2 = INF
         
         # Return the smaller root
-        return min(root_1, root_2)
+        return min(root_1, root_2), surface_move
 
 #==============================================================================
 # Mesh operations
@@ -1254,6 +1287,8 @@ def move_to_event(P, mcdc):
             surface = mcdc['surfaces'][P['surface_ID']]
             if not surface['reflective']:
                 event = EVENT_SURFACE_N_MESH
+        elif event == EVENT_SURFACE_MOVE :
+            event = EVENT_SURFACE_MOVE_N_MESH
         # Lattice and mesh?
         elif event == EVENT_LATTICE:
             event = EVENT_LATTICE_N_MESH
@@ -1311,14 +1346,18 @@ def distance_to_boundary(P, mcdc):
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
         # Distance to nearest surface
-        d_surface, surface_ID = distance_to_nearest_surface(P, cell, trans, mcdc)
+        d_surface, surface_ID, surface_move = \
+                distance_to_nearest_surface(P, cell, trans, mcdc)
 
         # Check if smaller
         if d_surface*PREC < distance:
-            distance           = d_surface
-            event              = EVENT_SURFACE
-            P['surface_ID']    = surface_ID
+            distance            = d_surface
+            event               = EVENT_SURFACE
+            P['surface_ID']     = surface_ID
             P['translation'][:] = trans
+
+            if surface_move:
+                event = EVENT_SURFACE_MOVE
 
         # Lattice cell?
         if cell['lattice']:
@@ -1360,16 +1399,18 @@ def distance_to_boundary(P, mcdc):
 
 @njit
 def distance_to_nearest_surface(P, cell, trans, mcdc):
-    surface_ID = -1
-    distance   = INF
+    distance     = INF
+    surface_ID   = -1
+    surface_move = False
 
     for i in range(cell['N_surface']):
         surface = mcdc['surfaces'][cell['surface_IDs'][i]]
-        d = surface_distance(P, surface, trans)
+        d, sm = surface_distance(P, surface, trans, mcdc)
         if d < distance:
-            surface_ID = surface['ID']
-            distance   = d
-    return distance, surface_ID
+            distance     = d
+            surface_ID   = surface['ID']
+            surface_move = sm
+    return distance, surface_ID, surface_move
 
 @njit
 def distance_to_lattice(P, lattice, trans):
@@ -1419,7 +1460,7 @@ def surface_crossing(P, mcdc):
     surface_bc(P, surface, trans)
 
     # Small shift to ensure crossing
-    surface_shift(P, surface, trans)
+    surface_shift(P, surface, trans, mcdc)
  
     # Check new cell?
     if P['w'] > 0.0 and not surface['reflective']:
@@ -1484,7 +1525,7 @@ def collision(P, mcdc):
             event = EVENT_FISSION
         else:
             event = EVENT_CAPTURE
-    return event
+    P['event'] = event
 
 #==============================================================================
 # Capture
