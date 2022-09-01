@@ -15,10 +15,8 @@ with h5py.File('output.h5', 'r') as f:
     dt     = t[1:]-t[:-1]
     K      = len(t)-1
 
-    phi    = f['tally/flux/mean'][:]
-    phi_sd = f['tally/flux/sdev'][:]
-    J      = f['tally/current/mean'][:,:,0]
-    J_sd   = f['tally/current/sdev'][:,:,0]
+    phi    = f['tally/flux-t/mean'][:]
+    phi_sd = f['tally/flux-t/sdev'][:]
 
 # Flux - average
 fig = plt.figure(figsize=(6,4))
@@ -28,34 +26,30 @@ ax.set_xlabel(r'$x$')
 ax.set_ylabel(r'Flux')
 ax.set_title(r'$\bar{\phi}_{k,j}$')
 line1, = ax.plot([], [],'-b',label="MC")
+asp1 = ax.axvspan(0, 2, facecolor='r', alpha=0.1)
+asp2 = ax.axvspan(2, 6, facecolor='g', alpha=0.1)
 text   = ax.text(0.02, 0.9, '', transform=ax.transAxes)
-ax.legend()        
-def animate(k):        
-    line1.set_data(x_mid,phi[k,:])
-    ax.collections.clear()
-    ax.fill_between(x_mid,phi[k,:]-phi_sd[k,:],phi[k,:]+phi_sd[k,:],alpha=0.2,color='b')
-    text.set_text(r'$t \in [%.1f,%.1f]$ s'%(t[k],t[k+1]))
-    return line1, text
-simulation = animation.FuncAnimation(fig, animate, frames=K)
-writervideo = animation.FFMpegWriter(fps=6)
-plt.show()
+ax.legend()       
 
-# Flux - average
-fig = plt.figure(figsize=(6,4))
-ax = plt.axes()
-ax.grid()
-ax.set_xlabel(r'$x$')
-ax.set_ylabel(r'Flux')
-ax.set_title(r'$\bar{J}_{k,j}$')
-line1, = ax.plot([], [],'-b',label="MC")
-text   = ax.text(0.02, 0.9, '', transform=ax.transAxes)
-ax.legend()        
+def s(t):
+    if t < 18.0:
+        return 2.0
+    elif t < 24.0:
+        return 2.0 + 0.5*(t-18.0)
+    else:
+        return 1.0
 def animate(k):        
-    line1.set_data(x_mid,J[k,:])
+    global asp1, asp2
+    k = k+1
     ax.collections.clear()
-    ax.fill_between(x_mid,J[k,:]-J_sd[k,:],J[k,:]+J_sd[k,:],alpha=0.2,color='b')
-    text.set_text(r'$t \in [%.1f,%.1f]$ s'%(t[k],t[k+1]))
+    asp1.remove()
+    asp2.remove()
+    line1.set_data(x_mid,phi[k,:])
+    ax.fill_between(x_mid,phi[k,:]-phi_sd[k,:],phi[k,:]+phi_sd[k,:],alpha=0.2,color='b')
+    asp1 = ax.axvspan(0, s(t[k]), facecolor='r', alpha=0.2)
+    asp2 = ax.axvspan(s(t[k]), 6.0, facecolor='g', alpha=0.2)
+    text.set_text(r'$t=%.1f$ s'%(t[k]))
     return line1, text
 simulation = animation.FuncAnimation(fig, animate, frames=K)
-writervideo = animation.FFMpegWriter(fps=6)
+writervideo = animation.FFMpegWriter(fps=3600)
 plt.show()
