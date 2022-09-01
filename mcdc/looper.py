@@ -90,7 +90,7 @@ def loop_source(mcdc):
         # =====================================================================
         # Run the source particle and its secondaries
         # =====================================================================
-        
+
         # Loop until active bank is exhausted
         while mcdc['bank_active']['size'] > 0:
             # Get particle from active bank
@@ -134,7 +134,7 @@ def loop_particle(P, mcdc):
         # Determine and move to event
         kernel.move_to_event(P, mcdc)
         event = P['event']
-        
+
         # Collision
         if event == EVENT_COLLISION:
             # Generate IC?
@@ -148,7 +148,8 @@ def loop_particle(P, mcdc):
             # Normal collision
             else:
                 # Get collision type
-                event = kernel.collision(P, mcdc)
+                kernel.collision(P, mcdc)
+                event = P['event']
 
                 # Perform collision
                 if event == EVENT_CAPTURE:
@@ -183,6 +184,17 @@ def loop_particle(P, mcdc):
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:
             kernel.time_boundary(P, mcdc)
+
+        # Surface move
+        elif event == EVENT_SURFACE_MOVE:
+            P['t']       += SHIFT
+            P['cell_ID']  = -1
+
+        # Surface move
+        elif event == EVENT_SURFACE_MOVE_N_MESH:
+            kernel.mesh_crossing(P, mcdc)
+            P['t']       += SHIFT
+            P['cell_ID']  = -1
 
         # Apply weight window
         if mcdc['technique']['weight_window']:
