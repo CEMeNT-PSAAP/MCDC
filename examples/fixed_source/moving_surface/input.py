@@ -14,7 +14,7 @@ m_abs = mcdc.material(capture=np.array([0.9]), scatter=np.array([[0.1]]))
 # Set surfaces
 s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
 s2 = mcdc.surface('plane-x', x=[1.0, 2.0,  5.0,  1.0],
-                             t=[0.0, 12.0, 20.0, 20.0])
+                             t=[0.0, 18.0, 24.0, 24.0])
 s3 = mcdc.surface('plane-x', x=6.0, bc="vacuum")
 
 # Set cells
@@ -26,14 +26,14 @@ mcdc.cell([+s2, -s3], m_abs)
 # =============================================================================
 # Uniform isotropic source throughout the medium
 
-mcdc.source(x=[0.0, 6.0], time=[0.0, 25.0], isotropic=True)
+mcdc.source(x=[0.0, 6.0], time=[0.0, 24.0], isotropic=True)
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=['flux', 'current'],
-           x=np.linspace(0.0, 6.0, 61), t=np.linspace(0.0, 25.0, 51))
+mcdc.tally(scores=['flux', 'flux-t'],
+           x=np.linspace(0.0, 6.0, 61), t=np.linspace(0.0, 30.0, 301))
 
 # Setting
 mcdc.setting(N_particle=int(1E7))
