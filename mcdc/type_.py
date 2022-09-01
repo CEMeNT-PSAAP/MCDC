@@ -64,13 +64,18 @@ def make_type_material(G,J):
 # Surface
 # ==============================================================================
 
-surface = np.dtype([('ID', int64), 
-                    ('vacuum', bool_), ('reflective', bool_),
-                    ('A', float64), ('B', float64), ('C', float64), 
-                    ('D', float64), ('E', float64), ('F', float64), 
-                    ('G', float64), ('H', float64), ('I', float64), 
-                    ('J', float64), ('linear', bool_), 
-                    ('nx', float64), ('ny', float64), ('nz', float64)])
+surface = None
+def make_type_surface(Nmax_slice):
+    global surface
+
+    surface = np.dtype([('ID', int64), ('N_slice', int64),
+                        ('vacuum', bool_), ('reflective', bool_),
+                        ('A', float64), ('B', float64), ('C', float64), 
+                        ('D', float64), ('E', float64), ('F', float64), 
+                        ('G', float64), ('H', float64), ('I', float64), 
+                        ('J', float64, (Nmax_slice,2)), ('t', float64, (Nmax_slice+1,)),
+                        ('linear', bool_), 
+                        ('nx', float64), ('ny', float64), ('nz', float64)])
 
 # ==============================================================================
 # Cell

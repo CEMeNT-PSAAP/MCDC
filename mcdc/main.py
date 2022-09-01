@@ -62,7 +62,10 @@ def prepare():
     N_cycle    = input_card.setting['N_cycle']
     # Derived numbers
     Nmax_surface = 0
+    Nmax_slice   = 0 # Surface time-dependence slice
     Nmax_cell    = 0
+    for surface in input_card.surfaces:
+        Nmax_slice = max(Nmax_slice, surface['N_slice'])
     for cell in input_card.cells:
         Nmax_surface = max(Nmax_surface, cell['N_surface'])
     for universe in input_card.universes:
@@ -84,6 +87,7 @@ def prepare():
     # =========================================================================
 
     type_.make_type_material(G,J)
+    type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)
     type_.make_type_lattice(input_card.lattices)
@@ -109,6 +113,9 @@ def prepare():
 
     for i in range(N_surface):
         for name in type_.surface.names:
+            if name in ['J', 't']:
+                shape = mcdc['surfaces'][i][name].shape
+                input_card.surfaces[i][name].resize(shape)
             mcdc['surfaces'][i][name] = input_card.surfaces[i][name]
     
     # =========================================================================
