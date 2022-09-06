@@ -608,7 +608,9 @@ def surface_evaluate(P, surface, trans):
     I = surface['I']
 
     # Get time indices
-    idx = binary_search(t, surface['t'][:surface['N_slice']+1])
+    idx = 0
+    if surface['N_slice'] > 1:
+        idx = binary_search(t, surface['t'][:surface['N_slice']+1])
 
     # Get constant
     J0 = surface['J'][idx][0]
@@ -664,7 +666,10 @@ def surface_shift(P, surface, trans, mcdc):
 
     # Get dot product to determine shift sign
     if surface['linear']:
-        idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
+        # Get time indices
+        idx = 0
+        if surface['N_slice'] > 1:
+            idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
         J1  = surface['J'][idx][1]
         v   = get_particle_speed(P, mcdc)
         dot = ux*nx + uy*ny + uz*nz + J1/v
@@ -723,14 +728,16 @@ def surface_distance(P, surface, trans, mcdc):
     H  = surface['H']
     I  = surface['I']
     
+    surface_move = False
     if surface['linear']:
-        idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
+        idx = 0
+        if surface['N_slice'] > 1:
+            idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
         J1  = surface['J'][idx][1]
         v   = get_particle_speed(P, mcdc)
 
-        surface_move = False
-        t_max        = surface['t'][idx+1]
-        d_max        = (t_max - P['t'])*v
+        t_max = surface['t'][idx+1]
+        d_max = (t_max - P['t'])*v
 
         distance = -surface_evaluate(P, surface, trans)\
                     /(G*ux + H*uy + I*uz + J1/v)
