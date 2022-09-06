@@ -7,7 +7,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.looper   import loop_main
+from mcdc.loop     import loop_main
 from mcdc.print_   import print_banner, print_msg, print_runtime,\
                           print_header_eigenvalue
 from mcdc.util     import profile
