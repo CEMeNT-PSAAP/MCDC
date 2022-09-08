@@ -51,5 +51,5 @@ def animate(k):
     text.set_text(r'$t=%.1f$ s'%(t[k]))
     return line1, text
 simulation = animation.FuncAnimation(fig, animate, frames=K)
-writervideo = animation.FFMpegWriter(fps=3600)
+#simulation.save('animation.gif', writer='imagemagick', fps=60)
 plt.show()
