@@ -200,21 +200,21 @@ def surface(type_, **kw):
     if type_ == 'plane-x':
         card['G']      = 1.0
         card['linear'] = True
-        if type(kw.get('x')) == type([]):
+        if type(kw.get('x')) in [type([]), type(np.array([]))]:
             set_J(kw.get('x'), kw.get('t'), card)
         else:
             card['J'][0,0] = -kw.get('x')
     elif type_ == 'plane-y':
         card['H']      = 1.0
         card['linear'] = True
-        if type(kw.get('y')) == type([]):
+        if type(kw.get('y')) in [type([]), type(np.array([]))]:
             set_J(kw.get('y'), kw.get('t'), card)
         else:
             card['J'][0,0] = -kw.get('y')
     elif type_ == 'plane-z':
         card['I']      = 1.0
         card['linear'] = True
-        if type(kw.get('z')) == type([]):
+        if type(kw.get('z')) in [type([]), type(np.array([]))]:
             set_J(kw.get('z'), kw.get('t'), card)
         else:
             card['J'][0,0] = -kw.get('z')

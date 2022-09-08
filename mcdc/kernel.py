@@ -949,7 +949,7 @@ def score_crossing_y(P, t, x, y, z, mcdc):
         y += 1
 
     # Score
-    flux = P['w']/abs(P['ux'])
+    flux = P['w']/abs(P['uy'])
     if tally['flux_y']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_y'])
     if tally['density_y']:
@@ -977,7 +977,7 @@ def score_crossing_z(P, t, x, y, z, mcdc):
         z += 1
 
     # Score
-    flux = P['w']/abs(P['ux'])
+    flux = P['w']/abs(P['uz'])
     if tally['flux_z']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_z'])
     if tally['density_z']:
