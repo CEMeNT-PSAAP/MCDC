@@ -173,6 +173,7 @@ def get_particle(bank):
     P['uz'] = P_rec['uz']
     P['g']  = P_rec['g']
     P['w']  = P_rec['w']
+    P['alive'] = True
 
     # Set default IDs and event
     P['material_ID'] = -1
@@ -554,7 +555,7 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
 
     # Particle is not found
     print("A particle is lost at (",P['x'],P['y'],P['z'],")")
-    P['w'] = 0.0
+    P['alive'] = False
     return -1
 
 @njit
@@ -634,7 +635,7 @@ def surface_evaluate(P, surface, trans):
 @njit
 def surface_bc(P, surface, trans):
     if surface['vacuum']:
-        P['w'] = 0.0
+        P['alive'] = False
     elif surface['reflective']:
         surface_reflect(P, surface, trans)
 
@@ -833,13 +834,11 @@ def mesh_get_index(P, mesh):
        P['y'] < mesh['y'][0] or P['y'] > mesh['y'][-1] or\
        P['z'] < mesh['z'][0] or P['z'] > mesh['z'][-1]:
         outside = True
-        return -1, -1, -1, -1, outside
-
 
     t = binary_search(P['t'], mesh['t'])
-    x = binary_search(P['x'],    mesh['x'])
-    y = binary_search(P['y'],    mesh['y'])
-    z = binary_search(P['z'],    mesh['z'])
+    x = binary_search(P['x'], mesh['x'])
+    y = binary_search(P['y'], mesh['y'])
+    z = binary_search(P['z'], mesh['z'])
     return t, x, y, z, outside
 
 @njit
@@ -1470,7 +1469,7 @@ def surface_crossing(P, mcdc):
     surface_shift(P, surface, trans, mcdc)
  
     # Check new cell?
-    if P['w'] > 0.0 and not surface['reflective']:
+    if P['alive'] and not surface['reflective']:
         cell  = mcdc['cells'][P['cell_ID']]
         if not cell_check(P, cell, trans, mcdc):
             trans = np.zeros(3)
@@ -1541,7 +1540,7 @@ def collision(P, mcdc):
 @njit
 def capture(P, mcdc):
     # Kill the current particle
-    P['w'] = 0.0
+    P['alive'] = False
 
     pass
 
@@ -1567,7 +1566,7 @@ def scattering(P, mcdc):
         weight_new = P['w']
 
     # Kill the current particle
-    P['w'] = 0.0
+    P['alive'] = False
 
     # Get number of secondaries
     N = int(math.floor(weight_eff*nu_s + rng(mcdc)))
@@ -1653,7 +1652,7 @@ def fission(P, mcdc):
         weight_new = P['w']
 
     # Kill the current particle
-    P['w'] = 0.0
+    P['alive'] = False
 
     # Sample prompt and delayed neutrons
     for jj in range(J+1):
@@ -1771,7 +1770,7 @@ def branchless_collision(P, mcdc):
 
         # Kill if it's beyond time boundary
         if P['t'] > mcdc['setting']['time_boundary']:
-            P['w'] = 0.0
+            P['alive'] = False
             return
     
     # Set energy
@@ -1792,10 +1791,7 @@ def branchless_collision(P, mcdc):
 
 @njit
 def time_boundary(P, mcdc):
-    P['w'] = 0.0
-
-    # Check if mesh crossing occured
-    mesh_crossing(P, mcdc)
+    P['alive'] = False
 
 #==============================================================================
 # Move to event
@@ -1833,7 +1829,7 @@ def weight_window(P, mcdc):
         # Russian roulette
         xi = rng(mcdc)
         if xi > p:
-            P['w'] = 0.0
+            P['alive'] = False
 
 #==============================================================================
 # Miscellany

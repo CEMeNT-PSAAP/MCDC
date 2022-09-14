@@ -31,8 +31,10 @@ def run():
     print_msg(" Now running TNT...")
     if mcdc['setting']['mode_eigenvalue']:
         print_header_eigenvalue(mcdc)
+    MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime()
     loop_main(mcdc)
+    MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
     
     # Output: generate hdf5 output files
@@ -181,7 +183,7 @@ def prepare():
         S['prob'] /= tot
 
     # =========================================================================
-    # Source
+    # Tally
     # =========================================================================
 
     for name in type_.tally.names:

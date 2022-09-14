@@ -17,7 +17,7 @@ bool_   = np.bool_
 particle = np.dtype([
     ('x', float64), ('y', float64), ('z', float64), ('t', float64),
     ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
-    ('w', float64),
+    ('w', float64), ('alive', bool_),
     ('material_ID', int64), ('cell_ID', int64), 
     ('surface_ID', int64), ('translation', float64, (3,)),
     ('event', int64)])
