@@ -125,7 +125,7 @@ def loop_source(mcdc):
 
 @njit
 def loop_particle(P, mcdc):
-    while P['w'] > 0.0:
+    while P['alive']:
         # Find cell from root universe if unknown
         if P['cell_ID'] == -1:
             trans        = np.zeros(3)
@@ -183,6 +183,7 @@ def loop_particle(P, mcdc):
 
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:
+            kernel.mesh_crossing(P, mcdc)
             kernel.time_boundary(P, mcdc)
 
         # Surface move
