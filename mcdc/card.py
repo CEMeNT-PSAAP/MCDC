@@ -74,7 +74,8 @@ class InputCard:
                         'rng_g'                : 2806196910506780709,
                         'rng_c'                : 1,
                         'rng_mod'              : 2**63,
-                        'bank_max'             : 100,
+                        'bank_active_buff'     : 100,
+                        'bank_census_buff'     : 0.5,
                         'k_init'               : 1.0,
                         'output'               : 'output',
                         'progress_bar'         : True,
@@ -89,12 +90,17 @@ class InputCard:
                           'population_control'   : False,
                           'branchless_collision' : False,
                           'weight_window'        : False,
+                          'time_census'          : False,
+                          'IC_generator'         : False,
+
                           'ww'                   : np.ones([1,1,1,1]), 
                           'ww_mesh'              : {'x' : np.array([-INF, INF]),
                                                     'y' : np.array([-INF, INF]),
                                                     'z' : np.array([-INF, INF]),
                                                     't' : np.array([-INF, INF])},
-                          'IC_generator'         : False,
+
+                          'census_time' : np.array([INF]),
+
                           'IC_Nn'                : 0,
                           'IC_Np'                : 0}
 
