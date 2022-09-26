@@ -558,15 +558,16 @@ def tally(scores, x=None, y=None, z=None, t=None):
 
 def setting(**kw):
     # Get keyword arguments
-    N_particle    = kw.get('N_particle')
-    time_boundary = kw.get('time_boundary')
-    rng_seed      = kw.get('rng_seed')
-    rng_stride    = kw.get('rng_stride')
-    output        = kw.get('output')
-    progress_bar  = kw.get('progress_bar')
-    k_eff         = kw.get('k_eff')
-    bank_max      = kw.get('bank_max')
-    source_file   = kw.get('source_file')
+    N_particle       = kw.get('N_particle')
+    time_boundary    = kw.get('time_boundary')
+    rng_seed         = kw.get('rng_seed')
+    rng_stride       = kw.get('rng_stride')
+    output           = kw.get('output')
+    progress_bar     = kw.get('progress_bar')
+    k_eff            = kw.get('k_eff')
+    bank_active_buff = kw.get('active_bank_buff')
+    bank_census_buff = kw.get('census_bank_buff')
+    source_file      = kw.get('source_file')
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
@@ -598,8 +599,12 @@ def setting(**kw):
         card['k_init'] = k_eff
 
     # Maximum active bank size
-    if bank_max is not None:
-        card['bank_max'] = int(bank_max)
+    if bank_active_buff is not None:
+        card['bank_active_buff'] = int(bank_active_buff)
+
+    # Census bank size multiplier
+    if bank_census_buff is not None:
+        card['bank_census_buff'] = int(bank_census_buff)
 
     # TODO: IC source?
     '''
@@ -664,10 +669,21 @@ def weighted_emission(flag):
 def population_control():
     card = mcdc.input_card.technique
     card['population_control'] = True
+    card['weighted_emission'] = False
 
 def branchless_collision():
     card = mcdc.input_card.technique
     card['branchless_collision'] = True
+    card['weighted_emission'] = False
+
+def census(t=None, population_control=False):
+    card = mcdc.input_card.technique
+    card['time_census'] = population_control
+    card['population_control'] = population_control
+    if population_control:
+        card['weighted_emission'] = False
+    if t is not None:
+        card['census_time'] = t
 
 def weight_window(x=None, y=None, z=None, t=None, window=None):
     card = mcdc.input_card.technique
