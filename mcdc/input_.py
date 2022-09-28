@@ -666,24 +666,28 @@ def weighted_emission(flag):
     card = mcdc.input_card.technique
     card['weighted_emission'] = flag
 
-def population_control():
+def population_control(pct='combing'):
     card = mcdc.input_card.technique
     card['population_control'] = True
-    card['weighted_emission'] = False
+    card['weighted_emission']  = False
+    if pct == 'combing':
+        card['pct'] = PCT_COMBING
+    elif pct == 'combing-weight':
+        card['pct'] = PCT_COMBING_WEIGHT
+    else:
+        print_error("Unknown PCT type " + pct)
 
 def branchless_collision():
     card = mcdc.input_card.technique
     card['branchless_collision'] = True
     card['weighted_emission'] = False
 
-def census(t=None, population_control=False):
+def census(t, pct='none'):
     card = mcdc.input_card.technique
-    card['time_census'] = population_control
-    card['population_control'] = population_control
-    if population_control:
-        card['weighted_emission'] = False
-    if t is not None:
-        card['census_time'] = t
+    card['time_census'] = True
+    card['census_time'] = t
+    if pct != 'none':
+        population_control(pct)
 
 def weight_window(x=None, y=None, z=None, t=None, window=None):
     card = mcdc.input_card.technique
