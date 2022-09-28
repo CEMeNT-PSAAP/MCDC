@@ -33,6 +33,11 @@ GR_ONLY_X     = 4
 GR_ONLY_Y     = 5
 GR_ONLY_Z     = 6
 
+# Population control
+PCT_NONE            = 0
+PCT_COMBING        = 1
+PCT_COMBING_WEIGHT = 10
+
 # Misc.
 INF   = 1E10
 PI    = math.acos(-1.0)

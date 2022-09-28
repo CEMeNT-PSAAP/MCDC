@@ -1,6 +1,6 @@
 import numpy as np
 
-from mcdc.constant import INF, GR_ALL
+from mcdc.constant import INF, GR_ALL, PCT_NONE
 
 class InputCard:
     def __init__(self):
@@ -75,7 +75,7 @@ class InputCard:
                         'rng_c'                : 1,
                         'rng_mod'              : 2**63,
                         'bank_active_buff'     : 100,
-                        'bank_census_buff'     : 0.5,
+                        'bank_census_buff'     : 1.0,
                         'k_init'               : 1.0,
                         'output'               : 'output',
                         'progress_bar'         : True,
@@ -92,6 +92,8 @@ class InputCard:
                           'weight_window'        : False,
                           'time_census'          : False,
                           'IC_generator'         : False,
+
+                          'pct'                  : PCT_NONE,
 
                           'ww'                   : np.ones([1,1,1,1]), 
                           'ww_mesh'              : {'x' : np.array([-INF, INF]),

@@ -196,7 +196,6 @@ def manage_particle_banks(mcdc):
     # Population control
     if mcdc['technique']['population_control']:
         population_control(mcdc)
-        rng_rebase(mcdc)
     else:
         # TODO: Swap??
         # Swap census and source bank
@@ -261,6 +260,15 @@ def manage_IC_bank(mcdc):
 
 @njit
 def population_control(mcdc):
+    if mcdc['technique']['pct'] == PCT_COMBING:
+        pct_combing(mcdc)
+        rng_rebase(mcdc)
+    elif mcdc['technique']['pct'] == PCT_COMBING_WEIGHT:
+        pct_combing_weight(mcdc)
+        rng_rebase(mcdc)
+
+@njit
+def pct_combing(mcdc):
     bank_census = mcdc['bank_census']
     M           = mcdc['setting']['N_particle']
     bank_source = mcdc['bank_source']
@@ -293,6 +301,40 @@ def population_control(mcdc):
         add_particle(P, bank_source)
 
 @njit
+def pct_combing_weight(mcdc):
+    bank_census = mcdc['bank_census']
+    M           = mcdc['setting']['N_particle']
+    bank_source = mcdc['bank_source']
+    
+    # Scan the bank based on weight
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Teeth distance
+    td = W/M
+
+    # Tooth offset
+    xi     = rng(mcdc)
+    offset = xi*td
+
+    # First hiting tooth
+    tooth_start = math.ceil((w_start-offset)/td)
+
+    # Last hiting tooth
+    tooth_end = math.floor((w_end-offset)/td) + 1
+
+    # Locally sample particles from census bank
+    bank_source['size'] = 0
+    idx = 0
+    for i in range(tooth_start, tooth_end):
+        tooth  = i*td+offset
+        idx   += binary_search(tooth,w_cdf[idx:])
+        P = copy_particle(bank_census['particles'][idx])
+        # Set weight
+        P['w'] = td
+        add_particle(P, bank_source)
+
+@njit
 def bank_scanning(bank, mcdc):
     N_local = bank['size']
 
@@ -309,6 +351,30 @@ def bank_scanning(bank, mcdc):
     N_global = buff[0]
 
     return idx_start, N_local, N_global
+
+@njit
+def bank_scanning_weight(bank, mcdc):
+    # Local weight CDF
+    N_local = bank['size']
+    w_cdf   = np.zeros(N_local+1)
+    for i in range(N_local):
+        w_cdf[i+1] = w_cdf[i] + bank['particles'][i]['w']
+    W_local = w_cdf[-1]
+
+    # Starting weight
+    buff = np.zeros(1, dtype=np.float64)
+    with objmode():
+        MPI.COMM_WORLD.Exscan(np.array([W_local]), buff, MPI.SUM)
+    w_start = buff[0]
+    w_cdf += w_start
+
+    # Global weight
+    buff[0] = w_cdf[-1]
+    with objmode():
+        MPI.COMM_WORLD.Bcast(buff, mcdc['mpi_size']-1)
+    W_global = buff[0]
+
+    return w_start, w_cdf, W_global
 
 @njit
 def normalize_weight(bank, norm):

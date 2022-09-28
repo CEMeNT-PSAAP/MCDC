@@ -262,6 +262,12 @@ def make_type_technique(card):
               ('IC_generator', bool_)]
 
     # =========================================================================
+    # Population control
+    # =========================================================================
+
+    struct += [('pct', int64)]
+
+    # =========================================================================
     # Weight window
     # =========================================================================
 
@@ -328,7 +334,6 @@ def make_type_global(card):
     N_cycle          = card.setting['N_cycle']
     bank_active_buff = card.setting['bank_active_buff']
     bank_census_buff = card.setting['bank_census_buff']
-    pop_ctrl         = card.technique['population_control']
     J                = card.materials[0]['J']
     N_work           = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
 
