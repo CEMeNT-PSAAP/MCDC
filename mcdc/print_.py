@@ -10,10 +10,9 @@ def print_msg(msg):
         sys.stdout.flush()
 
 def print_error(msg):
-    if master:
-        print("ERROR: %s\n"%msg)
-        sys.stdout.flush()
-        sys.exit()
+    print("ERROR: %s\n"%msg)
+    sys.stdout.flush()
+    sys.exit()
 
 def print_warning(msg):
     if master:
@@ -44,7 +43,12 @@ def print_progress(percent, mcdc):
     if master:
         sys.stdout.write('\r')
         if not mcdc['setting']['mode_eigenvalue']:
-            sys.stdout.write(" [%-28s] %d%%" % ('='*int(percent*28), percent*100.0))
+            if not mcdc['technique']['time_census']:
+                sys.stdout.write(" [%-28s] %d%%" % ('='*int(percent*28), percent*100.0))
+            else:
+                idx = mcdc['technique']['census_idx']+1
+                N   = len(mcdc['technique']['census_time'])
+                sys.stdout.write(" Census %i/%i: [%-28s] %d%%" % (idx, N, '='*int(percent*28), percent*100.0))
         else:
             if mcdc['setting']['gyration_radius']:
                 sys.stdout.write(" [%-40s] %d%%" % ('='*int(percent*40), percent*100.0))
