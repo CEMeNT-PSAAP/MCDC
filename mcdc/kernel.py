@@ -141,7 +141,7 @@ def add_particle(P, bank):
     # Check if bank is full
     if bank['size'] == bank['particles'].shape[0]:
         with objmode():
-            print_error('Particle bank is full.')
+            print_error('Particle %s bank is full.'%bank['tag'])
 
     # Set particle
     bank['particles'][bank['size']] = P
@@ -154,7 +154,7 @@ def get_particle(bank):
     # Check if bank is empty
     if bank['size'] == 0:
         with objmode():
-            print_error('Particle bank is empty.')
+            print_error('Particle %s bank is empty.'%bank['tag'])
 
     # Decrement size
     bank['size'] -= 1
@@ -196,7 +196,6 @@ def manage_particle_banks(mcdc):
     # Population control
     if mcdc['technique']['population_control']:
         population_control(mcdc)
-        rng_rebase(mcdc)
     else:
         # TODO: Swap??
         # Swap census and source bank
@@ -213,50 +212,63 @@ def manage_particle_banks(mcdc):
 
     # Manage IC bank
     if mcdc['technique']['IC_generator'] and mcdc['cycle_active']:
-        buff_n = np.zeros(mcdc['technique']['IC_bank_neutron_local']['content'].shape[0], 
-                          dtype=type_.neutron)
-        buff_p = np.zeros(mcdc['technique']['IC_bank_precursor_local']['content'].shape[0], 
-                          dtype=type_.precursor)
+        manage_IC_bank(mcdc)
 
-        with objmode(Nn='int64', Np='int64'):
-            # Create MPI-supported numpy object
-            Nn = mcdc['technique']['IC_bank_neutron_local']['size']
-            Np = mcdc['technique']['IC_bank_precursor_local']['size']
-        
-            neutrons   = MPI.COMM_WORLD.gather(
-                    mcdc['technique']['IC_bank_neutron_local']['content'][:Nn])
-            precursors = MPI.COMM_WORLD.gather(
-                    mcdc['technique']['IC_bank_precursor_local']['content'][:Np])
+@njit
+def manage_IC_bank(mcdc):
+    buff_n = np.zeros(mcdc['technique']['IC_bank_neutron_local']['content'].shape[0], 
+                      dtype=type_.neutron)
+    buff_p = np.zeros(mcdc['technique']['IC_bank_precursor_local']['content'].shape[0], 
+                      dtype=type_.precursor)
 
-            if mcdc['mpi_master']:
-                neutrons   = np.concatenate(neutrons[:])
-                precursors = np.concatenate(precursors[:])
-
-                # Set output buffer
-                Nn = neutrons.shape[0]
-                Np = precursors.shape[0]
-                for i in range(Nn):
-                    buff_n[i] = neutrons[i]
-                for i in range(Np):
-                    buff_p[i] = precursors[i]
+    with objmode(Nn='int64', Np='int64'):
+        # Create MPI-supported numpy object
+        Nn = mcdc['technique']['IC_bank_neutron_local']['size']
+        Np = mcdc['technique']['IC_bank_precursor_local']['size']
     
-        # Set global bank from buffer
-        if mcdc['mpi_master']:
-            start_n = mcdc['technique']['IC_bank_neutron']['size']
-            start_p = mcdc['technique']['IC_bank_precursor']['size']
-            mcdc['technique']['IC_bank_neutron']['size']   += Nn
-            mcdc['technique']['IC_bank_precursor']['size'] += Np
-            for i in range(Nn):
-                mcdc['technique']['IC_bank_neutron']['content'][start_n+i] = buff_n[i]
-            for i in range(Np):
-                mcdc['technique']['IC_bank_precursor']['content'][start_p+i] = buff_p[i]
+        neutrons   = MPI.COMM_WORLD.gather(
+                mcdc['technique']['IC_bank_neutron_local']['content'][:Nn])
+        precursors = MPI.COMM_WORLD.gather(
+                mcdc['technique']['IC_bank_precursor_local']['content'][:Np])
 
-        # Reset local banks
-        mcdc['technique']['IC_bank_neutron_local']['size'] = 0
-        mcdc['technique']['IC_bank_precursor_local']['size'] = 0
+        if mcdc['mpi_master']:
+            neutrons   = np.concatenate(neutrons[:])
+            precursors = np.concatenate(precursors[:])
+
+            # Set output buffer
+            Nn = neutrons.shape[0]
+            Np = precursors.shape[0]
+            for i in range(Nn):
+                buff_n[i] = neutrons[i]
+            for i in range(Np):
+                buff_p[i] = precursors[i]
+
+    # Set global bank from buffer
+    if mcdc['mpi_master']:
+        start_n = mcdc['technique']['IC_bank_neutron']['size']
+        start_p = mcdc['technique']['IC_bank_precursor']['size']
+        mcdc['technique']['IC_bank_neutron']['size']   += Nn
+        mcdc['technique']['IC_bank_precursor']['size'] += Np
+        for i in range(Nn):
+            mcdc['technique']['IC_bank_neutron']['content'][start_n+i] = buff_n[i]
+        for i in range(Np):
+            mcdc['technique']['IC_bank_precursor']['content'][start_p+i] = buff_p[i]
+
+    # Reset local banks
+    mcdc['technique']['IC_bank_neutron_local']['size'] = 0
+    mcdc['technique']['IC_bank_precursor_local']['size'] = 0
 
 @njit
 def population_control(mcdc):
+    if mcdc['technique']['pct'] == PCT_COMBING:
+        pct_combing(mcdc)
+        rng_rebase(mcdc)
+    elif mcdc['technique']['pct'] == PCT_COMBING_WEIGHT:
+        pct_combing_weight(mcdc)
+        rng_rebase(mcdc)
+
+@njit
+def pct_combing(mcdc):
     bank_census = mcdc['bank_census']
     M           = mcdc['setting']['N_particle']
     bank_source = mcdc['bank_source']
@@ -289,6 +301,40 @@ def population_control(mcdc):
         add_particle(P, bank_source)
 
 @njit
+def pct_combing_weight(mcdc):
+    bank_census = mcdc['bank_census']
+    M           = mcdc['setting']['N_particle']
+    bank_source = mcdc['bank_source']
+    
+    # Scan the bank based on weight
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Teeth distance
+    td = W/M
+
+    # Tooth offset
+    xi     = rng(mcdc)
+    offset = xi*td
+
+    # First hiting tooth
+    tooth_start = math.ceil((w_start-offset)/td)
+
+    # Last hiting tooth
+    tooth_end = math.floor((w_end-offset)/td) + 1
+
+    # Locally sample particles from census bank
+    bank_source['size'] = 0
+    idx = 0
+    for i in range(tooth_start, tooth_end):
+        tooth  = i*td+offset
+        idx   += binary_search(tooth,w_cdf[idx:])
+        P = copy_particle(bank_census['particles'][idx])
+        # Set weight
+        P['w'] = td
+        add_particle(P, bank_source)
+
+@njit
 def bank_scanning(bank, mcdc):
     N_local = bank['size']
 
@@ -305,6 +351,30 @@ def bank_scanning(bank, mcdc):
     N_global = buff[0]
 
     return idx_start, N_local, N_global
+
+@njit
+def bank_scanning_weight(bank, mcdc):
+    # Local weight CDF
+    N_local = bank['size']
+    w_cdf   = np.zeros(N_local+1)
+    for i in range(N_local):
+        w_cdf[i+1] = w_cdf[i] + bank['particles'][i]['w']
+    W_local = w_cdf[-1]
+
+    # Starting weight
+    buff = np.zeros(1, dtype=np.float64)
+    with objmode():
+        MPI.COMM_WORLD.Exscan(np.array([W_local]), buff, MPI.SUM)
+    w_start = buff[0]
+    w_cdf += w_start
+
+    # Global weight
+    buff[0] = w_cdf[-1]
+    with objmode():
+        MPI.COMM_WORLD.Bcast(buff, mcdc['mpi_size']-1)
+    W_global = buff[0]
+
+    return w_start, w_cdf, W_global
 
 @njit
 def normalize_weight(bank, norm):
@@ -1264,6 +1334,10 @@ def move_to_event(P, mcdc):
     speed = get_particle_speed(P, mcdc)
     d_time_boundary = speed*(mcdc['setting']['time_boundary'] - P['t'])
 
+    # Distance to census time
+    idx           = mcdc['technique']['census_idx']
+    d_time_census = speed*(mcdc['technique']['census_time'][idx] - P['t'])
+
     # Distance to collision
     d_collision = distance_to_collision(P, mcdc)
 
@@ -1273,12 +1347,15 @@ def move_to_event(P, mcdc):
     #     boundary > time_boundary > mesh > collision
     # =========================================================================
 
-    # Fin the minimum
+    # Find the minimum
     event    = event_boundary
     distance = d_boundary
     if d_time_boundary*PREC < distance:
         event    = EVENT_TIME_BOUNDARY
         distance = d_time_boundary
+    if d_time_census*PREC < distance:
+        event    = EVENT_CENSUS
+        distance = d_time_census
     if d_mesh*PREC < distance:
         event    = EVENT_MESH
         distance = d_mesh
@@ -1289,18 +1366,26 @@ def move_to_event(P, mcdc):
     # Crossing both boundary and mesh
     if d_boundary == d_mesh:
         # Surface and mesh?
-        if event == EVENT_SURFACE :
+        if event == EVENT_SURFACE:
             surface = mcdc['surfaces'][P['surface_ID']]
             if not surface['reflective']:
                 event = EVENT_SURFACE_N_MESH
-        elif event == EVENT_SURFACE_MOVE :
+        elif event == EVENT_SURFACE_MOVE:
             event = EVENT_SURFACE_MOVE_N_MESH
         # Lattice and mesh?
         elif event == EVENT_LATTICE:
             event = EVENT_LATTICE_N_MESH
 
+    # Crossing both time census and mesh
+    if event == EVENT_CENSUS and d_time_census == d_mesh:
+        event = EVENT_CENSUS_N_MESH
+
     # Assign event
     P['event'] = event
+
+    # Return if particle is already beyond current census time
+    if event == EVENT_CENSUS and distance < 0.0:
+        return
 
     # =========================================================================
     # Move particle
@@ -1498,7 +1583,7 @@ def mesh_crossing(P, mcdc):
         if flag == MESH_T and mcdc['tally']['crossing_t']:
             score_crossing_t(P, t, x, y, z, mcdc)
     
-    # Shift particle if surface and lattice are not crossed as well
+    # Shift particle if only mesh crossing occurs
     if P['event'] == EVENT_MESH:
         shift_particle(P, SHIFT)
 
@@ -1794,7 +1879,7 @@ def time_boundary(P, mcdc):
     P['alive'] = False
 
 #==============================================================================
-# Move to event
+# Weight widow
 #==============================================================================
     
 @njit
