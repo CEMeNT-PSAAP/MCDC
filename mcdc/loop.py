@@ -192,6 +192,7 @@ def loop_particle(P, mcdc):
 
         # Time census
         elif event == EVENT_CENSUS:
+            P['t'] += SHIFT
             kernel.add_particle(kernel.copy_particle(P), mcdc['bank_census'])
             P['alive'] = False
 
@@ -214,6 +215,7 @@ def loop_particle(P, mcdc):
         # Time census and mesh crossing
         elif event == EVENT_CENSUS_N_MESH:
             kernel.mesh_crossing(P, mcdc)
+            P['t'] += SHIFT
             kernel.add_particle(kernel.copy_particle(P), mcdc['bank_census'])
             P['alive'] = False
 
