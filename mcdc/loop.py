@@ -39,6 +39,15 @@ def loop_main(mcdc):
             elif mcdc['i_cycle'] >= mcdc['setting']['N_inactive']:
                 mcdc['cycle_active'] = True
 
+        # Time census closeout
+        elif mcdc['technique']['time_census'] and \
+             mcdc['technique']['census_idx'] < len(mcdc['technique']['census_time'])-1:
+            # Manage particle banks
+            kernel.manage_particle_banks(mcdc)
+
+            # Increment census index
+            mcdc['technique']['census_idx'] += 1
+
         # Fixed-source closeout
         else:
             simulation_end = True
@@ -145,7 +154,7 @@ def loop_particle(P, mcdc):
             if mcdc['technique']['branchless_collision']:
                 kernel.branchless_collision(P, mcdc)
 
-            # Normal collision
+            # Analog collision
             else:
                 # Get collision type
                 kernel.collision(P, mcdc)
@@ -171,16 +180,6 @@ def loop_particle(P, mcdc):
         elif event == EVENT_LATTICE:
             kernel.shift_particle(P, SHIFT)
     
-        # Surface and mesh crossing
-        elif event == EVENT_SURFACE_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
-            kernel.surface_crossing(P, mcdc)
-
-        # Lattice and mesh crossing
-        elif event == EVENT_LATTICE_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
-            kernel.shift_particle(P, SHIFT)
-
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:
             kernel.mesh_crossing(P, mcdc)
@@ -191,11 +190,34 @@ def loop_particle(P, mcdc):
             P['t']       += SHIFT
             P['cell_ID']  = -1
 
-        # Surface move
+        # Time census
+        elif event == EVENT_CENSUS:
+            P['t'] += SHIFT
+            kernel.add_particle(kernel.copy_particle(P), mcdc['bank_census'])
+            P['alive'] = False
+
+        # Surface and mesh crossing
+        elif event == EVENT_SURFACE_N_MESH:
+            kernel.mesh_crossing(P, mcdc)
+            kernel.surface_crossing(P, mcdc)
+
+        # Lattice and mesh crossing
+        elif event == EVENT_LATTICE_N_MESH:
+            kernel.mesh_crossing(P, mcdc)
+            kernel.shift_particle(P, SHIFT)
+
+        # Surface move and mesh crossing
         elif event == EVENT_SURFACE_MOVE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
             P['t']       += SHIFT
             P['cell_ID']  = -1
+
+        # Time census and mesh crossing
+        elif event == EVENT_CENSUS_N_MESH:
+            kernel.mesh_crossing(P, mcdc)
+            P['t'] += SHIFT
+            kernel.add_particle(kernel.copy_particle(P), mcdc['bank_census'])
+            P['alive'] = False
 
         # Apply weight window
         if mcdc['technique']['weight_window']:
