@@ -38,3 +38,6 @@ SHIFT = 1E-10 # To ensure lattice, surface, and mesh crossings
 PREC  = 1.0+1E-5 # Precision factor to determine if a distance is smaller than
                  # another (for lattice, surface, and mesh)
 BANKMAX = 100 # Default maximum active bank
+#PLANCK = 
+#BOLTZMANN
+#
