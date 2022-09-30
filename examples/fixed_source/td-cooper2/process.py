@@ -28,8 +28,11 @@ with h5py.File('output.h5', 'r') as f:
 	phit_sd = f['tally/flux-t/sdev'][:]*4*cf
 	T = f['runtime'][:]
 
-with np.load('ww.npz') as data:
-	ww = data['phi']
+#with np.load('ww.npz') as data:
+#	ww = data['phi']
+
+Nx = len(x_mid)
+Ny = len(y_mid)
 
 #print(ww[0][5:15,1:10])
 
@@ -51,61 +54,50 @@ for k in range(K):
 	
 
 rel_var = phi_sd*phi_sd/phi/phi #MC relative variance
-FOM = 1/T/rel_var			#piecewise figure of merit
-rel_var_t = phit_sd*phit_sd/phit/phit #MC relative variance
-FOM_t = 1/T/rel_var_t		#piecewise figure of merit
+FOM = 1/np.sum(n)/rel_var			#piecewise figure of merit
+FOM[n==0]=0
+
+def print_var(outfile, var):
+    for k in range(K):
+        outfile.write("Time Step "+str(k+1)+"\n")
+        outfile.write('      ')
+        outfile.write('        ix')
+        for i in range(Nx):
+            outfile.write('%12d' % (i+1))
+        outfile.write('\n')
+        outfile.write('    iy')
+        outfile.write('       y/x')
+        for i in range(Nx):
+            outfile.write('%12.2f'%x_mid[i])
+        outfile.write('\n')
+        for j in range(Ny):
+            outfile.write('%6d'%(j+1))
+            outfile.write('%10.2f'%y_mid[j])
+            for i in range(Nx):
+                outfile.write('%12.4e'%var[k][j][i])
+            outfile.write('\n')
+
 
 #write file for phi
 with open('phi.txt', 'w') as outfile:
-    for k in range(K):
-        outfile.write("Time Step "+str(k+1)+"\n")
-        np.savetxt(outfile, phi[k], fmt='%-10.4e')
+    print_var(outfile, phi)
 
 #write file for standard deviation
 with open('phi_sd.txt', 'w') as outfile:
-    for k in range(K):
-        outfile.write("Time Step "+str(k+1)+"\n")
-        np.savetxt(outfile, phi_sd[k], fmt='%-10.4e')
+    print_var(outfile, phi_sd)
+
+#write file for rel var
+with open('relvar.txt', 'w') as outfile:
+    print_var(outfile, rel_var)
 
 #write file for local Figure of Merit
 with open('FOM.txt', 'w') as outfile:
-    for k in range(K):
-        outfile.write("Time Step "+str(k+1)+"\n")
-        np.savetxt(outfile, FOM[k], fmt='%-10.4e')
+    print_var(outfile, FOM)
 
 #write file for n
 with open('n.txt', 'w') as outfile:
-    for k in range(K):
-        outfile.write("Time Step "+str(k+1)+"\n")
-        np.savetxt(outfile, n[k], fmt='%-10.4e')
+    print_var(outfile, n)
 
 #write file for alpha
 with open('alpha.txt', 'w') as outfile:
-    for k in range(K):
-        outfile.write("Time Step "+str(k+1)+"\n")
-        np.savetxt(outfile, alpha[k], fmt='%-10.4e')
-
-#write file for phi_t
-with open('phi-t.txt', 'w') as outfile:
-    for k in range(K+1):
-        outfile.write("Time Step "+str(k)+"\n")
-        np.savetxt(outfile, phit[k], fmt='%-10.4e')
-
-#write file for phi_t standard deviation
-with open('phi-t_sd.txt', 'w') as outfile:
-    for k in range(K+1):
-        outfile.write("Time Step "+str(k)+"\n")
-        np.savetxt(outfile, phit_sd[k], fmt='%-10.4e')
-
-#write file for local Figure of Merit
-with open('FOM-t.txt', 'w') as outfile:
-    for k in range(K+1):
-        outfile.write("Time Step "+str(k)+"\n")
-        np.savetxt(outfile, FOM_t[k], fmt='%-10.4e')
-
-#write file for n
-with open('n-t.txt', 'w') as outfile:
-    for k in range(K+1):
-        outfile.write("Time Step "+str(k)+"\n")
-        np.savetxt(outfile, nt[k], fmt='%-10.4e')
-
+    print_var(outfile, alpha)

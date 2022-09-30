@@ -83,7 +83,7 @@ def loop_source(mcdc):
         # Get from source bank
         else:
             P = mcdc['bank_source']['particles'][work_idx]
-
+        
         # Add the source particle into the active bank
         kernel.add_particle(P, mcdc['bank_active'])
 
@@ -98,7 +98,10 @@ def loop_source(mcdc):
 
             # Apply weight window
             if mcdc['technique']['weight_window']:
-                kernel.weight_window(P, mcdc)
+                if mcdc['technique']['weight_window_quad']:
+                    kernel.weight_window_quad(P, mcdc)
+                else:
+                    kernel.weight_window(P, mcdc)
             
             # Particle loop
             loop_particle(P, mcdc)

@@ -138,7 +138,7 @@ def make_type_source(G):
                        ('box_z', float64, (2,)),
                        ('ux', float64), ('uy', float64), ('uz', float64),
                        ('group', float64, (G,)), ('time', float64, (2,)),
-                       ('prob', float64)])
+                       ('prob', float64), ('weight', float64)])
 
 # ==============================================================================
 # Tally
@@ -147,11 +147,11 @@ def make_type_source(G):
 tally = None
 
 # Score lists
-score_tl_list = ('flux',   'current',   'eddington',   'density',   'fission',   'total')
-score_x_list  = ('flux_x', 'current_x', 'eddington_x', 'density_x', 'fission_x', 'total_x')
-score_y_list  = ('flux_y', 'current_y', 'eddington_y', 'density_y', 'fission_y', 'total_y')
-score_z_list  = ('flux_z', 'current_z', 'eddington_z', 'density_z', 'fission_z', 'total_z')
-score_t_list  = ('flux_t', 'current_t', 'eddington_t', 'density_t', 'fission_t', 'total_t')
+score_tl_list = ('n',   'flux',   'current',   'eddington',   'density',   'fission',   'total')
+score_x_list  = ('n_x', 'flux_x', 'current_x', 'eddington_x', 'density_x', 'fission_x', 'total_x')
+score_y_list  = ('n_y', 'flux_y', 'current_y', 'eddington_y', 'density_y', 'fission_y', 'total_y')
+score_z_list  = ('n_z', 'flux_z', 'current_z', 'eddington_z', 'density_z', 'fission_z', 'total_z')
+score_t_list  = ('n_t', 'flux_t', 'current_t', 'eddington_t', 'density_t', 'fission_t', 'total_t')
 
 score_list = score_tl_list + score_x_list + score_y_list + score_z_list\
                            + score_t_list
@@ -182,30 +182,35 @@ def make_type_tally(card):
                      ['total',     (Ng, Nt, Nx, Ny, Nz)],
                      ['current',     (Ng, Nt, Nx, Ny, Nz, 3)],
                      ['eddington',   (Ng, Nt, Nx, Ny, Nz, 6)],
+                     ['n',        (Ng, Nt, Nx, Ny, Nz)],
                      ['flux_x',      (Ng, Nt, Nx+1, Ny, Nz)],
                      ['density_x',   (Ng, Nt, Nx+1, Ny, Nz)],
                      ['fission_x',   (Ng, Nt, Nx+1, Ny, Nz)],
                      ['total_x',   (Ng, Nt, Nx+1, Ny, Nz)],
                      ['current_x',   (Ng, Nt, Nx+1, Ny, Nz, 3)],
                      ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
+                     ['n_x',      (Ng, Nt, Nx+1, Ny, Nz)],
                      ['flux_y',      (Ng, Nt, Nx, Ny+1, Nz)],
                      ['density_y',   (Ng, Nt, Nx, Ny+1, Nz)],
                      ['fission_y',   (Ng, Nt, Nx, Ny+1, Nz)],
                      ['total_y',   (Ng, Nt, Nx, Ny+1, Nz)],
                      ['current_y',   (Ng, Nt, Nx, Ny+1, Nz, 3)],
                      ['eddington_y', (Ng, Nt, Nx, Ny+1, Nz, 6)],
+                     ['n_y',      (Ng, Nt, Nx, Ny+1, Nz)],
                      ['flux_z',      (Ng, Nt, Nx, Ny, Nz+1)],
                      ['density_z',   (Ng, Nt, Nx, Ny, Nz+1)],
                      ['fission_z',   (Ng, Nt, Nx, Ny, Nz+1)],
                      ['total_z',   (Ng, Nt, Nx, Ny, Nz+1)],
                      ['current_z',   (Ng, Nt, Nx, Ny, Nz+1, 3)],
                      ['eddington_z', (Ng, Nt, Nx, Ny, Nz+1, 6)],
+                     ['n_z',      (Ng, Nt, Nx, Ny, Nz+1)],
                      ['flux_t',      (Ng, Nt+1, Nx, Ny, Nz)],
                      ['density_t',   (Ng, Nt+1, Nx, Ny, Nz)],
                      ['fission_t',   (Ng, Nt+1, Nx, Ny, Nz)],
                      ['total_t',   (Ng, Nt+1, Nx, Ny, Nz)],
                      ['current_t',   (Ng, Nt+1, Nx, Ny, Nz, 3)],
                      ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)],
+                     ['n_t',      (Ng, Nt+1, Nx, Ny, Nz)],
                     ]
 
     # Add score flags to structure
@@ -253,7 +258,11 @@ def make_type_technique(card):
     # Technique flags
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('branchless_collision', bool_),
-              ('weight_window', bool_), ('IC_generator', bool_)]
+              ('weight_window', bool_), ('IC_generator', bool_),
+              ('weight_window_quad', bool_), ('aww', bool_)]
+    
+
+    struct += [('wwf', float64)]
 
     # =========================================================================
     # Weight window
@@ -265,6 +274,14 @@ def make_type_technique(card):
     
     # Window
     struct += [('ww', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('ww2', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('ww3', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('ww4', float64, (Nt, Nx, Ny, Nz))]
+    
+    # Angular Windows
+    struct += [('wwBx', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('wwBy', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('wwBz', float64, (Nt, Nx, Ny, Nz))]
 
     # =========================================================================
     # IC generator
