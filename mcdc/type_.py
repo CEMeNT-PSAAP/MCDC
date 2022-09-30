@@ -17,7 +17,7 @@ bool_   = np.bool_
 particle = np.dtype([
     ('x', float64), ('y', float64), ('z', float64), ('t', float64),
     ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
-    ('w', float64),
+    ('w', float64), ('alive', bool_),
     ('material_ID', int64), ('cell_ID', int64), 
     ('surface_ID', int64), ('translation', float64, (3,)),
     ('event', int64)])
@@ -41,7 +41,7 @@ precursor = np.dtype([('x', float64), ('y', float64), ('z', float64),
 
 def particle_bank(max_size):
     return np.dtype([('particles', particle_record, (max_size,)), 
-                     ('size', int64)])
+                     ('size', int64), ('tag', 'U10')])
 
 # ==============================================================================
 # Material
@@ -64,13 +64,18 @@ def make_type_material(G,J):
 # Surface
 # ==============================================================================
 
-surface = np.dtype([('ID', int64), 
-                    ('vacuum', bool_), ('reflective', bool_),
-                    ('A', float64), ('B', float64), ('C', float64), 
-                    ('D', float64), ('E', float64), ('F', float64), 
-                    ('G', float64), ('H', float64), ('I', float64), 
-                    ('J', float64), ('linear', bool_), 
-                    ('nx', float64), ('ny', float64), ('nz', float64)])
+surface = None
+def make_type_surface(Nmax_slice):
+    global surface
+
+    surface = np.dtype([('ID', int64), ('N_slice', int64),
+                        ('vacuum', bool_), ('reflective', bool_),
+                        ('A', float64), ('B', float64), ('C', float64), 
+                        ('D', float64), ('E', float64), ('F', float64), 
+                        ('G', float64), ('H', float64), ('I', float64), 
+                        ('J', float64, (Nmax_slice,2)), ('t', float64, (Nmax_slice+1,)),
+                        ('linear', bool_), 
+                        ('nx', float64), ('ny', float64), ('nz', float64)])
 
 # ==============================================================================
 # Cell
@@ -240,7 +245,7 @@ setting = np.dtype([('N_particle', int64), ('N_inactive', int64),
                     ('N_active', int64), ('N_cycle', int64),
                     ('rng_seed', int64), ('rng_stride', int64),
                     ('rng_g', int64), ('rng_c', int64), ('rng_mod', uint64),
-                    ('time_boundary', float64), ('bank_max', int64),
+                    ('time_boundary', float64), ('bank_active_buff', int64),
                     ('mode_eigenvalue', bool_), ('k_init', float64),
                     ('gyration_radius', bool_), ('gyration_radius_type', int64),
                     ('output', 'U30'), ('progress_bar', bool_),
@@ -259,10 +264,16 @@ def make_type_technique(card):
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('branchless_collision', bool_),
               ('weight_window', bool_), ('IC_generator', bool_),
-              ('weight_window_quad', bool_), ('aww', bool_)]
+              ('weight_window_quad', bool_),('time_census', bool_), ('aww', bool_)]
     
 
     struct += [('wwf', float64)]
+
+    # =========================================================================
+    # Population control
+    # =========================================================================
+
+    struct += [('pct', int64)]
 
     # =========================================================================
     # Weight window
@@ -282,6 +293,13 @@ def make_type_technique(card):
     struct += [('wwBx', float64, (Nt, Nx, Ny, Nz))]
     struct += [('wwBy', float64, (Nt, Nx, Ny, Nz))]
     struct += [('wwBz', float64, (Nt, Nx, Ny, Nz))]
+
+    # =========================================================================
+    # Time census
+    # =========================================================================
+
+    struct += [('census_time', float64, (len(card.technique['census_time']),)),
+               ('census_idx', int64)]
 
     # =========================================================================
     # IC generator
@@ -322,26 +340,29 @@ def make_type_global(card):
     global global_
 
     # Some numbers
-    N_material = len(card.materials)
-    N_surface  = len(card.surfaces)
-    N_cell     = len(card.cells)
-    N_source   = len(card.sources)
-    N_universe = len(card.universes)
-    N_lattice  = len(card.lattices)
-    N_particle = card.setting['N_particle']
-    N_cycle    = card.setting['N_cycle']
-    N_bank_max = card.setting['bank_max']
-    J          = card.materials[0]['J']
-    N_work     = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
+    N_material       = len(card.materials)
+    N_surface        = len(card.surfaces)
+    N_cell           = len(card.cells)
+    N_source         = len(card.sources)
+    N_universe       = len(card.universes)
+    N_lattice        = len(card.lattices)
+    N_particle       = card.setting['N_particle']
+    N_cycle          = card.setting['N_cycle']
+    bank_active_buff = card.setting['bank_active_buff']
+    bank_census_buff = card.setting['bank_census_buff']
+    J                = card.materials[0]['J']
+    N_work           = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
-    bank_active = particle_bank(N_bank_max)
-    if card.setting['mode_eigenvalue']:
-        bank_census  = particle_bank(2*N_work)
-        bank_source  = particle_bank(2*N_work)
+    bank_active = particle_bank(1+bank_active_buff)
+    if card.setting['mode_eigenvalue'] or card.technique['time_census']:
+        bank_census = particle_bank(int((1+bank_census_buff)*N_work))
+        bank_source = particle_bank(int((1+bank_census_buff)*N_work))
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
+
+    # TODO
     if card.setting['filed_source']:
         bank_source = particle_bank(N_work)
 
