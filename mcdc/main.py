@@ -212,11 +212,16 @@ def prepare():
     # =========================================================================
 
     for name in type_.technique.names:
-        if name not in ['ww_mesh', 
+        if name not in ['ww_mesh',
+                        'census_idx',
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff']:
             mcdc['technique'][name] = input_card.technique[name]
+
+    # Set time census parameter
+    if mcdc['technique']['time_census']:
+        mcdc['technique']['census_idx'] = 0
 
     # Set weight window mesh
     if input_card.technique['weight_window']:
@@ -229,7 +234,7 @@ def prepare():
     # Global tally
     # =========================================================================
 
-    mcdc['k_eff']     = mcdc['setting']['k_init']
+    mcdc['k_eff'] = mcdc['setting']['k_init']
 
     # =========================================================================
     # Misc.
@@ -244,6 +249,11 @@ def prepare():
     mcdc['mpi_size']   = MPI.COMM_WORLD.Get_size()
     mcdc['mpi_rank']   = MPI.COMM_WORLD.Get_rank()
     mcdc['mpi_master'] = mcdc['mpi_rank'] == 0
+
+    # Particle bank tags
+    mcdc['bank_active']['tag'] = 'active'
+    mcdc['bank_census']['tag'] = 'census'
+    mcdc['bank_source']['tag'] = 'source'
 
     # Distribute work to processors
     kernel.distribute_work(mcdc['setting']['N_particle'], mcdc)
