@@ -1,5 +1,5 @@
 #!/bin/tcsh
-#SBATCH -N 8
-#SBATCH -t 1:00:00
+#SBATCH -N 16
+#SBATCH -t 8:00:00
 
-srun -n 288 python input.py
+srun -n 576 python input.py

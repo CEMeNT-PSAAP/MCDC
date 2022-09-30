@@ -128,7 +128,7 @@ def source_particle(source, rng):
     P['uy'] = uy
     P['uz'] = uz
     P['g']  = g
-    P['w']  = 1.0
+    P['w']  = source['weight']
 
     return P
 
@@ -869,6 +869,8 @@ def score_tracklength(P, distance, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current'])
     if tally['eddington']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington'])
+    if tally['n']:
+        score_flux(g, t, x, y, z, 1.0, tally['score']['n'])
 
 @njit
 def score_crossing_x(P, t, x, y, z, mcdc):
@@ -897,6 +899,8 @@ def score_crossing_x(P, t, x, y, z, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current_x'])
     if tally['eddington_x']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_x'])
+    if tally['n_x']:
+        score_flux(g, t, x, y, z, 1.0, tally['score']['n_x'])
 
 @njit
 def score_crossing_y(P, t, x, y, z, mcdc):
@@ -925,6 +929,8 @@ def score_crossing_y(P, t, x, y, z, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current_y'])
     if tally['eddington_y']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_y'])
+    if tally['n_y']:
+        score_flux(g, t, x, y, z, 1.0, tally['score']['n_y'])
 
 @njit
 def score_crossing_z(P, t, x, y, z, mcdc):
@@ -953,6 +959,8 @@ def score_crossing_z(P, t, x, y, z, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current_z'])
     if tally['eddington_z']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_z'])
+    if tally['n_z']:
+        score_flux(g, t, x, y, z, 1.0, tally['score']['n_z'])
 
 @njit
 def score_crossing_t(P, t, x, y, z, mcdc):
@@ -980,6 +988,8 @@ def score_crossing_t(P, t, x, y, z, mcdc):
         score_current(g, t, x, y, z, flux, P, tally['score']['current_t'])
     if tally['eddington_t']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_t'])
+    if tally['n_t']:
+        score_flux(g, t, x, y, z, 1.0, tally['score']['n_t'])
 
 @njit
 def score_flux(g, t, x, y, z, flux, score):
@@ -1760,32 +1770,94 @@ def weight_window(P, mcdc):
 
     # Target weight
     w_target = mcdc['technique']['ww'][t,x,y,z]
-   
-    # Surviving probability
-    p = P['w']/w_target
+    if mcdc['technique']['aww']:
+        Bx=mcdc['technique']['wwBx'][t,x,y,z]
+        By=mcdc['technique']['wwBy'][t,x,y,z]
+        Bz=mcdc['technique']['wwBz'][t,x,y,z]
+        w_target=w_target*math.exp(P['ux']*Bx+P['uy']*By+P['uz']*Bz)
 
-    # Set target weight
-    P['w'] = w_target
+    # Check if no weight windows in cell
+    if (w_target > 0):
+    
+        # Surviving probability
+        p = P['w']/w_target
+    
+        # Window Width
+        f = mcdc['technique']['wwf']
+    
+        # If above target
+        if p > f:
+            # Set target weight
+            P['w'] = w_target
+            # Splitting (keep the original particle)
+            n_split = math.floor(p)
+            for i in range(n_split-1):
+                add_particle(copy_particle(P), mcdc['bank_active'])
+    
+            # Russian roulette
+            p -= n_split
+            xi = rng(mcdc)
+            if xi <= p:
+                add_particle(copy_particle(P), mcdc['bank_active'])
+    
+        # Below target
+        elif p < 1.0/f:
+            # Russian roulette
+            xi = rng(mcdc)
+            if xi > p:
+                P['w'] = 0.0
+            else:
+                P['w'] = w_target
 
-    # If above target
-    if p > 1.0:
-        # Splitting (keep the original particle)
-        n_split = math.floor(p)
-        for i in range(n_split-1):
-            add_particle(copy_particle(P), mcdc['bank_active'])
+@njit
+def weight_window_quad(P, mcdc):
+    # Get indices
+    t, x, y, z, outside = mesh_get_index(P, mcdc['technique']['ww_mesh'])
 
-        # Russian roulette
-        p -= n_split
-        xi = rng(mcdc)
-        if xi <= p:
-            add_particle(copy_particle(P), mcdc['bank_active'])
-
-    # Below target
+    # Target weight
+    if (P['ux'] > 0):
+        if (P['uy'] > 0):
+            w_target = mcdc['technique']['ww'][t,x,y,z]
+        else:
+            w_target = mcdc['technique']['ww4'][t,x,y,z]
     else:
-        # Russian roulette
-        xi = rng(mcdc)
-        if xi > p:
-            P['w'] = 0.0
+        if (P['uy'] > 0):
+            w_target = mcdc['technique']['ww2'][t,x,y,z]
+        else:
+            w_target = mcdc['technique']['ww3'][t,x,y,z]
+
+    # Check if no weight windows in cell
+    if (w_target > 0):
+    
+        # Surviving probability
+        p = P['w']/w_target
+    
+        # Window Width
+        f = mcdc['technique']['wwf']
+    
+        # If above target
+        if p > f:
+            # Set target weight
+            P['w'] = w_target
+            # Splitting (keep the original particle)
+            n_split = math.floor(p)
+            for i in range(n_split-1):
+                add_particle(copy_particle(P), mcdc['bank_active'])
+    
+            # Russian roulette
+            p -= n_split
+            xi = rng(mcdc)
+            if xi <= p:
+                add_particle(copy_particle(P), mcdc['bank_active'])
+    
+        # Below target
+        elif p < 1.0/f:
+            # Russian roulette
+            xi = rng(mcdc)
+            if xi > p:
+                P['w'] = 0.0
+            else:
+                P['w'] = w_target
 
 #==============================================================================
 # Miscellany
