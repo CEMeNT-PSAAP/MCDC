@@ -176,7 +176,9 @@ def surface(type_, **kw):
     card['G']          = 0.0
     card['H']          = 0.0
     card['I']          = 0.0
-    card['J']          = 0.0
+    card['J']          = np.array([[0.0, 0.0]])
+    card['t']          = np.array([-SHIFT, INF])
+    card['N_slice']    = 1
     card['linear']     = False
     card['nx']         = 0.0
     card['ny']         = 0.0
@@ -193,24 +195,34 @@ def surface(type_, **kw):
             print_error("Unsupported surface boundary condition: "+bc)
 
     # Surface type
-    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
+    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
+    #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
     if type_ == 'plane-x':
-        card['G'] = 1.0
-        card['J'] = -kw.get('x')
+        card['G']      = 1.0
         card['linear'] = True
+        if type(kw.get('x')) in [type([]), type(np.array([]))]:
+            set_J(kw.get('x'), kw.get('t'), card)
+        else:
+            card['J'][0,0] = -kw.get('x')
     elif type_ == 'plane-y':
-        card['H'] = 1.0
-        card['J'] = -kw.get('y')
+        card['H']      = 1.0
         card['linear'] = True
+        if type(kw.get('y')) in [type([]), type(np.array([]))]:
+            set_J(kw.get('y'), kw.get('t'), card)
+        else:
+            card['J'][0,0] = -kw.get('y')
     elif type_ == 'plane-z':
-        card['I'] = 1.0
-        card['J'] = -kw.get('z')
+        card['I']      = 1.0
         card['linear'] = True
+        if type(kw.get('z')) in [type([]), type(np.array([]))]:
+            set_J(kw.get('z'), kw.get('t'), card)
+        else:
+            card['J'][0,0] = -kw.get('z')
     elif type_ == 'plane':
         card['G'] = kw.get('A')
         card['H'] = kw.get('B')
         card['I'] = kw.get('C')
-        card['J'] = kw.get('D')
+        card['J'][0,0] = kw.get('D')
         card['linear'] = True
     elif type_ == 'cylinder-x':
         y, z = kw.get('center')[:]
@@ -219,7 +231,7 @@ def surface(type_, **kw):
         card['C'] = 1.0
         card['H'] = -2.0*y
         card['I'] = -2.0*z
-        card['J'] = y**2 + z**2 - r**2
+        card['J'][0,0] = y**2 + z**2 - r**2
     elif type_ == 'cylinder-y':
         x, z = kw.get('center')[:]
         r    = kw.get('radius')
@@ -227,7 +239,7 @@ def surface(type_, **kw):
         card['C'] = 1.0
         card['G'] = -2.0*x
         card['I'] = -2.0*z
-        card['J'] = x**2 + z**2 - r**2
+        card['J'][0,0] = x**2 + z**2 - r**2
     elif type_ == 'cylinder-z':
         x, y = kw.get('center')[:]
         r    = kw.get('radius')
@@ -235,7 +247,7 @@ def surface(type_, **kw):
         card['B'] = 1.0
         card['G'] = -2.0*x
         card['H'] = -2.0*y
-        card['J'] = x**2 + y**2 - r**2
+        card['J'][0,0] = x**2 + y**2 - r**2
     elif type_ == 'sphere':
         x, y, z = kw.get('center')[:]
         r       = kw.get('radius')
@@ -245,7 +257,7 @@ def surface(type_, **kw):
         card['G'] = -2.0*x
         card['H'] = -2.0*y
         card['I'] = -2.0*z
-        card['J'] = x**2 + y**2 + z**2 - r**2
+        card['J'][0,0] = x**2 + y**2 + z**2 - r**2
     elif type_ == 'quadric':
         card['A'] = kw.get('A')
         card['B'] = kw.get('B')
@@ -256,7 +268,7 @@ def surface(type_, **kw):
         card['G'] = kw.get('G')
         card['H'] = kw.get('H')
         card['I'] = kw.get('I')
-        card['J'] = kw.get('J')
+        card['J'][0,0] = kw.get('J')
     else:
         print_error("Unsupported surface type: "+type_)
 
@@ -274,6 +286,34 @@ def surface(type_, **kw):
     # Push card
     mcdc.input_card.surfaces.append(card)
     return SurfaceHandle(card)
+
+def set_J(x, t, card):
+    # Edit and add the edges
+    t[0] = -SHIFT
+    t    = np.append(t, INF)
+    x    = np.append(x, x[-1])
+
+    # Reset the constants
+    card['J'] = np.zeros([0,2])
+    card['t'] = np.array([-SHIFT])
+
+    # Iterate over inputs
+    idx = 0
+    for i in range(len(t)-1):
+        # Skip if step
+        if t[i] == t[i+1]:
+            continue
+        
+        # Calculate constants
+        J0 = x[i]
+        J1 = (x[i+1]-x[i])/(t[i+1]-t[i])
+
+        # Append to card
+        card['J'] = np.append(card['J'], [[J0, J1]], axis=0)
+        card['t'] = np.append(card['t'], t[i+1])
+
+    card['J'] *= -1
+    card['N_slice'] = len(card['J'])
 
 # =============================================================================
 # Cell
@@ -524,15 +564,16 @@ def tally(scores, x=None, y=None, z=None, t=None):
 
 def setting(**kw):
     # Get keyword arguments
-    N_particle    = kw.get('N_particle')
-    time_boundary = kw.get('time_boundary')
-    rng_seed      = kw.get('rng_seed')
-    rng_stride    = kw.get('rng_stride')
-    output        = kw.get('output')
-    progress_bar  = kw.get('progress_bar')
-    k_eff         = kw.get('k_eff')
-    bank_max      = kw.get('bank_max')
-    source_file   = kw.get('source_file')
+    N_particle       = kw.get('N_particle')
+    time_boundary    = kw.get('time_boundary')
+    rng_seed         = kw.get('rng_seed')
+    rng_stride       = kw.get('rng_stride')
+    output           = kw.get('output')
+    progress_bar     = kw.get('progress_bar')
+    k_eff            = kw.get('k_eff')
+    bank_active_buff = kw.get('active_bank_buff')
+    bank_census_buff = kw.get('census_bank_buff')
+    source_file      = kw.get('source_file')
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
@@ -564,8 +605,12 @@ def setting(**kw):
         card['k_init'] = k_eff
 
     # Maximum active bank size
-    if bank_max is not None:
-        card['bank_max'] = int(bank_max)
+    if bank_active_buff is not None:
+        card['bank_active_buff'] = int(bank_active_buff)
+
+    # Census bank size multiplier
+    if bank_census_buff is not None:
+        card['bank_census_buff'] = int(bank_census_buff)
 
     # TODO: IC source?
     '''
@@ -627,13 +672,28 @@ def weighted_emission(flag):
     card = mcdc.input_card.technique
     card['weighted_emission'] = flag
 
-def population_control():
+def population_control(pct='combing'):
     card = mcdc.input_card.technique
     card['population_control'] = True
+    card['weighted_emission']  = False
+    if pct == 'combing':
+        card['pct'] = PCT_COMBING
+    elif pct == 'combing-weight':
+        card['pct'] = PCT_COMBING_WEIGHT
+    else:
+        print_error("Unknown PCT type " + pct)
 
 def branchless_collision():
     card = mcdc.input_card.technique
     card['branchless_collision'] = True
+    card['weighted_emission'] = False
+
+def census(t, pct='none'):
+    card = mcdc.input_card.technique
+    card['time_census'] = True
+    card['census_time'] = t
+    if pct != 'none':
+        population_control(pct)
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, f=None, Bx=None, By=None, Bz=None):
     card = mcdc.input_card.technique

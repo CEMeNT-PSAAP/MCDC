@@ -141,7 +141,7 @@ def add_particle(P, bank):
     # Check if bank is full
     if bank['size'] == bank['particles'].shape[0]:
         with objmode():
-            print_error('Particle bank is full.')
+            print_error('Particle %s bank is full.'%bank['tag'])
 
     # Set particle
     bank['particles'][bank['size']] = P
@@ -154,7 +154,7 @@ def get_particle(bank):
     # Check if bank is empty
     if bank['size'] == 0:
         with objmode():
-            print_error('Particle bank is empty.')
+            print_error('Particle %s bank is empty.'%bank['tag'])
 
     # Decrement size
     bank['size'] -= 1
@@ -173,6 +173,7 @@ def get_particle(bank):
     P['uz'] = P_rec['uz']
     P['g']  = P_rec['g']
     P['w']  = P_rec['w']
+    P['alive'] = True
 
     # Set default IDs and event
     P['material_ID'] = -1
@@ -195,7 +196,6 @@ def manage_particle_banks(mcdc):
     # Population control
     if mcdc['technique']['population_control']:
         population_control(mcdc)
-        rng_rebase(mcdc)
     else:
         # TODO: Swap??
         # Swap census and source bank
@@ -212,50 +212,63 @@ def manage_particle_banks(mcdc):
 
     # Manage IC bank
     if mcdc['technique']['IC_generator'] and mcdc['cycle_active']:
-        buff_n = np.zeros(mcdc['technique']['IC_bank_neutron_local']['content'].shape[0], 
-                          dtype=type_.neutron)
-        buff_p = np.zeros(mcdc['technique']['IC_bank_precursor_local']['content'].shape[0], 
-                          dtype=type_.precursor)
+        manage_IC_bank(mcdc)
 
-        with objmode(Nn='int64', Np='int64'):
-            # Create MPI-supported numpy object
-            Nn = mcdc['technique']['IC_bank_neutron_local']['size']
-            Np = mcdc['technique']['IC_bank_precursor_local']['size']
-        
-            neutrons   = MPI.COMM_WORLD.gather(
-                    mcdc['technique']['IC_bank_neutron_local']['content'][:Nn])
-            precursors = MPI.COMM_WORLD.gather(
-                    mcdc['technique']['IC_bank_precursor_local']['content'][:Np])
+@njit
+def manage_IC_bank(mcdc):
+    buff_n = np.zeros(mcdc['technique']['IC_bank_neutron_local']['content'].shape[0], 
+                      dtype=type_.neutron)
+    buff_p = np.zeros(mcdc['technique']['IC_bank_precursor_local']['content'].shape[0], 
+                      dtype=type_.precursor)
 
-            if mcdc['mpi_master']:
-                neutrons   = np.concatenate(neutrons[:])
-                precursors = np.concatenate(precursors[:])
-
-                # Set output buffer
-                Nn = neutrons.shape[0]
-                Np = precursors.shape[0]
-                for i in range(Nn):
-                    buff_n[i] = neutrons[i]
-                for i in range(Np):
-                    buff_p[i] = precursors[i]
+    with objmode(Nn='int64', Np='int64'):
+        # Create MPI-supported numpy object
+        Nn = mcdc['technique']['IC_bank_neutron_local']['size']
+        Np = mcdc['technique']['IC_bank_precursor_local']['size']
     
-        # Set global bank from buffer
-        if mcdc['mpi_master']:
-            start_n = mcdc['technique']['IC_bank_neutron']['size']
-            start_p = mcdc['technique']['IC_bank_precursor']['size']
-            mcdc['technique']['IC_bank_neutron']['size']   += Nn
-            mcdc['technique']['IC_bank_precursor']['size'] += Np
-            for i in range(Nn):
-                mcdc['technique']['IC_bank_neutron']['content'][start_n+i] = buff_n[i]
-            for i in range(Np):
-                mcdc['technique']['IC_bank_precursor']['content'][start_p+i] = buff_p[i]
+        neutrons   = MPI.COMM_WORLD.gather(
+                mcdc['technique']['IC_bank_neutron_local']['content'][:Nn])
+        precursors = MPI.COMM_WORLD.gather(
+                mcdc['technique']['IC_bank_precursor_local']['content'][:Np])
 
-        # Reset local banks
-        mcdc['technique']['IC_bank_neutron_local']['size'] = 0
-        mcdc['technique']['IC_bank_precursor_local']['size'] = 0
+        if mcdc['mpi_master']:
+            neutrons   = np.concatenate(neutrons[:])
+            precursors = np.concatenate(precursors[:])
+
+            # Set output buffer
+            Nn = neutrons.shape[0]
+            Np = precursors.shape[0]
+            for i in range(Nn):
+                buff_n[i] = neutrons[i]
+            for i in range(Np):
+                buff_p[i] = precursors[i]
+
+    # Set global bank from buffer
+    if mcdc['mpi_master']:
+        start_n = mcdc['technique']['IC_bank_neutron']['size']
+        start_p = mcdc['technique']['IC_bank_precursor']['size']
+        mcdc['technique']['IC_bank_neutron']['size']   += Nn
+        mcdc['technique']['IC_bank_precursor']['size'] += Np
+        for i in range(Nn):
+            mcdc['technique']['IC_bank_neutron']['content'][start_n+i] = buff_n[i]
+        for i in range(Np):
+            mcdc['technique']['IC_bank_precursor']['content'][start_p+i] = buff_p[i]
+
+    # Reset local banks
+    mcdc['technique']['IC_bank_neutron_local']['size'] = 0
+    mcdc['technique']['IC_bank_precursor_local']['size'] = 0
 
 @njit
 def population_control(mcdc):
+    if mcdc['technique']['pct'] == PCT_COMBING:
+        pct_combing(mcdc)
+        rng_rebase(mcdc)
+    elif mcdc['technique']['pct'] == PCT_COMBING_WEIGHT:
+        pct_combing_weight(mcdc)
+        rng_rebase(mcdc)
+
+@njit
+def pct_combing(mcdc):
     bank_census = mcdc['bank_census']
     M           = mcdc['setting']['N_particle']
     bank_source = mcdc['bank_source']
@@ -288,6 +301,40 @@ def population_control(mcdc):
         add_particle(P, bank_source)
 
 @njit
+def pct_combing_weight(mcdc):
+    bank_census = mcdc['bank_census']
+    M           = mcdc['setting']['N_particle']
+    bank_source = mcdc['bank_source']
+    
+    # Scan the bank based on weight
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Teeth distance
+    td = W/M
+
+    # Tooth offset
+    xi     = rng(mcdc)
+    offset = xi*td
+
+    # First hiting tooth
+    tooth_start = math.ceil((w_start-offset)/td)
+
+    # Last hiting tooth
+    tooth_end = math.floor((w_end-offset)/td) + 1
+
+    # Locally sample particles from census bank
+    bank_source['size'] = 0
+    idx = 0
+    for i in range(tooth_start, tooth_end):
+        tooth  = i*td+offset
+        idx   += binary_search(tooth,w_cdf[idx:])
+        P = copy_particle(bank_census['particles'][idx])
+        # Set weight
+        P['w'] = td
+        add_particle(P, bank_source)
+
+@njit
 def bank_scanning(bank, mcdc):
     N_local = bank['size']
 
@@ -304,6 +351,30 @@ def bank_scanning(bank, mcdc):
     N_global = buff[0]
 
     return idx_start, N_local, N_global
+
+@njit
+def bank_scanning_weight(bank, mcdc):
+    # Local weight CDF
+    N_local = bank['size']
+    w_cdf   = np.zeros(N_local+1)
+    for i in range(N_local):
+        w_cdf[i+1] = w_cdf[i] + bank['particles'][i]['w']
+    W_local = w_cdf[-1]
+
+    # Starting weight
+    buff = np.zeros(1, dtype=np.float64)
+    with objmode():
+        MPI.COMM_WORLD.Exscan(np.array([W_local]), buff, MPI.SUM)
+    w_start = buff[0]
+    w_cdf += w_start
+
+    # Global weight
+    buff[0] = w_cdf[-1]
+    with objmode():
+        MPI.COMM_WORLD.Bcast(buff, mcdc['mpi_size']-1)
+    W_global = buff[0]
+
+    return w_start, w_cdf, W_global
 
 @njit
 def normalize_weight(bank, norm):
@@ -554,7 +625,7 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
 
     # Particle is not found
     print("A particle is lost at (",P['x'],P['y'],P['z'],")")
-    P['w'] = 0.0
+    P['alive'] = False
     return -1
 
 @njit
@@ -593,18 +664,29 @@ def cell_check(P, cell, trans, mcdc):
 #==============================================================================
 # Surface operations
 #==============================================================================
-# Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
+# Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
+#   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
 
 @njit
 def surface_evaluate(P, surface, trans):
     x = P['x'] + trans[0]
     y = P['y'] + trans[1]
     z = P['z'] + trans[2]
+    t = P['t']
     
     G = surface['G']
     H = surface['H']
     I = surface['I']
-    J = surface['J']
+
+    # Get time indices
+    idx = 0
+    if surface['N_slice'] > 1:
+        idx = binary_search(t, surface['t'][:surface['N_slice']+1])
+
+    # Get constant
+    J0 = surface['J'][idx][0]
+    J1 = surface['J'][idx][1]
+    J = J0 + J1*(t-surface['t'][idx])
 
     result = G*x + H*y + I*z + J
     
@@ -623,7 +705,7 @@ def surface_evaluate(P, surface, trans):
 @njit
 def surface_bc(P, surface, trans):
     if surface['vacuum']:
-        P['w'] = 0.0
+        P['alive'] = False
     elif surface['reflective']:
         surface_reflect(P, surface, trans)
 
@@ -640,7 +722,7 @@ def surface_reflect(P, surface, trans):
     P['uz'] = uz - c*nz
 
 @njit
-def surface_shift(P, surface, trans):
+def surface_shift(P, surface, trans, mcdc):
     ux = P['ux']
     uy = P['uy']
     uz = P['uz']
@@ -654,7 +736,16 @@ def surface_shift(P, surface, trans):
     shift_z = nz*SHIFT
 
     # Get dot product to determine shift sign
-    dot = ux*nx + uy*ny + uz*nz
+    if surface['linear']:
+        # Get time indices
+        idx = 0
+        if surface['N_slice'] > 1:
+            idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
+        J1  = surface['J'][idx][1]
+        v   = get_particle_speed(P, mcdc)
+        dot = ux*nx + uy*ny + uz*nz + J1/v
+    else:
+        dot = ux*nx + uy*ny + uz*nz
 
     if dot > 0.0:
         P['x'] += shift_x
@@ -699,7 +790,7 @@ def surface_normal_component(P, surface, trans):
     return nx*ux + ny*uy + nz*uz
 
 @njit
-def surface_distance(P, surface, trans):
+def surface_distance(P, surface, trans, mcdc):
     ux = P['ux']
     uy = P['uy']
     uz = P['uz']
@@ -707,12 +798,32 @@ def surface_distance(P, surface, trans):
     G  = surface['G']
     H  = surface['H']
     I  = surface['I']
-
+    
+    surface_move = False
     if surface['linear']:
-        distance = -surface_evaluate(P, surface, trans)/(G*ux + H*uy + I*uz)
+        idx = 0
+        if surface['N_slice'] > 1:
+            idx = binary_search(P['t'], surface['t'][:surface['N_slice']+1])
+        J1  = surface['J'][idx][1]
+        v   = get_particle_speed(P, mcdc)
+
+        t_max = surface['t'][idx+1]
+        d_max = (t_max - P['t'])*v
+
+        distance = -surface_evaluate(P, surface, trans)\
+                    /(G*ux + H*uy + I*uz + J1/v)
+        
+        # Go beyond current movement slice?
+        if distance > d_max:
+            distance = d_max
+            surface_move = True
+        elif distance < 0 and idx < surface['N_slice']-1:
+            distance = d_max
+            surface_move = True
+
         # Moving away from the surface
-        if distance < 0.0: return INF
-        else:              return distance
+        if distance < 0.0: return INF, surface_move
+        else:              return distance, surface_move
         
     x  = P['x'] + trans[0] 
     y  = P['y'] + trans[1] 
@@ -738,7 +849,7 @@ def surface_distance(P, surface, trans):
     # Roots are identical: tangent
     # ==> return huge number
     if determinant <= 0.0:
-        return INF
+        return INF, surface_move
     else:
         # Get the roots
         denom = 2.0*a
@@ -751,7 +862,7 @@ def surface_distance(P, surface, trans):
         if root_2 < 0.0: root_2 = INF
         
         # Return the smaller root
-        return min(root_1, root_2)
+        return min(root_1, root_2), surface_move
 
 #==============================================================================
 # Mesh operations
@@ -793,13 +904,11 @@ def mesh_get_index(P, mesh):
        P['y'] < mesh['y'][0] or P['y'] > mesh['y'][-1] or\
        P['z'] < mesh['z'][0] or P['z'] > mesh['z'][-1]:
         outside = True
-        return -1, -1, -1, -1, outside
-
 
     t = binary_search(P['t'], mesh['t'])
-    x = binary_search(P['x'],    mesh['x'])
-    y = binary_search(P['y'],    mesh['y'])
-    z = binary_search(P['z'],    mesh['z'])
+    x = binary_search(P['x'], mesh['x'])
+    y = binary_search(P['y'], mesh['y'])
+    z = binary_search(P['z'], mesh['z'])
     return t, x, y, z, outside
 
 @njit
@@ -913,7 +1022,7 @@ def score_crossing_y(P, t, x, y, z, mcdc):
         y += 1
 
     # Score
-    flux = P['w']/abs(P['ux'])
+    flux = P['w']/abs(P['uy'])
     if tally['flux_y']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_y'])
     if tally['density_y']:
@@ -943,7 +1052,7 @@ def score_crossing_z(P, t, x, y, z, mcdc):
         z += 1
 
     # Score
-    flux = P['w']/abs(P['ux'])
+    flux = P['w']/abs(P['uz'])
     if tally['flux_z']:
         score_flux(g, t, x, y, z, flux, tally['score']['flux_z'])
     if tally['density_z']:
@@ -1235,6 +1344,10 @@ def move_to_event(P, mcdc):
     speed = get_particle_speed(P, mcdc)
     d_time_boundary = speed*(mcdc['setting']['time_boundary'] - P['t'])
 
+    # Distance to census time
+    idx           = mcdc['technique']['census_idx']
+    d_time_census = speed*(mcdc['technique']['census_time'][idx] - P['t'])
+
     # Distance to collision
     d_collision = distance_to_collision(P, mcdc)
 
@@ -1244,12 +1357,15 @@ def move_to_event(P, mcdc):
     #     boundary > time_boundary > mesh > collision
     # =========================================================================
 
-    # Fin the minimum
+    # Find the minimum
     event    = event_boundary
     distance = d_boundary
     if d_time_boundary*PREC < distance:
         event    = EVENT_TIME_BOUNDARY
         distance = d_time_boundary
+    if d_time_census*PREC < distance:
+        event    = EVENT_CENSUS
+        distance = d_time_census
     if d_mesh*PREC < distance:
         event    = EVENT_MESH
         distance = d_mesh
@@ -1260,16 +1376,26 @@ def move_to_event(P, mcdc):
     # Crossing both boundary and mesh
     if d_boundary == d_mesh:
         # Surface and mesh?
-        if event == EVENT_SURFACE :
+        if event == EVENT_SURFACE:
             surface = mcdc['surfaces'][P['surface_ID']]
             if not surface['reflective']:
                 event = EVENT_SURFACE_N_MESH
+        elif event == EVENT_SURFACE_MOVE:
+            event = EVENT_SURFACE_MOVE_N_MESH
         # Lattice and mesh?
         elif event == EVENT_LATTICE:
             event = EVENT_LATTICE_N_MESH
 
+    # Crossing both time census and mesh
+    if event == EVENT_CENSUS and d_time_census == d_mesh:
+        event = EVENT_CENSUS_N_MESH
+
     # Assign event
     P['event'] = event
+
+    # Return if particle is already beyond current census time
+    if event == EVENT_CENSUS and distance < 0.0:
+        return
 
     # =========================================================================
     # Move particle
@@ -1321,14 +1447,18 @@ def distance_to_boundary(P, mcdc):
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
         # Distance to nearest surface
-        d_surface, surface_ID = distance_to_nearest_surface(P, cell, trans, mcdc)
+        d_surface, surface_ID, surface_move = \
+                distance_to_nearest_surface(P, cell, trans, mcdc)
 
         # Check if smaller
         if d_surface*PREC < distance:
-            distance           = d_surface
-            event              = EVENT_SURFACE
-            P['surface_ID']    = surface_ID
+            distance            = d_surface
+            event               = EVENT_SURFACE
+            P['surface_ID']     = surface_ID
             P['translation'][:] = trans
+
+            if surface_move:
+                event = EVENT_SURFACE_MOVE
 
         # Lattice cell?
         if cell['lattice']:
@@ -1370,16 +1500,18 @@ def distance_to_boundary(P, mcdc):
 
 @njit
 def distance_to_nearest_surface(P, cell, trans, mcdc):
-    surface_ID = -1
-    distance   = INF
+    distance     = INF
+    surface_ID   = -1
+    surface_move = False
 
     for i in range(cell['N_surface']):
         surface = mcdc['surfaces'][cell['surface_IDs'][i]]
-        d = surface_distance(P, surface, trans)
+        d, sm = surface_distance(P, surface, trans, mcdc)
         if d < distance:
-            surface_ID = surface['ID']
-            distance   = d
-    return distance, surface_ID
+            distance     = d
+            surface_ID   = surface['ID']
+            surface_move = sm
+    return distance, surface_ID, surface_move
 
 @njit
 def distance_to_lattice(P, lattice, trans):
@@ -1429,10 +1561,10 @@ def surface_crossing(P, mcdc):
     surface_bc(P, surface, trans)
 
     # Small shift to ensure crossing
-    surface_shift(P, surface, trans)
+    surface_shift(P, surface, trans, mcdc)
  
     # Check new cell?
-    if P['w'] > 0.0 and not surface['reflective']:
+    if P['alive'] and not surface['reflective']:
         cell  = mcdc['cells'][P['cell_ID']]
         if not cell_check(P, cell, trans, mcdc):
             trans = np.zeros(3)
@@ -1461,7 +1593,7 @@ def mesh_crossing(P, mcdc):
         if flag == MESH_T and mcdc['tally']['crossing_t']:
             score_crossing_t(P, t, x, y, z, mcdc)
     
-    # Shift particle if surface and lattice are not crossed as well
+    # Shift particle if only mesh crossing occurs
     if P['event'] == EVENT_MESH:
         shift_particle(P, SHIFT)
 
@@ -1494,7 +1626,7 @@ def collision(P, mcdc):
             event = EVENT_FISSION
         else:
             event = EVENT_CAPTURE
-    return event
+    P['event'] = event
 
 #==============================================================================
 # Capture
@@ -1503,7 +1635,7 @@ def collision(P, mcdc):
 @njit
 def capture(P, mcdc):
     # Kill the current particle
-    P['w'] = 0.0
+    P['alive'] = False
 
     pass
 
@@ -1529,7 +1661,7 @@ def scattering(P, mcdc):
         weight_new = P['w']
 
     # Kill the current particle
-    P['w'] = 0.0
+    P['alive'] = False
 
     # Get number of secondaries
     N = int(math.floor(weight_eff*nu_s + rng(mcdc)))
@@ -1615,7 +1747,7 @@ def fission(P, mcdc):
         weight_new = P['w']
 
     # Kill the current particle
-    P['w'] = 0.0
+    P['alive'] = False
 
     # Sample prompt and delayed neutrons
     for jj in range(J+1):
@@ -1733,7 +1865,7 @@ def branchless_collision(P, mcdc):
 
         # Kill if it's beyond time boundary
         if P['t'] > mcdc['setting']['time_boundary']:
-            P['w'] = 0.0
+            P['alive'] = False
             return
     
     # Set energy
@@ -1754,13 +1886,10 @@ def branchless_collision(P, mcdc):
 
 @njit
 def time_boundary(P, mcdc):
-    P['w'] = 0.0
-
-    # Check if mesh crossing occured
-    mesh_crossing(P, mcdc)
+    P['alive'] = False
 
 #==============================================================================
-# Move to event
+# Weight widow
 #==============================================================================
     
 @njit
@@ -1850,14 +1979,14 @@ def weight_window_quad(P, mcdc):
             if xi <= p:
                 add_particle(copy_particle(P), mcdc['bank_active'])
     
-        # Below target
+        # Below target - Russian roulette
         elif p < 1.0/f:
-            # Russian roulette
             xi = rng(mcdc)
             if xi > p:
-                P['w'] = 0.0
+                P['alive'] = False
             else:
                 P['w'] = w_target
+        
 
 #==============================================================================
 # Miscellany

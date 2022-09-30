@@ -7,7 +7,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.looper   import loop_main
+from mcdc.loop     import loop_main
 from mcdc.print_   import print_banner, print_msg, print_runtime,\
                           print_header_eigenvalue
 from mcdc.util     import profile
@@ -31,8 +31,10 @@ def run():
     print_msg(" Now running TNT...")
     if mcdc['setting']['mode_eigenvalue']:
         print_header_eigenvalue(mcdc)
+    MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime()
     loop_main(mcdc)
+    MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
     
     # Output: generate hdf5 output files
@@ -62,7 +64,10 @@ def prepare():
     N_cycle    = input_card.setting['N_cycle']
     # Derived numbers
     Nmax_surface = 0
+    Nmax_slice   = 0 # Surface time-dependence slice
     Nmax_cell    = 0
+    for surface in input_card.surfaces:
+        Nmax_slice = max(Nmax_slice, surface['N_slice'])
     for cell in input_card.cells:
         Nmax_surface = max(Nmax_surface, cell['N_surface'])
     for universe in input_card.universes:
@@ -84,6 +89,7 @@ def prepare():
     # =========================================================================
 
     type_.make_type_material(G,J)
+    type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)
     type_.make_type_lattice(input_card.lattices)
@@ -109,6 +115,9 @@ def prepare():
 
     for i in range(N_surface):
         for name in type_.surface.names:
+            if name in ['J', 't']:
+                shape = mcdc['surfaces'][i][name].shape
+                input_card.surfaces[i][name].resize(shape)
             mcdc['surfaces'][i][name] = input_card.surfaces[i][name]
     
     # =========================================================================
@@ -174,7 +183,7 @@ def prepare():
         S['prob'] /= tot
 
     # =========================================================================
-    # Source
+    # Tally
     # =========================================================================
 
     for name in type_.tally.names:
@@ -203,11 +212,16 @@ def prepare():
     # =========================================================================
 
     for name in type_.technique.names:
-        if name not in ['ww_mesh', 
+        if name not in ['ww_mesh',
+                        'census_idx',
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff']:
             mcdc['technique'][name] = input_card.technique[name]
+
+    # Set time census parameter
+    if mcdc['technique']['time_census']:
+        mcdc['technique']['census_idx'] = 0
 
     # Set weight window mesh
     if input_card.technique['weight_window']:
@@ -220,7 +234,7 @@ def prepare():
     # Global tally
     # =========================================================================
 
-    mcdc['k_eff']     = mcdc['setting']['k_init']
+    mcdc['k_eff'] = mcdc['setting']['k_init']
 
     # =========================================================================
     # Misc.
@@ -235,6 +249,11 @@ def prepare():
     mcdc['mpi_size']   = MPI.COMM_WORLD.Get_size()
     mcdc['mpi_rank']   = MPI.COMM_WORLD.Get_rank()
     mcdc['mpi_master'] = mcdc['mpi_rank'] == 0
+
+    # Particle bank tags
+    mcdc['bank_active']['tag'] = 'active'
+    mcdc['bank_census']['tag'] = 'census'
+    mcdc['bank_source']['tag'] = 'source'
 
     # Distribute work to processors
     kernel.distribute_work(mcdc['setting']['N_particle'], mcdc)
