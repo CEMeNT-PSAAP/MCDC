@@ -25,3 +25,7 @@ output*.h5
 # Misc.
 tmp*
 *.core
+
+# test cache
+.pytest_cache
+pytestdebug.log

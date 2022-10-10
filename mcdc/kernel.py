@@ -57,6 +57,7 @@ def rng_skip_ahead_strides(n, mcdc):
 def rng_skip_ahead(n, mcdc):
     rng_skip_ahead_(int(n), mcdc)
 
+
 @njit
 def rng_skip_ahead_(n, mcdc):
     seed_base = mcdc['rng_seed_base']
