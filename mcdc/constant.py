@@ -42,6 +42,6 @@ PCT_COMBING_WEIGHT = 10
 INF   = 1E10
 PI    = math.acos(-1.0)
 SHIFT = 1E-10 # To ensure lattice, surface, and mesh crossings
-PREC  = 1.0+1E-8 # Precision factor to determine if a distance is smaller than
+PREC  = 1.0+1E-5 # Precision factor to determine if a distance is smaller than
                  # another (for lattice, surface, and mesh)
 BANKMAX = 100 # Default maximum active bank

@@ -58,7 +58,8 @@ for k in range(K):
 	
 
 rel_var = phi_sd*phi_sd/phi/phi #MC relative variance
-FOM = 1/T/rel_var			#piecewise figure of merit
+FOM = 1/np.sum(n)/rel_var			#piecewise figure of merit
+FOM[n==0]=0
 
 fig = plt.figure(figsize=(16,9))
 ax = fig.gca(projection='3d')
@@ -93,6 +94,7 @@ for k in range(K):
 	filenames.append(filename)
 	plt.savefig(filename)
 	ax.cla()
+
 
 with imageio.get_writer('n.gif', mode='I') as writer:
     for filename in filenames:

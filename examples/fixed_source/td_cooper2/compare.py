@@ -122,11 +122,32 @@ fig = plt.figure(figsize=(16,9))
 ax = fig.gca(projection='3d')
 filenames = []
 for k in range(K):
+	ax.plot_surface(X,Y,np.log10(rvar[k]),color='w',edgecolors='k', lw=0.1)
+	ax.set_facecolor('w')
+	ax.set_xlabel(r'$x$ [cm]')
+	ax.set_ylabel(r'$y$ [cm]')
+	ax.set_zlim(-2,2)
+	filename = f'{k}.png'
+	filenames.append(filename)
+	plt.savefig(filename)
+	ax.cla()
+
+with imageio.get_writer('rvar.gif', mode='I') as writer:
+    for filename in filenames:
+        image = imageio.imread(filename)
+        writer.append_data(image)
+
+
+for filename in set(filenames):
+    os.remove(filename)
+
+filenames = []
+for k in range(K):
 	ax.plot_surface(X,Y,np.log10(rFOM[k]),color='w',edgecolors='k', lw=0.1)
 	ax.set_facecolor('w')
 	ax.set_xlabel(r'$x$ [cm]')
 	ax.set_ylabel(r'$y$ [cm]')
-	ax.set_zlim(-4,4)
+	ax.set_zlim(-2,2)
 	filename = f'{k}.png'
 	filenames.append(filename)
 	plt.savefig(filename)

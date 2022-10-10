@@ -41,7 +41,7 @@ precursor = np.dtype([('x', float64), ('y', float64), ('z', float64),
 
 def particle_bank(max_size):
     return np.dtype([('particles', particle_record, (max_size,)), 
-                     ('size', int64), ('tag', 'U10')])
+                     ('size', uint64), ('tag', 'U10')])
 
 # ==============================================================================
 # Material
@@ -354,10 +354,10 @@ def make_type_global(card):
     N_work           = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
-    bank_active = particle_bank(1+bank_active_buff)
+    bank_active = particle_bank(np.int_(1+bank_active_buff))
     if card.setting['mode_eigenvalue'] or card.technique['time_census']:
-        bank_census = particle_bank(int((1+bank_census_buff)*N_work))
-        bank_source = particle_bank(int((1+bank_census_buff)*N_work))
+        bank_census = particle_bank(np.uint(1+bank_census_buff))
+        bank_source = particle_bank(np.uint(1+bank_census_buff))
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)

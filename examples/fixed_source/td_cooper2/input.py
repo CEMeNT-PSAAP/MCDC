@@ -57,33 +57,35 @@ mcdc.tally(scores=['flux','flux-x','flux-y','flux-t',
            t=t)
 
 # Setting
-mcdc.setting(N_particle=2E6,
+mcdc.setting(N_particle=2E5,
              time_boundary=10.0+2E-4,
-             bank_max=2E6,
+             active_bank_buff=2.147E7, #max c int limit
+#             census_bank_buff=3E6,
              rng_seed=12345)
 
 # Technique
 mcdc.implicit_capture()
 #mcdc.population_control()
+#mcdc.census(t=np.linspace(1.0,10.0,10))
 
 t=np.linspace(0.0,10.0,101)
 t[0]=t[0]-1E-6
 t[-1]=t[-1]+2E-5
 f = np.load("ww.npz")
-mcdc.weight_window(x=np.linspace(0.0, 20.0, 41),
-                   y=np.linspace(0.0, 20.0, 41),
-                   t=t,
-                   f=1.0,
-                   window=f['phi'])
-#                   #Bx=f['Bx'],
-#                   #By=f['By'],
-#                   #Bz=f['Bz'])
-#mcdc.weight_window_quad(x=np.linspace(0.0, 20.0, 41),
+#mcdc.weight_window(x=np.linspace(0.0, 20.0, 41),
 #                   y=np.linspace(0.0, 20.0, 41),
 #                   t=t,
 #                   f=1.0,
-#                   ww1=f['ww1'],
-#                   ww2=f['ww2'],
-#                   ww3=f['ww3'],
-#                   ww4=f['ww4'])
+#                   window=f['phi'])
+#                   #Bx=f['Bx'],
+#                   #By=f['By'],
+#                   #Bz=f['Bz'])
+mcdc.weight_window_quad(x=np.linspace(0.0, 20.0, 41),
+                   y=np.linspace(0.0, 20.0, 41),
+                   t=t,
+                   f=1.0,
+                   ww1=f['ww1'],
+                   ww2=f['ww2'],
+                   ww3=f['ww3'],
+                   ww4=f['ww4'])
 mcdc.run()
