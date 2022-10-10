@@ -264,10 +264,10 @@ def make_type_technique(card):
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('branchless_collision', bool_),
               ('weight_window', bool_), ('IC_generator', bool_),
-              ('weight_window_quad', bool_),('time_census', bool_), ('aww', bool_)]
+              ('time_census', bool_)]
     
 
-    struct += [('wwf', float64)]
+    struct += [('weight_window_rho', float64)]
 
     # =========================================================================
     # Population control
@@ -285,14 +285,6 @@ def make_type_technique(card):
     
     # Window
     struct += [('ww', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('ww2', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('ww3', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('ww4', float64, (Nt, Nx, Ny, Nz))]
-    
-    # Angular Windows
-    struct += [('wwBx', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('wwBy', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('wwBz', float64, (Nt, Nx, Ny, Nz))]
 
     # =========================================================================
     # Time census
