@@ -16,7 +16,6 @@ m_barrier = mcdc.material(capture=np.array([1.0]),
                           scatter=np.array([[4.0]]),
                           speed=np.array([[v]]))
 
-#mcdc.universal_speed(v) #broken
 
 # Set surfaces
 sx1 = mcdc.surface('plane-x', x=0.0,  bc="reflective")
@@ -44,23 +43,26 @@ mcdc.source(x=[0.0, 5.0], y=[0.0, 5.0], prob=v*5*5, isotropic=True)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=['flux','flux-x','flux-y',
-                   'n','n-x','n-y'], 
+mcdc.tally(scores=['flux','n','current'],
            x=np.linspace(0.0, 20.0, 41), 
            y=np.linspace(0.0, 20.0, 41))
 
 # Setting
-mcdc.setting(N_particle=2E5,
-             bank_max=2E7)
+mcdc.setting(N_particle=2E6,
+             active_bank_buff=2.147E7, #max c int limit
+             progress_bar=False,
+             rng_seed=12345)
 
 # Technique
 mcdc.implicit_capture()
-#mcdc.ww_source()
 
 f = np.load("ww.npz")
 mcdc.weight_window(x=np.linspace(0.0, 20.0, 41),
                    y=np.linspace(0.0, 20.0, 41),
                    f=1.0,
-                   window=f['phi'])
+                   window=f['phi'],
+                   Bx=f['Bx'],
+                   By=f['By'],
+                   Bz=f['Bz'])
 
 mcdc.run()

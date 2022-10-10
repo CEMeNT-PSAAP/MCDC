@@ -225,3 +225,4 @@ def loop_particle(P, mcdc):
         # Apply weight window
         if mcdc['technique']['weight_window']:
             kernel.weight_window(P, mcdc)
+
