@@ -346,10 +346,10 @@ def make_type_global(card):
     N_work           = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
-    bank_active = particle_bank(np.int_(1+bank_active_buff))
+    bank_active = particle_bank(1+bank_active_buff)
     if card.setting['mode_eigenvalue'] or card.technique['time_census']:
-        bank_census = particle_bank(np.uint(1+bank_census_buff))
-        bank_source = particle_bank(np.uint(1+bank_census_buff))
+        bank_census = particle_bank(int((1+bank_census_buff)*N_work))
+        bank_source = particle_bank(int((1+bank_census_buff)*N_work))
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)

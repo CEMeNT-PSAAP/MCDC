@@ -695,7 +695,7 @@ def census(t, pct='none'):
     if pct != 'none':
         population_control(pct)
 
-def weight_window(x=None, y=None, z=None, t=None, window=None, f=None, Bx=None, By=None, Bz=None):
+def weight_window(x=None, y=None, z=None, t=None, window=None, rho=None):
     card = mcdc.input_card.technique
     card['weight_window'] = True
 
@@ -706,7 +706,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, f=None, Bx=None, 
     if t is not None: card['ww_mesh']['t'] = t
 
     # Set window width
-    if f is not None: card['wwf'] = f
+    if rho is not None: card['weight_window_rho'] = rho
 
     # Set window
     ax_expand = []
@@ -718,57 +718,9 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, f=None, Bx=None, 
         ax_expand.append(2)
     if z is None:
         ax_expand.append(3)
-    #window /= np.max(window)
     for ax in ax_expand:
         window = np.expand_dims(window, axis=ax)
     card['ww'] = window
-
-    if Bx is not None:
-        card['aww'] = True
-        for ax in ax_expand:
-            Bx = np.expand_dims(Bx, axis=ax)
-            By = np.expand_dims(By, axis=ax)
-            Bz = np.expand_dims(Bz, axis=ax)
-        card['wwBx'] = Bx 
-        card['wwBy'] = By
-        card['wwBz'] = Bz
-
-    return card
-
-def weight_window_quad(x=None, y=None, z=None, t=None, ww1=None, ww2=None, ww3=None, ww4=None, f=None):
-    card = mcdc.input_card.technique
-    card['weight_window'] = True
-    card['weight_window_quad'] = True
-
-    # Set mesh
-    if x is not None: card['ww_mesh']['x'] = x
-    if y is not None: card['ww_mesh']['y'] = y
-    if z is not None: card['ww_mesh']['z'] = z
-    if t is not None: card['ww_mesh']['t'] = t
-
-    # Set window width
-    if f is not None: card['wwf'] = f
-
-    # Set window
-    ax_expand = []
-    if t is None:
-        ax_expand.append(0)
-    if x is None:
-        ax_expand.append(1)
-    if y is None:
-        ax_expand.append(2)
-    if z is None:
-        ax_expand.append(3)
-    #window /= np.max(window)
-    for ax in ax_expand:
-        ww1 = np.expand_dims(ww1, axis=ax)
-        ww2 = np.expand_dims(ww2, axis=ax)
-        ww3 = np.expand_dims(ww3, axis=ax)
-        ww4 = np.expand_dims(ww4, axis=ax)
-    card['ww'] = ww1
-    card['ww2'] = ww2
-    card['ww3'] = ww3
-    card['ww4'] = ww4
 
     return card
 
