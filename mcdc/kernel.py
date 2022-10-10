@@ -1902,11 +1902,6 @@ def weight_window(P, mcdc):
 
         # Target weight
         w_target = mcdc['technique']['ww'][t,x,y,z]
-        if mcdc['technique']['aww']:
-            Bx=mcdc['technique']['wwBx'][t,x,y,z]
-            By=mcdc['technique']['wwBy'][t,x,y,z]
-            Bz=mcdc['technique']['wwBz'][t,x,y,z]
-            w_target=w_target*math.exp(P['ux']*Bx+P['uy']*By+P['uz']*Bz)
 
         # Check if no weight windows in cell
         if (w_target > 0):
@@ -1915,10 +1910,10 @@ def weight_window(P, mcdc):
             p = P['w']/w_target
         
             # Window Width
-            f = mcdc['technique']['wwf']
+            rho = mcdc['technique']['weight_window_rho']
         
             # If above target
-            if p > f:
+            if p > rho:
                 # Set target weight
                 P['w'] = w_target
                 # Splitting (keep the original particle)
@@ -1933,7 +1928,7 @@ def weight_window(P, mcdc):
                     add_particle(copy_particle(P), mcdc['bank_active'])
         
             # Below target
-            elif p < 1.0/f:
+            elif p < 1.0/rho:
                 # Russian roulette
                 xi = rng(mcdc)
                 if xi > p:
@@ -1941,57 +1936,6 @@ def weight_window(P, mcdc):
                 else:
                     P['w'] = w_target
 
-@njit
-def weight_window_quad(P, mcdc):
-    # Get indices
-    t, x, y, z, outside = mesh_get_index(P, mcdc['technique']['ww_mesh'])
-
-    if (not outside):
-    
-        # Target weight
-        if (P['ux'] > 0):
-            if (P['uy'] > 0):
-                w_target = mcdc['technique']['ww'][t,x,y,z]
-            else:
-                w_target = mcdc['technique']['ww4'][t,x,y,z]
-        else:
-            if (P['uy'] > 0):
-                w_target = mcdc['technique']['ww2'][t,x,y,z]
-            else:
-                w_target = mcdc['technique']['ww3'][t,x,y,z]
-    
-        # Check if no weight windows in cell
-        if (w_target > 0):
-        
-            # Surviving probability
-            p = P['w']/w_target
-        
-            # Window Width
-            f = mcdc['technique']['wwf']
-        
-            # If above target
-            if p > f:
-                # Set target weight
-                P['w'] = w_target
-                # Splitting (keep the original particle)
-                n_split = math.floor(p)
-                for i in range(n_split-1):
-                    add_particle(copy_particle(P), mcdc['bank_active'])
-        
-                # Russian roulette
-                p -= n_split
-                xi = rng(mcdc)
-                if xi <= p:
-                    add_particle(copy_particle(P), mcdc['bank_active'])
-        
-            # Below target - Russian roulette
-            elif p < 1.0/f:
-                xi = rng(mcdc)
-                if xi > p:
-                    P['alive'] = False
-                else:
-                    P['w'] = w_target
-        
 
 #==============================================================================
 # Miscellany
