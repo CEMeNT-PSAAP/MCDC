@@ -342,7 +342,7 @@ def bank_scanning(bank, mcdc):
     # Starting index
     buff = np.zeros(1, dtype=np.int64)
     with objmode():
-        MPI.COMM_WORLD.Exscan(np.array([N_local],dtype=np.int64), buff, MPI.SUM)
+        MPI.COMM_WORLD.Exscan(np.array([N_local]), buff, MPI.SUM)
     idx_start = buff[0]
 
     # Global size
@@ -449,7 +449,6 @@ def bank_rebalance(mcdc):
             bank = bank[n:]
         if more_right:
             n = idx_end - work_end
-            n = int(n)
             request_right = MPI.COMM_WORLD.isend(bank[-n:], dest=right)
             bank = bank[:-n]
 
