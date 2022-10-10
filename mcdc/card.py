@@ -100,7 +100,7 @@ class InputCard:
                           'IC_generator'         : False,
 
                           'pct'                  : PCT_NONE,
-                          
+
                           'ww'                   : np.ones([1,1,1,1]), 
                           'ww_mesh'              : {'x' : np.array([-INF, INF]),
                                                     'y' : np.array([-INF, INF]),
