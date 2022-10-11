@@ -3,7 +3,7 @@ import sys
 
 import mcdc
 
-N_history = 3000 #int(sys.argv[2])
+N_history = 5 #int(sys.argv[2])
 tag       = 'test' #sys.argv[3]
 
 # =============================================================================
@@ -41,9 +41,9 @@ x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6,
 mcdc.tally(scores=['flux-x'], x=x)
 
 # Setting
-mcdc.setting(N_particle=1E5, output='output_'+tag+'_'+str(N_history), 
+mcdc.setting(N_particle=100, output='output_'+tag+'_'+str(N_history), 
              progress_bar=False)
-mcdc.eigenmode(N_inactive=50, N_active=N_history, gyration_radius='only-x')
+mcdc.eigenmode(N_inactive=5, N_active=N_history, gyration_radius='only-x')
 mcdc.population_control()
 
 # Run

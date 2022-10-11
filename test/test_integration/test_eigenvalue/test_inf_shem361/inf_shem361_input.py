@@ -3,7 +3,7 @@ import sys
 
 import mcdc
 
-N_history = 3000 #int(sys.argv[2])
+N_history = 5 #int(sys.argv[2])
 tag       = "test" #sys.argv[3]
 
 # =============================================================================
@@ -48,9 +48,9 @@ source = mcdc.source(energy=np.ones(G))
 mcdc.tally(scores=['flux'])
 
 # Setting
-mcdc.setting(N_particle=1E5, output='output_'+tag+'_'+str(N_history), 
+mcdc.setting(N_particle=100, output='output_'+tag+'_'+str(N_history), 
              progress_bar=False)
-mcdc.eigenmode(N_inactive=20, N_active=N_history)
+mcdc.eigenmode(N_inactive=5, N_active=N_history)
 
 # Run
 mcdc.run()

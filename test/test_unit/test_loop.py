@@ -2,6 +2,7 @@
 
 from mcdc.loop import loop_particle, loop_main, loop_source
 import mcdc.type_
+import mcdc.card
 
 
 def loop_setup_test():
@@ -20,14 +21,19 @@ def loop_setup_test():
     # Surface on the left
     P['x'] = 4.0
     
-    return(S, P)
+    setup_card = card.InputCard()
+    
+
+    #mcdc = 
+
+    return(S, P, mcdc)
 
 
 def test_loop_main():
     
     [P, S] = loop_setup_test()
 
-    
+
 
 
     print('This worked')
