@@ -25,6 +25,7 @@ output*.h5
 # Misc.
 tmp*
 *.core
+*.DS_Store # for mac users
 
 # test cache
 .pytest_cache
