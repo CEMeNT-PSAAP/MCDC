@@ -2,4 +2,4 @@
 #null containers sood stuff
 
 
-setup_card = InputCard()
+#setup_card = InputCard()

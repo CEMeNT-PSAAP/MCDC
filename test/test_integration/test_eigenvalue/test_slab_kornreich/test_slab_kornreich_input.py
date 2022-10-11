@@ -3,48 +3,53 @@ import sys
 
 import mcdc
 
-N_history = 5 #int(sys.argv[2])
-tag       = 'test' #sys.argv[3]
 
-# =============================================================================
-# Set model
-# =============================================================================
+def test_slab_kornreich_eig():
+    N_history = 5 #int(sys.argv[2])
+    tag       = 'test_slab_korneich' #sys.argv[3]
 
-# Set materials
-m1 = mcdc.material(capture=np.array([0.0]), scatter=np.array([[0.9]]),
-                   fission=np.array([0.1]), nu_p=np.array([6.0]))
-m2 = mcdc.material(capture=np.array([0.68]), scatter=np.array([[0.2]]),
-                   fission=np.array([0.12]), nu_p=np.array([2.5]))
+    # =============================================================================
+    # Set model
+    # =============================================================================
 
-# Set surfaces
-s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
-s2 = mcdc.surface('plane-x', x=1.5)
-s3 = mcdc.surface('plane-x', x=2.5, bc="vacuum")
+    # Set materials
+    m1 = mcdc.material(capture=np.array([0.0]), scatter=np.array([[0.9]]),
+                    fission=np.array([0.1]), nu_p=np.array([6.0]))
+    m2 = mcdc.material(capture=np.array([0.68]), scatter=np.array([[0.2]]),
+                    fission=np.array([0.12]), nu_p=np.array([2.5]))
 
-# Set cells
-mcdc.cell([+s1, -s2], m1)
-mcdc.cell([+s2, -s3], m2)
+    # Set surfaces
+    s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
+    s2 = mcdc.surface('plane-x', x=1.5)
+    s3 = mcdc.surface('plane-x', x=2.5, bc="vacuum")
 
-# =============================================================================
-# Set source
-# =============================================================================
+    # Set cells
+    mcdc.cell([+s1, -s2], m1)
+    mcdc.cell([+s2, -s3], m2)
 
-mcdc.source(x=[0.0, 2.5], isotropic=True)
+    # =============================================================================
+    # Set source
+    # =============================================================================
 
-# =============================================================================
-# Set tally, setting, and run mcdc
-# =============================================================================
+    mcdc.source(x=[0.0, 2.5], isotropic=True)
 
-# Tally
-x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6, 
-              1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
-mcdc.tally(scores=['flux-x'], x=x)
+    # =============================================================================
+    # Set tally, setting, and run mcdc
+    # =============================================================================
 
-# Setting
-mcdc.setting(N_particle=100, output='output_'+tag+'_'+str(N_history), 
-             progress_bar=False)
-mcdc.eigenmode(N_inactive=5, N_active=N_history, gyration_radius='only-x')
-mcdc.population_control()
+    # Tally
+    x  = np.array([0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05, 1.2, 1.35, 1.5, 1.6, 
+                1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5])
+    mcdc.tally(scores=['flux-x'], x=x)
 
-# Run
-mcdc.run()
+    # Setting
+    mcdc.setting(N_particle=1000, output='output_'+tag+'_'+str(N_history), 
+                progress_bar=False)
+    mcdc.eigenmode(N_inactive=5, N_active=N_history, gyration_radius='only-x')
+    mcdc.population_control()
+
+    # Run
+    mcdc.run()
+
+    
+

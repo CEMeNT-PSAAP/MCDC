@@ -21,7 +21,7 @@ def loop_setup_test():
     # Surface on the left
     P['x'] = 4.0
     
-    #setup_card = card.InputCard()
+    # setup_card = card.InputCard()
     
 
     #mcdc = 
@@ -31,7 +31,7 @@ def loop_setup_test():
 
 def test_loop_main():
     
-    [P, S] = loop_setup_test()
+    #[P, S] = loop_setup_test()
 
 
 
