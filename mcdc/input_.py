@@ -197,7 +197,7 @@ def surface(type_, **kw):
     # Surface type
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
-    type_=type_.replace('_','-').replace(' ','-')
+    type_=type_.replace('_','-').replace(' ','-').lower()
     if type_ == 'plane-x':
         card['G']      = 1.0
         card['linear'] = True
