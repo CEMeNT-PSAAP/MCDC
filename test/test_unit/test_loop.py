@@ -21,11 +21,15 @@ def loop_setup_test():
     P['x'] = 4.0
     
     return(S, P)
-    
+
 
 def test_loop_main():
     
+    [P, S] = loop_setup_test()
+
     
+
+
     print('This worked')
     assert 0 == 0
 

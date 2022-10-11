@@ -3,8 +3,8 @@ import sys
 
 import mcdc
 
-N_history = int(sys.argv[2])
-tag       = sys.argv[3]
+N_history = 3000 #int(sys.argv[2])
+tag       = 'test' #sys.argv[3]
 
 # =============================================================================
 # Set model
