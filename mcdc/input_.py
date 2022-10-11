@@ -14,7 +14,7 @@ import mcdc.global_ as mcdc
 # Material
 # ==============================================================================
 
-def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None, 
+def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
              chi_p=None, chi_d=None, nu_s=None, speed=None, decay=None):
     """
     Arguments
@@ -24,8 +24,8 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     scatter : numpy.ndarray (2D)
         Differential scattering cross-section [gout][gin] [/cm].
     fission : numpy.ndarray (1D)
-        Fission cross-section [/cm]. 
-    *At least capture, scatter, or fission cross-section needs to be 
+        Fission cross-section [/cm].
+    *At least capture, scatter, or fission cross-section needs to be
     provided.
 
     nu_s : numpy.ndarray (1D)
@@ -35,7 +35,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     nu_d : numpy.ndarray (2D)
         Delayed neutron precursor yield [dg][gin].
     *nu_p or nu_d is needed if fission is provided.
-    
+
     chi_p : numpy.ndarray (2D)
         Prompt fission spectrum [gout][gin]
     chi_d : numpy.ndarray (2D)
@@ -46,8 +46,8 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
         Energy group speed
     decay : numpy.ndarray (1D)
         Precursor group decay constant [/s]
-    *speed and decay are optional. By default, values for speed and decay 
-    are one and infinite, respectively. Universal speed and decay can be 
+    *speed and decay are optional. By default, values for speed and decay
+    are one and infinite, respectively. Universal speed and decay can be
     provided through mcdc.set_universal_speed and mcdc.set_universal_decay.
     """
 
@@ -66,7 +66,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     J = 0
     if nu_d is not None:
         J = len(nu_d)
-    
+
     # Set default card values (c.f. type_.py)
     card            = {}
     card['tag']     = 'Material'
@@ -103,7 +103,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     if fission is not None:
         card['fission'][:] = fission[:]
     card['total'][:] = card['capture'] + card['scatter'] + card['fission']
-    
+
     # Scattering multiplication
     if nu_s is not None:
         card['nu_s'][:,:] = nu_s[:,:]
@@ -124,7 +124,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     # Scattering spectrum
     if scatter is not None:
         card['chi_s'][:,:] = np.swapaxes(scatter, 0, 1)[:,:] # [gout,gin] -> [gin,gout]
-        for g in range(G): 
+        for g in range(G):
             if card['scatter'][g] > 0.0:
                 card['chi_s'][g,:] /= card['scatter'][g]
 
@@ -187,16 +187,17 @@ def surface(type_, **kw):
     # Boundary condition
     bc = kw.get('bc')
     if bc is not None:
+        bc = bc.lower()
         if bc == 'vacuum':
             card['vacuum'] = True
         elif bc == 'reflective':
             card['reflective'] = True
         else:
-            print_error("Unsupported surface boundary condition: "+bc)
-
+            print_error("Unsupported surface boundary condition: "+bc+ '; Supported options are "vacuum" or "reflective"')
     # Surface type
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
+    type_ = type_.replace('_','-').replace(' ','-').lower()
     if type_ == 'plane-x':
         card['G']      = 1.0
         card['linear'] = True
@@ -282,7 +283,7 @@ def surface(type_, **kw):
         card['nx'] = nx/norm
         card['ny'] = ny/norm
         card['nz'] = nz/norm
-    
+
     # Push card
     mcdc.input_card.surfaces.append(card)
     return SurfaceHandle(card)
@@ -303,7 +304,7 @@ def set_J(x, t, card):
         # Skip if step
         if t[i] == t[i+1]:
             continue
-        
+
         # Calculate constants
         J0 = x[i]
         J1 = (x[i+1]-x[i])/(t[i+1]-t[i])
@@ -345,11 +346,11 @@ def cell(surfaces_flags, fill, lattice_center=None):
         card['lattice_ID'] = fill['ID']
         if lattice_center is not None:
             card['lattice_center'] = np.array(lattice_center)
-    
+
     # Material cell
     else:
         card['material_ID'] = fill['ID']
-    
+
     # Push card
     mcdc.input_card.cells.append(card)
     return card
@@ -394,23 +395,23 @@ def lattice(x=None, y=None, z=None, universes=None):
                             'y0' : -INF, 'dy' : 2*INF, 'Ny' : 1,
                             'z0' : -INF, 'dz' : 2*INF, 'Nz' : 1}
     card['universe_IDs'] = np.array([[[[0]]]])
-        
+
     # Set mesh
-    if x is not None: 
+    if x is not None:
         card['mesh']['x0'] = x[0]
         card['mesh']['dx'] = x[1]
         card['mesh']['Nx'] = x[2]
-    if y is not None: 
+    if y is not None:
         card['mesh']['y0'] = y[0]
         card['mesh']['dy'] = y[1]
         card['mesh']['Ny'] = y[2]
-    if z is not None: 
+    if z is not None:
         card['mesh']['z0'] = z[0]
         card['mesh']['dz'] = z[1]
         card['mesh']['Nz'] = z[2]
 
     # Set universe IDs
-    universe_IDs = np.array(universes, dtype=np.int64) 
+    universe_IDs = np.array(universes, dtype=np.int64)
     ax_expand = []
     if x is None:
         ax_expand.append(2)
@@ -445,7 +446,6 @@ def source(**kw):
     energy    = kw.get('energy')
     time      = kw.get('time')
     prob      = kw.get('prob')
-        
     # Set default card values (c.f. type_.py)
     card              = {}
     card['tag']       = 'Source'
@@ -464,7 +464,6 @@ def source(**kw):
     card['group']     = np.array([1.0])
     card['time']      = np.array([0.0, 0.0])
     card['prob']      = 1.0
-    
     # Set position
     if point is not None:
         card['x'] = point[0]
