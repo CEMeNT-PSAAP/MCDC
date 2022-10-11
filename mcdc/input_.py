@@ -187,7 +187,7 @@ def surface(type_, **kw):
     # Boundary condition
     bc = kw.get('bc')
     if bc is not None:
-        bc=bc.lower()
+        bc = bc.lower()
         if bc == 'vacuum':
             card['vacuum'] = True
         elif bc == 'reflective':
@@ -197,7 +197,7 @@ def surface(type_, **kw):
     # Surface type
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
-    type_=type_.replace('_','-').replace(' ','-').lower()
+    type_ = type_.replace('_','-').replace(' ','-').lower()
     if type_ == 'plane-x':
         card['G']      = 1.0
         card['linear'] = True
@@ -503,7 +503,7 @@ def source(**kw):
     # Set probability
     if prob is not None:
         card['prob'] = prob
-        
+
     # Push card
     mcdc.input_card.sources.append(card)
     return card
