@@ -106,7 +106,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
 
     # Scattering multiplication
     if nu_s is not None:
-        card['nu_s'][:,:] = nu_s[:,:]
+        card['nu_s'][:] = nu_s[:]
 
     # Fission productions
     if fission is not None:
