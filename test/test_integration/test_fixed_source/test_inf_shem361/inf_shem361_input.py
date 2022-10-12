@@ -3,8 +3,8 @@ import sys
 
 import mcdc
 
-N_history = int(sys.argv[2])
-tag       = sys.argv[3]
+N_particle = 1000 #int(sys.argv[2])
+tag        = 'test' #sys.argv[3]
 
 # =============================================================================
 # Set model
@@ -13,7 +13,8 @@ tag       = sys.argv[3]
 
 # Load material data
 with np.load('SHEM-361.npz') as data:
-    SigmaC = data['SigmaC']   # /cm
+    SigmaT = data['SigmaT']   # /cm
+    SigmaC = data['SigmaC']
     SigmaS = data['SigmaS']
     SigmaF = data['SigmaF']
     nu_p   = data['nu_p']
@@ -21,6 +22,14 @@ with np.load('SHEM-361.npz') as data:
     chi_p  = data['chi_p']
     chi_d  = data['chi_d']
     G      = data['G']
+    v      = data['v']
+    lamd   = data['lamd']
+# Buckling and leakage XS to make the problem subcritical
+R      = 10.0 # Sub
+B_sq   = (np.pi/R)**2
+D      = 1/(3*SigmaT)
+SigmaL = D*B_sq
+SigmaC += SigmaL
 
 # Set material
 m = mcdc.material(capture=SigmaC, scatter=SigmaS, fission=SigmaF, nu_p=nu_p,
@@ -48,9 +57,8 @@ source = mcdc.source(energy=np.ones(G))
 mcdc.tally(scores=['flux'])
 
 # Setting
-mcdc.setting(N_particle=1E5, output='output_'+tag+'_'+str(N_history), 
+mcdc.setting(N_particle=N_particle, output='output_'+tag+'_'+str(N_particle), 
              progress_bar=False)
-mcdc.eigenmode(N_inactive=20, N_active=N_history)
 
 # Run
 mcdc.run()
