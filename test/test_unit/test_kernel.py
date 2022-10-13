@@ -37,9 +37,9 @@ def test_rn_basic():
     Nmax_slice      = 1
     Nmax_surface    = 1
     Nmax_cell       = 1
-    
+    input_card.materials.append({'G':1, 'J':1}) # need a psuedo material for mcdc container
+
     # Make types for dummy mcdc container
-    input_card.material.append({'G'  : 1}) # need a psuedo material for mcdc container
     type_.make_type_material(G,J)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
@@ -49,7 +49,7 @@ def test_rn_basic():
     type_.make_type_tally(input_card)
     type_.make_type_technique(input_card)
     type_.make_type_global(input_card)
-    
+
     # The dummy container
     mcdc = np.zeros(1, dtype=type_.global_)[0]
     
