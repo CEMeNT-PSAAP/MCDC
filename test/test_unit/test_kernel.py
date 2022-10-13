@@ -15,7 +15,8 @@ def test_rn_basic():
     
     Seed numbers for index 1-5, 123456-123460
     
-    [1] REFERENCE
+    [1] F. B. Brown, “Random number generation with arbitrary strides”, 
+        Trans. Am. Nucl. Soc, 71, 202 (1994)
     
     """
     ref_data = np.array((3512401965023503517, 5461769869401032777, 
