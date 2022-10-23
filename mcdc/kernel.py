@@ -27,6 +27,35 @@ def sample_isotropic_direction(mcdc):
     return x, y, z
 
 @njit
+def sample_white_direction(nx, ny, nz, mcdc):
+    # Sample polar cosine
+    mu = math.sqrt(rng(mcdc))
+    
+    # Sample azimuthal direction
+    azi     = 2.0*PI*rng(mcdc)
+    cos_azi = math.cos(azi)
+    sin_azi = math.sin(azi)
+    Ac      = (1.0 - mu**2)**0.5
+    
+    if nz != 1.0:
+        B = (1.0 - nz**2)**0.5
+        C = Ac/B
+        
+        x = nx*mu + (nx*nz*cos_azi - ny*sin_azi)*C
+        y = ny*mu + (ny*nz*cos_azi + nx*sin_azi)*C
+        z = nz*mu - cos_azi*Ac*B
+    
+    # If dir = 0i + 0j + k, interchange z and y in the formula
+    else:
+        B = (1.0 - ny**2)**0.5
+        C = Ac/B
+        
+        x = nx*mu + (nx*ny*cos_azi - nz*sin_azi)*C
+        y = nz*mu + (nz*ny*cos_azi + nx*sin_azi)*C
+        z = ny*mu - cos_azi*Ac*B
+    return x, y, z
+
+@njit
 def sample_uniform(a, b, mcdc):
     return a + rng(mcdc) * (b - a)
 
@@ -110,6 +139,10 @@ def source_particle(source, rng):
     # Direction
     if source['isotropic']:
         ux, uy, uz = sample_isotropic_direction(rng)
+    elif source['white']:
+        ux, uy, uz = sample_white_direction(source['white_x'], 
+                                            source['white_y'], 
+                                            source['white_z'], rng)
     else:
         ux = source['ux']
         uy = source['uy']
@@ -258,82 +291,6 @@ def manage_IC_bank(mcdc):
     # Reset local banks
     mcdc['technique']['IC_bank_neutron_local']['size'] = 0
     mcdc['technique']['IC_bank_precursor_local']['size'] = 0
-
-@njit
-def population_control(mcdc):
-    if mcdc['technique']['pct'] == PCT_COMBING:
-        pct_combing(mcdc)
-        rng_rebase(mcdc)
-    elif mcdc['technique']['pct'] == PCT_COMBING_WEIGHT:
-        pct_combing_weight(mcdc)
-        rng_rebase(mcdc)
-
-@njit
-def pct_combing(mcdc):
-    bank_census = mcdc['bank_census']
-    M           = mcdc['setting']['N_particle']
-    bank_source = mcdc['bank_source']
-    
-    # Scan the bank
-    idx_start, N_local, N = bank_scanning(bank_census, mcdc)
-    idx_end = idx_start + N_local
-
-    # Teeth distance
-    td = N/M
-
-    # Tooth offset
-    xi     = rng(mcdc)
-    offset = xi*td
-
-    # First hiting tooth
-    tooth_start = math.ceil((idx_start-offset)/td)
-
-    # Last hiting tooth
-    tooth_end = math.floor((idx_end-offset)/td) + 1
-
-    # Locally sample particles from census bank
-    bank_source['size'] = 0
-    for i in range(tooth_start, tooth_end):
-        tooth = i*td+offset
-        idx   = math.floor(tooth) - idx_start
-        P = copy_particle(bank_census['particles'][idx])
-        # Set weight
-        P['w'] *= td
-        add_particle(P, bank_source)
-
-@njit
-def pct_combing_weight(mcdc):
-    bank_census = mcdc['bank_census']
-    M           = mcdc['setting']['N_particle']
-    bank_source = mcdc['bank_source']
-    
-    # Scan the bank based on weight
-    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
-    w_end = w_cdf[-1]
-
-    # Teeth distance
-    td = W/M
-
-    # Tooth offset
-    xi     = rng(mcdc)
-    offset = xi*td
-
-    # First hiting tooth
-    tooth_start = math.ceil((w_start-offset)/td)
-
-    # Last hiting tooth
-    tooth_end = math.floor((w_end-offset)/td) + 1
-
-    # Locally sample particles from census bank
-    bank_source['size'] = 0
-    idx = 0
-    for i in range(tooth_start, tooth_end):
-        tooth  = i*td+offset
-        idx   += binary_search(tooth,w_cdf[idx:])
-        P = copy_particle(bank_census['particles'][idx])
-        # Set weight
-        P['w'] = td
-        add_particle(P, bank_source)
 
 @njit
 def bank_scanning(bank, mcdc):
@@ -517,7 +474,7 @@ def bank_IC(P, mcdc):
     wn     = flux/v
 
     # Neutron target weight
-    Nn       = mcdc['technique']['IC_Nn']
+    Nn       = mcdc['technique']['IC_N_neutron']
     tally_n  = mcdc['technique']['IC_n_eff']
     wn_prime = tally_n/Nn
     
@@ -544,7 +501,7 @@ def bank_IC(P, mcdc):
     #==========================================================================
 
     # Sample precursor?
-    Np = mcdc['technique']['IC_Np']
+    Np = mcdc['technique']['IC_N_precursor']
     if Np == 0:
         return
 
@@ -584,6 +541,123 @@ def bank_IC(P, mcdc):
         precursor['g'] = j
 
         mcdc['technique']['IC_bank_precursor_local']['size'] += 1
+
+# =============================================================================
+# Population control techniques
+# =============================================================================
+# TODO: Make it a stand-alone function that takes (bank_init, bank_final, M).
+#       The challenge is in the use of type-dependent copy_particle which is 
+#       required due to pure-Python behavior of taking things by reference.
+
+@njit
+def population_control(mcdc):
+    if mcdc['technique']['pct'] == PCT_COMBING:
+        pct_combing(mcdc)
+        rng_rebase(mcdc)
+    elif mcdc['technique']['pct'] == PCT_COMBING_WEIGHT:
+        pct_combing_weight(mcdc)
+        rng_rebase(mcdc)
+
+@njit
+def pct_combing(mcdc):
+    bank_census = mcdc['bank_census']
+    M           = mcdc['setting']['N_particle']
+    bank_source = mcdc['bank_source']
+    
+    # Scan the bank
+    idx_start, N_local, N = bank_scanning(bank_census, mcdc)
+    idx_end = idx_start + N_local
+
+    # Teeth distance
+    td = N/M
+
+    # Tooth offset
+    xi     = rng(mcdc)
+    offset = xi*td
+
+    # First hiting tooth
+    tooth_start = math.ceil((idx_start-offset)/td)
+
+    # Last hiting tooth
+    tooth_end = math.floor((idx_end-offset)/td) + 1
+
+    # Locally sample particles from census bank
+    bank_source['size'] = 0
+    for i in range(tooth_start, tooth_end):
+        tooth = i*td+offset
+        idx   = math.floor(tooth) - idx_start
+        P = copy_particle(bank_census['particles'][idx])
+        # Set weight
+        P['w'] *= td
+        add_particle(P, bank_source)
+
+@njit
+def pct_combing_weight(mcdc):
+    bank_census = mcdc['bank_census']
+    M           = mcdc['setting']['N_particle']
+    bank_source = mcdc['bank_source']
+    
+    # Scan the bank based on weight
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Teeth distance
+    td = W/M
+
+    # Tooth offset
+    xi     = rng(mcdc)
+    offset = xi*td
+
+    # First hiting tooth
+    tooth_start = math.ceil((w_start-offset)/td)
+
+    # Last hiting tooth
+    tooth_end = math.floor((w_end-offset)/td) + 1
+
+    # Locally sample particles from census bank
+    bank_source['size'] = 0
+    idx = 0
+    for i in range(tooth_start, tooth_end):
+        tooth  = i*td+offset
+        idx   += binary_search(tooth,w_cdf[idx:])
+        P = copy_particle(bank_census['particles'][idx])
+        # Set weight
+        P['w'] = td
+        add_particle(P, bank_source)
+
+@njit
+def pct_IC_neutron(mcdc):
+    bank_census = mcdc['bank_census']
+    M           = mcdc['setting']['N_particle']
+    bank_source = mcdc['bank_source']
+    
+    # Scan the bank based on weight
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Teeth distance
+    td = W/M
+
+    # Tooth offset
+    xi     = rng(mcdc)
+    offset = xi*td
+
+    # First hiting tooth
+    tooth_start = math.ceil((w_start-offset)/td)
+
+    # Last hiting tooth
+    tooth_end = math.floor((w_end-offset)/td) + 1
+
+    # Locally sample particles from census bank
+    bank_source['size'] = 0
+    idx = 0
+    for i in range(tooth_start, tooth_end):
+        tooth  = i*td+offset
+        idx   += binary_search(tooth,w_cdf[idx:])
+        P = copy_particle(bank_census['particles'][idx])
+        # Set weight
+        P['w'] = td
+        add_particle(P, bank_source)
 
 #==============================================================================
 # Particle operations
@@ -1192,7 +1266,7 @@ def global_tally(P, distance, mcdc):
     # IC generator tally
     if mcdc['technique']['IC_generator']:
         # Neutron
-        v     = get_particle_speed(P, mcdc)
+        v = get_particle_speed(P, mcdc)
         mcdc['technique']['IC_tally_n'] += flux/v
 
         # Precursor
@@ -1201,8 +1275,8 @@ def global_tally(P, distance, mcdc):
         decay = material['decay']
         total = 0.0
         for j in range(J):
-            total += nu_d[j]*SigmaF/decay[j]/mcdc['k_eff']
-        mcdc['technique']['IC_tally_C'] += flux*total
+            total += nu_d[j]/decay[j]
+        mcdc['technique']['IC_tally_C'] += flux*total*SigmaF/mcdc['k_eff']
 
 @njit
 def global_tally_closeout_history(mcdc):
@@ -1212,8 +1286,8 @@ def global_tally_closeout_history(mcdc):
 
     # MPI Allreduce
     buff_nuSigmaF = np.zeros(1, np.float64)
-    buff_IC_n = np.zeros(1, np.float64)
-    buff_IC_C = np.zeros(1, np.float64)
+    buff_IC_n     = np.zeros(1, np.float64)
+    buff_IC_C     = np.zeros(1, np.float64)
     with objmode():
         MPI.COMM_WORLD.Allreduce(np.array([mcdc['global_tally_nuSigmaF']]), buff_nuSigmaF, MPI.SUM)
         if mcdc['technique']['IC_generator']:
@@ -1329,7 +1403,9 @@ def move_to_event(P, mcdc):
     d_boundary, event_boundary = distance_to_boundary(P, mcdc)
 
     # Distance to tally mesh
-    d_mesh = distance_to_mesh(P, mcdc['tally']['mesh'], mcdc)
+    d_mesh = INF
+    if mcdc['cycle_active']:
+        d_mesh = distance_to_mesh(P, mcdc['tally']['mesh'], mcdc)
 
     # Distance to time boundary
     speed = get_particle_speed(P, mcdc)
