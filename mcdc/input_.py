@@ -443,6 +443,7 @@ def source(**kw):
     z         = kw.get('z')
     isotropic = kw.get('isotropic')
     direction = kw.get('direction')
+    white     = kw.get('white_direction')
     energy    = kw.get('energy')
     time      = kw.get('time')
     prob      = kw.get('prob')
@@ -452,6 +453,7 @@ def source(**kw):
     card['ID']        = len(mcdc.input_card.sources)
     card['box']       = False
     card['isotropic'] = True
+    card['white']     = False
     card['x']         = 0.0
     card['y']         = 0.0
     card['z']         = 0.0
@@ -461,6 +463,9 @@ def source(**kw):
     card['ux']        = 0.0
     card['uy']        = 0.0
     card['uz']        = 0.0
+    card['white_x']   = 0.0
+    card['white_y']   = 0.0
+    card['white_z']   = 0.0
     card['group']     = np.array([1.0])
     card['time']      = np.array([0.0, 0.0])
     card['prob']      = 1.0
@@ -479,7 +484,18 @@ def source(**kw):
             card['box_z'] = np.array(z)
 
     # Set direction
-    if direction is not None:
+    if white is not None:
+        card['isotropic'] = False
+        card['white']     = True
+        ux = white[0]
+        uy = white[1]
+        uz = white[2]
+        # Normalize
+        norm = (ux**2 + uy**2 + uz**2)**0.5
+        card['white_x'] = ux/norm
+        card['white_y'] = uy/norm
+        card['white_z'] = uz/norm
+    elif direction is not None:
         card['isotropic'] = False
         ux = direction[0]
         uy = direction[1]
@@ -605,20 +621,6 @@ def setting(**kw):
     if bank_census_buff is not None:
         card['bank_census_buff'] = int(bank_census_buff)
 
-    # TODO: IC source?
-    '''
-    if source_file is not None:
-        card['filed_source'] = True
-        card['source_file']  = source_file
-
-        # Set N_particle
-        with h5py.File('IC.h5', 'r') as f:
-            Np = f['IC/N_prompt'][0]
-            Nd = f['IC/N_delayed'][0]
-            N_partice = Np + np.sum(Nd)
-        card['N_particle'] = N_particle
-    '''
-
 def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None):
     # Update setting card
     card                    = mcdc.input_card.setting
@@ -717,9 +719,10 @@ def weight_window(x=None, y=None, z=None, t=None, window=None):
 
 def IC_generator(N_neutron=0, N_precursor=0):
     card = mcdc.input_card.technique
-    card['IC_generator'] = True
-    card['IC_Nn']        = int(N_neutron)
-    card['IC_Np']        = int(N_precursor)
+    card['IC_generator']   = True
+    card['IC_N_neutron']   = int(N_neutron)
+    card['IC_N_precursor'] = int(N_precursor)
+
 
 # ==============================================================================
 # Util

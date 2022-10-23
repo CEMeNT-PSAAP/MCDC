@@ -28,7 +28,7 @@ particle_record = np.dtype([
     ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
     ('w', float64)])
 
-# Records (for IC generator, )
+# Static records (for IC generator, )
 neutron   = np.dtype([('x', float64), ('y', float64), ('z', float64),
                       ('ux', float64), ('uy', float64), ('uz', float64),
                       ('g', uint64), ('w', float64)])
@@ -137,11 +137,12 @@ source = None
 def make_type_source(G):
     global source
     source = np.dtype([('ID', int64),
-                       ('box', bool_), ('isotropic', bool_),
+                       ('box', bool_), ('isotropic', bool_), ('white', bool_),
                        ('x', float64), ('y', float64), ('z', float64),
                        ('box_x', float64, (2,)), ('box_y', float64, (2,)), 
                        ('box_z', float64, (2,)),
                        ('ux', float64), ('uy', float64), ('uz', float64),
+                       ('white_x', float64), ('white_y', float64), ('white_z', float64),
                        ('group', float64, (G,)), ('time', float64, (2,)),
                        ('prob', float64)])
 
@@ -292,8 +293,8 @@ def make_type_technique(card):
     # Banks
     #   We need local banks to ensure reproducibility regardless of # of MPIs
     if card.technique['IC_generator']:
-        Nn = int(card.technique['IC_Nn']*1.2)
-        Np = int(card.technique['IC_Np']*1.2)
+        Nn = int(card.technique['IC_N_neutron']*1.2)
+        Np = int(card.technique['IC_N_precursor']*1.2)
         Nn_local = Nn#int(Nn/card.setting['N_active'])
         Np_local = Np#int(Np/card.setting['N_active'])
     else:
@@ -303,7 +304,7 @@ def make_type_technique(card):
     bank_neutron_local   = np.dtype([('content', neutron, (Nn_local,)), ('size', int64)])
     bank_precursor_local = np.dtype([('content', precursor, (Np_local,)), ('size', int64)])
 
-    struct += [('IC_Nn', int64), ('IC_Np', int64),
+    struct += [('IC_N_neutron', int64), ('IC_N_precursor', int64),
                ('IC_tally_n', float64), ('IC_tally_C', float64),
                ('IC_n_eff', float64), ('IC_C_eff', float64),
                ('IC_bank_neutron_local', bank_neutron_local), 

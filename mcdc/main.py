@@ -275,7 +275,6 @@ def prepare():
         mcdc['cycle_active'] = True
 
 def generate_hdf5():
-    # TODO: Gather and reduce IC bank
     if mcdc['mpi_master']:
         if mcdc['setting']['progress_bar']: print_msg('')
         print_msg(" Generating output HDF5 files...")
@@ -311,6 +310,6 @@ def generate_hdf5():
             # IC generator
             if mcdc['technique']['IC_generator']:
                 Nn = mcdc['technique']['IC_bank_neutron']['size']
-                Np = mcdc['technique']['IC_bank_neutron']['size']
+                Np = mcdc['technique']['IC_bank_precursor']['size']
                 f.create_dataset("IC/neutron",data=mcdc['technique']['IC_bank_neutron']['content'][:Nn])
                 f.create_dataset("IC/precursor",data=mcdc['technique']['IC_bank_precursor']['content'][:Np])
