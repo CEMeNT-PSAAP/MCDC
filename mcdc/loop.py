@@ -39,6 +39,14 @@ def loop_main(mcdc):
             elif mcdc['i_cycle'] >= mcdc['setting']['N_inactive']:
                 mcdc['cycle_active'] = True
 
+        # iQMC convergence criteria
+        elif mcdc['technique']['iQMC']:
+            # do stuff?
+            if mcdc['itt'] == mcdc['technique']['maxitt']:
+                simulation_end = True
+            if mcdc['res'] == mcdc['technique']['tol']:
+                simulation_end = True
+
         # Time census closeout
         elif mcdc['technique']['time_census'] and \
              mcdc['technique']['census_idx'] < len(mcdc['technique']['census_time'])-1:

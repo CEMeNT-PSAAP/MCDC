@@ -106,6 +106,10 @@ class InputCard:
                           'IC_generator'   : False,
                           'IC_N_neutron'   : 0,
                           'IC_N_precursor' : 0,
+                          
+                          'iQMC'           : False, 
+                          'tol'            : 1e-6,
+                          'maxit'          : 25,
                           }
 
 class SurfaceHandle:
