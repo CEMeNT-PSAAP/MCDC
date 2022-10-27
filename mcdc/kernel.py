@@ -1417,6 +1417,8 @@ def move_to_event(P, mcdc):
 
     # Distance to collision
     d_collision = distance_to_collision(P, mcdc)
+    if mcdc['technique']['iQMC']:
+        d_collision = INF
 
     # =========================================================================
     # Determine event
@@ -1476,6 +1478,9 @@ def move_to_event(P, mcdc):
 
     # Move particle
     move_particle(P, distance, mcdc)
+    
+    if mcdc['technique']['iQMC']:
+        continuous_weight_reduction(P, distance, mcdc)
 
 @njit
 def distance_to_collision(P, mcdc):
@@ -1992,6 +1997,20 @@ def weight_window(P, mcdc):
         xi = rng(mcdc)
         if xi > p:
             P['alive'] = False
+
+#==============================================================================
+# Continuous Weight Reduction
+#==============================================================================
+
+@njit
+def continuous_weight_reduction(P, distance, mcdc):
+    # w_new = w_old*exp(-s*sigt)
+    material = mcdc['materials'][P['material_ID']]
+    w        = P['w']
+    g        = P['g']
+    SigmaT   = material['total'][g]
+    P['w']   = w*np.exp(-distance*SigmaT)
+    
 
 #==============================================================================
 # Miscellany
