@@ -2014,19 +2014,15 @@ def weight_window(P, mcdc):
 # Quasi Monte Carlo
 #==============================================================================
 
-@njit
-def continuous_weight_reduction(w, distance, SigmaT):
-    # w_new = w_old*exp(-s*sigt)
-    w_final  = w*np.exp(-distance*SigmaT)
-    w_avg    = (w-w_final)/(SigmaT*distance)
-    return w_avg, w_final
+# @njit
+# def continuous_weight_reduction(w, distance, SigmaT):
+#     # w_new = w_old*exp(-s*sigt)
+#     w_final  = w*np.exp(-distance*SigmaT)
+#     w_avg    = (w-w_final)/(SigmaT*distance)
+#     return w_avg, w_final
 
-def prepare_qmc_source(mcdc):
+#def prepare_qmc_source(mcdc, SigmaS, SigmaF):
     # first get avg scalar flux from tally
-    flux_x = mcdc['tally']['flux_x']
-    # calculate scattering source
-    for cell in range(flux_x.size):
-        
     # calculate fission source
     # calculate fixed sources
     # loop over source particles 

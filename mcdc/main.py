@@ -1,5 +1,6 @@
 import h5py
 import numpy as np
+from scipy.stats import qmc
 
 from mpi4py import MPI
 
@@ -216,7 +217,10 @@ def prepare():
                         'census_idx',
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
-                        'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff']:
+                        'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff',
+                        'iqmc_scattering_source', 'iqmc_fission_source', 
+                        'iqmc_mesh', 'lds']:
+            print(name)
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -229,7 +233,23 @@ def prepare():
         mcdc['technique']['ww_mesh']['y'] = input_card.technique['ww_mesh']['y']
         mcdc['technique']['ww_mesh']['z'] = input_card.technique['ww_mesh']['z']
         mcdc['technique']['ww_mesh']['t'] = input_card.technique['ww_mesh']['t']
-
+        
+    # =========================================================================
+    # Quasi Monte Carlo
+    # =========================================================================
+    
+    if input_card.technique['iQMC']:
+        mcdc['technique']['iqmc_mesh']['x'] = input_card.technique['iqmc_mesh']['x']
+        mcdc['technique']['iqmc_mesh']['y'] = input_card.technique['iqmc_mesh']['y']
+        mcdc['technique']['iqmc_mesh']['z'] = input_card.technique['iqmc_mesh']['z']
+        mcdc['technique']['iqmc_mesh']['t'] = input_card.technique['iqmc_mesh']['t']
+    
+        if (input_card.technique['generator'] == 'sobol'):
+            N                        = mcdc['setting']['N_particle']
+            sampler                  = qmc.Sobol(d=6, scramble=False)
+            m                        = math.ceil(math.log(N, 2))
+            mcdc['technique']['lds'] = sampler.random_base2(m=m)
+    
     # =========================================================================
     # Global tally
     # =========================================================================
