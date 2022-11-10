@@ -260,7 +260,7 @@ def make_type_technique(card):
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('branchless_collision', bool_),
               ('weight_window', bool_), ('time_census', bool_),
-              ('IC_generator', bool_)]
+              ('IC_generator', bool_), ('iQMC', bool_)]
 
     # =========================================================================
     # Population control
@@ -279,6 +279,24 @@ def make_type_technique(card):
     # Window
     struct += [('ww', float64, (Nt, Nx, Ny, Nz))]
 
+    # =========================================================================
+    # Quasi Monte Carlo
+    # =========================================================================
+    
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card.technique['iqmc_mesh'])
+    struct += [('iqmc_mesh', mesh)]
+    
+    # Low-discprenecy sequence
+    N_particle  = card.setting['N_particle']
+    N_dim       = 3
+    struct      += [('lds'), float64, (N_particle, N_dim)]
+    
+    # Source
+    struct += [('qmc_source', (Nt, Nx, Ny, Nz))]
+    
+    # Second scalar flux tally for k-eigenvalue problems (?)
+    
     # =========================================================================
     # Time census
     # =========================================================================
