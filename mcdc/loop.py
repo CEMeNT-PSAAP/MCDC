@@ -41,11 +41,16 @@ def loop_main(mcdc):
 
         # iQMC convergence criteria
         elif mcdc['technique']['iQMC']:
+            kernel.calculate_qmc_res(mcdc)
+            mcdc['qmc_itt'] += 1
             # do stuff?
-            if mcdc['itt'] == mcdc['technique']['maxitt']:
+            if mcdc['qmc_itt'] == mcdc['technique']['qmc_maxitt'] or \
+                mcdc['qmc_res'] <= mcdc['technique']['qmc_tol']:
                 simulation_end = True
-            if mcdc['res'] == mcdc['technique']['tol']:
-                simulation_end = True
+            else:
+                # prepare source for next iteration
+                kernel.prepare_qmc_source(mcdc) # set bank source
+
 
         # Time census closeout
         elif mcdc['technique']['time_census'] and \

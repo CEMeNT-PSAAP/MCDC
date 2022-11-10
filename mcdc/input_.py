@@ -723,7 +723,7 @@ def IC_generator(N_neutron=0, N_precursor=0):
     card['IC_N_neutron']   = int(N_neutron)
     card['IC_N_precursor'] = int(N_precursor)
     
-def iQMC(generator='sobol', solver='LGMRES'):
+def iQMC(generator='sobol', fixed_source_solver='LGMRES', eigenmode_solver='davidson'):
     card = mcdc.input_card.technique
     card['iQMC']    = True
 
