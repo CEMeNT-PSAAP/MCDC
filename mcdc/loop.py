@@ -42,10 +42,10 @@ def loop_main(mcdc):
         # iQMC convergence criteria
         elif mcdc['technique']['iQMC']:
             kernel.calculate_qmc_res(mcdc)
-            mcdc['qmc_itt'] += 1
+            mcdc['iqmc_itt'] += 1
             # do stuff?
-            if mcdc['qmc_itt'] == mcdc['technique']['qmc_maxitt'] or \
-                mcdc['qmc_res'] <= mcdc['technique']['qmc_tol']:
+            if mcdc['iqmc_itt'] == mcdc['technique']['iqmc_maxitt'] or \
+                mcdc['iqmc_res'] <= mcdc['technique']['iqmc_tol']:
                 simulation_end = True
             else:
                 # prepare source for next iteration
