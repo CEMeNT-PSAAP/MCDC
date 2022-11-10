@@ -108,8 +108,8 @@ class InputCard:
                           'IC_N_precursor' : 0,
                           
                           'iQMC'           : False, 
-                          'tol'            : 1e-6,
-                          'maxit'          : 25,
+                          'qmc_tol'        : 1e-6,
+                          'qmc_maxitt'     : 25,
                           }
 
 class SurfaceHandle:

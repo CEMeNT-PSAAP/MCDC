@@ -1416,9 +1416,11 @@ def move_to_event(P, mcdc):
     d_time_census = speed*(mcdc['technique']['census_time'][idx] - P['t'])
 
     # Distance to collision
-    d_collision = distance_to_collision(P, mcdc)
     if mcdc['technique']['iQMC']:
         d_collision = INF
+    else:
+        d_collision = distance_to_collision(P, mcdc)
+
 
     # =========================================================================
     # Determine event
@@ -1470,17 +1472,26 @@ def move_to_event(P, mcdc):
     # Move particle
     # =========================================================================
 
+    if mcdc['technique']['iQMC']:
+        material = mcdc['materials'][P['material_ID']]
+        w        = P['w']
+        g        = P['g']
+        SigmaT   = material['total'][g]
+        w_avg, w_final = continuous_weight_reduction(w, distance, SigmaT)
+        P['w'] = w_avg
+        
     # Score tracklength tallies
     if mcdc['tally']['tracklength'] and mcdc['cycle_active']:
         score_tracklength(P, distance, mcdc)
     if mcdc['setting']['mode_eigenvalue']:
-        global_tally(P, distance, mcdc)
+        global_tally(P, distance, mcdc)    
 
     # Move particle
     move_particle(P, distance, mcdc)
     
     if mcdc['technique']['iQMC']:
-        continuous_weight_reduction(P, distance, mcdc)
+        P['w'] = w_final
+    
 
 @njit
 def distance_to_collision(P, mcdc):
@@ -1998,18 +2009,29 @@ def weight_window(P, mcdc):
         if xi > p:
             P['alive'] = False
 
+
 #==============================================================================
-# Continuous Weight Reduction
+# iQMC Kernels
 #==============================================================================
 
 @njit
-def continuous_weight_reduction(P, distance, mcdc):
+def continuous_weight_reduction(w, distance, SigmaT):
     # w_new = w_old*exp(-s*sigt)
-    material = mcdc['materials'][P['material_ID']]
-    w        = P['w']
-    g        = P['g']
-    SigmaT   = material['total'][g]
-    P['w']   = w*np.exp(-distance*SigmaT)
+    w_final  = w*np.exp(-distance*SigmaT)
+    w_avg    = (w-w_final)/(SigmaT*distance)
+    return w_avg, w_final
+
+def prepare_qmc_source(mcdc):
+    # first get avg scalar flux from tally
+    # calculate scattering source
+    # calculate fission source
+    # calculate fixed sources
+    # loop over source particles 
+        # sample direction, 
+        # sample angle, 
+        # set weight based on scattering+fission+fixed sources
+
+# reset tallies function
     
 
 #==============================================================================
