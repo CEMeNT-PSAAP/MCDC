@@ -2011,7 +2011,7 @@ def weight_window(P, mcdc):
 
 
 #==============================================================================
-# iQMC Kernels
+# Quasi Monte Carlo
 #==============================================================================
 
 @njit
@@ -2023,7 +2023,10 @@ def continuous_weight_reduction(w, distance, SigmaT):
 
 def prepare_qmc_source(mcdc):
     # first get avg scalar flux from tally
+    flux_x = mcdc['tally']['flux_x']
     # calculate scattering source
+    for cell in range(flux_x.size):
+        
     # calculate fission source
     # calculate fixed sources
     # loop over source particles 
@@ -2033,6 +2036,7 @@ def prepare_qmc_source(mcdc):
 
 # reset tallies function
     
+# calculate_qmc_res function
 
 #==============================================================================
 # Miscellany
