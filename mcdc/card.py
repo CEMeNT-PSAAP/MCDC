@@ -76,6 +76,7 @@ class InputCard:
                         'rng_mod'              : 2**63,
                         'bank_active_buff'     : 100,
                         'bank_census_buff'     : 1.0,
+                        'N_cycle_buff'         : 0,
                         'k_init'               : 1.0,
                         'output'               : 'output',
                         'progress_bar'         : True,
