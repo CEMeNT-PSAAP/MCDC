@@ -307,6 +307,8 @@ def make_type_technique(card):
     struct += [('IC_N_neutron', int64), ('IC_N_precursor', int64),
                ('IC_tally_n', float64), ('IC_tally_C', float64),
                ('IC_n_eff', float64), ('IC_C_eff', float64),
+               ('IC_Pmax_n', float64), ('IC_Pmax_C', float64),
+               ('IC_resample', bool_),
                ('IC_bank_neutron_local', bank_neutron_local), 
                ('IC_bank_precursor_local', bank_precursor_local),
                ('IC_bank_neutron', bank_neutron), 
@@ -332,7 +334,8 @@ def make_type_global(card):
     N_universe       = len(card.universes)
     N_lattice        = len(card.lattices)
     N_particle       = card.setting['N_particle']
-    N_cycle          = card.setting['N_cycle']
+    N_cycle_buff     = card.setting['N_cycle_buff']
+    N_cycle          = card.setting['N_cycle']*(1+N_cycle_buff)
     bank_active_buff = card.setting['bank_active_buff']
     bank_census_buff = card.setting['bank_census_buff']
     J                = card.materials[0]['J']
@@ -383,7 +386,9 @@ def make_type_global(card):
                         ('mpi_work_start', int64),
                         ('mpi_work_size', int64),
                         ('mpi_work_size_total', int64),
-                        ('runtime_total', float64)])
+                        ('runtime_total', float64),
+                        ('runtime_bank_management', float64)
+                        ])
 
 # ==============================================================================
 # Util

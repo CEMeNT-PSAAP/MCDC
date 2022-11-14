@@ -24,14 +24,14 @@ def loop_main(mcdc):
             kernel.global_tally_closeout_history(mcdc)
             if mcdc['cycle_active']:
                 kernel.tally_closeout_history(mcdc)
-            
+
             # Print progress
             with objmode():
                 print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
             kernel.manage_particle_banks(mcdc)
-
+            
             # Cycle management
             mcdc['i_cycle'] += 1
             if mcdc['i_cycle'] == mcdc['setting']['N_cycle']: 
@@ -93,8 +93,14 @@ def loop_source(mcdc):
         else:
             P = mcdc['bank_source']['particles'][work_idx]
 
-        # Add the source particle into the active bank
-        kernel.add_particle(P, mcdc['bank_active'])
+        # Check if it is beyond
+        census_idx = mcdc['technique']['census_idx']
+        if P['t'] > mcdc['technique']['census_time'][census_idx]:
+            P['t'] += SHIFT
+            kernel.add_particle(P, mcdc['bank_census'])
+        else:
+            # Add the source particle into the active bank
+            kernel.add_particle(P, mcdc['bank_active'])
 
         # =====================================================================
         # Run the source particle and its secondaries
