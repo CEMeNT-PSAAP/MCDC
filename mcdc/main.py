@@ -216,7 +216,8 @@ def prepare():
                         'census_idx',
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
-                        'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff']:
+                        'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff',
+                        'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -281,7 +282,9 @@ def generate_hdf5():
 
         with h5py.File(mcdc['setting']['output']+'.h5', 'w') as f:
             # Runtime
-            f.create_dataset("runtime",data=np.array([mcdc['runtime_total']]))
+            for name in ['total', 'bank_management']:
+                f.create_dataset("runtime_"+name,
+                                 data=np.array([mcdc['runtime_'+name]]))
 
             # Tally
             T = mcdc['tally']
@@ -301,11 +304,12 @@ def generate_hdf5():
                 
             # Eigenvalues
             if mcdc['setting']['mode_eigenvalue']:
-                f.create_dataset("k_cycle",data=mcdc['k_cycle'])
+                N_cycle = mcdc['setting']['N_cycle']
+                f.create_dataset("k_cycle",data=mcdc['k_cycle'][:N_cycle])
                 f.create_dataset("k_mean",data=mcdc['k_avg_running'])
                 f.create_dataset("k_sdev",data=mcdc['k_sdv_running'])
                 if mcdc['setting']['gyration_radius']:
-                    f.create_dataset("gyration_radius",data=mcdc['gyration_radius'])
+                    f.create_dataset("gyration_radius",data=mcdc['gyration_radius'][:N_cycle])
 
             # IC generator
             if mcdc['technique']['IC_generator']:

@@ -621,7 +621,8 @@ def setting(**kw):
     if bank_census_buff is not None:
         card['bank_census_buff'] = int(bank_census_buff)
 
-def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None):
+def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None,
+              N_cycle_buff=0):
     # Update setting card
     card                    = mcdc.input_card.setting
     card['N_inactive']      = N_inactive
@@ -629,6 +630,7 @@ def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None):
     card['N_cycle']         = N_inactive + N_active
     card['mode_eigenvalue'] = True
     card['k_init']          = k_init
+    card['N_cycle_buff']    = N_cycle_buff
 
     # Gyration radius setup
     if gyration_radius is not None:
