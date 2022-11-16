@@ -1542,8 +1542,9 @@ def move_to_event(P, mcdc):
         # Surface and mesh?
         if event == EVENT_SURFACE:
             surface = mcdc['surfaces'][P['surface_ID']]
-            if not surface['reflective']:
-                event = EVENT_SURFACE_N_MESH
+            event = EVENT_SURFACE_N_MESH
+            #if not surface['reflective']:
+            #    event = EVENT_SURFACE_N_MESH
         elif event == EVENT_SURFACE_MOVE:
             event = EVENT_SURFACE_MOVE_N_MESH
         # Lattice and mesh?
@@ -1723,6 +1724,10 @@ def surface_crossing(P, mcdc):
     # Implement BC
     surface = mcdc['surfaces'][P['surface_ID']]
     surface_bc(P, surface, trans)
+
+    # Trigger mesh crossing?
+    if surface['reflective'] and P['event'] == EVENT_SURFACE_N_MESH:
+        mesh_crossing(P, mcdc)
 
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
