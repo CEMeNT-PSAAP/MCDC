@@ -219,7 +219,7 @@ def prepare():
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff',
                         'iqmc_scattering_source', 'iqmc_fission_source', 
-                        'iqmc_mesh', 'lds']:
+                        'iqmc_flux_old', 'iqmc_mesh', 'lds']:
             print(name)
             mcdc['technique'][name] = input_card.technique[name]
 
@@ -249,6 +249,10 @@ def prepare():
             sampler                  = qmc.Sobol(d=6, scramble=False)
             m                        = math.ceil(math.log(N, 2))
             mcdc['technique']['lds'] = sampler.random_base2(m=m)
+        if (input_card.technique['generator'] == 'halton'):
+            N                        = mcdc['setting']['N_particle']
+            sampler                  = qmc.Halton(d=6, scramble=False)
+            mcdc['technique']['lds'] = sampler.random(N)
     
     # =========================================================================
     # Global tally

@@ -298,9 +298,12 @@ def make_type_technique(card):
     struct += [('iqmc_fixed_source', float64, (Nt, Nx, Ny, Nz))]
     
     # Second scalar flux tally for k-eigenvalue problems (?)
+    Ng = card.materials[0]['G']
+    struct += [('iqmc_flux_old', float64, (Ng, Nt, Nx, Ny, Nz))]
     
     # Constants
-    struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64)]
+    struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64), ('iqmc_itt', int64),
+               ('iqmc_res', float64)]
     
     
     # =========================================================================
