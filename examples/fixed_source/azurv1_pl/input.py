@@ -1,9 +1,6 @@
 import numpy as np
-import sys
 
 import mcdc
-
-N_particle = int(sys.argv[2])
 
 # =============================================================================
 # Set model
@@ -25,6 +22,7 @@ mcdc.cell([+s1, -s2], m)
 # =============================================================================
 # Set source
 # =============================================================================
+# Isotropic pulse at x=t=0
 
 mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
 
@@ -38,8 +36,7 @@ mcdc.tally(scores=['flux', 'flux-x', 'flux-t'],
         t=np.linspace(0.0, 20.0, 21))
 
 # Setting
-mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle), 
-            progress_bar=False)
+mcdc.setting(N_particle=1E3)
 
 # Run
 mcdc.run()
