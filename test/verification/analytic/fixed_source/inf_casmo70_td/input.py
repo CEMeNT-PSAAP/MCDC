@@ -46,7 +46,7 @@ source = mcdc.source(energy=energy)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux-t'], t=np.insert(np.logspace(-10,1,100), 0, 0.0))
+mcdc.tally(scores=['flux-t'], t=np.insert(np.logspace(-8,1,100), 0, 0.0))
 
 # Setting
 mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle),

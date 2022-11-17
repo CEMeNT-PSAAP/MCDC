@@ -3,7 +3,6 @@ import h5py
 import sys
 sys.path.append('../../util')
 
-from reference import reference
 from plotter   import plot_convergence
 
 
@@ -31,6 +30,7 @@ for N_particle in N_particle_list:
         phi   = f['tally/flux/mean'][:]
         phi_x = f['tally/flux-x/mean'][:]
         phi_t = f['tally/flux-t/mean'][:]
+        K = len(t) - 1
     for k in range(K):
         phi[k]      /= (dx*dt[k])
         phi_x[k]    /= (dt[k])

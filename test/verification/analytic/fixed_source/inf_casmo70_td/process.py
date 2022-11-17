@@ -12,7 +12,12 @@ N_max = int(sys.argv[2])
 N_particle_list = np.logspace(N_min, N_max, (N_max-N_min)*2+1)
 
 # Reference solution 
-phi_ref, n_ref = reference()
+with h5py.File('output_%i.h5'%int(N_particle_list[0]), 'r') as f:
+    t = f['tally/grid/t'][:]
+    K = len(t)-1
+phi_ref, n_ref = reference(t)
+phi_ref = phi_ref[1:].T
+n_ref   = n_ref[1:]
 
 error   = []
 error_n = []
@@ -21,8 +26,6 @@ for N_particle in N_particle_list:
     # Get results
     with h5py.File('output_%i.h5'%int(N_particle), 'r') as f:
         phi = f['tally/flux-t/mean'][:]
-        t   = f['tally/grid/t'][:]
-        K   = len(t)-1
     phi = phi[:,1:]
     with np.load('CASMO-70.npz') as data:
         speed = data['v']
