@@ -176,41 +176,43 @@ def make_type_tally(card):
               ('crossing_z', bool_), ('crossing_t', bool_)]
 
     # Mesh
-    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card.tally['mesh'])
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.tally['mesh'])
     struct += [('mesh', mesh)]
 
     # Scores and shapes
     Ng = card.materials[0]['G']
     scores_shapes = [
-                     ['flux',        (Ng, Nt, Nx, Ny, Nz)],
-                     ['density',     (Ng, Nt, Nx, Ny, Nz)],
-                     ['fission',     (Ng, Nt, Nx, Ny, Nz)],
-                     ['total',     (Ng, Nt, Nx, Ny, Nz)],
+                     ['flux',        (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['density',     (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['fission',     (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['total',       (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['flux_x',      (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['density_x',   (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['fission_x',   (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['total_x',     (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['flux_y',      (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['density_y',   (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['fission_y',   (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['total_y',     (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['flux_z',      (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['density_z',   (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['fission_z',   (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['total_z',     (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['flux_t',      (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['density_t',   (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['fission_t',   (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['total_t',     (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+
                      ['current',     (Ng, Nt, Nx, Ny, Nz, 3)],
-                     ['eddington',   (Ng, Nt, Nx, Ny, Nz, 6)],
-                     ['flux_x',      (Ng, Nt, Nx+1, Ny, Nz)],
-                     ['density_x',   (Ng, Nt, Nx+1, Ny, Nz)],
-                     ['fission_x',   (Ng, Nt, Nx+1, Ny, Nz)],
-                     ['total_x',   (Ng, Nt, Nx+1, Ny, Nz)],
                      ['current_x',   (Ng, Nt, Nx+1, Ny, Nz, 3)],
-                     ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
-                     ['flux_y',      (Ng, Nt, Nx, Ny+1, Nz)],
-                     ['density_y',   (Ng, Nt, Nx, Ny+1, Nz)],
-                     ['fission_y',   (Ng, Nt, Nx, Ny+1, Nz)],
-                     ['total_y',   (Ng, Nt, Nx, Ny+1, Nz)],
                      ['current_y',   (Ng, Nt, Nx, Ny+1, Nz, 3)],
-                     ['eddington_y', (Ng, Nt, Nx, Ny+1, Nz, 6)],
-                     ['flux_z',      (Ng, Nt, Nx, Ny, Nz+1)],
-                     ['density_z',   (Ng, Nt, Nx, Ny, Nz+1)],
-                     ['fission_z',   (Ng, Nt, Nx, Ny, Nz+1)],
-                     ['total_z',   (Ng, Nt, Nx, Ny, Nz+1)],
                      ['current_z',   (Ng, Nt, Nx, Ny, Nz+1, 3)],
-                     ['eddington_z', (Ng, Nt, Nx, Ny, Nz+1, 6)],
-                     ['flux_t',      (Ng, Nt+1, Nx, Ny, Nz)],
-                     ['density_t',   (Ng, Nt+1, Nx, Ny, Nz)],
-                     ['fission_t',   (Ng, Nt+1, Nx, Ny, Nz)],
-                     ['total_t',   (Ng, Nt+1, Nx, Ny, Nz)],
                      ['current_t',   (Ng, Nt+1, Nx, Ny, Nz, 3)],
+
+                     ['eddington',   (Ng, Nt, Nx, Ny, Nz, 6)],
+                     ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
+                     ['eddington_y', (Ng, Nt, Nx, Ny+1, Nz, 6)],
+                     ['eddington_z', (Ng, Nt, Nx, Ny, Nz+1, 6)],
                      ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)],
                     ]
 
@@ -273,7 +275,7 @@ def make_type_technique(card):
     # =========================================================================
 
     # Mesh
-    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card.technique['ww_mesh'])
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.technique['ww_mesh'])
     struct += [('ww_mesh', mesh)]
     
     # Window
@@ -395,10 +397,13 @@ def make_type_global(card):
 # ==============================================================================
 
 def make_type_mesh(card):
-    Nx = len(card['x']) - 1
-    Ny = len(card['y']) - 1
-    Nz = len(card['z']) - 1
-    Nt = len(card['t']) - 1
+    Nx    = len(card['x']) - 1
+    Ny    = len(card['y']) - 1
+    Nz    = len(card['z']) - 1
+    Nt    = len(card['t']) - 1
+    Nmu   = len(card['mu']) - 1
+    N_azi = len(card['azi']) - 1
     return  np.dtype([('x', float64, (Nx+1,)), ('y', float64, (Ny+1,)),
-                      ('z', float64, (Nz+1,)), ('t', float64, (Nt+1,))]),\
-            Nx, Ny, Nz, Nt
+                      ('z', float64, (Nz+1,)), ('t', float64, (Nt+1,)),
+                      ('mu', float64, (Nmu+1,)), ('azi', float64, (N_azi+1,))]),\
+            Nx, Ny, Nz, Nt, Nmu, N_azi
