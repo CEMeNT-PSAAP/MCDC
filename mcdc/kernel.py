@@ -1055,6 +1055,21 @@ def mesh_get_index(P, mesh):
     return t, x, y, z, outside
 
 @njit
+def mesh_get_angular_index(P, mesh):
+    ux = P['ux']
+    uy = P['uy']
+    uz = P['uz']
+
+    P_mu  = uz
+    P_azi = math.acos(ux/math.sqrt(ux*ux + uy*uy))
+    if uy < 0.0: 
+        P_azi *= -1
+
+    mu  = binary_search(P_mu, mesh['mu'])
+    azi = binary_search(P_azi, mesh['azi'])
+    return mu, azi
+
+@njit
 def mesh_uniform_get_index(P, mesh, trans):
     Px = P['x'] + trans[0]
     Py = P['y'] + trans[1]
@@ -1099,6 +1114,7 @@ def score_tracklength(P, distance, mcdc):
     # Get indices
     g = P['g']
     t, x, y, z, outside = mesh_get_index(P, tally['mesh'])
+    mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Outside grid?
     if outside:
@@ -1107,16 +1123,16 @@ def score_tracklength(P, distance, mcdc):
     # Score
     flux = distance*P['w']
     if tally['flux']:
-        score_flux(g, t, x, y, z, flux, tally['score']['flux'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux'])
     if tally['density']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['density'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density'])
     if tally['fission']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission'])
     if tally['total']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['total'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total'])
     if tally['current']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current'])
     if tally['eddington']:
@@ -1131,20 +1147,21 @@ def score_crossing_x(P, t, x, y, z, mcdc):
     g = P['g']
     if P['ux'] > 0.0:
         x += 1
+    mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']/abs(P['ux'])
     if tally['flux_x']:
-        score_flux(g, t, x, y, z, flux, tally['score']['flux_x'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_x'])
     if tally['density_x']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['density_x'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_x'])
     if tally['fission_x']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_x'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_x'])
     if tally['total_x']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['total_x'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_x'])
     if tally['current_x']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_x'])
     if tally['eddington_x']:
@@ -1159,20 +1176,21 @@ def score_crossing_y(P, t, x, y, z, mcdc):
     g = P['g']
     if P['uy'] > 0.0:
         y += 1
+    mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']/abs(P['uy'])
     if tally['flux_y']:
-        score_flux(g, t, x, y, z, flux, tally['score']['flux_y'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_y'])
     if tally['density_y']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['density_y'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_y'])
     if tally['fission_y']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_y'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_y'])
     if tally['total_y']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['total_y'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_y'])
     if tally['current_y']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_y'])
     if tally['eddington_y']:
@@ -1187,20 +1205,21 @@ def score_crossing_z(P, t, x, y, z, mcdc):
     g = P['g']
     if P['uz'] > 0.0:
         z += 1
+    mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']/abs(P['uz'])
     if tally['flux_z']:
-        score_flux(g, t, x, y, z, flux, tally['score']['flux_z'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_z'])
     if tally['density_z']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['density_z'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_z'])
     if tally['fission_z']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_z'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_z'])
     if tally['total_z']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['total_z'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_z'])
     if tally['current_z']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_z'])
     if tally['eddington_z']:
@@ -1214,28 +1233,29 @@ def score_crossing_t(P, t, x, y, z, mcdc):
     # Get indices
     g  = P['g']
     t += 1
+    mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']*material['speed'][g]
     if tally['flux_t']:
-        score_flux(g, t, x, y, z, flux, tally['score']['flux_t'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_t'])
     if tally['density_t']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['density_t'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_t'])
     if tally['fission_t']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['fission_t'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_t'])
     if tally['total_t']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, flux, tally['score']['total_t'])
+        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_t'])
     if tally['current_t']:
         score_current(g, t, x, y, z, flux, P, tally['score']['current_t'])
     if tally['eddington_t']:
         score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_t'])
 
 @njit
-def score_flux(g, t, x, y, z, flux, score):
-    score['bin'][g, t, x, y, z] += flux
+def score_flux(g, t, x, y, z, mu, azi, flux, score):
+    score['bin'][g, t, x, y, z, mu, azi] += flux
 
 @njit
 def score_current(g, t, x, y, z, flux, P, score):
