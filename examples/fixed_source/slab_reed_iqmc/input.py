@@ -32,11 +32,11 @@ mcdc.cell([+s4, -s5], m4)
 # =============================================================================
 
 # Isotropic source in the absorbing medium
-#mcdc.source(x=[0.0, 2.0], isotropic=True, prob=100.0)
+mcdc.source(x=[0.0, 2.0], isotropic=True, prob=100.0)
 
 # Isotropic source in the first half of the outermost medium, 
 # with 1/100 strength
-#mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
+mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 
 # =============================================================================
 # iQMC Parameters

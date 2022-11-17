@@ -1277,6 +1277,9 @@ def global_tally(P, distance, mcdc):
         for j in range(J):
             total += nu_d[j]/decay[j]
         mcdc['technique']['IC_tally_C'] += flux*total*SigmaF/mcdc['k_eff']
+    
+    #if mcdc['technique']['iQMC']:
+    #    mcdc['tally']['flux'] += score_iqmc_flux(P['w'], distance, ?, SigmaT, ?)
 
 @njit
 def global_tally_closeout_history(mcdc):
@@ -2014,12 +2017,11 @@ def weight_window(P, mcdc):
 # Quasi Monte Carlo
 #==============================================================================
 
-# @njit
-# def continuous_weight_reduction(w, distance, SigmaT):
-#     # w_new = w_old*exp(-s*sigt)
-#     w_final  = w*np.exp(-distance*SigmaT)
-#     w_avg    = (w-w_final)/(SigmaT*distance)
-#     return w_avg, w_final
+@njit
+def continuous_weight_reduction(w, distance, SigmaT):
+    w_final  = w*np.exp(-distance*SigmaT)
+    w_avg    = (w-w_final)/(SigmaT*distance)
+    return w_avg, w_final
 
 #def prepare_qmc_source(mcdc, SigmaS, SigmaF):
     # first get avg scalar flux from tally
@@ -2029,10 +2031,20 @@ def weight_window(P, mcdc):
         # sample direction, 
         # sample angle, 
         # set weight based on scattering+fission+fixed sources
-
-# reset tallies function
+@njit
+def reset_iqmc_flux(flux):
+    return np.zeros_like(flux)
     
-# calculate_qmc_res function
+@njit
+def calculate_qmc_res(flux_new, flux_old):
+    return np.linalg.norm((flux_new - flux_old))
+
+@njit
+def score_iqmc_flux(w, distance, cell_vol, SigmaT, flux):
+    if (SigmaT == 0.0):
+        return (w*distance/cell_vol)
+    return (w*(1-np.exp(-(distance*SigmaT)))/(SigmaT*cell_vol))
+        
 
 #==============================================================================
 # Miscellany

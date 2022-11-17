@@ -41,16 +41,21 @@ def loop_main(mcdc):
 
         # iQMC convergence criteria
         elif mcdc['technique']['iQMC']:
-            kernel.calculate_qmc_res(mcdc)
-            mcdc['iqmc_itt'] += 1
-            # do stuff?
-            if mcdc['iqmc_itt'] == mcdc['technique']['iqmc_maxitt'] or \
-                mcdc['iqmc_res'] <= mcdc['technique']['iqmc_tol']:
+            mcdc['technique']['iqmc_itt'] += 1
+            if mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt'] or \
+                mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']:
                 simulation_end = True
             else:
                 # prepare source for next iteration
                 kernel.prepare_qmc_source(mcdc) # set bank source
-
+            # calculate norm of flux iterations
+            mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['tally']['flux'], 
+                                                        mcdc['technique']['iqmc_flux_old'])
+            # set flux_old = current flux
+            mcdc['technique']['iqmc_flux_old'] = mcdc['tally']['flux'].copy()
+            # reset flux tally to zeros
+            mcdc['tally']['flux'] = kernel.reset_iqmc_flux(mcdc['tally']['flux'])
+            
 
         # Time census closeout
         elif mcdc['technique']['time_census'] and \
