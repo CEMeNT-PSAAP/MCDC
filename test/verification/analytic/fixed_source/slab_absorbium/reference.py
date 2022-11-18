@@ -1,8 +1,11 @@
 import numpy as np
 from scipy.integrate import quad
 
-def reference(x):
-    dx = x[1:]-x[:-1]
+def reference(x, mu):
+    dx  = x[1:]-x[:-1]
+    dmu = mu[1:]-mu[:-1]
+    I = len(x)-1
+    N = len(mu)-1
 
     # Parameters
     SigmaT3 = 1.0
@@ -68,27 +71,56 @@ def reference(x):
     def J3(x):
         return quad(mu_psi3, -1, 1, args=(x), points=[0.0])[0]
 
-    phi      = np.zeros(60)
-    J        = np.zeros(60)
-    phi_x = np.zeros(61)
-    J_x   = np.zeros(61)
+    # Angular flux
+    def psi1_(x,mu0,mu1):
+        return quad(psi1, mu0, mu1, args=(x), points=[0.0])[0]
+    def psi2_(x,mu0,mu1):
+        return quad(psi2, mu0, mu1, args=(x), points=[0.0])[0]
+    def psi3_(x,mu0,mu1):
+        return quad(psi3, mu0, mu1, args=(x), points=[0.0])[0]
 
-    for i in range(20):
-        phi[i]      = quad(phi1,x[i],x[i+1])[0]/dx[i]
-        J[i]        = quad(J1,x[i],x[i+1])[0]/dx[i]
+    phi   = np.zeros(I)
+    psi   = np.zeros((I,N))
+    J     = np.zeros(I)
+    phi_x = np.zeros(I+1)
+    psi_x = np.zeros((I+1,N))
+    J_x   = np.zeros(I+1)
+
+    for i in range(int(I/3)):
+        phi[i]   = quad(phi1,x[i],x[i+1])[0]/dx[i]
+        J[i]     = quad(J1,x[i],x[i+1])[0]/dx[i]
         phi_x[i] = phi1(x[i])
         J_x[i]   = J1(x[i])
-    for i in range(20,40):
-        phi[i]      = quad(phi2,x[i],x[i+1])[0]/dx[i]
-        J[i]        = quad(J2,x[i],x[i+1])[0]/dx[i]
+        for n in range(N):
+            mu0 = mu[n]
+            mu1 = mu[n+1]
+            psi[i,n] = quad(psi1_,x[i],x[i+1],args=(mu0,mu1))[0]/dx[i]/dmu[n]
+            psi_x[i,n] = psi1_(x[i],mu0,mu1)/dmu[n]
+    for i in range(int(I/3),int(2*I/3)):
+        phi[i]   = quad(phi2,x[i],x[i+1])[0]/dx[i]
+        J[i]     = quad(J2,x[i],x[i+1])[0]/dx[i]
         phi_x[i] = phi2(x[i])
         J_x[i]   = J2(x[i])
-    for i in range(40,60):
-        phi[i]      = quad(phi3,x[i],x[i+1])[0]/dx[i]
-        J[i]        = quad(J3,x[i],x[i+1])[0]/dx[i]
+        for n in range(N):
+            mu0 = mu[n]
+            mu1 = mu[n+1]
+            psi[i,n] = quad(psi2_,x[i],x[i+1],args=(mu0,mu1))[0]/dx[i]/dmu[n]
+            psi_x[i,n] = psi2_(x[i],mu0,mu1)/dmu[n]
+    for i in range(int(2*I/3),I):
+        phi[i]   = quad(phi3,x[i],x[i+1])[0]/dx[i]
+        J[i]     = quad(J3,x[i],x[i+1])[0]/dx[i]
         phi_x[i] = phi3(x[i])
         J_x[i]   = J3(x[i])
-    phi_x[60] = phi3(x[60])
-    J_x[60]   = J3(x[60])
+        for n in range(N):
+            mu0 = mu[n]
+            mu1 = mu[n+1]
+            psi[i,n] = quad(psi3_,x[i],x[i+1],args=(mu0,mu1))[0]/dx[i]/dmu[n]
+            psi_x[i,n] = psi3_(x[i],mu0,mu1)/dmu[n]
+    phi_x[I] = phi3(x[I])
+    J_x[I]   = J3(x[I])
+    for n in range(N):
+        mu0 = mu[n]
+        mu1 = mu[n+1]
+        psi_x[I,n] = psi3_(x[I],mu0,mu1)/dmu[n]
 
-    return phi, phi_x, J, J_x
+    return phi, phi_x, J, J_x, psi, psi_x

@@ -57,12 +57,12 @@ class InputCard:
                       'total_t'     : False,
                       'current_t'   : False,
                       'eddington_t' : False,
-                      'mesh'        : {'x'   : False,
-                                       'y'   : False,
-                                       'z'   : False,
-                                       't'   : False,
-                                       'mu'  : False,
-                                       'azi' : False}}
+                      'mesh'        : {'x'   : np.array([-INF, INF]),
+                                       'y'   : np.array([-INF, INF]),
+                                       'z'   : np.array([-INF, INF]),
+                                       't'   : np.array([-INF, INF]),
+                                       'mu'  : np.array([-1.0, 1.0]),
+                                       'azi' : np.array([-PI, PI])}}
 
         self.setting = {'tag'                  : 'Setting',
                         'N_particle'           : 0,

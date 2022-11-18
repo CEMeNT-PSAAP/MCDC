@@ -37,7 +37,7 @@ phi_ref, n_ref = reference(t)
 # Neutron density
 plt.plot(t[1:],n,'-b',label="MC")
 plt.fill_between(t[1:],n-n_sd,n+n_sd,alpha=0.2,color='b')
-plt.plot(t,n_ref,'--r',label="ref.")
+plt.plot(t,n_ref,'--r',label="Ref.")
 plt.xlabel(r'$t$, s')
 plt.ylabel('Density')
 plt.yscale('log')

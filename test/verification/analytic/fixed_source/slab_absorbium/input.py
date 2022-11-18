@@ -8,7 +8,7 @@ N_particle = int(sys.argv[2])
 # =============================================================================
 # Set model
 # =============================================================================
-# Three slab layers with different materials
+# Three slab layers with different purely-absorbing materials
 
 # Set materials
 m1 = mcdc.material(capture=np.array([1.0]))
@@ -29,7 +29,7 @@ mcdc.cell([+s3, -s4], m1)
 # =============================================================================
 # Set source
 # =============================================================================
-# Uniform isotropic source throughout the medium
+# Uniform isotropic source throughout the domain
 
 mcdc.source(x=[0.0, 6.0], isotropic=True)
 
@@ -37,8 +37,10 @@ mcdc.source(x=[0.0, 6.0], isotropic=True)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=['flux', 'current', 'flux-x', 'current-x'],
-        x=np.linspace(0.0, 6.0, 61))
+# Tally: cell-average and cell-edge angular fluxes and currents
+mcdc.tally(scores=['flux', 'current', 'flux-z', 'current-z'], 
+           z=np.linspace(0.0, 6.0, 61),
+           mu=np.linspace(-1.0, 1.0, 32+1))
 
 # Setting
 mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle), 
