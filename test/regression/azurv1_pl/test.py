@@ -18,7 +18,8 @@ def test():
 
     mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
 
-    mcdc.tally(scores=['flux', 'flux-x', 'flux-t'], 
+    scores = ['flux', 'flux-x', 'flux-t']
+    mcdc.tally(scores=scores, 
             x=np.linspace(-20.5, 20.5, 202), 
             t=np.linspace(0.0, 20.0, 21))
 
@@ -32,7 +33,7 @@ def test():
 
     output = h5py.File('output.h5', 'r')
     answer = h5py.File('answer.h5', 'r')
-    for score in ['flux', 'flux-x', 'flux-t']:
+    for score in scores:
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
