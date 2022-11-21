@@ -8,11 +8,13 @@ from reference import reference
 # Load results
 with h5py.File('output.h5', 'r') as f:
     z        = f['tally/grid/z'][:]
-    dz       = z[1:]-z[:-1]
-    z_mid    = 0.5*(z[:-1]+z[1:])
+    dz       = z[1:] - z[:-1]
+    z_mid    = 0.5 * (z[:-1] + z[1:])
+
     mu       = f['tally/grid/mu'][:]
-    dmu      = mu[1:]-mu[:-1]
-    mu_mid   = 0.5*(mu[:-1]+mu[1:])
+    dmu      = mu[1:] - mu[:-1]
+    mu_mid   = 0.5 * (mu[:-1] + mu[1:])
+
     psi      = f['tally/flux/mean'][:]
     psi_sd   = f['tally/flux/sdev'][:]
     psi_z    = f['tally/flux-z/mean'][:]
@@ -22,8 +24,8 @@ with h5py.File('output.h5', 'r') as f:
     J_z      = f['tally/current-z/mean'][:,2]
     J_z_sd   = f['tally/current-z/sdev'][:,2]
 
-I = len(z)-1
-N = len(mu)-1
+I = len(z) - 1
+N = len(mu) - 1
 
 # Scalar flux
 phi      = np.zeros(I)
@@ -47,7 +49,7 @@ for n in range(N):
     psi[:,n]    = psi[:,n]/dz/dmu[n]
     psi_sd[:,n] = psi_sd[:,n]/dz/dmu[n]
 
-# Reference solution 
+# Reference solution
 phi_ref, phi_z_ref, J_ref, J_z_ref, psi_ref, psi_z_ref = reference(z,mu)
 
 # Flux - spatial average
@@ -101,7 +103,7 @@ plt.show()
 # Angular flux - spatial average
 vmin = min(np.min(psi_ref), np.min(psi))
 vmax = max(np.max(psi_ref), np.max(psi))
-fig, ax = plt.subplots(1, 2, figsize=(4,3), sharey=True)
+fig, ax = plt.subplots(1, 2, sharey=True)
 Z,MU = np.meshgrid(z_mid, mu_mid)
 im = ax[0].pcolormesh(MU.T,Z.T,psi_ref,vmin=vmin,vmax=vmax)
 ax[0].set_xlabel(r'Polar cosine, $\mu$')
