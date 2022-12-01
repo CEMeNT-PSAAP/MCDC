@@ -49,10 +49,10 @@ def loop_main(mcdc):
                 # prepare source for next iteration
                 kernel.prepare_qmc_source(mcdc) # set bank source
             # calculate norm of flux iterations
-            mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['tally']['flux'], 
+            mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['technique']['iqmc_flux'], 
                                                         mcdc['technique']['iqmc_flux_old'])
             # set flux_old = current flux
-            mcdc['technique']['iqmc_flux_old'] = mcdc['tally']['flux'].copy()
+            mcdc['technique']['iqmc_flux_old'] = mcdc['technique']['iqmc_flux'].copy()
             # reset flux tally to zeros
             mcdc['tally']['flux'] = kernel.reset_iqmc_flux(mcdc['tally']['flux'])
             

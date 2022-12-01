@@ -724,7 +724,8 @@ def IC_generator(N_neutron=0, N_precursor=0):
     card['IC_N_precursor'] = int(N_precursor)
     
 def iQMC(x=None, y=None, z=None, t=None, fixed_source=None, maxitt=25, tol=1e-6,
-         generator='sobol', fixed_source_solver='LGMRES', eigenmode_solver='davidson'):
+         generator='sobol', fixed_source_solver='LGMRES', eigenmode_solver='davidson',
+         material_idx=None):
     card                = mcdc.input_card.technique
     card['iQMC']        = True
     card['iqmc_tol']    = tol
@@ -747,7 +748,9 @@ def iQMC(x=None, y=None, z=None, t=None, fixed_source=None, maxitt=25, tol=1e-6,
         ax_expand.append(3)
     for ax in ax_expand:
         fixed_source = np.expand_dims(fixed_source, axis=ax)
+        material_idx = np.expand_dims(material_idx, axis=ax)
     card['iqmc_fixed_source'] = fixed_source
+    card['iqmc_material_idx'] = material_idx
 
 # ==============================================================================
 # Util
