@@ -107,17 +107,18 @@ class InputCard:
                           'IC_N_neutron'   : 0,
                           'IC_N_precursor' : 0,
                           
-                          'iQMC'             : False, 
-                          'iqmc_generator'   : 'sobol',
-                          'iqmc_tol'         : 1e-6,
-                          'iqmc_res'         : 1.0,
-                          'iqmc_itt'         : 0,
-                          'iqmc_maxitt'      : 25,
-                          'iqmc_fixed_source': np.ones([1,1,1,1]),
-                          'iqmc_mesh'        : {'x': np.array([-INF, INF]),
-                                               'y' : np.array([-INF, INF]),
-                                               'z' : np.array([-INF, INF]),
-                                               't' : np.array([-INF, INF])}
+                          'iQMC'              : False, 
+                          'iqmc_generator'    : 'sobol',
+                          'iqmc_tol'          : 1e-6,
+                          'iqmc_res'          : 1.0,
+                          'iqmc_itt'          : 0,
+                          'iqmc_maxitt'       : 25,
+                          'iqmc_fixed_source' : np.ones([1,1,1,1]),
+                          'iqmc_material_idx' : np.ones([1,1,1,1]),
+                          'iqmc_mesh'         : {'x': np.array([-INF, INF]),
+                                                'y' : np.array([-INF, INF]),
+                                                'z' : np.array([-INF, INF]),
+                                                't' : np.array([-INF, INF])}
                           }
 
 class SurfaceHandle:

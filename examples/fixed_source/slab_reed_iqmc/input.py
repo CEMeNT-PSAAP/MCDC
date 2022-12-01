@@ -32,17 +32,27 @@ mcdc.cell([+s4, -s5], m4)
 # =============================================================================
 
 # Isotropic source in the absorbing medium
-mcdc.source(x=[0.0, 2.0], isotropic=True, prob=100.0)
+#mcdc.source(x=[0.0, 2.0], isotropic=True, prob=100.0)
 
 # Isotropic source in the first half of the outermost medium, 
 # with 1/100 strength
-mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
+#mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
 
-mcdc.iQMC()
+Nx                  = 81
+fixed_source        = np.zeros(Nx-1)
+fixed_source[:20]   = 100.0
+fixed_source[50:60] = 1.0
+
+material_idx        = np.zeros(Nx-1, dtype=int)
+material_idx[20:30] = 1
+material_idx[30:50] = 2
+material_idx[50:]   = 3
+
+mcdc.iQMC(x=np.linspace(0,8,num=Nx), fixed_source=fixed_source , material_idx=material_idx)
 
 # =============================================================================
 # Set tally, setting, and run mcdc

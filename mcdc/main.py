@@ -245,14 +245,15 @@ def prepare():
         mcdc['technique']['iqmc_mesh']['t'] = input_card.technique['iqmc_mesh']['t']
     
         if (input_card.technique['generator'] == 'sobol'):
-            N                        = mcdc['setting']['N_particle']
-            sampler                  = qmc.Sobol(d=6, scramble=False)
-            m                        = math.ceil(math.log(N, 2))
-            mcdc['technique']['lds'] = sampler.random_base2(m=m)
+            N                               = mcdc['setting']['N_particle']
+            sampler                         = qmc.Sobol(d=6, scramble=False)
+            m                               = math.ceil(math.log(N, 2))
+            mcdc['setting']['N_particle']   = 2**m
+            mcdc['technique']['lds']        = sampler.random_base2(m=m)
         if (input_card.technique['generator'] == 'halton'):
-            N                        = mcdc['setting']['N_particle']
-            sampler                  = qmc.Halton(d=6, scramble=False)
-            mcdc['technique']['lds'] = sampler.random(N)
+            N                               = mcdc['setting']['N_particle']
+            sampler                         = qmc.Halton(d=6, scramble=False)
+            mcdc['technique']['lds']        = sampler.random(N)
     
     # =========================================================================
     # Global tally
