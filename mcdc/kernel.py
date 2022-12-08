@@ -2018,19 +2018,95 @@ def weight_window(P, mcdc):
 
 @njit
 def continuous_weight_reduction(w, distance, SigmaT):
-    w_final  = w*np.exp(-distance*SigmaT)
-    w_avg    = (w-w_final)/(SigmaT*distance)
+    w_final  = w * np.exp(-distance * SigmaT)
+    w_avg    = (w - w_final) / (SigmaT * distance)
     return w_avg, w_final
 
-#def prepare_qmc_source(mcdc, SigmaS, nuSigmaF):
-    # First create particle source
-    # first get avg scalar flux from tally
-    # calculate fission source
-    # calculate fixed sources
-    # Second, loop over source particles 
-        # sample direction, 
-        # sample angle, 
-        # set weight based on scattering+fission+fixed sources
+@njit
+def prepare_qmc_source(mcdc):
+    fixed_source    = mcdc['technique']['iqmc_fixed_source']
+    Q               = np.zeros_like(fixed_source)
+    flux            = mcdc['technique']['iqmc_flux']
+    Nx              = len(mcdc['technique']['iqmc_mesh']['x']) - 1
+    Ny              = len(mcdc['technique']['iqmc_mesh']['y']) - 1
+    Nz              = len(mcdc['technique']['iqmc_mesh']['z']) - 1
+    mesh            = mcdc['technique']['iqmc_mesh']
+    for i in range(Nx):
+        if (mesh['x'][i] == -INF) or (mesh['x'][i+1] == INF):
+            dx = 1
+        else:
+            dx = (mesh['x'][i+1] - mesh['x'][i])
+        for j in range(Ny):
+            if (mesh['y'][j] == -INF) or (mesh['y'][j+1] == INF):
+                dy = 1
+            else:
+                dy = (mesh['y'][j+1] - mesh['y'][j])
+            for k in range(Nz):
+                if (mesh['z'][k] == -INF) or (mesh['z'][k+1] == INF):
+                    dz = 1
+                else:
+                    dz = (mesh['z'][k+1] - mesh['z'][k])
+                dv = dx*dy*dz
+                g   = 0
+                t   = 0
+                flux[g, t, i, j, k] /= dv 
+                mat_idx = mcdc['technique']['iqmc_material_idx'][t, i , j, k]
+                Q[t, i, j, k] =  ( fission_source(flux[g, t, i, j, k], 
+                                                     mat_idx, mcdc) 
+                                    + scattering_source(flux[g, t, i, j, k], 
+                                                        mat_idx, mcdc)
+                                    + fixed_source[t, i, j, k] )
+    
+    for n in range(N):
+        # TODO: Sample phase-space with lds
+        # Create new particle
+        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+
+        # Copy relevant attributes
+        P_new['x'] = P['x']         
+        P_new['y'] = P['y']         
+        P_new['z'] = P['z']         
+        P_new['t'] = 0
+        P_new['g'] = 0
+
+        # Set weight
+        P_new['w'] = weight_new # based on Q above
+
+        P_new['g'] = g_out
+
+        # Sample isotropic direction
+        P_new['ux'], P_new['uy'], P_new['uz'] = \
+                sample_isotropic_direction(mcdc)
+
+        # Bank
+        if mcdc['setting']['mode_eigenvalue']:
+            add_particle(P_new, mcdc['bank_census'])
+        else:
+            add_particle(P_new, mcdc['bank_active'])
+    
+        
+@njit
+def fission_source(phi, mat_idx, mcdc):
+    material = mcdc['materials'][mat_idx]
+    g        = 0
+    chi      = 1
+    nu_p     = material['nu_p'][g]
+    J        = material['J']
+    nu       = nu_p
+    if J>0: 
+        nu_d  = material['nu_d'][g]
+        nu   += sum(nu_d)
+    keff     = mcdc['k_eff']
+    SigmaF   = material['fission'][g]
+    return nu / keff * chi * SigmaF * phi
+
+@njit
+def scattering_source(phi, mat_idx, mcdc):
+    material = mcdc['materials'][mat_idx]
+    g        = 0
+    SigmaS   = material['scatter'][g]
+    return SigmaS * phi
+
 @njit
 def reset_iqmc_flux(flux):
     return np.zeros_like(flux)
