@@ -15,6 +15,9 @@ from mcdc.print_   import print_progress, print_progress_eigenvalue
 def loop_main(mcdc):
     simulation_end = False
     while not simulation_end:
+        if mcdc['technique']['iQMC']:
+            # prepare source for next iteration
+            kernel.prepare_qmc_source(mcdc) # set bank source
         # Loop over source particles
         loop_source(mcdc)
         
@@ -45,9 +48,7 @@ def loop_main(mcdc):
             if mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt'] or \
                 mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']:
                 simulation_end = True
-            else:
-                # prepare source for next iteration
-                kernel.prepare_qmc_source(mcdc) # set bank source
+
             # calculate norm of flux iterations
             mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['technique']['iqmc_flux'], 
                                                         mcdc['technique']['iqmc_flux_old'])

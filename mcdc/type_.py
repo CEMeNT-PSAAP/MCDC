@@ -293,13 +293,14 @@ def make_type_technique(card):
     struct      += [('lds', float64, (N_particle, N_dim))]
     
     # Source
-    struct += [('iqmc_scattering_source', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('iqmc_fission_source', float64, (Nt, Nx, Ny, Nz))]
+    # struct += [('iqmc_scattering_source', float64, (Nt, Nx, Ny, Nz))]
+    # struct += [('iqmc_fission_source', float64, (Nt, Nx, Ny, Nz))]
     struct += [('iqmc_fixed_source', float64, (Nt, Nx, Ny, Nz))]
     struct += [('iqmc_material_idx', int64, (Nt, Nx, Ny, Nz))]
     
     # Second scalar flux tally for k-eigenvalue problems (?)
     Ng = card.materials[0]['G']
+    struct += [('iqmc_flux', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_flux_old', float64, (Ng, Nt, Nx, Ny, Nz))]
     
     # Constants
