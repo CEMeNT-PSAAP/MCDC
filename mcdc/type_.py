@@ -295,6 +295,7 @@ def make_type_technique(card):
     # Source
     # struct += [('iqmc_scattering_source', float64, (Nt, Nx, Ny, Nz))]
     # struct += [('iqmc_fission_source', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_source', float64, (Nt, Nx, Ny, Nz))]
     struct += [('iqmc_fixed_source', float64, (Nt, Nx, Ny, Nz))]
     struct += [('iqmc_material_idx', int64, (Nt, Nx, Ny, Nz))]
     
@@ -377,7 +378,7 @@ def make_type_global(card):
         bank_source = particle_bank(0)
 
     # TODO
-    if card.setting['filed_source']:
+    if card.setting['filed_source'] or card.technique['iQMC']:
         bank_source = particle_bank(N_work)
 
     # GLobal type

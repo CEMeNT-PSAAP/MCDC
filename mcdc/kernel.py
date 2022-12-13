@@ -2020,17 +2020,20 @@ def weight_window(P, mcdc):
 def continuous_weight_reduction(w, distance, SigmaT):
     w_final  = w * np.exp(-distance * SigmaT)
     w_avg    = (w - w_final) / (SigmaT * distance)
+    if np.isnan(w_avg):
+        w_avg = 0.0
     return w_avg, w_final
 
 @njit
 def prepare_qmc_source(mcdc):
+    Q               = mcdc['technique']['iqmc_source']
     fixed_source    = mcdc['technique']['iqmc_fixed_source']
-    Q               = np.zeros_like(fixed_source)
     flux            = mcdc['technique']['iqmc_flux']
-    Nx              = len(mcdc['technique']['iqmc_mesh']['x']) - 1
-    Ny              = len(mcdc['technique']['iqmc_mesh']['y']) - 1
-    Nz              = len(mcdc['technique']['iqmc_mesh']['z']) - 1
     mesh            = mcdc['technique']['iqmc_mesh']
+    Nx              = len(mesh['x']) - 1
+    Ny              = len(mesh['y']) - 1
+    Nz              = len(mesh['z']) - 1
+    # calculate source for every cell in the iqmc_mesh
     for i in range(Nx):
         if (mesh['x'][i] == -INF) or (mesh['x'][i+1] == INF):
             dx = 1
@@ -2056,35 +2059,63 @@ def prepare_qmc_source(mcdc):
                                     + scattering_source(flux[g, t, i, j, k], 
                                                         mat_idx, mcdc)
                                     + fixed_source[t, i, j, k] )
-    
-    for n in range(N):
+                
+@njit
+def prepare_qmc_particles(mcdc):
+    Q               = mcdc['technique']['iqmc_source']
+    mesh            = mcdc['technique']['iqmc_mesh']
+    N_particle      = mcdc['setting']['N_particle']
+    lds             = mcdc['technique']['lds'] # low discrepency sequence
+    Nx              = len(mesh['x']) - 1
+    Ny              = len(mesh['y']) - 1
+    Nz              = len(mesh['z']) - 1
+    # outter mesh boundaries for sampling
+    xa              = mesh['x'][0]
+    xb              = mesh['x'][-1]
+    ya              = mesh['y'][0]
+    yb              = mesh['y'][-1]
+    za              = mesh['z'][0]
+    zb              = mesh['z'][-1]
+    for n in range(N_particle):
         # TODO: Sample phase-space with lds
         # Create new particle
         P_new = np.zeros(1, dtype=type_.particle_record)[0]
-
-        # Copy relevant attributes
-        P_new['x'] = P['x']         
-        P_new['y'] = P['y']         
-        P_new['z'] = P['z']         
-        P_new['t'] = 0
-        P_new['g'] = 0
-
-        # Set weight
-        P_new['w'] = weight_new # based on Q above
-
-        P_new['g'] = g_out
-
+        # assign direction
+        P_new['x'] = sample_qmc_position(xa,xb,lds[n,0])
+        P_new['y'] = sample_qmc_position(ya,yb,lds[n,1])
+        P_new['z'] = sample_qmc_position(za,zb,lds[n,2]) 
+        if (P_new['x'] == 0.0):
+            P_new['x'] += 0.01
+        # assign angle
         # Sample isotropic direction
         P_new['ux'], P_new['uy'], P_new['uz'] = \
-                sample_isotropic_direction(mcdc)
-
-        # Bank
-        if mcdc['setting']['mode_eigenvalue']:
-            add_particle(P_new, mcdc['bank_census'])
+                sample_qmc_isotropic_direction(lds[n,3], lds[n,4])
+        if (P_new['ux'] == 0.0):
+            P_new['ux'] += 0.01
+        # time and group
+        P_new['t'] = 0
+        P_new['g'] = 0
+        # Set weight
+        t,x,y,z,outside = mesh_get_index(P_new, mesh)
+        #calculate dx,dy,dz and then dV
+        if (mesh['x'][x] == -INF) or (mesh['x'][x] == INF):
+            dx = 1
         else:
-            add_particle(P_new, mcdc['bank_active'])
+            dx = (mesh['x'][x+1] - mesh['x'][x])
+        if (mesh['y'][y] == -INF) or (mesh['y'][y] == INF):
+            dy = 1
+        else:
+            dy = (mesh['y'][y+1] - mesh['y'][y])
+        if (mesh['z'][z] == -INF) or (mesh['z'][z] == INF):
+            dz = 1
+        else:
+            dz = (mesh['z'][z+1] - mesh['z'][z])
+        dV = dx*dy*dz
+        P_new['w'] = Q[t,x,y,z] * dV * Nx / N_particle 
+        # add to source bank
+        add_particle(P_new, mcdc['bank_source'])
     
-        
+
 @njit
 def fission_source(phi, mat_idx, mcdc):
     material = mcdc['materials'][mat_idx]
@@ -2108,8 +2139,9 @@ def scattering_source(phi, mat_idx, mcdc):
     return SigmaS * phi
 
 @njit
-def reset_iqmc_flux(flux):
-    return np.zeros_like(flux)
+def zero_iqmc_array(array):
+    array = np.zeros_like(array)
+    # return np.zeros_like(flux)
     
 @njit
 def calculate_qmc_res(flux_new, flux_old):
@@ -2127,9 +2159,29 @@ def score_iqmc_flux(P, distance, mcdc):
 
     # Score
     flux = distance*P['w']
-    score_flux(g, t, x, y, z, flux, mcdc['technique']['iqmc_flux'])
+    mcdc['technique']['iqmc_flux'][g,t,x,y,z] += flux 
+    # score_flux(g, t, x, y, z, flux, mcdc['technique']['iqmc_flux'])
+    # TODO: score effective scattering/fission rate 
+    # effective_scattering = (flux)*(scattering cross section of material)
+    # effective_fission = (flux)*(fission cross section of material)
+    
 
-        
+@njit 
+def sample_qmc_position(a, b, sample):
+    return a + (b-a)*sample
+
+@njit
+def sample_qmc_isotropic_direction(sample1, sample2):
+    # Sample polar cosine and azimuthal angle uniformly
+    mu  = 2.0*sample1 - 1.0
+    azi = 2.0*PI*sample2
+
+    # Convert to Cartesian coordinates
+    c = (1.0 - mu**2)**0.5
+    y = math.cos(azi)*c
+    z = math.sin(azi)*c
+    x = mu
+    return x,y,z
 
 #==============================================================================
 # Miscellany

@@ -218,7 +218,7 @@ def prepare():
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff', 
-                        'iqmc_flux','iqmc_flux_old', 'iqmc_mesh', 'lds']:
+                        'iqmc_flux','iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -248,7 +248,9 @@ def prepare():
             m                               = math.ceil(math.log(N, 2))
             mcdc['setting']['N_particle']   = 2**m
             mcdc['technique']['lds']        = sampler.random_base2(m=m)
+            # lds is shape (2**m, d)
         if (input_card.technique['generator'] == 'halton'):
+            print("halton")
             N                               = mcdc['setting']['N_particle']
             sampler                         = qmc.Halton(d=6, scramble=False)
             mcdc['technique']['lds']        = sampler.random(N)

@@ -16,8 +16,14 @@ def loop_main(mcdc):
     simulation_end = False
     while not simulation_end:
         if mcdc['technique']['iQMC']:
+            # reset particle bank size
+            mcdc['bank_source']['size']=0
             # prepare source for next iteration
+            kernel.zero_iqmc_array(mcdc['technique']['iqmc_source'])
             kernel.prepare_qmc_source(mcdc) # set bank source
+            kernel.prepare_qmc_particles(mcdc) # initialize particles with LDS
+            # reset flux to zeros
+            kernel.zero_iqmc_array(mcdc['technique']['iqmc_flux'])
         # Loop over source particles
         loop_source(mcdc)
         
@@ -52,11 +58,19 @@ def loop_main(mcdc):
             # calculate norm of flux iterations
             mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['technique']['iqmc_flux'], 
                                                         mcdc['technique']['iqmc_flux_old'])
+            
+            print()
+            print()
+            print('*******************************')
+            print()
+            print(mcdc['technique']['iqmc_res'])
+            print()
+            print('*******************************')
+            print()
+            print()
+            
             # set flux_old = current flux
             mcdc['technique']['iqmc_flux_old'] = mcdc['technique']['iqmc_flux'].copy()
-            # reset flux tally to zeros
-            mcdc['tally']['flux'] = kernel.reset_iqmc_flux(mcdc['tally']['flux'])
-            
 
         # Time census closeout
         elif mcdc['technique']['time_census'] and \
