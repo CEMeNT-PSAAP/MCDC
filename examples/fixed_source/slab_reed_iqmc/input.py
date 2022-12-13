@@ -59,10 +59,10 @@ mcdc.iQMC(x=np.linspace(0,8,num=Nx), fixed_source=fixed_source , material_idx=ma
 # =============================================================================
 
 mcdc.tally(scores=['flux', 'flux-x'], 
-            x=np.linspace(0.0, 8.0, 41))
+            x=np.linspace(0.0, 8.0, Nx))
 
 # Setting
-mcdc.setting(N_particle=2**12)
+mcdc.setting(N_particle=1E2)
 
 # Run
 mcdc.run()
