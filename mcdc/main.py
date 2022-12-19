@@ -218,7 +218,7 @@ def prepare():
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff', 
-                        'iqmc_flux','iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds']:
+                        'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -242,6 +242,9 @@ def prepare():
         mcdc['technique']['iqmc_mesh']['z'] = input_card.technique['iqmc_mesh']['z']
         mcdc['technique']['iqmc_mesh']['t'] = input_card.technique['iqmc_mesh']['t']
     
+        # TODO: make RQMC/scramble an mcdc setting
+        # TODO: make a function to determine the number of dimensions for LDS
+        # TODO: input LDS seed from mcdc object
         if (input_card.technique['generator'] == 'sobol'):
             N                               = mcdc['setting']['N_particle']
             sampler                         = qmc.Sobol(d=6, scramble=False)
@@ -250,10 +253,15 @@ def prepare():
             mcdc['technique']['lds']        = sampler.random_base2(m=m)
             # lds is shape (2**m, d)
         if (input_card.technique['generator'] == 'halton'):
-            print("halton")
             N                               = mcdc['setting']['N_particle']
-            sampler                         = qmc.Halton(d=6, scramble=False)
+            sampler                         = qmc.Halton(d=6, scramble=False, seed=1234)
+            sampler.fast_forward(1)
             mcdc['technique']['lds']        = sampler.random(N)
+        if (input_card.technique['generator'] == 'random'):
+            N                               = mcdc['setting']['N_particle']
+            sampler                         = qmc.Halton(d=6, scramble=False, seed=1234)
+            sampler.fast_forward(1)
+            mcdc['technique']['lds']        = np.random.random((N, 6))
     
     # =========================================================================
     # Global tally
@@ -338,3 +346,20 @@ def generate_hdf5():
                 Np = mcdc['technique']['IC_bank_precursor']['size']
                 f.create_dataset("IC/neutron",data=mcdc['technique']['IC_bank_neutron']['content'][:Nn])
                 f.create_dataset("IC/precursor",data=mcdc['technique']['IC_bank_precursor']['content'][:Np])
+            
+            # iQMC 
+            if mcdc['technique']['iQMC']:
+                # TODO: dump multigroup and time dependent data
+                T = mcdc['technique']
+                f.create_dataset("iqmc/grid/x", data=T['iqmc_mesh']['x'])
+                f.create_dataset("iqmc/grid/y", data=T['iqmc_mesh']['y'])
+                f.create_dataset("iqmc/grid/z", data=T['iqmc_mesh']['z'])
+                
+                f.create_dataset("iqmc/flux/x", data=T['iqmc_flux'][0,0,:,0,0])
+                f.create_dataset("iqmc/flux/y", data=T['iqmc_flux'][0,0,0,:,0])
+                f.create_dataset("iqmc/flux/z", data=T['iqmc_flux'][0,0,0,0,:])
+                
+                
+                
+            
+            

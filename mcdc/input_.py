@@ -723,7 +723,7 @@ def IC_generator(N_neutron=0, N_precursor=0):
     card['IC_N_neutron']   = int(N_neutron)
     card['IC_N_precursor'] = int(N_precursor)
     
-def iQMC(x=None, y=None, z=None, t=None, fixed_source=None, maxitt=25, tol=1e-6,
+def iQMC(x=None, y=None, z=None, t=None, fixed_source=None, phi0=None, maxitt=25, tol=1e-6,
          generator='halton', fixed_source_solver='LGMRES', eigenmode_solver='davidson',
          material_idx=None):
     card                = mcdc.input_card.technique
@@ -749,8 +749,11 @@ def iQMC(x=None, y=None, z=None, t=None, fixed_source=None, maxitt=25, tol=1e-6,
     for ax in ax_expand:
         fixed_source = np.expand_dims(fixed_source, axis=ax)
         material_idx = np.expand_dims(material_idx, axis=ax)
+        phi0         = np.expand_dims(phi0, axis=ax)
+        
     card['iqmc_fixed_source'] = fixed_source
     card['iqmc_material_idx'] = material_idx
+    card['iqmc_flux'] = phi0
 
 # ==============================================================================
 # Util
