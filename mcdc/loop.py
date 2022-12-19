@@ -7,6 +7,8 @@ import mcdc.kernel as kernel
 from mcdc.constant import *
 from mcdc.print_   import print_progress, print_progress_eigenvalue
 
+import matplotlib.pyplot as plt
+
 # =========================================================================
 # Main loop
 # =========================================================================
@@ -19,11 +21,11 @@ def loop_main(mcdc):
             # reset particle bank size
             mcdc['bank_source']['size']=0
             # prepare source for next iteration
-            kernel.zero_iqmc_array(mcdc['technique']['iqmc_source'])
+            mcdc['technique']['iqmc_source'] = np.zeros_like(mcdc['technique']['iqmc_source'])
             kernel.prepare_qmc_source(mcdc) # set bank source
+            mcdc['technique']['iqmc_flux'] = np.zeros_like(mcdc['technique']['iqmc_flux'])
             kernel.prepare_qmc_particles(mcdc) # initialize particles with LDS
-            # reset flux to zeros
-            kernel.zero_iqmc_array(mcdc['technique']['iqmc_flux'])
+            
         # Loop over source particles
         loop_source(mcdc)
         
@@ -51,8 +53,8 @@ def loop_main(mcdc):
         # iQMC convergence criteria
         elif mcdc['technique']['iQMC']:
             mcdc['technique']['iqmc_itt'] += 1
-            if mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt'] or \
-                mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']:
+            if (mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt']) or \
+                (mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
                 simulation_end = True
 
             # calculate norm of flux iterations
@@ -62,9 +64,8 @@ def loop_main(mcdc):
             print()
             print()
             print('*******************************')
-            print()
-            print(mcdc['technique']['iqmc_res'])
-            print()
+            print('Iteration ', mcdc['technique']['iqmc_itt'])
+            print('Residual ', mcdc['technique']['iqmc_res'])
             print('*******************************')
             print()
             print()
@@ -125,10 +126,9 @@ def loop_source(mcdc):
         # Get from source bank
         else:
             P = mcdc['bank_source']['particles'][work_idx]
-
         # Add the source particle into the active bank
         kernel.add_particle(P, mcdc['bank_active'])
-
+        
         # =====================================================================
         # Run the source particle and its secondaries
         # =====================================================================
