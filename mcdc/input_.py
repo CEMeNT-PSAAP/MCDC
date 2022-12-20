@@ -725,12 +725,15 @@ def IC_generator(N_neutron=0, N_precursor=0):
     
 def iQMC(x=None, y=None, z=None, t=None, fixed_source=None, phi0=None, maxitt=25, tol=1e-6,
          generator='halton', fixed_source_solver='LGMRES', eigenmode_solver='davidson',
-         material_idx=None):
-    card                = mcdc.input_card.technique
-    card['iQMC']        = True
-    card['iqmc_tol']    = tol
-    card['iqmc_maxitt'] = maxitt
-    card['generator']   = generator
+         material_idx=None, N_dim=6, scramble=False, seed=12345):
+    card                    = mcdc.input_card.technique
+    card['iQMC']            = True
+    card['iqmc_tol']        = tol
+    card['iqmc_maxitt']     = maxitt
+    card['generator']       = generator
+    card['iqmc_N_dim']      = N_dim
+    card['iqmc_scramble']   = scramble
+    card['iqmc_seed']       = seed
     
     # Set mesh
     if x is not None: card['iqmc_mesh']['x'] = x

@@ -289,18 +289,17 @@ def make_type_technique(card):
     
     # Low-discprenecy sequence
     N_particle  = card.setting['N_particle']
-    N_dim       = 6 # x, y, z, mu, phi, group
+    Ng          = card.materials[0]['G']
+    N_dim       = 6 # group, x, y, z, mu, phi 
+    # TODO: make N_dim an input setting
     struct      += [('lds', float64, (N_particle, N_dim))]
     
     # Source
-    # struct += [('iqmc_scattering_source', float64, (Nt, Nx, Ny, Nz))]
-    # struct += [('iqmc_fission_source', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('iqmc_source', float64, (Nt, Nx, Ny, Nz))]
-    struct += [('iqmc_fixed_source', float64, (Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_source', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_fixed_source', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_material_idx', int64, (Nt, Nx, Ny, Nz))]
     
     # Second scalar flux tally for k-eigenvalue problems (?)
-    Ng = card.materials[0]['G']
     struct += [('iqmc_flux', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_flux_old', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_effective_scattering', float64, (Ng, Nt, Nx, Ny, Nz))]
@@ -308,7 +307,8 @@ def make_type_technique(card):
     
     # Constants
     struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64), ('iqmc_itt', int64),
-               ('iqmc_res', float64)]
+               ('iqmc_res', float64), ('iqmc_N_dim', int64), 
+               ('iqmc_scramble', bool_), ('iqmc_seed', int64)]
     
     
     # =========================================================================

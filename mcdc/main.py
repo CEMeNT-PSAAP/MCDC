@@ -243,26 +243,30 @@ def prepare():
         mcdc['technique']['iqmc_mesh']['z'] = input_card.technique['iqmc_mesh']['z']
         mcdc['technique']['iqmc_mesh']['t'] = input_card.technique['iqmc_mesh']['t']
     
-        # TODO: make RQMC/scramble an mcdc setting
-        # TODO: make a function to determine the number of dimensions for LDS
-        # TODO: input LDS seed from mcdc object
         if (input_card.technique['generator'] == 'sobol'):
+            scramble                        = mcdc['technique']['iqmc_scramble']
+            N_dim                           = mcdc['technique']['iqmc_N_dim']
             N                               = mcdc['setting']['N_particle']
-            sampler                         = qmc.Sobol(d=6, scramble=False)
+            sampler                         = qmc.Sobol(d=N_dim, scramble=scramble)
             m                               = math.ceil(math.log(N, 2))
             mcdc['setting']['N_particle']   = 2**m
             mcdc['technique']['lds']        = sampler.random_base2(m=m)
             # lds is shape (2**m, d)
         if (input_card.technique['generator'] == 'halton'):
+            scramble                        = mcdc['technique']['iqmc_scramble']
+            N_dim                           = mcdc['technique']['iqmc_N_dim']
+            seed                            = mcdc['technique']['iqmc_seed']
             N                               = mcdc['setting']['N_particle']
-            sampler                         = qmc.Halton(d=6, scramble=False, seed=1234)
+            sampler                         = qmc.Halton(d=N_dim, 
+                                            scramble=scramble, seed=seed)
             sampler.fast_forward(1)
             mcdc['technique']['lds']        = sampler.random(N)
         if (input_card.technique['generator'] == 'random'):
+            seed                            = mcdc['technique']['iqmc_seed']
+            N_dim                           = mcdc['technique']['iqmc_N_dim']
             N                               = mcdc['setting']['N_particle']
-            sampler                         = qmc.Halton(d=6, scramble=False, seed=1234)
-            sampler.fast_forward(1)
-            mcdc['technique']['lds']        = np.random.random((N, 6))
+            np.random.seed(seed)
+            mcdc['technique']['lds']        = np.random.random((N, N_dim))
     
     # =========================================================================
     # Global tally

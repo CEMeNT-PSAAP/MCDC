@@ -1408,7 +1408,6 @@ def move_to_event(P, mcdc):
     if mcdc['cycle_active']:
         d_mesh = distance_to_mesh(P, mcdc['tally']['mesh'], mcdc)
         
-    # TODO: check for distance to iqmc mesh and compare to d_mesh
     if (mcdc['technique']['iQMC']):
          d_iqmc_mesh = distance_to_mesh(P, mcdc['technique']['iqmc_mesh'], mcdc)
          if (d_iqmc_mesh < d_mesh):
@@ -2025,7 +2024,7 @@ def weight_window(P, mcdc):
 
 @njit
 def continuous_weight_reduction(w, distance, SigmaT):
-    return ( w * np.exp(-distance * SigmaT) )
+    return w * np.exp(-distance * SigmaT) 
 
 @njit
 def prepare_qmc_source(mcdc):
@@ -2043,15 +2042,15 @@ def prepare_qmc_source(mcdc):
                 t       = 0
                 mat_idx = mcdc['technique']['iqmc_material_idx'][t,i,j,k]
                 G       =  mcdc['materials'][mat_idx]['G']
-                for g in range(G):
-                    dv  = iqmc_cell_volume(i,j,k,mesh)
-                    mat_idx = mcdc['technique']['iqmc_material_idx'][t, i , j, k]
-                    Q[t, i, j, k] =  ( fission_source(flux[g, t, i, j, k], 
-                                                         mat_idx, mcdc) 
-                                        + scattering_source(flux[g, t, i, j, k], 
-                                                            mat_idx, mcdc)
-                                        + fixed_source[t, i, j, k] )
-                    # TODO: make fixed source [g,t,x,y,z]
+
+                dv  = iqmc_cell_volume(i,j,k,mesh)
+                mat_idx = mcdc['technique']['iqmc_material_idx'][t, i , j, k]
+                # we can vectorize the multigroup calculation here
+                Q[:, t, i, j, k] =  ( fission_source(flux[:, t, i, j, k], 
+                                                     mat_idx, mcdc) 
+                                    + scattering_source(flux[:, t, i, j, k], 
+                                                        mat_idx, mcdc)
+                                    + fixed_source[:, t, i, j, k] )
                 
 @njit
 def prepare_qmc_particles(mcdc):
@@ -2087,11 +2086,12 @@ def prepare_qmc_particles(mcdc):
         t,x,y,z,outside = mesh_get_index(P_new, mesh)
         mat_idx         = mcdc['technique']['iqmc_material_idx'][t,x,y,z]
         G               =  mcdc['materials'][mat_idx]['G']
-        P_new['g']      = sample_qmc_group(lds[n,5], G)
+        g               = sample_qmc_group(lds[n,5], G)
+        P_new['g']      = g
         #calculate dx,dy,dz and then dV
         dV = iqmc_cell_volume(x,y,z,mesh)
         # Set weight
-        P_new['w'] = Q[t,x,y,z] * dV * Nt / N_particle 
+        P_new['w'] = Q[g,t,x,y,z] * dV * Nt / N_particle 
         # add to source bank
         add_particle(P_new, mcdc['bank_source'])
 
@@ -2146,7 +2146,6 @@ def score_iqmc_flux(P, distance, mcdc):
     mcdc['technique']['iqmc_flux'][idx]                 += flux
     mcdc['technique']['iqmc_effective_scattering'][idx] += flux*SigmaS 
     mcdc['technique']['iqmc_effective_fission'][idx]    += flux*SigmaF 
-    # TODO: score effective scattering/fission rate 
     # effective_scattering = (flux)*(scattering cross section of material)
     # effective_fission = (flux)*(fission cross section of material)
 
@@ -2182,7 +2181,7 @@ def sample_qmc_isotropic_direction(sample1, sample2):
 
 @njit
 def sample_qmc_group(sample, G):
-    return np.floor(sample*G)
+    return int(np.floor(sample*G))
 
 #==============================================================================
 # Miscellany
