@@ -303,6 +303,8 @@ def make_type_technique(card):
     Ng = card.materials[0]['G']
     struct += [('iqmc_flux', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_flux_old', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_effective_scattering', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_effective_fission', float64, (Ng, Nt, Nx, Ny, Nz))]
     
     # Constants
     struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64), ('iqmc_itt', int64),

@@ -2025,11 +2025,7 @@ def weight_window(P, mcdc):
 
 @njit
 def continuous_weight_reduction(w, distance, SigmaT):
-    w_final  = w * np.exp(-distance * SigmaT)
-    # w_avg    = (w - w_final) / (SigmaT * distance)
-    # if np.isnan(w_avg):
-    #     w_avg = 0.0
-    return w_final
+    return ( w * np.exp(-distance * SigmaT) )
 
 @njit
 def prepare_qmc_source(mcdc):
@@ -2040,31 +2036,22 @@ def prepare_qmc_source(mcdc):
     Nx              = len(mesh['x']) - 1
     Ny              = len(mesh['y']) - 1
     Nz              = len(mesh['z']) - 1
-    # calculate source for every cell in the iqmc_mesh
+    # calculate source for every cell and group in the iqmc_mesh
     for i in range(Nx):
-        if (mesh['x'][i] == -INF) or (mesh['x'][i+1] == INF):
-            dx = 1
-        else:
-            dx = (mesh['x'][i+1] - mesh['x'][i])
         for j in range(Ny):
-            if (mesh['y'][j] == -INF) or (mesh['y'][j+1] == INF):
-                dy = 1
-            else:
-                dy = (mesh['y'][j+1] - mesh['y'][j])
             for k in range(Nz):
-                if (mesh['z'][k] == -INF) or (mesh['z'][k+1] == INF):
-                    dz = 1
-                else:
-                    dz = (mesh['z'][k+1] - mesh['z'][k])
-                dv = dx*dy*dz
-                g   = 0
-                t   = 0
-                mat_idx = mcdc['technique']['iqmc_material_idx'][t, i , j, k]
-                Q[t, i, j, k] =  ( fission_source(flux[g, t, i, j, k], 
-                                                     mat_idx, mcdc) 
-                                    + scattering_source(flux[g, t, i, j, k], 
-                                                        mat_idx, mcdc)
-                                    + fixed_source[t, i, j, k] )
+                t       = 0
+                mat_idx = mcdc['technique']['iqmc_material_idx'][t,i,j,k]
+                G       =  mcdc['materials'][mat_idx]['G']
+                for g in range(G):
+                    dv  = iqmc_cell_volume(i,j,k,mesh)
+                    mat_idx = mcdc['technique']['iqmc_material_idx'][t, i , j, k]
+                    Q[t, i, j, k] =  ( fission_source(flux[g, t, i, j, k], 
+                                                         mat_idx, mcdc) 
+                                        + scattering_source(flux[g, t, i, j, k], 
+                                                            mat_idx, mcdc)
+                                        + fixed_source[t, i, j, k] )
+                    # TODO: make fixed source [g,t,x,y,z]
                 
 @njit
 def prepare_qmc_particles(mcdc):
@@ -2096,28 +2083,17 @@ def prepare_qmc_particles(mcdc):
         if (P_new['ux'] == 0.0):
             P_new['ux'] += 0.01
         # time and group
-        P_new['t'] = 0
-        P_new['g'] = 0
-        # Set weight
+        P_new['t']      = 0
         t,x,y,z,outside = mesh_get_index(P_new, mesh)
+        mat_idx         = mcdc['technique']['iqmc_material_idx'][t,x,y,z]
+        G               =  mcdc['materials'][mat_idx]['G']
+        P_new['g']      = sample_qmc_group(lds[n,5], G)
         #calculate dx,dy,dz and then dV
-        if (mesh['x'][x] == -INF) or (mesh['x'][x] == INF):
-            dx = 1
-        else:
-            dx = (mesh['x'][x+1] - mesh['x'][x])
-        if (mesh['y'][y] == -INF) or (mesh['y'][y] == INF):
-            dy = 1
-        else:
-            dy = (mesh['y'][y+1] - mesh['y'][y])
-        if (mesh['z'][z] == -INF) or (mesh['z'][z] == INF):
-            dz = 1
-        else:
-            dz = (mesh['z'][z+1] - mesh['z'][z])
-        dV = dx*dy*dz
+        dV = iqmc_cell_volume(x,y,z,mesh)
+        # Set weight
         P_new['w'] = Q[t,x,y,z] * dV * Nt / N_particle 
         # add to source bank
         add_particle(P_new, mcdc['bank_source'])
-    
 
 @njit
 def fission_source(phi, mat_idx, mcdc):
@@ -2154,35 +2130,39 @@ def score_iqmc_flux(P, distance, mcdc):
     w                   = P['w']
     g                   = P['g']
     SigmaT              = material['total'][g]
+    SigmaS              = material['scatter'][g]
+    SigmaF              = material['fission'][g]
     t, x, y, z, outside = mesh_get_index(P, mesh)
-
     # Outside grid?
     if outside:
         return
-    if (mesh['x'][x] == -INF) or (mesh['x'][x] == INF):
-        dx = 1
-    else:
-        dx = (mesh['x'][x+1] - mesh['x'][x])
-    if (mesh['y'][y] == -INF) or (mesh['y'][y] == INF):
-        dy = 1
-    else:
-        dy = (mesh['y'][y+1] - mesh['y'][y])
-    if (mesh['z'][z] == -INF) or (mesh['z'][z] == INF):
-        dz = 1
-    else:
-        dz = (mesh['z'][z+1] - mesh['z'][z])
-    dV = dx*dy*dz
+    dV = iqmc_cell_volume(x,y,z,mesh)
     # Score
     if (SigmaT > 0.0):
         flux = P['w']*(1-np.exp(-(distance*SigmaT)))/(SigmaT*dV)
     else:
         flux = distance*P['w']/dV
-    mcdc['technique']['iqmc_flux'][g,t,x,y,z] += flux 
+    idx = (g,t,x,y,z)
+    mcdc['technique']['iqmc_flux'][idx]                 += flux
+    mcdc['technique']['iqmc_effective_scattering'][idx] += flux*SigmaS 
+    mcdc['technique']['iqmc_effective_fission'][idx]    += flux*SigmaF 
     # TODO: score effective scattering/fission rate 
     # effective_scattering = (flux)*(scattering cross section of material)
     # effective_fission = (flux)*(fission cross section of material)
-    
 
+
+@njit
+def iqmc_cell_volume(x,y,z,mesh):
+    dx = dy = dz = 1
+    if (mesh['x'][x] != -INF) and (mesh['x'][x] != INF):
+        dx = (mesh['x'][x+1] - mesh['x'][x])
+    if (mesh['y'][y] != -INF) and (mesh['y'][y] != INF):
+        dy = (mesh['y'][y+1] - mesh['y'][y])
+    if (mesh['z'][z] != -INF) and (mesh['z'][z] != INF):
+        dz = (mesh['z'][z+1] - mesh['z'][z])
+    dV = dx*dy*dz
+    return dV
+    
 @njit 
 def sample_qmc_position(a, b, sample):
     return a + (b-a)*sample
@@ -2200,7 +2180,9 @@ def sample_qmc_isotropic_direction(sample1, sample2):
     x = mu
     return x,y,z
 
-# TODO: def sample_qmc_group()
+@njit
+def sample_qmc_group(sample, G):
+    return np.floor(sample*G)
 
 #==============================================================================
 # Miscellany

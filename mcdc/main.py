@@ -218,7 +218,8 @@ def prepare():
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff', 
-                        'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds']:
+                        'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds',
+                        'iqmc_effective_scattering', 'iqmc_effective_fission']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
