@@ -2024,10 +2024,45 @@ def weight_window(P, mcdc):
 
 @njit
 def continuous_weight_reduction(w, distance, SigmaT):
+    """
+    Continuous weight reduction technique based on particle track-length, for 
+    use with iQMC.
+    
+    Parameters
+    ----------
+    w : float64
+        particle weight
+    distance : float64
+        track length
+    SigmaT : float64
+        total cross section
+
+    Returns
+    -------
+    float64
+        New particle weight
+    """
     return w * np.exp(-distance * SigmaT) 
 
 @njit
 def prepare_qmc_source(mcdc):
+    """
+    
+    Iterates trhough all spatial cells to calculate the iQMC source. The source
+    is a combination of the user input Fixed-Source plus the calculated 
+    Scattering-Source and Fission-Sources. Resutls are stored in 
+    mcdc['technique']['iqmc_source'], a matrix of size [G,Nt,Nx,Ny,Nz].
+    
+    Parameters
+    ----------
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     Q               = mcdc['technique']['iqmc_source']
     fixed_source    = mcdc['technique']['iqmc_fixed_source']
     flux            = mcdc['technique']['iqmc_flux']
@@ -2054,6 +2089,20 @@ def prepare_qmc_source(mcdc):
                 
 @njit
 def prepare_qmc_particles(mcdc):
+    """
+    Create N_particles assigning the position, direction, and group from the 
+    QMC Low-Discrepency Sequence. Particles are added to the bank_source.
+
+    Parameters
+    ----------
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     Q               = mcdc['technique']['iqmc_source']
     mesh            = mcdc['technique']['iqmc_mesh']
     N_particle      = mcdc['setting']['N_particle']
@@ -2061,8 +2110,8 @@ def prepare_qmc_particles(mcdc):
     Nx              = len(mesh['x']) - 1
     Ny              = len(mesh['y']) - 1
     Nz              = len(mesh['z']) - 1
-    Nt              = Nx * Ny * Nz
-    # outter mesh boundaries for sampling
+    Nt              = Nx * Ny * Nz # total number of spatial cells
+    # outter mesh boundaries for sampling position
     xa              = mesh['x'][0]
     xb              = mesh['x'][-1]
     ya              = mesh['y'][0]
@@ -2074,11 +2123,11 @@ def prepare_qmc_particles(mcdc):
         P_new = np.zeros(1, dtype=type_.particle_record)[0]
         # assign direction
         P_new['x'] = sample_qmc_position(xa,xb,lds[n,0])
-        P_new['y'] = sample_qmc_position(ya,yb,lds[n,3])
-        P_new['z'] = sample_qmc_position(za,zb,lds[n,2]) 
+        P_new['y'] = sample_qmc_position(ya,yb,lds[n,4])
+        P_new['z'] = sample_qmc_position(za,zb,lds[n,3]) 
         # Sample isotropic direction
         P_new['ux'], P_new['uy'], P_new['uz'] = \
-                sample_qmc_isotropic_direction(lds[n,1], lds[n,4])
+                sample_qmc_isotropic_direction(lds[n,1], lds[n,5])
         if (P_new['ux'] == 0.0):
             P_new['ux'] += 0.01
         # time and group
@@ -2086,7 +2135,7 @@ def prepare_qmc_particles(mcdc):
         t,x,y,z,outside = mesh_get_index(P_new, mesh)
         mat_idx         = mcdc['technique']['iqmc_material_idx'][t,x,y,z]
         G               =  mcdc['materials'][mat_idx]['G']
-        g               = sample_qmc_group(lds[n,5], G)
+        g               = sample_qmc_group(lds[n,2], G)
         P_new['g']      = g
         #calculate dx,dy,dz and then dV
         dV = iqmc_cell_volume(x,y,z,mesh)
@@ -2097,6 +2146,24 @@ def prepare_qmc_particles(mcdc):
 
 @njit
 def fission_source(phi, mat_idx, mcdc):
+    """
+    Calculate the fission source for use with iQMC.
+
+    Parameters
+    ----------
+    phi : float64
+        scalar flux in the spatial cell
+    mat_idx : 
+        material index
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    float64
+        fission source
+
+    """
     material = mcdc['materials'][mat_idx]
     g        = 0
     chi      = 1
@@ -2112,6 +2179,24 @@ def fission_source(phi, mat_idx, mcdc):
 
 @njit
 def scattering_source(phi, mat_idx, mcdc):
+    """
+    Calculate the scattering source for use with iQMC.
+
+    Parameters
+    ----------
+    phi : float64
+        scalar flux in the spatial cell
+    mat_idx : 
+        material index
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    float64
+        scattering source
+
+    """
     material = mcdc['materials'][mat_idx]
     g        = 0
     SigmaS   = material['scatter'][g]
@@ -2119,10 +2204,44 @@ def scattering_source(phi, mat_idx, mcdc):
     
 @njit
 def calculate_qmc_res(flux_new, flux_old):
+    """
+    
+    Calculate residual between scalar flux iterations.
+
+    Parameters
+    ----------
+    flux_new : TYPE
+        Current scalar flux iteration.
+    flux_old : TYPE
+        previous scalar flux iteration.
+
+    Returns
+    -------
+    float64
+        L2 Norm of arrays.
+
+    """
     return np.linalg.norm((flux_new - flux_old))
 
 @njit
 def score_iqmc_flux(P, distance, mcdc):
+    """
+    
+    Tally the scalar flux and effective fission/scattering rates.
+
+    Parameters
+    ----------
+    P : particle
+    distance : float64
+        tracklength.
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     # Get indices
     g                   = P['g']
     mesh                = mcdc['technique']['iqmc_mesh']
@@ -2146,12 +2265,30 @@ def score_iqmc_flux(P, distance, mcdc):
     mcdc['technique']['iqmc_flux'][idx]                 += flux
     mcdc['technique']['iqmc_effective_scattering'][idx] += flux*SigmaS 
     mcdc['technique']['iqmc_effective_fission'][idx]    += flux*SigmaF 
-    # effective_scattering = (flux)*(scattering cross section of material)
-    # effective_fission = (flux)*(fission cross section of material)
 
 
 @njit
 def iqmc_cell_volume(x,y,z,mesh):
+    """
+    Calculate the volume of the current spatial cell.
+
+    Parameters
+    ----------
+    x : int64
+        Current x-position index.
+    y : int64
+        Current y-position index.
+    z : int64
+        Current z-position index.
+    mesh : TYPE
+        iqmc mesh.
+
+    Returns
+    -------
+    dV : TYPE
+        cell volume.
+
+    """
     dx = dy = dz = 1
     if (mesh['x'][x] != -INF) and (mesh['x'][x] != INF):
         dx = (mesh['x'][x+1] - mesh['x'][x])
@@ -2168,19 +2305,56 @@ def sample_qmc_position(a, b, sample):
 
 @njit
 def sample_qmc_isotropic_direction(sample1, sample2):
+    """
+    
+    Sample the an isotropic direction using samples between [0,1].
+
+    Parameters
+    ----------
+    sample1 : float64
+        LDS sample 1.
+    sample2 : float64
+        LDS sample 2.
+
+    Returns
+    -------
+    ux : float64
+        x direction.
+    uy : float64
+        y direction.
+    uz : float64
+        z direction.
+
+    """
     # Sample polar cosine and azimuthal angle uniformly
     mu  = 2.0*sample1 - 1.0
     azi = 2.0*PI*sample2
 
     # Convert to Cartesian coordinates
     c = (1.0 - mu**2)**0.5
-    y = math.cos(azi)*c
-    z = math.sin(azi)*c
-    x = mu
-    return x,y,z
+    uy = math.cos(azi)*c
+    uz = math.sin(azi)*c
+    ux = mu
+    return ux,uy,uz
 
 @njit
 def sample_qmc_group(sample, G):
+    """
+    Uniformly sample energy group using a random sample between [0,1].
+
+    Parameters
+    ----------
+    sample : float64
+        LDS sample.
+    G : int64
+        Number of energy groups.
+
+    Returns
+    -------
+    int64
+        Assigned energy group.
+
+    """
     return int(np.floor(sample*G))
 
 #==============================================================================
