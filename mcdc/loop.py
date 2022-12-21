@@ -56,7 +56,6 @@ def loop_main(mcdc):
             if (mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt']) or \
                 (mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
                 simulation_end = True
-
             # calculate norm of flux iterations
             mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['technique']['iqmc_flux'], 
                                                         mcdc['technique']['iqmc_flux_old'])
@@ -255,3 +254,17 @@ def loop_particle(P, mcdc):
         # Apply weight window
         if mcdc['technique']['weight_window']:
             kernel.weight_window(P, mcdc)
+        
+        # Apply weight roulette
+        if mcdc['technique']['weight_roulette']:
+            # check if weight has fallen below threshold
+            if abs(P['w']) <= mcdc['technique']['wr_threshold']:
+                kernel.weight_roulette(P, mcdc)
+
+
+# =============================================================================
+# iQMC Loop
+# =============================================================================
+
+# @njit
+# def iqmc_loop(mcdc):

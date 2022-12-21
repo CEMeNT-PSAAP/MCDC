@@ -100,28 +100,32 @@ class InputCard:
                                              'z' : np.array([-INF, INF]),
                                              't' : np.array([-INF, INF])},
 
-                          'time_census' : False,
-                          'census_time' : np.array([INF]),
+                          'time_census'         : False,
+                          'census_time'         : np.array([INF]),
 
-                          'IC_generator'   : False,
-                          'IC_N_neutron'   : 0,
-                          'IC_N_precursor' : 0,
+                          'IC_generator'        : False,
+                          'IC_N_neutron'        : 0,
+                          'IC_N_precursor'      : 0,
                           
-                          'iQMC'              : False, 
-                          'iqmc_generator'    : 'sobol',
-                          'iqmc_tol'          : 1e-6,
-                          'iqmc_res'          : 1.0,
-                          'iqmc_itt'          : 0,
-                          'iqmc_maxitt'       : 5,
-                          'iqmc_N_dim'        : 6,
-                          'iqmc_seed'         : 12345,
-                          'iqmc_scramble'     : False,
-                          'iqmc_fixed_source' : np.ones([1,1,1,1]),
-                          'iqmc_material_idx' : np.ones([1,1,1,1]),
-                          'iqmc_mesh'         : {'x': np.array([-INF, INF]),
-                                                'y' : np.array([-INF, INF]),
-                                                'z' : np.array([-INF, INF]),
-                                                't' : np.array([-INF, INF])}
+                          'weight_roulette'     : False,
+                          'wr_threshold'        : 0.0,
+                          'wr_target'           : 1.0,
+                          
+                          'iQMC'                : False, 
+                          'iqmc_generator'      : 'sobol',
+                          'iqmc_tol'            : 1e-6,
+                          'iqmc_res'            : 1.0,
+                          'iqmc_itt'            : 0,
+                          'iqmc_maxitt'         : 5,
+                          'iqmc_N_dim'          : 6,
+                          'iqmc_seed'           : 12345,
+                          'iqmc_scramble'       : False,
+                          'iqmc_fixed_source'   : np.ones([1,1,1,1]),
+                          'iqmc_material_idx'   : np.ones([1,1,1,1]),
+                          'iqmc_mesh'           : {'x': np.array([-INF, INF]),
+                                                   'y' : np.array([-INF, INF]),
+                                                   'z' : np.array([-INF, INF]),
+                                                   't' : np.array([-INF, INF])}
                           }
 
 class SurfaceHandle:

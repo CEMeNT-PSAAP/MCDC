@@ -2044,6 +2044,7 @@ def continuous_weight_reduction(w, distance, SigmaT):
     """
     return w * np.exp(-distance * SigmaT) 
 
+
 @njit
 def prepare_qmc_source(mcdc):
     """
@@ -2076,9 +2077,6 @@ def prepare_qmc_source(mcdc):
             for k in range(Nz):
                 t       = 0
                 mat_idx = mcdc['technique']['iqmc_material_idx'][t,i,j,k]
-                G       =  mcdc['materials'][mat_idx]['G']
-
-                dv  = iqmc_cell_volume(i,j,k,mesh)
                 mat_idx = mcdc['technique']['iqmc_material_idx'][t, i , j, k]
                 # we can vectorize the multigroup calculation here
                 Q[:, t, i, j, k] =  ( fission_source(flux[:, t, i, j, k], 
@@ -2086,7 +2084,7 @@ def prepare_qmc_source(mcdc):
                                     + scattering_source(flux[:, t, i, j, k], 
                                                         mat_idx, mcdc)
                                     + fixed_source[:, t, i, j, k] )
-                
+    
 @njit
 def prepare_qmc_particles(mcdc):
     """
@@ -2165,17 +2163,19 @@ def fission_source(phi, mat_idx, mcdc):
 
     """
     material = mcdc['materials'][mat_idx]
-    g        = 0
-    chi      = 1
-    nu_p     = material['nu_p'][g]
+    chi_p    = material['chi_p']
+    chi_d    = material['chi_d']
+    nu_p     = material['nu_p']
+    nu_d     = material['nu_d']
     J        = material['J']
-    nu       = nu_p
-    if J>0: 
-        nu_d  = material['nu_d'][g]
-        nu   += sum(nu_d)
     keff     = mcdc['k_eff']
-    SigmaF   = material['fission'][g]
-    return nu / keff * chi * SigmaF * phi
+    SigmaF   = material['fission']
+    
+    F_p = np.dot(chi_p.T, nu_p / keff * SigmaF * phi)
+    F_d = np.dot(chi_d.T, (nu_d.T / keff * SigmaF * phi).sum(axis=1))
+    F = F_p + F_d
+    
+    return F
 
 @njit
 def scattering_source(phi, mat_idx, mcdc):
@@ -2198,9 +2198,9 @@ def scattering_source(phi, mat_idx, mcdc):
 
     """
     material = mcdc['materials'][mat_idx]
-    g        = 0
-    SigmaS   = material['scatter'][g]
-    return SigmaS * phi
+    chi_s    = material['chi_s']
+    SigmaS   = material['scatter']
+    return np.dot(chi_s.T, SigmaS * phi)
     
 @njit
 def calculate_qmc_res(flux_new, flux_old):
@@ -2356,6 +2356,21 @@ def sample_qmc_group(sample, G):
 
     """
     return int(np.floor(sample*G))
+
+# =============================================================================
+# Weight Roulette
+# =============================================================================
+
+@njit
+def weight_roulette(P, mcdc):
+    target    = mcdc['technique']['wr_target']
+    chance    = abs(P['w']/target)
+    x         = rng(mcdc)
+    if (x <= chance):
+        P['w'] /= chance
+    else:
+        P['alive'] = False
+
 
 #==============================================================================
 # Miscellany
