@@ -162,27 +162,29 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
 
 def surface(type_, **kw):
     # Set default card values (c.f. type_.py)
-    card               = {}
-    card['tag']        = 'Surface'
-    card['ID']         = len(mcdc.input_card.surfaces)
-    card['vacuum']     = False
-    card['reflective'] = False
-    card['A']          = 0.0
-    card['B']          = 0.0
-    card['C']          = 0.0
-    card['D']          = 0.0
-    card['E']          = 0.0
-    card['F']          = 0.0
-    card['G']          = 0.0
-    card['H']          = 0.0
-    card['I']          = 0.0
-    card['J']          = np.array([[0.0, 0.0]])
-    card['t']          = np.array([-SHIFT, INF])
-    card['N_slice']    = 1
-    card['linear']     = False
-    card['nx']         = 0.0
-    card['ny']         = 0.0
-    card['nz']         = 0.0
+    card                = {}
+    card['tag']         = 'Surface'
+    card['ID']          = len(mcdc.input_card.surfaces)
+    card['vacuum']      = False
+    card['reflective']     = False
+    card['A']              = 0.0
+    card['B']              = 0.0
+    card['C']              = 0.0
+    card['D']              = 0.0
+    card['E']              = 0.0
+    card['F']              = 0.0
+    card['G']              = 0.0
+    card['H']              = 0.0
+    card['I']              = 0.0
+    card['J']              = np.array([[0.0, 0.0]])
+    card['t']              = np.array([-SHIFT, INF])
+    card['N_slice']        = 1
+    card['linear']         = False
+    card['nx']             = 0.0
+    card['ny']             = 0.0
+    card['nz']             = 0.0
+    card['sensitivity']    = False
+    card['sensitivity_ID'] = 0
 
     # Boundary condition
     bc = kw.get('bc')
@@ -194,6 +196,7 @@ def surface(type_, **kw):
             card['reflective'] = True
         else:
             print_error("Unsupported surface boundary condition: "+bc+ '; Supported options are "vacuum" or "reflective"')
+
     # Surface type
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
@@ -283,6 +286,18 @@ def surface(type_, **kw):
         card['nx'] = nx/norm
         card['ny'] = ny/norm
         card['nz'] = nz/norm
+
+    # Sensitivity
+    sensitivity = kw.get('sensitivity')
+    if sensitivity is not None and sensitivity:
+        # Set flag
+        card['sensitivity'] = True
+        mcdc.input_card.technique['sensitivity'] = True
+        mcdc.input_card.technique['weighted_emission'] = False
+
+        # Set ID
+        mcdc.input_card.technique['sensitivity_N'] += 1
+        card['sensitivity_ID'] = mcdc.input_card.technique['sensitivity_N']
 
     # Push card
     mcdc.input_card.surfaces.append(card)

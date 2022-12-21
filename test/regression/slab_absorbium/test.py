@@ -12,16 +12,16 @@ def test():
     m2 = mcdc.material(capture=np.array([1.5]))
     m3 = mcdc.material(capture=np.array([2.0]))
 
-    s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
-    s2 = mcdc.surface('plane-x', x=2.0)
-    s3 = mcdc.surface('plane-x', x=4.0)
-    s4 = mcdc.surface('plane-x', x=6.0, bc="vacuum")
+    s1 = mcdc.surface('plane-z', z=0.0, bc="vacuum")
+    s2 = mcdc.surface('plane-z', z=2.0)
+    s3 = mcdc.surface('plane-z', z=4.0)
+    s4 = mcdc.surface('plane-z', z=6.0, bc="vacuum")
 
     mcdc.cell([+s1, -s2], m2)
     mcdc.cell([+s2, -s3], m3)
     mcdc.cell([+s3, -s4], m1)
 
-    mcdc.source(x=[0.0, 6.0], isotropic=True)
+    mcdc.source(z=[0.0, 6.0], isotropic=True)
 
     scores = ['flux', 'current', 'flux-z', 'current-z']
     mcdc.tally(scores=scores, 
