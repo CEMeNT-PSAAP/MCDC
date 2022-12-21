@@ -37,12 +37,12 @@ def test():
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
-        assert np.array_equal(a,b)
+        assert np.isclose(a,b).all()
         
         name = 'tally/'+score+'/sdev'
         a = output[name][:]
         b = answer[name][:]
-        assert np.array_equal(a,b)
+        assert np.isclose(a,b).all()
 
     output.close()
     answer.close()
