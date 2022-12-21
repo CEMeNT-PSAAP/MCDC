@@ -131,7 +131,9 @@ class InputCard:
                           'iqmc_mesh'           : {'x': np.array([-INF, INF]),
                                                    'y' : np.array([-INF, INF]),
                                                    'z' : np.array([-INF, INF]),
-                                                   't' : np.array([-INF, INF])}
+                                                   't' : np.array([-INF, INF]),
+                                                   'mu'  : np.array([-1.0, 1.0]),
+                                                   'azi' : np.array([-PI, PI]),}
                           }
 
 class SurfaceHandle:
