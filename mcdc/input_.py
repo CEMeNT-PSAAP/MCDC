@@ -528,15 +528,20 @@ def source(**kw):
 # Tally
 #==============================================================================
 
-def tally(scores, x=None, y=None, z=None, t=None):
-    # Check if tally card has been initialized
+def tally(scores, x=np.array([-INF, INF]), y=np.array([-INF, INF]), 
+          z=np.array([-INF, INF]), t=np.array([-INF, INF]), 
+          mu=np.array([-1.0, 1.0]), azi=np.array([-PI, PI])):
+
+    # Get tally card
     card = mcdc.input_card.tally
 
     # Set mesh
-    if x is not None: card['mesh']['x'] = x
-    if y is not None: card['mesh']['y'] = y
-    if z is not None: card['mesh']['z'] = z
-    if t is not None: card['mesh']['t'] = t
+    card['mesh']['x']   = x
+    card['mesh']['y']   = y
+    card['mesh']['z']   = z
+    card['mesh']['t']   = t
+    card['mesh']['mu']  = mu
+    card['mesh']['azi'] = azi
 
     # Set score flags
     for s in scores:
@@ -558,6 +563,16 @@ def tally(scores, x=None, y=None, z=None, t=None):
         if card[score_name]:
             card['crossing'] = True
             card['crossing_x'] = True
+            break
+    for score_name in type_.score_y_list:
+        if card[score_name]:
+            card['crossing'] = True
+            card['crossing_y'] = True
+            break
+    for score_name in type_.score_z_list:
+        if card[score_name]:
+            card['crossing'] = True
+            card['crossing_z'] = True
             break
     for score_name in type_.score_t_list:
         if card[score_name]:
@@ -621,7 +636,8 @@ def setting(**kw):
     if bank_census_buff is not None:
         card['bank_census_buff'] = int(bank_census_buff)
 
-def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None):
+def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None,
+              N_cycle_buff=0):
     # Update setting card
     card                    = mcdc.input_card.setting
     card['N_inactive']      = N_inactive
@@ -629,6 +645,7 @@ def eigenmode(N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None):
     card['N_cycle']         = N_inactive + N_active
     card['mode_eigenvalue'] = True
     card['k_init']          = k_init
+    card['N_cycle_buff']    = N_cycle_buff
 
     # Gyration radius setup
     if gyration_radius is not None:
