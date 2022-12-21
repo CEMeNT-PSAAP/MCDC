@@ -262,7 +262,8 @@ def make_type_technique(card):
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('branchless_collision', bool_),
               ('weight_window', bool_), ('time_census', bool_),
-              ('IC_generator', bool_), ('iQMC', bool_)]
+              ('IC_generator', bool_), ('iQMC', bool_),
+              ('weight_roulette', bool_)]
 
     # =========================================================================
     # Population control
@@ -286,15 +287,14 @@ def make_type_technique(card):
     # =========================================================================
     
     # Constants
-    struct += [('weight_roulette', bool_),('wr_threshold', float64), 
-               ('wr_target', float64)]
+    struct += [('wr_threshold', float64),('wr_target', float64)]
     
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
     
     # Mesh (for qmc source tallies)
-    mesh, Nx, Ny, Nz, Nt = make_type_mesh(card.technique['iqmc_mesh'])
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.technique['iqmc_mesh'])
     struct += [('iqmc_mesh', mesh)]
     
     # Low-discprenecy sequence

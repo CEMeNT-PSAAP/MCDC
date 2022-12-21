@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/slab_reed_iqmc/output.h5', 'r')
 
-flux = hf['iqmc']['flux']['x'][0,:]
+flux = hf['tally']['iqmc_flux'][:]
 xspan = hf['iqmc']['grid']['x'][:]
 dx = xspan[1] - xspan[0]
 midpoints = xspan[1:] - dx
