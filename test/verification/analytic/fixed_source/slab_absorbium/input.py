@@ -16,10 +16,10 @@ m2 = mcdc.material(capture=np.array([1.5]))
 m3 = mcdc.material(capture=np.array([2.0]))
 
 # Set surfaces
-s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
-s2 = mcdc.surface('plane-x', x=2.0)
-s3 = mcdc.surface('plane-x', x=4.0)
-s4 = mcdc.surface('plane-x', x=6.0, bc="vacuum")
+s1 = mcdc.surface('plane-z', z=0.0, bc="vacuum")
+s2 = mcdc.surface('plane-z', z=2.0)
+s3 = mcdc.surface('plane-z', z=4.0)
+s4 = mcdc.surface('plane-z', z=6.0, bc="vacuum")
 
 # Set cells
 mcdc.cell([+s1, -s2], m2)
@@ -31,7 +31,7 @@ mcdc.cell([+s3, -s4], m1)
 # =============================================================================
 # Uniform isotropic source throughout the domain
 
-mcdc.source(x=[0.0, 6.0], isotropic=True)
+mcdc.source(z=[0.0, 6.0], isotropic=True)
 
 # =============================================================================
 # Set tally, setting, and run mcdc
