@@ -35,18 +35,6 @@ for k in range(K):
 phi_ref, n_ref = reference(t)
 
 # Neutron density
-plt.plot(t[1:],n,'-b',label="MC")
-plt.fill_between(t[1:],n-n_sd,n+n_sd,alpha=0.2,color='b')
-plt.plot(t,n_ref,'--r',label="Ref.")
-plt.xlabel(r'$t$, s')
-plt.ylabel('Density')
-plt.yscale('log')
-plt.xscale('log')
-plt.grid()
-plt.legend()
-plt.title(r'$n_g(t)$')
-plt.show()
-
 phi_ref = phi_ref[1:]
 for k in range(K):
     phi_ref[k,:] *= E_mid/dE
@@ -54,26 +42,41 @@ for k in range(K):
     phi_sd[:,k]  *= E_mid/dE
 
 # Flux - t
-fig = plt.figure(figsize=(6,4))
-ax = plt.axes()
-ax.grid()
-ax.set_xlabel(r'$E$, MeV')
-ax.set_ylabel(r'$E\phi(E)$')
-ax.set_title(r'$\phi(E,t)$')
-ax.set_xscale('log')
-line1, = ax.step([], [],'-b',where='mid',label="MC")
-line2, = ax.step([], [],'--r',where='mid',label="Ref.")
-text   = ax.text(0.02, 0.9, '', transform=ax.transAxes)
-ax.legend()        
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
+fig.tight_layout(pad=3.0)
+
+ax1.plot(t[1:],n,'-b',label="MC")
+no = np.zeros_like(n)
+line, = ax1.plot(t[1:],no,'ko',fillstyle='none')
+ax1.fill_between(t[1:],n-n_sd,n+n_sd,alpha=0.2,color='b')
+ax1.plot(t,n_ref,'--r',label="Ref.")
+ax1.set_xlabel(r'$t$, s')
+ax1.set_ylabel('Density')
+ax1.set_yscale('log')
+ax1.set_xscale('log')
+ax1.grid()
+ax1.legend()
+ax1.set_title(r'$n_g(t)$')
+
+ax2.grid()
+ax2.set_xlabel(r'$E$, MeV')
+ax2.set_ylabel(r'$E\phi(E)$')
+ax2.set_title(r'$\phi(E,t)$')
+ax2.set_xscale('log')
+line1, = ax2.step([], [],'-b',where='mid',label="MC")
+line2, = ax2.step([], [],'--r',where='mid',label="Ref.")
+ax2.legend()        
 def animate(k):
+    no[k-1] = 0.0; no[k] = n[k]
+    line.set_data(t[1:],no)
     line1.set_data(E_mid,phi[:,k])
-    ax.collections.clear()
-    ax.fill_between(E_mid,phi[:,k]-phi_sd[:,k],phi[:,k]+phi_sd[:,k],alpha=0.2,color='b',step='mid')
+    ax2.collections.clear()
+    ax2.fill_between(E_mid,phi[:,k]-phi_sd[:,k],phi[:,k]+phi_sd[:,k],alpha=0.2,color='b',step='mid')
     line2.set_data(E_mid,phi_ref[k,:G])
-    ax.set_ylim([(phi_ref[k,:G]).min(), (phi_ref[k,:G]).max()])
-    ax.legend()
-    text.set_text(r'$t = %.8f$ s'%(t[k+1]))
-    return line1, line2, text        
-simulation = animation.FuncAnimation(fig, animate, frames=K)
-writervideo = animation.FFMpegWriter(fps=6)
+    ax2.set_ylim([(phi_ref[k,:G]).min(), (phi_ref[k,:G]).max()])
+    ax2.legend()
+    return line1, line2
+simulation = animation.FuncAnimation(fig, animate, frames=K, interval=100)
+simulation.save('inf.gif', savefig_kwargs={'bbox_inches':'tight', 'pad_inches':0})
+simulation.save('inf.mp4', savefig_kwargs={'bbox_inches':'tight', 'pad_inches':0})
 plt.show()

@@ -112,6 +112,9 @@ class InputCard:
                           'IC_generator'   : False,
                           'IC_N_neutron'   : 0,
                           'IC_N_precursor' : 0,
+
+                          'sensitivity'   : 0,
+                          'sensitivity_N' : 0,
                           }
 
 class SurfaceHandle:
