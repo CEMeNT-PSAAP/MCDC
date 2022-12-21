@@ -55,15 +55,16 @@ material_idx[int(0.8125*Nx):]                = 3
 
 phi0 = np.ones((Nx))
 
-mcdc.iQMC(x=np.linspace(-8,8,num=Nx+1), fixed_source=fixed_source , 
-          phi0=phi0, material_idx=material_idx, maxitt=10, tol=1e-4)
+mcdc.iQMC(x=np.linspace(-8,8,num=Nx+1), fixed_source=fixed_source, 
+          phi0=phi0, material_idx=material_idx, maxitt=10, tol=1e-4,
+          generator='sobol')
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=4000)
+mcdc.setting(N_particle=2**12)
 
 # Run
 mcdc.run()

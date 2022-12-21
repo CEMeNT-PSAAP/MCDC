@@ -34,6 +34,7 @@ def run():
         print_header_eigenvalue(mcdc)
     MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime()
+    # TODO: add if iQMC execute iqmc_loop()
     loop_main(mcdc)
     MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
@@ -219,7 +220,8 @@ def prepare():
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff', 
                         'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds',
-                        'iqmc_effective_scattering', 'iqmc_effective_fission']:
+                        'iqmc_effective_scattering', 'iqmc_effective_fission',
+                        'iqmc_flux']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -354,15 +356,17 @@ def generate_hdf5():
             
             # iQMC 
             if mcdc['technique']['iQMC']:
-                # TODO: dump multigroup and time dependent data
+                # TODO: dump time dependent tallies
                 T = mcdc['technique']
+                f.create_dataset("iqmc/grid/t", data=T['iqmc_mesh']['t'])
                 f.create_dataset("iqmc/grid/x", data=T['iqmc_mesh']['x'])
                 f.create_dataset("iqmc/grid/y", data=T['iqmc_mesh']['y'])
                 f.create_dataset("iqmc/grid/z", data=T['iqmc_mesh']['z'])
                 
-                f.create_dataset("iqmc/flux/x", data=T['iqmc_flux'][0,0,:,0,0])
-                f.create_dataset("iqmc/flux/y", data=T['iqmc_flux'][0,0,0,:,0])
-                f.create_dataset("iqmc/flux/z", data=T['iqmc_flux'][0,0,0,0,:])
+                # dump x,y,z scalar flux across all groups                 
+                f.create_dataset("tally/"+"iqmc_flux",
+                                 data=np.squeeze(T['iqmc_flux']))
+
                 
                 
                 
