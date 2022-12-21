@@ -20,13 +20,15 @@ particle = np.dtype([
     ('w', float64), ('alive', bool_),
     ('material_ID', int64), ('cell_ID', int64), 
     ('surface_ID', int64), ('translation', float64, (3,)),
-    ('event', int64)])
+    ('event', int64),
+    ('sensitivity_ID', int64)
+    ])
 
 # Particle record (in-bank)
 particle_record = np.dtype([
     ('x', float64), ('y', float64), ('z', float64), ('t', float64),
     ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
-    ('w', float64)])
+    ('w', float64), ('sensitivity_ID', int64)])
 
 # Static records (for IC generator, )
 neutron   = np.dtype([('x', float64), ('y', float64), ('z', float64),
@@ -75,7 +77,9 @@ def make_type_surface(Nmax_slice):
                         ('G', float64), ('H', float64), ('I', float64), 
                         ('J', float64, (Nmax_slice,2)), ('t', float64, (Nmax_slice+1,)),
                         ('linear', bool_), 
-                        ('nx', float64), ('ny', float64), ('nz', float64)])
+                        ('nx', float64), ('ny', float64), ('nz', float64),
+                        ('sensitivity', bool_), ('sensitivity_ID', int64),
+                        ])
 
 # ==============================================================================
 # Cell
@@ -181,39 +185,40 @@ def make_type_tally(card):
 
     # Scores and shapes
     Ng = card.materials[0]['G']
+    Ns = card.technique['sensitivity_N'] + 1
     scores_shapes = [
-                     ['flux',        (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['density',     (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['fission',     (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['total',       (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['flux_x',      (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['density_x',   (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['fission_x',   (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['total_x',     (Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['flux_y',      (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['density_y',   (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['fission_y',   (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['total_y',     (Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['flux_z',      (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['density_z',   (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['fission_z',   (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['total_z',     (Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['flux_t',      (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['density_t',   (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['fission_t',   (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['total_t',     (Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['flux',        (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['density',     (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['fission',     (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['total',       (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['flux_x',      (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['density_x',   (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['fission_x',   (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['total_x',     (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
+                     ['flux_y',      (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['density_y',   (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['fission_y',   (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['total_y',     (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
+                     ['flux_z',      (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['density_z',   (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['fission_z',   (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['total_z',     (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
+                     ['flux_t',      (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['density_t',   (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['fission_t',   (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+                     ['total_t',     (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
 
-                     ['current',     (Ng, Nt, Nx, Ny, Nz, 3)],
-                     ['current_x',   (Ng, Nt, Nx+1, Ny, Nz, 3)],
-                     ['current_y',   (Ng, Nt, Nx, Ny+1, Nz, 3)],
-                     ['current_z',   (Ng, Nt, Nx, Ny, Nz+1, 3)],
-                     ['current_t',   (Ng, Nt+1, Nx, Ny, Nz, 3)],
+                     ['current',     (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
+                     ['current_x',   (Ns, Ng, Nt, Nx+1, Ny, Nz, 3)],
+                     ['current_y',   (Ns, Ng, Nt, Nx, Ny+1, Nz, 3)],
+                     ['current_z',   (Ns, Ng, Nt, Nx, Ny, Nz+1, 3)],
+                     ['current_t',   (Ns, Ng, Nt+1, Nx, Ny, Nz, 3)],
 
-                     ['eddington',   (Ng, Nt, Nx, Ny, Nz, 6)],
-                     ['eddington_x', (Ng, Nt, Nx+1, Ny, Nz, 6)],
-                     ['eddington_y', (Ng, Nt, Nx, Ny+1, Nz, 6)],
-                     ['eddington_z', (Ng, Nt, Nx, Ny, Nz+1, 6)],
-                     ['eddington_t', (Ng, Nt+1, Nx, Ny, Nz, 6)],
+                     ['eddington',   (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
+                     ['eddington_x', (Ns, Ng, Nt, Nx+1, Ny, Nz, 6)],
+                     ['eddington_y', (Ns, Ng, Nt, Nx, Ny+1, Nz, 6)],
+                     ['eddington_z', (Ns, Ng, Nt, Nx, Ny, Nz+1, 6)],
+                     ['eddington_t', (Ns, Ng, Nt+1, Nx, Ny, Nz, 6)],
                     ]
 
     # Add score flags to structure
