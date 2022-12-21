@@ -54,9 +54,9 @@ for N_particle in N_particle_list:
     error_z.append(np.linalg.norm((phi_z - phi_z_ref)/phi_z_ref))
     error_J.append(np.linalg.norm((J - J_ref)/J_ref))
     error_Jz.append(np.linalg.norm((J_z - J_z_ref)/J_z_ref))
-    error.append(np.linalg.norm((phi - phi_ref)/phi_ref))
-    error_z.append(np.linalg.norm((phi_z - phi_z_ref)/phi_z_ref))
-
+    error_psi.append(np.linalg.norm((psi - psi_ref)/psi_ref))
+    error_psi_z.append(np.linalg.norm((psi_z - psi_z_ref)/psi_z_ref))
+print(len(N_particle_list),len(error))
 plot_convergence('slab_absorbium_flux', N_particle_list, error)
 plot_convergence('slab_absorbium_flux_z', N_particle_list, error_z)
 plot_convergence('slab_absorbium_current', N_particle_list, error_J)

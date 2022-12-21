@@ -163,6 +163,8 @@ def source_particle(source, rng):
     P['uz'] = uz
     P['g']  = g
     P['w']  = 1.0
+    
+    P['sensitivity_ID'] = 0
 
     return P
 
@@ -208,6 +210,7 @@ def get_particle(bank):
     P['g']  = P_rec['g']
     P['w']  = P_rec['w']
     P['alive'] = True
+    P['sensitivity_ID'] = P_rec['sensitivity_ID']
 
     # Set default IDs and event
     P['material_ID'] = -1
@@ -771,6 +774,44 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
     P['alive'] = False
     return -1
 
+@njit 
+def get_particle_material(P, mcdc):
+    # Translation accumulator
+    trans = np.zeros(3)
+
+    # Top level cell
+    cell = mcdc['cells'][P['cell_ID']]
+
+    # Recursively check if cell is a lattice cell, until material cell is found
+    while True:
+        # Lattice cell?
+        if cell['lattice']:
+            # Get lattice
+            lattice = mcdc['lattices'][cell['lattice_ID']]
+
+            # Get lattice center for translation)
+            trans -= cell['lattice_center']
+           
+            # Get universe
+            mesh        = lattice['mesh']
+            x, y, z     = mesh_uniform_get_index(P, mesh, trans)
+            universe_ID = lattice['universe_IDs'][x,y,z]
+
+            # Update translation
+            trans[0] -= mesh['x0'] + (x+0.5)*mesh['dx']
+            trans[1] -= mesh['y0'] + (y+0.5)*mesh['dy']
+            trans[2] -= mesh['z0'] + (z+0.5)*mesh['dz']
+
+            # Get inner cell
+            cell_ID = get_particle_cell(P, universe_ID, trans, mcdc)
+            cell    = mcdc['cells'][cell_ID]
+
+        else:
+            # Material cell found, return material_ID
+            break
+    
+    return cell['material_ID']
+
 @njit
 def get_particle_speed(P, mcdc):
     return mcdc['materials'][P['material_ID']]['speed'][P['g']]
@@ -787,6 +828,7 @@ def copy_particle(P):
     P_new['uz'] = P['uz']        
     P_new['g']  = P['g']     
     P_new['w']  = P['w']     
+    P_new['sensitivity_ID'] = P['sensitivity_ID']
     return P_new
 
 #==============================================================================
@@ -1113,6 +1155,7 @@ def score_tracklength(P, distance, mcdc):
 
     # Get indices
     g = P['g']
+    s = P['sensitivity_ID']
     t, x, y, z, outside = mesh_get_index(P, tally['mesh'])
     mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
@@ -1123,20 +1166,20 @@ def score_tracklength(P, distance, mcdc):
     # Score
     flux = distance*P['w']
     if tally['flux']:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['flux'])
     if tally['density']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['density'])
     if tally['fission']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['fission'])
     if tally['total']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['total'])
     if tally['current']:
-        score_current(g, t, x, y, z, flux, P, tally['score']['current'])
+        score_current(s, g, t, x, y, z, flux, P, tally['score']['current'])
     if tally['eddington']:
-        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington'])
+        score_eddington(s, g, t, x, y, z, flux, P, tally['score']['eddington'])
 
 @njit
 def score_crossing_x(P, t, x, y, z, mcdc):
@@ -1147,25 +1190,26 @@ def score_crossing_x(P, t, x, y, z, mcdc):
     g = P['g']
     if P['ux'] > 0.0:
         x += 1
+    s = P['sensitivity_ID']
     mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']/abs(P['ux'])
     if tally['flux_x']:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_x'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['flux_x'])
     if tally['density_x']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_x'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['density_x'])
     if tally['fission_x']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_x'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['fission_x'])
     if tally['total_x']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_x'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['total_x'])
     if tally['current_x']:
-        score_current(g, t, x, y, z, flux, P, tally['score']['current_x'])
+        score_current(s, g, t, x, y, z, flux, P, tally['score']['current_x'])
     if tally['eddington_x']:
-        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_x'])
+        score_eddington(s, g, t, x, y, z, flux, P, tally['score']['eddington_x'])
 
 @njit
 def score_crossing_y(P, t, x, y, z, mcdc):
@@ -1176,25 +1220,26 @@ def score_crossing_y(P, t, x, y, z, mcdc):
     g = P['g']
     if P['uy'] > 0.0:
         y += 1
+    s = P['sensitivity_ID']
     mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']/abs(P['uy'])
     if tally['flux_y']:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_y'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['flux_y'])
     if tally['density_y']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_y'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['density_y'])
     if tally['fission_y']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_y'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['fission_y'])
     if tally['total_y']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_y'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['total_y'])
     if tally['current_y']:
-        score_current(g, t, x, y, z, flux, P, tally['score']['current_y'])
+        score_current(s, g, t, x, y, z, flux, P, tally['score']['current_y'])
     if tally['eddington_y']:
-        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_y'])
+        score_eddington(s, g, t, x, y, z, flux, P, tally['score']['eddington_y'])
 
 @njit
 def score_crossing_z(P, t, x, y, z, mcdc):
@@ -1205,25 +1250,26 @@ def score_crossing_z(P, t, x, y, z, mcdc):
     g = P['g']
     if P['uz'] > 0.0:
         z += 1
+    s = P['sensitivity_ID']
     mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']/abs(P['uz'])
     if tally['flux_z']:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_z'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['flux_z'])
     if tally['density_z']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_z'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['density_z'])
     if tally['fission_z']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_z'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['fission_z'])
     if tally['total_z']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_z'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['total_z'])
     if tally['current_z']:
-        score_current(g, t, x, y, z, flux, P, tally['score']['current_z'])
+        score_current(s, g, t, x, y, z, flux, P, tally['score']['current_z'])
     if tally['eddington_z']:
-        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_z'])
+        score_eddington(s, g, t, x, y, z, flux, P, tally['score']['eddington_z'])
 
 @njit
 def score_crossing_t(P, t, x, y, z, mcdc):
@@ -1232,48 +1278,49 @@ def score_crossing_t(P, t, x, y, z, mcdc):
     
     # Get indices
     g  = P['g']
+    s = P['sensitivity_ID']
     t += 1
     mu, azi = mesh_get_angular_index(P, tally['mesh'])
 
     # Score
     flux = P['w']*material['speed'][g]
     if tally['flux_t']:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['flux_t'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['flux_t'])
     if tally['density_t']:
         flux /= material['speed'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['density_t'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['density_t'])
     if tally['fission_t']:
         flux *= material['fission'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['fission_t'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['fission_t'])
     if tally['total_t']:
         flux *= material['total'][g]
-        score_flux(g, t, x, y, z, mu, azi, flux, tally['score']['total_t'])
+        score_flux(s, g, t, x, y, z, mu, azi, flux, tally['score']['total_t'])
     if tally['current_t']:
-        score_current(g, t, x, y, z, flux, P, tally['score']['current_t'])
+        score_current(s, g, t, x, y, z, flux, P, tally['score']['current_t'])
     if tally['eddington_t']:
-        score_eddington(g, t, x, y, z, flux, P, tally['score']['eddington_t'])
+        score_eddington(s, g, t, x, y, z, flux, P, tally['score']['eddington_t'])
 
 @njit
-def score_flux(g, t, x, y, z, mu, azi, flux, score):
-    score['bin'][g, t, x, y, z, mu, azi] += flux
+def score_flux(s, g, t, x, y, z, mu, azi, flux, score):
+    score['bin'][s, g, t, x, y, z, mu, azi] += flux
 
 @njit
-def score_current(g, t, x, y, z, flux, P, score):
-    score['bin'][g, t, x, y, z, 0] += flux*P['ux']
-    score['bin'][g, t, x, y, z, 1] += flux*P['uy']
-    score['bin'][g, t, x, y, z, 2] += flux*P['uz']
+def score_current(s, g, t, x, y, z, flux, P, score):
+    score['bin'][s, g, t, x, y, z, 0] += flux*P['ux']
+    score['bin'][s, g, t, x, y, z, 1] += flux*P['uy']
+    score['bin'][s, g, t, x, y, z, 2] += flux*P['uz']
 
 @njit
-def score_eddington(g, t, x, y, z, flux, P, score):
+def score_eddington(s, g, t, x, y, z, flux, P, score):
     ux = P['ux']
     uy = P['uy']
     uz = P['uz']
-    score['bin'][g, t, x, y, z, 0] += flux*ux*ux
-    score['bin'][g, t, x, y, z, 1] += flux*ux*uy
-    score['bin'][g, t, x, y, z, 2] += flux*ux*uz
-    score['bin'][g, t, x, y, z, 3] += flux*uy*uy
-    score['bin'][g, t, x, y, z, 4] += flux*uy*uz
-    score['bin'][g, t, x, y, z, 5] += flux*uz*uz
+    score['bin'][s, g, t, x, y, z, 0] += flux*ux*ux
+    score['bin'][s, g, t, x, y, z, 1] += flux*ux*uy
+    score['bin'][s, g, t, x, y, z, 2] += flux*ux*uz
+    score['bin'][s, g, t, x, y, z, 3] += flux*uy*uy
+    score['bin'][s, g, t, x, y, z, 4] += flux*uy*uz
+    score['bin'][s, g, t, x, y, z, 5] += flux*uz*uz
 
 @njit
 def score_closeout_history(score, mcdc):
@@ -1775,13 +1822,24 @@ def surface_crossing(P, mcdc):
 
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
- 
+
+    # Record old material for sensitivity quantification
+    material_ID_old = P['material_ID']
+
     # Check new cell?
     if P['alive'] and not surface['reflective']:
         cell  = mcdc['cells'][P['cell_ID']]
         if not cell_check(P, cell, trans, mcdc):
             trans = np.zeros(3)
             P['cell_ID'] = get_particle_cell(P, 0, trans, mcdc)
+
+    # Sensitivity quantification for surface
+    if surface['sensitivity'] and P['sensitivity_ID'] == 0:
+        material_ID_new = get_particle_material(P, mcdc)
+        if material_ID_old != material_ID_new:
+            sensitivity_surface(P, surface, material_ID_old, material_ID_new, 
+                                mcdc)
+
 
 #==============================================================================
 # Mesh crossing
@@ -1858,12 +1916,8 @@ def capture(P, mcdc):
 
 @njit
 def scattering(P, mcdc):
-    # Get outgoing spectrum
-    material = mcdc['materials'][P['material_ID']]
-    g        = P['g']
-    chi_s    = material['chi_s'][g]
-    nu_s     = material['nu_s'][g]
-    G        = material['G']
+    # Kill the current particle
+    P['alive'] = False
 
     # Get effective and new weight
     if mcdc['technique']['weighted_emission']:
@@ -1873,8 +1927,10 @@ def scattering(P, mcdc):
         weight_eff = 1.0
         weight_new = P['w']
 
-    # Kill the current particle
-    P['alive'] = False
+    # Get production factor
+    material = mcdc['materials'][P['material_ID']]
+    g        = P['g']
+    nu_s     = material['nu_s'][g]
 
     # Get number of secondaries
     N = int(math.floor(weight_eff*nu_s + rng(mcdc)))
@@ -1882,66 +1938,117 @@ def scattering(P, mcdc):
     for n in range(N):
         # Create new particle
         P_new = np.zeros(1, dtype=type_.particle_record)[0]
-
-        # Copy relevant attributes
-        P_new['x'] = P['x']         
-        P_new['y'] = P['y']         
-        P_new['z'] = P['z']         
-        P_new['t'] = P['t']      
-
+        
         # Set weight
         P_new['w'] = weight_new
 
-        # Sample outgoing energy
-        xi  = rng(mcdc)
-        tot = 0.0
-        for g_out in range(G):
-            tot += chi_s[g_out]
-            if tot > xi:
-                break
-        P_new['g'] = g_out
-        
-        # Sample scattering angle
-        mu = 2.0*rng(mcdc) - 1.0;
-        
-        # Sample azimuthal direction
-        azi     = 2.0*PI*rng(mcdc)
-        cos_azi = math.cos(azi)
-        sin_azi = math.sin(azi)
-        Ac      = (1.0 - mu**2)**0.5
-
-        ux = P['ux']
-        uy = P['uy']
-        uz = P['uz']
-        
-        if uz != 1.0:
-            B = (1.0 - P['uz']**2)**0.5
-            C = Ac/B
-            
-            P_new['ux'] = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
-            P_new['uy'] = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
-            P_new['uz'] = uz*mu - cos_azi*Ac*B
-        
-        # If dir = 0i + 0j + k, interchange z and y in the scattering formula
-        else:
-            B = (1.0 - uy**2)**0.5
-            C = Ac/B
-            
-            P_new['ux'] = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
-            P_new['uz'] = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
-            P_new['uy'] = uy*mu - cos_azi*Ac*B
+        # Sample scattering phase space
+        sample_phasespace_scattering(P, material, P_new, mcdc)
 
         # Bank
         add_particle(P_new, mcdc['bank_active'])
         
+@njit
+def sample_phasespace_scattering(P, material, P_new, mcdc):
+    # Get outgoing spectrum
+    g      = P['g']
+    G      = material['G']
+    chi_s  = material['chi_s'][g]
+
+    # Copy relevant attributes
+    P_new['x'] = P['x']
+    P_new['y'] = P['y']
+    P_new['z'] = P['z']
+    P_new['t'] = P['t']
+    P_new['sensitivity_ID'] = P['sensitivity_ID']
+
+    # Sample outgoing energy
+    xi  = rng(mcdc)
+    tot = 0.0
+    for g_out in range(G):
+        tot += chi_s[g_out]
+        if tot > xi:
+            break
+    P_new['g'] = g_out
+    
+    # Sample scattering angle
+    mu = 2.0*rng(mcdc) - 1.0;
+    
+    # Sample azimuthal direction
+    azi     = 2.0*PI*rng(mcdc)
+    cos_azi = math.cos(azi)
+    sin_azi = math.sin(azi)
+    Ac      = (1.0 - mu**2)**0.5
+
+    ux = P['ux']
+    uy = P['uy']
+    uz = P['uz']
+    
+    if uz != 1.0:
+        B = (1.0 - P['uz']**2)**0.5
+        C = Ac/B
+        
+        P_new['ux'] = ux*mu + (ux*uz*cos_azi - uy*sin_azi)*C
+        P_new['uy'] = uy*mu + (uy*uz*cos_azi + ux*sin_azi)*C
+        P_new['uz'] = uz*mu - cos_azi*Ac*B
+    
+    # If dir = 0i + 0j + k, interchange z and y in the scattering formula
+    else:
+        B = (1.0 - uy**2)**0.5
+        C = Ac/B
+        
+        P_new['ux'] = ux*mu + (ux*uy*cos_azi - uz*sin_azi)*C
+        P_new['uz'] = uz*mu + (uz*uy*cos_azi + ux*sin_azi)*C
+        P_new['uy'] = uy*mu - cos_azi*Ac*B
+
 #==============================================================================
 # Fission
 #==============================================================================
 
 @njit
 def fission(P, mcdc):
-    # Get constants
+    # Kill the current particle
+    P['alive'] = False
+
+    # Get production factor
     material = mcdc['materials'][P['material_ID']]
+    g        = P['g']
+    nu       = material['nu_p'][g] + sum(material['nu_d'][g])
+
+    # Get effective and new weight
+    if mcdc['technique']['weighted_emission']:
+        weight_eff = P['w']
+        weight_new = 1.0
+    else:
+        weight_eff = 1.0
+        weight_new = P['w']
+    
+    # Get number of secondaries
+    N = int(math.floor(weight_eff*nu/mcdc['k_eff'] + rng(mcdc)))
+
+    for n in range(N):
+        # Create new particle
+        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        
+        # Set weight
+        P_new['w'] = weight_new
+
+        # Sample scattering phase space
+        sample_phasespace_fission(P, material, P_new, mcdc)
+
+        # Skip if it's beyond time boundary
+        if P_new['t'] > mcdc['setting']['time_boundary']:
+            continue
+
+        # Bank
+        if mcdc['setting']['mode_eigenvalue']:
+            add_particle(P_new, mcdc['bank_census'])
+        else:
+            add_particle(P_new, mcdc['bank_active'])
+
+@njit
+def sample_phasespace_fission(P, material, P_new, mcdc):
+    # Get constants
     G        = material['G']
     J        = material['J']
     g        = P['g']
@@ -1950,76 +2057,48 @@ def fission(P, mcdc):
     if J>0: 
         nu_d  = material['nu_d'][g]
         nu   += sum(nu_d)
+    
+    # Copy relevant attributes
+    P_new['x'] = P['x']
+    P_new['y'] = P['y']
+    P_new['z'] = P['z']
+    P_new['t'] = P['t']
+    P_new['sensitivity_ID'] = P['sensitivity_ID']
+    
+    # Sample isotropic direction
+    P_new['ux'], P_new['uy'], P_new['uz'] = \
+            sample_isotropic_direction(mcdc)
 
-    # Get effective and new weight
-    if mcdc['technique']['weighted_emission']:
-        weight_eff = P['w']
-        weight_new = 1.0
+    # Prompt or delayed?
+    xi  = rng(mcdc)*nu
+    tot = nu_p
+    if xi < tot:
+        prompt = True
+        spectrum = material['chi_p'][g]
     else:
-        weight_eff = 1.0
-        weight_new = P['w']
+        prompt = False
 
-    # Kill the current particle
-    P['alive'] = False
+        # Determine delayed group
+        for j in range(J):
+            tot += nu_d[j]
+            if xi < tot:
+                spectrum = material['chi_d'][j]
+                decay    = material['decay'][j]
+                break
 
-    # Sample prompt and delayed neutrons
-    for jj in range(J+1):
-        prompt = jj == 0
-        j      = jj - 1
-
-        # Get data (average emission number, spectrum, decay rate)
-        if prompt:
-            nu       = nu_p
-            spectrum = material['chi_p'][g]
-        else:
-            nu       = nu_d[j]
-            spectrum = material['chi_d'][j]
-            decay    = material['decay'][j]
-
-        # Sample number of fission neutrons
-        N = int(math.floor(weight_eff*nu/mcdc['k_eff'] + rng(mcdc)))
-
-        # Push fission neutrons to bank
-        for n in range(N):
-            # Create new particle
-            P_new = np.zeros(1, dtype=type_.particle_record)[0]
-
-            # Copy relevant attributes
-            P_new['x'] = P['x']         
-            P_new['y'] = P['y']         
-            P_new['z'] = P['z']         
-            P_new['t'] = P['t']      
-
-            # Set weight
-            P_new['w'] = weight_new
-
-            # Sample emission time
-            if not prompt:
-                xi = rng(mcdc)
-                P_new['t'] -= math.log(xi)/decay
-
-                # Skip if it's beyond time boundary
-                if P_new['t'] > mcdc['setting']['time_boundary']:
-                    continue
-
-            # Sample outgoing energy
-            xi  = rng(mcdc)
-            tot = 0.0
-            for g_out in range(G):
-                tot += spectrum[g_out]
-                if tot > xi:
-                    break
-            P_new['g'] = g_out
-
-            # Sample isotropic direction
-            P_new['ux'], P_new['uy'], P_new['uz'] = \
-                    sample_isotropic_direction(mcdc)
-
-            # Bank
-            if mcdc['setting']['mode_eigenvalue']:
-                add_particle(P_new, mcdc['bank_census'])
-            else:
-                add_particle(P_new, mcdc['bank_active'])
+    # Sample outgoing energy
+    xi  = rng(mcdc)
+    tot = 0.0
+    for g_out in range(G):
+        tot += spectrum[g_out]
+        if tot > xi:
+            break
+    P_new['g'] = g_out
+    
+    # Sample emission time
+    if not prompt:
+        xi = rng(mcdc)
+        P_new['t'] -= math.log(xi)/decay
 
 #==============================================================================
 # Branchless collision
@@ -2492,6 +2571,139 @@ def weight_roulette(P, mcdc):
         P['w'] /= chance
     else:
         P['alive'] = False
+
+
+#==============================================================================
+# Sensitivity quantification (Derivative Source Method)
+#==============================================================================
+
+@njit
+def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
+    # Put the current particle into the secondary bank
+    add_particle(copy_particle(P), mcdc['bank_active'])
+    
+    # Assign sensitivity_ID
+    P['sensitivity_ID'] = surface['sensitivity_ID']
+
+    # Get materials
+    material_old = mcdc['materials'][material_ID_old]
+    material_new = mcdc['materials'][material_ID_new]
+
+    # Determine the plus and minus components and then their weight signs
+    trans = P['translation']
+    sign = surface_evaluate(P, surface, trans)
+    if sign > 0.0:
+        # New is +, old is -
+        sign_new = -1.0
+        sign_old = 1.0
+    else:
+        sign_new = 1.0
+        sign_old = -1.0
+
+    # Get XS
+    g = P['g']
+    SigmaT_old = material_old['total'][g]
+    SigmaT_new = material_new['total'][g]
+    SigmaS_old = material_old['scatter'][g]
+    SigmaS_new = material_new['scatter'][g]
+    SigmaF_old = material_old['fission'][g]
+    SigmaF_new = material_new['fission'][g]
+    nu_s_old   = material_old['nu_s'][g]
+    nu_s_new   = material_new['nu_s'][g]
+    nu_old     = material_old['nu_p'][g] + sum(material_old['nu_d'][g])
+    nu_new     = material_new['nu_p'][g] + sum(material_new['nu_d'][g])
+
+    nuSigmaS_old = nu_s_old*SigmaS_old
+    nuSigmaS_new = nu_s_new*SigmaS_new
+    nuSigmaF_old = nu_old*SigmaF_old
+    nuSigmaF_new = nu_new*SigmaF_new
+
+    # Get inducing flux
+    flux = P['w']/abs(surface_normal_component(P, surface, trans))
+
+    # Get collision term
+    collision      = -(SigmaT_old*sign_old + SigmaT_new*sign_new)
+    collision_prob = abs(collision)
+    collision_sign = collision/collision_prob
+
+    # Set particle weight
+    tot_prob = collision_prob + nuSigmaS_old + nuSigmaS_new\
+                              + nuSigmaF_old + nuSigmaF_new
+    P['w'] = tot_prob*flux
+
+    # Sample derivative weight and set phase space
+    xi  = rng(mcdc)*tot_prob
+    tot = collision_prob
+    if tot > xi:
+        # Collision delta source
+        P['w'] *= collision_sign
+    else:
+        tot += nuSigmaS_old
+        if tot > xi:
+            sample_phasespace_scattering(P, material_old, P, mcdc)
+            P['w'] *= sign_old
+        else:
+            tot += nuSigmaS_new
+            if tot > xi:
+                sample_phasespace_scattering(P, material_new, P, mcdc)
+                P['w'] *= sign_new
+            else:
+                tot += nuSigmaF_old
+                if tot > xi:
+                    sample_phasespace_fission(P, material_old, P, mcdc)
+                    P['w'] *= sign_old
+                else:
+                    sample_phasespace_fission(P, material_new, P, mcdc)
+                    P['w'] *= sign_new
+    '''
+    # Get source type probabilities
+    delta   = -(SigmaT_old*sign_old + SigmaT_new*sign_new)
+    scatter = (nuSigmaS_old*sign_old + nuSigmaS_new*sign_new)
+    fission = (nuSigmaF_old*sign_old + nuSigmaF_new*sign_new)
+    p_delta   = abs(delta)
+    p_scatter = abs(scatter)
+    p_fission = abs(fission)
+    p_total   = p_delta + p_scatter + p_fission
+
+    # Base weight
+    w_hat = p_total*flux
+
+    # Sample source type
+    xi  = rng(mcdc)*p_total
+    tot = p_delta
+    if tot > xi:
+        # Delta source
+        sign_delta = delta/p_delta
+        P['w'] = w_hat*sign_delta
+
+    else:
+        tot += p_scatter
+        if tot > xi:
+            # Scattering source
+            total_scatter = nuSigmaS_old + nuSigmaS_new
+            w_hat *= total_scatter/p_scatter
+
+            # Sample if it is from + or - component
+            if nuSigmaS_old > rng(mcdc)*total_scatter:
+                sample_phasespace_scattering(P, material_old, P, mcdc)
+                P['w'] = w_hat*sign_old
+            else:
+                sample_phasespace_scattering(P, material_new, P, mcdc)
+                P['w'] = w_hat*sign_new
+        else:
+            # Fission source
+            total_fission = nuSigmaF_old + nuSigmaF_new
+            w_hat *= total_fission/p_fission
+
+            # Sample if it is from + or - component
+            if nuSigmaF_old > rng(mcdc)*total_fission:
+                sample_phasespace_fission(P, material_old, P, mcdc)
+                P['w'] = w_hat*sign_old
+            else:
+                sample_phasespace_fission(P, material_new, P, mcdc)
+                P['w'] = w_hat*sign_new
+
+    '''
 
 
 #==============================================================================
