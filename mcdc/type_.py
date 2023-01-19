@@ -60,7 +60,9 @@ def make_type_material(G,J):
                          ('nu_s', float64, (G,)), ('nu_f', float64, (G,)),
                          ('nu_p', float64, (G,)), ('nu_d', float64, (G,J)), 
                          ('chi_s', float64, (G,G)), ('chi_p', float64, (G,G)),
-                         ('chi_d', float64, (J,G))])
+                         ('chi_d', float64, (J,G)),
+                         ('sensitivity', bool_), ('sensitivity_ID', int64),
+                         ])
 
 # ==============================================================================
 # Surface
