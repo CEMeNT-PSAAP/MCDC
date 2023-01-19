@@ -2240,8 +2240,13 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     nuSigmaF_new = nu_new*SigmaF_new
 
     # Get inducing flux
-    flux = P['w']/abs(surface_normal_component(P, surface, trans))
+    #   Apply constant flux approximation for tangent direction [Dupree 2002]
+    mu = abs(surface_normal_component(P, surface, trans))
+    if mu < 0.01:
+        mu = 0.01/2
+    flux = P['w']/mu
 
+    '''
     # Get collision term
     collision      = -(SigmaT_old*sign_old + SigmaT_new*sign_new)
     collision_prob = abs(collision)
@@ -2323,9 +2328,6 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
             else:
                 sample_phasespace_fission(P, material_new, P, mcdc)
                 P['w'] = w_hat*sign_new
-
-    '''
-
 
 #==============================================================================
 # Miscellany
