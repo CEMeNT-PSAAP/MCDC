@@ -1809,7 +1809,7 @@ def surface_crossing(P, mcdc):
             trans = np.zeros(3)
             P['cell_ID'] = get_particle_cell(P, 0, trans, mcdc)
 
-    # Sensitivity quantification for surface
+    # Sensitivity quantification for surface?
     if surface['sensitivity'] and P['sensitivity_ID'] == 0:
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
@@ -2246,42 +2246,6 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
         mu = 0.01/2
     flux = P['w']/mu
 
-    '''
-    # Get collision term
-    collision      = -(SigmaT_old*sign_old + SigmaT_new*sign_new)
-    collision_prob = abs(collision)
-    collision_sign = collision/collision_prob
-
-    # Set particle weight
-    tot_prob = collision_prob + nuSigmaS_old + nuSigmaS_new\
-                              + nuSigmaF_old + nuSigmaF_new
-    P['w'] = tot_prob*flux
-
-    # Sample derivative weight and set phase space
-    xi  = rng(mcdc)*tot_prob
-    tot = collision_prob
-    if tot > xi:
-        # Collision delta source
-        P['w'] *= collision_sign
-    else:
-        tot += nuSigmaS_old
-        if tot > xi:
-            sample_phasespace_scattering(P, material_old, P, mcdc)
-            P['w'] *= sign_old
-        else:
-            tot += nuSigmaS_new
-            if tot > xi:
-                sample_phasespace_scattering(P, material_new, P, mcdc)
-                P['w'] *= sign_new
-            else:
-                tot += nuSigmaF_old
-                if tot > xi:
-                    sample_phasespace_fission(P, material_old, P, mcdc)
-                    P['w'] *= sign_old
-                else:
-                    sample_phasespace_fission(P, material_new, P, mcdc)
-                    P['w'] *= sign_new
-    '''
     # Get source type probabilities
     delta   = -(SigmaT_old*sign_old + SigmaT_new*sign_new)
     scatter = (nuSigmaS_old*sign_old + nuSigmaS_new*sign_new)
@@ -2301,7 +2265,6 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
         # Delta source
         sign_delta = delta/p_delta
         P['w'] = w_hat*sign_delta
-
     else:
         tot += p_scatter
         if tot > xi:
@@ -2328,6 +2291,45 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
             else:
                 sample_phasespace_fission(P, material_new, P, mcdc)
                 P['w'] = w_hat*sign_new
+
+@njit
+def sensitivity_material(P, mcdc):
+    # Get material
+    material = mcdc['materials'][P['material_ID']]
+
+    # Revive and assign sensitivity_ID
+    P['alive'] = True
+    P['sensitivity_ID'] = material['sensitivity_ID']
+
+    # Get XS
+    g = P['g']
+    SigmaT = material['total'][g]
+    SigmaS = material['scatter'][g]
+    SigmaF = material['fission'][g]
+    nu_s   = material['nu_s'][g]
+    nu     = material['nu_p'][g] + sum(material['nu_d'][g])
+
+    nuSigmaS = nu_s*SigmaS
+    nuSigmaF = nu*SigmaF
+
+    # Set weight
+    total  = SigmaT + nuSigmaS + nuSigmaF
+    P['w'] = total*P['w']/SigmaT
+
+    # Sample source type
+    xi  = rng(mcdc)*total
+    tot = SigmaT
+    if tot > xi:
+        # Delta source
+        P['w'] *= -1
+    else:
+        tot += nuSigmaS
+        if tot > xi:
+            # Scattering source
+            sample_phasespace_scattering(P, material, P, mcdc)
+        else:
+            # Fission source
+            sample_phasespace_fission(P, material, P, mcdc)
 
 #==============================================================================
 # Miscellany
