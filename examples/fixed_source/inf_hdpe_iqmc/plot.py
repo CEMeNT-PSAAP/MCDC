@@ -9,41 +9,53 @@ Created on Tue Dec 13 14:29:02 2022
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+import os
 
-# Load XS
-with np.load('../td_inf_shem361/SHEM-361.npz') as data:
-    SigmaT   = data['SigmaT']
-    nuSigmaF = data['nuSigmaF']
-    SigmaS   = data['SigmaS']
-    E        = data['E']
+# =============================================================================
+# import cross sections 
+# =============================================================================
+G = 12 # G may equal 12, 70, or 618
+script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
+rel_path        = "./HDPE/"
+abs_file_path   = os.path.join(script_dir, rel_path)
+D = np.genfromtxt(abs_file_path+"D_{}G_HDPE.csv".format(G), delimiter=",")
+SigmaA = np.genfromtxt(abs_file_path+"Siga_{}G_HDPE.csv".format(G), delimiter=",")
+SigmaS = np.genfromtxt(abs_file_path+"Scat_{}G_HDPE.csv".format(G), delimiter=",")
+# SigmaS = np.flip(SigmaS,1)
+# SigmaS = np.flip(SigmaS)
 
-G = len(SigmaT)
-E_mid = 0.5*(E[1:]+E[:-1])
-dE    = E[1:]-E[:-1]
+# =============================================================================
+# Calculate analytic solution
+# =============================================================================
+Nx = 5
+source = np.ones((G,Nx))
+SigmaT = SigmaS.sum(axis=0) + SigmaA
+SigmaT = 1/(3*D)
+sol = np.dot(np.linalg.inv(np.diag(SigmaT) - SigmaS), source)
 
-hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
+# =============================================================================
+# Grab data from MCDC Run
+# =============================================================================
 
-flux = hf['tally']['iqmc_flux'][:]
-flux = flux/dE*E_mid
-xspan = hf['iqmc']['grid']['x'][:]
-dx = xspan[1] - xspan[0]
-midpoints = xspan[1:] - dx
-# Nx = flux.shape[1]
+# hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
+hf = h5py.File('C:/Users/Sam/Documents/Github/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
 
+G           = 12
+flux        = hf['tally']['iqmc_flux'][:]
+xspan       = hf['iqmc']['grid']['x'][:]
+dx          = xspan[1] - xspan[0]
+midpoints   = xspan[1:] - dx
+Nx          = flux.shape[1]
 
-plt.step(E_mid,flux,'-b',label="MC",where='mid')
-# plt.fill_between(E_mid,phi_avg-phi_sd,phi_avg+phi_sd,alpha=0.2,color='b',step='mid')
-# plt.step(E_mid,phi_exact,'--r',label='analytical',where='mid')
-plt.xscale('log')
-plt.xlabel(r'$E$, eV')
-plt.ylabel(r'$E\phi(E)$')
-plt.grid()
-plt.legend()
-plt.show()
-# plt.figure(dpi=300, figsize=(7,4))
-# plt.plot(flux)
-# plt.title('HDPE Multigroup Problem')
-# plt.ylabel(r'$\phi$')
-# plt.xlabel('x')
+# =============================================================================
+# Plot 
+# =============================================================================
+plt.figure(dpi=300, figsize=(7,4))
+for i in range(G):
+    plt.plot(midpoints,flux[i,:])
+    # plt.plot(midpoints, sol[i,:], '--')
+plt.title('HDPE Multigroup Problem')
+plt.ylabel(r'$\phi$')
+plt.xlabel('x')
 
 hf.close()
