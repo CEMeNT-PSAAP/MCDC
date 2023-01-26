@@ -308,6 +308,8 @@ def make_type_technique(card):
     N_dim       = 6 # group, x, y, z, mu, phi 
     # TODO: make N_dim an input setting
     struct      += [('lds', float64, (N_particle, N_dim))]
+    # vectorized weights
+    struct      += [('iqmc_w', float64, (Ng,))]
     
     # Source
     struct += [('iqmc_source', float64, (Ng, Nt, Nx, Ny, Nz))]

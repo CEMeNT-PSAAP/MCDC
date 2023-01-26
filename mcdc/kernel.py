@@ -2306,6 +2306,7 @@ def prepare_qmc_particles(mcdc):
     mesh            = mcdc['technique']['iqmc_mesh']
     N_particle      = mcdc['setting']['N_particle']
     lds             = mcdc['technique']['lds'] # low discrepency sequence
+    weight          = mcdc['technique']['iqmc_w']
     Nx              = len(mesh['x']) - 1
     Ny              = len(mesh['y']) - 1
     Nz              = len(mesh['z']) - 1
@@ -2334,12 +2335,12 @@ def prepare_qmc_particles(mcdc):
         t,x,y,z,outside = mesh_get_index(P_new, mesh)
         mat_idx         = mcdc['technique']['iqmc_material_idx'][t,x,y,z]
         G               =  mcdc['materials'][mat_idx]['G']
-        g               = sample_qmc_group(lds[n,2], G)
-        P_new['g']      = g
+        # g               = sample_qmc_group(lds[n,2], G)
+        # P_new['g']      = g
         #calculate dx,dy,dz and then dV
         dV = iqmc_cell_volume(x,y,z,mesh)
         # Set weight
-        P_new['w'] = Q[g,t,x,y,z] * dV * Nt / N_particle 
+        P_new['w'] = Q[:,t,x,y,z] * dV * Nt / N_particle 
         # add to source bank
         add_particle(P_new, mcdc['bank_source'])
 
@@ -2444,14 +2445,14 @@ def score_iqmc_flux(P, distance, mcdc):
 
     """
     # Get indices
-    g                   = P['g']
+    # g                   = P['g']
     mesh                = mcdc['technique']['iqmc_mesh']
     material            = mcdc['materials'][P['material_ID']]
     w                   = P['w']
     g                   = P['g']
-    SigmaT              = material['total'][g]
-    SigmaS              = material['scatter'][g]
-    SigmaF              = material['fission'][g]
+    SigmaT              = material['total'][:]
+    SigmaS              = material['scatter'][:]
+    SigmaF              = material['fission'][:]
     t, x, y, z, outside = mesh_get_index(P, mesh)
     # Outside grid?
     if outside:
@@ -2462,10 +2463,10 @@ def score_iqmc_flux(P, distance, mcdc):
         flux = P['w']*(1-np.exp(-(distance*SigmaT)))/(SigmaT*dV)
     else:
         flux = distance*P['w']/dV
-    idx = (g,t,x,y,z)
-    mcdc['technique']['iqmc_flux'][idx]                 += flux
-    mcdc['technique']['iqmc_effective_scattering'][idx] += flux*SigmaS 
-    mcdc['technique']['iqmc_effective_fission'][idx]    += flux*SigmaF 
+    # idx = (g,t,x,y,z)
+    mcdc['technique']['iqmc_flux'][:,t,x,y,z]                 += flux
+    mcdc['technique']['iqmc_effective_scattering'][:,t,x,y,z] += flux*SigmaS 
+    mcdc['technique']['iqmc_effective_fission'][:,t,x,y,z]    += flux*SigmaF 
 
 
 @njit
@@ -2565,7 +2566,7 @@ def sample_qmc_group(sample, G):
 @njit
 def weight_roulette(P, mcdc):
     target    = mcdc['technique']['wr_target']
-    chance    = abs(P['w']/target)
+    chance    = abs(P['w']/target).sum()
     x         = rng(mcdc)
     if (x <= chance):
         P['w'] /= chance
