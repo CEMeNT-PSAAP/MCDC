@@ -268,10 +268,7 @@ def loop_particle(P, mcdc):
             if abs(P['w']) <= mcdc['technique']['wr_threshold']:
                 kernel.weight_roulette(P, mcdc)
 
-
 # =============================================================================
 # iQMC Loop
 # =============================================================================
-
-# @njit
-# def iqmc_loop(mcdc):
+# TODO: write iterative methods
