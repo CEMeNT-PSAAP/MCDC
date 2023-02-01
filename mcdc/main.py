@@ -90,6 +90,8 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_particle(input_card)
+    type_.make_type_particle_record(input_card)
     type_.make_type_material(G,J)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)

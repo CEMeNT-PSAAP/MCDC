@@ -10,8 +10,8 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
-#hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/slab_reed_iqmc/output.h5', 'r')
-hf = h5py.File('C:/Users/Sam/Documents/Github/MCDC/examples/fixed_source/slab_reed_iqmc/output.h5', 'r')
+hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/slab_reed_iqmc/output.h5', 'r')
+# hf = h5py.File('C:/Users/Sam/Documents/Github/MCDC/examples/fixed_source/slab_reed_iqmc/output.h5', 'r')
 
 flux = hf['tally']['iqmc_flux'][:]
 xspan = hf['iqmc']['grid']['x'][:]

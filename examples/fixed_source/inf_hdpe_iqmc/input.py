@@ -51,14 +51,14 @@ mcdc.iQMC(g             = np.ones((0,G)),
           material_idx  = material_idx, 
           maxitt        = 5,
           tol           = 1e-3,
-          generator     = 'sobol')
+          generator     = 'halton')
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=2**10)
+mcdc.setting(N_particle=1000)
 
 # Run
 mcdc.run()

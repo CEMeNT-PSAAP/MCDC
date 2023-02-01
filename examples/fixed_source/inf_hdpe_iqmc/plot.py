@@ -21,24 +21,21 @@ abs_file_path   = os.path.join(script_dir, rel_path)
 D = np.genfromtxt(abs_file_path+"D_{}G_HDPE.csv".format(G), delimiter=",")
 SigmaA = np.genfromtxt(abs_file_path+"Siga_{}G_HDPE.csv".format(G), delimiter=",")
 SigmaS = np.genfromtxt(abs_file_path+"Scat_{}G_HDPE.csv".format(G), delimiter=",")
-# SigmaS = np.flip(SigmaS,1)
-# SigmaS = np.flip(SigmaS)
+SigmaT = np.sum(SigmaS,0)[:] + SigmaA
 
 # =============================================================================
 # Calculate analytic solution
 # =============================================================================
 Nx = 5
 source = np.ones((G,Nx))
-SigmaT = SigmaS.sum(axis=0) + SigmaA
-SigmaT = 1/(3*D)
 sol = np.dot(np.linalg.inv(np.diag(SigmaT) - SigmaS), source)
 
 # =============================================================================
-# Grab data from MCDC Run
+# Data from MCDC Run
 # =============================================================================
 
-# hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
-hf = h5py.File('C:/Users/Sam/Documents/Github/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
+hf = h5py.File('/Users/sampasmann/Documents/GitHub/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
+# hf = h5py.File('C:/Users/Sam/Documents/Github/MCDC/examples/fixed_source/inf_hdpe_iqmc/output.h5', 'r')
 
 G           = 12
 flux        = hf['tally']['iqmc_flux'][:]
@@ -59,3 +56,4 @@ plt.ylabel(r'$\phi$')
 plt.xlabel('x')
 
 hf.close()
+
