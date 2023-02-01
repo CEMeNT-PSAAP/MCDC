@@ -225,7 +225,8 @@ def prepare():
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff',
                         'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample',
                         'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds',
-                        'iqmc_effective_scattering', 'iqmc_effective_fission']:
+                        'iqmc_effective_scattering', 'iqmc_effective_fission',
+                        'iqmc_res']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter

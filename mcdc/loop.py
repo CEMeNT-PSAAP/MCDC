@@ -56,8 +56,7 @@ def loop_main(mcdc):
                 (mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
                 simulation_end = True
             # calculate norm of flux iterations
-            mcdc['technique']['iqmc_res'] = kernel.calculate_qmc_res(mcdc['technique']['iqmc_flux'],
-                                                        mcdc['technique']['iqmc_flux_old'])
+            kernel.calculate_qmc_res(mcdc)
 
             print()
             print()
