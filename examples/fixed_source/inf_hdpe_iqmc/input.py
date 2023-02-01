@@ -16,7 +16,6 @@ SigmaA = np.genfromtxt(abs_file_path+"Siga_{}G_HDPE.csv".format(G), delimiter=",
 SigmaS = np.genfromtxt(abs_file_path+"Scat_{}G_HDPE.csv".format(G), delimiter=",")
 
 SigmaS = np.flip(SigmaS,1)
-SigmaS = np.flip(SigmaS)
 
 # =============================================================================
 # Set Model
