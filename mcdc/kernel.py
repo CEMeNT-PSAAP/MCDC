@@ -209,6 +209,9 @@ def get_particle(bank):
     P['uz'] = P_rec['uz']
     P['g']  = P_rec['g']
     P['w']  = P_rec['w']
+    
+    P['iqmc_w'] = P_rec['iqmc_w']
+    
     P['alive'] = True
     P['sensitivity_ID'] = P_rec['sensitivity_ID']
 
@@ -1644,14 +1647,15 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     if mcdc['technique']['iQMC']:
-        material = mcdc['materials'][P['material_ID']]
-        w        = P['w']
-        g        = P['g']
-        SigmaT   = material['total'][g]
+        material    = mcdc['materials'][P['material_ID']]
+        w           = P['iqmc_w']
+        SigmaT      = material['total'][:]
         score_iqmc_flux(P, distance, mcdc)
-        w_final = continuous_weight_reduction(w, distance, SigmaT)
-        P['w'] = w_final
-        
+        # print(distance)
+        w_final     = continuous_weight_reduction(w, distance, SigmaT)
+        P['iqmc_w'] = w_final
+        P['w']      = w_final.sum()
+        # print(P['iqmc_w'])
         
     # Score tracklength tallies
     if mcdc['tally']['tracklength'] and mcdc['cycle_active']:
@@ -1662,8 +1666,8 @@ def move_to_event(P, mcdc):
     # Move particle
     move_particle(P, distance, mcdc)
     
-    if mcdc['technique']['iQMC']:
-        P['w'] = w_final
+    # if mcdc['technique']['iQMC']:
+    #     P['iqmc_w'] = w_final
     
 
 @njit
@@ -2333,13 +2337,15 @@ def prepare_qmc_particles(mcdc):
         P_new['t']      = 0
         t,x,y,z,outside = mesh_get_index(P_new, mesh)
         mat_idx         = mcdc['technique']['iqmc_material_idx'][t,x,y,z]
-        G               =  mcdc['materials'][mat_idx]['G']
-        g               = sample_qmc_group(lds[n,2], G)
-        P_new['g']      = g
+        G               = mcdc['materials'][mat_idx]['G']
         #calculate dx,dy,dz and then dV
+        # TODO: Bug where if x = 0.0 the x-index is -1 
         dV = iqmc_cell_volume(x,y,z,mesh)
         # Set weight
-        P_new['w'] = Q[g,t,x,y,z] * dV * Nt / N_particle 
+        P_new['iqmc_w'] = Q[:,t,x,y,z] * dV * Nt / N_particle 
+        P_new['w']      = (P_new['iqmc_w']).sum()
+        # print(P_new['w'])
+        # print(P_new['iqmc_w'])
         # add to source bank
         add_particle(P_new, mcdc['bank_source'])
 
@@ -2444,28 +2450,26 @@ def score_iqmc_flux(P, distance, mcdc):
 
     """
     # Get indices
-    g                   = P['g']
+    # g                   = P['g']
     mesh                = mcdc['technique']['iqmc_mesh']
     material            = mcdc['materials'][P['material_ID']]
-    w                   = P['w']
-    g                   = P['g']
-    SigmaT              = material['total'][g]
-    SigmaS              = material['scatter'][g]
-    SigmaF              = material['fission'][g]
+    w                   = P['iqmc_w']
+    SigmaT              = material['total']
+    SigmaS              = material['scatter']
+    SigmaF              = material['fission']
     t, x, y, z, outside = mesh_get_index(P, mesh)
     # Outside grid?
     if outside:
         return
     dV = iqmc_cell_volume(x,y,z,mesh)
     # Score
-    if (SigmaT > 0.0):
-        flux = P['w']*(1-np.exp(-(distance*SigmaT)))/(SigmaT*dV)
+    if (SigmaT.all() > 0.0):
+        flux = w*(1-np.exp(-(distance*SigmaT)))/(SigmaT*dV)
     else:
-        flux = distance*P['w']/dV
-    idx = (g,t,x,y,z)
-    mcdc['technique']['iqmc_flux'][idx]                 += flux
-    mcdc['technique']['iqmc_effective_scattering'][idx] += flux*SigmaS 
-    mcdc['technique']['iqmc_effective_fission'][idx]    += flux*SigmaF 
+        flux = distance * w / dV
+    mcdc['technique']['iqmc_flux'][:,t,x,y,z]                 += flux
+    mcdc['technique']['iqmc_effective_scattering'][:,t,x,y,z] += flux*SigmaS 
+    mcdc['technique']['iqmc_effective_fission'][:,t,x,y,z]    += flux*SigmaF 
 
 
 @njit
@@ -2564,11 +2568,11 @@ def sample_qmc_group(sample, G):
 
 @njit
 def weight_roulette(P, mcdc):
-    target    = mcdc['technique']['wr_target']
-    chance    = abs(P['w']/target)
+    chance    = 0.1 # (1-chance)x100% particles are eliminated 
     x         = rng(mcdc)
     if (x <= chance):
-        P['w'] /= chance
+        P['iqmc_w'] /= chance
+        P['w']      /= chance
     else:
         P['alive'] = False
 
