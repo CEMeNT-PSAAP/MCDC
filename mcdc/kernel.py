@@ -2337,7 +2337,7 @@ def prepare_qmc_particles(mcdc):
         P_new['t']      = 0
         t,x,y,z,outside = mesh_get_index(P_new, mesh)
         mat_idx         = mcdc['technique']['iqmc_material_idx'][t,x,y,z]
-        G               =  mcdc['materials'][mat_idx]['G']
+        G               = mcdc['materials'][mat_idx]['G']
         #calculate dx,dy,dz and then dV
         # TODO: Bug where if x = 0.0 the x-index is -1 
         dV = iqmc_cell_volume(x,y,z,mesh)

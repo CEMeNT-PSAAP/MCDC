@@ -805,10 +805,11 @@ def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
         ax_expand.append(3)
     for ax in ax_expand:
         material_idx = np.expand_dims(material_idx, axis=ax)
-        
+    
+    card['iqmc_flux']           = phi0
     card['iqmc_fixed_source']   = fixed_source
     card['iqmc_material_idx']   = material_idx
-    card['iqmc_flux']           = phi0
+
 
 # ==============================================================================
 # Util

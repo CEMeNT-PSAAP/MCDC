@@ -14,7 +14,6 @@ abs_file_path   = os.path.join(script_dir, rel_path)
 D = np.genfromtxt(abs_file_path+"D_{}G_HDPE.csv".format(G), delimiter=",")
 SigmaA = np.genfromtxt(abs_file_path+"Siga_{}G_HDPE.csv".format(G), delimiter=",")
 SigmaS = np.genfromtxt(abs_file_path+"Scat_{}G_HDPE.csv".format(G), delimiter=",")
-
 SigmaS = np.flip(SigmaS,1)
 
 # =============================================================================
@@ -49,7 +48,7 @@ mcdc.iQMC(g             = np.ones((0,G)),
           fixed_source  = fixed_source, 
           phi0          = phi0, 
           material_idx  = material_idx, 
-          maxitt        = 5,
+          maxitt        = 25,
           tol           = 1e-3,
           generator     = 'halton')
 
