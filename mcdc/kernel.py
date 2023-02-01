@@ -2410,7 +2410,7 @@ def scattering_source(phi, mat_idx, mcdc):
     return np.dot(chi_s.T, SigmaS * phi)
     
 @njit
-def calculate_qmc_res(flux_new, flux_old):
+def calculate_qmc_res(mcdc):
     """
     
     Calculate residual between scalar flux iterations.
@@ -2428,7 +2428,11 @@ def calculate_qmc_res(flux_new, flux_old):
         L2 Norm of arrays.
 
     """
-    return np.linalg.norm((flux_new - flux_old))
+    size = mcdc['technique']['iqmc_flux'].size
+    flux_new = mcdc['technique']['iqmc_flux'].reshape((size,))
+    flux_old = mcdc['technique']['iqmc_flux_old'].reshape((size,))
+    res      = np.linalg.norm((flux_new - flux_old))
+    mcdc['technique']['iqmc_res'] = res
 
 @njit
 def score_iqmc_flux(P, distance, mcdc):
