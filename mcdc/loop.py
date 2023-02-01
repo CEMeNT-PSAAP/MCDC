@@ -20,12 +20,11 @@ def loop_main(mcdc):
         if mcdc['technique']['iQMC']:
             # reset particle bank size
             mcdc['bank_source']['size']=0
-            # prepare source for next iteration
             mcdc['technique']['iqmc_source'] = np.zeros_like(mcdc['technique']['iqmc_source'])
             kernel.prepare_qmc_source(mcdc) # set bank source
-            mcdc['technique']['iqmc_flux'] = np.zeros_like(mcdc['technique']['iqmc_flux'])
             kernel.prepare_qmc_particles(mcdc) # initialize particles with LDS
-
+            # prepare source for next iteration
+            mcdc['technique']['iqmc_flux'] = np.zeros_like(mcdc['technique']['iqmc_flux'])
         # Loop over source particles
         loop_source(mcdc)
 
@@ -268,10 +267,7 @@ def loop_particle(P, mcdc):
             if abs(P['w']) <= mcdc['technique']['wr_threshold']:
                 kernel.weight_roulette(P, mcdc)
 
-
 # =============================================================================
 # iQMC Loop
 # =============================================================================
-
-# @njit
-# def iqmc_loop(mcdc):
+# TODO: write iterative methods

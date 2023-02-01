@@ -90,6 +90,8 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_particle(input_card)
+    type_.make_type_particle_record(input_card)
     type_.make_type_material(G,J)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
@@ -223,8 +225,7 @@ def prepare():
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff',
                         'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample',
                         'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds',
-                        'iqmc_effective_scattering', 'iqmc_effective_fission',
-                        'iqmc_flux']:
+                        'iqmc_effective_scattering', 'iqmc_effective_fission']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter

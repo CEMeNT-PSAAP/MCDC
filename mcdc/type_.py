@@ -14,21 +14,34 @@ bool_   = np.bool_
 # ==============================================================================
 
 # Particle (in-flight)
-particle = np.dtype([
-    ('x', float64), ('y', float64), ('z', float64), ('t', float64),
-    ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
-    ('w', float64), ('alive', bool_),
-    ('material_ID', int64), ('cell_ID', int64), 
-    ('surface_ID', int64), ('translation', float64, (3,)),
-    ('event', int64),
-    ('sensitivity_ID', int64)
-    ])
+particle = None
+def make_type_particle(input_card):
+    global particle
+    struct = [
+        ('x', float64), ('y', float64), ('z', float64), ('t', float64),
+        ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
+        ('w', float64), ('alive', bool_),
+        ('material_ID', int64), ('cell_ID', int64), 
+        ('surface_ID', int64), ('translation', float64, (3,)),
+        ('event', int64),
+        ('sensitivity_ID', int64)
+        ]
+    if (input_card.technique['iQMC']):
+        Ng        = input_card.materials[0]['G']
+        struct += [('iqmc_w', float64, (Ng,))]
+    particle = np.dtype(struct)
 
 # Particle record (in-bank)
-particle_record = np.dtype([
-    ('x', float64), ('y', float64), ('z', float64), ('t', float64),
-    ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
-    ('w', float64), ('sensitivity_ID', int64)])
+def make_type_particle_record(input_card):
+    global particle_record
+    struct = [
+        ('x', float64), ('y', float64), ('z', float64), ('t', float64),
+        ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64), 
+        ('w', float64), ('sensitivity_ID', int64)]
+    if (input_card.technique['iQMC']):
+        Ng      = input_card.materials[0]['G']
+        struct += [('iqmc_w', float64, (Ng,))]
+    particle_record = np.dtype(struct)
 
 # Static records (for IC generator, )
 neutron   = np.dtype([('x', float64), ('y', float64), ('z', float64),

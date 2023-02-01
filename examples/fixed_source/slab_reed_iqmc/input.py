@@ -38,7 +38,7 @@ mcdc.cell([+s7, -s8], m4)
 # iQMC Parameters
 # =============================================================================
 
-Nx                                         = 64
+Nx                                         = 32
 
 fixed_source                               = np.zeros(Nx)
 fixed_source[int(0.375*Nx):int(0.625*Nx)]  = 50.0
@@ -56,7 +56,7 @@ material_idx[int(0.8125*Nx):]                = 3
 phi0 = np.ones((Nx))
 
 mcdc.iQMC(x=np.linspace(-8,8,num=Nx+1), fixed_source=fixed_source, 
-          phi0=phi0, material_idx=material_idx, maxitt=10, tol=1e-4,
+          phi0=phi0, material_idx=material_idx, maxitt=10, tol=1e-3,
           generator='sobol')
 
 # =============================================================================
@@ -64,7 +64,7 @@ mcdc.iQMC(x=np.linspace(-8,8,num=Nx+1), fixed_source=fixed_source,
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=2**12)
+mcdc.setting(N_particle=2**11)
 
 # Run
 mcdc.run()

@@ -769,8 +769,8 @@ def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
     card['iqmc_scramble']   = scramble
     card['iqmc_seed']       = seed
     card['weight_roulette'] = True
-    card['wr_threshold']    = 1e-14
-    card['wr_target']       = 1.0
+    card['wr_threshold']    = 1e-4
+    card['wr_target']       = 1e-12 # TODO: remove
     
     # Set mesh
     if g is not None: card['iqmc_mesh']['g'] = g
@@ -805,10 +805,11 @@ def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
         ax_expand.append(3)
     for ax in ax_expand:
         material_idx = np.expand_dims(material_idx, axis=ax)
-        
+    
+    card['iqmc_flux']           = phi0
     card['iqmc_fixed_source']   = fixed_source
     card['iqmc_material_idx']   = material_idx
-    card['iqmc_flux']           = phi0
+
 
 # ==============================================================================
 # Util
