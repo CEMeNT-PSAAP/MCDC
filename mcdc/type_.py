@@ -336,7 +336,8 @@ def make_type_technique(card):
     # Constants
     struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64), ('iqmc_itt', int64),
                ('iqmc_res', float64), ('iqmc_N_dim', int64), 
-               ('iqmc_scramble', bool_), ('iqmc_seed', int64)]
+               ('iqmc_scramble', bool_), ('iqmc_seed', int64), 
+               ('iqmc_generator', 'U30')]
     
     
     # =========================================================================

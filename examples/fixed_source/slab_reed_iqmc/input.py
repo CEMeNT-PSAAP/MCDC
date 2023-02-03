@@ -57,7 +57,7 @@ phi0 = np.ones((Nx))
 
 mcdc.iQMC(x=np.linspace(-8,8,num=Nx+1), fixed_source=fixed_source, 
           phi0=phi0, material_idx=material_idx, maxitt=10, tol=1e-3,
-          generator='sobol')
+          generator='halton')
 
 # =============================================================================
 # Set tally, setting, and run mcdc

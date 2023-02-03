@@ -764,7 +764,7 @@ def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
     card['iQMC']            = True
     card['iqmc_tol']        = tol
     card['iqmc_maxitt']     = maxitt
-    card['generator']       = generator
+    card['iqmc_generator']  = generator
     card['iqmc_N_dim']      = N_dim
     card['iqmc_scramble']   = scramble
     card['iqmc_seed']       = seed

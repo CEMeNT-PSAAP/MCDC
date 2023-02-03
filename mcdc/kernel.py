@@ -186,7 +186,7 @@ def add_particle(P, bank):
     bank['size'] += 1
 
 @njit
-def get_particle(bank):
+def get_particle(bank, mcdc):
     # Check if bank is empty
     if bank['size'] == 0:
         with objmode():
@@ -210,7 +210,8 @@ def get_particle(bank):
     P['g']  = P_rec['g']
     P['w']  = P_rec['w']
     
-    # P['iqmc_w'] = P_rec['iqmc_w']
+    if (mcdc['technique']['iQMC']):
+        P['iqmc_w'] = P_rec['iqmc_w']
     
     P['alive'] = True
     P['sensitivity_ID'] = P_rec['sensitivity_ID']
