@@ -5,7 +5,7 @@ from numba import njit, objmode
 import mcdc.kernel as kernel
 
 from mcdc.constant import *
-from mcdc.print_   import print_progress, print_progress_eigenvalue
+from mcdc.print_   import print_progress, print_progress_eigenvalue, print_progress_iqmc
 
 import matplotlib.pyplot as plt
 
@@ -52,21 +52,14 @@ def loop_main(mcdc):
         # iQMC convergence criteria
         elif mcdc['technique']['iQMC']:
             mcdc['technique']['iqmc_itt'] += 1
+            # calculate norm of flux iterations
+            kernel.calculate_qmc_res(mcdc)
             if (mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt']) or \
                 (mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
                 simulation_end = True
-            # calculate norm of flux iterations
-            kernel.calculate_qmc_res(mcdc)
-
-            print()
-            print()
-            print('*******************************')
-            print('Iteration ', mcdc['technique']['iqmc_itt'])
-            print('Residual ', mcdc['technique']['iqmc_res'])
-            print('*******************************')
-            print()
-            print()
-
+            # Print progres
+            #with objmode():
+            print_progress_iqmc(mcdc)
             # set flux_old = current flux
             mcdc['technique']['iqmc_flux_old'] = mcdc['technique']['iqmc_flux'].copy()
 
@@ -140,7 +133,7 @@ def loop_source(mcdc):
         # Loop until active bank is exhausted
         while mcdc['bank_active']['size'] > 0:
             # Get particle from active bank
-            P = kernel.get_particle(mcdc['bank_active'])
+            P = kernel.get_particle(mcdc['bank_active'], mcdc)
 
             # Apply weight window
             if mcdc['technique']['weight_window']:

@@ -69,7 +69,7 @@ def f_phi_x(x):
     return phi5(x)
 
 with h5py.File('output.h5', 'r') as f:
-    x     = f['tally/grid/x'][:]
+    x     = f['iqmc/grid/x'][:]
     dx    = (x[1]-x[0])
     x_mid = 0.5*(x[:-1]+x[1:])
 
@@ -89,29 +89,13 @@ for i in range(len(x_mid)):
 # Load output
 with h5py.File('output.h5', 'r') as f:
     # Note the spatial (dx) and source strength (100+1) normalization
-    phi      = f['tally/flux/mean'][:]/dx*101.
-    phi_sd   = f['tally/flux/sdev'][:]/dx*101.
-    phi_x    = f['tally/flux-x/mean'][1:]*101.
-    phi_x_sd = f['tally/flux-x/sdev'][1:]*101.
+    phi      = f['tally/iqmc_flux'][:]/dx*101.
 
 # Flux - spatial average
-plt.plot(x_mid,phi,'-b',label="MC")
-plt.fill_between(x_mid,phi-phi_sd,phi+phi_sd,alpha=0.2,color='b')
-plt.plot(x_mid,phi_ref,'--r',label="ref.")
-plt.xlabel(r'$x$, cm')
-plt.ylabel('Flux')
+plt.figure(dpi=300,figsize=(8,5))
+# plt.plot(x_mid,phi_ref,label='Sol')
+plt.plot(x_mid,phi,label='iQMC')
+plt.ylabel(r'$\phi(x)$')
+plt.xlabel(r'$x$')
 plt.grid()
-plt.legend()
-plt.title(r'$\bar{\phi}_i$')
-plt.show()
 
-# Flux - spatial grid
-plt.plot(x[1:],phi_x,'-b',label="MC")
-plt.fill_between(x[1:],phi_x-phi_x_sd,phi_x+phi_x_sd,alpha=0.2,color='b')
-plt.plot(x[:],phi_x_ref,'--r',label="ref.")
-plt.xlabel(r'$x$, cm')
-plt.ylabel('Flux')
-plt.grid()
-plt.legend()
-plt.title(r'$\phi(x)$')
-plt.show()

@@ -20,14 +20,14 @@ mcdc       = mcdc_.global_
 
 #@profile
 def run():
-    # Print banner and hardware configuration
-    print_banner()
-
     # Preparation:
     #   process input cards, make types, and allocate global variables
     prepare()
     input_card.reset()
-
+    
+    # Print banner and hardware configuration
+    print_banner(mcdc)
+    
     # Run
     print_msg(" Now running TNT...")
     if mcdc['setting']['mode_eigenvalue']:
@@ -226,7 +226,7 @@ def prepare():
                         'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample',
                         'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source','lds',
                         'iqmc_effective_scattering', 'iqmc_effective_fission',
-                        'iqmc_res']:
+                        'iqmc_res', 'iqmc_generator']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -253,7 +253,8 @@ def prepare():
         mcdc['technique']['iqmc_mesh']['z'] = input_card.technique['iqmc_mesh']['z']
         mcdc['technique']['iqmc_mesh']['t'] = input_card.technique['iqmc_mesh']['t']
 
-        if (input_card.technique['generator'] == 'sobol'):
+        mcdc['technique']['iqmc_generator'] = input_card.technique['iqmc_generator']
+        if (input_card.technique['iqmc_generator'] == 'sobol'):
             scramble                        = mcdc['technique']['iqmc_scramble']
             N_dim                           = mcdc['technique']['iqmc_N_dim']
             N                               = mcdc['setting']['N_particle']
@@ -262,7 +263,7 @@ def prepare():
             mcdc['setting']['N_particle']   = 2**m
             mcdc['technique']['lds']        = sampler.random_base2(m=m)
             # lds is shape (2**m, d)
-        if (input_card.technique['generator'] == 'halton'):
+        if (input_card.technique['iqmc_generator'] == 'halton'):
             scramble                        = mcdc['technique']['iqmc_scramble']
             N_dim                           = mcdc['technique']['iqmc_N_dim']
             seed                            = mcdc['technique']['iqmc_seed']
@@ -271,7 +272,7 @@ def prepare():
                                             scramble=scramble, seed=seed)
             sampler.fast_forward(1)
             mcdc['technique']['lds']        = sampler.random(N)
-        if (input_card.technique['generator'] == 'random'):
+        if (input_card.technique['iqmc_generator'] == 'random'):
             seed                            = mcdc['technique']['iqmc_seed']
             N_dim                           = mcdc['technique']['iqmc_N_dim']
             N                               = mcdc['setting']['N_particle']

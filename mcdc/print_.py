@@ -19,7 +19,7 @@ def print_warning(msg):
         print("Warning: %s\n"%msg)
         sys.stdout.flush()
 
-def print_banner():
+def print_banner(mcdc):
     size = MPI.COMM_WORLD.Get_size()
     if master:
         banner = "\n"\
@@ -33,11 +33,17 @@ def print_banner():
             banner += "           Mode | Python\n"
         else:
             banner += "           Mode | Numba\n"
-        banner     += "      Algorithm | History-based\n"
+        if mcdc['technique']['iQMC']:
+            banner += "      Algorithm | iQMC\n"
+            rng     = mcdc['technique']['iqmc_generator']
+            banner += "            RNG | "+rng+"\n"
+        else:
+            banner += "      Algorithm | History-based\n"
         banner     += "  MPI Processes | %i\n"%size
         banner     += " OpenMP Threads | 1"
         print(banner)
         sys.stdout.flush()
+            
 
 def print_progress(percent, mcdc):
     if master:
@@ -115,3 +121,15 @@ def print_bank(bank, show_content=False):
         for i in range(size):
             print(' ',particles[i])
     print('\n')
+
+@nb.njit
+def print_progress_iqmc(mcdc):
+    # TODO: function was not working with numba when structured like the 
+    # other print_progress functions
+    if master:
+        itt = mcdc['technique']['iqmc_itt']
+        res = mcdc['technique']['iqmc_res']
+        print("\n*******************************")
+        print("Iteration ", itt)
+        print("Residual ", res)
+        print("*******************************\n")
