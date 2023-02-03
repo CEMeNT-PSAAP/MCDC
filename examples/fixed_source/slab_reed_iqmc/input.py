@@ -38,7 +38,7 @@ mcdc.cell([+s7, -s8], m4)
 # iQMC Parameters
 # =============================================================================
 
-Nx                                         = 32
+Nx                                         = 128
 
 fixed_source                               = np.zeros(Nx)
 fixed_source[int(0.375*Nx):int(0.625*Nx)]  = 50.0
