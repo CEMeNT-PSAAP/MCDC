@@ -210,7 +210,7 @@ def get_particle(bank):
     P['g']  = P_rec['g']
     P['w']  = P_rec['w']
     
-    P['iqmc_w'] = P_rec['iqmc_w']
+    # P['iqmc_w'] = P_rec['iqmc_w']
     
     P['alive'] = True
     P['sensitivity_ID'] = P_rec['sensitivity_ID']
