@@ -754,6 +754,61 @@ def IC_generator(N_neutron=0, N_precursor=0):
     card['IC_generator']   = True
     card['IC_N_neutron']   = int(N_neutron)
     card['IC_N_precursor'] = int(N_precursor)
+    
+def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None, 
+         maxitt=25, tol=1e-6, generator='halton', fixed_source_solver='picard', 
+         eigenmode_solver='davidson', material_idx=None, N_dim=6, 
+         scramble=False, seed=12345):
+    
+    card                    = mcdc.input_card.technique
+    card['iQMC']            = True
+    card['iqmc_tol']        = tol
+    card['iqmc_maxitt']     = maxitt
+    card['iqmc_generator']  = generator
+    card['iqmc_N_dim']      = N_dim
+    card['iqmc_scramble']   = scramble
+    card['iqmc_seed']       = seed
+    card['weight_roulette'] = True
+    card['wr_threshold']    = 1e-4
+    card['wr_target']       = 1e-12 # TODO: remove
+    
+    # Set mesh
+    if g is not None: card['iqmc_mesh']['g'] = g
+    if t is not None: card['iqmc_mesh']['t'] = t
+    if x is not None: card['iqmc_mesh']['x'] = x
+    if y is not None: card['iqmc_mesh']['y'] = y
+    if z is not None: card['iqmc_mesh']['z'] = z
+
+    ax_expand = []
+    if g is None:
+        ax_expand.append(0)
+    if t is None:
+        ax_expand.append(1)
+    if x is None:
+        ax_expand.append(2)
+    if y is None:
+        ax_expand.append(3)
+    if z is None:
+        ax_expand.append(4)
+    for ax in ax_expand:
+        fixed_source = np.expand_dims(fixed_source, axis=ax)
+        phi0         = np.expand_dims(phi0, axis=ax)
+        
+    ax_expand = []
+    if t is None:
+        ax_expand.append(0)
+    if x is None:
+        ax_expand.append(1)
+    if y is None:
+        ax_expand.append(2)
+    if z is None:
+        ax_expand.append(3)
+    for ax in ax_expand:
+        material_idx = np.expand_dims(material_idx, axis=ax)
+    
+    card['iqmc_flux']           = phi0
+    card['iqmc_fixed_source']   = fixed_source
+    card['iqmc_material_idx']   = material_idx
 
 
 # ==============================================================================
