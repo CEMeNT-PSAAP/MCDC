@@ -15,7 +15,8 @@ import mcdc.global_ as mcdc
 # ==============================================================================
 
 def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
-             chi_p=None, chi_d=None, nu_s=None, speed=None, decay=None):
+             chi_p=None, chi_d=None, nu_s=None, speed=None, decay=None,
+             sensitivity=False):
     """
     Arguments
     ---------
@@ -86,6 +87,8 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     card['chi_s']   = np.zeros([G,G])
     card['chi_p']   = np.zeros([G,G])
     card['chi_d']   = np.zeros([J,G])
+    card['sensitivity']    = False
+    card['sensitivity_ID'] = 0
 
     # Speed
     if speed is not None:
@@ -151,6 +154,17 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
         for dg in range(J):
             if np.sum(card['chi_d'][dg,:]) > 0.0:
                 card['chi_d'][dg,:] /= np.sum(card['chi_d'][dg,:])
+    
+    # Sensitivity
+    if sensitivity:
+        # Set flag
+        card['sensitivity'] = True
+        mcdc.input_card.technique['sensitivity'] = True
+        mcdc.input_card.technique['weighted_emission'] = False
+
+        # Set ID
+        mcdc.input_card.technique['sensitivity_N'] += 1
+        card['sensitivity_ID'] = mcdc.input_card.technique['sensitivity_N']
 
     # Push card
     mcdc.input_card.materials.append(card)
