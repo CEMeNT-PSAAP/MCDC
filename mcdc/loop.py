@@ -5,7 +5,8 @@ from numba import njit, objmode
 import mcdc.kernel as kernel
 
 from mcdc.constant import *
-from mcdc.print_ import print_progress, print_progress_eigenvalue, print_progress_iqmc
+from mcdc.print_ import print_progress, print_progress_eigenvalue, \
+    print_progress_iqmc
 
 import matplotlib.pyplot as plt
 
@@ -57,14 +58,17 @@ def loop_main(mcdc):
             mcdc['technique']['iqmc_itt'] += 1
             # calculate norm of flux iterations
             kernel.calculate_qmc_res(mcdc)
-            if (mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt']) or (
-                    mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
+            if (mcdc['technique']['iqmc_itt'] ==
+                mcdc['technique']['iqmc_maxitt']) or (
+                    mcdc['technique']['iqmc_res'] <=
+                    mcdc['technique']['iqmc_tol']):
                 simulation_end = True
             # Print progres
             # with objmode():
             print_progress_iqmc(mcdc)
             # set flux_old = current flux
-            mcdc['technique']['iqmc_flux_old'] = mcdc['technique']['iqmc_flux'].copy()
+            mcdc['technique']['iqmc_flux_old'] = \
+                mcdc['technique']['iqmc_flux'].copy()
 
         # Time census closeout
         elif mcdc['technique']['time_census']\
