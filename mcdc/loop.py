@@ -5,11 +5,13 @@ from numba import njit, objmode
 import mcdc.kernel as kernel
 
 from mcdc.constant import *
-from mcdc.print_   import print_progress, print_progress_eigenvalue
+from mcdc.print_ import print_progress, print_progress_eigenvalue
+
 
 # =========================================================================
 # Main loop
 # =========================================================================
+
 
 @njit
 def loop_main(mcdc):
@@ -17,7 +19,7 @@ def loop_main(mcdc):
     while not simulation_end:
         # Loop over source particles
         loop_source(mcdc)
-        
+
         # Eigenvalue cycle closeout
         if mcdc['setting']['mode_eigenvalue']:
             # Tally history closeout
@@ -31,17 +33,18 @@ def loop_main(mcdc):
 
             # Manage particle banks
             kernel.manage_particle_banks(mcdc)
-            
+
             # Cycle management
             mcdc['i_cycle'] += 1
-            if mcdc['i_cycle'] == mcdc['setting']['N_cycle']: 
+            if mcdc['i_cycle'] == mcdc['setting']['N_cycle']:
                 simulation_end = True
             elif mcdc['i_cycle'] >= mcdc['setting']['N_inactive']:
                 mcdc['cycle_active'] = True
 
         # Time census closeout
-        elif mcdc['technique']['time_census'] and \
-             mcdc['technique']['census_idx'] < len(mcdc['technique']['census_time'])-1:
+        elif mcdc['technique']['time_census']\
+            and mcdc['technique']['census_idx']\
+                < len(mcdc['technique']['census_time'])-1:
             # Manage particle banks
             kernel.manage_particle_banks(mcdc)
 
@@ -53,7 +56,7 @@ def loop_main(mcdc):
             simulation_end = True
 
     # Tally closeout
-    kernel.tally_closeout(mcdc)    
+    kernel.tally_closeout(mcdc)
 
 
 # =============================================================================
@@ -68,7 +71,7 @@ def loop_source(mcdc):
 
     # Progress bar indicator
     N_prog = 0
-    
+
     # Loop over particle sources
     for work_idx in range(mcdc['mpi_work_size']):
         # Initialize RNG wrt work index
@@ -81,7 +84,7 @@ def loop_source(mcdc):
         # Get from fixed-source?
         if mcdc['bank_source']['size'] == 0:
             # Sample source
-            xi  = kernel.rng(mcdc)
+            xi = kernel.rng(mcdc)
             tot = 0.0
             for S in mcdc['sources']:
                 tot += S['prob']
@@ -114,7 +117,7 @@ def loop_source(mcdc):
             # Apply weight window
             if mcdc['technique']['weight_window']:
                 kernel.weight_window(P, mcdc)
-            
+
             # Particle loop
             loop_particle(P, mcdc)
 
@@ -125,15 +128,15 @@ def loop_source(mcdc):
         # Tally history closeout for fixed-source simulation
         if not mcdc['setting']['mode_eigenvalue']:
             kernel.tally_closeout_history(mcdc)
-        
+
         # Progress printout
         percent = (work_idx+1.0)/mcdc['mpi_work_size']
         if mcdc['setting']['progress_bar'] and int(percent*100.0) > N_prog:
             N_prog += 1
-            with objmode(): 
+            with objmode():
                 print_progress(percent, mcdc)
 
-        
+
 # =========================================================================
 # Particle loop
 # =========================================================================
@@ -143,7 +146,7 @@ def loop_particle(P, mcdc):
     while P['alive']:
         # Find cell from root universe if unknown
         if P['cell_ID'] == -1:
-            trans        = np.zeros(3)
+            trans = np.zeros(3)
             P['cell_ID'] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
         # Determine and move to event
@@ -173,7 +176,7 @@ def loop_particle(P, mcdc):
                     kernel.scattering(P, mcdc)
                 elif event == EVENT_FISSION:
                     kernel.fission(P, mcdc)
-    
+
                 # Sensitivity quantification for material?
                 material = mcdc['materials'][P['material_ID']]
                 if material['sensitivity'] and P['sensitivity_ID'] == 0:
@@ -190,7 +193,7 @@ def loop_particle(P, mcdc):
         # Lattice crossing
         elif event == EVENT_LATTICE:
             kernel.shift_particle(P, SHIFT)
-    
+
         # Time boundary
         elif event == EVENT_TIME_BOUNDARY:
             kernel.mesh_crossing(P, mcdc)
@@ -198,8 +201,8 @@ def loop_particle(P, mcdc):
 
         # Surface move
         elif event == EVENT_SURFACE_MOVE:
-            P['t']       += SHIFT
-            P['cell_ID']  = -1
+            P['t'] += SHIFT
+            P['cell_ID'] = -1
 
         # Time census
         elif event == EVENT_CENSUS:
@@ -220,8 +223,8 @@ def loop_particle(P, mcdc):
         # Surface move and mesh crossing
         elif event == EVENT_SURFACE_MOVE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            P['t']       += SHIFT
-            P['cell_ID']  = -1
+            P['t'] += SHIFT
+            P['cell_ID'] = -1
 
         # Time census and mesh crossing
         elif event == EVENT_CENSUS_N_MESH:
