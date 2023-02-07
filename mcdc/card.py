@@ -138,7 +138,7 @@ class InputCard:
                                                    'z' : np.array([-INF, INF]),
                                                    't' : np.array([-INF, INF]),
                                                    'mu'  : np.array([-1.0, 1.0]),
-                                                   'azi' : np.array([-PI, PI]),}
+                                                   'azi' : np.array([-PI, PI]),},
                           'sensitivity': 0,
                           'sensitivity_N': 0,
                           }
