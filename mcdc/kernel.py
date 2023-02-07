@@ -2312,6 +2312,11 @@ def sensitivity_material(P, mcdc):
     nuSigmaS = nu_s*SigmaS
     nuSigmaF = nu*SigmaF
 
+    # Undo implicit capture
+    if mcdc['technique']['implicit_capture']:
+        SigmaC  = material['capture'][g]
+        P['w'] *= SigmaT/(SigmaT-SigmaC)
+
     # Set weight
     total  = SigmaT + nuSigmaS + nuSigmaF
     P['w'] = total*P['w']/SigmaT
