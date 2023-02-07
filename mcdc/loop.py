@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 # Main loop
 # =========================================================================
 
+
 @njit
 def loop_main(mcdc):
     simulation_end = False
@@ -64,8 +65,9 @@ def loop_main(mcdc):
             mcdc['technique']['iqmc_flux_old'] = mcdc['technique']['iqmc_flux'].copy()
 
         # Time census closeout
-        elif mcdc['technique']['time_census'] and \
-             mcdc['technique']['census_idx'] < len(mcdc['technique']['census_time'])-1:
+        elif mcdc['technique']['time_census']\
+            and mcdc['technique']['census_idx']\
+                < len(mcdc['technique']['census_time'])-1:
             # Manage particle banks
             kernel.manage_particle_banks(mcdc)
 
@@ -105,7 +107,7 @@ def loop_source(mcdc):
         # Get from fixed-source?
         if mcdc['bank_source']['size'] == 0:
             # Sample source
-            xi  = kernel.rng(mcdc)
+            xi = kernel.rng(mcdc)
             tot = 0.0
             for S in mcdc['sources']:
                 tot += S['prob']
@@ -167,7 +169,7 @@ def loop_particle(P, mcdc):
     while P['alive']:
         # Find cell from root universe if unknown
         if P['cell_ID'] == -1:
-            trans        = np.zeros(3)
+            trans = np.zeros(3)
             P['cell_ID'] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
         # Determine and move to event
@@ -198,6 +200,11 @@ def loop_particle(P, mcdc):
                 elif event == EVENT_FISSION:
                     kernel.fission(P, mcdc)
 
+                # Sensitivity quantification for material?
+                material = mcdc['materials'][P['material_ID']]
+                if material['sensitivity'] and P['sensitivity_ID'] == 0:
+                    kernel.sensitivity_material(P, mcdc)
+
         # Mesh crossing
         elif event == EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)
@@ -217,8 +224,8 @@ def loop_particle(P, mcdc):
 
         # Surface move
         elif event == EVENT_SURFACE_MOVE:
-            P['t']       += SHIFT
-            P['cell_ID']  = -1
+            P['t'] += SHIFT
+            P['cell_ID'] = -1
 
         # Time census
         elif event == EVENT_CENSUS:
@@ -239,8 +246,8 @@ def loop_particle(P, mcdc):
         # Surface move and mesh crossing
         elif event == EVENT_SURFACE_MOVE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            P['t']       += SHIFT
-            P['cell_ID']  = -1
+            P['t'] += SHIFT
+            P['cell_ID'] = -1
 
         # Time census and mesh crossing
         elif event == EVENT_CENSUS_N_MESH:
