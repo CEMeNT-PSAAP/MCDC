@@ -5,7 +5,7 @@ from numba import njit, objmode
 import mcdc.kernel as kernel
 
 from mcdc.constant import *
-from mcdc.print_   import print_progress, print_progress_eigenvalue, print_progress_iqmc
+from mcdc.print_ import print_progress, print_progress_eigenvalue, print_progress_iqmc
 
 import matplotlib.pyplot as plt
 
@@ -20,12 +20,14 @@ def loop_main(mcdc):
     while not simulation_end:
         if mcdc['technique']['iQMC']:
             # reset particle bank size
-            mcdc['bank_source']['size']=0
-            mcdc['technique']['iqmc_source'] = np.zeros_like(mcdc['technique']['iqmc_source'])
-            kernel.prepare_qmc_source(mcdc) # set bank source
-            kernel.prepare_qmc_particles(mcdc) # initialize particles with LDS
+            mcdc['bank_source']['size'] = 0
+            mcdc['technique']['iqmc_source'] = np.zeros_like(
+                mcdc['technique']['iqmc_source'])
+            kernel.prepare_qmc_source(mcdc)  # set bank source
+            kernel.prepare_qmc_particles(mcdc)  # initialize particles with LDS
             # prepare source for next iteration
-            mcdc['technique']['iqmc_flux'] = np.zeros_like(mcdc['technique']['iqmc_flux'])
+            mcdc['technique']['iqmc_flux'] = np.zeros_like(
+                mcdc['technique']['iqmc_flux'])
         # Loop over source particles
         loop_source(mcdc)
 
@@ -55,11 +57,11 @@ def loop_main(mcdc):
             mcdc['technique']['iqmc_itt'] += 1
             # calculate norm of flux iterations
             kernel.calculate_qmc_res(mcdc)
-            if (mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt']) or \
-                (mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
+            if (mcdc['technique']['iqmc_itt'] == mcdc['technique']['iqmc_maxitt']) or (
+                    mcdc['technique']['iqmc_res'] <= mcdc['technique']['iqmc_tol']):
                 simulation_end = True
             # Print progres
-            #with objmode():
+            # with objmode():
             print_progress_iqmc(mcdc)
             # set flux_old = current flux
             mcdc['technique']['iqmc_flux_old'] = mcdc['technique']['iqmc_flux'].copy()
@@ -67,7 +69,7 @@ def loop_main(mcdc):
         # Time census closeout
         elif mcdc['technique']['time_census']\
             and mcdc['technique']['census_idx']\
-                < len(mcdc['technique']['census_time'])-1:
+                < len(mcdc['technique']['census_time']) - 1:
             # Manage particle banks
             kernel.manage_particle_banks(mcdc)
 
@@ -153,8 +155,8 @@ def loop_source(mcdc):
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        percent = (work_idx+1.0)/mcdc['mpi_work_size']
-        if mcdc['setting']['progress_bar'] and int(percent*100.0) > N_prog:
+        percent = (work_idx + 1.0) / mcdc['mpi_work_size']
+        if mcdc['setting']['progress_bar'] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
