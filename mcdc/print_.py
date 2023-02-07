@@ -127,9 +127,10 @@ def print_progress_iqmc(mcdc):
     # TODO: function was not working with numba when structured like the 
     # other print_progress functions
     if master:
-        itt = mcdc['technique']['iqmc_itt']
-        res = mcdc['technique']['iqmc_res']
-        print("\n*******************************")
-        print("Iteration ", itt)
-        print("Residual ", res)
-        print("*******************************\n")
+        if mcdc['setting']['progress_bar']:
+            itt = mcdc['technique']['iqmc_itt']
+            res = mcdc['technique']['iqmc_res']
+            print("\n*******************************")
+            print("Iteration ", itt)
+            print("Residual ", res)
+            print("*******************************\n")

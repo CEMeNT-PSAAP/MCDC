@@ -89,12 +89,12 @@ for i in range(len(x_mid)):
 # Load output
 with h5py.File('output.h5', 'r') as f:
     # Note the spatial (dx) and source strength (100+1) normalization
-    phi      = f['tally/iqmc_flux'][:]/dx*101.
+    phi_mcdc      = f['tally/iqmc_flux'][:]/dx*101.
 
 # Flux - spatial average
 plt.figure(dpi=300,figsize=(8,5))
 # plt.plot(x_mid,phi_ref,label='Sol')
-plt.plot(x_mid,phi,label='iQMC')
+plt.plot(x_mid,phi_mcdc,label='iQMC')
 plt.ylabel(r'$\phi(x)$')
 plt.xlabel(r'$x$')
 plt.grid()
