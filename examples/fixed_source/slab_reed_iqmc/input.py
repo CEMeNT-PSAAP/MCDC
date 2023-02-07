@@ -37,8 +37,12 @@ mcdc.cell([+s7, -s8], m4)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-
-Nx                                         = 128
+N           = 1E2
+Nx          = 32
+maxit       = 5
+tol         = 1e-3
+x           = np.linspace(-8,8,num=Nx+1)
+generator   = "halton"
 
 fixed_source                               = np.zeros(Nx)
 fixed_source[int(0.375*Nx):int(0.625*Nx)]  = 50.0
@@ -55,16 +59,16 @@ material_idx[int(0.8125*Nx):]                = 3
 
 phi0 = np.ones((Nx))
 
-mcdc.iQMC(x=np.linspace(-8,8,num=Nx+1), fixed_source=fixed_source, 
-          phi0=phi0, material_idx=material_idx, maxitt=10, tol=1e-3,
-          generator='halton')
+mcdc.iQMC(x=x, fixed_source=fixed_source, 
+          phi0=phi0, material_idx=material_idx, maxitt=maxit, tol=tol,
+          generator=generator)
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=2**11)
+mcdc.setting(N_particle=N, progress_bar=False)
 
 # Run
 mcdc.run()
