@@ -27,7 +27,7 @@ on the [AZURV1 benchmark](https://inis.iaea.org/search/search.aspx?orig_q=RN:410
 ```python
 import numpy as np
 
-import mcdc
+import mcdc test
 
 # =============================================================================
 # Set model
