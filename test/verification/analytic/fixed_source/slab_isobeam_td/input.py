@@ -25,7 +25,7 @@ mcdc.cell([+s1, -s2], m)
 # =============================================================================
 # Isotropic beam from left-end
 
-mcdc.source(point=[1E-10,0.0,0.0], time=[0.0, 5.0], 
+mcdc.source(point=[1E-10, 0.0, 0.0], time=[0.0, 5.0],
             white_direction=[1.0, 0.0, 0.0])
 
 # =============================================================================
@@ -33,7 +33,7 @@ mcdc.source(point=[1E-10,0.0,0.0], time=[0.0, 5.0],
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux', 'flux-x', 'flux-t'], x=np.linspace(0.0, 5.0, 51), 
+mcdc.tally(scores=['flux', 'flux-x', 'flux-t'], x=np.linspace(0.0, 5.0, 51),
            t=np.linspace(0.0, 5.0, 51))
 
 # Setting
