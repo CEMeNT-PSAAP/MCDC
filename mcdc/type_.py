@@ -28,21 +28,39 @@ global_ = None
 
 
 # Particle (in-flight)
-particle = np.dtype([
-    ('x', float64), ('y', float64), ('z', float64), ('t', float64),
-    ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64),
-    ('w', float64), ('alive', bool_),
-    ('material_ID', int64), ('cell_ID', int64),
-    ('surface_ID', int64), ('translation', float64, (3,)),
-    ('event', int64),
-    ('sensitivity_ID', int64)
-    ])
+particle = None
+
+
+def make_type_particle(input_card):
+    global particle
+    struct = [
+        ('x', float64), ('y', float64), ('z', float64), ('t', float64),
+        ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64),
+        ('w', float64), ('alive', bool_),
+        ('material_ID', int64), ('cell_ID', int64),
+        ('surface_ID', int64), ('translation', float64, (3,)),
+        ('event', int64),
+        ('sensitivity_ID', int64)
+    ]
+    if (input_card.technique['iQMC']):
+        Ng = input_card.materials[0]['G']
+        struct += [('iqmc_w', float64, (Ng,))]
+    particle = np.dtype(struct)
 
 # Particle record (in-bank)
-particle_record = np.dtype([
-    ('x', float64), ('y', float64), ('z', float64), ('t', float64),
-    ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64),
-    ('w', float64), ('sensitivity_ID', int64)])
+
+
+def make_type_particle_record(input_card):
+    global particle_record
+    struct = [
+        ('x', float64), ('y', float64), ('z', float64), ('t', float64),
+        ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64),
+        ('w', float64), ('sensitivity_ID', int64)]
+    if (input_card.technique['iQMC']):
+        Ng = input_card.materials[0]['G']
+        struct += [('iqmc_w', float64, (Ng,))]
+    particle_record = np.dtype(struct)
+
 
 # Static records (for IC generator, )
 neutron = np.dtype([('x', float64), ('y', float64), ('z', float64),
@@ -98,7 +116,7 @@ def make_type_surface(Nmax_slice):
                         ('D', float64), ('E', float64), ('F', float64),
                         ('G', float64), ('H', float64), ('I', float64),
                         ('J', float64, (Nmax_slice, 2)),
-                        ('t', float64, (Nmax_slice+1,)),
+                        ('t', float64, (Nmax_slice + 1,)),
                         ('linear', bool_),
                         ('nx', float64), ('ny', float64), ('nz', float64),
                         ('sensitivity', bool_), ('sensitivity_ID', int64),
@@ -221,39 +239,39 @@ def make_type_tally(card):
     Ng = card.materials[0]['G']
     Ns = card.technique['sensitivity_N'] + 1
     scores_shapes = [
-                     ['flux',        (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['density',     (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['fission',     (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['total',       (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['flux_x',      (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['density_x',   (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['fission_x',   (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['total_x',     (Ns, Ng, Nt, Nx+1, Ny, Nz, Nmu, N_azi)],
-                     ['flux_y',      (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['density_y',   (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['fission_y',   (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['total_y',     (Ns, Ng, Nt, Nx, Ny+1, Nz, Nmu, N_azi)],
-                     ['flux_z',      (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['density_z',   (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['fission_z',   (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['total_z',     (Ns, Ng, Nt, Nx, Ny, Nz+1, Nmu, N_azi)],
-                     ['flux_t',      (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['density_t',   (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['fission_t',   (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
-                     ['total_t',     (Ns, Ng, Nt+1, Nx, Ny, Nz, Nmu, N_azi)],
+        ['flux', (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ['density', (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ['fission', (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ['total', (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ['flux_x', (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
+        ['density_x', (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
+        ['fission_x', (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
+        ['total_x', (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
+        ['flux_y', (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
+        ['density_y', (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
+        ['fission_y', (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
+        ['total_y', (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
+        ['flux_z', (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
+        ['density_z', (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
+        ['fission_z', (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
+        ['total_z', (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
+        ['flux_t', (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
+        ['density_t', (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
+        ['fission_t', (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
+        ['total_t', (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
 
-                     ['current',     (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-                     ['current_x',   (Ns, Ng, Nt, Nx+1, Ny, Nz, 3)],
-                     ['current_y',   (Ns, Ng, Nt, Nx, Ny+1, Nz, 3)],
-                     ['current_z',   (Ns, Ng, Nt, Nx, Ny, Nz+1, 3)],
-                     ['current_t',   (Ns, Ng, Nt+1, Nx, Ny, Nz, 3)],
+        ['current', (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
+        ['current_x', (Ns, Ng, Nt, Nx + 1, Ny, Nz, 3)],
+        ['current_y', (Ns, Ng, Nt, Nx, Ny + 1, Nz, 3)],
+        ['current_z', (Ns, Ng, Nt, Nx, Ny, Nz + 1, 3)],
+        ['current_t', (Ns, Ng, Nt + 1, Nx, Ny, Nz, 3)],
 
-                     ['eddington',   (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-                     ['eddington_x', (Ns, Ng, Nt, Nx+1, Ny, Nz, 6)],
-                     ['eddington_y', (Ns, Ng, Nt, Nx, Ny+1, Nz, 6)],
-                     ['eddington_z', (Ns, Ng, Nt, Nx, Ny, Nz+1, 6)],
-                     ['eddington_t', (Ns, Ng, Nt+1, Nx, Ny, Nz, 6)],
-                    ]
+        ['eddington', (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
+        ['eddington_x', (Ns, Ng, Nt, Nx + 1, Ny, Nz, 6)],
+        ['eddington_y', (Ns, Ng, Nt, Nx, Ny + 1, Nz, 6)],
+        ['eddington_z', (Ns, Ng, Nt, Nx, Ny, Nz + 1, 6)],
+        ['eddington_t', (Ns, Ng, Nt + 1, Nx, Ny, Nz, 6)],
+    ]
 
     # Add score flags to structure
     for i in range(len(scores_shapes)):
@@ -266,7 +284,7 @@ def make_type_tally(card):
         name = scores_shapes[i][0]
         shape = scores_shapes[i][1]
         if not card.tally[name]:
-            shape = (0,)*len(shape)
+            shape = (0,) * len(shape)
         scores_struct += [(name, make_type_score(shape))]
     scores = np.dtype(scores_struct)
     struct += [('score', scores)]
@@ -304,7 +322,8 @@ def make_type_technique(card):
     struct = [('weighted_emission', bool_), ('implicit_capture', bool_),
               ('population_control', bool_), ('branchless_collision', bool_),
               ('weight_window', bool_), ('time_census', bool_),
-              ('IC_generator', bool_)]
+              ('IC_generator', bool_), ('iQMC', bool_),
+              ('weight_roulette', bool_)]
 
     # =========================================================================
     # Population control
@@ -325,6 +344,46 @@ def make_type_technique(card):
     struct += [('ww', float64, (Nt, Nx, Ny, Nz))]
 
     # =========================================================================
+    # Weight Roulette
+    # =========================================================================
+
+    # Constants
+    struct += [('wr_threshold', float64), ('wr_target', float64)]
+
+    # =========================================================================
+    # Quasi Monte Carlo
+    # =========================================================================
+
+    # Mesh (for qmc source tallies)
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(
+        card.technique['iqmc_mesh'])
+    struct += [('iqmc_mesh', mesh)]
+
+    # Low-discprenecy sequence
+    N_particle = card.setting['N_particle']
+    Ng = card.materials[0]['G']
+    N_dim = 6  # group, x, y, z, mu, phi
+    # TODO: make N_dim an input setting
+    struct += [('lds', float64, (N_particle, N_dim))]
+
+    # Source
+    struct += [('iqmc_source', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_fixed_source', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_material_idx', int64, (Nt, Nx, Ny, Nz))]
+
+    # Second scalar flux tally for k-eigenvalue problems (?)
+    struct += [('iqmc_flux', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_flux_old', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_effective_scattering', float64, (Ng, Nt, Nx, Ny, Nz))]
+    struct += [('iqmc_effective_fission', float64, (Ng, Nt, Nx, Ny, Nz))]
+
+    # Constants
+    struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64),
+               ('iqmc_itt', int64), ('iqmc_res', float64),
+               ('iqmc_N_dim', int64), ('iqmc_scramble', bool_),
+               ('iqmc_seed', int64), ('iqmc_generator', 'U30')]
+
+    # =========================================================================
     # Time census
     # =========================================================================
 
@@ -338,8 +397,8 @@ def make_type_technique(card):
     # Banks
     #   We need local banks to ensure reproducibility regardless of # of MPIs
     if card.technique['IC_generator']:
-        Nn = int(card.technique['IC_N_neutron']*1.2)
-        Np = int(card.technique['IC_N_precursor']*1.2)
+        Nn = int(card.technique['IC_N_neutron'] * 1.2)
+        Np = int(card.technique['IC_N_precursor'] * 1.2)
         Nn_local = Nn
         Np_local = Np
     else:
@@ -385,23 +444,23 @@ def make_type_global(card):
     N_lattice = len(card.lattices)
     N_particle = card.setting['N_particle']
     N_cycle_buff = card.setting['N_cycle_buff']
-    N_cycle = card.setting['N_cycle']*(1+N_cycle_buff)
+    N_cycle = card.setting['N_cycle'] * (1 + N_cycle_buff)
     bank_active_buff = card.setting['bank_active_buff']
     bank_census_buff = card.setting['bank_census_buff']
     J = card.materials[0]['J']
-    N_work = math.ceil(N_particle/MPI.COMM_WORLD.Get_size())
+    N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
-    bank_active = particle_bank(1+bank_active_buff)
+    bank_active = particle_bank(1 + bank_active_buff)
     if card.setting['mode_eigenvalue'] or card.technique['time_census']:
-        bank_census = particle_bank(int((1+bank_census_buff)*N_work))
-        bank_source = particle_bank(int((1+bank_census_buff)*N_work))
+        bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
+        bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
 
     # TODO
-    if card.setting['filed_source']:
+    if card.setting['filed_source'] or card.technique['iQMC']:
         bank_source = particle_bank(N_work)
 
     # GLobal type
@@ -453,7 +512,10 @@ def make_type_mesh(card):
     Nt = len(card['t']) - 1
     Nmu = len(card['mu']) - 1
     N_azi = len(card['azi']) - 1
-    return np.dtype([('x', float64, (Nx+1,)), ('y', float64, (Ny+1,)),
-                     ('z', float64, (Nz+1,)), ('t', float64, (Nt+1,)),
-                     ('mu', float64, (Nmu+1,)),
-                     ('azi', float64, (N_azi+1,))]), Nx, Ny, Nz, Nt, Nmu, N_azi
+    return (np.dtype([('x', float64, (Nx + 1,)),
+                     ('y', float64, (Ny + 1,)),
+                     ('z', float64, (Nz + 1,)),
+                     ('t', float64, (Nt + 1,)),
+                     ('mu', float64, (Nmu + 1,)),
+                     ('azi', float64, (N_azi + 1,))]),
+            Nx, Ny, Nz, Nt, Nmu, N_azi)

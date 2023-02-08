@@ -1,5 +1,6 @@
 import h5py
 import numpy as np
+from scipy.stats import qmc
 
 from mpi4py import MPI
 
@@ -9,7 +10,7 @@ import mcdc.type_ as type_
 from mcdc.constant import *
 from mcdc.loop import loop_main
 from mcdc.print_ import print_banner, print_msg, print_runtime,\
-                        print_header_eigenvalue
+    print_header_eigenvalue
 
 # Get input_card and set global variables as "mcdc"
 import mcdc.global_ as mcdc_
@@ -18,13 +19,13 @@ mcdc = mcdc_.global_
 
 
 def run():
-    # Print banner and hardware configuration
-    print_banner()
-
     # Preparation:
     #   process input cards, make types, and allocate global variables
     prepare()
     input_card.reset()
+
+    # Print banner and hardware configuration
+    print_banner(mcdc)
 
     # Run
     print_msg(" Now running TNT...")
@@ -32,6 +33,7 @@ def run():
         print_header_eigenvalue(mcdc)
     MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime()
+    # TODO: add if iQMC execute iqmc_loop()
     loop_main(mcdc)
     MPI.COMM_WORLD.Barrier()
     mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
@@ -88,6 +90,8 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_particle(input_card)
+    type_.make_type_particle_record(input_card)
     type_.make_type_material(G, J)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
@@ -228,7 +232,10 @@ def prepare():
                         'IC_bank_neutron', 'IC_bank_precursor',
                         'IC_bank_neutron_local', 'IC_bank_precursor_local',
                         'IC_tally_n', 'IC_tally_C', 'IC_n_eff', 'IC_C_eff',
-                        'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample']:
+                        'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample',
+                        'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source', 'lds',
+                        'iqmc_effective_scattering', 'iqmc_effective_fission',
+                        'iqmc_res', 'iqmc_generator']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -244,6 +251,47 @@ def prepare():
         mcdc['technique'][name]['t'] = input_card.technique[name]['t']
         mcdc['technique'][name]['mu'] = input_card.technique[name]['mu']
         mcdc['technique'][name]['azi'] = input_card.technique[name]['azi']
+
+    # =========================================================================
+    # Quasi Monte Carlo
+    # =========================================================================
+
+    if input_card.technique['iQMC']:
+        mcdc['technique']['iqmc_mesh']['x'] = \
+            input_card.technique['iqmc_mesh']['x']
+        mcdc['technique']['iqmc_mesh']['y'] = \
+            input_card.technique['iqmc_mesh']['y']
+        mcdc['technique']['iqmc_mesh']['z'] = \
+            input_card.technique['iqmc_mesh']['z']
+        mcdc['technique']['iqmc_mesh']['t'] =\
+            input_card.technique['iqmc_mesh']['t']
+        mcdc['technique']['iqmc_generator'] = \
+            input_card.technique['iqmc_generator']
+        # generate lds
+        if (input_card.technique['iqmc_generator'] == 'sobol'):
+            scramble = mcdc['technique']['iqmc_scramble']
+            N_dim = mcdc['technique']['iqmc_N_dim']
+            N = mcdc['setting']['N_particle']
+            sampler = qmc.Sobol(d=N_dim, scramble=scramble)
+            m = math.ceil(math.log(N, 2))
+            mcdc['setting']['N_particle'] = 2**m
+            mcdc['technique']['lds'] = sampler.random_base2(m=m)
+            # lds is shape (2**m, d)
+        if (input_card.technique['iqmc_generator'] == 'halton'):
+            scramble = mcdc['technique']['iqmc_scramble']
+            N_dim = mcdc['technique']['iqmc_N_dim']
+            seed = mcdc['technique']['iqmc_seed']
+            N = mcdc['setting']['N_particle']
+            sampler = qmc.Halton(d=N_dim,
+                                 scramble=scramble, seed=seed)
+            sampler.fast_forward(1)
+            mcdc['technique']['lds'] = sampler.random(N)
+        if (input_card.technique['iqmc_generator'] == 'random'):
+            seed = mcdc['technique']['iqmc_seed']
+            N_dim = mcdc['technique']['iqmc_N_dim']
+            N = mcdc['setting']['N_particle']
+            np.random.seed(seed)
+            mcdc['technique']['lds'] = np.random.random((N, N_dim))
 
     # =========================================================================
     # Global tally
@@ -296,11 +344,11 @@ def generate_hdf5():
             print_msg('')
         print_msg(" Generating output HDF5 files...")
 
-        with h5py.File(mcdc['setting']['output']+'.h5', 'w') as f:
+        with h5py.File(mcdc['setting']['output'] + '.h5', 'w') as f:
             # Runtime
             for name in ['total', 'bank_management']:
-                f.create_dataset("runtime_"+name,
-                                 data=np.array([mcdc['runtime_'+name]]))
+                f.create_dataset("runtime_" + name,
+                                 data=np.array([mcdc['runtime_' + name]]))
 
             # Tally
             T = mcdc['tally']
@@ -315,9 +363,9 @@ def generate_hdf5():
             for name in T['score'].dtype.names:
                 if mcdc['tally'][name]:
                     name_h5 = name.replace('_', '-')
-                    f.create_dataset("tally/"+name_h5+"/mean",
+                    f.create_dataset("tally/" + name_h5 + "/mean",
                                      data=np.squeeze(T['score'][name]['mean']))
-                    f.create_dataset("tally/"+name_h5+"/sdev",
+                    f.create_dataset("tally/" + name_h5 + "/sdev",
                                      data=np.squeeze(T['score'][name]['sdev']))
 
             # Eigenvalues
@@ -334,9 +382,22 @@ def generate_hdf5():
             if mcdc['technique']['IC_generator']:
                 Nn = mcdc['technique']['IC_bank_neutron']['size']
                 Np = mcdc['technique']['IC_bank_precursor']['size']
-                f.create_dataset("IC/neutron",
-                                 data=mcdc['technique']['IC_bank_neutron']
-                                          ['content'][:Nn])
-                f.create_dataset("IC/precursor",
-                                 data=mcdc['technique']['IC_bank_precursor']
-                                          ['content'][:Np])
+                f.create_dataset(
+                    "IC/neutron", data=mcdc['technique']['IC_bank_neutron']
+                    ['content'][:Nn])
+                f.create_dataset(
+                    "IC/precursor", data=mcdc['technique']['IC_bank_precursor']
+                    ['content'][:Np])
+
+            # iQMC
+            if mcdc['technique']['iQMC']:
+                # TODO: dump time dependent tallies
+                T = mcdc['technique']
+                f.create_dataset("iqmc/grid/t", data=T['iqmc_mesh']['t'])
+                f.create_dataset("iqmc/grid/x", data=T['iqmc_mesh']['x'])
+                f.create_dataset("iqmc/grid/y", data=T['iqmc_mesh']['y'])
+                f.create_dataset("iqmc/grid/z", data=T['iqmc_mesh']['z'])
+
+                # dump x,y,z scalar flux across all groups
+                f.create_dataset("tally/" + "iqmc_flux",
+                                 data=np.squeeze(T['iqmc_flux']))
