@@ -2434,6 +2434,7 @@ def prepare_qmc_particles(mcdc):
             P_new['ux'] += 0.01
         # time and group
         P_new['t'] = 0
+        P_new['g'] = 0
         t, x, y, z, outside = mesh_get_index(P_new, mesh)
         mat_idx = mcdc['technique']['iqmc_material_idx'][t, x, y, z]
         G = mcdc['materials'][mat_idx]['G']

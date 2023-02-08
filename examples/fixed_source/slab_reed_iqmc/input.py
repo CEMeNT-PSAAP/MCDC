@@ -68,7 +68,7 @@ mcdc.iQMC(x=x, fixed_source=fixed_source,
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=N, progress_bar=False)
+mcdc.setting(N_particle=N, progress_bar=True)
 
 # Run
 mcdc.run()
