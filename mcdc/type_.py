@@ -42,9 +42,11 @@ def make_type_particle(input_card):
         ('event', int64),
         ('sensitivity_ID', int64)
     ]
+    # iqmc vector of weights
+    Ng = 0
     if (input_card.technique['iQMC']):
         Ng = input_card.materials[0]['G']
-        struct += [('iqmc_w', float64, (Ng,))]
+    struct += [('iqmc_w', float64, (Ng,))]
     particle = np.dtype(struct)
 
 # Particle record (in-bank)
@@ -56,9 +58,11 @@ def make_type_particle_record(input_card):
         ('x', float64), ('y', float64), ('z', float64), ('t', float64),
         ('ux', float64), ('uy', float64), ('uz', float64), ('g', uint64),
         ('w', float64), ('sensitivity_ID', int64)]
+    # iqmc vector of weights
+    Ng = 0
     if (input_card.technique['iQMC']):
         Ng = input_card.materials[0]['G']
-        struct += [('iqmc_w', float64, (Ng,))]
+    struct += [('iqmc_w', float64, (Ng,))]
     particle_record = np.dtype(struct)
 
 
