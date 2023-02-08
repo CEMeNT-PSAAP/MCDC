@@ -3,13 +3,15 @@ import h5py
 
 import mcdc
 
+
 def test():
     # =========================================================================
     # Set model and run
     # =========================================================================
 
-    m      = mcdc.material(capture=np.array([0.05]), scatter=np.array([[0.05]]))
-    m_void = mcdc.material(capture=np.array([5E-5]), scatter=np.array([[5E-5]]))
+    m = mcdc.material(capture=np.array([0.05]), scatter=np.array([[0.05]]))
+    m_void = mcdc.material(capture=np.array(
+        [5E-5]), scatter=np.array([[5E-5]]))
 
     sx1 = mcdc.surface('plane-x', x=0.0,  bc="reflective")
     sx2 = mcdc.surface('plane-x', x=10.0)
@@ -53,7 +55,7 @@ def test():
     mcdc.implicit_capture()
 
     mcdc.run()
-    
+
     # =========================================================================
     # Check output
     # =========================================================================
@@ -64,12 +66,12 @@ def test():
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
-        
+        assert np.isclose(a, b).all()
+
         name = 'tally/'+score+'/sdev'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
+        assert np.isclose(a, b).all()
 
     output.close()
     answer.close()

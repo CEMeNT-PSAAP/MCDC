@@ -3,17 +3,18 @@ import h5py
 
 import mcdc
 
+
 def test():
     # =============================================================================
     # Set model and run
     # =============================================================================
 
-    m     = mcdc.material(capture=np.array([0.1]), scatter=np.array([[0.9]]))
+    m = mcdc.material(capture=np.array([0.1]), scatter=np.array([[0.9]]))
     m_abs = mcdc.material(capture=np.array([0.9]), scatter=np.array([[0.1]]))
 
     s1 = mcdc.surface('plane-x', x=0.0, bc="vacuum")
     s2 = mcdc.surface('plane-x', x=np.array([2.0, 2.0,  5.0,  1.0]),
-                                 t=np.array([0.0, 5.0, 10.0, 10.0]))
+                      t=np.array([0.0, 5.0, 10.0, 10.0]))
     s3 = mcdc.surface('plane-x', x=6.0, bc="vacuum")
 
     mcdc.cell([+s1, -s2], m)
@@ -28,7 +29,7 @@ def test():
     mcdc.setting(N_particle=int(1E2))
 
     mcdc.run()
-    
+
     # =========================================================================
     # Check output
     # =========================================================================
@@ -39,12 +40,12 @@ def test():
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
-        
+        assert np.isclose(a, b).all()
+
         name = 'tally/'+score+'/sdev'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
+        assert np.isclose(a, b).all()
 
     output.close()
     answer.close()
