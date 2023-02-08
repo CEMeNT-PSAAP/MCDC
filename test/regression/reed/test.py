@@ -3,6 +3,7 @@ import h5py
 
 import mcdc
 
+
 def test():
     # =========================================================================
     # Set model and run
@@ -10,7 +11,7 @@ def test():
 
     m1 = mcdc.material(capture=np.array([50.0]))
     m2 = mcdc.material(capture=np.array([5.0]))
-    m3 = mcdc.material(capture=np.array([0.0])) # Vacuum
+    m3 = mcdc.material(capture=np.array([0.0]))  # Vacuum
     m4 = mcdc.material(capture=np.array([0.1]), scatter=np.array([[0.9]]))
 
     s1 = mcdc.surface('plane-x', x=0.0, bc="reflective")
@@ -29,13 +30,13 @@ def test():
     mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 
     scores = ['flux', 'flux-x']
-    mcdc.tally(scores=scores, 
+    mcdc.tally(scores=scores,
                x=np.linspace(0.0, 8.0, 41))
 
     mcdc.setting(N_particle=1E2, progress_bar=False)
 
     mcdc.run()
-    
+
     # =========================================================================
     # Check output
     # =========================================================================
@@ -46,12 +47,12 @@ def test():
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
-        
+        assert np.isclose(a, b).all()
+
         name = 'tally/'+score+'/sdev'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
+        assert np.isclose(a, b).all()
 
     output.close()
     answer.close()

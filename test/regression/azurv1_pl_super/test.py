@@ -3,30 +3,31 @@ import h5py
 
 import mcdc
 
+
 def test():
     # =========================================================================
     # Set model and run
     # =========================================================================
 
     m = mcdc.material(capture=np.array([1.0/3.0]), scatter=np.array([[1.0/3.0]]),
-                    fission=np.array([1.0/3.0]), nu_p=np.array([2.3]))
+                      fission=np.array([1.0/3.0]), nu_p=np.array([2.3]))
 
     s1 = mcdc.surface('plane-x', x=-1E10, bc="reflective")
     s2 = mcdc.surface('plane-x', x=1E10,  bc="reflective")
 
     mcdc.cell([+s1, -s2], m)
 
-    mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
+    mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
 
     scores = ['flux', 'flux-x', 'flux-t']
-    mcdc.tally(scores=scores, 
-            x=np.linspace(-20.5, 20.5, 202), 
-            t=np.linspace(0.0, 20.0, 21))
+    mcdc.tally(scores=scores,
+               x=np.linspace(-20.5, 20.5, 202),
+               t=np.linspace(0.0, 20.0, 21))
 
     mcdc.setting(N_particle=1E2, progress_bar=False)
 
     mcdc.run()
-    
+
     # =========================================================================
     # Check output
     # =========================================================================
@@ -37,12 +38,12 @@ def test():
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
-        
+        assert np.isclose(a, b).all()
+
         name = 'tally/'+score+'/sdev'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
+        assert np.isclose(a, b).all()
 
     output.close()
     answer.close()

@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
-import numpy             as np
+import numpy as np
+
 
 def plot_convergence(name, N_particle, error):
-    mid   = int(len(N_particle)/2)
-    line  = 1.0/np.sqrt(N_particle)
+    mid = int(len(N_particle)/2)
+    line = 1.0/np.sqrt(N_particle)
     line *= error[mid]/line[mid]
     plt.plot(N_particle, error, 'bo', fillstyle='none')
     plt.plot(N_particle, line, 'r--', label=r'$O(N^{-0.5})$')
