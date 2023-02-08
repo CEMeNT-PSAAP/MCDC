@@ -114,9 +114,6 @@ class InputCard:
                           'IC_N_neutron': 0,
                           'IC_N_precursor': 0,
 
-                          'sensitivity': 0,
-                          'sensitivity_N': 0,
-
                           'weight_roulette': False,
                           'wr_threshold': 0.0,
                           'wr_target': 1.0,
@@ -139,6 +136,7 @@ class InputCard:
                                         't': np.array([-INF, INF]),
                                         'mu': np.array([-1.0, 1.0]),
                                         'azi': np.array([-PI, PI]), },
+
                           'sensitivity': 0,
                           'sensitivity_N': 0,
                           }
