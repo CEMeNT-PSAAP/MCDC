@@ -1,3 +1,4 @@
+"""This module contains functions for setting MC/DC input cards."""
 import h5py
 import numpy as np
 
@@ -16,44 +17,55 @@ import mcdc.global_ as mcdc
 # ==============================================================================
 
 
-def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
-             chi_p=None, chi_d=None, nu_s=None, speed=None, decay=None,
+def material(capture=None, scatter=None, fission=None, nu_s=None, nu_p=None,
+             nu_d=None, chi_p=None, chi_d=None, speed=None, decay=None,
              sensitivity=False):
     """
-    Arguments
-    ---------
-    capture : numpy.ndarray (1D)
+    Create a material card.
+
+    Parameters
+    ----------
+    capture : numpy.ndarray (1D), optional
         Capture cross-section [/cm]
-    scatter : numpy.ndarray (2D)
-        Differential scattering cross-section [gout][gin] [/cm].
-    fission : numpy.ndarray (1D)
+    scatter : numpy.ndarray (2D), optional
+        Differential scattering cross-section [gout, gin] [/cm].
+    fission : numpy.ndarray (1D), optional
         Fission cross-section [/cm].
-    *At least capture, scatter, or fission cross-section needs to be
-    provided.
-
-    nu_s : numpy.ndarray (1D)
+    nu_s : numpy.ndarray (1D), optional
         Scattering multiplication.
-    nu_p : numpy.ndarray (1D)
+    nu_p : numpy.ndarray (1D), optional
         Prompt fission neutron yield.
-    nu_d : numpy.ndarray (2D)
-        Delayed neutron precursor yield [dg][gin].
-    *nu_p or nu_d is needed if fission is provided.
-
-    chi_p : numpy.ndarray (2D)
-        Prompt fission spectrum [gout][gin]
-    chi_d : numpy.ndarray (2D)
-        Delayed neutron spectrum [gout][dg]
-    *chi_p and chi_d are needed if nu_p and nu_d are provided, respectively.
-
-    speed : numpy.ndarray (1D)
-        Energy group speed
-    decay : numpy.ndarray (1D)
+    nu_d : numpy.ndarray (2D), optional
+        Delayed neutron precursor yield [dg, gin].
+    chi_p : numpy.ndarray (2D), optional
+        Prompt fission spectrum [gout, gin]
+    chi_d : numpy.ndarray (2D), optional
+        Delayed neutron spectrum [gout, dg]
+    speed : numpy.ndarray (1D), optional
+        Energy group speed [cm/s]
+    decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s]
-    *speed and decay are optional. By default, values for speed and decay
-    are one and infinite, respectively. Universal speed and decay can be
-    provided through mcdc.set_universal_speed and mcdc.set_universal_decay.
-    """
+    sensitivity : bool, optional
+        Set to `True` to calculate sensitivities to the material
+        (default is `False`)
 
+    Returns
+    -------
+    dictionary
+        A material card
+
+    Notes
+    -----
+    - Parameters are set to zeros by default.
+    - Energy group size G is determined by the size of `capture`,
+      `scatter`, or `fission`. Thus, at least `capture`, `scatter`, or
+      `fission` needs to be provided.
+    - `nu_p` or `nu_d` is needed if `fission` is provided.
+    - `chi_p` and `chi_d` are needed if `nu_p` and `nu_d` are provided,
+       respectively, and G > 1.
+    - Delayed neutron precursor group size is determined by the
+      size of `nu_d`.
+    """
     # Energy group size
     if capture is not None:
         G = len(capture)
@@ -92,15 +104,15 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     card['sensitivity'] = False
     card['sensitivity_ID'] = 0
 
-    # Speed
+    # Speed (vector of size G)
     if speed is not None:
         card['speed'][:] = speed[:]
 
-    # Decay constant
+    # Decay constant (vector of size J)
     if decay is not None:
         card['decay'][:] = decay[:]
 
-    # Cross-sections
+    # Cross-sections (vector of size G)
     if capture is not None:
         card['capture'][:] = capture[:]
     if scatter is not None:
@@ -109,59 +121,68 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
         card['fission'][:] = fission[:]
     card['total'][:] = card['capture'] + card['scatter'] + card['fission']
 
-    # Scattering multiplication
+    # Scattering multiplication (vector of size G)
     if nu_s is not None:
         card['nu_s'][:] = nu_s[:]
 
-    # Fission productions
+    # Check if nu_p or nu_d is not provided, give fission
     if fission is not None:
         if nu_p is None and nu_d is None:
             print_error("Need to supply nu_p or nu_d for fissionable "
                         + "mcdc.material")
+
+    # Prompt fission production (vector of size G)
     if nu_p is not None:
         card['nu_p'][:] = nu_p[:]
+
+    # Delayed fission production (matrix of size GxJ)
     if nu_d is not None:
-        # Transpose: [dg,gin] -> [gin,dg]
+        # Transpose: [dg, gin] -> [gin, dg]
         card['nu_d'][:, :] = np.swapaxes(nu_d, 0, 1)[:, :]
+
+    # Total fission production (vector of size G)
     card['nu_f'] += card['nu_p']
     for j in range(J):
         card['nu_f'] += card['nu_d'][:, j]
 
-    # Scattering spectrum
+    # Scattering spectrum (matrix of size GxG)
     if scatter is not None:
-        # Transpose: [gout,gin] -> [gin,gout]
+        # Transpose: [gout, gin] -> [gin, gout]
         card['chi_s'][:, :] = np.swapaxes(scatter, 0, 1)[:, :]
         for g in range(G):
             if card['scatter'][g] > 0.0:
                 card['chi_s'][g, :] /= card['scatter'][g]
 
-    # Fission spectrums
+    # Prompt fission spectrum (matrix of size GxG)
     if nu_p is not None:
         if G == 1:
             card['chi_p'][:, :] = np.array([[1.0]])
         elif chi_p is None:
-            print_error("Need to supply chi_p if nu_p is provided")
+            print_error("Need to supply chi_p if nu_p is provided and G > 1")
         else:
-            # Transpose: [gout,gin] -> [gin,gout]
+            # Transpose: [gout, gin] -> [gin, gout]
             card['chi_p'][:, :] = np.swapaxes(chi_p, 0, 1)[:, :]
             # Normalize
             for g in range(G):
                 if np.sum(card['chi_p'][g, :]) > 0.0:
                     card['chi_p'][g, :] /= np.sum(card['chi_p'][g, :])
+
+    # Delayed fission spectrum (matrix of size JxG)
     if nu_d is not None:
         if G == 1:
             card['chi_d'][:, :] = np.ones([J, G])
         else:
             if chi_d is None:
-                print_error("Need to supply chi_d if nu_d is provided")
-            # Transpose: [gout,dg] -> [dg,gout]
+                print_error("Need to supply chi_d if nu_d is provided "
+                            + "and G > 1")
+            # Transpose: [gout, dg] -> [dg, gout]
             card['chi_d'][:, :] = np.swapaxes(chi_d, 0, 1)[:, :]
         # Normalize
         for dg in range(J):
             if np.sum(card['chi_d'][dg, :]) > 0.0:
                 card['chi_d'][dg, :] /= np.sum(card['chi_d'][dg, :])
 
-    # Sensitivity
+    # Sensitivity setup
     if sensitivity:
         # Set flag
         card['sensitivity'] = True
@@ -175,6 +196,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     # Push card
     mcdc.input_card.materials.append(card)
     return card
+
 
 # ==============================================================================
 # Surface
@@ -876,15 +898,3 @@ def print_card(card):
             print(card[key] + ' card')
         else:
             print('  ' + key + ' : ' + str(card[key]))
-
-
-def universal_speed(speed):
-    for C in mcdc.input_card.cells:
-        material = mcdc.input_card.materials[C['material_ID']]
-        material['speed'] = speed
-
-
-def universal_decay(decay):
-    for C in mcdc.input_card.cells:
-        material = mcdc.input_card.materials[C['material_ID']]
-        material['decay'] = decay

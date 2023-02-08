@@ -3,6 +3,7 @@ import h5py
 
 import mcdc
 
+
 def test():
     # =========================================================================
     # Set model and run
@@ -24,14 +25,14 @@ def test():
     mcdc.source(z=[0.0, 6.0], isotropic=True)
 
     scores = ['flux', 'current', 'flux-z', 'current-z']
-    mcdc.tally(scores=scores, 
+    mcdc.tally(scores=scores,
                z=np.linspace(0.0, 6.0, 61),
                mu=np.linspace(-1.0, 1.0, 32+1))
 
     mcdc.setting(N_particle=1E2, progress_bar=False)
 
     mcdc.run()
-    
+
     # =========================================================================
     # Check output
     # =========================================================================
@@ -42,12 +43,12 @@ def test():
         name = 'tally/'+score+'/mean'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
-        
+        assert np.isclose(a, b).all()
+
         name = 'tally/'+score+'/sdev'
         a = output[name][:]
         b = answer[name][:]
-        assert np.isclose(a,b).all()
+        assert np.isclose(a, b).all()
 
     output.close()
     answer.close()
