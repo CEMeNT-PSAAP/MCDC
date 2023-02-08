@@ -12,16 +12,16 @@ N_particle = int(sys.argv[2])
 
 # Load material data
 with np.load('CASMO-70.npz') as data:
-    SigmaC = data['SigmaC']*1.28 # /cm
+    SigmaC = data['SigmaC']*1.28  # /cm
     SigmaS = data['SigmaS']
     SigmaF = data['SigmaF']
-    nu_p   = data['nu_p']
-    nu_d   = data['nu_d']
-    chi_p  = data['chi_p']
-    chi_d  = data['chi_d']
-    G      = data['G']
-    speed  = data['v']
-    lamd   = data['lamd']
+    nu_p = data['nu_p']
+    nu_d = data['nu_d']
+    chi_p = data['chi_p']
+    chi_d = data['chi_d']
+    G = data['G']
+    speed = data['v']
+    lamd = data['lamd']
 
 # Set material
 m = mcdc.material(capture=SigmaC, scatter=SigmaS, fission=SigmaF, nu_p=nu_p,
@@ -38,7 +38,8 @@ c = mcdc.cell([+s1, -s2], m)
 # Set initial source
 # =============================================================================
 
-energy = np.zeros(G); energy[-1] = 1.0
+energy = np.zeros(G)
+energy[-1] = 1.0
 source = mcdc.source(energy=energy)
 
 # =============================================================================
@@ -46,7 +47,7 @@ source = mcdc.source(energy=energy)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=['flux-t'], t=np.insert(np.logspace(-8,1,100), 0, 0.0))
+mcdc.tally(scores=['flux-t'], t=np.insert(np.logspace(-8, 1, 100), 0, 0.0))
 
 # Setting
 mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle),

@@ -8,7 +8,7 @@ N_max = 7
 for task in os.scandir('./fixed_source'):
     print(task)
     os.chdir(task)
-    os.system("python process.py %i %i"%(N_min,N_max))
+    os.system("python process.py %i %i" % (N_min, N_max))
     os.chdir(r"../..")
 
 # Eigenvalue
