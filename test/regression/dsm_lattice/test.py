@@ -39,7 +39,7 @@ def test():
     mcdc.source(point=[1.0, 0.0, 0.0], energy=[1,0,0,0,0,0,0], isotropic=True)
 
     scores = ['flux']
-    mcdc.tally(scores=['flux'], x=np.linspace(0.0, 2.0, 201))
+    mcdc.tally(scores=['flux'], x=np.linspace(0.0, 2.0, 11))
 
     mcdc.setting(N_particle=5)
 
