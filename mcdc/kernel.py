@@ -1463,7 +1463,7 @@ def global_tally(P, distance, mcdc):
     # Parameters
     flux = distance*P['w']
     g = P['g']
-    nu = material['nu_p'][g] + sum(material['nu_d'][g])
+    nu = material['nu_f'][g]
     SigmaF = material['fission'][g]
     nuSigmaF = nu*SigmaF
 
@@ -2082,7 +2082,7 @@ def fission(P, mcdc):
     # Get production factor
     material = mcdc['materials'][P['material_ID']]
     g = P['g']
-    nu = material['nu_p'][g] + sum(material['nu_d'][g])
+    nu = material['nu_f'][g]
 
     # Get effective and new weight
     if mcdc['technique']['weighted_emission']:
@@ -2122,11 +2122,10 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
     G = material['G']
     J = material['J']
     g = P['g']
+    nu = material['nu_f'][g]
     nu_p = material['nu_p'][g]
-    nu = nu_p
     if J > 0:
         nu_d = material['nu_d'][g]
-        nu += sum(nu_d)
 
     # Copy relevant attributes
     P_new['x'] = P['x']
@@ -2191,9 +2190,7 @@ def branchless_collision(P, mcdc):
     G = material['G']
 
     # Total nu fission
-    nu = nu_p
-    for j in range(J):
-        nu += nu_d[j]
+    nu = material['nu_f'][g]
 
     # Set weight
     n_scatter = nu_s*SigmaS
@@ -2332,8 +2329,8 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     SigmaF_new = material_new['fission'][g]
     nu_s_old = material_old['nu_s'][g]
     nu_s_new = material_new['nu_s'][g]
-    nu_old = material_old['nu_p'][g] + sum(material_old['nu_d'][g])
-    nu_new = material_new['nu_p'][g] + sum(material_new['nu_d'][g])
+    nu_old = material_old['nu_f'][g]
+    nu_new = material_new['nu_f'][g]
 
     nuSigmaS_old = nu_s_old*SigmaS_old
     nuSigmaS_new = nu_s_new*SigmaS_new
@@ -2409,7 +2406,7 @@ def sensitivity_material(P, mcdc):
     SigmaS = material['scatter'][g]
     SigmaF = material['fission'][g]
     nu_s = material['nu_s'][g]
-    nu = material['nu_p'][g] + sum(material['nu_d'][g])
+    nu = material['nu_f'][g]
 
     nuSigmaS = nu_s*SigmaS
     nuSigmaF = nu*SigmaF
