@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import sys
-            
+
 os.system("rm *png")
 
 # Fixed source

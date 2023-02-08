@@ -3,8 +3,9 @@ import numpy as np
 from mcdc.type_ import material
 from mcdc.input_ import material
 
+
 def generate_test_nuclear_data(n_neutron_groups, n_dnp_groups):
-    
+
     # Set random seed
     np.random.seed(90053)
 
@@ -12,20 +13,21 @@ def generate_test_nuclear_data(n_neutron_groups, n_dnp_groups):
     capture = np.random.rand(n_neutron_groups)
     scatter = np.random.rand(n_neutron_groups, n_neutron_groups)
     fission = np.random.rand(n_neutron_groups)
-    nu_s    = np.random.rand(n_neutron_groups)
-    nu_p    = np.random.rand(n_neutron_groups)
-    nu_d    = np.random.rand(n_dnp_groups, n_neutron_groups)
-    chi_p   = np.random.rand(n_neutron_groups, n_neutron_groups)
-    chi_d   = np.random.rand(n_neutron_groups, n_dnp_groups)
-    speed   = np.random.rand(n_neutron_groups)
-    decay   = np.random.rand(n_dnp_groups)
+    nu_s = np.random.rand(n_neutron_groups)
+    nu_p = np.random.rand(n_neutron_groups)
+    nu_d = np.random.rand(n_dnp_groups, n_neutron_groups)
+    chi_p = np.random.rand(n_neutron_groups, n_neutron_groups)
+    chi_d = np.random.rand(n_neutron_groups, n_dnp_groups)
+    speed = np.random.rand(n_neutron_groups)
+    decay = np.random.rand(n_dnp_groups)
 
-    return [capture, scatter, fission, nu_s, nu_p, 
-        nu_d, chi_p, chi_d, speed, decay]
+    return [capture, scatter, fission, nu_s, nu_p,
+            nu_d, chi_p, chi_d, speed, decay]
 
-def verify_card_quantities_with_input_quantities(mat, capture, scatter, 
-        fission, nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay):
-    
+
+def verify_card_quantities_with_input_quantities(mat, capture, scatter,
+                                                 fission, nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay):
+
     # Verify pass-through quantities are correct
     assert (np.allclose(mat['capture'], capture))
     assert (np.allclose(mat['fission'], fission))
@@ -36,10 +38,10 @@ def verify_card_quantities_with_input_quantities(mat, capture, scatter,
 
     # Verify modified and/or calculated quantities are correct
     n_neutron_groups = len(capture)
-    n_dnp_groups     = len(decay)
-    total_scatter    = np.sum(scatter,0)
-    total            = capture + total_scatter + fission 
-    nu_f             = nu_p + np.sum(np.transpose(nu_d), 1)
+    n_dnp_groups = len(decay)
+    total_scatter = np.sum(scatter, 0)
+    total = capture + total_scatter + fission
+    nu_f = nu_p + np.sum(np.transpose(nu_d), 1)
     normalized_chi_s = scatter * np.divide(1.0, np.sum(scatter, 0))
     normalized_chi_p = chi_p * np.divide(1.0, np.sum(chi_p, 0))
     normalized_chi_d = chi_d * np.divide(1.0, np.sum(chi_d, 0))
@@ -53,6 +55,7 @@ def verify_card_quantities_with_input_quantities(mat, capture, scatter,
     assert (np.allclose(mat['chi_p'], np.transpose(normalized_chi_p)))
     assert (np.allclose(mat['chi_d'], np.transpose(normalized_chi_d)))
 
+
 def test_single_neutron_energy_and_zero_dnp_group_material():
 
     n_neutron_groups = 1
@@ -63,13 +66,14 @@ def test_single_neutron_energy_and_zero_dnp_group_material():
         = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
     # Initialize material with single energy and DNP group
-    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p, 
-            nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed, 
-            decay=decay)
-    
+    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p,
+                 nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed,
+                 decay=decay)
+
     # Verify input processing
-    verify_card_quantities_with_input_quantities(m, capture, scatter, fission, 
-        nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+    verify_card_quantities_with_input_quantities(m, capture, scatter, fission,
+                                                 nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+
 
 def test_single_neutron_energy_and_single_dnp_group_material():
 
@@ -81,13 +85,14 @@ def test_single_neutron_energy_and_single_dnp_group_material():
         = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
     # Initialize material with single energy and DNP group
-    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p, 
-            nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed, 
-            decay=decay)
-    
+    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p,
+                 nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed,
+                 decay=decay)
+
     # Verify input processing
-    verify_card_quantities_with_input_quantities(m, capture, scatter, fission, 
-        nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+    verify_card_quantities_with_input_quantities(m, capture, scatter, fission,
+                                                 nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+
 
 def test_multiple_neutron_energy_and_zero_dnp_group_material():
 
@@ -99,13 +104,14 @@ def test_multiple_neutron_energy_and_zero_dnp_group_material():
         = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
     # Initialize material with single energy and DNP group
-    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p, 
-            nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed, 
-            decay=decay)
-    
+    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p,
+                 nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed,
+                 decay=decay)
+
     # Verify input processing
-    verify_card_quantities_with_input_quantities(m, capture, scatter, fission, 
-        nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+    verify_card_quantities_with_input_quantities(m, capture, scatter, fission,
+                                                 nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+
 
 def test_multiple_neutron_energy_and_single_dnp_group_material():
 
@@ -117,13 +123,14 @@ def test_multiple_neutron_energy_and_single_dnp_group_material():
         = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
     # Initialize material with single energy and DNP group
-    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p, 
-            nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed, 
-            decay=decay)
-    
+    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p,
+                 nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed,
+                 decay=decay)
+
     # Verify input processing
-    verify_card_quantities_with_input_quantities(m, capture, scatter, fission, 
-        nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+    verify_card_quantities_with_input_quantities(m, capture, scatter, fission,
+                                                 nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+
 
 def test_single_neutron_energy_and_multiple_dnp_group_material():
 
@@ -135,13 +142,14 @@ def test_single_neutron_energy_and_multiple_dnp_group_material():
         = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
     # Initialize material with single energy and DNP group
-    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p, 
-            nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed, 
-            decay=decay)
-    
+    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p,
+                 nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed,
+                 decay=decay)
+
     # Verify input processing
-    verify_card_quantities_with_input_quantities(m, capture, scatter, fission, 
-        nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+    verify_card_quantities_with_input_quantities(m, capture, scatter, fission,
+                                                 nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+
 
 def test_multiple_neutron_energy_and_multiple_dnp_group_material():
 
@@ -153,10 +161,10 @@ def test_multiple_neutron_energy_and_multiple_dnp_group_material():
         = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
     # Initialize material with single energy and DNP group
-    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p, 
-            nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed, 
-            decay=decay)
-    
+    m = material(capture=capture, scatter=scatter, fission=fission, nu_p=nu_p,
+                 nu_d=nu_d, chi_p=chi_p, chi_d=chi_d, nu_s=nu_s, speed=speed,
+                 decay=decay)
+
     # Verify input processing
-    verify_card_quantities_with_input_quantities(m, capture, scatter, fission, 
-        nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
+    verify_card_quantities_with_input_quantities(m, capture, scatter, fission,
+                                                 nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay)
