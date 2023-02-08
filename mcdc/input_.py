@@ -77,7 +77,7 @@ def material(capture=None, scatter=None, fission=None, nu_p=None, nu_d=None,
     card['G'] = G
     card['J'] = J
     card['speed'] = np.ones(G)
-    card['decay'] = np.ones(J)*INF
+    card['decay'] = np.ones(J) * INF
     card['capture'] = np.zeros(G)
     card['scatter'] = np.zeros(G)
     card['fission'] = np.zeros(G)
@@ -255,24 +255,24 @@ def surface(type_, **kw):
         r = kw.get('radius')
         card['B'] = 1.0
         card['C'] = 1.0
-        card['H'] = -2.0*y
-        card['I'] = -2.0*z
+        card['H'] = -2.0 * y
+        card['I'] = -2.0 * z
         card['J'][0, 0] = y**2 + z**2 - r**2
     elif type_ == 'cylinder-y':
         x, z = kw.get('center')[:]
         r = kw.get('radius')
         card['A'] = 1.0
         card['C'] = 1.0
-        card['G'] = -2.0*x
-        card['I'] = -2.0*z
+        card['G'] = -2.0 * x
+        card['I'] = -2.0 * z
         card['J'][0, 0] = x**2 + z**2 - r**2
     elif type_ == 'cylinder-z':
         x, y = kw.get('center')[:]
         r = kw.get('radius')
         card['A'] = 1.0
         card['B'] = 1.0
-        card['G'] = -2.0*x
-        card['H'] = -2.0*y
+        card['G'] = -2.0 * x
+        card['H'] = -2.0 * y
         card['J'][0, 0] = x**2 + y**2 - r**2
     elif type_ == 'sphere':
         x, y, z = kw.get('center')[:]
@@ -280,9 +280,9 @@ def surface(type_, **kw):
         card['A'] = 1.0
         card['B'] = 1.0
         card['C'] = 1.0
-        card['G'] = -2.0*x
-        card['H'] = -2.0*y
-        card['I'] = -2.0*z
+        card['G'] = -2.0 * x
+        card['H'] = -2.0 * y
+        card['I'] = -2.0 * z
         card['J'][0, 0] = x**2 + y**2 + z**2 - r**2
     elif type_ == 'quadric':
         card['A'] = kw.get('A')
@@ -296,7 +296,7 @@ def surface(type_, **kw):
         card['I'] = kw.get('I')
         card['J'][0, 0] = kw.get('J')
     else:
-        print_error("Unsupported surface type: "+type_)
+        print_error("Unsupported surface type: " + type_)
 
     # Normal vector if linear
     if card['linear']:
@@ -305,9 +305,9 @@ def surface(type_, **kw):
         nz = card['I']
         # Normalize
         norm = (nx**2 + ny**2 + nz**2)**0.5
-        card['nx'] = nx/norm
-        card['ny'] = ny/norm
-        card['nz'] = nz/norm
+        card['nx'] = nx / norm
+        card['ny'] = ny / norm
+        card['nz'] = nz / norm
 
     # Sensitivity
     sensitivity = kw.get('sensitivity')
@@ -338,18 +338,18 @@ def set_J(x, t, card):
 
     # Iterate over inputs
     idx = 0
-    for i in range(len(t)-1):
+    for i in range(len(t) - 1):
         # Skip if step
-        if t[i] == t[i+1]:
+        if t[i] == t[i + 1]:
             continue
 
         # Calculate constants
         J0 = x[i]
-        J1 = (x[i+1]-x[i])/(t[i+1]-t[i])
+        J1 = (x[i + 1] - x[i]) / (t[i + 1] - t[i])
 
         # Append to card
         card['J'] = np.append(card['J'], [[J0, J1]], axis=0)
-        card['t'] = np.append(card['t'], t[i+1])
+        card['t'] = np.append(card['t'], t[i + 1])
 
     card['J'] *= -1
     card['N_slice'] = len(card['J'])
@@ -433,9 +433,9 @@ def lattice(x=None, y=None, z=None, universes=None):
     card = {}
     card['tag'] = 'Lattice'
     card['ID'] = len(mcdc.input_card.lattices)
-    card['mesh'] = {'x0': -INF, 'dx': 2*INF, 'Nx': 1,
-                    'y0': -INF, 'dy': 2*INF, 'Ny': 1,
-                    'z0': -INF, 'dz': 2*INF, 'Nz': 1}
+    card['mesh'] = {'x0': -INF, 'dx': 2 * INF, 'Nx': 1,
+                    'y0': -INF, 'dy': 2 * INF, 'Ny': 1,
+                    'z0': -INF, 'dz': 2 * INF, 'Nz': 1}
     card['universe_IDs'] = np.array([[[[0]]]])
 
     # Set mesh
@@ -536,9 +536,9 @@ def source(**kw):
         uz = white[2]
         # Normalize
         norm = (ux**2 + uy**2 + uz**2)**0.5
-        card['white_x'] = ux/norm
-        card['white_y'] = uy/norm
-        card['white_z'] = uz/norm
+        card['white_x'] = ux / norm
+        card['white_y'] = uy / norm
+        card['white_z'] = uz / norm
     elif direction is not None:
         card['isotropic'] = False
         ux = direction[0]
@@ -546,15 +546,15 @@ def source(**kw):
         uz = direction[2]
         # Normalize
         norm = (ux**2 + uy**2 + uz**2)**0.5
-        card['ux'] = ux/norm
-        card['uy'] = uy/norm
-        card['uz'] = uz/norm
+        card['ux'] = ux / norm
+        card['uy'] = uy / norm
+        card['uz'] = uz / norm
 
     # Set energy
     if energy is not None:
         group = np.array(energy)
         # Normalize
-        card['group'] = group/np.sum(group)
+        card['group'] = group / np.sum(group)
 
     # Set time
     if time is not None:
@@ -802,6 +802,67 @@ def IC_generator(N_neutron=0, N_precursor=0):
     card['IC_N_precursor'] = int(N_precursor)
 
 
+def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
+         maxitt=25, tol=1e-6, generator='halton', fixed_source_solver='picard',
+         eigenmode_solver='davidson', material_idx=None, N_dim=6,
+         scramble=False, seed=12345):
+
+    card = mcdc.input_card.technique
+    card['iQMC'] = True
+    card['iqmc_tol'] = tol
+    card['iqmc_maxitt'] = maxitt
+    card['iqmc_generator'] = generator
+    card['iqmc_N_dim'] = N_dim
+    card['iqmc_scramble'] = scramble
+    card['iqmc_seed'] = seed
+    card['weight_roulette'] = True
+    card['wr_threshold'] = 1e-4
+    card['wr_target'] = 1e-12  # TODO: remove
+
+    # Set mesh
+    if g is not None:
+        card['iqmc_mesh']['g'] = g
+    if t is not None:
+        card['iqmc_mesh']['t'] = t
+    if x is not None:
+        card['iqmc_mesh']['x'] = x
+    if y is not None:
+        card['iqmc_mesh']['y'] = y
+    if z is not None:
+        card['iqmc_mesh']['z'] = z
+
+    ax_expand = []
+    if g is None:
+        ax_expand.append(0)
+    if t is None:
+        ax_expand.append(1)
+    if x is None:
+        ax_expand.append(2)
+    if y is None:
+        ax_expand.append(3)
+    if z is None:
+        ax_expand.append(4)
+    for ax in ax_expand:
+        fixed_source = np.expand_dims(fixed_source, axis=ax)
+        phi0 = np.expand_dims(phi0, axis=ax)
+
+    ax_expand = []
+    if t is None:
+        ax_expand.append(0)
+    if x is None:
+        ax_expand.append(1)
+    if y is None:
+        ax_expand.append(2)
+    if z is None:
+        ax_expand.append(3)
+    for ax in ax_expand:
+        material_idx = np.expand_dims(material_idx, axis=ax)
+
+    card['iqmc_flux'] = phi0
+    card['iqmc_fixed_source'] = fixed_source
+    card['iqmc_material_idx'] = material_idx
+
+
 # ==============================================================================
 # Util
 # ==============================================================================
@@ -812,9 +873,9 @@ def print_card(card):
         card = card.card
     for key in card:
         if key == 'tag':
-            print(card[key]+' card')
+            print(card[key] + ' card')
         else:
-            print('  '+key+' : '+str(card[key]))
+            print('  ' + key + ' : ' + str(card[key]))
 
 
 def universal_speed(speed):
