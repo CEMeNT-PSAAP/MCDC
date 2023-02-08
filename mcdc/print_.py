@@ -111,17 +111,28 @@ def print_progress_eigenvalue(mcdc):
 
 def print_runtime(mcdc):
     total = mcdc['runtime_total']
+    preparation = mcdc['runtime_preparation']
+    simulation = mcdc['runtime_simulation']
+    output = mcdc['runtime_output']
+    print('\n Runtime report:')
     if master:
-        if total >= 24 * 60 * 60:
-            print(' Total runtime: %.2f days\n' % (total / 24 / 60 / 60))
-        elif total >= 60 * 60:
-            print(' Total runtime: %.2f hours\n' % (total / 60 / 60))
-        elif total >= 60:
-            print(' Total runtime: %.2f minutes\n' % (total / 60))
-        else:
-            print(' Total runtime: %.2f seconds\n' % total)
+        print_time('Total      ', total, 100)
+        print_time('Preparation', preparation, preparation/total*100)
+        print_time('Simulation ', simulation, simulation/total*100)
+        print_time('Output     ', output, output/total*100)
+        print('\n')
         sys.stdout.flush()
 
+
+def print_time(tag, t, percent):
+    if t >= 24 * 60 * 60:
+        print('   %s | %.2f days (%.1f%%)' % (tag, t / 24 / 60 / 60), percent)
+    elif t >= 60 * 60:
+        print('   %s | %.2f hours (%.1f%%)' % (tag, t / 60 / 60, percent))
+    elif t >= 60:
+        print('   %s | %.2f minutes (%.1f%%)' % (tag, t / 60, percent))
+    else:
+        print('   %s | %.2f seconds (%.1f%%)' % (tag, t, percent))
 
 def print_bank(bank, show_content=False):
     tag = bank['tag']
