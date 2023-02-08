@@ -13,13 +13,13 @@ def loop_setup_test():
     x = 5.0
     trans = np.array([0.0, 0.0, 0.0])
 
-    S['G'] = 1.0
-    S['linear'] = True
-    S['J'] = np.array([-x, -x])
-    S['t'] = np.array([0.0, INF])
+    S["G"] = 1.0
+    S["linear"] = True
+    S["J"] = np.array([-x, -x])
+    S["t"] = np.array([0.0, INF])
 
     # Surface on the left
-    P['x'] = 4.0
+    P["x"] = 4.0
 
     # setup_card = card.InputCard()
 
@@ -29,13 +29,12 @@ def loop_setup_test():
 
 
 def test_loop_main():
-
     # [P, S] = loop_setup_test()
 
-    print('This worked')
+    print("This worked")
     assert 0 == 0
 
 
 def test_loop_particle():
-    print('This worked')
+    print("This worked")
     assert 0 == 0

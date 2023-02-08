@@ -11,20 +11,18 @@ import mcdc
 # Set materials
 SigmaT = 5.0
 c = 0.8
-m_barrier = mcdc.material(capture=np.array([SigmaT]),
-                          scatter=np.array([[SigmaT*c]]))
+m_barrier = mcdc.material(capture=np.array([SigmaT]), scatter=np.array([[SigmaT * c]]))
 SigmaT = 1.0
-m_room = mcdc.material(capture=np.array([SigmaT]),
-                       scatter=np.array([[SigmaT*c]]))
+m_room = mcdc.material(capture=np.array([SigmaT]), scatter=np.array([[SigmaT * c]]))
 
 # Set surfaces
-sx1 = mcdc.surface('plane-x', x=0.0, bc="reflective")
-sx2 = mcdc.surface('plane-x', x=2.0)
-sx3 = mcdc.surface('plane-x', x=2.4)
-sx4 = mcdc.surface('plane-x', x=4.0, bc="vacuum")
-sy1 = mcdc.surface('plane-y', y=0.0, bc="reflective")
-sy2 = mcdc.surface('plane-y', y=2.0)
-sy3 = mcdc.surface('plane-y', y=4.0, bc="vacuum")
+sx1 = mcdc.surface("plane-x", x=0.0, bc="reflective")
+sx2 = mcdc.surface("plane-x", x=2.0)
+sx3 = mcdc.surface("plane-x", x=2.4)
+sx4 = mcdc.surface("plane-x", x=4.0, bc="vacuum")
+sy1 = mcdc.surface("plane-y", y=0.0, bc="reflective")
+sy2 = mcdc.surface("plane-y", y=2.0)
+sy3 = mcdc.surface("plane-y", y=4.0, bc="vacuum")
 
 # Set cells
 mcdc.cell([+sx1, -sx2, +sy1, -sy2], m_room)
@@ -44,11 +42,10 @@ mcdc.source(x=[0.0, 1.0], y=[0.0, 1.0], isotropic=True)
 # =============================================================================
 
 # Tally: cell-average and cell-edge angular fluxes and currents
-mcdc.tally(scores=['flux'], x=np.linspace(0.0, 4.0, 40),
-                            y=np.linspace(0.0, 4.0, 40))
+mcdc.tally(scores=["flux"], x=np.linspace(0.0, 4.0, 40), y=np.linspace(0.0, 4.0, 40))
 
 # Setting
-mcdc.setting(N_particle=1E5)
+mcdc.setting(N_particle=1e5)
 mcdc.implicit_capture()
 
 # Run

@@ -18,11 +18,11 @@ m3 = mcdc.material(capture=np.array([0.0]))  # Vacuum
 m4 = mcdc.material(capture=np.array([0.1]), scatter=np.array([[0.9]]))
 
 # Set surfaces
-s1 = mcdc.surface('plane-x', x=0.0, bc="reflective")
-s2 = mcdc.surface('plane-x', x=2.0)
-s3 = mcdc.surface('plane-x', x=3.0)
-s4 = mcdc.surface('plane-x', x=5.0)
-s5 = mcdc.surface('plane-x', x=8.0, bc="vacuum")
+s1 = mcdc.surface("plane-x", x=0.0, bc="reflective")
+s2 = mcdc.surface("plane-x", x=2.0)
+s3 = mcdc.surface("plane-x", x=3.0)
+s4 = mcdc.surface("plane-x", x=5.0)
+s5 = mcdc.surface("plane-x", x=8.0, bc="vacuum")
 
 # Set cells
 mcdc.cell([+s1, -s2], m1)
@@ -45,12 +45,12 @@ mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=['flux', 'flux-x'],
-           x=np.linspace(0.0, 8.0, 41))
+mcdc.tally(scores=["flux", "flux-x"], x=np.linspace(0.0, 8.0, 41))
 
 # Setting
-mcdc.setting(N_particle=N_particle, output='output_'+str(N_particle),
-             progress_bar=False)
+mcdc.setting(
+    N_particle=N_particle, output="output_" + str(N_particle), progress_bar=False
+)
 
 # Run
 mcdc.run()
