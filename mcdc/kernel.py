@@ -2441,7 +2441,7 @@ def prepare_qmc_particles(mcdc):
         # TODO: Bug where if x = 0.0 the x-index is -1
         dV = iqmc_cell_volume(x, y, z, mesh)
         # Set weight
-        P_new['iqmc_w'] = Q[:, t, x, y, z] * dV * Nt / N_particle
+        P_new['iqmc_w'] = (Q[:, t, x, y, z] * dV * Nt / N_particle)
         P_new['w'] = (P_new['iqmc_w']).sum()
         # print(P_new['w'])
         # print(P_new['iqmc_w'])
