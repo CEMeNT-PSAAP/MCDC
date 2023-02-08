@@ -19,27 +19,36 @@ mcdc = mcdc_.global_
 
 
 def run():
+    # Start timer
+    total_start = MPI.Wtime()
+
     # Preparation:
     #   process input cards, make types, and allocate global variables
+    preparation_start = MPI.Wtime()
     prepare()
     input_card.reset()
+    mcdc['runtime_preparation'] = MPI.Wtime() - preparation_start
 
-    # Print banner and hardware configuration
+    # Print banner, hardware configuration, and header
     print_banner(mcdc)
-
-    # Run
     print_msg(" Now running TNT...")
     if mcdc['setting']['mode_eigenvalue']:
         print_header_eigenvalue(mcdc)
-    MPI.COMM_WORLD.Barrier()
-    mcdc['runtime_total'] = MPI.Wtime()
+
+    # Run simulation
     # TODO: add if iQMC execute iqmc_loop()
+    simulation_start = MPI.Wtime()
     loop_main(mcdc)
-    MPI.COMM_WORLD.Barrier()
-    mcdc['runtime_total'] = MPI.Wtime() - mcdc['runtime_total']
+    mcdc['runtime_simulation'] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
+    output_start = MPI.Wtime()
     generate_hdf5()
+    mcdc['runtime_output'] = MPI.Wtime() - output_start
+
+    # Stop timer
+    MPI.COMM_WORLD.Barrier()
+    mcdc['runtime_total'] = MPI.Wtime() - total_start
 
     # Closout
     print_runtime(mcdc)
@@ -47,8 +56,6 @@ def run():
 
 def prepare():
     global mcdc
-
-    print_msg("\n Preparing...")
 
     # =========================================================================
     # Some numbers
@@ -346,7 +353,8 @@ def generate_hdf5():
 
         with h5py.File(mcdc['setting']['output'] + '.h5', 'w') as f:
             # Runtime
-            for name in ['total', 'bank_management']:
+            for name in ['total', 'preparation', 'simulation', 'output',
+                         'bank_management']:
                 f.create_dataset("runtime_" + name,
                                  data=np.array([mcdc['runtime_' + name]]))
 

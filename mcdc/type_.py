@@ -500,6 +500,9 @@ def make_type_global(card):
                         ('mpi_work_size', int64),
                         ('mpi_work_size_total', int64),
                         ('runtime_total', float64),
+                        ('runtime_preparation', float64),
+                        ('runtime_simulation', float64),
+                        ('runtime_output', float64),
                         ('runtime_bank_management', float64)
                         ])
 
