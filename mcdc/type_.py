@@ -352,35 +352,35 @@ def make_type_technique(card):
     # =========================================================================
 
     # Constants
-    struct += [('wr_threshold', float64), ('wr_target', float64)]
+    struct += [('wr_chance', float64), ('wr_threshold', float64)]
 
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
 
     # Mesh (for qmc source tallies)
+    
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(
         card.technique['iqmc_mesh'])
-    struct += [('iqmc_mesh', mesh)]
-
-    # Low-discprenecy sequence
     N_particle = card.setting['N_particle']
     Ng = card.materials[0]['G']
     N_dim = 6  # group, x, y, z, mu, phi
+    if not card.technique['iQMC']:
+        Nx = Ny = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
+        
+    struct += [('iqmc_mesh', mesh)]
+    # Low-discprenecy sequence
     # TODO: make N_dim an input setting
     struct += [('lds', float64, (N_particle, N_dim))]
-
     # Source
     struct += [('iqmc_source', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_fixed_source', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_material_idx', int64, (Nt, Nx, Ny, Nz))]
-
-    # Second scalar flux tally for k-eigenvalue problems (?)
+    # TODO: Second scalar flux tally for k-eigenvalue problems
     struct += [('iqmc_flux', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_flux_old', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_effective_scattering', float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [('iqmc_effective_fission', float64, (Ng, Nt, Nx, Ny, Nz))]
-
     # Constants
     struct += [('iqmc_maxitt', int64), ('iqmc_tol', float64),
                ('iqmc_itt', int64), ('iqmc_res', float64),

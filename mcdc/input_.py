@@ -837,9 +837,9 @@ def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
     card['iqmc_N_dim'] = N_dim
     card['iqmc_scramble'] = scramble
     card['iqmc_seed'] = seed
-    card['weight_roulette'] = True
-    card['wr_threshold'] = 1e-4
-    card['wr_target'] = 1e-12  # TODO: remove
+    # card['weight_roulette'] = True
+    # card['wr_threshold'] = 1e-4
+    # card['wr_target'] = 1e-12  # TODO: remove
 
     # Set mesh
     if g is not None:
@@ -884,7 +884,29 @@ def iQMC(g=None, t=None, x=None, y=None, z=None, fixed_source=None, phi0=None,
     card['iqmc_fixed_source'] = fixed_source
     card['iqmc_material_idx'] = material_idx
 
+def weight_roulette(chance, wr_threshold):
+    """
+    If neutron weight is below wr_threshold, then enter weight rouelette
+    technique. Neutron has 'chance' probability of having its weight increased
+    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
+    
+    Parameters
+    ----------
+    chance : probability of termination
+    wr_threshold : weight_roulette() is called on a particle 
+                    if P['w'] <= wr_threshold
 
+    Returns
+    -------
+    None.
+
+    """
+    card = mcdc.input_card.technique
+    card['weight_roulette'] = True
+    card['wr_chance'] = chance
+    card['wr_threshold'] = wr_threshold
+    
+    
 # ==============================================================================
 # Util
 # ==============================================================================
