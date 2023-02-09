@@ -235,7 +235,8 @@ def prepare():
                         'IC_Pmax_n', 'IC_Pmax_C', 'IC_resample',
                         'iqmc_flux_old', 'iqmc_mesh', 'iqmc_source', 'lds',
                         'iqmc_effective_scattering', 'iqmc_effective_fission',
-                        'iqmc_res', 'iqmc_generator']:
+                        'iqmc_res', 'iqmc_generator', 'wr_chance',
+                        'wr_threshold']:
             mcdc['technique'][name] = input_card.technique[name]
 
     # Set time census parameter
@@ -252,6 +253,15 @@ def prepare():
         mcdc['technique'][name]['mu'] = input_card.technique[name]['mu']
         mcdc['technique'][name]['azi'] = input_card.technique[name]['azi']
 
+
+    # =========================================================================
+    # weight roulette    
+    # =========================================================================
+    if input_card.technique['weight_roulette']:
+        mcdc['technique']['wr_chance'] = input_card.technique['wr_chance']
+        mcdc['technique']['wr_threshold'] = \
+            input_card.technique['wr_threshold']
+        
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================

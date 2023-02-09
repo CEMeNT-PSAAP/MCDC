@@ -6,7 +6,7 @@ import mcdc
 # =============================================================================
 # Import Cross Section Data
 # =============================================================================
-G = 12 # G may equal 12, 70, or 618
+G = 12 # G must be 12, 70, or 618
 
 script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 rel_path        = "./HDPE/"
@@ -48,7 +48,7 @@ mcdc.iQMC(g             = np.ones((0,G)),
           fixed_source  = fixed_source, 
           phi0          = phi0, 
           material_idx  = material_idx, 
-          maxitt        = 25,
+          maxitt        = 30,
           tol           = 1e-3,
           generator     = 'halton')
 
@@ -56,8 +56,12 @@ mcdc.iQMC(g             = np.ones((0,G)),
 # Set tally, setting, and run mcdc
 # =============================================================================
 
+# weight roulette
+chance = 0.9
+threshold = 1e-3
+mcdc.weight_roulette(chance, threshold)
 # Setting
-mcdc.setting(N_particle=1000)
+mcdc.setting(N_particle=1E3)
 
 # Run
 mcdc.run()
