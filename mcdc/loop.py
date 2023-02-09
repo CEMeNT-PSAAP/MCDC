@@ -5,8 +5,7 @@ from numba import njit, objmode
 import mcdc.kernel as kernel
 
 from mcdc.constant import *
-from mcdc.print_ import print_progress, print_progress_eigenvalue, \
-    print_progress_iqmc
+from mcdc.print_ import print_progress, print_progress_eigenvalue, print_progress_iqmc
 
 import matplotlib.pyplot as plt
 
@@ -19,24 +18,26 @@ import matplotlib.pyplot as plt
 def loop_main(mcdc):
     simulation_end = False
     while not simulation_end:
-        if mcdc['technique']['iQMC']:
+        if mcdc["technique"]["iQMC"]:
             # reset particle bank size
-            mcdc['bank_source']['size'] = 0
-            mcdc['technique']['iqmc_source'] = np.zeros_like(
-                mcdc['technique']['iqmc_source'])
+            mcdc["bank_source"]["size"] = 0
+            mcdc["technique"]["iqmc_source"] = np.zeros_like(
+                mcdc["technique"]["iqmc_source"]
+            )
             kernel.prepare_qmc_source(mcdc)  # set bank source
             kernel.prepare_qmc_particles(mcdc)  # initialize particles with LDS
             # prepare source for next iteration
-            mcdc['technique']['iqmc_flux'] = np.zeros_like(
-                mcdc['technique']['iqmc_flux'])
+            mcdc["technique"]["iqmc_flux"] = np.zeros_like(
+                mcdc["technique"]["iqmc_flux"]
+            )
         # Loop over source particles
         loop_source(mcdc)
 
         # Eigenvalue cycle closeout
-        if mcdc['setting']['mode_eigenvalue']:
+        if mcdc["setting"]["mode_eigenvalue"]:
             # Tally history closeout
             kernel.global_tally_closeout_history(mcdc)
-            if mcdc['cycle_active']:
+            if mcdc["cycle_active"]:
                 kernel.tally_closeout_history(mcdc)
 
             # Print progress
@@ -47,38 +48,38 @@ def loop_main(mcdc):
             kernel.manage_particle_banks(mcdc)
 
             # Cycle management
-            mcdc['i_cycle'] += 1
-            if mcdc['i_cycle'] == mcdc['setting']['N_cycle']:
+            mcdc["i_cycle"] += 1
+            if mcdc["i_cycle"] == mcdc["setting"]["N_cycle"]:
                 simulation_end = True
-            elif mcdc['i_cycle'] >= mcdc['setting']['N_inactive']:
-                mcdc['cycle_active'] = True
+            elif mcdc["i_cycle"] >= mcdc["setting"]["N_inactive"]:
+                mcdc["cycle_active"] = True
 
         # iQMC convergence criteria
-        elif mcdc['technique']['iQMC']:
-            mcdc['technique']['iqmc_itt'] += 1
+        elif mcdc["technique"]["iQMC"]:
+            mcdc["technique"]["iqmc_itt"] += 1
             # calculate norm of flux iterations
             kernel.calculate_qmc_res(mcdc)
-            if (mcdc['technique']['iqmc_itt'] ==
-                mcdc['technique']['iqmc_maxitt']) or (
-                    mcdc['technique']['iqmc_res'] <=
-                    mcdc['technique']['iqmc_tol']):
+            if (mcdc["technique"]["iqmc_itt"] == mcdc["technique"]["iqmc_maxitt"]) or (
+                mcdc["technique"]["iqmc_res"] <= mcdc["technique"]["iqmc_tol"]
+            ):
                 simulation_end = True
             # Print progres
             # with objmode():
             print_progress_iqmc(mcdc)
             # set flux_old = current flux
-            mcdc['technique']['iqmc_flux_old'] = \
-                mcdc['technique']['iqmc_flux'].copy()
+            mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
 
         # Time census closeout
-        elif mcdc['technique']['time_census']\
-            and mcdc['technique']['census_idx']\
-                < len(mcdc['technique']['census_time']) - 1:
+        elif (
+            mcdc["technique"]["time_census"]
+            and mcdc["technique"]["census_idx"]
+            < len(mcdc["technique"]["census_time"]) - 1
+        ):
             # Manage particle banks
             kernel.manage_particle_banks(mcdc)
 
             # Increment census index
-            mcdc['technique']['census_idx'] += 1
+            mcdc["technique"]["census_idx"] += 1
 
         # Fixed-source closeout
         else:
@@ -92,17 +93,18 @@ def loop_main(mcdc):
 # Source loop
 # =============================================================================
 
+
 @njit
 def loop_source(mcdc):
     # Rebase rng skip_ahead seed
-    kernel.rng_skip_ahead_strides(mcdc['mpi_work_start'], mcdc)
+    kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"], mcdc)
     kernel.rng_rebase(mcdc)
 
     # Progress bar indicator
     N_prog = 0
 
     # Loop over particle sources
-    for work_idx in range(mcdc['mpi_work_size']):
+    for work_idx in range(mcdc["mpi_work_size"]):
         # Initialize RNG wrt work index
         kernel.rng_skip_ahead_strides(work_idx, mcdc)
 
@@ -111,40 +113,40 @@ def loop_source(mcdc):
         # =====================================================================
 
         # Get from fixed-source?
-        if mcdc['bank_source']['size'] == 0:
+        if mcdc["bank_source"]["size"] == 0:
             # Sample source
             xi = kernel.rng(mcdc)
             tot = 0.0
-            for S in mcdc['sources']:
-                tot += S['prob']
+            for S in mcdc["sources"]:
+                tot += S["prob"]
                 if tot >= xi:
                     break
             P = kernel.source_particle(S, mcdc)
 
         # Get from source bank
         else:
-            P = mcdc['bank_source']['particles'][work_idx]
+            P = mcdc["bank_source"]["particles"][work_idx]
 
         # Check if it is beyond
-        census_idx = mcdc['technique']['census_idx']
-        if P['t'] > mcdc['technique']['census_time'][census_idx]:
-            P['t'] += SHIFT
-            kernel.add_particle(P, mcdc['bank_census'])
+        census_idx = mcdc["technique"]["census_idx"]
+        if P["t"] > mcdc["technique"]["census_time"][census_idx]:
+            P["t"] += SHIFT
+            kernel.add_particle(P, mcdc["bank_census"])
         else:
             # Add the source particle into the active bank
-            kernel.add_particle(P, mcdc['bank_active'])
+            kernel.add_particle(P, mcdc["bank_active"])
 
         # =====================================================================
         # Run the source particle and its secondaries
         # =====================================================================
 
         # Loop until active bank is exhausted
-        while mcdc['bank_active']['size'] > 0:
+        while mcdc["bank_active"]["size"] > 0:
             # Get particle from active bank
-            P = kernel.get_particle(mcdc['bank_active'], mcdc)
+            P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
             # Apply weight window
-            if mcdc['technique']['weight_window']:
+            if mcdc["technique"]["weight_window"]:
                 kernel.weight_window(P, mcdc)
 
             # Particle loop
@@ -155,12 +157,12 @@ def loop_source(mcdc):
         # =====================================================================
 
         # Tally history closeout for fixed-source simulation
-        if not mcdc['setting']['mode_eigenvalue']:
+        if not mcdc["setting"]["mode_eigenvalue"]:
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        percent = (work_idx + 1.0) / mcdc['mpi_work_size']
-        if mcdc['setting']['progress_bar'] and int(percent * 100.0) > N_prog:
+        percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
@@ -170,33 +172,34 @@ def loop_source(mcdc):
 # Particle loop
 # =========================================================================
 
+
 @njit
 def loop_particle(P, mcdc):
-    while P['alive']:
+    while P["alive"]:
         # Find cell from root universe if unknown
-        if P['cell_ID'] == -1:
+        if P["cell_ID"] == -1:
             trans = np.zeros(3)
-            P['cell_ID'] = kernel.get_particle_cell(P, 0, trans, mcdc)
+            P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
         # Determine and move to event
         kernel.move_to_event(P, mcdc)
-        event = P['event']
+        event = P["event"]
 
         # Collision
         if event == EVENT_COLLISION:
             # Generate IC?
-            if mcdc['technique']['IC_generator'] and mcdc['cycle_active']:
+            if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
                 kernel.bank_IC(P, mcdc)
 
             # Branchless collision?
-            if mcdc['technique']['branchless_collision']:
+            if mcdc["technique"]["branchless_collision"]:
                 kernel.branchless_collision(P, mcdc)
 
             # Analog collision
             else:
                 # Get collision type
                 kernel.collision(P, mcdc)
-                event = P['event']
+                event = P["event"]
 
                 # Perform collision
                 if event == EVENT_CAPTURE:
@@ -207,8 +210,8 @@ def loop_particle(P, mcdc):
                     kernel.fission(P, mcdc)
 
                 # Sensitivity quantification for material?
-                material = mcdc['materials'][P['material_ID']]
-                if material['sensitivity'] and P['sensitivity_ID'] == 0:
+                material = mcdc["materials"][P["material_ID"]]
+                if material["sensitivity"] and P["sensitivity_ID"] == 0:
                     kernel.sensitivity_material(P, mcdc)
 
         # Mesh crossing
@@ -230,14 +233,14 @@ def loop_particle(P, mcdc):
 
         # Surface move
         elif event == EVENT_SURFACE_MOVE:
-            P['t'] += SHIFT
-            P['cell_ID'] = -1
+            P["t"] += SHIFT
+            P["cell_ID"] = -1
 
         # Time census
         elif event == EVENT_CENSUS:
-            P['t'] += SHIFT
-            kernel.add_particle(kernel.copy_particle(P), mcdc['bank_census'])
-            P['alive'] = False
+            P["t"] += SHIFT
+            kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
+            P["alive"] = False
 
         # Surface and mesh crossing
         elif event == EVENT_SURFACE_N_MESH:
@@ -252,25 +255,26 @@ def loop_particle(P, mcdc):
         # Surface move and mesh crossing
         elif event == EVENT_SURFACE_MOVE_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            P['t'] += SHIFT
-            P['cell_ID'] = -1
+            P["t"] += SHIFT
+            P["cell_ID"] = -1
 
         # Time census and mesh crossing
         elif event == EVENT_CENSUS_N_MESH:
             kernel.mesh_crossing(P, mcdc)
-            P['t'] += SHIFT
-            kernel.add_particle(kernel.copy_particle(P), mcdc['bank_census'])
-            P['alive'] = False
+            P["t"] += SHIFT
+            kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
+            P["alive"] = False
 
         # Apply weight window
-        if mcdc['technique']['weight_window']:
+        if mcdc["technique"]["weight_window"]:
             kernel.weight_window(P, mcdc)
 
         # Apply weight roulette
-        if mcdc['technique']['weight_roulette']:
+        if mcdc["technique"]["weight_roulette"]:
             # check if weight has fallen below threshold
-            if abs(P['w']) <= mcdc['technique']['wr_threshold']:
+            if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
                 kernel.weight_roulette(P, mcdc)
+
 
 # =============================================================================
 # iQMC Loop
