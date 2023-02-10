@@ -232,6 +232,7 @@ def get_particle(bank, mcdc):
     P["sensitivity_ID"] = P_rec["sensitivity_ID"]
 
     # Set default IDs and event
+    P["nuclide_ID"] = -1
     P["material_ID"] = -1
     P["cell_ID"] = -1
     P["surface_ID"] = -1
@@ -560,7 +561,7 @@ def distribute_work(N, mcdc):
 
 @njit
 def bank_IC(P, mcdc):
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # =========================================================================
     # Neutron
@@ -1217,7 +1218,7 @@ def mesh_crossing_evaluate(P, mesh):
 @njit
 def score_tracklength(P, distance, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Get indices
     g = P["g"]
@@ -1251,7 +1252,7 @@ def score_tracklength(P, distance, mcdc):
 @njit
 def score_crossing_x(P, t, x, y, z, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Get indices
     g = P["g"]
@@ -1282,7 +1283,7 @@ def score_crossing_x(P, t, x, y, z, mcdc):
 @njit
 def score_crossing_y(P, t, x, y, z, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Get indices
     g = P["g"]
@@ -1313,7 +1314,7 @@ def score_crossing_y(P, t, x, y, z, mcdc):
 @njit
 def score_crossing_z(P, t, x, y, z, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Get indices
     g = P["g"]
@@ -1344,7 +1345,7 @@ def score_crossing_z(P, t, x, y, z, mcdc):
 @njit
 def score_crossing_t(P, t, x, y, z, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Get indices
     g = P["g"]
@@ -1465,7 +1466,7 @@ def tally_closeout(mcdc):
 @njit
 def global_tally(P, distance, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Parameters
     flux = distance * P["w"]
@@ -1727,7 +1728,7 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     if mcdc["technique"]["iQMC"]:
-        material = mcdc["materials"][P["material_ID"]]
+        material = mcdc["nuclides"][P["material_ID"]]
         w = P["iqmc_w"]
         SigmaT = material["total"][:]
         score_iqmc_flux(P, distance, mcdc)
@@ -1967,14 +1968,17 @@ def mesh_crossing(P, mcdc):
 
 @njit
 def collision(P, mcdc):
+    # TODO: Sample the colliding nuclide
+
     # Get the reaction cross-sections
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
     g = P["g"]
     SigmaT = material["total"][g]
     SigmaC = material["capture"][g]
     SigmaS = material["scatter"][g]
     SigmaF = material["fission"][g]
 
+    # Implicit capture
     if mcdc["technique"]["implicit_capture"]:
         P["w"] *= (SigmaT - SigmaC) / SigmaT
         SigmaT -= SigmaC
@@ -2003,9 +2007,6 @@ def capture(P, mcdc):
     # Kill the current particle
     P["alive"] = False
 
-    pass
-
-
 # =============================================================================
 # Scattering
 # =============================================================================
@@ -2025,7 +2026,7 @@ def scattering(P, mcdc):
         weight_new = P["w"]
 
     # Get production factor
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
     g = P["g"]
     nu_s = material["nu_s"][g]
 
@@ -2111,7 +2112,7 @@ def fission(P, mcdc):
     P["alive"] = False
 
     # Get production factor
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
     g = P["g"]
     nu = material["nu_f"][g]
 
@@ -2208,7 +2209,7 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
 @njit
 def branchless_collision(P, mcdc):
     # Data
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
     w = P["w"]
     g = P["g"]
     SigmaT = material["total"][g]
@@ -2440,7 +2441,7 @@ def prepare_qmc_particles(mcdc):
         P_new["g"] = 0
         t, x, y, z, outside = mesh_get_index(P_new, mesh)
         mat_idx = mcdc["technique"]["iqmc_material_idx"][t, x, y, z]
-        G = mcdc["materials"][mat_idx]["G"]
+        G = mcdc["nuclides"][mat_idx]["G"]
         # calculate dx,dy,dz and then dV
         # TODO: Bug where if x = 0.0 the x-index is -1
         dV = iqmc_cell_volume(x, y, z, mesh)
@@ -2473,7 +2474,7 @@ def fission_source(phi, mat_idx, mcdc):
         fission source
 
     """
-    material = mcdc["materials"][mat_idx]
+    material = mcdc["nuclides"][mat_idx]
     chi_p = material["chi_p"]
     chi_d = material["chi_d"]
     nu_p = material["nu_p"]
@@ -2509,7 +2510,7 @@ def scattering_source(phi, mat_idx, mcdc):
         scattering source
 
     """
-    material = mcdc["materials"][mat_idx]
+    material = mcdc["nuclides"][mat_idx]
     chi_s = material["chi_s"]
     SigmaS = material["scatter"]
     return np.dot(chi_s.T, SigmaS * phi)
@@ -2563,7 +2564,7 @@ def score_iqmc_flux(P, distance, mcdc):
     # Get indices
     # g                   = P['g']
     mesh = mcdc["technique"]["iqmc_mesh"]
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
     w = P["iqmc_w"]
     SigmaT = material["total"]
     SigmaS = material["scatter"]
@@ -2706,9 +2707,9 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     # Assign sensitivity_ID
     P["sensitivity_ID"] = surface["sensitivity_ID"]
 
-    # Get materials
-    material_old = mcdc["materials"][material_ID_old]
-    material_new = mcdc["materials"][material_ID_new]
+    # Get nuclides
+    material_old = mcdc["nuclides"][material_ID_old]
+    material_new = mcdc["nuclides"][material_ID_new]
 
     # Determine the plus and minus components and then their weight signs
     trans = P["translation"]
@@ -2796,7 +2797,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 @njit
 def sensitivity_material(P, mcdc):
     # Get material
-    material = mcdc["materials"][P["material_ID"]]
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Revive and assign sensitivity_ID
     P["alive"] = True
