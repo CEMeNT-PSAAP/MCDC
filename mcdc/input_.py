@@ -13,11 +13,11 @@ import mcdc.global_ as mcdc
 
 
 # ==============================================================================
-# Material
+# Nuclide
 # ==============================================================================
 
 
-def material(
+def nuclide(
     capture=None,
     scatter=None,
     fission=None,
@@ -31,16 +31,26 @@ def material(
     sensitivity=False,
 ):
     """
-    Create a material card.
+    Create a nuclide card.
+
+        - Parameters are set to zeros by default.
+        - Energy group size G is determined by the size of `capture`,
+          `scatter`, or `fission`. Thus, at least `capture`, `scatter`, or
+          `fission` needs to be provided.
+        - `nu_p` or `nu_d` is needed if `fission` is provided.
+        - `chi_p` and `chi_d` are needed if `nu_p` and `nu_d` are provided,
+           respectively, and G > 1.
+        - Delayed neutron precursor group size is determined by the
+          size of `nu_d`.
 
     Parameters
     ----------
     capture : numpy.ndarray (1D), optional
-        Capture cross-section [/cm]
+        Capture microscopic cross-section [barn]
     scatter : numpy.ndarray (2D), optional
-        Differential scattering cross-section [gout, gin] [/cm].
+        Differential scattering microscopic cross-section [gout, gin] [barn].
     fission : numpy.ndarray (1D), optional
-        Fission cross-section [/cm].
+        Fission microscopic cross-section [barn].
     nu_s : numpy.ndarray (1D), optional
         Scattering multiplication.
     nu_p : numpy.ndarray (1D), optional
@@ -56,25 +66,13 @@ def material(
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s]
     sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the material
+        Set to `True` to calculate sensitivities to the nuclide
         (default is `False`)
 
     Returns
     -------
     dictionary
-        A material card
-
-    Notes
-    -----
-    - Parameters are set to zeros by default.
-    - Energy group size G is determined by the size of `capture`,
-      `scatter`, or `fission`. Thus, at least `capture`, `scatter`, or
-      `fission` needs to be provided.
-    - `nu_p` or `nu_d` is needed if `fission` is provided.
-    - `chi_p` and `chi_d` are needed if `nu_p` and `nu_d` are provided,
-       respectively, and G > 1.
-    - Delayed neutron precursor group size is determined by the
-      size of `nu_d`.
+        A nuclide card
     """
     # Energy group size
     if capture is not None:
@@ -84,7 +82,7 @@ def material(
     elif fission is not None:
         G = len(fission)
     else:
-        print_error("Need to supply capture, scatter, or fission to " + "mcdc.material")
+        print_error("Need to supply capture, scatter, or fission to mcdc.nuclide")
 
     # Delayed group size
     J = 0
@@ -93,8 +91,8 @@ def material(
 
     # Set default card values (c.f. type_.py)
     card = {}
-    card["tag"] = "Material"
-    card["ID"] = len(mcdc.input_card.materials)
+    card["tag"] = "Nuclide"
+    card["ID"] = len(mcdc.input_card.nuclides)
     card["G"] = G
     card["J"] = J
     card["speed"] = np.ones(G)
@@ -137,9 +135,7 @@ def material(
     # Check if nu_p or nu_d is not provided, give fission
     if fission is not None:
         if nu_p is None and nu_d is None:
-            print_error(
-                "Need to supply nu_p or nu_d for fissionable " + "mcdc.material"
-            )
+            print_error("Need to supply nu_p or nu_d for fissionable mcdc.nuclide")
 
     # Prompt fission production (vector of size G)
     if nu_p is not None:
@@ -183,7 +179,7 @@ def material(
             card["chi_d"][:, :] = np.ones([J, G])
         else:
             if chi_d is None:
-                print_error("Need to supply chi_d if nu_d is provided " + "and G > 1")
+                print_error("Need to supply chi_d if nu_d is provided  and G > 1")
             # Transpose: [gout, dg] -> [dg, gout]
             card["chi_d"][:, :] = np.swapaxes(chi_d, 0, 1)[:, :]
         # Normalize
@@ -201,6 +197,165 @@ def material(
         # Set ID
         mcdc.input_card.technique["sensitivity_N"] += 1
         card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
+
+    # Push card
+    mcdc.input_card.nuclides.append(card)
+    return card
+
+
+# ==============================================================================
+# Material
+# ==============================================================================
+
+
+def material(
+    nuclides=None,
+    capture=None,
+    scatter=None,
+    fission=None,
+    nu_s=None,
+    nu_p=None,
+    nu_d=None,
+    chi_p=None,
+    chi_d=None,
+    speed=None,
+    decay=None,
+    sensitivity=False,
+):
+    """
+    Create a material card.
+
+    The material card is defined either as a collection of nuclides or directly by its
+    macroscopic constants.
+
+    Parameters
+    ----------
+    nuclides : list of tuple of (dictionary, float), optional
+        List of pairs of nuclide card and its density [/barn-cm]
+    capture : numpy.ndarray (1D), optional
+        Capture macroscopic cross-section [/cm]
+    scatter : numpy.ndarray (2D), optional
+        Differential scattering macroscopic cross-section [gout, gin] [/cm].
+    fission : numpy.ndarray (1D), optional
+        Fission macroscopic cross-section [/cm].
+    nu_s : numpy.ndarray (1D), optional
+        Scattering multiplication.
+    nu_p : numpy.ndarray (1D), optional
+        Prompt fission neutron yield.
+    nu_d : numpy.ndarray (2D), optional
+        Delayed neutron precursor yield [dg, gin].
+    chi_p : numpy.ndarray (2D), optional
+        Prompt fission spectrum [gout, gin]
+    chi_d : numpy.ndarray (2D), optional
+        Delayed neutron spectrum [gout, dg]
+    speed : numpy.ndarray (1D), optional
+        Energy group speed [cm/s]
+    decay : numpy.ndarray (1D), optional
+        Precursor group decay constant [/s]
+    sensitivity : bool, optional
+        Set to `True` to calculate sensitivities to the material
+        (default is `False`)
+
+    Returns
+    -------
+    dictionary
+        A material card
+    """
+    # If nuclides are not given, and macroscopic constants are given instead,
+    # create a nuclide card and set a single-nuclide material
+    if nuclides is None:
+        card_nuclide = nuclide(
+            capture,
+            scatter,
+            fission,
+            nu_s,
+            nu_p,
+            nu_d,
+            chi_p,
+            chi_d,
+            speed,
+            decay,
+            sensitivity,
+        )
+        nuclides = [[card_nuclide, 1.0]]
+
+    # Nuclide and group sizes
+    N_nuclide = len(nuclides)
+    G = nuclides[0][0]["G"]
+    J = nuclides[0][0]["J"]
+
+    # Set default card values (c.f. type_.py)
+    card = {}
+    card["tag"] = "Material"
+    card["ID"] = len(mcdc.input_card.materials)
+    card["N_nuclide"] = N_nuclide
+    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
+    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
+    card["G"] = G
+    card["J"] = J
+    card["speed"] = np.zeros(G)
+    card["decay"] = np.zeros(J)
+    card["capture"] = np.zeros(G)
+    card["scatter"] = np.zeros(G)
+    card["fission"] = np.zeros(G)
+    card["total"] = np.zeros(G)
+    card["nu_s"] = np.ones(G)
+    card["nu_p"] = np.zeros(G)
+    card["nu_d"] = np.zeros([G, J])
+    card["nu_f"] = np.zeros(G)
+    card["chi_s"] = np.zeros([G, G])
+    card["chi_p"] = np.zeros([G, G])
+    card["chi_d"] = np.zeros([J, G])
+    card["sensitivity"] = False
+
+    # Calculate basic XS and determine sensitivity flag
+    for i in range(N_nuclide):
+        nuc = nuclides[i][0]
+        density = nuclides[i][1]
+        card["nuclide_IDs"][i] = nuc["ID"]
+        card["nuclide_densities"][i] = density
+        for tag in ["capture", 'scatter', 'fission', "total", "sensitivity"]:
+            card[tag] += nuc[tag] * density
+    card['sensitivity'] = bool(card['sensitivity'])
+
+    # Calculate effective speed
+    # Current approach: weighted by nuclide macroscopic total cross section
+    # TODO: other more appropriate way?
+    for i in range(N_nuclide):
+        nuc = nuclides[i][0]
+        density = nuclides[i][1]
+        card['speed'] += nuc['speed'] * nuc['total'] * density
+    # Check if vacuum material
+    if max(card['total']) == 0.0:
+        card["speed"][:] = nuc['speed'][:]
+    else:
+        card["speed"] /= card['total']
+
+    # Calculate effective spectra and multiplicities
+    if max(card['scatter']) > 0.0:
+        nuSigmaS = np.zeros((G,G), dtype=float)
+        for i in range(N_nuclide):
+            nuc = nuclides[i][0]
+            density = nuclides[i][1]
+            SigmaS = np.diag(nuc['scatter'])*density
+            nu_s = np.diag(nuc['nu_s'])
+            chi_s = np.transpose(nuc['chi_s'])
+            nuSigmaS += chi_s.dot(nu_s.dot(SigmaS))
+        chi_nu_s = nuSigmaS.dot(np.diag(1.0/card['scatter']))
+        card['nu_s'] = np.sum(chi_nu_s, axis=0)
+        card['chi_s'] = np.transpose(chi_nu_s.dot(np.diag(1.0/card['nu_s'])))
+    if max(card['fission']) > 0.0:
+        nuSigmaF = np.zeros((G,G), dtype=float)
+        for i in range(N_nuclide):
+            nuc = nuclides[i][0]
+            density = nuclides[i][1]
+            SigmaF = np.diag(nuc['fission'])*density
+            nu_p = np.diag(nuc['nu_p'])
+            chi_p = np.transpose(nuc['chi_p'])
+            nuSigmaF += chi_p.dot(nu_p.dot(SigmaF))
+        chi_nu_p = nuSigmaF.dot(np.diag(1.0/card['fission']))
+        card['nu_p'] = np.sum(chi_nu_p, axis=0)
+        card['chi_p'] = np.transpose(chi_nu_p.dot(np.diag(1.0/card['nu_p'])))
 
     # Push card
     mcdc.input_card.materials.append(card)
@@ -939,3 +1094,12 @@ def print_card(card):
             print(card[key] + " card")
         else:
             print("  " + key + " : " + str(card[key]))
+
+
+# ======================================================================================
+# Reset
+# ======================================================================================
+
+
+def reset_cards():
+    mcdc.input_card.reset()
