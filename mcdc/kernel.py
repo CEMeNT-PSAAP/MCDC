@@ -1967,6 +1967,8 @@ def mesh_crossing(P, mcdc):
 
 @njit
 def collision(P, mcdc):
+    # TODO: Sample the colliding nuclide
+
     # Get the reaction cross-sections
     material = mcdc["materials"][P["material_ID"]]
     g = P["g"]
@@ -1975,6 +1977,7 @@ def collision(P, mcdc):
     SigmaS = material["scatter"][g]
     SigmaF = material["fission"][g]
 
+    # Implicit capture
     if mcdc["technique"]["implicit_capture"]:
         P["w"] *= (SigmaT - SigmaC) / SigmaT
         SigmaT -= SigmaC
@@ -2002,8 +2005,6 @@ def collision(P, mcdc):
 def capture(P, mcdc):
     # Kill the current particle
     P["alive"] = False
-
-    pass
 
 
 # =============================================================================
@@ -2177,12 +2178,82 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
     else:
         prompt = False
 
+        # Determine delayed group and nuclide-dependent decay constant and spectrum
+        for j in range(J):
+            tot += nu_d[j]
+            if xi < tot:
+                # Delayed group determined, now determine nuclide
+                N_nuclide = material["N_nuclide"]
+                if N_nuclide == 1:
+                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
+                    spectrum = nuclide["chi_d"][j]
+                    decay = nuclide["decay"][j]
+                    break
+                SigmaF = material["fission"][g]
+                xi = rng(mcdc) * nu_d[j] * SigmaF
+                tot = 0.0
+                for i in range(N_nuclide):
+                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+                    density = material["nuclide_densities"][i]
+                    tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
+                    if xi < tot:
+                        # Nuclide determined, now get the constant and spectruum
+                        spectrum = nuclide["chi_d"][j]
+                        decay = nuclide["decay"][j]
+                        break
+                break
+
+    # Sample outgoing energy
+    xi = rng(mcdc)
+    tot = 0.0
+    for g_out in range(G):
+        tot += spectrum[g_out]
+        if tot > xi:
+            break
+    P_new["g"] = g_out
+
+    # Sample emission time
+    if not prompt:
+        xi = rng(mcdc)
+        P_new["t"] -= math.log(xi) / decay
+
+
+@njit
+def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
+    # Get constants
+    G = nuclide["G"]
+    J = nuclide["J"]
+    g = P["g"]
+    nu = nuclide["nu_f"][g]
+    nu_p = nuclide["nu_p"][g]
+    if J > 0:
+        nu_d = nuclide["nu_d"][g]
+
+    # Copy relevant attributes
+    P_new["x"] = P["x"]
+    P_new["y"] = P["y"]
+    P_new["z"] = P["z"]
+    P_new["t"] = P["t"]
+    P_new["sensitivity_ID"] = P["sensitivity_ID"]
+
+    # Sample isotropic direction
+    P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(mcdc)
+
+    # Prompt or delayed?
+    xi = rng(mcdc) * nu
+    tot = nu_p
+    if xi < tot:
+        prompt = True
+        spectrum = nuclide["chi_p"][g]
+    else:
+        prompt = False
+
         # Determine delayed group
         for j in range(J):
             tot += nu_d[j]
             if xi < tot:
-                spectrum = material["chi_d"][j]
-                decay = material["decay"][j]
+                spectrum = nuclide["chi_d"][j]
+                decay = nuclide["decay"][j]
                 break
 
     # Sample outgoing energy
@@ -2473,7 +2544,8 @@ def fission_source(phi, mat_idx, mcdc):
         fission source
 
     """
-    material = mcdc["materials"][mat_idx]
+    # TODO: Now, only single-nuclide material allow
+    material = mcdc["nuclides"][mat_idx]
     chi_p = material["chi_p"]
     chi_d = material["chi_d"]
     nu_p = material["nu_p"]
@@ -2797,26 +2869,44 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 def sensitivity_material(P, mcdc):
     # Get material
     material = mcdc["materials"][P["material_ID"]]
-
-    # Revive and assign sensitivity_ID
-    P["alive"] = True
-    P["sensitivity_ID"] = material["sensitivity_ID"]
-
-    # Get XS
     g = P["g"]
     SigmaT = material["total"][g]
-    SigmaS = material["scatter"][g]
-    SigmaF = material["fission"][g]
-    nu_s = material["nu_s"][g]
-    nu = material["nu_f"][g]
 
-    nuSigmaS = nu_s * SigmaS
-    nuSigmaF = nu * SigmaF
+    # Check if sensitivity nuclide is sampled
+    N_nuclide = material["N_nuclide"]
+    if N_nuclide == 1:
+        nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
+    else:
+        xi = rng(mcdc) * SigmaT
+        tot = 0.0
+        for i in range(N_nuclide):
+            nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+            density = material["nuclide_densities"][i]
+            tot += density * nuclide["total"][g]
+            if xi < tot:
+                break
+    if not nuclide["sensitivity"]:
+        return
 
     # Undo implicit capture
     if mcdc["technique"]["implicit_capture"]:
         SigmaC = material["capture"][g]
         P["w"] *= SigmaT / (SigmaT - SigmaC)
+
+    # Revive and assign sensitivity_ID
+    P["alive"] = True
+    P["sensitivity_ID"] = nuclide["sensitivity_ID"]
+
+    # Get XS
+    g = P["g"]
+    SigmaT = nuclide["total"][g]
+    SigmaS = nuclide["scatter"][g]
+    SigmaF = nuclide["fission"][g]
+    nu_s = nuclide["nu_s"][g]
+    nu = nuclide["nu_f"][g]
+
+    nuSigmaS = nu_s * SigmaS
+    nuSigmaF = nu * SigmaF
 
     # Set weight
     total = SigmaT + nuSigmaS + nuSigmaF
@@ -2832,10 +2922,10 @@ def sensitivity_material(P, mcdc):
         tot += nuSigmaS
         if tot > xi:
             # Scattering source
-            sample_phasespace_scattering(P, material, P, mcdc)
+            sample_phasespace_scattering(P, nuclide, P, mcdc)
         else:
             # Fission source
-            sample_phasespace_fission(P, material, P, mcdc)
+            sample_phasespace_fission_nuclide(P, nuclide, P, mcdc)
 
 
 # =============================================================================
