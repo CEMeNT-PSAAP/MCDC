@@ -1967,8 +1967,6 @@ def mesh_crossing(P, mcdc):
 
 @njit
 def collision(P, mcdc):
-    # TODO: Sample the colliding nuclide
-
     # Get the reaction cross-sections
     material = mcdc["materials"][P["material_ID"]]
     g = P["g"]
@@ -2248,7 +2246,7 @@ def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
     else:
         prompt = False
 
-        # Determine delayed group
+        # Determine delayed group and get decay constant and spectrum
         for j in range(J):
             tot += nu_d[j]
             if xi < tot:
@@ -2544,7 +2542,7 @@ def fission_source(phi, mat_idx, mcdc):
         fission source
 
     """
-    # TODO: Now, only single-nuclide material allow
+    # TODO: now assuming single-nuclide materials
     material = mcdc["nuclides"][mat_idx]
     chi_p = material["chi_p"]
     chi_d = material["chi_d"]
@@ -2869,30 +2867,32 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 def sensitivity_material(P, mcdc):
     # Get material
     material = mcdc["materials"][P["material_ID"]]
-    g = P["g"]
-    SigmaT = material["total"][g]
 
     # Check if sensitivity nuclide is sampled
     N_nuclide = material["N_nuclide"]
-    if N_nuclide == 1:
-        nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
-    else:
-        xi = rng(mcdc) * SigmaT
-        tot = 0.0
-        for i in range(N_nuclide):
-            nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
-            density = material["nuclide_densities"][i]
-            tot += density * nuclide["total"][g]
-            if xi < tot:
-                break
-    if not nuclide["sensitivity"]:
-        return
+    g = P["g"]
+    xi = rng(mcdc) * material["total"][g]
+    tot = 0.0
+    for i_nuclide in range(N_nuclide):
+        nuclide = mcdc["nuclides"][material["nuclide_IDs"][i_nuclide]]
+        density = material["nuclide_densities"][i_nuclide]
+        tot += density * nuclide["total"][g]
+        if xi < tot:
+            break
+    nuclide = mcdc["nuclides"][i_nuclide]
 
-    # Undo implicit capture
-    if mcdc["technique"]["implicit_capture"]:
-        SigmaC = material["capture"][g]
-        P["w"] *= SigmaT / (SigmaT - SigmaC)
+    if nuclide["sensitivity"]:
+        # Undo implicit capture
+        if mcdc["technique"]["implicit_capture"]:
+            SigmaC = material["capture"][g]
+            P["w"] *= SigmaT / (SigmaT - SigmaC)
 
+        # Produce derivative source
+        sensitivity_nuclide(P, nuclide, mcdc)
+
+
+@njit
+def sensitivity_nuclide(P, nuclide, mcdc):
     # Revive and assign sensitivity_ID
     P["alive"] = True
     P["sensitivity_ID"] = nuclide["sensitivity_ID"]

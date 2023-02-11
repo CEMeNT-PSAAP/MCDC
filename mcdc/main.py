@@ -63,6 +63,7 @@ def prepare():
 
     G = input_card.materials[0]["G"]
     J = input_card.materials[0]["J"]
+    N_nuclide = len(input_card.nuclides)
     N_material = len(input_card.materials)
     N_surface = len(input_card.surfaces)
     N_cell = len(input_card.cells)
@@ -72,9 +73,12 @@ def prepare():
     N_particle = input_card.setting["N_particle"]
     N_cycle = input_card.setting["N_cycle"]
     # Derived numbers
+    Nmax_nuclide = 0
     Nmax_surface = 0
     Nmax_slice = 0  # Surface time-dependence slice
     Nmax_cell = 0
+    for material in input_card.materials:
+        Nmax_nuclide = max(Nmax_nuclide, material["N_nuclide"])
     for surface in input_card.surfaces:
         Nmax_slice = max(Nmax_slice, surface["N_slice"])
     for cell in input_card.cells:
@@ -99,7 +103,8 @@ def prepare():
 
     type_.make_type_particle(input_card)
     type_.make_type_particle_record(input_card)
-    type_.make_type_material(G, J)
+    type_.make_type_nuclide(G, J)
+    type_.make_type_material(G, J, Nmax_nuclide)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)
@@ -111,6 +116,14 @@ def prepare():
 
     # The global variable container
     mcdc = np.zeros(1, dtype=type_.global_)[0]
+
+    # =========================================================================
+    # Nuclides
+    # =========================================================================
+
+    for i in range(N_nuclide):
+        for name in type_.nuclide.names:
+            mcdc["nuclides"][i][name] = input_card.nuclides[i][name]
 
     # =========================================================================
     # Materials
