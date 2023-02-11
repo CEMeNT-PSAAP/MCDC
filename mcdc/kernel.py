@@ -560,7 +560,8 @@ def distribute_work(N, mcdc):
 
 @njit
 def bank_IC(P, mcdc):
-    material = mcdc["materials"][P["material_ID"]]
+    # TODO: Consider multi-nuclide material
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # =========================================================================
     # Neutron
@@ -1465,7 +1466,9 @@ def tally_closeout(mcdc):
 @njit
 def global_tally(P, distance, mcdc):
     tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
+
+    # TODO: Consider multi-nuclide material
+    material = mcdc["nuclides"][P["material_ID"]]
 
     # Parameters
     flux = distance * P["w"]
@@ -1967,8 +1970,6 @@ def mesh_crossing(P, mcdc):
 
 @njit
 def collision(P, mcdc):
-    # TODO: Sample the colliding nuclide
-
     # Get the reaction cross-sections
     material = mcdc["materials"][P["material_ID"]]
     g = P["g"]
@@ -2279,7 +2280,8 @@ def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
 @njit
 def branchless_collision(P, mcdc):
     # Data
-    material = mcdc["materials"][P["material_ID"]]
+    # TODO: Consider multi-nuclide material
+    material = mcdc["nuclides"][P["material_ID"]]
     w = P["w"]
     g = P["g"]
     SigmaT = material["total"][g]
@@ -2544,7 +2546,7 @@ def fission_source(phi, mat_idx, mcdc):
         fission source
 
     """
-    # TODO: Now, only single-nuclide material allow
+    # TODO: Now, only single-nuclide material is allowed
     material = mcdc["nuclides"][mat_idx]
     chi_p = material["chi_p"]
     chi_d = material["chi_d"]
