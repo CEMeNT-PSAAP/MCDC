@@ -312,9 +312,9 @@ def material(
         density = nuclides[i][1]
         card["nuclide_IDs"][i] = nuc["ID"]
         card["nuclide_densities"][i] = density
-        for tag in ["capture", 'scatter', 'fission', "total", "sensitivity"]:
+        for tag in ["capture", "scatter", "fission", "total", "sensitivity"]:
             card[tag] += nuc[tag] * density
-    card['sensitivity'] = bool(card['sensitivity'])
+    card["sensitivity"] = bool(card["sensitivity"])
 
     # Calculate effective speed
     # Current approach: weighted by nuclide macroscopic total cross section
@@ -322,50 +322,50 @@ def material(
     for i in range(N_nuclide):
         nuc = nuclides[i][0]
         density = nuclides[i][1]
-        card['speed'] += nuc['speed'] * nuc['total'] * density
+        card["speed"] += nuc["speed"] * nuc["total"] * density
     # Check if vacuum material
-    if max(card['total']) == 0.0:
-        card["speed"][:] = nuc['speed'][:]
+    if max(card["total"]) == 0.0:
+        card["speed"][:] = nuc["speed"][:]
     else:
-        card["speed"] /= card['total']
+        card["speed"] /= card["total"]
 
     # Calculate effective spectra and multiplicities of scattering and prompt
-    if max(card['scatter']) > 0.0:
-        nuSigmaS = np.zeros((G,G), dtype=float)
+    if max(card["scatter"]) > 0.0:
+        nuSigmaS = np.zeros((G, G), dtype=float)
         for i in range(N_nuclide):
             nuc = nuclides[i][0]
             density = nuclides[i][1]
-            SigmaS = np.diag(nuc['scatter'])*density
-            nu_s = np.diag(nuc['nu_s'])
-            chi_s = np.transpose(nuc['chi_s'])
+            SigmaS = np.diag(nuc["scatter"]) * density
+            nu_s = np.diag(nuc["nu_s"])
+            chi_s = np.transpose(nuc["chi_s"])
             nuSigmaS += chi_s.dot(nu_s.dot(SigmaS))
-        chi_nu_s = nuSigmaS.dot(np.diag(1.0/card['scatter']))
-        card['nu_s'] = np.sum(chi_nu_s, axis=0)
-        card['chi_s'] = np.transpose(chi_nu_s.dot(np.diag(1.0/card['nu_s'])))
-    if max(card['fission']) > 0.0:
-        nuSigmaF = np.zeros((G,G), dtype=float)
+        chi_nu_s = nuSigmaS.dot(np.diag(1.0 / card["scatter"]))
+        card["nu_s"] = np.sum(chi_nu_s, axis=0)
+        card["chi_s"] = np.transpose(chi_nu_s.dot(np.diag(1.0 / card["nu_s"])))
+    if max(card["fission"]) > 0.0:
+        nuSigmaF = np.zeros((G, G), dtype=float)
         for i in range(N_nuclide):
             nuc = nuclides[i][0]
             density = nuclides[i][1]
-            SigmaF = np.diag(nuc['fission'])*density
-            nu_p = np.diag(nuc['nu_p'])
-            chi_p = np.transpose(nuc['chi_p'])
+            SigmaF = np.diag(nuc["fission"]) * density
+            nu_p = np.diag(nuc["nu_p"])
+            chi_p = np.transpose(nuc["chi_p"])
             nuSigmaF += chi_p.dot(nu_p.dot(SigmaF))
-        chi_nu_p = nuSigmaF.dot(np.diag(1.0/card['fission']))
-        card['nu_p'] = np.sum(chi_nu_p, axis=0)
-        card['chi_p'] = np.transpose(chi_nu_p.dot(np.diag(1.0/card['nu_p'])))
+        chi_nu_p = nuSigmaF.dot(np.diag(1.0 / card["fission"]))
+        card["nu_p"] = np.sum(chi_nu_p, axis=0)
+        card["chi_p"] = np.transpose(chi_nu_p.dot(np.diag(1.0 / card["nu_p"])))
 
     # Calculate delayed and total fission multiplicities
-    if max(card['fission']) > 0.0:
-        card['nu_f'][:] = card['nu_p'][:]
+    if max(card["fission"]) > 0.0:
+        card["nu_f"][:] = card["nu_p"][:]
         for j in range(J):
             total = np.zeros(G)
             for i in range(N_nuclide):
                 nuc = nuclides[i][0]
                 density = nuclides[i][1]
-                total += nuc['nu_d'][:,j]*nuc['fission']*density
-            card['nu_d'][:,j] = total/card['fission']
-            card['nu_f'] += card['nu_d'][:,j]
+                total += nuc["nu_d"][:, j] * nuc["fission"] * density
+            card["nu_d"][:, j] = total / card["fission"]
+            card["nu_f"] += card["nu_d"][:, j]
 
     # Push card
     mcdc.input_card.materials.append(card)

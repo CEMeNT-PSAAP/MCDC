@@ -93,52 +93,52 @@ def test_nuclide_default():
 
     # Create nuclides with incomplete definitions
     n1 = mcdc.nuclide(capture=np.ones(5))
-    n2 = mcdc.nuclide(scatter=np.ones((5,5)))
-    n3 = mcdc.nuclide(fission=np.ones(5), nu_p=np.ones(5), chi_p=np.ones((5,5)))
+    n2 = mcdc.nuclide(scatter=np.ones((5, 5)))
+    n3 = mcdc.nuclide(fission=np.ones(5), nu_p=np.ones(5), chi_p=np.ones((5, 5)))
 
     # Checks
     assert n1["tag"] == "Nuclide"
     assert n1["ID"] == 0
     assert n1["G"] == 5
-    assert n1['J'] == 0
+    assert n1["J"] == 0
     assert (n1["speed"] == np.ones(5)).all()
     assert (n1["decay"] == np.zeros(0)).all()
-    assert (n1['capture'] == np.ones(5)).all()
-    assert (n1['scatter'] == np.zeros(5)).all()
-    assert (n1['fission'] == np.zeros(5)).all()
-    assert (n1['nu_s'] == np.ones(5)).all()
-    assert (n1['nu_p'] == np.zeros(5)).all()
-    assert (n1['nu_f'] == np.zeros(5)).all()
-    assert (n1['nu_d'] == np.zeros((5,0))).all()
-    assert (n1['chi_s'] == np.zeros((5,5))).all()
-    assert (n1['chi_p'] == np.zeros((5,5))).all()
-    assert (n1['chi_d'] == np.zeros((0,5))).all()
+    assert (n1["capture"] == np.ones(5)).all()
+    assert (n1["scatter"] == np.zeros(5)).all()
+    assert (n1["fission"] == np.zeros(5)).all()
+    assert (n1["nu_s"] == np.ones(5)).all()
+    assert (n1["nu_p"] == np.zeros(5)).all()
+    assert (n1["nu_f"] == np.zeros(5)).all()
+    assert (n1["nu_d"] == np.zeros((5, 0))).all()
+    assert (n1["chi_s"] == np.zeros((5, 5))).all()
+    assert (n1["chi_p"] == np.zeros((5, 5))).all()
+    assert (n1["chi_d"] == np.zeros((0, 5))).all()
     assert n1["sensitivity"] == False
     assert n1["sensitivity_ID"] == 0
 
-    assert (n2['capture'] == np.zeros(5)).all()
-    assert (n2['scatter'] == np.ones(5)*5.0).all()
-    assert (n2['fission'] == np.zeros(5)).all()
-    assert (n1['nu_s'] == np.ones(5)).all()
-    assert (n2['nu_p'] == np.zeros(5)).all()
-    assert (n2['nu_f'] == np.zeros(5)).all()
-    assert (n2['nu_d'] == np.zeros((5,0))).all()
-    assert (n2['chi_s'] == np.ones((5,5))*0.2).all()
-    assert (n2['chi_p'] == np.zeros((5,5))).all()
-    assert (n2['chi_d'] == np.zeros((0,5))).all()
+    assert (n2["capture"] == np.zeros(5)).all()
+    assert (n2["scatter"] == np.ones(5) * 5.0).all()
+    assert (n2["fission"] == np.zeros(5)).all()
+    assert (n1["nu_s"] == np.ones(5)).all()
+    assert (n2["nu_p"] == np.zeros(5)).all()
+    assert (n2["nu_f"] == np.zeros(5)).all()
+    assert (n2["nu_d"] == np.zeros((5, 0))).all()
+    assert (n2["chi_s"] == np.ones((5, 5)) * 0.2).all()
+    assert (n2["chi_p"] == np.zeros((5, 5))).all()
+    assert (n2["chi_d"] == np.zeros((0, 5))).all()
     assert n2["sensitivity"] == False
     assert n2["sensitivity_ID"] == 0
 
-    assert (n3['capture'] == np.zeros(5)).all()
-    assert (n3['scatter'] == np.zeros(5)).all()
-    assert (n3['fission'] == np.ones(5)).all()
-    assert (n1['nu_s'] == np.ones(5)).all()
-    assert (n3['nu_p'] == np.ones(5)).all()
-    assert (n3['nu_f'] == np.ones(5)).all()
-    assert (n3['nu_d'] == np.zeros((5,0))).all()
-    assert (n3['chi_s'] == np.zeros((5,5))).all()
-    assert (n3['chi_p'] == np.ones((5,5))*0.2).all()
-    assert (n3['chi_d'] == np.zeros((0,5))).all()
+    assert (n3["capture"] == np.zeros(5)).all()
+    assert (n3["scatter"] == np.zeros(5)).all()
+    assert (n3["fission"] == np.ones(5)).all()
+    assert (n1["nu_s"] == np.ones(5)).all()
+    assert (n3["nu_p"] == np.ones(5)).all()
+    assert (n3["nu_f"] == np.ones(5)).all()
+    assert (n3["nu_d"] == np.zeros((5, 0))).all()
+    assert (n3["chi_s"] == np.zeros((5, 5))).all()
+    assert (n3["chi_p"] == np.ones((5, 5)) * 0.2).all()
+    assert (n3["chi_d"] == np.zeros((0, 5))).all()
     assert n3["sensitivity"] == False
     assert n3["sensitivity_ID"] == 0
 
@@ -157,27 +157,27 @@ def test_nuclide_IDs_sensitivity():
     n7 = mcdc.nuclide(capture=np.array([1.0]), sensitivity=True)
 
     # Checks
-    assert n1['ID'] == 0
-    assert n2['ID'] == 1
-    assert n3['ID'] == 2
-    assert n4['ID'] == 3
-    assert n5['ID'] == 4
-    assert n6['ID'] == 5
-    assert n7['ID'] == 6
-    assert n1['sensitivity']
-    assert not n2['sensitivity']
-    assert n3['sensitivity']
-    assert n4['sensitivity']
-    assert not n5['sensitivity']
-    assert not n6['sensitivity']
-    assert n7['sensitivity']
-    assert n1['sensitivity_ID'] == 1
-    assert n2['sensitivity_ID'] == 0
-    assert n3['sensitivity_ID'] == 2
-    assert n4['sensitivity_ID'] == 3
-    assert n5['sensitivity_ID'] == 0
-    assert n6['sensitivity_ID'] == 0
-    assert n7['sensitivity_ID'] == 4
+    assert n1["ID"] == 0
+    assert n2["ID"] == 1
+    assert n3["ID"] == 2
+    assert n4["ID"] == 3
+    assert n5["ID"] == 4
+    assert n6["ID"] == 5
+    assert n7["ID"] == 6
+    assert n1["sensitivity"]
+    assert not n2["sensitivity"]
+    assert n3["sensitivity"]
+    assert n4["sensitivity"]
+    assert not n5["sensitivity"]
+    assert not n6["sensitivity"]
+    assert n7["sensitivity"]
+    assert n1["sensitivity_ID"] == 1
+    assert n2["sensitivity_ID"] == 0
+    assert n3["sensitivity_ID"] == 2
+    assert n4["sensitivity_ID"] == 3
+    assert n5["sensitivity_ID"] == 0
+    assert n6["sensitivity_ID"] == 0
+    assert n7["sensitivity_ID"] == 4
 
 
 # ======================================================================================
@@ -264,7 +264,7 @@ def test_material_single():
 
     # Check if the nuclide was registered
     n2 = mcdc.nuclide(capture=np.ones(5))
-    assert n2['ID'] == 1
+    assert n2["ID"] == 1
 
 
 def test_material_multi():
@@ -272,9 +272,11 @@ def test_material_multi():
     mcdc.reset_cards()
 
     # Create a multi-nuclide material
-    n1 = mcdc.nuclide(capture=np.ones(5), speed=np.ones(5)*1)
-    n2 = mcdc.nuclide(scatter=np.ones((5,5)), speed=np.ones(5)*2, sensitivity=True)
-    n3 = mcdc.nuclide(fission=np.ones(5), nu_p=np.ones(5), chi_p=np.ones((5,5)), speed=np.ones(5)*3)
+    n1 = mcdc.nuclide(capture=np.ones(5), speed=np.ones(5) * 1)
+    n2 = mcdc.nuclide(scatter=np.ones((5, 5)), speed=np.ones(5) * 2, sensitivity=True)
+    n3 = mcdc.nuclide(
+        fission=np.ones(5), nu_p=np.ones(5), chi_p=np.ones((5, 5)), speed=np.ones(5) * 3
+    )
     m1 = mcdc.material(nuclides=[(n1, 1.0), (n2, 2.0), (n3, 3.0)])
 
     # Checks
@@ -285,8 +287,8 @@ def test_material_multi():
     assert (m1["nuclide_densities"] == np.array([1.0, 2.0, 3.0])).all()
     assert m1["G"] == 5
     assert m1["J"] == 0
-    assert (m1["total"] == np.ones(5)*14).all()
-    assert (m1["speed"] == np.ones(5)*30/14).all()
+    assert (m1["total"] == np.ones(5) * 14).all()
+    assert (m1["speed"] == np.ones(5) * 30 / 14).all()
     assert m1["sensitivity"] == True
 
 
@@ -304,20 +306,20 @@ def test_material_IDs_sensitivity():
     m7 = mcdc.material(capture=np.array([1.0]), sensitivity=True)
 
     # Checks
-    assert m1['ID'] == 0
-    assert m2['ID'] == 1
-    assert m3['ID'] == 2
-    assert m4['ID'] == 3
-    assert m5['ID'] == 4
-    assert m6['ID'] == 5
-    assert m7['ID'] == 6
-    assert m1['sensitivity']
-    assert not m2['sensitivity']
-    assert m3['sensitivity']
-    assert m4['sensitivity']
-    assert not m5['sensitivity']
-    assert not m6['sensitivity']
-    assert m7['sensitivity']
+    assert m1["ID"] == 0
+    assert m2["ID"] == 1
+    assert m3["ID"] == 2
+    assert m4["ID"] == 3
+    assert m5["ID"] == 4
+    assert m6["ID"] == 5
+    assert m7["ID"] == 6
+    assert m1["sensitivity"]
+    assert not m2["sensitivity"]
+    assert m3["sensitivity"]
+    assert m4["sensitivity"]
+    assert not m5["sensitivity"]
+    assert not m6["sensitivity"]
+    assert m7["sensitivity"]
 
 
 # ======================================================================================

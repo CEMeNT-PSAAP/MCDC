@@ -2004,6 +2004,7 @@ def capture(P, mcdc):
     # Kill the current particle
     P["alive"] = False
 
+
 # =============================================================================
 # Scattering
 # =============================================================================
@@ -2182,17 +2183,17 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
                 # Delayed group determined, now determine nuclide
                 N_nuclide = material["N_nuclide"]
                 if N_nuclide == 1:
-                    nuclide = mcdc['nuclides'][material['nuclide_IDs'][0]]
+                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
                     spectrum = nuclide["chi_d"][j]
                     decay = nuclide["decay"][j]
                     break
-                SigmaF = material['fission'][g]
-                xi = rng(mcdc)*nu_d[j]*SigmaF
+                SigmaF = material["fission"][g]
+                xi = rng(mcdc) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
-                    nuclide = mcdc['nuclides'][material['nuclide_IDs'][i]]
-                    density = material['nuclide_densities'][i]
-                    tot += density*nuclide['nu_d'][g,j]*nuclide['fission'][g]
+                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+                    density = material["nuclide_densities"][i]
+                    tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
                     if xi < tot:
                         # Nuclide determined, now get the constant and spectruum
                         spectrum = nuclide["chi_d"][j]
@@ -2868,19 +2869,19 @@ def sensitivity_material(P, mcdc):
     material = mcdc["materials"][P["material_ID"]]
 
     # Check if sensitivity nuclide is sampled
-    N_nuclide = material['N_nuclide']
-    g = P['g']
-    xi = rng(mcdc)*material['total'][g]
+    N_nuclide = material["N_nuclide"]
+    g = P["g"]
+    xi = rng(mcdc) * material["total"][g]
     tot = 0.0
     for i_nuclide in range(N_nuclide):
-        nuclide = mcdc['nuclides'][material['nuclide_IDs'][i_nuclide]]
-        density = material['nuclide_densities'][i_nuclide]
-        tot += density*nuclide['total'][g]
+        nuclide = mcdc["nuclides"][material["nuclide_IDs"][i_nuclide]]
+        density = material["nuclide_densities"][i_nuclide]
+        tot += density * nuclide["total"][g]
         if xi < tot:
             break
-    nuclide = mcdc['nuclides'][i_nuclide]
+    nuclide = mcdc["nuclides"][i_nuclide]
 
-    if nuclide['sensitivity']:
+    if nuclide["sensitivity"]:
         # Undo implicit capture
         if mcdc["technique"]["implicit_capture"]:
             SigmaC = material["capture"][g]
