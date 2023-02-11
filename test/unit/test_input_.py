@@ -246,6 +246,18 @@ def test_material_single():
     assert (m1["total"] == np.array([6.0, 12.0, 18.0, 24.0])).all()
     assert (m1["nu_s"] == np.array([1.0, 2.0, 3.0, 4.0])).all()
     assert (m1["nu_p"] == np.array([1.0, 2.0, 3.0, 4.0])).all()
+    assert (
+        m1["nu_d"]
+        == np.array(
+            [
+                [1.0, 1.0, 1.0],
+                [2.0, 2.0, 2.0],
+                [3.0, 3.0, 3.0],
+                [4.0, 4.0, 4.0],
+            ]
+        )
+    ).all()
+    assert (m1["nu_f"] == np.array([4.0, 8.0, 12.0, 16.0])).all()
     assert (m1["chi_s"] == np.ones([4, 4]) * 0.25).all()
     assert (m1["chi_p"] == np.ones([4, 4]) * 0.25).all()
     assert m1["sensitivity"] == True

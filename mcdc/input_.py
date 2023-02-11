@@ -294,7 +294,6 @@ def material(
     card["G"] = G
     card["J"] = J
     card["speed"] = np.zeros(G)
-    card["decay"] = np.zeros(J)
     card["capture"] = np.zeros(G)
     card["scatter"] = np.zeros(G)
     card["fission"] = np.zeros(G)
@@ -305,7 +304,6 @@ def material(
     card["nu_f"] = np.zeros(G)
     card["chi_s"] = np.zeros([G, G])
     card["chi_p"] = np.zeros([G, G])
-    card["chi_d"] = np.zeros([J, G])
     card["sensitivity"] = False
 
     # Calculate basic XS and determine sensitivity flag
@@ -331,7 +329,7 @@ def material(
     else:
         card["speed"] /= card['total']
 
-    # Calculate effective spectra and multiplicities
+    # Calculate effective spectra and multiplicities of scattering and prompt
     if max(card['scatter']) > 0.0:
         nuSigmaS = np.zeros((G,G), dtype=float)
         for i in range(N_nuclide):
@@ -356,6 +354,18 @@ def material(
         chi_nu_p = nuSigmaF.dot(np.diag(1.0/card['fission']))
         card['nu_p'] = np.sum(chi_nu_p, axis=0)
         card['chi_p'] = np.transpose(chi_nu_p.dot(np.diag(1.0/card['nu_p'])))
+
+    # Calculate delayed and total fission multiplicities
+    if max(card['fission']) > 0.0:
+        card['nu_f'][:] = card['nu_p'][:]
+        for j in range(J):
+            total = np.zeros(G)
+            for i in range(N_nuclide):
+                nuc = nuclides[i][0]
+                density = nuclides[i][1]
+                total += nuc['nu_d'][:,j]*nuc['fission']*density
+            card['nu_d'][:,j] = total/card['fission']
+            card['nu_f'] += card['nu_d'][:,j]
 
     # Push card
     mcdc.input_card.materials.append(card)
