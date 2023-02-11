@@ -127,8 +127,8 @@ def print_runtime(mcdc):
     preparation = mcdc["runtime_preparation"]
     simulation = mcdc["runtime_simulation"]
     output = mcdc["runtime_output"]
-    print("\n Runtime report:")
     if master:
+        print("\n Runtime report:")
         print_time("Total      ", total, 100)
         print_time("Preparation", preparation, preparation / total * 100)
         print_time("Simulation ", simulation, simulation / total * 100)
