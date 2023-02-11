@@ -43,7 +43,6 @@ def make_type_particle(input_card):
         ("g", uint64),
         ("w", float64),
         ("alive", bool_),
-        ("nuclide_ID", int64),
         ("material_ID", int64),
         ("cell_ID", int64),
         ("surface_ID", int64),
@@ -153,7 +152,6 @@ def make_type_material(G, J, Nmax_nuclide):
             ("G", int64),
             ("J", int64),
             ("speed", float64, (G,)),
-            ("decay", float64, (J,)),
             ("total", float64, (G,)),
             ("capture", float64, (G,)),
             ("scatter", float64, (G,)),
@@ -164,7 +162,6 @@ def make_type_material(G, J, Nmax_nuclide):
             ("nu_d", float64, (G, J)),
             ("chi_s", float64, (G, G)),
             ("chi_p", float64, (G, G)),
-            ("chi_d", float64, (J, G)),
             ("sensitivity", bool_),
         ]
     )
