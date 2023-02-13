@@ -209,7 +209,7 @@ def loop_particle(P, mcdc):
                 elif event == EVENT_FISSION:
                     kernel.fission(P, mcdc)
 
-                # Sensitivity quantification for material?
+                # Sensitivity quantification for nuclide?
                 material = mcdc["materials"][P["material_ID"]]
                 if material["sensitivity"] and P["sensitivity_ID"] == 0:
                     kernel.sensitivity_material(P, mcdc)

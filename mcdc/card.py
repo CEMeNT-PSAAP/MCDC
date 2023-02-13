@@ -8,6 +8,7 @@ class InputCard:
         self.reset()
 
     def reset(self):
+        self.nuclides = []
         self.materials = []
         self.surfaces = []
         self.cells = []
