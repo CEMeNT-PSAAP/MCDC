@@ -504,20 +504,23 @@ def make_type_technique(card):
     # =========================================================================
 
     # Constants
-    struct += [("wr_threshold", float64), ("wr_target", float64)]
+    struct += [("wr_chance", float64), ("wr_threshold", float64)]
 
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
 
     # Mesh (for qmc source tallies)
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.technique["iqmc_mesh"])
-    struct += [("iqmc_mesh", mesh)]
 
-    # Low-discprenecy sequence
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.technique["iqmc_mesh"])
     N_particle = card.setting["N_particle"]
     Ng = card.materials[0]["G"]
     N_dim = 6  # group, x, y, z, mu, phi
+    if not card.technique["iQMC"]:
+        Nx = Ny = Nz = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
+
+    struct += [("iqmc_mesh", mesh)]
+    # Low-discprenecy sequence
     # TODO: make N_dim an input setting
     struct += [("lds", float64, (N_particle, N_dim))]
 
