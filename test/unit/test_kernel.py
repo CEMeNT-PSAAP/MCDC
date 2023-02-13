@@ -50,7 +50,7 @@ def test_rn_basic():
     input_card.materials.append({"G": 1, "J": 1})
 
     # Make types for dummy mcdc container
-    type_.make_type_material(G, J)
+    type_.make_type_material(G, J, 1)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)

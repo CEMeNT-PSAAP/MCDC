@@ -1,7 +1,7 @@
 import numpy as np
 
-from mcdc.type_ import material
-from mcdc.input_ import material
+from mcdc.type_ import nuclide
+from mcdc.input_ import nuclide
 
 
 def generate_test_nuclear_data(n_neutron_groups, n_dnp_groups):
@@ -54,7 +54,7 @@ def verify_card_quantities_with_input_quantities(
     assert np.allclose(mat["chi_d"], np.transpose(normalized_chi_d))
 
 
-def test_single_neutron_energy_and_zero_dnp_group_material():
+def test_single_neutron_energy_and_zero_dnp_group_nuclide():
     n_neutron_groups = 1
     n_dnp_groups = 0
 
@@ -72,8 +72,8 @@ def test_single_neutron_energy_and_zero_dnp_group_material():
         decay,
     ] = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
-    # Initialize material with single energy and DNP group
-    m = material(
+    # Initialize nuclide with single energy and DNP group
+    m = nuclide(
         capture=capture,
         scatter=scatter,
         fission=fission,
@@ -92,7 +92,7 @@ def test_single_neutron_energy_and_zero_dnp_group_material():
     )
 
 
-def test_single_neutron_energy_and_single_dnp_group_material():
+def test_single_neutron_energy_and_single_dnp_group_nuclide():
     n_neutron_groups = 1
     n_dnp_groups = 1
 
@@ -110,8 +110,8 @@ def test_single_neutron_energy_and_single_dnp_group_material():
         decay,
     ] = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
-    # Initialize material with single energy and DNP group
-    m = material(
+    # Initialize nuclide with single energy and DNP group
+    m = nuclide(
         capture=capture,
         scatter=scatter,
         fission=fission,
@@ -130,7 +130,7 @@ def test_single_neutron_energy_and_single_dnp_group_material():
     )
 
 
-def test_multiple_neutron_energy_and_zero_dnp_group_material():
+def test_multiple_neutron_energy_and_zero_dnp_group_nuclide():
     n_neutron_groups = 7
     n_dnp_groups = 0
 
@@ -148,8 +148,8 @@ def test_multiple_neutron_energy_and_zero_dnp_group_material():
         decay,
     ] = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
-    # Initialize material with single energy and DNP group
-    m = material(
+    # Initialize nuclide with single energy and DNP group
+    m = nuclide(
         capture=capture,
         scatter=scatter,
         fission=fission,
@@ -168,7 +168,7 @@ def test_multiple_neutron_energy_and_zero_dnp_group_material():
     )
 
 
-def test_multiple_neutron_energy_and_single_dnp_group_material():
+def test_multiple_neutron_energy_and_single_dnp_group_nuclide():
     n_neutron_groups = 7
     n_dnp_groups = 1
 
@@ -186,8 +186,8 @@ def test_multiple_neutron_energy_and_single_dnp_group_material():
         decay,
     ] = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
-    # Initialize material with single energy and DNP group
-    m = material(
+    # Initialize nuclide with single energy and DNP group
+    m = nuclide(
         capture=capture,
         scatter=scatter,
         fission=fission,
@@ -206,7 +206,7 @@ def test_multiple_neutron_energy_and_single_dnp_group_material():
     )
 
 
-def test_single_neutron_energy_and_multiple_dnp_group_material():
+def test_single_neutron_energy_and_multiple_dnp_group_nuclide():
     n_neutron_groups = 1
     n_dnp_groups = 6
 
@@ -224,8 +224,8 @@ def test_single_neutron_energy_and_multiple_dnp_group_material():
         decay,
     ] = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
-    # Initialize material with single energy and DNP group
-    m = material(
+    # Initialize nuclide with single energy and DNP group
+    m = nuclide(
         capture=capture,
         scatter=scatter,
         fission=fission,
@@ -244,7 +244,7 @@ def test_single_neutron_energy_and_multiple_dnp_group_material():
     )
 
 
-def test_multiple_neutron_energy_and_multiple_dnp_group_material():
+def test_multiple_neutron_energy_and_multiple_dnp_group_nuclide():
     n_neutron_groups = 7
     n_dnp_groups = 6
 
@@ -262,8 +262,8 @@ def test_multiple_neutron_energy_and_multiple_dnp_group_material():
         decay,
     ] = generate_test_nuclear_data(n_neutron_groups, n_dnp_groups)
 
-    # Initialize material with single energy and DNP group
-    m = material(
+    # Initialize nuclide with single energy and DNP group
+    m = nuclide(
         capture=capture,
         scatter=scatter,
         fission=fission,
