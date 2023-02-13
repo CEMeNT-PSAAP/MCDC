@@ -249,7 +249,7 @@ def prepare():
             "iqmc_res",
             "iqmc_generator",
             "wr_chance",
-            "wr_threshold"
+            "wr_threshold",
         ]:
             mcdc["technique"][name] = input_card.technique[name]
 
@@ -267,15 +267,13 @@ def prepare():
         mcdc["technique"][name]["mu"] = input_card.technique[name]["mu"]
         mcdc["technique"][name]["azi"] = input_card.technique[name]["azi"]
 
+    # =========================================================================
+    # weight roulette
+    # =========================================================================
+    if input_card.technique["weight_roulette"]:
+        mcdc["technique"]["wr_chance"] = input_card.technique["wr_chance"]
+        mcdc["technique"]["wr_threshold"] = input_card.technique["wr_threshold"]
 
-    # =========================================================================
-    # weight roulette    
-    # =========================================================================
-    if input_card.technique['weight_roulette']:
-        mcdc['technique']['wr_chance'] = input_card.technique['wr_chance']
-        mcdc['technique']['wr_threshold'] = \
-            input_card.technique['wr_threshold']
-        
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
