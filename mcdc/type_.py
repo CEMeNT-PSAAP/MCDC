@@ -517,7 +517,7 @@ def make_type_technique(card):
     Ng = card.materials[0]["G"]
     N_dim = 6  # group, x, y, z, mu, phi
     if not card.technique["iQMC"]:
-        Nx = Ny = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
+        Nx = Ny = Nz = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
 
     struct += [("iqmc_mesh", mesh)]
     # Low-discprenecy sequence
