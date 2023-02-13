@@ -2691,7 +2691,7 @@ def weight_roulette(P, mcdc):
 
     Parameters
     ----------
-    P : 
+    P :
     mcdc :
 
     Returns
@@ -2699,7 +2699,7 @@ def weight_roulette(P, mcdc):
     None.
 
     """
-    chance = mcdc['technique']['wr_chance'] 
+    chance = mcdc["technique"]["wr_chance"]
     x = rng(mcdc)
     if x <= chance:
         P["iqmc_w"] /= chance
