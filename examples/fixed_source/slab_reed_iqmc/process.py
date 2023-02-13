@@ -108,7 +108,7 @@ for i in range(len(x_mid)):
 # Load output
 with h5py.File("output.h5", "r") as f:
     # Note the spatial (dx) and source strength (100+1) normalization
-    phi_mcdc = f["tally/iqmc_flux"][:] / dx * 101.0
+    phi_mcdc = f["tally/iqmc_flux"][:]
 
 # Flux - spatial average
 plt.figure(dpi=300, figsize=(8, 5))

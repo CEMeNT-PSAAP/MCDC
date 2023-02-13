@@ -2758,7 +2758,22 @@ def sample_qmc_group(sample, G):
 
 @njit
 def weight_roulette(P, mcdc):
-    chance = 0.1  # (1-chance)x100% particles are eliminated
+    """
+    If neutron weight below wr_threshold, then enter weight rouelette
+    technique. Neutron has 'chance' probability of having its weight increased
+    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
+
+    Parameters
+    ----------
+    P :
+    mcdc :
+
+    Returns
+    -------
+    None.
+
+    """
+    chance = mcdc["technique"]["wr_chance"]
     x = rng(mcdc)
     if x <= chance:
         P["iqmc_w"] /= chance
