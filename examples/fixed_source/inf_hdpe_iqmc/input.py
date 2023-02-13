@@ -7,7 +7,7 @@ import mcdc
 # =============================================================================
 # Import Cross Section Data
 # =============================================================================
-G = 12 # G must be 12, 70, or 618
+G = 12  # G must be 12, 70, or 618
 
 script_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
 rel_path = "./HDPE/"
@@ -64,7 +64,7 @@ chance = 0.9
 threshold = 1e-3
 mcdc.weight_roulette(chance, threshold)
 # Setting
-mcdc.setting(N_particle=1E3)
+mcdc.setting(N_particle=1e3)
 
 # Run
 mcdc.run()
