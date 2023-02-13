@@ -11,6 +11,8 @@ uint64 = np.uint64
 bool_ = np.bool_
 
 # MC/DC types defined by input card
+particle = None
+nuclide = None
 material = None
 surface = None
 cell = None
@@ -28,9 +30,6 @@ global_ = None
 
 
 # Particle (in-flight)
-particle = None
-
-
 def make_type_particle(input_card):
     global particle
     struct = [
@@ -60,8 +59,6 @@ def make_type_particle(input_card):
 
 
 # Particle record (in-bank)
-
-
 def make_type_particle_record(input_card):
     global particle_record
     struct = [
@@ -114,13 +111,13 @@ def particle_bank(max_size):
 
 
 # ==============================================================================
-# Material
+# Nuclide and Material
 # ==============================================================================
 
 
-def make_type_material(G, J):
-    global material
-    material = np.dtype(
+def make_type_nuclide(G, J):
+    global nuclide
+    nuclide = np.dtype(
         [
             ("ID", int64),
             ("G", int64),
@@ -140,6 +137,32 @@ def make_type_material(G, J):
             ("chi_d", float64, (J, G)),
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
+        ]
+    )
+
+
+def make_type_material(G, J, Nmax_nuclide):
+    global material
+    material = np.dtype(
+        [
+            ("ID", int64),
+            ("N_nuclide", int64),
+            ("nuclide_IDs", int64, (Nmax_nuclide,)),
+            ("nuclide_densities", float64, (Nmax_nuclide,)),
+            ("G", int64),
+            ("J", int64),
+            ("speed", float64, (G,)),
+            ("total", float64, (G,)),
+            ("capture", float64, (G,)),
+            ("scatter", float64, (G,)),
+            ("fission", float64, (G,)),
+            ("nu_s", float64, (G,)),
+            ("nu_f", float64, (G,)),
+            ("nu_p", float64, (G,)),
+            ("nu_d", float64, (G, J)),
+            ("chi_s", float64, (G, G)),
+            ("chi_p", float64, (G, G)),
+            ("sensitivity", bool_),
         ]
     )
 
@@ -585,6 +608,7 @@ def make_type_global(card):
     global global_
 
     # Some numbers
+    N_nuclide = len(card.nuclides)
     N_material = len(card.materials)
     N_surface = len(card.surfaces)
     N_cell = len(card.cells)
@@ -615,6 +639,7 @@ def make_type_global(card):
     # GLobal type
     global_ = np.dtype(
         [
+            ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
             ("cells", cell, (N_cell,)),
