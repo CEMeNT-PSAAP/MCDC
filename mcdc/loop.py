@@ -7,7 +7,6 @@ import mcdc.kernel as kernel
 from mcdc.constant import *
 from mcdc.print_ import print_progress, print_progress_eigenvalue, print_progress_iqmc
 
-import matplotlib.pyplot as plt
 
 # =========================================================================
 # Main loop
