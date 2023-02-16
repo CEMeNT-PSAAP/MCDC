@@ -33,16 +33,6 @@ def nuclide(
     """
     Create a nuclide card.
 
-        - Parameters are set to zeros by default.
-        - Energy group size G is determined by the size of `capture`,
-          `scatter`, or `fission`. Thus, at least `capture`, `scatter`, or
-          `fission` needs to be provided.
-        - `nu_p` or `nu_d` is needed if `fission` is provided.
-        - `chi_p` and `chi_d` are needed if `nu_p` and `nu_d` are provided,
-           respectively, and G > 1.
-        - Delayed neutron precursor group size is determined by the
-          size of `nu_d`.
-
     Parameters
     ----------
     capture : numpy.ndarray (1D), optional
@@ -67,12 +57,24 @@ def nuclide(
         Precursor group decay constant [/s]
     sensitivity : bool, optional
         Set to `True` to calculate sensitivities to the nuclide
-        (default is `False`)
 
     Returns
     -------
     dictionary
         A nuclide card
+
+    Notes
+    -----
+    Parameters are set to zeros by default. Energy group size G is determined by the
+    size of `capture`, `scatter`, or `fission`. Thus, at least `capture`, `scatter`,
+    or `fission` needs to be provided. `nu_p` or `nu_d` is needed if `fission` is
+    provided. `chi_p` and `chi_d` are needed if `nu_p` and `nu_d` are provided,
+    respectively, and G > 1. Delayed neutron precursor group size is determined by
+    the size of `nu_d`.
+
+    See also
+    --------
+    mcdc.material : A material can be defined as a collection of nuclides.
     """
     # Energy group size
     if capture is not None:
@@ -254,12 +256,15 @@ def material(
         Precursor group decay constant [/s]
     sensitivity : bool, optional
         Set to `True` to calculate sensitivities to the material
-        (default is `False`)
 
     Returns
     -------
     dictionary
         A material card
+
+    See also
+    --------
+    mcdc.nuclide : A material can be defined as a collection of nuclides.
     """
     # If nuclides are not given, and macroscopic constants are given instead,
     # create a nuclide card and set a single-nuclide material
@@ -377,7 +382,46 @@ def material(
 # ==============================================================================
 
 
-def surface(type_, **kw):
+def surface(type_, bc="interface", sensitivity=False, **kw):
+    """
+    Create a surface card.
+
+    Parameters
+    ----------
+    type_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y',
+             'cylinder-z', 'sphere', 'quadric'}
+        Surface type.
+    bc : {'interface', 'vacuum', 'reflective'}
+        Surface boundary condition.
+    sensitivity : bool, optional
+        Set to `True` to calculate sensitivities to the nuclide
+
+    Other Parameters
+    ----------------
+    x : {float, array_like}
+        x-position [cm] for `plane-x`. If a vector is passed, positions of the surface
+        at the times specified by the parameter `t`.
+    y : {float, array_like}
+        y-position [cm] for `plane-y`. If a vector is passed, positions of the surface
+        at the times specified by the parameter `t`.
+    z : {float, array_like}
+        z-position [cm] for `plane-z`. If a vector is passed, positions of the surface
+        at the times specified by the parameter `t`.
+    center : array_like
+        Center point [cm] for `cylinder-x` (y,z), `cylinder-y` (x,z),
+        `cylinder-z` (x,y), and `sphere` (x,y,z).
+    radius : float
+        Radius [cm] for `cylinder-x`, `cylinder-y`, `cylinder-z`, and `sphere`.
+    A, B, C, D : float
+        Coefficients [cm] for `plane`.
+    A, B, C, D, E, F, G, H, I, J : float
+        Coefficients [cm] for `quadric`.
+
+    Returns
+    -------
+    SurfaceHandle
+        A surface handle used for assigning surface, and its sense, to a cell card.
+    """
     # Set default card values (c.f. type_.py)
     card = {}
     card["tag"] = "Surface"
@@ -403,26 +447,59 @@ def surface(type_, **kw):
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
 
-    # Boundary condition
-    bc = kw.get("bc")
-    if bc is not None:
-        bc = bc.lower()
-        if bc == "vacuum":
-            card["vacuum"] = True
-        elif bc == "reflective":
-            card["reflective"] = True
-        else:
-            print_error(
-                "Unsupported surface boundary condition: "
-                + bc
-                + '; Supported options are "vacuum" or "reflective"'
-            )
+    # Check if the selected type is supported
+    type_ = check_support(
+        "surface type",
+        type_,
+        [
+            "plane-x",
+            "plane-y",
+            "plane-z",
+            "plane",
+            "cylinder-x",
+            "cylinder-y",
+            "cylinder-z",
+            "sphere",
+            "quadric",
+        ],
+    )
 
-    # Surface type
+    # Boundary condition
+    bc = check_support(
+        "surface boundary condition",
+        bc,
+        [
+            "interface",
+            "vacuum",
+            "reflective",
+        ],
+    )
+    # Set bc flags
+    if bc == "vacuum":
+        card["vacuum"] = True
+    elif bc == "reflective":
+        card["reflective"] = True
+
+    # Sensitivity
+    if sensitivity is not None and sensitivity:
+        # Set flag
+        card["sensitivity"] = True
+        mcdc.input_card.technique["sensitivity"] = True
+        mcdc.input_card.technique["weighted_emission"] = False
+
+        # Set ID
+        mcdc.input_card.technique["sensitivity_N"] += 1
+        card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
+
+    # ==========================================================================
+    # Surface attributes
+    # ==========================================================================
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
-    type_ = type_.replace("_", "-").replace(" ", "-").lower()
+
+    # Set up surface attributes
     if type_ == "plane-x":
+        check_requirement("surface plane-x", kw, ["x"])
         card["G"] = 1.0
         card["linear"] = True
         if type(kw.get("x")) in [type([]), type(np.array([]))]:
@@ -430,6 +507,7 @@ def surface(type_, **kw):
         else:
             card["J"][0, 0] = -kw.get("x")
     elif type_ == "plane-y":
+        check_requirement("surface plane-y", kw, ["y"])
         card["H"] = 1.0
         card["linear"] = True
         if type(kw.get("y")) in [type([]), type(np.array([]))]:
@@ -437,6 +515,7 @@ def surface(type_, **kw):
         else:
             card["J"][0, 0] = -kw.get("y")
     elif type_ == "plane-z":
+        check_requirement("surface plane-z", kw, ["z"])
         card["I"] = 1.0
         card["linear"] = True
         if type(kw.get("z")) in [type([]), type(np.array([]))]:
@@ -444,12 +523,14 @@ def surface(type_, **kw):
         else:
             card["J"][0, 0] = -kw.get("z")
     elif type_ == "plane":
+        check_requirement("surface plane", kw, ["A", "B", "C", "D"])
         card["G"] = kw.get("A")
         card["H"] = kw.get("B")
         card["I"] = kw.get("C")
         card["J"][0, 0] = kw.get("D")
         card["linear"] = True
     elif type_ == "cylinder-x":
+        check_requirement("surface cylinder-x", kw, ["center", "radius"])
         y, z = kw.get("center")[:]
         r = kw.get("radius")
         card["B"] = 1.0
@@ -458,6 +539,7 @@ def surface(type_, **kw):
         card["I"] = -2.0 * z
         card["J"][0, 0] = y**2 + z**2 - r**2
     elif type_ == "cylinder-y":
+        check_requirement("surface cylinder-y", kw, ["center", "radius"])
         x, z = kw.get("center")[:]
         r = kw.get("radius")
         card["A"] = 1.0
@@ -466,6 +548,7 @@ def surface(type_, **kw):
         card["I"] = -2.0 * z
         card["J"][0, 0] = x**2 + z**2 - r**2
     elif type_ == "cylinder-z":
+        check_requirement("surface cylinder-z", kw, ["center", "radius"])
         x, y = kw.get("center")[:]
         r = kw.get("radius")
         card["A"] = 1.0
@@ -474,6 +557,7 @@ def surface(type_, **kw):
         card["H"] = -2.0 * y
         card["J"][0, 0] = x**2 + y**2 - r**2
     elif type_ == "sphere":
+        check_requirement("surface sphere", kw, ["center", "radius"])
         x, y, z = kw.get("center")[:]
         r = kw.get("radius")
         card["A"] = 1.0
@@ -484,6 +568,9 @@ def surface(type_, **kw):
         card["I"] = -2.0 * z
         card["J"][0, 0] = x**2 + y**2 + z**2 - r**2
     elif type_ == "quadric":
+        check_requirement(
+            "surface quadric", kw, ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+        )
         card["A"] = kw.get("A")
         card["B"] = kw.get("B")
         card["C"] = kw.get("C")
@@ -494,10 +581,8 @@ def surface(type_, **kw):
         card["H"] = kw.get("H")
         card["I"] = kw.get("I")
         card["J"][0, 0] = kw.get("J")
-    else:
-        print_error("Unsupported surface type: " + type_)
 
-    # Normal vector if linear
+    # Set normal vector if linear
     if card["linear"]:
         nx = card["G"]
         ny = card["H"]
@@ -507,18 +592,6 @@ def surface(type_, **kw):
         card["nx"] = nx / norm
         card["ny"] = ny / norm
         card["nz"] = nz / norm
-
-    # Sensitivity
-    sensitivity = kw.get("sensitivity")
-    if sensitivity is not None and sensitivity:
-        # Set flag
-        card["sensitivity"] = True
-        mcdc.input_card.technique["sensitivity"] = True
-        mcdc.input_card.technique["weighted_emission"] = False
-
-        # Set ID
-        mcdc.input_card.technique["sensitivity_N"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
 
     # Push card
     mcdc.input_card.surfaces.append(card)
@@ -1126,9 +1199,32 @@ def print_card(card):
             print("  " + key + " : " + str(card[key]))
 
 
-# ======================================================================================
+def check_support(label, value, supported):
+    value = value.replace("_", "-").replace(" ", "-").lower()
+    supported_str = "{"
+    for str_ in supported:
+        supported_str += str_ + ", "
+    supported_str = supported_str[:-2] + "}"
+    if value not in supported:
+        print_error("Unsupported " + label + ": " + value + "\n" + supported_str)
+    return value
+
+
+def check_requirement(label, kw, required):
+    missing = "{"
+    error = False
+    for req in required:
+        if req not in kw.keys():
+            error = True
+            missing += req + ", "
+    missing = missing[:-2] + "}"
+    if error:
+        print_error("Parameters " + missing + " are required for" + label)
+
+
+# ==============================================================================
 # Reset
-# ======================================================================================
+# ==============================================================================
 
 
 def reset_cards():
