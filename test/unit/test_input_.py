@@ -1,5 +1,4 @@
 import mcdc
-from mcdc.input_ import surface
 import mcdc.type_
 import numpy as np
 
@@ -329,7 +328,7 @@ def test_material_IDs_sensitivity():
 
 def test_surface_input_lower():
     type_ = "pLaNe x"
-    result = surface(type_, bc="RefLeCtiVe", x=0.0)
+    result = mcdc.surface(type_, bc="RefLeCtiVe", x=0.0)
     assert result.card["reflective"]
     assert result.card["A"] == 0.0
     assert result.card["B"] == 0.0
