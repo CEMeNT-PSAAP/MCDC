@@ -43,7 +43,7 @@ def test():
     scores = ["flux"]
     mcdc.tally(scores=scores)
 
-    mcdc.setting(N_particle=1e1, progress_bar=False)
+    mcdc.setting(N_particle=2e1, progress_bar=False)
 
     mcdc.run()
 
