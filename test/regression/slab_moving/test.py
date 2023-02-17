@@ -28,7 +28,7 @@ def test():
         scores=scores, x=np.linspace(0.0, 6.0, 61), t=np.linspace(0.0, 15.0, 151)
     )
 
-    mcdc.setting(N_particle=int(1e2))
+    mcdc.setting(N_particle=1e2)
 
     mcdc.run()
 

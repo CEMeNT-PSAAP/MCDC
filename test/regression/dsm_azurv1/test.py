@@ -9,12 +9,15 @@ def test():
     # Set model and run
     # =========================================================================
 
-    m = mcdc.material(
-        capture=np.array([1.0 / 3.0]),
-        scatter=np.array([[1.0 / 3.0]]),
-        fission=np.array([1.0 / 3.0]),
-        nu_p=np.array([2.3]),
+    n1 = mcdc.nuclide(capture=np.array([0.5]))
+    n2 = mcdc.nuclide(
+        capture=np.array([0.1]),
+        fission=np.array([0.4]),
+        nu_p=np.array([2.5]),
+        sensitivity=True,
     )
+
+    m = mcdc.material(nuclides=[(n1, 1.0), (n2, 1.0)])
 
     s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
     s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
@@ -23,12 +26,14 @@ def test():
 
     mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
 
-    scores = ["flux", "flux-x", "flux-t"]
+    scores = ["flux-t"]
     mcdc.tally(
-        scores=scores, x=np.linspace(-20.5, 20.5, 202), t=np.linspace(0.0, 20.0, 21)
+        scores=scores,
+        x=np.linspace(-20.0, 20.0, 202),
+        t=np.linspace(0.0, 20.0, 21),
     )
 
-    mcdc.setting(N_particle=1e1, progress_bar=False)
+    mcdc.setting(N_particle=2e1)
 
     mcdc.run()
 
