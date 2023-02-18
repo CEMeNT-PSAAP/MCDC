@@ -54,7 +54,7 @@ def test():
         t=np.linspace(0.0, 200.0, 21),
     )
 
-    mcdc.setting(N_particle=1e2)
+    mcdc.setting(N_particle=4e1)
     mcdc.implicit_capture()
 
     mcdc.run()
