@@ -51,7 +51,7 @@ def run():
     mcdc["runtime_total"] = MPI.Wtime() - total_start
 
     # Closout
-    print_runtime(mcdc)
+    closeout()
 
 
 def prepare():
@@ -374,18 +374,6 @@ def generate_hdf5():
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
-            # Runtime
-            for name in [
-                "total",
-                "preparation",
-                "simulation",
-                "output",
-                "bank_management",
-            ]:
-                f.create_dataset(
-                    "runtime_" + name, data=np.array([mcdc["runtime_" + name]])
-                )
-
             # Tally
             T = mcdc["tally"]
             f.create_dataset("tally/grid/t", data=T["mesh"]["t"])
@@ -445,3 +433,20 @@ def generate_hdf5():
                 f.create_dataset(
                     "tally/" + "iqmc_flux", data=np.squeeze(T["iqmc_flux"])
                 )
+
+
+def closeout():
+    # Runtime
+    with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+        for name in [
+            "total",
+            "preparation",
+            "simulation",
+            "output",
+            "bank_management",
+        ]:
+            f.create_dataset(
+                "runtime_" + name, data=np.array([mcdc["runtime_" + name]])
+            )
+
+    print_runtime(mcdc)
