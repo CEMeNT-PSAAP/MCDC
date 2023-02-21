@@ -54,8 +54,8 @@ def sample_white_direction(nx, ny, nz, mcdc):
         C = Ac / B
 
         x = nx * mu + (nx * ny * cos_azi - nz * sin_azi) * C
-        y = nz * mu + (nz * ny * cos_azi + nx * sin_azi) * C
-        z = ny * mu - cos_azi * Ac * B
+        z = nz * mu + (nz * ny * cos_azi + nx * sin_azi) * C
+        y = ny * mu - cos_azi * Ac * B
     return x, y, z
 
 
