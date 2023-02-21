@@ -13,10 +13,10 @@ m2 = mcdc.material(capture=np.array([1.5]))
 m3 = mcdc.material(capture=np.array([2.0]))
 
 # Set surfaces
-s1 = mcdc.surface('plane-z', z=0.0, bc="vacuum")
-s2 = mcdc.surface('plane-z', z=2.0)
-s3 = mcdc.surface('plane-z', z=4.0)
-s4 = mcdc.surface('plane-z', z=6.0, bc="vacuum")
+s1 = mcdc.surface("plane-z", z=0.0, bc="vacuum")
+s2 = mcdc.surface("plane-z", z=2.0)
+s3 = mcdc.surface("plane-z", z=4.0)
+s4 = mcdc.surface("plane-z", z=6.0, bc="vacuum")
 
 # Set cells
 mcdc.cell([+s1, -s2], m2)
@@ -35,12 +35,14 @@ mcdc.source(z=[0.0, 6.0], isotropic=True)
 # =============================================================================
 
 # Tally: cell-average and cell-edge angular fluxes and currents
-mcdc.tally(scores=['flux', 'current', 'flux-z', 'current-z'],
-           z=np.linspace(0.0, 6.0, 61),
-           mu=np.linspace(-1.0, 1.0, 32+1))
+mcdc.tally(
+    scores=["flux", "current", "flux-z", "current-z"],
+    z=np.linspace(0.0, 6.0, 61),
+    mu=np.linspace(-1.0, 1.0, 32 + 1),
+)
 
 # Setting
-mcdc.setting(N_particle=1E5)
+mcdc.setting(N_particle=1e5)
 
 # Run
 mcdc.run()
