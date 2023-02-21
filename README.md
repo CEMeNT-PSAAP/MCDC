@@ -4,6 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![Code of Conduct](https://img.shields.io/badge/code%20of%20conduct-contributor%20covenant-green.svg)](https://www.contributor-covenant.org/version/2/1/code_of_conduct/code_of_conduct.md)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 MC/DC is a performant, scalable, and machine-portable Python-based Monte Carlo 
 neutron transport software currently developed in the Center for Exascale Monte 
