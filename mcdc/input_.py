@@ -384,7 +384,7 @@ def material(
 
 def surface(type_, bc="interface", sensitivity=False, **kw):
     """
-    Create a surface card.
+    Create a surface card and return SurfaceHandle to define cell domain.
 
     Parameters
     ----------
@@ -421,6 +421,10 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
     -------
     SurfaceHandle
         A surface handle used for assigning surface, and its sense, to a cell card.
+
+    See also
+    --------
+    mcdc.cell : SurfaceHandle is used to define cell domain
     """
     # Set default card values (c.f. type_.py)
     card = {}
@@ -762,6 +766,39 @@ def lattice(x=None, y=None, z=None, universes=None):
 
 
 def source(**kw):
+    """
+    Create a source card.
+
+    Other Parameters
+    ----------------
+    point : array_like
+        [x, y, z] point position for point source.
+    x : array_like
+        [x_min and x_max] for uniform source.
+    y : array_like
+        [y_min and y_max] for uniform source.
+    z : array_like
+        [z_min and z_max] for uniform source.
+    isotropic : bool
+        Flag for isotropic source
+    direction : array_like
+        [ux, uy, uz] unit vector for parallel beam source.
+    white_direction : array_like
+        [nx, ny, nz] unit vector of the normal outward direction of the surface
+        at which isotropic surface source is emitted. Note that it is similar to the
+        mechanics of the typical white boundary condition in reactor physics.
+    energy : array_like
+        Probability mass function of the energy group for multigroup source.
+    time : array_like
+        [t_min and t_max] in/at which source is emitted.
+    prob : float
+        Relative probability (or strength) of the source.
+
+    Returns
+    -------
+    dictionary
+        A source card
+    """
     # Get keyword arguments
     point = kw.get("point")
     x = kw.get("x")
