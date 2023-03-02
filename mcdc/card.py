@@ -95,6 +95,7 @@ class InputCard:
             "gyration_radius_type": GR_ALL,
             "filed_source": False,
             "source_file": "",
+            "particle_tracker": False,
         }
 
         self.technique = {
