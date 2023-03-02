@@ -970,6 +970,7 @@ def setting(**kw):
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
     source_file = kw.get("source_file")
+    particle_tracker = kw.get("particle_tracker")
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
@@ -1007,6 +1008,10 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
+
+    # Particle tracker
+    if particle_tracker is not None:
+        card['particle_tracker'] = particle_tracker
 
 
 def eigenmode(

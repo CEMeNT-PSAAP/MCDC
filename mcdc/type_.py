@@ -457,6 +457,7 @@ setting = np.dtype(
         ("progress_bar", bool_),
         ("filed_source", bool_),
         ("source_file", "U20"),
+        ("particle_tracker", bool_),
     ]
 )
 
