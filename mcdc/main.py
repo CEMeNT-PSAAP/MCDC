@@ -435,10 +435,10 @@ def generate_hdf5():
                 )
 
             # Particle tracker
-            if mcdc['setting']['track_particle']:
-                with h5py.File(mcdc['setting']['output']+'_ptrack.h5', 'w') as f:
-                    N_track = mcdc['particle_track_N']
-                    f.create_dataset("tracks",data=mcdc['particle_track'][:N_track])
+            if mcdc["setting"]["track_particle"]:
+                with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
+                    N_track = mcdc["particle_track_N"]
+                    f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
 
 
 def closeout():

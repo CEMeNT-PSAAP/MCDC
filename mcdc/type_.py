@@ -635,8 +635,8 @@ def make_type_global(card):
 
     # Particle tracker
     N_track = 0
-    if card.setting['track_particle']:
-        N_track = N_work*1000
+    if card.setting["track_particle"]:
+        N_track = N_work * 1000
 
     # TODO
     if card.setting["filed_source"] or card.technique["iQMC"]:
@@ -682,10 +682,10 @@ def make_type_global(card):
             ("runtime_simulation", float64),
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
-            ('particle_track', float64, (N_track,8)),
-            ('particle_track_N', int64),
-            ('particle_track_history_ID', int64),
-            ('particle_track_particle_ID', int64),
+            ("particle_track", float64, (N_track, 8)),
+            ("particle_track_N", int64),
+            ("particle_track_history_ID", int64),
+            ("particle_track_particle_ID", int64),
         ]
     )
 

@@ -198,7 +198,6 @@ def loop_particle(P, mcdc):
 
         # Collision
         if event == EVENT_COLLISION:
-
             # Generate IC?
             if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
                 kernel.bank_IC(P, mcdc)
