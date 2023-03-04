@@ -2,6 +2,8 @@
 import h5py
 import numpy as np
 
+from mpi4py import MPI
+
 import mcdc.type_ as type_
 
 from mcdc.card import SurfaceHandle
@@ -1011,7 +1013,10 @@ def setting(**kw):
 
     # Particle tracker
     if particle_tracker is not None:
-        card['particle_tracker'] = particle_tracker
+        card['track_particle'] = particle_tracker
+        if particle_tracker and MPI.COMM_WORLD.Get_size() > 1:
+            print_error("Particle tracker currently only runs on a single MPI rank")
+
 
 
 def eigenmode(

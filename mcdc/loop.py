@@ -104,6 +104,10 @@ def loop_source(mcdc):
 
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
+        # Particle tracker
+        if mcdc["setting"]["track_particle"]:
+            mcdc["particle_track_history_ID"] += 1
+
         # Initialize RNG wrt work index
         kernel.rng_skip_ahead_strides(work_idx, mcdc)
 
@@ -148,6 +152,10 @@ def loop_source(mcdc):
             if mcdc["technique"]["weight_window"]:
                 kernel.weight_window(P, mcdc)
 
+            # Particle tracker
+            if mcdc["setting"]["track_particle"]:
+                mcdc["particle_track_particle_ID"] += 1
+
             # Particle loop
             loop_particle(P, mcdc)
 
@@ -174,6 +182,10 @@ def loop_source(mcdc):
 
 @njit
 def loop_particle(P, mcdc):
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
+
     while P["alive"]:
         # Find cell from root universe if unknown
         if P["cell_ID"] == -1:
@@ -186,6 +198,7 @@ def loop_particle(P, mcdc):
 
         # Collision
         if event == EVENT_COLLISION:
+
             # Generate IC?
             if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
                 kernel.bank_IC(P, mcdc)
@@ -273,6 +286,10 @@ def loop_particle(P, mcdc):
             # check if weight has fallen below threshold
             if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
                 kernel.weight_roulette(P, mcdc)
+
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
 
 
 # =============================================================================
