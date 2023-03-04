@@ -2,6 +2,8 @@
 import h5py
 import numpy as np
 
+from mpi4py import MPI
+
 import mcdc.type_ as type_
 
 from mcdc.card import SurfaceHandle
@@ -384,7 +386,7 @@ def material(
 
 def surface(type_, bc="interface", sensitivity=False, **kw):
     """
-    Create a surface card.
+    Create a surface card and return SurfaceHandle to define cell domain.
 
     Parameters
     ----------
@@ -421,6 +423,10 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
     -------
     SurfaceHandle
         A surface handle used for assigning surface, and its sense, to a cell card.
+
+    See also
+    --------
+    mcdc.cell : SurfaceHandle is used to define cell domain
     """
     # Set default card values (c.f. type_.py)
     card = {}
@@ -762,6 +768,39 @@ def lattice(x=None, y=None, z=None, universes=None):
 
 
 def source(**kw):
+    """
+    Create a source card.
+
+    Other Parameters
+    ----------------
+    point : array_like
+        [x, y, z] point position for point source.
+    x : array_like
+        [x_min and x_max] for uniform source.
+    y : array_like
+        [y_min and y_max] for uniform source.
+    z : array_like
+        [z_min and z_max] for uniform source.
+    isotropic : bool
+        Flag for isotropic source
+    direction : array_like
+        [ux, uy, uz] unit vector for parallel beam source.
+    white_direction : array_like
+        [nx, ny, nz] unit vector of the normal outward direction of the surface
+        at which isotropic surface source is emitted. Note that it is similar to the
+        mechanics of the typical white boundary condition in reactor physics.
+    energy : array_like
+        Probability mass function of the energy group for multigroup source.
+    time : array_like
+        [t_min and t_max] in/at which source is emitted.
+    prob : float
+        Relative probability (or strength) of the source.
+
+    Returns
+    -------
+    dictionary
+        A source card
+    """
     # Get keyword arguments
     point = kw.get("point")
     x = kw.get("x")
@@ -773,6 +812,27 @@ def source(**kw):
     energy = kw.get("energy")
     time = kw.get("time")
     prob = kw.get("prob")
+
+    # Check the suplied keyword arguments
+    for key in kw.keys():
+        check_support(
+            "source argument",
+            key,
+            [
+                "point",
+                "x",
+                "y",
+                "z",
+                "isotropic",
+                "direction",
+                "white_direction",
+                "energy",
+                "time",
+                "prob",
+            ],
+            False,
+        )
+
     # Set default card values (c.f. type_.py)
     card = {}
     card["tag"] = "Source"
@@ -795,6 +855,7 @@ def source(**kw):
     card["group"] = np.array([1.0])
     card["time"] = np.array([0.0, 0.0])
     card["prob"] = 1.0
+
     # Set position
     if point is not None:
         card["x"] = point[0]
@@ -933,6 +994,7 @@ def setting(**kw):
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
     source_file = kw.get("source_file")
+    particle_tracker = kw.get("particle_tracker")
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
@@ -970,6 +1032,12 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
+
+    # Particle tracker
+    if particle_tracker is not None:
+        card["track_particle"] = particle_tracker
+        if particle_tracker and MPI.COMM_WORLD.Get_size() > 1:
+            print_error("Particle tracker currently only runs on a single MPI rank")
 
 
 def eigenmode(
@@ -1199,8 +1267,9 @@ def print_card(card):
             print("  " + key + " : " + str(card[key]))
 
 
-def check_support(label, value, supported):
-    value = value.replace("_", "-").replace(" ", "-").lower()
+def check_support(label, value, supported, replace=True):
+    if replace:
+        value = value.replace("_", "-").replace(" ", "-").lower()
     supported_str = "{"
     for str_ in supported:
         supported_str += str_ + ", "
