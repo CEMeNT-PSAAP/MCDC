@@ -812,6 +812,27 @@ def source(**kw):
     energy = kw.get("energy")
     time = kw.get("time")
     prob = kw.get("prob")
+
+    # Check the suplied keyword arguments
+    for key in kw.keys():
+        check_support(
+            "source argument",
+            key,
+            [
+                "point",
+                "x",
+                "y",
+                "z",
+                "isotropic",
+                "direction",
+                "white_direction",
+                "energy",
+                "time",
+                "prob",
+            ],
+            False,
+        )
+
     # Set default card values (c.f. type_.py)
     card = {}
     card["tag"] = "Source"
@@ -834,6 +855,7 @@ def source(**kw):
     card["group"] = np.array([1.0])
     card["time"] = np.array([0.0, 0.0])
     card["prob"] = 1.0
+
     # Set position
     if point is not None:
         card["x"] = point[0]
@@ -1013,10 +1035,9 @@ def setting(**kw):
 
     # Particle tracker
     if particle_tracker is not None:
-        card['track_particle'] = particle_tracker
+        card["track_particle"] = particle_tracker
         if particle_tracker and MPI.COMM_WORLD.Get_size() > 1:
             print_error("Particle tracker currently only runs on a single MPI rank")
-
 
 
 def eigenmode(
@@ -1246,8 +1267,9 @@ def print_card(card):
             print("  " + key + " : " + str(card[key]))
 
 
-def check_support(label, value, supported):
-    value = value.replace("_", "-").replace(" ", "-").lower()
+def check_support(label, value, supported, replace=True):
+    if replace:
+        value = value.replace("_", "-").replace(" ", "-").lower()
     supported_str = "{"
     for str_ in supported:
         supported_str += str_ + ", "
