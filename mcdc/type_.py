@@ -457,7 +457,7 @@ setting = np.dtype(
         ("progress_bar", bool_),
         ("filed_source", bool_),
         ("source_file", "U20"),
-        ("particle_tracker", bool_),
+        ("track_particle", bool_),
     ]
 )
 
@@ -633,6 +633,11 @@ def make_type_global(card):
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
 
+    # Particle tracker
+    N_track = 0
+    if card.setting['track_particle']:
+        N_track = N_work*1000
+
     # TODO
     if card.setting["filed_source"] or card.technique["iQMC"]:
         bank_source = particle_bank(N_work)
@@ -677,6 +682,10 @@ def make_type_global(card):
             ("runtime_simulation", float64),
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
+            ('particle_track', float64, (N_track,8)),
+            ('particle_track_N', int64),
+            ('particle_track_history_ID', int64),
+            ('particle_track_particle_ID', int64),
         ]
     )
 
