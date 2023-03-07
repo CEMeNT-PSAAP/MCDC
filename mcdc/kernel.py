@@ -303,8 +303,6 @@ def manage_IC_bank(mcdc):
         Pmax_n = mcdc["technique"]["IC_Pmax_n"]
         Pmax_C = mcdc["technique"]["IC_Pmax_C"]
 
-        print(size_n, size_C)
-
         # Neutron
         Nn = 0
         # Sample and store to buffer
@@ -336,8 +334,6 @@ def manage_IC_bank(mcdc):
         # Reset parameters
         mcdc["technique"]["IC_Pmax_n"] = 0.0
         mcdc["technique"]["IC_Pmax_C"] = 0.0
-
-        print(Nn, Np)
 
     with objmode(Nn="int64", Np="int64"):
         # Create MPI-supported numpy object
@@ -579,7 +575,10 @@ def bank_IC(P, mcdc):
     Nn = mcdc["technique"]["IC_N_neutron"]
     tally_n = mcdc["technique"]["IC_n_eff"]
     N_cycle = mcdc["setting"]["N_active"]
-    wn_prime = tally_n * N_cycle / Nn
+    if mcdc["technique"]["IC_uniform_weight"]:
+        wn_prime = tally_n * N_cycle / Nn
+    else:
+        wn_prime = wn * tally_n * N_cycle / Nn
 
     # Sampling probability
     Pn = wn / wn_prime
@@ -624,7 +623,10 @@ def bank_IC(P, mcdc):
 
     # Precursor target weight
     tally_C = mcdc["technique"]["IC_C_eff"]
-    wp_prime = tally_C * N_cycle / Np
+    if mcdc["technique"]["IC_uniform_weight"]:
+        wp_prime = tally_C * N_cycle / Np
+    else:
+        wp_prime = wp * tally_C * N_cycle / Np
 
     # Sampling probability
     Pp = wp / wp_prime
@@ -1481,18 +1483,22 @@ def global_tally(P, distance, mcdc):
 
     # IC generator tally
     if mcdc["technique"]["IC_generator"]:
-        # Neutron
-        v = get_particle_speed(P, mcdc)
-        mcdc["technique"]["IC_tally_n"] += flux / v
+        if mcdc["technique"]["IC_uniform_weight"]:
+            # Neutron
+            v = get_particle_speed(P, mcdc)
+            mcdc["technique"]["IC_tally_n"] += flux / v
 
-        # Precursor
-        J = material["J"]
-        nu_d = material["nu_d"][g]
-        decay = material["decay"]
-        total = 0.0
-        for j in range(J):
-            total += nu_d[j] / decay[j]
-        mcdc["technique"]["IC_tally_C"] += flux * total * SigmaF / mcdc["k_eff"]
+            # Precursor
+            J = material["J"]
+            nu_d = material["nu_d"][g]
+            decay = material["decay"]
+            total = 0.0
+            for j in range(J):
+                total += nu_d[j] / decay[j]
+            mcdc["technique"]["IC_tally_C"] += flux * total * SigmaF / mcdc["k_eff"]
+        else:
+            mcdc["technique"]["IC_tally_n"] += 1.0
+            mcdc["technique"]["IC_tally_C"] += 1.0
 
 
 @njit

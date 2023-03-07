@@ -561,8 +561,10 @@ def make_type_technique(card):
     # IC generator
     # =========================================================================
 
-    # Banks
+    # Create bank types
     #   We need local banks to ensure reproducibility regardless of # of MPIs
+    #   TODO: Having smaller bank buffer (~N_target/MPI_size) and even smaller
+    #         local bank would be more efficient.
     if card.technique["IC_generator"]:
         Nn = int(card.technique["IC_N_neutron"] * 1.2)
         Np = int(card.technique["IC_N_precursor"] * 1.2)
@@ -580,16 +582,18 @@ def make_type_technique(card):
         [("content", precursor, (Np_local,)), ("size", int64)]
     )
 
+    # The parameters
     struct += [
-        ("IC_N_neutron", int64),
+        ("IC_uniform_weight", bool_), # Generate uniform-weight samples?
+        ("IC_N_neutron", int64), # Target size
         ("IC_N_precursor", int64),
-        ("IC_tally_n", float64),
+        ("IC_tally_n", float64),  # Running density (or # of collisions) tally
         ("IC_tally_C", float64),
-        ("IC_n_eff", float64),
+        ("IC_n_eff", float64), # Effective density to determine sampling prob.
         ("IC_C_eff", float64),
-        ("IC_Pmax_n", float64),
+        ("IC_Pmax_n", float64), # Maximum sampling probability
         ("IC_Pmax_C", float64),
-        ("IC_resample", bool_),
+        ("IC_resample", bool_), # For resampling due to insufficient N_cycle
         ("IC_bank_neutron_local", bank_neutron_local),
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),

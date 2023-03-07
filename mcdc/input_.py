@@ -1151,9 +1151,32 @@ def weight_window(x=None, y=None, z=None, t=None, window=None):
     return card
 
 
-def IC_generator(N_neutron=0, N_precursor=0):
+def IC_generator(N_neutron=0, N_precursor=0, uniform_weight=True):
+    """
+    Turn on initial condition generator, which samples initial neutrons and precursors
+    during the active cycles of an eigenvalue simulation.
+
+
+    Parameters
+    ----------
+    N_neutron : int
+        Neutron target size
+    N_precursor : int
+        Delayed neutron precursot target size
+    uniform_weight : bool
+        If `True`, sampled particles would have uniform weight; in this case,
+        weight-based population control is used during the sampling.
+        If `False`, sampled particles would have varying weights, which can range
+        over several order of magnitudes.
+    """
+    # Check if k-eigenvalue is turned on
+    if not mcdc.input_card.setting["mode_eigenvalue"]:
+        print_error("IC generator requires running in an eigenvalue mode")
+
+    # Set parameters
     card = mcdc.input_card.technique
     card["IC_generator"] = True
+    card["IC_uniform_weight"] = uniform_weight
     card["IC_N_neutron"] = int(N_neutron)
     card["IC_N_precursor"] = int(N_precursor)
 

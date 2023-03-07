@@ -118,6 +118,7 @@ class InputCard:
             "time_census": False,
             "census_time": np.array([INF]),
             "IC_generator": False,
+            "IC_uniform_weight": True,
             "IC_N_neutron": 0,
             "IC_N_precursor": 0,
             "weight_roulette": False,
