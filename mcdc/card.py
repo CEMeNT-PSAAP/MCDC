@@ -87,7 +87,6 @@ class InputCard:
             "rng_mod": 2**63,
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
-            "N_cycle_buff": 0,
             "k_init": 1.0,
             "output": "output",
             "progress_bar": True,
@@ -96,6 +95,7 @@ class InputCard:
             "filed_source": False,
             "source_file": "",
             "track_particle": False,
+            "IC_generator": False,
         }
 
         self.technique = {
@@ -117,10 +117,6 @@ class InputCard:
             },
             "time_census": False,
             "census_time": np.array([INF]),
-            "IC_generator": False,
-            "IC_uniform_weight": True,
-            "IC_N_neutron": 0,
-            "IC_N_precursor": 0,
             "weight_roulette": False,
             "wr_threshold": 0.0,
             "wr_target": 1.0,

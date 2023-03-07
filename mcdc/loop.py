@@ -86,6 +86,7 @@ def loop_main(mcdc):
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
+    kernel.global_tally_closeout(mcdc)
 
 
 # =============================================================================
@@ -198,9 +199,9 @@ def loop_particle(P, mcdc):
 
         # Collision
         if event == EVENT_COLLISION:
-            # Generate IC?
-            if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-                kernel.bank_IC(P, mcdc)
+            # TODO: Generate IC?
+            # if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+            #    kernel.bank_IC(P, mcdc)
 
             # Branchless collision?
             if mcdc["technique"]["branchless_collision"]:

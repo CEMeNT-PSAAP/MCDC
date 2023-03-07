@@ -274,8 +274,8 @@ def manage_particle_banks(mcdc):
     mcdc["bank_census"]["size"] = 0
 
     # Manage IC bank
-    if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-        manage_IC_bank(mcdc)
+    # if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+    #    manage_IC_bank(mcdc)
 
     # Accumulate time
     if mcdc["mpi_master"]:
@@ -1460,6 +1460,35 @@ def tally_closeout(mcdc):
             score_closeout(tally["score"][name], mcdc)
 
 
+@njit
+def global_tally_closeout(mcdc):
+    # MPI reduce tallies for IC generator
+    if mcdc["setting"]["IC_generator"]:
+        buff_Ncoll = np.zeros(1, np.float64)
+        buff_n = np.zeros(1, np.float64)
+        buff_C = np.zeros(1, np.float64)
+        with objmode():
+            MPI.COMM_WORLD.Allreduce(
+                np.array([mcdc["IC_tally_collision_count"]]),
+                buff_Ncoll,
+                MPI.SUM,
+            )
+            MPI.COMM_WORLD.Allreduce(
+                np.array([mcdc["IC_tally_neutron_density"]]),
+                buff_n,
+                MPI.SUM,
+            )
+            MPI.COMM_WORLD.Allreduce(
+                np.array([mcdc["IC_tally_precursor_density"]]),
+                buff_C,
+                MPI.SUM,
+            )
+        denom = mcdc["setting"]["N_particle"] * mcdc["setting"]["N_active"]
+        mcdc["IC_tally_collision_count"] = buff_Ncoll[0] / denom
+        mcdc["IC_tally_neutron_density"] = buff_n[0] / denom
+        mcdc["IC_tally_precursor_density"] = buff_C[0] / denom
+
+
 # =============================================================================
 # Global tally operations
 # =============================================================================
@@ -1482,23 +1511,22 @@ def global_tally(P, distance, mcdc):
     mcdc["global_tally_nuSigmaF"] += flux * nuSigmaF
 
     # IC generator tally
-    if mcdc["technique"]["IC_generator"]:
-        if mcdc["technique"]["IC_uniform_weight"]:
-            # Neutron
-            v = get_particle_speed(P, mcdc)
-            mcdc["technique"]["IC_tally_n"] += flux / v
+    if mcdc["cycle_active"] and mcdc["setting"]["IC_generator"]:
+        # Collision count
+        mcdc["IC_tally_collision_count"] += 1
 
-            # Precursor
-            J = material["J"]
-            nu_d = material["nu_d"][g]
-            decay = material["decay"]
-            total = 0.0
-            for j in range(J):
-                total += nu_d[j] / decay[j]
-            mcdc["technique"]["IC_tally_C"] += flux * total * SigmaF / mcdc["k_eff"]
-        else:
-            mcdc["technique"]["IC_tally_n"] += 1.0
-            mcdc["technique"]["IC_tally_C"] += 1.0
+        # Neutron density
+        v = get_particle_speed(P, mcdc)
+        mcdc["IC_tally_neutron_density"] += flux / v
+
+        # Precursor density
+        J = material["J"]
+        nu_d = material["nu_d"][g]
+        decay = material["decay"]
+        total = 0.0
+        for j in range(J):
+            total += nu_d[j] / decay[j]
+        mcdc["IC_tally_precursor_density"] += flux * total * SigmaF / mcdc["k_eff"]
 
 
 @njit
@@ -1517,6 +1545,7 @@ def global_tally_closeout_history(mcdc):
         MPI.COMM_WORLD.Allreduce(
             np.array([mcdc["global_tally_nuSigmaF"]]), buff_nuSigmaF, MPI.SUM
         )
+        """
         if mcdc["technique"]["IC_generator"]:
             MPI.COMM_WORLD.Allreduce(
                 np.array([mcdc["technique"]["IC_tally_n"]]), buff_IC_n, MPI.SUM
@@ -1530,8 +1559,10 @@ def global_tally_closeout_history(mcdc):
             MPI.COMM_WORLD.Allreduce(
                 np.array([mcdc["technique"]["IC_Pmax_C"]]), buff_Pmax_C, MPI.MAX
             )
+        """
 
     # IC generator: Increase number of active cycles?
+    """
     if mcdc["technique"]["IC_generator"]:
         Pmax_n = buff_Pmax_n[0]
         Pmax_C = buff_Pmax_C[0]
@@ -1555,12 +1586,13 @@ def global_tally_closeout_history(mcdc):
             mcdc["technique"]["IC_resample"] = False
             mcdc["technique"]["IC_Pmax_n"] = 0.0
             mcdc["technique"]["IC_Pmax_C"] = 0.0
+    """
 
     # Update and store k_eff
     mcdc["k_eff"] = buff_nuSigmaF[0] / N_particle
     mcdc["k_cycle"][i_cycle] = mcdc["k_eff"]
-    mcdc["technique"]["IC_n_eff"] = buff_IC_n[0]
-    mcdc["technique"]["IC_C_eff"] = buff_IC_C[0]
+    # mcdc["technique"]["IC_n_eff"] = buff_IC_n[0]
+    # mcdc["technique"]["IC_C_eff"] = buff_IC_C[0]
 
     # Accumulate running average
     if mcdc["cycle_active"]:
@@ -1578,8 +1610,8 @@ def global_tally_closeout_history(mcdc):
 
     # Reset accumulators
     mcdc["global_tally_nuSigmaF"] = 0.0
-    mcdc["technique"]["IC_tally_n"] = 0.0
-    mcdc["technique"]["IC_tally_C"] = 0.0
+    # mcdc["technique"]["IC_tally_n"] = 0.0
+    # mcdc["technique"]["IC_tally_C"] = 0.0
 
     # =====================================================================
     # Gyration radius

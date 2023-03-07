@@ -89,10 +89,10 @@ def print_header_eigenvalue(mcdc):
     if master:
         if mcdc["setting"]["gyration_radius"]:
             print("\n #     k        GyRad.  k (avg)            ")
-            print(" ==== ======= ====== ===================")
+            print(" ====  =======  ======  ===================")
         else:
             print("\n #     k        k (avg)            ")
-            print(" ==== ======= ===================")
+            print(" ====  =======  ===================")
 
 
 def print_progress_eigenvalue(mcdc):
