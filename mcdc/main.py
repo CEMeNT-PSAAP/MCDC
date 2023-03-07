@@ -242,17 +242,6 @@ def prepare():
         if name not in [
             "ww_mesh",
             "census_idx",
-            "IC_bank_neutron",
-            "IC_bank_precursor",
-            "IC_bank_neutron_local",
-            "IC_bank_precursor_local",
-            "IC_tally_n",
-            "IC_tally_C",
-            "IC_n_eff",
-            "IC_C_eff",
-            "IC_Pmax_n",
-            "IC_Pmax_C",
-            "IC_resample",
             "iqmc_flux_old",
             "iqmc_mesh",
             "iqmc_source",
@@ -407,19 +396,6 @@ def generate_hdf5():
                         "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
                     )
 
-            # IC generator
-            if mcdc["technique"]["IC_generator"]:
-                Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
-                Np = mcdc["technique"]["IC_bank_precursor"]["size"]
-                f.create_dataset(
-                    "IC/neutron",
-                    data=mcdc["technique"]["IC_bank_neutron"]["content"][:Nn],
-                )
-                f.create_dataset(
-                    "IC/precursor",
-                    data=mcdc["technique"]["IC_bank_precursor"]["content"][:Np],
-                )
-
             # iQMC
             if mcdc["technique"]["iQMC"]:
                 # TODO: dump time dependent tallies
@@ -439,6 +415,50 @@ def generate_hdf5():
                 with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
                     N_track = mcdc["particle_track_N"]
                     f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
+
+    # IC generator
+    if mcdc["setting"]["IC_generator"]:
+        # Gather source bank
+        N = mcdc["bank_source"]["size"]
+        neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
+
+        # Master creates datasets
+        if mcdc["mpi_master"]:
+            # Remove unwanted particle fields
+            neutrons = np.concatenate(neutrons[:])
+            neutrons = neutrons[
+                [
+                    name
+                    for name in neutrons.dtype.names
+                    if name not in ["sensitivity_ID", "iqmc_w"]
+                ]
+            ]
+
+            # Create datasets
+            with h5py.File(mcdc["setting"]["output"] + "_IC_generator.h5", "w") as f:
+                f.create_dataset(
+                    "collision_count", data=mcdc["IC_tally_collision_count"]
+                )
+                f.create_dataset(
+                    "neutron_density", data=mcdc["IC_tally_neutron_density"]
+                )
+                f.create_dataset(
+                    "precursor_density", data=mcdc["IC_tally_precursor_density"]
+                )
+                f.create_dataset("neutrons", data=neutrons[:])
+                """
+                if mcdc["technique"]["IC_generator"]:
+                    Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
+                    Np = mcdc["technique"]["IC_bank_precursor"]["size"]
+                    f.create_dataset(
+                        "IC/neutron",
+                        data=mcdc["technique"]["IC_bank_neutron"]["content"][:Nn],
+                    )
+                    f.create_dataset(
+                        "IC/precursor",
+                        data=mcdc["technique"]["IC_bank_precursor"]["content"][:Np],
+                    )
+                """
 
 
 def closeout():

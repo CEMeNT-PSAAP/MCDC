@@ -1041,7 +1041,7 @@ def setting(**kw):
 
 
 def eigenmode(
-    N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, N_cycle_buff=0
+    N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, IC_generator=False
 ):
     # Update setting card
     card = mcdc.input_card.setting
@@ -1050,7 +1050,7 @@ def eigenmode(
     card["N_cycle"] = N_inactive + N_active
     card["mode_eigenvalue"] = True
     card["k_init"] = k_init
-    card["N_cycle_buff"] = N_cycle_buff
+    card["IC_generator"] = IC_generator
 
     # Gyration radius setup
     if gyration_radius is not None:
@@ -1151,6 +1151,8 @@ def weight_window(x=None, y=None, z=None, t=None, window=None):
     return card
 
 
+# TODO
+'''
 def IC_generator(N_neutron=0, N_precursor=0, uniform_weight=True):
     """
     Turn on initial condition generator, which samples initial neutrons and precursors
@@ -1179,6 +1181,7 @@ def IC_generator(N_neutron=0, N_precursor=0, uniform_weight=True):
     card["IC_uniform_weight"] = uniform_weight
     card["IC_N_neutron"] = int(N_neutron)
     card["IC_N_precursor"] = int(N_precursor)
+'''
 
 
 def iQMC(

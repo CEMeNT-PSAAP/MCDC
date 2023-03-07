@@ -81,24 +81,6 @@ def make_type_particle_record(input_card):
     particle_record = np.dtype(struct)
 
 
-# Static records (for IC generator, )
-neutron = np.dtype(
-    [
-        ("x", float64),
-        ("y", float64),
-        ("z", float64),
-        ("ux", float64),
-        ("uy", float64),
-        ("uz", float64),
-        ("g", uint64),
-        ("w", float64),
-    ]
-)
-precursor = np.dtype(
-    [("x", float64), ("y", float64), ("z", float64), ("g", uint64), ("w", float64)]
-)
-
-
 # ==============================================================================
 # Particle bank
 # ==============================================================================
@@ -458,6 +440,7 @@ setting = np.dtype(
         ("filed_source", bool_),
         ("source_file", "U20"),
         ("track_particle", bool_),
+        ("IC_generator", bool_),
     ]
 )
 
@@ -478,7 +461,6 @@ def make_type_technique(card):
         ("branchless_collision", bool_),
         ("weight_window", bool_),
         ("time_census", bool_),
-        ("IC_generator", bool_),
         ("iQMC", bool_),
         ("weight_roulette", bool_),
     ]
@@ -557,6 +539,8 @@ def make_type_technique(card):
         ("census_idx", int64),
     ]
 
+    # TODO
+    """
     # =========================================================================
     # IC generator
     # =========================================================================
@@ -584,21 +568,22 @@ def make_type_technique(card):
 
     # The parameters
     struct += [
-        ("IC_uniform_weight", bool_), # Generate uniform-weight samples?
-        ("IC_N_neutron", int64), # Target size
+        ("IC_uniform_weight", bool_),  # Generate uniform-weight samples?
+        ("IC_N_neutron", int64),  # Target size
         ("IC_N_precursor", int64),
         ("IC_tally_n", float64),  # Running density (or # of collisions) tally
         ("IC_tally_C", float64),
-        ("IC_n_eff", float64), # Effective density to determine sampling prob.
+        ("IC_n_eff", float64),  # Effective density to determine sampling prob.
         ("IC_C_eff", float64),
-        ("IC_Pmax_n", float64), # Maximum sampling probability
+        ("IC_Pmax_n", float64),  # Maximum sampling probability
         ("IC_Pmax_C", float64),
-        ("IC_resample", bool_), # For resampling due to insufficient N_cycle
+        ("IC_resample", bool_),  # For resampling due to insufficient N_cycle
         ("IC_bank_neutron_local", bank_neutron_local),
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
     ]
+    """
 
     # Finalize technique type
     technique = np.dtype(struct)
@@ -621,8 +606,7 @@ def make_type_global(card):
     N_universe = len(card.universes)
     N_lattice = len(card.lattices)
     N_particle = card.setting["N_particle"]
-    N_cycle_buff = card.setting["N_cycle_buff"]
-    N_cycle = card.setting["N_cycle"] * (1 + N_cycle_buff)
+    N_cycle = card.setting["N_cycle"]
     bank_active_buff = card.setting["bank_active_buff"]
     bank_census_buff = card.setting["bank_census_buff"]
     J = card.materials[0]["J"]
@@ -675,6 +659,9 @@ def make_type_global(card):
             ("i_cycle", int64),
             ("cycle_active", bool_),
             ("global_tally_nuSigmaF", float64),
+            ("IC_tally_neutron_density", float64),  # For IC generator
+            ("IC_tally_precursor_density", float64),
+            ("IC_tally_collision_count", float64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
