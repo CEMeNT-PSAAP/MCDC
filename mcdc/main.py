@@ -26,7 +26,6 @@ def run():
     #   process input cards, make types, and allocate global variables
     preparation_start = MPI.Wtime()
     prepare()
-    input_card.reset()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -356,6 +355,21 @@ def prepare():
         mcdc["cycle_active"] = True
 
 
+def dictlist_to_h5group(dictlist, input_group, name):
+    main_group = input_group.create_group(name + "s")
+    for item in dictlist:
+        group = main_group.create_group(name + "_%i" % item["ID"])
+        dict_to_h5group(item, group)
+
+
+def dict_to_h5group(dict_, group):
+    for k, v in dict_.items():
+        if type(v) == dict:
+            dict_to_h5group(dict_[k], group.create_group(k))
+        else:
+            group[k] = v
+
+
 def generate_hdf5():
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
@@ -363,6 +377,19 @@ def generate_hdf5():
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
+            # Input card
+            input_group = f.create_group("input_deck")
+            dictlist_to_h5group(input_card.nuclides, input_group, "nuclide")
+            dictlist_to_h5group(input_card.materials, input_group, "material")
+            dictlist_to_h5group(input_card.surfaces, input_group, "surface")
+            dictlist_to_h5group(input_card.cells, input_group, "cell")
+            dictlist_to_h5group(input_card.universes, input_group, "universe")
+            dictlist_to_h5group(input_card.lattices, input_group, "lattice")
+            dictlist_to_h5group(input_card.sources, input_group, "source")
+            dict_to_h5group(input_card.tally, input_group.create_group("tally"))
+            dict_to_h5group(input_card.setting, input_group.create_group("setting"))
+            dict_to_h5group(input_card.technique, input_group.create_group("technique"))
+
             # Tally
             T = mcdc["tally"]
             f.create_dataset("tally/grid/t", data=T["mesh"]["t"])
@@ -473,7 +500,8 @@ def closeout():
                 "bank_management",
             ]:
                 f.create_dataset(
-                    "runtime_" + name, data=np.array([mcdc["runtime_" + name]])
+                    "runtime/" + name, data=np.array([mcdc["runtime_" + name]])
                 )
 
     print_runtime(mcdc)
+    input_card.reset()
