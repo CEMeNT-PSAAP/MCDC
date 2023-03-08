@@ -440,7 +440,8 @@ setting = np.dtype(
         ("filed_source", bool_),
         ("source_file", "U20"),
         ("track_particle", bool_),
-        ("IC_generator", bool_),
+        ("save_particle", bool_),
+        ("save_input_deck", bool_),
     ]
 )
 
@@ -653,15 +654,21 @@ def make_type_global(card):
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
             ("k_sdv", float64),
+            ("n_avg", float64),
+            ("n_sdv", float64),
+            ("C_avg", float64),
+            ("C_sdv", float64),
+            ("Ncoll_avg", float64),
+            ("Ncoll_sdv", float64),
             ("k_avg_running", float64),
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
             ("i_cycle", int64),
             ("cycle_active", bool_),
-            ("global_tally_nuSigmaF", float64),
-            ("IC_tally_neutron_density", float64),  # For IC generator
-            ("IC_tally_precursor_density", float64),
-            ("IC_tally_collision_count", float64),
+            ("eigenvalue_tally_nuSigmaF", float64),
+            ("eigenvalue_tally_n", float64),  # Neutron density
+            ("eigenvalue_tally_C", float64),  # Precursor density
+            ("eigenvalue_tally_Ncoll", float64),  # Number of collisions
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),

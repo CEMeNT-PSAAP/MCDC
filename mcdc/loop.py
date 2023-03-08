@@ -35,7 +35,7 @@ def loop_main(mcdc):
         # Eigenvalue cycle closeout
         if mcdc["setting"]["mode_eigenvalue"]:
             # Tally history closeout
-            kernel.global_tally_closeout_history(mcdc)
+            kernel.eigenvalue_tally_closeout_history(mcdc)
             if mcdc["cycle_active"]:
                 kernel.tally_closeout_history(mcdc)
 
@@ -86,7 +86,8 @@ def loop_main(mcdc):
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
-    kernel.global_tally_closeout(mcdc)
+    if mcdc["setting"]["mode_eigenvalue"]:
+        kernel.eigenvalue_tally_closeout(mcdc)
 
 
 # =============================================================================

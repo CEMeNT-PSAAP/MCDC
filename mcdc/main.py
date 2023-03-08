@@ -354,6 +354,10 @@ def prepare():
     if not mcdc["setting"]["mode_eigenvalue"]:
         mcdc["cycle_active"] = True
 
+    # All active eigenvalue cycle?
+    elif mcdc['setting']["N_inactive"] == 0:
+        mcdc["cycle_active"] = True
+
 
 def dictlist_to_h5group(dictlist, input_group, name):
     main_group = input_group.create_group(name + "s")
@@ -378,17 +382,20 @@ def generate_hdf5():
 
         with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
             # Input card
-            input_group = f.create_group("input_deck")
-            dictlist_to_h5group(input_card.nuclides, input_group, "nuclide")
-            dictlist_to_h5group(input_card.materials, input_group, "material")
-            dictlist_to_h5group(input_card.surfaces, input_group, "surface")
-            dictlist_to_h5group(input_card.cells, input_group, "cell")
-            dictlist_to_h5group(input_card.universes, input_group, "universe")
-            dictlist_to_h5group(input_card.lattices, input_group, "lattice")
-            dictlist_to_h5group(input_card.sources, input_group, "source")
-            dict_to_h5group(input_card.tally, input_group.create_group("tally"))
-            dict_to_h5group(input_card.setting, input_group.create_group("setting"))
-            dict_to_h5group(input_card.technique, input_group.create_group("technique"))
+            if mcdc["setting"]["save_input_deck"]:
+                input_group = f.create_group("input_deck")
+                dictlist_to_h5group(input_card.nuclides, input_group, "nuclide")
+                dictlist_to_h5group(input_card.materials, input_group, "material")
+                dictlist_to_h5group(input_card.surfaces, input_group, "surface")
+                dictlist_to_h5group(input_card.cells, input_group, "cell")
+                dictlist_to_h5group(input_card.universes, input_group, "universe")
+                dictlist_to_h5group(input_card.lattices, input_group, "lattice")
+                dictlist_to_h5group(input_card.sources, input_group, "source")
+                dict_to_h5group(input_card.tally, input_group.create_group("tally"))
+                dict_to_h5group(input_card.setting, input_group.create_group("setting"))
+                dict_to_h5group(
+                    input_card.technique, input_group.create_group("technique")
+                )
 
             # Tally
             T = mcdc["tally"]
@@ -418,6 +425,12 @@ def generate_hdf5():
                 f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
                 f.create_dataset("k_mean", data=mcdc["k_avg_running"])
                 f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
+                f.create_dataset("global_tally/n_mean", data=mcdc["n_avg"])
+                f.create_dataset("global_tally/n_sdev", data=mcdc["n_sdv"])
+                f.create_dataset("global_tally/C_mean", data=mcdc["C_avg"])
+                f.create_dataset("global_tally/C_sdev", data=mcdc["C_sdv"])
+                f.create_dataset("global_tally/Ncoll_mean", data=mcdc["Ncoll_avg"])
+                f.create_dataset("global_tally/Ncoll_sdev", data=mcdc["Ncoll_sdv"])
                 if mcdc["setting"]["gyration_radius"]:
                     f.create_dataset(
                         "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
@@ -443,13 +456,14 @@ def generate_hdf5():
                     N_track = mcdc["particle_track_N"]
                     f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
 
-    # IC generator
-    if mcdc["setting"]["IC_generator"]:
+    # Save particle?
+    if mcdc["setting"]["save_particle"]:
         # Gather source bank
+        # TODO: Parallel HDF5
         N = mcdc["bank_source"]["size"]
         neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
 
-        # Master creates datasets
+        # Master saves the particle
         if mcdc["mpi_master"]:
             # Remove unwanted particle fields
             neutrons = np.concatenate(neutrons[:])
@@ -461,18 +475,9 @@ def generate_hdf5():
                 ]
             ]
 
-            # Create datasets
-            with h5py.File(mcdc["setting"]["output"] + "_IC_generator.h5", "w") as f:
-                f.create_dataset(
-                    "collision_count", data=mcdc["IC_tally_collision_count"]
-                )
-                f.create_dataset(
-                    "neutron_density", data=mcdc["IC_tally_neutron_density"]
-                )
-                f.create_dataset(
-                    "precursor_density", data=mcdc["IC_tally_precursor_density"]
-                )
-                f.create_dataset("neutrons", data=neutrons[:])
+            # Create dataset
+            with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+                f.create_dataset("particles", data=neutrons[:])
                 """
                 if mcdc["technique"]["IC_generator"]:
                     Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
