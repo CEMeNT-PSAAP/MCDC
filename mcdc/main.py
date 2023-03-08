@@ -434,19 +434,26 @@ def generate_hdf5():
                     "tally/" + "iqmc_flux", data=np.squeeze(T["iqmc_flux"])
                 )
 
+            # Particle tracker
+            if mcdc["setting"]["track_particle"]:
+                with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
+                    N_track = mcdc["particle_track_N"]
+                    f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
+
 
 def closeout():
     # Runtime
-    with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
-        for name in [
-            "total",
-            "preparation",
-            "simulation",
-            "output",
-            "bank_management",
-        ]:
-            f.create_dataset(
-                "runtime_" + name, data=np.array([mcdc["runtime_" + name]])
-            )
+    if mcdc["mpi_master"]:
+        with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+            for name in [
+                "total",
+                "preparation",
+                "simulation",
+                "output",
+                "bank_management",
+            ]:
+                f.create_dataset(
+                    "runtime_" + name, data=np.array([mcdc["runtime_" + name]])
+                )
 
     print_runtime(mcdc)
