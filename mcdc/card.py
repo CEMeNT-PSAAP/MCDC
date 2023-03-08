@@ -95,7 +95,8 @@ class InputCard:
             "filed_source": False,
             "source_file": "",
             "track_particle": False,
-            "IC_generator": False,
+            "save_particle": False,
+            'save_input_deck': True,
         }
 
         self.technique = {

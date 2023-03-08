@@ -995,6 +995,7 @@ def setting(**kw):
     bank_census_buff = kw.get("census_bank_buff")
     source_file = kw.get("source_file")
     particle_tracker = kw.get("particle_tracker")
+    save_input_deck = kw.get("save_input_deck")
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
@@ -1039,9 +1040,13 @@ def setting(**kw):
         if particle_tracker and MPI.COMM_WORLD.Get_size() > 1:
             print_error("Particle tracker currently only runs on a single MPI rank")
 
+    # Save input card?
+    if save_input_deck is not None:
+        card["save_input_deck"] = save_input_deck
+
 
 def eigenmode(
-    N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, IC_generator=False
+    N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, save_particle=False
 ):
     # Update setting card
     card = mcdc.input_card.setting
@@ -1050,7 +1055,7 @@ def eigenmode(
     card["N_cycle"] = N_inactive + N_active
     card["mode_eigenvalue"] = True
     card["k_init"] = k_init
-    card["IC_generator"] = IC_generator
+    card["save_particle"] = save_particle
 
     # Gyration radius setup
     if gyration_radius is not None:
