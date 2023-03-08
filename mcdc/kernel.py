@@ -2945,6 +2945,25 @@ def sensitivity_material(P, mcdc):
             sample_phasespace_fission_nuclide(P, nuclide, P, mcdc)
 
 
+# ==============================================================================
+# Particle tracker
+# ==============================================================================
+
+
+@njit
+def track_particle(P, mcdc):
+    idx = mcdc["particle_track_N"]
+    mcdc["particle_track"][idx, 0] = mcdc["particle_track_history_ID"]
+    mcdc["particle_track"][idx, 1] = mcdc["particle_track_particle_ID"]
+    mcdc["particle_track"][idx, 2] = P["g"] + 1
+    mcdc["particle_track"][idx, 3] = P["t"]
+    mcdc["particle_track"][idx, 4] = P["x"]
+    mcdc["particle_track"][idx, 5] = P["y"]
+    mcdc["particle_track"][idx, 6] = P["z"]
+    mcdc["particle_track"][idx, 7] = P["w"]
+    mcdc["particle_track_N"] += 1
+
+
 # =============================================================================
 # Miscellany
 # =============================================================================
