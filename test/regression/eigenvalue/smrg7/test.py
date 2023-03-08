@@ -3,15 +3,15 @@ import numpy as np
 
 import mcdc
 
+
 def test():
     # =========================================================================
     # Materials
     # =========================================================================
-    
+
     # Load material data
     lib = h5py.File("c5g7.h5", "r")
-    
-    
+
     # Materials
     def set_mat(mat):
         return mcdc.material(
@@ -25,8 +25,7 @@ def test():
             speed=mat["speed"],
             decay=mat["decay"],
         )
-    
-    
+
     mat_uo2 = set_mat(lib["uo2"])
     mat_mox43 = set_mat(lib["mox43"])
     mat_mox7 = set_mat(lib["mox7"])
@@ -35,19 +34,19 @@ def test():
     mat_fc = set_mat(lib["fc"])
     mat_cr = set_mat(lib["cr"])
     mat_mod = set_mat(lib["mod"])
-    
+
     # =========================================================================
     # Pin cells
     # =========================================================================
-    
+
     pitch = 1.26
     radius = 0.54
-    
+
     # Surfaces
     cy = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=radius)
     z0 = mcdc.surface("plane-z", z=-100.0)
     z1 = mcdc.surface("plane-z", z=100.0)
-    
+
     # Cells
     fc = mcdc.cell([-cy, +z0], mat_fc)  # Fission chamber (in and above core)
     uo2 = mcdc.cell([-cy, +z0, -z1], mat_uo2)  # Fuel rods (in core)
@@ -59,7 +58,7 @@ def test():
     gta = mcdc.cell([-cy, +z1], mat_gt)  #            (above core)
     mod = mcdc.cell([+cy], mat_mod)  # Moderator (outside rod)
     modu = mcdc.cell([-cy, -z0], mat_mod)  #           (under rod)
-    
+
     # Universes (pin cells)
     f = mcdc.universe([fc, mod, modu])["ID"]
     u = mcdc.universe([uo2, gta, mod, modu])["ID"]
@@ -68,11 +67,11 @@ def test():
     n = mcdc.universe([mox8, gta, mod, modu])["ID"]
     c = mcdc.universe([gti, cr, mod, modu])["ID"]
     g = mcdc.universe([gti, gta, mod, modu])["ID"]
-    
+
     # =========================================================================
     # Assemblies
     # =========================================================================
-    
+
     # Lattices
     lattice_uo2 = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
@@ -97,7 +96,7 @@ def test():
             [u, u, u, u, u, u, u, u, u, u, u, u, u, u, u, u, u],
         ],
     )
-    
+
     lattice_mox = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -121,7 +120,7 @@ def test():
             [l, l, l, l, l, l, l, l, l, l, l, l, l, l, l, l, l],
         ],
     )
-    
+
     lattice_uo2_cr = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -145,7 +144,7 @@ def test():
             [u, u, u, u, u, u, u, u, u, u, u, u, u, u, u, u, u],
         ],
     )
-    
+
     lattice_mox_cr = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -169,7 +168,7 @@ def test():
             [l, l, l, l, l, l, l, l, l, l, l, l, l, l, l, l, l],
         ],
     )
-    
+
     # Reflector
     gt = mcdc.cell([-cy], mat_gt)  # Reflector
     gto = mcdc.cell([+cy], mat_gt)  #
@@ -199,7 +198,7 @@ def test():
             [g, g, g, g, g, g, g, g, g, g, g, g, g, g, g, g, g],
         ],
     )
-    
+
     lattice_rll = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -223,7 +222,7 @@ def test():
             [w, g, g, g, g, g, g, g, g, g, g, g, g, w, g, g, g],
         ],
     )
-    
+
     lattice_rul = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -247,7 +246,7 @@ def test():
             [g, g, g, g, g, g, g, g, g, g, g, g, g, g, g, g, g],
         ],
     )
-    
+
     lattice_rur = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -271,7 +270,7 @@ def test():
             [g, g, g, g, g, g, g, g, g, g, g, g, g, g, g, g, g],
         ],
     )
-    
+
     lattice_rlr = mcdc.lattice(
         x=[-pitch * 17 / 2, pitch, 17],
         y=[-pitch * 17 / 2, pitch, 17],
@@ -295,7 +294,7 @@ def test():
             [g, g, g, w, g, g, g, g, g, g, g, g, g, g, g, g, w],
         ],
     )
-    
+
     # Assembly cells
     # Surfaces
     x0 = mcdc.surface("plane-x", x=-pitch * 17 / 2)
@@ -310,7 +309,7 @@ def test():
     assembly_rur = mcdc.cell([+x0, -x1, +y0, -y1], lattice_rur)
     assembly_rlr = mcdc.cell([+x0, -x1, +y0, -y1], lattice_rlr)
     assembly_r = mcdc.cell([+x0, -x1, +y0, -y1], lattice_r)
-    
+
     # Set assemblies in their respective universes
     u = mcdc.universe([assembly_uo2])["ID"]
     m = mcdc.universe([assembly_mox])["ID"]
@@ -319,11 +318,11 @@ def test():
     c = mcdc.universe([assembly_rur])["ID"]
     d = mcdc.universe([assembly_rlr])["ID"]
     e = mcdc.universe([assembly_r])["ID"]
-    
+
     # =========================================================================
     # Root universe: core
     # =========================================================================
-    
+
     # Lattice
     lattice_core = mcdc.lattice(
         x=[-pitch * 17 * 9 / 2, pitch * 17, 9],
@@ -340,7 +339,7 @@ def test():
             [e, e, e, e, e, e, e, e, e],
         ],
     )
-    
+
     # Core cell
     # Surfaces
     cy0 = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=pitch * 17 * 8.6 / 2)
@@ -356,41 +355,41 @@ def test():
     barrel = mcdc.cell([+cy0, -cy1, +zlo, -zup], mat_gt)
     water = mcdc.cell([+cy1, -cy2, +zlo, -zup], mat_mod)
     vessel = mcdc.cell([+cy2, -cy3, +zlo, -zup], mat_gt)
-    
+
     # Root universe
     mcdc.universe([core, barrel, water, vessel], root=True)
-    
+
     # =========================================================================
     # Set source
     # =========================================================================
     # Uniform in energy
-    
+
     source = mcdc.source(
         x=[-pitch * 17 * 7 / 2, pitch * 17 * 7 / 2],
         y=[-pitch * 17 * 7 / 2, pitch * 17 * 7 / 2],
         z=[-100.0, 100.0],
         energy=np.ones(7),
     )
-    
+
     # =========================================================================
     # Set tally and parameter, and then run mcdc
     # =========================================================================
-    
+
     # Tally
-    #x_grid = np.linspace(-pitch * 17 * 9 / 2, pitch * 17 * 9 / 2, 17 * 9 + 1)
-    #y_grid = np.linspace(-pitch * 17 * 9 / 2, pitch * 17 * 9 / 2, 17 * 9 + 1)
-    #z_grid = np.linspace(-130, 130, 131)
+    # x_grid = np.linspace(-pitch * 17 * 9 / 2, pitch * 17 * 9 / 2, 17 * 9 + 1)
+    # y_grid = np.linspace(-pitch * 17 * 9 / 2, pitch * 17 * 9 / 2, 17 * 9 + 1)
+    # z_grid = np.linspace(-130, 130, 131)
     x_grid = np.linspace(-100, 100, 20)
     y_grid = np.linspace(-100, 100, 20)
     z_grid = np.linspace(-130, 130, 20)
     scores = ["flux"]
     mcdc.tally(scores=scores, x=x_grid, y=y_grid, z=z_grid)
-    
+
     # Setting
     mcdc.setting(N_particle=1e2, progress_bar=False)
     mcdc.eigenmode(N_inactive=1, N_active=2, gyration_radius="all")
     mcdc.population_control()
-    
+
     # Run
     mcdc.run()
 
@@ -426,5 +425,6 @@ def test():
     output.close()
     answer.close()
 
-if (__name__ == "__main__"):
+
+if __name__ == "__main__":
     test()
