@@ -5,7 +5,13 @@ from numba import njit, objmode
 import mcdc.kernel as kernel
 
 from mcdc.constant import *
-from mcdc.print_ import print_progress, print_progress_eigenvalue, print_progress_iqmc
+from mcdc.print_ import (
+    print_progress,
+    print_progress_eigenvalue,
+    print_progress_iqmc,
+    print_iqmc_eigenvalue_progress,
+    print_iqmc_eigenvalue_exit_code,
+)
 
 
 # =========================================================================
@@ -17,18 +23,6 @@ from mcdc.print_ import print_progress, print_progress_eigenvalue, print_progres
 def loop_main(mcdc):
     simulation_end = False
     while not simulation_end:
-        if mcdc["technique"]["iQMC"]:
-            # reset particle bank size
-            mcdc["bank_source"]["size"] = 0
-            mcdc["technique"]["iqmc_source"] = np.zeros_like(
-                mcdc["technique"]["iqmc_source"]
-            )
-            kernel.prepare_qmc_source(mcdc)  # set bank source
-            kernel.prepare_qmc_particles(mcdc)  # initialize particles with LDS
-            # prepare source for next iteration
-            mcdc["technique"]["iqmc_flux"] = np.zeros_like(
-                mcdc["technique"]["iqmc_flux"]
-            )
         # Loop over source particles
         loop_source(mcdc)
 
@@ -52,21 +46,6 @@ def loop_main(mcdc):
                 simulation_end = True
             elif mcdc["i_cycle"] >= mcdc["setting"]["N_inactive"]:
                 mcdc["cycle_active"] = True
-
-        # iQMC convergence criteria
-        elif mcdc["technique"]["iQMC"]:
-            mcdc["technique"]["iqmc_itt"] += 1
-            # calculate norm of flux iterations
-            kernel.calculate_qmc_res(mcdc)
-            if (mcdc["technique"]["iqmc_itt"] == mcdc["technique"]["iqmc_maxitt"]) or (
-                mcdc["technique"]["iqmc_res"] <= mcdc["technique"]["iqmc_tol"]
-            ):
-                simulation_end = True
-            # Print progres
-            # with objmode():
-            print_progress_iqmc(mcdc)
-            # set flux_old = current flux
-            mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
 
         # Time census closeout
         elif (
@@ -294,4 +273,99 @@ def loop_particle(P, mcdc):
 # =============================================================================
 # iQMC Loop
 # =============================================================================
-# TODO: write iterative methods
+
+
+@njit
+def loop_iqmc(mcdc):
+    # function calls from specified solvers
+    if mcdc["setting"]["mode_eigenvalue"]:
+        power_iteration(mcdc)
+    else:
+        source_iteration(mcdc)
+
+
+@njit
+def source_iteration(mcdc):
+    simulation_end = False
+
+    while not simulation_end:
+        # reset particle bank size
+        mcdc["bank_source"]["size"] = 0
+        mcdc["technique"]["iqmc_source"] = np.zeros_like(
+            mcdc["technique"]["iqmc_source"]
+        )
+
+        # set bank source
+        kernel.prepare_qmc_source(mcdc)
+        # initialize particles with LDS
+        kernel.prepare_qmc_particles(mcdc)
+
+        # prepare source for next iteration
+        mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+
+        # sweep particles
+        loop_source(mcdc)
+        mcdc["technique"]["iqmc_itt"] += 1
+
+        # calculate norm of flux iterations
+        mcdc["technique"]["iqmc_res"] = kernel.qmc_res(
+            mcdc["technique"]["iqmc_flux"], mcdc["technique"]["iqmc_flux_old"]
+        )
+
+        # iQMC convergence criteria
+        if (mcdc["technique"]["iqmc_itt"] == mcdc["technique"]["iqmc_maxitt"]) or (
+            mcdc["technique"]["iqmc_res"] <= mcdc["technique"]["iqmc_tol"]
+        ):
+            simulation_end = True
+
+        # Print progres
+        if not mcdc["setting"]["mode_eigenvalue"]:
+            print_progress_iqmc(mcdc)
+
+        # set flux_old = current flux
+        mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
+
+
+@njit
+def power_iteration(mcdc):
+    simulation_end = False
+
+    # iteration tolerance
+    tol = mcdc["technique"]["iqmc_tol"]
+    # maximum number of iterations
+    maxit = mcdc["technique"]["iqmc_maxitt"]
+    mcdc["technique"]["iqmc_flux_outter"] = mcdc["technique"]["iqmc_flux"].copy()
+
+    # assign function call from specified solvers
+    # inner_iteration = globals()[mcdc["technique"]["fixed_source_solver"]]
+
+    while not simulation_end:
+        # iterate over scattering source
+        source_iteration(mcdc)
+        # reset counter for inner iteration
+        mcdc["technique"]["iqmc_itt"] = 0
+
+        # update k_eff
+        kernel.UpdateK(
+            mcdc["k_eff"],
+            mcdc["technique"]["iqmc_flux_outter"],
+            mcdc["technique"]["iqmc_flux"],
+            mcdc,
+        )
+
+        # calculate diff in flux
+        mcdc["technique"]["iqmc_res_outter"] = kernel.qmc_res(
+            mcdc["technique"]["iqmc_flux"], mcdc["technique"]["iqmc_flux_outter"]
+        )
+        mcdc["technique"]["iqmc_flux_outter"] = mcdc["technique"]["iqmc_flux"].copy()
+        mcdc["technique"]["iqmc_itt_outter"] += 1
+
+        print_iqmc_eigenvalue_progress(mcdc)
+
+        # iQMC convergence criteria
+        if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
+            mcdc["technique"]["iqmc_res_outter"] <= tol
+        ):
+            simulation_end = True
+
+    print_iqmc_eigenvalue_exit_code(mcdc)

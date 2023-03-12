@@ -9,9 +9,11 @@ float64 = np.float64
 int64 = np.int64
 uint64 = np.uint64
 bool_ = np.bool_
+str_ = "U30"  # np.str_
 
 # MC/DC types defined by input card
 particle = None
+particle_record = None
 nuclide = None
 material = None
 surface = None
@@ -512,12 +514,12 @@ def make_type_technique(card):
     # =========================================================================
 
     # Mesh (for qmc source tallies)
-
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.technique["iqmc_mesh"])
-    N_particle = card.setting["N_particle"]
-    Ng = card.materials[0]["G"]
-    N_dim = 6  # group, x, y, z, mu, phi
-    if not card.technique["iQMC"]:
+    if card.technique["iQMC"]:
+        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card.technique["iqmc_mesh"])
+        N_particle = card.setting["N_particle"]
+        Ng = card.materials[0]["G"]
+        N_dim = 6  # group, x, y, z, mu, phi
+    else:
         Nx = Ny = Nz = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
 
     struct += [("iqmc_mesh", mesh)]
@@ -530,22 +532,28 @@ def make_type_technique(card):
     struct += [("iqmc_fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [("iqmc_material_idx", int64, (Nt, Nx, Ny, Nz))]
 
-    # Second scalar flux tally for k-eigenvalue problems (?)
+    # flux tallies
     struct += [("iqmc_flux", float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [("iqmc_flux_old", float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [("iqmc_effective_scattering", float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [("iqmc_effective_fission", float64, (Ng, Nt, Nx, Ny, Nz))]
+    # TODO: make outter flux size zero if not eigenmode
+    struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
 
     # Constants
     struct += [
         ("iqmc_maxitt", int64),
         ("iqmc_tol", float64),
         ("iqmc_itt", int64),
+        ("iqmc_itt_outter", int64),
         ("iqmc_res", float64),
+        ("iqmc_res_outter", float64),
         ("iqmc_N_dim", int64),
         ("iqmc_scramble", bool_),
         ("iqmc_seed", int64),
-        ("iqmc_generator", "U30"),
+        ("iqmc_generator", str_),
+        ("fixed_source_solver", str_),
+        ("eigenmode_solver", str_),
     ]
 
     # =========================================================================
@@ -641,7 +649,8 @@ def make_type_global(card):
     # TODO
     if card.setting["filed_source"] or card.technique["iQMC"]:
         bank_source = particle_bank(N_work)
-
+        if card.technique["iQMC"] and card.setting["mode_eigenvalue"]:
+            bank_census = particle_bank(0)
     # GLobal type
     global_ = np.dtype(
         [
