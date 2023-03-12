@@ -1729,16 +1729,15 @@ def move_to_event(P, mcdc):
     # Move particle
     # =========================================================================
 
+    # score iQMC tallies
     if mcdc["technique"]["iQMC"]:
         material = mcdc["materials"][P["material_ID"]]
         w = P["iqmc_w"]
         SigmaT = material["total"][:]
         score_iqmc_flux(P, distance, mcdc)
-        # print(distance)
         w_final = continuous_weight_reduction(w, distance, SigmaT)
         P["iqmc_w"] = w_final
         P["w"] = w_final.sum()
-        # print(P['iqmc_w'])
 
     # Score tracklength tallies
     if mcdc["tally"]["tracklength"] and mcdc["cycle_active"]:
@@ -2424,6 +2423,28 @@ def continuous_weight_reduction(w, distance, SigmaT):
 
 
 @njit
+def UpdateK(keff, phi_outter, phi_inner, mcdc):
+    mesh = mcdc["technique"]["iqmc_mesh"]
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+    nuSigmaF = np.zeros_like(phi_outter)
+    # calculate nu*SigmaF for every cell
+    for i in range(Nx):
+        for j in range(Ny):
+            for k in range(Nz):
+                t = 0
+                mat_idx = mcdc["technique"]["iqmc_material_idx"][t, i, j, k]
+                material = mcdc["materials"][mat_idx]
+                nu_f = material["nu_f"]
+                SigmaF = material["fission"]
+                nuSigmaF[:, t, i, j, k] = nu_f * SigmaF
+
+    keff *= np.sum(nuSigmaF * phi_inner) / np.sum(nuSigmaF * phi_outter)
+    mcdc["k_eff"] = keff
+
+
+@njit
 def prepare_qmc_source(mcdc):
     """
 
@@ -2431,6 +2452,48 @@ def prepare_qmc_source(mcdc):
     is a combination of the user input Fixed-Source plus the calculated
     Scattering-Source and Fission-Sources. Resutls are stored in
     mcdc['technique']['iqmc_source'], a matrix of size [G,Nt,Nx,Ny,Nz].
+
+    Parameters
+    ----------
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    Q = mcdc["technique"]["iqmc_source"]
+    fixed_source = mcdc["technique"]["iqmc_fixed_source"]
+    flux_scatter = mcdc["technique"]["iqmc_flux"]
+    flux_fission = mcdc["technique"]["iqmc_flux"]
+    if mcdc["setting"]["mode_eigenvalue"]:
+        flux_fission = mcdc["technique"]["iqmc_flux_outter"]
+    mesh = mcdc["technique"]["iqmc_mesh"]
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+    # calculate source for every cell and group in the iqmc_mesh
+    for i in range(Nx):
+        for j in range(Ny):
+            for k in range(Nz):
+                t = 0
+                mat_idx = mcdc["technique"]["iqmc_material_idx"][t, i, j, k]
+                # we can vectorize the multigroup calculation here
+                Q[:, t, i, j, k] = (
+                    fission_source(flux_fission[:, t, i, j, k], mat_idx, mcdc)
+                    + scattering_source(flux_scatter[:, t, i, j, k], mat_idx, mcdc)
+                    + fixed_source[:, t, i, j, k]
+                )
+
+
+@njit
+def prepare_qmc_scattering_source(mcdc):
+    """
+
+    Iterates trhough all spatial cells to calculate the iQMC source.
+    Resutls are stored in mcdc['technique']['iqmc_source'], a matrix
+    of size [G,Nt,Nx,Ny,Nz].
 
     Parameters
     ----------
@@ -2453,6 +2516,51 @@ def prepare_qmc_source(mcdc):
     for i in range(Nx):
         for j in range(Ny):
             for k in range(Nz):
+                t = 0
+                mat_idx = mcdc["technique"]["iqmc_material_idx"][t, i, j, k]
+                # we can vectorize the multigroup calculation here
+                Q[:, t, i, j, k] = (
+                    scattering_source(flux[:, t, i, j, k], mat_idx, mcdc)
+                    + fixed_source[:, t, i, j, k]
+                )
+
+
+@njit
+def prepare_qmc_fission_source(mcdc):
+    """
+
+    Iterates trhough all spatial cells to calculate the iQMC source.
+    Resutls are stored in mcdc['technique']['iqmc_source'], a matrix
+    of size [G,Nt,Nx,Ny,Nz].
+
+    Parameters
+    ----------
+    mcdc : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    Q = mcdc["technique"]["iqmc_source"]
+    fixed_source = mcdc["technique"]["iqmc_fixed_source"]
+    flux = mcdc["technique"]["iqmc_flux"]
+    mesh = mcdc["technique"]["iqmc_mesh"]
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+    # calculate source for every cell and group in the iqmc_mesh
+    for i in range(Nx):
+        for j in range(Ny):
+            for k in range(Nz):
+                t = 0
+                mat_idx = mcdc["technique"]["iqmc_material_idx"][t, i, j, k]
+                # we can vectorize the multigroup calculation here
+                Q[:, t, i, j, k] = (
+                    fission_source(flux[:, t, i, j, k], mat_idx, mcdc)
+                    + fixed_source[:, t, i, j, k]
+                )
                 t = 0
                 mat_idx = mcdc["technique"]["iqmc_material_idx"][t, i, j, k]
                 mat_idx = mcdc["technique"]["iqmc_material_idx"][t, i, j, k]
@@ -2590,7 +2698,7 @@ def scattering_source(phi, mat_idx, mcdc):
 
 
 @njit
-def calculate_qmc_res(mcdc):
+def qmc_res(flux_new, flux_old):
     """
 
     Calculate residual between scalar flux iterations.
@@ -2608,11 +2716,11 @@ def calculate_qmc_res(mcdc):
         L2 Norm of arrays.
 
     """
-    size = mcdc["technique"]["iqmc_flux"].size
-    flux_new = mcdc["technique"]["iqmc_flux"].reshape((size,))
-    flux_old = mcdc["technique"]["iqmc_flux_old"].reshape((size,))
-    res = np.linalg.norm((flux_new - flux_old))
-    mcdc["technique"]["iqmc_res"] = res
+    size = flux_old.size
+    flux_new = flux_new.reshape((size,))
+    flux_old = flux_old.reshape((size,))
+    res = np.linalg.norm((flux_new - flux_old), ord=2)
+    return res
 
 
 @njit
@@ -2635,7 +2743,6 @@ def score_iqmc_flux(P, distance, mcdc):
 
     """
     # Get indices
-    # g                   = P['g']
     mesh = mcdc["technique"]["iqmc_mesh"]
     material = mcdc["materials"][P["material_ID"]]
     w = P["iqmc_w"]
@@ -2653,7 +2760,9 @@ def score_iqmc_flux(P, distance, mcdc):
     else:
         flux = distance * w / dV
     mcdc["technique"]["iqmc_flux"][:, t, x, y, z] += flux
-    mcdc["technique"]["iqmc_effective_scattering"][:, t, x, y, z] += flux * SigmaS
+    mcdc["technique"]["iqmc_effective_scattering"][:, t, x, y, z] += (
+        flux * SigmaS
+    )  # chi_s.T, SigmaS * phi
     mcdc["technique"]["iqmc_effective_fission"][:, t, x, y, z] += flux * SigmaF
 
 

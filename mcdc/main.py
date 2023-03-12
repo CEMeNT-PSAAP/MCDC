@@ -8,7 +8,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_main
+from mcdc.loop import loop_main, loop_iqmc
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_card and set global variables as "mcdc"
@@ -38,7 +38,12 @@ def run():
     # Run simulation
     # TODO: add if iQMC execute iqmc_loop()
     simulation_start = MPI.Wtime()
-    loop_main(mcdc)
+
+    # iQMC loop
+    if mcdc["technique"]["iQMC"]:
+        loop_iqmc(mcdc)
+    else:
+        loop_main(mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -254,6 +259,7 @@ def prepare():
             "IC_Pmax_C",
             "IC_resample",
             "iqmc_flux_old",
+            "iqmc_flux_outter",
             "iqmc_mesh",
             "iqmc_source",
             "lds",
@@ -398,14 +404,17 @@ def generate_hdf5():
 
             # Eigenvalues
             if mcdc["setting"]["mode_eigenvalue"]:
-                N_cycle = mcdc["setting"]["N_cycle"]
-                f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
-                f.create_dataset("k_mean", data=mcdc["k_avg_running"])
-                f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
-                if mcdc["setting"]["gyration_radius"]:
-                    f.create_dataset(
-                        "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
-                    )
+                if mcdc["technique"]["iQMC"]:
+                    f.create_dataset("k_eff", data=mcdc["k_eff"])
+                else:
+                    N_cycle = mcdc["setting"]["N_cycle"]
+                    f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
+                    f.create_dataset("k_mean", data=mcdc["k_avg_running"])
+                    f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
+                    if mcdc["setting"]["gyration_radius"]:
+                        f.create_dataset(
+                            "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
+                        )
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:
