@@ -2860,6 +2860,60 @@ def sample_qmc_group(sample, G):
     return int(np.floor(sample * G))
 
 
+@njit
+def generate_iqmc_material_idx(mcdc):
+    """
+    This algorithm is meant to loop through every spatial cell of the
+    iQMC mesh and assign a material index according to the material_ID at
+    the center of the cell.
+
+    Therefore, the whole cell is treated as the material located at the
+    center of the cell, regardless of whethere there are more materials
+    present.
+
+    A somewhat crude but effient approximation.
+    """
+    iqmc_mesh = mcdc["technique"]["iqmc_mesh"]
+    Nx = len(iqmc_mesh["x"]) - 1
+    Ny = len(iqmc_mesh["y"]) - 1
+    Nz = len(iqmc_mesh["z"]) - 1
+    dx = dy = dz = 1
+    t = 0
+    # variables for cell finding functions
+    trans = np.zeros((3,))
+    # create particle to utilize cell finding functions
+    P_temp = np.zeros(1, dtype=type_.particle)[0]
+    # set default attributes
+    P_temp["alive"] = True
+    P_temp["material_ID"] = -1
+    P_temp["cell_ID"] = -1
+    
+    # loop through every cell
+    for i in range(Nx):
+        dx = iqmc_mesh["x"][i + 1] - iqmc_mesh["x"][i]
+        x = iqmc_mesh["x"][i] + dx * 0.5
+        for j in range(Ny):
+            dy = iqmc_mesh["y"][j + 1] - iqmc_mesh["y"][j]
+            y = iqmc_mesh["y"][j] + dy * 0.5
+            for k in range(Nz):
+                dx = iqmc_mesh["z"][k + 1] - iqmc_mesh["z"][k]
+                z = iqmc_mesh["z"][k] + dz * 0.5
+
+                # assign cell center position
+                P_temp["x"] = x
+                P_temp["y"] = y
+                P_temp["z"] = z
+
+                # set cell_ID
+                P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+
+                # set material_ID
+                material_ID = get_particle_material(P_temp, mcdc)
+
+                # assign material index
+                mcdc["technique"]["iqmc_material_idx"][t, i, j, k] = material_ID
+
+
 # =============================================================================
 # Weight Roulette
 # =============================================================================

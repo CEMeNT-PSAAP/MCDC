@@ -52,21 +52,12 @@ def test():
     fixed_source[int(0.125 * Nx) : int(0.1875 * Nx)] = 1.0
     fixed_source[int(0.8125 * Nx) : int(0.875 * Nx)] = 1.0
 
-    material_idx = np.zeros(Nx, dtype=int)
-    material_idx[: int(0.1875 * Nx)] = 3
-    material_idx[int(0.1875 * Nx) : int(0.3125 * Nx)] = 2
-    material_idx[int(0.3125 * Nx) : int(0.375 * Nx)] = 1
-    material_idx[int(0.625 * Nx) : int(0.6875 * Nx)] = 1
-    material_idx[int(0.6875 * Nx) : int(0.8125 * Nx)] = 2
-    material_idx[int(0.8125 * Nx) :] = 3
-
     phi0 = np.ones((Nx))
 
     mcdc.iQMC(
         x=x,
         fixed_source=fixed_source,
         phi0=phi0,
-        material_idx=material_idx,
         maxitt=maxit,
         tol=tol,
         generator=generator,
