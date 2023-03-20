@@ -46,7 +46,6 @@ tol = 1e-3
 x = np.linspace(0.0, 6.01275, num=Nx + 1)
 generator = "halton"
 fixed_source = np.zeros(Nx)
-material_idx = np.zeros(Nx, dtype=int)
 phi0 = np.ones((Nx))
 
 # =============================================================================
@@ -57,7 +56,6 @@ mcdc.iQMC(
     x=x,
     phi0=phi0,
     fixed_source=fixed_source,
-    material_idx=material_idx,
     maxitt=maxit,
     tol=tol,
     generator=generator,

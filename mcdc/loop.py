@@ -277,6 +277,8 @@ def loop_particle(P, mcdc):
 
 @njit
 def loop_iqmc(mcdc):
+    # generate material index
+    kernel.generate_iqmc_material_idx(mcdc)
     # function calls from specified solvers
     if mcdc["setting"]["mode_eigenvalue"]:
         power_iteration(mcdc)
