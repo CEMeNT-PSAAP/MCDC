@@ -2887,7 +2887,7 @@ def generate_iqmc_material_idx(mcdc):
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
     P_temp["cell_ID"] = -1
-    
+
     # loop through every cell
     for i in range(Nx):
         dx = iqmc_mesh["x"][i + 1] - iqmc_mesh["x"][i]
