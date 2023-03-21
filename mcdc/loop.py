@@ -307,6 +307,8 @@ def source_iteration(mcdc):
 
         # sweep particles
         loop_source(mcdc)
+        # sum resultant flux on all processors
+        kernel.iqmc_distribute_flux(mcdc)
         mcdc["technique"]["iqmc_itt"] += 1
 
         # calculate norm of flux iterations
