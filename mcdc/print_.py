@@ -126,11 +126,11 @@ def print_progress_eigenvalue(mcdc):
 
 @njit
 def print_iqmc_eigenvalue_progress(mcdc):
-    k_eff = mcdc["k_eff"]
-    itt = mcdc["technique"]["iqmc_itt_outter"]
-    res = mcdc["technique"]["iqmc_res_outter"]
-    # print(" %-4i  %.5f  %.6f" % (itt, k_eff, res))
-    print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
+    if master:
+        k_eff = mcdc["k_eff"]
+        itt = mcdc["technique"]["iqmc_itt_outter"]
+        res = mcdc["technique"]["iqmc_res_outter"]
+        print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
 
 
 @njit
