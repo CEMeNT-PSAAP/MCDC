@@ -259,13 +259,12 @@ def manage_particle_banks(mcdc):
     if mcdc["technique"]["population_control"]:
         population_control(mcdc)
     else:
-        # TODO: Swap??
         # Swap census and source bank
-        for i in range(mcdc["bank_census"]["size"]):
-            mcdc["bank_source"]["particles"][i] = copy_particle(
-                mcdc["bank_census"]["particles"][i]
-            )
-        mcdc["bank_source"]["size"] = mcdc["bank_census"]["size"]
+        size = mcdc["bank_census"]["size"]
+        mcdc["bank_source"]["size"] = size
+        mcdc["bank_source"]["particles"][:size] = mcdc["bank_census"]["particles"][
+            :size
+        ]
 
     # MPI rebalance
     bank_rebalance(mcdc)
@@ -274,8 +273,8 @@ def manage_particle_banks(mcdc):
     mcdc["bank_census"]["size"] = 0
 
     # Manage IC bank
-    # if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-    #    manage_IC_bank(mcdc)
+    if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+        manage_IC_bank(mcdc)
 
     # Accumulate time
     if mcdc["mpi_master"]:
@@ -288,52 +287,13 @@ def manage_particle_banks(mcdc):
 def manage_IC_bank(mcdc):
     # Buffer bank
     buff_n = np.zeros(
-        mcdc["technique"]["IC_bank_neutron_local"]["content"].shape[0],
-        dtype=type_.neutron,
+        mcdc["technique"]["IC_bank_neutron_local"]["particles"].shape[0],
+        dtype=type_.particle_record,
     )
     buff_p = np.zeros(
-        mcdc["technique"]["IC_bank_precursor_local"]["content"].shape[0],
+        mcdc["technique"]["IC_bank_precursor_local"]["particles"].shape[0],
         dtype=type_.precursor,
     )
-
-    # Resample?
-    if mcdc["technique"]["IC_resample"]:
-        size_n = mcdc["technique"]["IC_bank_neutron_local"]["size"]
-        size_C = mcdc["technique"]["IC_bank_precursor_local"]["size"]
-        Pmax_n = mcdc["technique"]["IC_Pmax_n"]
-        Pmax_C = mcdc["technique"]["IC_Pmax_C"]
-
-        # Neutron
-        Nn = 0
-        # Sample and store to buffer
-        for i in range(size_n):
-            P = mcdc["technique"]["IC_bank_neutron_local"]["content"][i]
-            if rng(mcdc) < Pmax_n * P["w"]:
-                P["w"] = 1.0 / Pmax_n
-                buff_n[Nn] = P
-                Nn += 1
-        # Set actual bank
-        for i in range(Nn):
-            mcdc["technique"]["IC_bank_neutron_local"]["content"][i] = buff_n[i]
-        mcdc["technique"]["IC_bank_neutron_local"]["size"] = Nn
-
-        # Precursor
-        Np = 0
-        # Sample and store to buffer
-        for i in range(size_C):
-            P = mcdc["technique"]["IC_bank_precursor_local"]["content"][i]
-            if rng(mcdc) < Pmax_C * P["w"]:
-                P["w"] = 1.0 / Pmax_C
-                buff_p[Np] = P
-                Np += 1
-        # Set actual bank
-        for i in range(Np):
-            mcdc["technique"]["IC_bank_precursor_local"]["content"][i] = buff_p[i]
-        mcdc["technique"]["IC_bank_precursor_local"]["size"] = Np
-
-        # Reset parameters
-        mcdc["technique"]["IC_Pmax_n"] = 0.0
-        mcdc["technique"]["IC_Pmax_C"] = 0.0
 
     with objmode(Nn="int64", Np="int64"):
         # Create MPI-supported numpy object
@@ -341,10 +301,10 @@ def manage_IC_bank(mcdc):
         Np = mcdc["technique"]["IC_bank_precursor_local"]["size"]
 
         neutrons = MPI.COMM_WORLD.gather(
-            mcdc["technique"]["IC_bank_neutron_local"]["content"][:Nn]
+            mcdc["technique"]["IC_bank_neutron_local"]["particles"][:Nn]
         )
         precursors = MPI.COMM_WORLD.gather(
-            mcdc["technique"]["IC_bank_precursor_local"]["content"][:Np]
+            mcdc["technique"]["IC_bank_precursor_local"]["particles"][:Np]
         )
 
         if mcdc["mpi_master"]:
@@ -366,9 +326,9 @@ def manage_IC_bank(mcdc):
         mcdc["technique"]["IC_bank_neutron"]["size"] += Nn
         mcdc["technique"]["IC_bank_precursor"]["size"] += Np
         for i in range(Nn):
-            mcdc["technique"]["IC_bank_neutron"]["content"][start_n + i] = buff_n[i]
+            mcdc["technique"]["IC_bank_neutron"]["particles"][start_n + i] = buff_n[i]
         for i in range(Np):
-            mcdc["technique"]["IC_bank_precursor"]["content"][start_p + i] = buff_p[i]
+            mcdc["technique"]["IC_bank_precursor"]["particles"][start_p + i] = buff_p[i]
 
     # Reset local banks
     mcdc["technique"]["IC_bank_neutron_local"]["size"] = 0
@@ -573,34 +533,27 @@ def bank_IC(P, mcdc):
 
     # Neutron target weight
     Nn = mcdc["technique"]["IC_N_neutron"]
-    tally_n = mcdc["technique"]["IC_n_eff"]
+    tally_n = mcdc["technique"]["IC_neutron_density"]
+    tally_coll = mcdc["technique"]["IC_collision_density"]
     N_cycle = mcdc["setting"]["N_active"]
     if mcdc["technique"]["IC_uniform_weight"]:
         wn_prime = tally_n * N_cycle / Nn
     else:
-        wn_prime = wn * tally_n * N_cycle / Nn
+        wn_prime = wn * tally_coll * N_cycle / Nn
 
     # Sampling probability
     Pn = wn / wn_prime
 
-    # Sample neutron
+    # TODO: Splitting for Pn > 1.0
     if Pn > 1.0:
-        wn_prime = wn
-        if Pn > mcdc["technique"]["IC_Pmax_n"]:
-            mcdc["technique"]["IC_Pmax_n"] = Pn
+        with objmode():
+            print_error("Pn > 1.0.")
 
+    # Sample particle
     if rng(mcdc) < Pn:
-        idx = mcdc["technique"]["IC_bank_neutron_local"]["size"]
-        neutron = mcdc["technique"]["IC_bank_neutron_local"]["content"][idx]
-        neutron["x"] = P["x"]
-        neutron["y"] = P["y"]
-        neutron["z"] = P["z"]
-        neutron["ux"] = P["ux"]
-        neutron["uy"] = P["uy"]
-        neutron["uz"] = P["uz"]
-        neutron["g"] = P["g"]
-        neutron["w"] = wn_prime
-        mcdc["technique"]["IC_bank_neutron_local"]["size"] += 1
+        P_new = copy_particle(P)
+        P_new["w"] = wn_prime
+        add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
 
     # =========================================================================
     # Precursor
@@ -622,24 +575,24 @@ def bank_IC(P, mcdc):
     wp = flux * total * SigmaF / mcdc["k_eff"]
 
     # Precursor target weight
-    tally_C = mcdc["technique"]["IC_C_eff"]
+    tally_C = mcdc["technique"]["IC_precursor_density"]
     if mcdc["technique"]["IC_uniform_weight"]:
         wp_prime = tally_C * N_cycle / Np
     else:
-        wp_prime = wp * tally_C * N_cycle / Np
+        wp_prime = wp * tally_coll * N_cycle / Np
 
     # Sampling probability
     Pp = wp / wp_prime
 
-    # Sample precursor
+    # TODO: Splitting for Pp > 1.0
     if Pp > 1.0:
-        wp_prime = wp
-        if Pp > mcdc["technique"]["IC_Pmax_C"]:
-            mcdc["technique"]["IC_Pmax_C"] = Pp
+        with objmode():
+            print_error("Pp > 1.0.")
 
+    # Sample precursor
     if rng(mcdc) < Pp:
         idx = mcdc["technique"]["IC_bank_precursor_local"]["size"]
-        precursor = mcdc["technique"]["IC_bank_precursor_local"]["content"][idx]
+        precursor = mcdc["technique"]["IC_bank_precursor_local"]["particles"][idx]
         precursor["x"] = P["x"]
         precursor["y"] = P["y"]
         precursor["z"] = P["z"]
@@ -1476,6 +1429,7 @@ def eigenvalue_tally(P, distance, mcdc):
     flux = distance * P["w"]
     g = P["g"]
     nu = material["nu_f"][g]
+    SigmaT = material["total"][g]
     SigmaF = material["fission"][g]
     nuSigmaF = nu * SigmaF
 
@@ -1484,11 +1438,15 @@ def eigenvalue_tally(P, distance, mcdc):
 
     if mcdc["cycle_active"]:
         # Collision count
-        mcdc["eigenvalue_tally_Ncoll"] += 1
+        mcdc["eigenvalue_tally_collision"] += flux * SigmaT
 
         # Neutron density
         v = get_particle_speed(P, mcdc)
-        mcdc["eigenvalue_tally_n"] += flux / v
+        n_density = flux / v
+        mcdc["eigenvalue_tally_n"] += n_density
+        # Maximum neutron density
+        if mcdc["n_max"] < n_density:
+            mcdc["n_max"] = n_density
 
         # Precursor density
         J = material["J"]
@@ -1497,7 +1455,11 @@ def eigenvalue_tally(P, distance, mcdc):
         total = 0.0
         for j in range(J):
             total += nu_d[j] / decay[j]
-        mcdc["eigenvalue_tally_C"] += flux * total * SigmaF / mcdc["k_eff"]
+        C_density =  flux * total * SigmaF / mcdc["k_eff"]
+        mcdc["eigenvalue_tally_C"] += C_density
+        # Maximum precursor density
+        if mcdc["C_max"] < C_density:
+            mcdc["C_max"] = C_density
 
 
 @njit
@@ -1509,8 +1471,10 @@ def eigenvalue_tally_closeout_history(mcdc):
     # MPI Allreduce
     buff_nuSigmaF = np.zeros(1, np.float64)
     buff_n = np.zeros(1, np.float64)
+    buff_nmax = np.zeros(1, np.float64)
     buff_C = np.zeros(1, np.float64)
-    buff_Ncoll = np.zeros(1, np.float64)
+    buff_Cmax = np.zeros(1, np.float64)
+    buff_collision = np.zeros(1, np.float64)
     with objmode():
         MPI.COMM_WORLD.Allreduce(
             np.array([mcdc["eigenvalue_tally_nuSigmaF"]]), buff_nuSigmaF, MPI.SUM
@@ -1520,11 +1484,17 @@ def eigenvalue_tally_closeout_history(mcdc):
                 np.array([mcdc["eigenvalue_tally_n"]]), buff_n, MPI.SUM
             )
             MPI.COMM_WORLD.Allreduce(
+                np.array([mcdc["n_max"]]), buff_nmax, MPI.MAX
+            )
+            MPI.COMM_WORLD.Allreduce(
                 np.array([mcdc["eigenvalue_tally_C"]]), buff_C, MPI.SUM
             )
             MPI.COMM_WORLD.Allreduce(
-                np.array([mcdc["eigenvalue_tally_Ncoll"]]),
-                buff_Ncoll,
+                np.array([mcdc["C_max"]]), buff_Cmax, MPI.MAX
+            )
+            MPI.COMM_WORLD.Allreduce(
+                np.array([mcdc["eigenvalue_tally_collision"]]),
+                buff_collision,
                 MPI.SUM,
             )
 
@@ -1535,7 +1505,11 @@ def eigenvalue_tally_closeout_history(mcdc):
     # Normalize other eigenvalue tallies
     tally_n = buff_n[0] / N_particle
     tally_C = buff_C[0] / N_particle
-    tally_Ncoll = buff_Ncoll[0] / N_particle
+    tally_collision = buff_collision[0] / N_particle
+
+    # Maximum densities
+    mcdc['n_max'] = buff_nmax[0]
+    mcdc['C_max'] = buff_Cmax[0]
 
     # Accumulate running average
     if mcdc["cycle_active"]:
@@ -1545,8 +1519,8 @@ def eigenvalue_tally_closeout_history(mcdc):
         mcdc["n_sdv"] += tally_n * tally_n
         mcdc["C_avg"] += tally_C
         mcdc["C_sdv"] += tally_C * tally_C
-        mcdc["Ncoll_avg"] += tally_Ncoll
-        mcdc["Ncoll_sdv"] += tally_Ncoll * tally_Ncoll
+        mcdc["collision_avg"] += tally_collision
+        mcdc["collision_sdv"] += tally_collision * tally_collision
 
         N = 1 + mcdc["i_cycle"] - mcdc["setting"]["N_inactive"]
         mcdc["k_avg_running"] = mcdc["k_avg"] / N
@@ -1561,7 +1535,7 @@ def eigenvalue_tally_closeout_history(mcdc):
     mcdc["eigenvalue_tally_nuSigmaF"] = 0.0
     mcdc["eigenvalue_tally_n"] = 0.0
     mcdc["eigenvalue_tally_C"] = 0.0
-    mcdc["eigenvalue_tally_Ncoll"] = 0.0
+    mcdc["eigenvalue_tally_collision"] = 0.0
 
     # =====================================================================
     # Gyration radius
@@ -1638,12 +1612,17 @@ def eigenvalue_tally_closeout(mcdc):
     N = mcdc["setting"]["N_active"]
     mcdc["n_avg"] /= N
     mcdc["C_avg"] /= N
-    mcdc["Ncoll_avg"] /= N
-    mcdc["n_sdv"] = math.sqrt((mcdc["n_sdv"] / N - mcdc["n_avg"] ** 2) / (N - 1))
-    mcdc["C_sdv"] = math.sqrt((mcdc["C_sdv"] / N - mcdc["C_avg"] ** 2) / (N - 1))
-    mcdc["Ncoll_sdv"] = math.sqrt(
-        (mcdc["Ncoll_sdv"] / N - mcdc["Ncoll_avg"] ** 2) / (N - 1)
-    )
+    mcdc["collision_avg"] /= N
+    if N > 1:
+        mcdc["n_sdv"] = math.sqrt((mcdc["n_sdv"] / N - mcdc["n_avg"] ** 2) / (N - 1))
+        mcdc["C_sdv"] = math.sqrt((mcdc["C_sdv"] / N - mcdc["C_avg"] ** 2) / (N - 1))
+        mcdc["collision_sdv"] = math.sqrt(
+            (mcdc["collision_sdv"] / N - mcdc["collision_avg"] ** 2) / (N - 1)
+        )
+    else:
+        mcdc["n_sdv"] = 0.0
+        mcdc["C_sdv"] = 0.0
+        mcdc["collision_sdv"] = 0.0
 
 
 # =============================================================================

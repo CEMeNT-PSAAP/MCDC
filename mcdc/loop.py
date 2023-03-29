@@ -200,9 +200,9 @@ def loop_particle(P, mcdc):
 
         # Collision
         if event == EVENT_COLLISION:
-            # TODO: Generate IC?
-            # if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-            #    kernel.bank_IC(P, mcdc)
+            # Generate IC?
+            if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+                kernel.bank_IC(P, mcdc)
 
             # Branchless collision?
             if mcdc["technique"]["branchless_collision"]:
