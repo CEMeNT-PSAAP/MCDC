@@ -2588,14 +2588,23 @@ def prepare_qmc_particles(mcdc):
     None.
 
     """
+    # determine which portion of particles to loop through
+    N_particle = mcdc["setting"]["N_particle"]
+    N_work = mcdc["mpi_work_size"]
+    rank = mcdc["mpi_rank"]
+    start = int(rank * N_work)
+    stop = int((rank + 1) * N_work)
+
+    # low discrepency sequence
+    lds = mcdc["technique"]["lds"]
+    # source
     Q = mcdc["technique"]["iqmc_source"]
     mesh = mcdc["technique"]["iqmc_mesh"]
-    N_particle = mcdc["setting"]["N_particle"]
-    lds = mcdc["technique"]["lds"]  # low discrepency sequence
     Nx = len(mesh["x"]) - 1
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
-    Nt = Nx * Ny * Nz  # total number of spatial cells
+    # total number of spatial cells
+    Nt = Nx * Ny * Nz
     # outter mesh boundaries for sampling position
     xa = mesh["x"][0]
     xb = mesh["x"][-1]
@@ -2603,7 +2612,8 @@ def prepare_qmc_particles(mcdc):
     yb = mesh["y"][-1]
     za = mesh["z"][0]
     zb = mesh["z"][-1]
-    for n in range(N_particle):
+
+    for n in range(start, stop):
         # Create new particle
         P_new = np.zeros(1, dtype=type_.particle_record)[0]
         # assign direction
@@ -2628,8 +2638,6 @@ def prepare_qmc_particles(mcdc):
         # Set weight
         P_new["iqmc_w"] = Q[:, t, x, y, z] * dV * Nt / N_particle
         P_new["w"] = (P_new["iqmc_w"]).sum()
-        # print(P_new['w'])
-        # print(P_new['iqmc_w'])
         # add to source bank
         add_particle(P_new, mcdc["bank_source"])
 
@@ -2858,6 +2866,71 @@ def sample_qmc_group(sample, G):
 
     """
     return int(np.floor(sample * G))
+
+
+@njit
+def generate_iqmc_material_idx(mcdc):
+    """
+    This algorithm is meant to loop through every spatial cell of the
+    iQMC mesh and assign a material index according to the material_ID at
+    the center of the cell.
+
+    Therefore, the whole cell is treated as the material located at the
+    center of the cell, regardless of whethere there are more materials
+    present.
+
+    A somewhat crude but effient approximation.
+    """
+    iqmc_mesh = mcdc["technique"]["iqmc_mesh"]
+    Nx = len(iqmc_mesh["x"]) - 1
+    Ny = len(iqmc_mesh["y"]) - 1
+    Nz = len(iqmc_mesh["z"]) - 1
+    dx = dy = dz = 1
+    t = 0
+    # variables for cell finding functions
+    trans = np.zeros((3,))
+    # create particle to utilize cell finding functions
+    P_temp = np.zeros(1, dtype=type_.particle)[0]
+    # set default attributes
+    P_temp["alive"] = True
+    P_temp["material_ID"] = -1
+    P_temp["cell_ID"] = -1
+
+    x_mid = 0.5 * (iqmc_mesh["x"][1:] + iqmc_mesh["x"][:-1])
+    y_mid = 0.5 * (iqmc_mesh["y"][1:] + iqmc_mesh["y"][:-1])
+    z_mid = 0.5 * (iqmc_mesh["z"][1:] + iqmc_mesh["z"][:-1])
+
+    # loop through every cell
+    for i in range(Nx):
+        x = x_mid[i]
+        for j in range(Ny):
+            y = y_mid[j]
+            for k in range(Nz):
+                z = z_mid[k]
+
+                # assign cell center position
+                P_temp["x"] = x
+                P_temp["y"] = y
+                P_temp["z"] = z
+
+                # set cell_ID
+                P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+
+                # set material_ID
+                material_ID = get_particle_material(P_temp, mcdc)
+
+                # assign material index
+                mcdc["technique"]["iqmc_material_idx"][t, i, j, k] = material_ID
+
+
+@njit
+def iqmc_distribute_flux(mcdc):
+    flux_local = mcdc["technique"]["iqmc_flux"].copy()
+    # TODO: is there a way to do this without creating a new matrix ?
+    flux_total = np.zeros_like(flux_local, np.float64)
+    with objmode():
+        MPI.COMM_WORLD.Allreduce(flux_local, flux_total, op=MPI.SUM)
+    mcdc["technique"]["iqmc_flux"] = flux_total
 
 
 # =============================================================================
