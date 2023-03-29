@@ -1194,17 +1194,16 @@ def iQMC(
     x=None,
     y=None,
     z=None,
-    fixed_source=None,
     phi0=None,
+    fixed_source=None,
+    scramble=False,
     maxitt=25,
     tol=1e-6,
-    generator="halton",
-    fixed_source_solver="picard",
-    eigenmode_solver="davidson",
-    material_idx=None,
     N_dim=6,
-    scramble=False,
     seed=12345,
+    generator="halton",
+    fixed_source_solver="source_iteration",
+    eigenmode_solver="power_iteration",
 ):
     card = mcdc.input_card.technique
     card["iQMC"] = True
@@ -1242,21 +1241,10 @@ def iQMC(
         fixed_source = np.expand_dims(fixed_source, axis=ax)
         phi0 = np.expand_dims(phi0, axis=ax)
 
-    ax_expand = []
-    if t is None:
-        ax_expand.append(0)
-    if x is None:
-        ax_expand.append(1)
-    if y is None:
-        ax_expand.append(2)
-    if z is None:
-        ax_expand.append(3)
-    for ax in ax_expand:
-        material_idx = np.expand_dims(material_idx, axis=ax)
-
     card["iqmc_flux"] = phi0
     card["iqmc_fixed_source"] = fixed_source
-    card["iqmc_material_idx"] = material_idx
+    card["fixed_source_solver"] = fixed_source_solver
+    card["eigenmode_solver"] = eigenmode_solver
 
 
 def weight_roulette(chance, wr_threshold):

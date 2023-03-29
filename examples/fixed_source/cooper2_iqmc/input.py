@@ -33,9 +33,9 @@ mcdc.cell([+sx2, -sx3, +sy1, -sy2], m_barrier)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 1e2
-Nx = Ny = 20
-maxit = 10
+N = 1e5
+Nx = Ny = 40
+maxit = 50
 tol = 1e-3
 x = np.linspace(0, 4, num=Nx + 1)
 y = np.linspace(0, 4, num=Ny + 1)
@@ -44,10 +44,6 @@ generator = "halton"
 # fixed source in lower left corner
 fixed_source = np.zeros((Nx, Ny))
 fixed_source[0 : int(0.25 * Nx), 0 : int(0.25 * Nx)] = 1
-# m_room
-material_idx = np.ones((Nx, Ny), dtype=int)
-# m_barrier
-material_idx[int(0.5 * Nx) : int(0.6 * Nx), 0 : int(0.5 * Nx)] = 0
 
 phi0 = np.ones((Nx, Ny))
 
@@ -56,7 +52,6 @@ mcdc.iQMC(
     y=y,
     fixed_source=fixed_source,
     phi0=phi0,
-    material_idx=material_idx,
     maxitt=maxit,
     tol=tol,
     generator=generator,

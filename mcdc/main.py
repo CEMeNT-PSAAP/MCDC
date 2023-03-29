@@ -8,7 +8,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_main
+from mcdc.loop import loop_main, loop_iqmc
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_card and set global variables as "mcdc"
@@ -37,7 +37,12 @@ def run():
     # Run simulation
     # TODO: add if iQMC execute iqmc_loop()
     simulation_start = MPI.Wtime()
-    loop_main(mcdc)
+
+    # iQMC loop
+    if mcdc["technique"]["iQMC"]:
+        loop_iqmc(mcdc)
+    else:
+        loop_main(mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -251,6 +256,7 @@ def prepare():
             "ww_mesh",
             "census_idx",
             "iqmc_flux_old",
+            "iqmc_flux_outter",
             "iqmc_mesh",
             "iqmc_source",
             "lds",
@@ -448,26 +454,29 @@ def generate_hdf5():
 
             # Eigenvalues
             if mcdc["setting"]["mode_eigenvalue"]:
-                N_cycle = mcdc["setting"]["N_cycle"]
-                f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
-                f.create_dataset("k_mean", data=mcdc["k_avg_running"])
-                f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
-                f.create_dataset("global_tally/neutron/mean", data=mcdc["n_avg"])
-                f.create_dataset("global_tally/neutron/sdev", data=mcdc["n_sdv"])
-                f.create_dataset("global_tally/neutron/max", data=mcdc["n_max"])
-                f.create_dataset("global_tally/precursor/mean", data=mcdc["C_avg"])
-                f.create_dataset("global_tally/precursor/sdev", data=mcdc["C_sdv"])
-                f.create_dataset("global_tally/precursor/max", data=mcdc["C_max"])
-                f.create_dataset(
-                    "global_tally/collision/mean", data=mcdc["collision_avg"]
-                )
-                f.create_dataset(
-                    "global_tally/collision/sdev", data=mcdc["collision_sdv"]
-                )
-                if mcdc["setting"]["gyration_radius"]:
+                if mcdc["technique"]["iQMC"]:
+                    f.create_dataset("k_eff", data=mcdc["k_eff"])
+                else:
+                    N_cycle = mcdc["setting"]["N_cycle"]
+                    f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
+                    f.create_dataset("k_mean", data=mcdc["k_avg_running"])
+                    f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
+                    f.create_dataset("global_tally/neutron/mean", data=mcdc["n_avg"])
+                    f.create_dataset("global_tally/neutron/sdev", data=mcdc["n_sdv"])
+                    f.create_dataset("global_tally/neutron/max", data=mcdc["n_max"])
+                    f.create_dataset("global_tally/precursor/mean", data=mcdc["C_avg"])
+                    f.create_dataset("global_tally/precursor/sdev", data=mcdc["C_sdv"])
+                    f.create_dataset("global_tally/precursor/max", data=mcdc["C_max"])
                     f.create_dataset(
-                        "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
+                        "global_tally/collision/mean", data=mcdc["collision_avg"]
                     )
+                    f.create_dataset(
+                        "global_tally/collision/sdev", data=mcdc["collision_sdv"]
+                    )
+                    if mcdc["setting"]["gyration_radius"]:
+                        f.create_dataset(
+                            "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
+                        )
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
