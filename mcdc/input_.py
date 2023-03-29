@@ -1,5 +1,5 @@
 """This module contains functions for setting MC/DC input cards."""
-import h5py
+import h5py, math
 import numpy as np
 
 from mpi4py import MPI
@@ -801,22 +801,10 @@ def source(**kw):
     dictionary
         A source card
     """
-    # Get keyword arguments
-    point = kw.get("point")
-    x = kw.get("x")
-    y = kw.get("y")
-    z = kw.get("z")
-    isotropic = kw.get("isotropic")
-    direction = kw.get("direction")
-    white = kw.get("white_direction")
-    energy = kw.get("energy")
-    time = kw.get("time")
-    prob = kw.get("prob")
-
     # Check the suplied keyword arguments
     for key in kw.keys():
         check_support(
-            "source argument",
+            "source parameter",
             key,
             [
                 "point",
@@ -832,6 +820,18 @@ def source(**kw):
             ],
             False,
         )
+
+    # Get keyword arguments
+    point = kw.get("point")
+    x = kw.get("x")
+    y = kw.get("y")
+    z = kw.get("z")
+    isotropic = kw.get("isotropic")
+    direction = kw.get("direction")
+    white = kw.get("white_direction")
+    energy = kw.get("energy")
+    time = kw.get("time")
+    prob = kw.get("prob")
 
     # Set default card values (c.f. type_.py)
     card = {}
@@ -983,6 +983,28 @@ def tally(
 
 
 def setting(**kw):
+    # Check the suplied keyword arguments
+    for key in kw.keys():
+        check_support(
+            "source parameter",
+            key,
+            [
+                "N_particle",
+                "time_boundary",
+                "rng_seed",
+                "rng_stride",
+                "output",
+                "progress_bar",
+                "k_eff",
+                "active_bank_buff",
+                "census_bank_buff",
+                "source_file",
+                "particle_tracker",
+                "save_input_deck",
+            ],
+            False,
+        )
+
     # Get keyword arguments
     N_particle = kw.get("N_particle")
     time_boundary = kw.get("time_boundary")
@@ -1043,6 +1065,16 @@ def setting(**kw):
     # Save input card?
     if save_input_deck is not None:
         card["save_input_deck"] = save_input_deck
+
+    # Source file
+    if source_file is not None:
+        card["source_file"] = True
+        card["source_file_name"] = source_file
+
+        # Set number of particles
+        card_setting = mcdc.input_card.setting
+        with h5py.File(source_file, "r") as f:
+            card_setting["N_particle"] = f["particles_size"][()]
 
 
 def eigenmode(
@@ -1156,39 +1188,6 @@ def weight_window(x=None, y=None, z=None, t=None, window=None):
     return card
 
 
-# TODO
-'''
-def IC_generator(N_neutron=0, N_precursor=0, uniform_weight=True):
-    """
-    Turn on initial condition generator, which samples initial neutrons and precursors
-    during the active cycles of an eigenvalue simulation.
-
-
-    Parameters
-    ----------
-    N_neutron : int
-        Neutron target size
-    N_precursor : int
-        Delayed neutron precursot target size
-    uniform_weight : bool
-        If `True`, sampled particles would have uniform weight; in this case,
-        weight-based population control is used during the sampling.
-        If `False`, sampled particles would have varying weights, which can range
-        over several order of magnitudes.
-    """
-    # Check if k-eigenvalue is turned on
-    if not mcdc.input_card.setting["mode_eigenvalue"]:
-        print_error("IC generator requires running in an eigenvalue mode")
-
-    # Set parameters
-    card = mcdc.input_card.technique
-    card["IC_generator"] = True
-    card["IC_uniform_weight"] = uniform_weight
-    card["IC_N_neutron"] = int(N_neutron)
-    card["IC_N_precursor"] = int(N_precursor)
-'''
-
-
 def iQMC(
     g=None,
     t=None,
@@ -1281,6 +1280,109 @@ def weight_roulette(chance, wr_threshold):
     card["weight_roulette"] = True
     card["wr_chance"] = chance
     card["wr_threshold"] = wr_threshold
+
+
+# ==============================================================================
+# IC generator
+# ==============================================================================
+
+
+def IC_generator(
+    N_neutron=0,
+    N_precursor=0,
+    uniform_weight=False,
+    cycle_stretch=1.0,
+    collision_density=None,
+    neutron_density=None,
+    max_neutron_density=None,
+    precursor_density=None,
+    max_precursor_density=None,
+):
+    """
+    Turn on initial condition generator, which samples initial neutrons and precursors
+    during an eigenvalue simulation.
+
+
+    Parameters
+    ----------
+    N_neutron : int
+        Neutron target size
+    N_precursor : int
+        Delayed neutron precursot target size
+    uniform_weight : bool
+        If `True`, sampled particles would have uniform weight; in this case,
+        weight-based population control is used during the sampling.
+        If `False`, sampled particles would have varying weights, which can range
+        over several orders of magnitude.
+    cycle_stretch : float
+        Factor to strethch number of cycles. Higher cycle stretch reduces inter-cycle
+        correlation.
+    collision_density : float
+        Total neutrocollision density, required if `uniform_weight`=`False`.
+    neutron_density, max_neutron_density : float
+        Total and maximum neutron density, required if
+        `uniform_weight`=`True` and `N_neutron` > 0.
+    precursor_density, max_precursor_density : float
+        Total and maximum precursor density, required if
+        `uniform_weight`=`True` and `N_precursor` > 0.
+    """
+
+    # Turn on eigenmode and population control
+    eigenmode()
+    population_control()
+
+    # Set parameters
+    card = mcdc.input_card.technique
+    card["IC_generator"] = True
+    card["IC_N_neutron"] = N_neutron
+    card["IC_N_precursor"] = N_precursor
+    card["IC_uniform_weight"] = uniform_weight
+    card["IC_cycle_stretch"] = cycle_stretch
+
+    # Setting parameters
+    card_setting = mcdc.input_card.setting
+    N_particle = card_setting["N_particle"]
+
+    # Check optional parameters
+    if uniform_weight:
+        if N_neutron > 0.0:
+            if neutron_density is None or max_neutron_density is None:
+                print_error("IC generator with uniform weight requires neutron_density and max_neutron_density")
+            card["IC_neutron_density"] = N_particle * neutron_density
+            card["IC_neutron_density_max"] = max_neutron_density
+        if N_precursor > 0.0:
+            if precursor_density is None:
+                print_error(
+                    "IC generator with uniform weight requires precursor_density and max_precursor_density"
+                )
+            card["IC_precursor_density"] = N_particle * precursor_density
+            card["IC_precursor_density_max"] = max_precursor_density
+    else:
+        if collision_density is None:
+            print_error(
+                "IC generator with non-uniform weight requires collision_density"
+            )
+        card["IC_collision_density"] = N_particle * collision_density
+
+    # Set number of active cycles
+    if uniform_weight:
+        n = card['IC_neutron_density']
+        n_max = card['IC_neutron_density_max']
+        C = card['IC_precursor_density']
+        C_max = card['IC_precursor_density_max']
+        N_cycle1 = 0.0
+        N_cycle2 = 0.0
+        if N_neutron > 0:
+            N_cycle1 = math.ceil(cycle_stretch * math.ceil(n_max/n*N_neutron))
+        if N_precursor > 0:
+            N_cycle2 = math.ceil(cycle_stretch * math.ceil(C_max/C*N_precursor))
+    else:
+        N_collision = card["IC_collision_density"]
+        N_cycle1 = math.ceil(cycle_stretch * math.ceil(N_neutron / N_collision))
+        N_cycle2 = math.ceil(cycle_stretch * math.ceil(N_precursor / N_collision))
+    N_cycle = max(N_cycle1, N_cycle2)
+    card_setting["N_cycle"] = N_cycle
+    card_setting["N_active"] = N_cycle
 
 
 # ==============================================================================

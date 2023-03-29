@@ -12,6 +12,7 @@ bool_ = np.bool_
 
 # MC/DC types defined by input card
 particle = None
+particle_record = None
 nuclide = None
 material = None
 surface = None
@@ -51,7 +52,7 @@ def make_type_particle(input_card):
         ("sensitivity_ID", int64),
     ]
     # iqmc vector of weights
-    Ng = 0
+    Ng = 1
     if input_card.technique["iQMC"]:
         Ng = input_card.materials[0]["G"]
     struct += [("iqmc_w", float64, (Ng,))]
@@ -74,11 +75,16 @@ def make_type_particle_record(input_card):
         ("sensitivity_ID", int64),
     ]
     # iqmc vector of weights
-    Ng = 0
+    Ng = 1
     if input_card.technique["iQMC"]:
         Ng = input_card.materials[0]["G"]
     struct += [("iqmc_w", float64, (Ng,))]
     particle_record = np.dtype(struct)
+
+
+precursor = np.dtype(
+    [("x", float64), ("y", float64), ("z", float64), ("g", uint64), ("w", float64)]
+)
 
 
 # ==============================================================================
@@ -437,8 +443,8 @@ setting = np.dtype(
         ("gyration_radius_type", int64),
         ("output", "U30"),
         ("progress_bar", bool_),
-        ("filed_source", bool_),
-        ("source_file", "U20"),
+        ("source_file", bool_),
+        ("source_file_name", "U20"),
         ("track_particle", bool_),
         ("save_particle", bool_),
         ("save_input_deck", bool_),
@@ -464,6 +470,7 @@ def make_type_technique(card):
         ("time_census", bool_),
         ("iQMC", bool_),
         ("weight_roulette", bool_),
+        ("IC_generator", bool_),
     ]
 
     # =========================================================================
@@ -540,8 +547,6 @@ def make_type_technique(card):
         ("census_idx", int64),
     ]
 
-    # TODO
-    """
     # =========================================================================
     # IC generator
     # =========================================================================
@@ -560,31 +565,31 @@ def make_type_technique(card):
         Np = 0
         Nn_local = 0
         Np_local = 0
-    bank_neutron = np.dtype([("content", neutron, (Nn,)), ("size", int64)])
-    bank_precursor = np.dtype([("content", precursor, (Np,)), ("size", int64)])
-    bank_neutron_local = np.dtype([("content", neutron, (Nn_local,)), ("size", int64)])
+    bank_neutron = particle_bank(Nn)
+    bank_neutron_local = particle_bank(Nn_local)
+    bank_precursor = np.dtype(
+        [("particles", precursor, (Np,)), ("size", int64), ("tag", "U10")]
+    )
     bank_precursor_local = np.dtype(
-        [("content", precursor, (Np_local,)), ("size", int64)]
+        [("particles", precursor, (Np_local,)), ("size", int64), ("tag", "U10")]
     )
 
     # The parameters
     struct += [
-        ("IC_uniform_weight", bool_),  # Generate uniform-weight samples?
-        ("IC_N_neutron", int64),  # Target size
+        ("IC_N_neutron", int64),
         ("IC_N_precursor", int64),
-        ("IC_tally_n", float64),  # Running density (or # of collisions) tally
-        ("IC_tally_C", float64),
-        ("IC_n_eff", float64),  # Effective density to determine sampling prob.
-        ("IC_C_eff", float64),
-        ("IC_Pmax_n", float64),  # Maximum sampling probability
-        ("IC_Pmax_C", float64),
-        ("IC_resample", bool_),  # For resampling due to insufficient N_cycle
+        ("IC_neutron_density", float64),
+        ("IC_neutron_density_max", float64),
+        ("IC_precursor_density", float64),
+        ("IC_precursor_density_max", float64),
+        ("IC_collision_density", float64),
+        ("IC_uniform_weight", bool_),
+        ("IC_cycle_stretch", float64),
         ("IC_bank_neutron_local", bank_neutron_local),
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
     ]
-    """
 
     # Finalize technique type
     technique = np.dtype(struct)
@@ -627,8 +632,10 @@ def make_type_global(card):
     if card.setting["track_particle"]:
         N_track = N_work * 1000
 
-    # TODO
-    if card.setting["filed_source"] or card.technique["iQMC"]:
+    # iQMC bank
+    if (
+        card.setting["source_file"] and not card.setting["mode_eigenvalue"]
+    ) or card.technique["iQMC"]:
         bank_source = particle_bank(N_work)
 
     # GLobal type
@@ -654,21 +661,23 @@ def make_type_global(card):
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
             ("k_sdv", float64),
-            ("n_avg", float64),
+            ("n_avg", float64), # Neutron density
             ("n_sdv", float64),
-            ("C_avg", float64),
+            ("n_max", float64),
+            ("C_avg", float64), # Precursor density
             ("C_sdv", float64),
-            ("Ncoll_avg", float64),
-            ("Ncoll_sdv", float64),
+            ("C_max", float64),
+            ("collision_avg", float64), # Collision density
+            ("collision_sdv", float64),
             ("k_avg_running", float64),
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
             ("i_cycle", int64),
             ("cycle_active", bool_),
             ("eigenvalue_tally_nuSigmaF", float64),
-            ("eigenvalue_tally_n", float64),  # Neutron density
-            ("eigenvalue_tally_C", float64),  # Precursor density
-            ("eigenvalue_tally_Ncoll", float64),  # Number of collisions
+            ("eigenvalue_tally_n", float64),
+            ("eigenvalue_tally_C", float64),
+            ("eigenvalue_tally_collision", float64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),

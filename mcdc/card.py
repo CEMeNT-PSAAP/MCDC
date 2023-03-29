@@ -92,11 +92,11 @@ class InputCard:
             "progress_bar": True,
             "gyration_radius": False,
             "gyration_radius_type": GR_ALL,
-            "filed_source": False,
-            "source_file": "",
+            "source_file": False,
+            "source_file_name": "",
             "track_particle": False,
             "save_particle": False,
-            'save_input_deck': True,
+            "save_input_deck": True,
         }
 
         self.technique = {
@@ -143,6 +143,16 @@ class InputCard:
             },
             "sensitivity": 0,
             "sensitivity_N": 0,
+            "IC_generator": False,
+            "IC_N_neutron": 0,
+            "IC_N_precursor": 0,
+            "IC_uniform_weight": False,
+            "IC_neutron_density": 0.0,
+            "IC_precursor_density": 0.0,
+            "IC_neutron_density_max": 0.0,
+            "IC_precursor_density_max": 0.0,
+            "IC_collision_density": 0.0,
+            "IC_cycle_stretch": 1.0,
         }
 
 
