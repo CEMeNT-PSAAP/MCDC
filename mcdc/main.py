@@ -391,6 +391,50 @@ def prepare():
             ]
             mcdc["bank_source"]["size"] = N_local
 
+    # =========================================================================
+    # IC file
+    # =========================================================================
+
+    if mcdc["setting"]["IC_file"]:
+        with h5py.File(mcdc["setting"]["IC_file_name"], "r") as f:
+            # =================================================================
+            # Set precursor first
+            # =================================================================
+
+            # Get source particle size
+            N_precursor = f["IC/precursors_size"][()]
+
+            # Redistribute work
+            kernel.distribute_work(N_precursor, mcdc)
+            N_local = mcdc["mpi_work_size"]
+            start = mcdc["mpi_work_start"]
+            end = start + N_local
+
+            # Add particles to source bank
+            mcdc["bank_precursor"]["precursors"][: mcdc["mpi_work_size"]] = f[
+                "IC/precursors"
+            ][start:end]
+            mcdc["bank_precursor"]["size"] = N_local
+
+            # =================================================================
+            # Set precursor first
+            # =================================================================
+
+            # Get source particle size
+            N_particle = f["IC/neutrons_size"][()]
+
+            # Redistribute work
+            kernel.distribute_work(N_particle, mcdc)
+            N_local = mcdc["mpi_work_size"]
+            start = mcdc["mpi_work_start"]
+            end = start + N_local
+
+            # Add particles to source bank
+            mcdc["bank_source"]["particles"][: mcdc["mpi_work_size"]] = f[
+                "IC/neutrons"
+            ][start:end]
+            mcdc["bank_source"]["size"] = N_local
+
 
 def dictlist_to_h5group(dictlist, input_group, name):
     main_group = input_group.create_group(name + "s")
@@ -473,6 +517,14 @@ def generate_hdf5():
                     f.create_dataset(
                         "global_tally/collision/sdev", data=mcdc["collision_sdv"]
                     )
+                    f.create_dataset(
+                        "global_tally/collision_fuel/mean",
+                        data=mcdc["collision_fuel_avg"],
+                    )
+                    f.create_dataset(
+                        "global_tally/collision_fuel/sdev",
+                        data=mcdc["collision_fuel_sdv"],
+                    )
                     if mcdc["setting"]["gyration_radius"]:
                         f.create_dataset(
                             "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
@@ -510,14 +562,8 @@ def generate_hdf5():
                     "IC/precursors",
                     data=mcdc["technique"]["IC_bank_precursor"]["particles"][:Np],
                 )
-                f.create_dataset(
-                    "IC/neutrons_size",
-                    data=Nn
-                )
-                f.create_dataset(
-                    "IC/precursors_size",
-                    data=Np
-                )
+                f.create_dataset("IC/neutrons_size", data=Nn)
+                f.create_dataset("IC/precursors_size", data=Np)
 
     # Save particle?
     if mcdc["setting"]["save_particle"]:
