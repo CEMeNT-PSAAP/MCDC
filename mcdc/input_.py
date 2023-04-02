@@ -1001,6 +1001,7 @@ def setting(**kw):
                 "source_file",
                 "particle_tracker",
                 "save_input_deck",
+                "IC_file",
             ],
             False,
         )
@@ -1018,6 +1019,7 @@ def setting(**kw):
     source_file = kw.get("source_file")
     particle_tracker = kw.get("particle_tracker")
     save_input_deck = kw.get("save_input_deck")
+    IC_file = kw.get("IC_file")
 
     # Check if setting card has been initialized
     card = mcdc.input_card.setting
@@ -1075,6 +1077,21 @@ def setting(**kw):
         card_setting = mcdc.input_card.setting
         with h5py.File(source_file, "r") as f:
             card_setting["N_particle"] = f["particles_size"][()]
+
+    # IC file
+    if IC_file is not None:
+        card["IC_file"] = True
+        card["IC_file_name"] = IC_file
+
+        # Set number of particles
+        card_setting = mcdc.input_card.setting
+        with h5py.File(IC_file, "r") as f:
+            card_setting["N_particle"] = f["IC/neutrons_size"][()]
+            card_setting["N_precursor"] = f["IC/precursors_size"][()]
+
+    # TODO: Allow both source and IC files
+    if IC_file and source_file:
+        print_error("Using both source and IC files is not supported yet.")
 
 
 def eigenmode(
@@ -1281,6 +1298,7 @@ def IC_generator(
     uniform_weight=False,
     cycle_stretch=1.0,
     collision_density=None,
+    fuel_collision_density=None,
     neutron_density=None,
     max_neutron_density=None,
     precursor_density=None,
@@ -1305,8 +1323,9 @@ def IC_generator(
     cycle_stretch : float
         Factor to strethch number of cycles. Higher cycle stretch reduces inter-cycle
         correlation.
-    collision_density : float
-        Total neutrocollision density, required if `uniform_weight`=`False`.
+    collision_density, fuel_collision_density : float
+        Total and in-fuel neutron collision density, required if
+        `uniform_weight`=`False` and `N_neutron` > 0 and `N_precursor` > 0, respectively.
     neutron_density, max_neutron_density : float
         Total and maximum neutron density, required if
         `uniform_weight`=`True` and `N_neutron` > 0.
@@ -1335,7 +1354,9 @@ def IC_generator(
     if uniform_weight:
         if N_neutron > 0.0:
             if neutron_density is None or max_neutron_density is None:
-                print_error("IC generator with uniform weight requires neutron_density and max_neutron_density")
+                print_error(
+                    "IC generator with uniform weight requires neutron_density and max_neutron_density"
+                )
             card["IC_neutron_density"] = N_particle * neutron_density
             card["IC_neutron_density_max"] = max_neutron_density
         if N_precursor > 0.0:
@@ -1346,28 +1367,36 @@ def IC_generator(
             card["IC_precursor_density"] = N_particle * precursor_density
             card["IC_precursor_density_max"] = max_precursor_density
     else:
-        if collision_density is None:
-            print_error(
-                "IC generator with non-uniform weight requires collision_density"
-            )
-        card["IC_collision_density"] = N_particle * collision_density
+        if N_neutron > 0.0:
+            if collision_density is None:
+                print_error(
+                    "IC generator with non-uniform weight requires collision_density"
+                )
+            card["IC_collision_density"] = N_particle * collision_density
+        if N_precursor > 0.0:
+            if fuel_collision_density is None:
+                print_error(
+                    "IC generator with non-uniform weight requires fuel_collision_density"
+                )
+            card["IC_collision_density_fuel"] = N_particle * fuel_collision_density
 
     # Set number of active cycles
     if uniform_weight:
-        n = card['IC_neutron_density']
-        n_max = card['IC_neutron_density_max']
-        C = card['IC_precursor_density']
-        C_max = card['IC_precursor_density_max']
+        n = card["IC_neutron_density"]
+        n_max = card["IC_neutron_density_max"]
+        C = card["IC_precursor_density"]
+        C_max = card["IC_precursor_density_max"]
         N_cycle1 = 0.0
         N_cycle2 = 0.0
         if N_neutron > 0:
-            N_cycle1 = math.ceil(cycle_stretch * math.ceil(n_max/n*N_neutron))
+            N_cycle1 = math.ceil(cycle_stretch * math.ceil(n_max / n * N_neutron))
         if N_precursor > 0:
-            N_cycle2 = math.ceil(cycle_stretch * math.ceil(C_max/C*N_precursor))
+            N_cycle2 = math.ceil(cycle_stretch * math.ceil(C_max / C * N_precursor))
     else:
         N_collision = card["IC_collision_density"]
+        N_collision_fuel = card["IC_collision_density_fuel"]
         N_cycle1 = math.ceil(cycle_stretch * math.ceil(N_neutron / N_collision))
-        N_cycle2 = math.ceil(cycle_stretch * math.ceil(N_precursor / N_collision))
+        N_cycle2 = math.ceil(cycle_stretch * math.ceil(N_precursor / N_collision_fuel))
     N_cycle = max(N_cycle1, N_cycle2)
     card_setting["N_cycle"] = N_cycle
     card_setting["N_active"] = N_cycle

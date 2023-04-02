@@ -99,6 +99,12 @@ def particle_bank(max_size):
     )
 
 
+def precursor_bank(max_size):
+    return np.dtype(
+        [("precursors", precursor, (max_size,)), ("size", int64), ("tag", "U10")]
+    )
+
+
 # ==============================================================================
 # Nuclide and Material
 # ==============================================================================
@@ -445,10 +451,13 @@ setting = np.dtype(
         ("output", "U30"),
         ("progress_bar", bool_),
         ("source_file", bool_),
-        ("source_file_name", "U20"),
+        ("source_file_name", "U30"),
         ("track_particle", bool_),
         ("save_particle", bool_),
         ("save_input_deck", bool_),
+        ("IC_file", bool_),
+        ("IC_file_name", "U30"),
+        ("N_precursor", int64),
     ]
 )
 
@@ -590,6 +599,7 @@ def make_type_technique(card):
         ("IC_precursor_density", float64),
         ("IC_precursor_density_max", float64),
         ("IC_collision_density", float64),
+        ("IC_collision_density_fuel", float64),
         ("IC_uniform_weight", bool_),
         ("IC_cycle_stretch", float64),
         ("IC_bank_neutron_local", bank_neutron_local),
@@ -619,11 +629,13 @@ def make_type_global(card):
     N_universe = len(card.universes)
     N_lattice = len(card.lattices)
     N_particle = card.setting["N_particle"]
+    N_precursor = card.setting["N_precursor"]
     N_cycle = card.setting["N_cycle"]
     bank_active_buff = card.setting["bank_active_buff"]
     bank_census_buff = card.setting["bank_census_buff"]
     J = card.materials[0]["J"]
     N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
+    N_work_precursor = math.ceil(N_precursor / MPI.COMM_WORLD.Get_size())
 
     # Particle bank types
     bank_active = particle_bank(1 + bank_active_buff)
@@ -633,19 +645,32 @@ def make_type_global(card):
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
+    bank_precursor = particle_bank(0)
 
     # Particle tracker
     N_track = 0
     if card.setting["track_particle"]:
         N_track = N_work * 1000
 
-    # iQMC bank
+    # iQMC bank adjustment
+    if card.technique["iQMC"]:
+        bank_source = particle_bank(N_work)
+        if card.setting["mode_eigenvalue"]:
+            bank_census = particle_bank(0)
+
+    # Source and IC files bank adjustments
+    if not card.setting["mode_eigenvalue"]:
+        if card.setting["source_file"]:
+            bank_source = particle_bank(N_work)
+        if card.setting["IC_file"]:
+            bank_source = particle_bank(N_work)
+            bank_precursor = precursor_bank(N_precursor)
+
     if (
         card.setting["source_file"] and not card.setting["mode_eigenvalue"]
     ) or card.technique["iQMC"]:
         bank_source = particle_bank(N_work)
-        if card.technique["iQMC"] and card.setting["mode_eigenvalue"]:
-            bank_census = particle_bank(0)
+
     # GLobal type
     global_ = np.dtype(
         [
@@ -662,6 +687,7 @@ def make_type_global(card):
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
+            ("bank_precursor", bank_precursor),
             ("rng_seed_base", int64),
             ("rng_seed", int64),
             ("rng_stride", int64),
@@ -669,14 +695,16 @@ def make_type_global(card):
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
             ("k_sdv", float64),
-            ("n_avg", float64), # Neutron density
+            ("n_avg", float64),  # Neutron density
             ("n_sdv", float64),
             ("n_max", float64),
-            ("C_avg", float64), # Precursor density
+            ("C_avg", float64),  # Precursor density
             ("C_sdv", float64),
             ("C_max", float64),
-            ("collision_avg", float64), # Collision density
+            ("collision_avg", float64),  # Collision density
             ("collision_sdv", float64),
+            ("collision_fuel_avg", float64),  # In-fuel Collision density
+            ("collision_fuel_sdv", float64),
             ("k_avg_running", float64),
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
@@ -686,12 +714,16 @@ def make_type_global(card):
             ("eigenvalue_tally_n", float64),
             ("eigenvalue_tally_C", float64),
             ("eigenvalue_tally_collision", float64),
+            ("eigenvalue_tally_collision_fuel", float64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
             ("mpi_work_start", int64),
             ("mpi_work_size", int64),
             ("mpi_work_size_total", int64),
+            ("mpi_work_start_precursor", int64),
+            ("mpi_work_size_precursor", int64),
+            ("mpi_work_size_total_precursor", int64),
             ("runtime_total", float64),
             ("runtime_preparation", float64),
             ("runtime_simulation", float64),

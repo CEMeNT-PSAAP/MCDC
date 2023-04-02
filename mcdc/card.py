@@ -97,6 +97,9 @@ class InputCard:
             "track_particle": False,
             "save_particle": False,
             "save_input_deck": True,
+            "IC_file": False,
+            "IC_file_name": "",
+            "N_precursor": 0,
         }
 
         self.technique = {
@@ -156,6 +159,7 @@ class InputCard:
             "IC_neutron_density_max": 0.0,
             "IC_precursor_density_max": 0.0,
             "IC_collision_density": 0.0,
+            "IC_collision_density_fuel": 0.0,
             "IC_cycle_stretch": 1.0,
         }
 
