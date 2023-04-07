@@ -270,6 +270,8 @@ def prepare():
             "IC_bank_precursor",
             "IC_bank_neutron_local",
             "IC_bank_precursor_local",
+            "IC_fission_score",
+            "IC_fission",
         ]:
             mcdc["technique"][name] = input_card.technique[name]
 
@@ -386,9 +388,7 @@ def prepare():
             end = start + N_local
 
             # Add particles to source bank
-            mcdc["bank_source"]["particles"][: mcdc["mpi_work_size"]] = f["particles"][
-                start:end
-            ]
+            mcdc["bank_source"]["particles"][:N_local] = f["particles"][start:end]
             mcdc["bank_source"]["size"] = N_local
 
     # =========================================================================
@@ -398,26 +398,7 @@ def prepare():
     if mcdc["setting"]["IC_file"]:
         with h5py.File(mcdc["setting"]["IC_file_name"], "r") as f:
             # =================================================================
-            # Set precursor first
-            # =================================================================
-
-            # Get source particle size
-            N_precursor = f["IC/precursors_size"][()]
-
-            # Redistribute work
-            kernel.distribute_work(N_precursor, mcdc)
-            N_local = mcdc["mpi_work_size"]
-            start = mcdc["mpi_work_start"]
-            end = start + N_local
-
-            # Add particles to source bank
-            mcdc["bank_precursor"]["precursors"][: mcdc["mpi_work_size"]] = f[
-                "IC/precursors"
-            ][start:end]
-            mcdc["bank_precursor"]["size"] = N_local
-
-            # =================================================================
-            # Set precursor first
+            # Set neutron source
             # =================================================================
 
             # Get source particle size
@@ -430,10 +411,33 @@ def prepare():
             end = start + N_local
 
             # Add particles to source bank
-            mcdc["bank_source"]["particles"][: mcdc["mpi_work_size"]] = f[
-                "IC/neutrons"
-            ][start:end]
+            mcdc["bank_source"]["particles"][:N_local] = f["IC/neutrons"][start:end]
             mcdc["bank_source"]["size"] = N_local
+
+            # =================================================================
+            # Set precursor source
+            # =================================================================
+
+            # Get source particle size
+            N_precursor = f["IC/precursors_size"][()]
+
+            # Redistribute work
+            kernel.distribute_work(N_precursor, mcdc, True)  # precursor = True
+            N_local = mcdc["mpi_work_size_precursor"]
+            start = mcdc["mpi_work_start_precursor"]
+            end = start + N_local
+
+            # Add particles to source bank
+            mcdc["bank_precursor"]["precursors"][:N_local] = f["IC/precursors"][
+                start:end
+            ]
+            mcdc["bank_precursor"]["size"] = N_local
+
+            # Set precursor strength (TODO: not considering nonuniform weight yet)
+            if N_precursor > 0 and N_particle > 0:
+                mcdc["precursor_strength"] = mcdc["bank_precursor"]["precursors"][0][
+                    "w"
+                ]
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
@@ -560,7 +564,7 @@ def generate_hdf5():
                 )
                 f.create_dataset(
                     "IC/precursors",
-                    data=mcdc["technique"]["IC_bank_precursor"]["particles"][:Np],
+                    data=mcdc["technique"]["IC_bank_precursor"]["precursors"][:Np],
                 )
                 f.create_dataset("IC/neutrons_size", data=Nn)
                 f.create_dataset("IC/precursors_size", data=Np)

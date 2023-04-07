@@ -11,7 +11,7 @@ uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"  # np.str_
 
-# MC/DC types defined by input card
+# MC/DC types, will be defined by input card
 particle = None
 particle_record = None
 nuclide = None
@@ -84,7 +84,14 @@ def make_type_particle_record(input_card):
 
 
 precursor = np.dtype(
-    [("x", float64), ("y", float64), ("z", float64), ("g", uint64), ("w", float64)]
+    [
+        ("x", float64),
+        ("y", float64),
+        ("z", float64),
+        ("g", uint64),
+        ("n_g", uint64),
+        ("w", float64),
+    ]
 )
 
 
@@ -583,12 +590,8 @@ def make_type_technique(card):
         Np_local = 0
     bank_neutron = particle_bank(Nn)
     bank_neutron_local = particle_bank(Nn_local)
-    bank_precursor = np.dtype(
-        [("particles", precursor, (Np,)), ("size", int64), ("tag", "U10")]
-    )
-    bank_precursor_local = np.dtype(
-        [("particles", precursor, (Np_local,)), ("size", int64), ("tag", "U10")]
-    )
+    bank_precursor = precursor_bank(Np)
+    bank_precursor_local = precursor_bank(Np_local)
 
     # The parameters
     struct += [
@@ -606,6 +609,8 @@ def make_type_technique(card):
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
+        ('IC_fission_score', float64),
+        ('IC_fission', float64),
     ]
 
     # Finalize technique type
@@ -645,7 +650,7 @@ def make_type_global(card):
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
-    bank_precursor = particle_bank(0)
+    bank_precursor = precursor_bank(0)
 
     # Particle tracker
     N_track = 0
@@ -733,6 +738,7 @@ def make_type_global(card):
             ("particle_track_N", int64),
             ("particle_track_history_ID", int64),
             ("particle_track_particle_ID", int64),
+            ("precursor_strength", float64),
         ]
     )
 

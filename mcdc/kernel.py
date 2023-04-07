@@ -250,11 +250,6 @@ def manage_particle_banks(mcdc):
         # Normalize weight
         normalize_weight(mcdc["bank_census"], mcdc["setting"]["N_particle"])
 
-    # Sync RNG
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-    rng_skip_ahead_strides(skip, mcdc)
-    rng_rebase(mcdc)
-
     # Population control
     if mcdc["technique"]["population_control"]:
         population_control(mcdc)
@@ -291,7 +286,7 @@ def manage_IC_bank(mcdc):
         dtype=type_.particle_record,
     )
     buff_p = np.zeros(
-        mcdc["technique"]["IC_bank_precursor_local"]["particles"].shape[0],
+        mcdc["technique"]["IC_bank_precursor_local"]["precursors"].shape[0],
         dtype=type_.precursor,
     )
 
@@ -304,7 +299,7 @@ def manage_IC_bank(mcdc):
             mcdc["technique"]["IC_bank_neutron_local"]["particles"][:Nn]
         )
         precursors = MPI.COMM_WORLD.gather(
-            mcdc["technique"]["IC_bank_precursor_local"]["particles"][:Np]
+            mcdc["technique"]["IC_bank_precursor_local"]["precursors"][:Np]
         )
 
         if mcdc["mpi_master"]:
@@ -328,7 +323,9 @@ def manage_IC_bank(mcdc):
         for i in range(Nn):
             mcdc["technique"]["IC_bank_neutron"]["particles"][start_n + i] = buff_n[i]
         for i in range(Np):
-            mcdc["technique"]["IC_bank_precursor"]["particles"][start_p + i] = buff_p[i]
+            mcdc["technique"]["IC_bank_precursor"]["precursors"][start_p + i] = buff_p[
+                i
+            ]
 
     # Reset local banks
     mcdc["technique"]["IC_bank_neutron_local"]["size"] = 0
@@ -377,6 +374,31 @@ def bank_scanning_weight(bank, mcdc):
     W_global = buff[0]
 
     return w_start, w_cdf, W_global
+
+
+@njit
+def bank_scanning_DNP(bank, mcdc):
+    N_DNP_local = bank["size"]
+
+    # Get sum of ceil-ed local DNP weights
+    N_local = 0
+    for i in range(N_DNP_local):
+        DNP = bank["precursors"][i]
+        N_local += math.ceil(DNP["w"])
+
+    # Starting index
+    buff = np.zeros(1, dtype=np.int64)
+    with objmode():
+        MPI.COMM_WORLD.Exscan(np.array([N_local]), buff, MPI.SUM)
+    idx_start = buff[0]
+
+    # Global size
+    buff[0] += N_local
+    with objmode():
+        MPI.COMM_WORLD.Bcast(buff, mcdc["mpi_size"] - 1)
+    N_global = buff[0]
+
+    return idx_start, N_local, N_global
 
 
 @njit
@@ -481,7 +503,7 @@ def bank_rebalance(mcdc):
 
 
 @njit
-def distribute_work(N, mcdc):
+def distribute_work(N, mcdc, precursor=False):
     size = mcdc["mpi_size"]
     rank = mcdc["mpi_rank"]
 
@@ -504,9 +526,14 @@ def distribute_work(N, mcdc):
     else:
         work_start += rem
 
-    mcdc["mpi_work_start"] = work_start
-    mcdc["mpi_work_size"] = work_size
-    mcdc["mpi_work_size_total"] = work_size_total
+    if not precursor:
+        mcdc["mpi_work_start"] = work_start
+        mcdc["mpi_work_size"] = work_size
+        mcdc["mpi_work_size_total"] = work_size_total
+    else:
+        mcdc["mpi_work_start_precursor"] = work_start
+        mcdc["mpi_work_size_precursor"] = work_size
+        mcdc["mpi_work_size_total_precursor"] = work_size_total
 
 
 # =============================================================================
@@ -553,8 +580,13 @@ def bank_IC(P, mcdc):
     # Sample particle
     if rng(mcdc) < Pn:
         P_new = copy_particle(P)
-        P_new["w"] = wn_prime
+        P_new["w"] = 1.0
         add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
+
+        # Accumulate fission
+        SigmaF = material["fission"][g]
+        mcdc["technique"]["IC_fission_score"] += v*SigmaF
+
 
     # =========================================================================
     # Precursor
@@ -597,11 +629,11 @@ def bank_IC(P, mcdc):
     # Sample precursor
     if rng(mcdc) < Pp:
         idx = mcdc["technique"]["IC_bank_precursor_local"]["size"]
-        precursor = mcdc["technique"]["IC_bank_precursor_local"]["particles"][idx]
+        precursor = mcdc["technique"]["IC_bank_precursor_local"]["precursors"][idx]
         precursor["x"] = P["x"]
         precursor["y"] = P["y"]
         precursor["z"] = P["z"]
-        precursor["w"] = wp_prime
+        precursor["w"] = wp_prime / wn_prime
         mcdc["technique"]["IC_bank_precursor_local"]["size"] += 1
 
         # Sample group
@@ -612,6 +644,9 @@ def bank_IC(P, mcdc):
             if total > xi:
                 break
         precursor["g"] = j
+
+        # Set inducing neutron group
+        precursor["n_g"] = g
 
 
 # =============================================================================
@@ -746,6 +781,8 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
     # Particle is not found
     print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
     P["alive"] = False
+    with objmode():
+        print_error("Man....")
     return -1
 
 
@@ -1381,6 +1418,9 @@ def score_closeout_history(score, mcdc):
 def score_closeout(score, mcdc):
     N_history = mcdc["setting"]["N_particle"]
 
+    if mcdc["setting"]["N_precursor"] > 0:
+        N_history += mcdc["precursor_strength"] * mcdc["setting"]["N_precursor"]
+
     if mcdc["setting"]["mode_eigenvalue"]:
         N_history = mcdc["setting"]["N_active"]
     else:
@@ -1484,6 +1524,7 @@ def eigenvalue_tally_closeout_history(mcdc):
     buff_Cmax = np.zeros(1, np.float64)
     buff_collision = np.zeros(1, np.float64)
     buff_collision_fuel = np.zeros(1, np.float64)
+    buff_IC_fission = np.zeros(1, np.float64)
     with objmode():
         MPI.COMM_WORLD.Allreduce(
             np.array([mcdc["eigenvalue_tally_nuSigmaF"]]), buff_nuSigmaF, MPI.SUM
@@ -1507,16 +1548,23 @@ def eigenvalue_tally_closeout_history(mcdc):
                 buff_collision_fuel,
                 MPI.SUM,
             )
+            if mcdc["technique"]["IC_generator"]:
+                MPI.COMM_WORLD.Allreduce(
+                    np.array([mcdc['technique']["IC_fission_score"]]),
+                    buff_IC_fission,
+                    MPI.SUM,
+                )
 
     # Update and store k_eff
     mcdc["k_eff"] = buff_nuSigmaF[0] / N_particle
     mcdc["k_cycle"][i_cycle] = mcdc["k_eff"]
 
-    # Normalize other eigenvalue tallies
+    # Normalize other eigenvalue/global tallies
     tally_n = buff_n[0] / N_particle
     tally_C = buff_C[0] / N_particle
     tally_collision = buff_collision[0] / N_particle
     tally_collision_fuel = buff_collision_fuel[0] / N_particle
+    tally_IC_fission = buff_IC_fission[0] / N_particle
 
     # Maximum densities
     mcdc["n_max"] = buff_nmax[0]
@@ -1535,6 +1583,9 @@ def eigenvalue_tally_closeout_history(mcdc):
         mcdc["collision_fuel_avg"] += tally_collision_fuel
         mcdc["collision_fuel_sdv"] += tally_collision_fuel * tally_collision_fuel
 
+        if mcdc['technique']['IC_generator']:
+            mcdc['technique']['IC_fission'] += tally_IC_fission
+
         N = 1 + mcdc["i_cycle"] - mcdc["setting"]["N_inactive"]
         mcdc["k_avg_running"] = mcdc["k_avg"] / N
         if N == 1:
@@ -1550,6 +1601,7 @@ def eigenvalue_tally_closeout_history(mcdc):
     mcdc["eigenvalue_tally_C"] = 0.0
     mcdc["eigenvalue_tally_collision"] = 0.0
     mcdc["eigenvalue_tally_collision_fuel"] = 0.0
+    mcdc['technique']['IC_fission_score'] = 0.0
 
     # =====================================================================
     # Gyration radius
