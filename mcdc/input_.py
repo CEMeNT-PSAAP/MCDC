@@ -336,7 +336,7 @@ def material(
     else:
         card["speed"] /= card["total"]
 
-    # Calculate effective spectra and multiplicities of scattering and prompt
+    # Calculate effective spectra and multiplicities of scattering and prompt fission
     if max(card["scatter"]) > 0.0:
         nuSigmaS = np.zeros((G, G), dtype=float)
         for i in range(N_nuclide):
