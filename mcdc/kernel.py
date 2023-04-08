@@ -561,13 +561,8 @@ def bank_IC(P, mcdc):
     # Neutron target weight
     Nn = mcdc["technique"]["IC_N_neutron"]
     tally_n = mcdc["technique"]["IC_neutron_density"]
-    tally_coll = mcdc["technique"]["IC_collision_density"]
-    tally_coll_fuel = mcdc["technique"]["IC_collision_density_fuel"]
     N_cycle = mcdc["setting"]["N_active"]
-    if mcdc["technique"]["IC_uniform_weight"]:
-        wn_prime = tally_n * N_cycle / Nn
-    else:
-        wn_prime = wn * tally_coll * N_cycle / Nn
+    wn_prime = tally_n * N_cycle / Nn
 
     # Sampling probability
     Pn = wn / wn_prime
@@ -581,12 +576,12 @@ def bank_IC(P, mcdc):
     if rng(mcdc) < Pn:
         P_new = copy_particle(P)
         P_new["w"] = 1.0
+        P_new["t"] = 0.0
         add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
 
         # Accumulate fission
         SigmaF = material["fission"][g]
-        mcdc["technique"]["IC_fission_score"] += v*SigmaF
-
+        mcdc["technique"]["IC_fission_score"] += v * SigmaF
 
     # =========================================================================
     # Precursor
@@ -613,10 +608,7 @@ def bank_IC(P, mcdc):
 
     # Precursor target weight
     tally_C = mcdc["technique"]["IC_precursor_density"]
-    if mcdc["technique"]["IC_uniform_weight"]:
-        wp_prime = tally_C * N_cycle / Np
-    else:
-        wp_prime = wp * tally_coll_fuel * N_cycle / Np
+    wp_prime = tally_C * N_cycle / Np
 
     # Sampling probability
     Pp = wp / wp_prime
@@ -1418,9 +1410,6 @@ def score_closeout_history(score, mcdc):
 def score_closeout(score, mcdc):
     N_history = mcdc["setting"]["N_particle"]
 
-    if mcdc["setting"]["N_precursor"] > 0:
-        N_history += mcdc["precursor_strength"] * mcdc["setting"]["N_precursor"]
-
     if mcdc["setting"]["mode_eigenvalue"]:
         N_history = mcdc["setting"]["N_active"]
     else:
@@ -1482,12 +1471,6 @@ def eigenvalue_tally(P, distance, mcdc):
     mcdc["eigenvalue_tally_nuSigmaF"] += flux * nuSigmaF
 
     if mcdc["cycle_active"]:
-        # Collision density
-        coll_rate = flux * SigmaT
-        mcdc["eigenvalue_tally_collision"] += coll_rate
-        if SigmaF > 0.0:
-            mcdc["eigenvalue_tally_collision_fuel"] += coll_rate
-
         # Neutron density
         v = get_particle_speed(P, mcdc)
         n_density = flux / v
@@ -1522,8 +1505,6 @@ def eigenvalue_tally_closeout_history(mcdc):
     buff_nmax = np.zeros(1, np.float64)
     buff_C = np.zeros(1, np.float64)
     buff_Cmax = np.zeros(1, np.float64)
-    buff_collision = np.zeros(1, np.float64)
-    buff_collision_fuel = np.zeros(1, np.float64)
     buff_IC_fission = np.zeros(1, np.float64)
     with objmode():
         MPI.COMM_WORLD.Allreduce(
@@ -1538,19 +1519,9 @@ def eigenvalue_tally_closeout_history(mcdc):
                 np.array([mcdc["eigenvalue_tally_C"]]), buff_C, MPI.SUM
             )
             MPI.COMM_WORLD.Allreduce(np.array([mcdc["C_max"]]), buff_Cmax, MPI.MAX)
-            MPI.COMM_WORLD.Allreduce(
-                np.array([mcdc["eigenvalue_tally_collision"]]),
-                buff_collision,
-                MPI.SUM,
-            )
-            MPI.COMM_WORLD.Allreduce(
-                np.array([mcdc["eigenvalue_tally_collision_fuel"]]),
-                buff_collision_fuel,
-                MPI.SUM,
-            )
             if mcdc["technique"]["IC_generator"]:
                 MPI.COMM_WORLD.Allreduce(
-                    np.array([mcdc['technique']["IC_fission_score"]]),
+                    np.array([mcdc["technique"]["IC_fission_score"]]),
                     buff_IC_fission,
                     MPI.SUM,
                 )
@@ -1562,9 +1533,7 @@ def eigenvalue_tally_closeout_history(mcdc):
     # Normalize other eigenvalue/global tallies
     tally_n = buff_n[0] / N_particle
     tally_C = buff_C[0] / N_particle
-    tally_collision = buff_collision[0] / N_particle
-    tally_collision_fuel = buff_collision_fuel[0] / N_particle
-    tally_IC_fission = buff_IC_fission[0] / N_particle
+    tally_IC_fission = buff_IC_fission[0]
 
     # Maximum densities
     mcdc["n_max"] = buff_nmax[0]
@@ -1578,13 +1547,6 @@ def eigenvalue_tally_closeout_history(mcdc):
         mcdc["n_sdv"] += tally_n * tally_n
         mcdc["C_avg"] += tally_C
         mcdc["C_sdv"] += tally_C * tally_C
-        mcdc["collision_avg"] += tally_collision
-        mcdc["collision_sdv"] += tally_collision * tally_collision
-        mcdc["collision_fuel_avg"] += tally_collision_fuel
-        mcdc["collision_fuel_sdv"] += tally_collision_fuel * tally_collision_fuel
-
-        if mcdc['technique']['IC_generator']:
-            mcdc['technique']['IC_fission'] += tally_IC_fission
 
         N = 1 + mcdc["i_cycle"] - mcdc["setting"]["N_inactive"]
         mcdc["k_avg_running"] = mcdc["k_avg"] / N
@@ -1595,13 +1557,14 @@ def eigenvalue_tally_closeout_history(mcdc):
                 (mcdc["k_sdv"] / N - mcdc["k_avg_running"] ** 2) / (N - 1)
             )
 
+        if mcdc["technique"]["IC_generator"]:
+            mcdc["technique"]["IC_fission"] += tally_IC_fission
+
     # Reset accumulators
     mcdc["eigenvalue_tally_nuSigmaF"] = 0.0
     mcdc["eigenvalue_tally_n"] = 0.0
     mcdc["eigenvalue_tally_C"] = 0.0
-    mcdc["eigenvalue_tally_collision"] = 0.0
-    mcdc["eigenvalue_tally_collision_fuel"] = 0.0
-    mcdc['technique']['IC_fission_score'] = 0.0
+    mcdc["technique"]["IC_fission_score"] = 0.0
 
     # =====================================================================
     # Gyration radius
@@ -1678,21 +1641,12 @@ def eigenvalue_tally_closeout(mcdc):
     N = mcdc["setting"]["N_active"]
     mcdc["n_avg"] /= N
     mcdc["C_avg"] /= N
-    mcdc["collision_avg"] /= N
-    mcdc["collision_fuel_avg"] /= N
     if N > 1:
         mcdc["n_sdv"] = math.sqrt((mcdc["n_sdv"] / N - mcdc["n_avg"] ** 2) / (N - 1))
         mcdc["C_sdv"] = math.sqrt((mcdc["C_sdv"] / N - mcdc["C_avg"] ** 2) / (N - 1))
-        mcdc["collision_sdv"] = math.sqrt(
-            (mcdc["collision_sdv"] / N - mcdc["collision_avg"] ** 2) / (N - 1)
-        )
-        mcdc["collision_fuel_sdv"] = math.sqrt(
-            (mcdc["collision_fuel_sdv"] / N - mcdc["collision_fuel_avg"] ** 2) / (N - 1)
-        )
     else:
         mcdc["n_sdv"] = 0.0
         mcdc["C_sdv"] = 0.0
-        mcdc["collision_fuel_sdv"] = 0.0
 
 
 # =============================================================================

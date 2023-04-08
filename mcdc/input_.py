@@ -1295,10 +1295,7 @@ def weight_roulette(chance, wr_threshold):
 def IC_generator(
     N_neutron=0,
     N_precursor=0,
-    uniform_weight=False,
     cycle_stretch=1.0,
-    collision_density=None,
-    fuel_collision_density=None,
     neutron_density=None,
     max_neutron_density=None,
     precursor_density=None,
@@ -1315,23 +1312,13 @@ def IC_generator(
         Neutron target size
     N_precursor : int
         Delayed neutron precursot target size
-    uniform_weight : bool
-        If `True`, sampled particles would have uniform weight; in this case,
-        weight-based population control is used during the sampling.
-        If `False`, sampled particles would have varying weights, which can range
-        over several orders of magnitude.
     cycle_stretch : float
         Factor to strethch number of cycles. Higher cycle stretch reduces inter-cycle
         correlation.
-    collision_density, fuel_collision_density : float
-        Total and in-fuel neutron collision density, required if
-        `uniform_weight`=`False` and `N_neutron` > 0 and `N_precursor` > 0, respectively.
     neutron_density, max_neutron_density : float
-        Total and maximum neutron density, required if
-        `uniform_weight`=`True` and `N_neutron` > 0.
+        Total and maximum neutron density, required if `N_neutron` > 0.
     precursor_density, max_precursor_density : float
-        Total and maximum precursor density, required if
-        `uniform_weight`=`True` and `N_precursor` > 0.
+        Total and maximum precursor density, required if `N_precursor` > 0.
     """
 
     # Turn on eigenmode and population control
@@ -1343,7 +1330,6 @@ def IC_generator(
     card["IC_generator"] = True
     card["IC_N_neutron"] = N_neutron
     card["IC_N_precursor"] = N_precursor
-    card["IC_uniform_weight"] = uniform_weight
     card["IC_cycle_stretch"] = cycle_stretch
 
     # Setting parameters
@@ -1351,52 +1337,30 @@ def IC_generator(
     N_particle = card_setting["N_particle"]
 
     # Check optional parameters
-    if uniform_weight:
-        if N_neutron > 0.0:
-            if neutron_density is None or max_neutron_density is None:
-                print_error(
-                    "IC generator with uniform weight requires neutron_density and max_neutron_density"
-                )
-            card["IC_neutron_density"] = N_particle * neutron_density
-            card["IC_neutron_density_max"] = max_neutron_density
-        if N_precursor > 0.0:
-            if precursor_density is None:
-                print_error(
-                    "IC generator with uniform weight requires precursor_density and max_precursor_density"
-                )
-            card["IC_precursor_density"] = N_particle * precursor_density
-            card["IC_precursor_density_max"] = max_precursor_density
-    else:
-        if N_neutron > 0.0:
-            if collision_density is None:
-                print_error(
-                    "IC generator with non-uniform weight requires collision_density"
-                )
-            card["IC_collision_density"] = N_particle * collision_density
-        if N_precursor > 0.0:
-            if fuel_collision_density is None:
-                print_error(
-                    "IC generator with non-uniform weight requires fuel_collision_density"
-                )
-            card["IC_collision_density_fuel"] = N_particle * fuel_collision_density
+    if N_neutron > 0.0:
+        if neutron_density is None or max_neutron_density is None:
+            print_error("IC generator requires neutron_density and max_neutron_density")
+        card["IC_neutron_density"] = N_particle * neutron_density
+        card["IC_neutron_density_max"] = max_neutron_density
+    if N_precursor > 0.0:
+        if precursor_density is None:
+            print_error(
+                "IC generator requires precursor_density and max_precursor_density"
+            )
+        card["IC_precursor_density"] = N_particle * precursor_density
+        card["IC_precursor_density_max"] = max_precursor_density
 
     # Set number of active cycles
-    if uniform_weight:
-        n = card["IC_neutron_density"]
-        n_max = card["IC_neutron_density_max"]
-        C = card["IC_precursor_density"]
-        C_max = card["IC_precursor_density_max"]
-        N_cycle1 = 0.0
-        N_cycle2 = 0.0
-        if N_neutron > 0:
-            N_cycle1 = math.ceil(cycle_stretch * math.ceil(n_max / n * N_neutron))
-        if N_precursor > 0:
-            N_cycle2 = math.ceil(cycle_stretch * math.ceil(C_max / C * N_precursor))
-    else:
-        N_collision = card["IC_collision_density"]
-        N_collision_fuel = card["IC_collision_density_fuel"]
-        N_cycle1 = math.ceil(cycle_stretch * math.ceil(N_neutron / N_collision))
-        N_cycle2 = math.ceil(cycle_stretch * math.ceil(N_precursor / N_collision_fuel))
+    n = card["IC_neutron_density"]
+    n_max = card["IC_neutron_density_max"]
+    C = card["IC_precursor_density"]
+    C_max = card["IC_precursor_density_max"]
+    N_cycle1 = 0.0
+    N_cycle2 = 0.0
+    if N_neutron > 0:
+        N_cycle1 = math.ceil(cycle_stretch * math.ceil(n_max / n * N_neutron))
+    if N_precursor > 0:
+        N_cycle2 = math.ceil(cycle_stretch * math.ceil(C_max / C * N_precursor))
     N_cycle = max(N_cycle1, N_cycle2)
     card_setting["N_cycle"] = N_cycle
     card_setting["N_active"] = N_cycle
