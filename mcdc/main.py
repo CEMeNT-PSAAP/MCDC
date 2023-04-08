@@ -433,7 +433,7 @@ def prepare():
             ]
             mcdc["bank_precursor"]["size"] = N_local
 
-            # Set precursor strength (TODO: not considering nonuniform weight yet)
+            # Set precursor strength
             if N_precursor > 0 and N_particle > 0:
                 mcdc["precursor_strength"] = mcdc["bank_precursor"]["precursors"][0][
                     "w"
@@ -515,20 +515,6 @@ def generate_hdf5():
                     f.create_dataset("global_tally/precursor/mean", data=mcdc["C_avg"])
                     f.create_dataset("global_tally/precursor/sdev", data=mcdc["C_sdv"])
                     f.create_dataset("global_tally/precursor/max", data=mcdc["C_max"])
-                    f.create_dataset(
-                        "global_tally/collision/mean", data=mcdc["collision_avg"]
-                    )
-                    f.create_dataset(
-                        "global_tally/collision/sdev", data=mcdc["collision_sdv"]
-                    )
-                    f.create_dataset(
-                        "global_tally/collision_fuel/mean",
-                        data=mcdc["collision_fuel_avg"],
-                    )
-                    f.create_dataset(
-                        "global_tally/collision_fuel/sdev",
-                        data=mcdc["collision_fuel_sdv"],
-                    )
                     if mcdc["setting"]["gyration_radius"]:
                         f.create_dataset(
                             "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
@@ -568,6 +554,9 @@ def generate_hdf5():
                 )
                 f.create_dataset("IC/neutrons_size", data=Nn)
                 f.create_dataset("IC/precursors_size", data=Np)
+                f.create_dataset(
+                    "IC/fission", data=mcdc["technique"]["IC_fission"] / Nn
+                )
 
     # Save particle?
     if mcdc["setting"]["save_particle"]:

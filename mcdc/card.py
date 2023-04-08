@@ -153,13 +153,10 @@ class InputCard:
             "IC_generator": False,
             "IC_N_neutron": 0,
             "IC_N_precursor": 0,
-            "IC_uniform_weight": False,
             "IC_neutron_density": 0.0,
             "IC_precursor_density": 0.0,
             "IC_neutron_density_max": 0.0,
             "IC_precursor_density_max": 0.0,
-            "IC_collision_density": 0.0,
-            "IC_collision_density_fuel": 0.0,
             "IC_cycle_stretch": 1.0,
         }
 

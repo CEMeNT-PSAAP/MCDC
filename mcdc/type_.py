@@ -601,16 +601,13 @@ def make_type_technique(card):
         ("IC_neutron_density_max", float64),
         ("IC_precursor_density", float64),
         ("IC_precursor_density_max", float64),
-        ("IC_collision_density", float64),
-        ("IC_collision_density_fuel", float64),
-        ("IC_uniform_weight", bool_),
         ("IC_cycle_stretch", float64),
         ("IC_bank_neutron_local", bank_neutron_local),
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
-        ('IC_fission_score', float64),
-        ('IC_fission', float64),
+        ("IC_fission_score", float64),
+        ("IC_fission", float64),
     ]
 
     # Finalize technique type
@@ -706,10 +703,6 @@ def make_type_global(card):
             ("C_avg", float64),  # Precursor density
             ("C_sdv", float64),
             ("C_max", float64),
-            ("collision_avg", float64),  # Collision density
-            ("collision_sdv", float64),
-            ("collision_fuel_avg", float64),  # In-fuel Collision density
-            ("collision_fuel_sdv", float64),
             ("k_avg_running", float64),
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
@@ -718,8 +711,6 @@ def make_type_global(card):
             ("eigenvalue_tally_nuSigmaF", float64),
             ("eigenvalue_tally_n", float64),
             ("eigenvalue_tally_C", float64),
-            ("eigenvalue_tally_collision", float64),
-            ("eigenvalue_tally_collision_fuel", float64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
