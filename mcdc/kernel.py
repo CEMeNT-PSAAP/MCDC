@@ -773,8 +773,6 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
     # Particle is not found
     print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
     P["alive"] = False
-    with objmode():
-        print_error("Man....")
     return -1
 
 
