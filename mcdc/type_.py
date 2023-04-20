@@ -605,9 +605,22 @@ def make_type_technique(card):
         ("IC_bank_precursor", bank_precursor),
     ]
 
+    ######################
+    #Domain Decomposition
+    ######################
+    mesh = np.dtype([
+                ("x", float64, (len(card.technique["dd_mesh"]["x"]),)),
+                ("y", float64, (len(card.technique["dd_mesh"]["y"]),)),
+                ("z", float64, (len(card.technique["dd_mesh"]["z"]),)),
+            ])
+    struct += [("dd_mesh", mesh)]
+
+    struct += [
+        ("domain_decomposition", bool_),
+        ("d_idx", int64),
+    ]
     # Finalize technique type
     technique = np.dtype(struct)
-
 
 # ==============================================================================
 # Global
@@ -648,6 +661,7 @@ def make_type_global(card):
         bank_domain_y_neg = particle_bank(card.technique["dd_bank_size"])
         bank_domain_z_pos = particle_bank(card.technique["dd_bank_size"])
         bank_domain_z_neg = particle_bank(card.technique["dd_bank_size"])
+        bank_lost = particle_bank(card.technique["dd_bank_size"])
     else:
         bank_domain_x_pos = particle_bank(0)
         bank_domain_x_neg = particle_bank(0)
@@ -655,6 +669,7 @@ def make_type_global(card):
         bank_domain_y_neg = particle_bank(0)
         bank_domain_z_pos = particle_bank(0)
         bank_domain_z_neg = particle_bank(0)
+        bank_lost = particle_bank(0)
 
     # Particle tracker
     N_track = 0
@@ -688,6 +703,7 @@ def make_type_global(card):
             ("bank_domain_y_neg", bank_domain_y_neg),
             ("bank_domain_z_pos", bank_domain_z_pos),
             ("bank_domain_z_neg", bank_domain_z_neg),
+            ("bank_lost", bank_lost),
             ("rng_seed_base", int64),
             ("rng_seed", int64),
             ("rng_stride", int64),

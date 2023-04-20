@@ -271,6 +271,7 @@ def prepare():
             "iqmc_generator",
             "wr_chance",
             "wr_threshold",
+            "dd_mesh",
         ]:
             mcdc["technique"][name] = input_card.technique[name]
 
@@ -329,6 +330,15 @@ def prepare():
             N = mcdc["setting"]["N_particle"]
             np.random.seed(seed)
             mcdc["technique"]["lds"] = np.random.random((N, N_dim))
+    
+    # =========================================================================
+    # Domain Decomposition
+    # =========================================================================
+
+    if input_card.technique["domain_decomposition"]:
+        mcdc["technique"]["dd_mesh"]["x"] = input_card.technique["dd_mesh"]["x"]
+        mcdc["technique"]["dd_mesh"]["y"] = input_card.technique["dd_mesh"]["y"]
+        mcdc["technique"]["dd_mesh"]["z"] = input_card.technique["dd_mesh"]["z"]
 
     # =========================================================================
     # Global tally
@@ -395,7 +405,7 @@ def dd_prepare():
     d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
     
     d_idx = MPI.COMM_WORLD.Get_rank()%(d_Nx*d_Ny*d_Nz)
-
+    input_card.technique["d_idx"] = d_idx
 
     #Bounds of domain
     x_min = input_card.technique["dd_mesh"]["x"][d_ix]
@@ -404,7 +414,7 @@ def dd_prepare():
     y_max = input_card.technique["dd_mesh"]["y"][d_iy+1]
     z_min = input_card.technique["dd_mesh"]["z"][d_iz]
     z_max = input_card.technique["dd_mesh"]["z"][d_iz+1]
-    
+   
     #############################################
     # Delete everything that is outside of domain
     #############################################
@@ -413,7 +423,31 @@ def dd_prepare():
     #If cell is entirely in domain, it can remain (volume of cell and domain == cell volume)
     #if cell is partially in domain, remove surfaces from cell that do not intersect domain box and add dd surfaces
     #if cell is not in domain, remove (volume of cell and domain == 0)
-#    for cell in input_card.cells:
+    for cell in input_card.cells:
+        if (d_ix > 0):
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2-d_Nx+2+d_ix-2)
+            cell["positive_flags"] = np.append(cell["positive_flags"],True)
+            cell["N_surface"] += 1
+        if (d_ix < d_Nx-1):
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2-d_Nx+2+d_ix-1)
+            cell["positive_flags"] = np.append(cell["positive_flags"],False)
+            cell["N_surface"] += 1
+        if (d_iy > 0):
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2+d_iy-2)
+            cell["positive_flags"] = np.append(cell["positive_flags"],True)
+            cell["N_surface"] += 1
+        if (d_iy < d_Ny-1):
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2+d_iy-1)
+            cell["positive_flags"] = np.append(cell["positive_flags"],False)
+            cell["N_surface"] += 1
+        if (d_iz > 0):
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2+d_iz-2)
+            cell["positive_flags"] = np.append(cell["positive_flags"],True)
+            cell["N_surface"] += 1
+        if (d_iz < d_Nz-1):
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2+d_iz-1)
+            cell["positive_flags"] = np.append(cell["positive_flags"],False)
+            cell["N_surface"] += 1
 #        for i in range(cell["N_surface"]):
 #            sid = input_card["surfaces"][cell["surface_IDs"][i]]
 #            direction = cell["positive_flags"][i]
@@ -442,7 +476,7 @@ def dd_prepare():
     # Or sample from all input sources and distribute those particles to relevant nodes later
     
     ##Tallies
-    #Truncate tally meshs to within the domain region
+    #Only include tally meshs to that overlap with subdomain
 
 
 

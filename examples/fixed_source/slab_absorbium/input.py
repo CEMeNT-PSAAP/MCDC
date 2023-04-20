@@ -42,9 +42,9 @@ mcdc.tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1e3)
+mcdc.setting(N_particle=1e4, bank_active_buff=100000)
 mcdc.implicit_capture()
-mcdc.domain_decomposition(z=[0.,1.3,6.])
+mcdc.domain_decomposition(z=[0.,2.0,4.0,6.], bank_size = 10000)
 
 # Run
 mcdc.run()

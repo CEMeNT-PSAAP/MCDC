@@ -150,6 +150,7 @@ class InputCard:
             "sensitivity": 0,
             "sensitivity_N": 0,
             "domain_decomposition": False,
+            "d_idx": 0,
             "dd_mesh": {
                 "x": np.array([-INF, INF]),
                 "y": np.array([-INF, INF]),

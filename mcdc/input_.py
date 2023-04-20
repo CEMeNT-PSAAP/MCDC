@@ -1252,7 +1252,14 @@ def domain_decomposition(x=[-INF,INF], y=[-INF,INF], z=[-INF,INF], bank_size=100
     card["dd_mesh"]["x"] = np.array(x)
     card["dd_mesh"]["y"] = np.array(y)
     card["dd_mesh"]["z"] = np.array(z)
-    
+
+    for i in x[1:-1]:
+        surface("plane-x", x=i, bc="domain-crossing")
+    for i in y[1:-1]:
+        surface("plane-y", y=i, bc="domain-crossing")
+    for i in z[1:-1]:
+        surface("plane-z", z=i, bc="domain-crossing")
+ 
     return card
 
 
