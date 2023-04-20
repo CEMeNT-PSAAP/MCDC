@@ -45,8 +45,9 @@ mcdc.source(x=[0.0, 1.0], y=[0.0, 1.0], isotropic=True)
 mcdc.tally(scores=["flux"], x=np.linspace(0.0, 4.0, 40), y=np.linspace(0.0, 4.0, 40))
 
 # Setting
-mcdc.setting(N_particle=1e10)
+mcdc.setting(N_particle=1e3,active_bank_buff=100000)
 mcdc.implicit_capture()
+mcdc.domain_decomposition(x=[0.0,2.0,4.0],y=[0.0,2.00,4.0],bank_size=10000)
 
 # Run
 mcdc.run()

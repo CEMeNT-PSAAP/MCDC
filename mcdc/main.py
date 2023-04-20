@@ -425,33 +425,32 @@ def dd_prepare():
     #if cell is not in domain, remove (volume of cell and domain == 0)
     for cell in input_card.cells:
         if (d_ix > 0):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2-d_Nx+2+d_ix-2)
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+1-d_Nx+d_ix)
             cell["positive_flags"] = np.append(cell["positive_flags"],True)
             cell["N_surface"] += 1
         if (d_ix < d_Nx-1):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2-d_Nx+2+d_ix-1)
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+1-d_Nx+d_ix+1)
             cell["positive_flags"] = np.append(cell["positive_flags"],False)
             cell["N_surface"] += 1
         if (d_iy > 0):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2+d_iy-2)
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+d_iy)
             cell["positive_flags"] = np.append(cell["positive_flags"],True)
             cell["N_surface"] += 1
         if (d_iy < d_Ny-1):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2-d_Ny+2+d_iy-1)
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+d_iy+1)
             cell["positive_flags"] = np.append(cell["positive_flags"],False)
             cell["N_surface"] += 1
         if (d_iz > 0):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2+d_iz-2)
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+d_iz)
             cell["positive_flags"] = np.append(cell["positive_flags"],True)
             cell["N_surface"] += 1
         if (d_iz < d_Nz-1):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+2+d_iz-1)
+            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+d_iz+1)
             cell["positive_flags"] = np.append(cell["positive_flags"],False)
             cell["N_surface"] += 1
 #        for i in range(cell["N_surface"]):
 #            sid = input_card["surfaces"][cell["surface_IDs"][i]]
 #            direction = cell["positive_flags"][i]
-
     ##Surfaces
     #eliminate surfaces that do not appear in surface IDs of cells
     #decrement all surfaces IDs for surface IDs greater than the deleted surface

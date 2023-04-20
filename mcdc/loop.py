@@ -94,11 +94,6 @@ def loop_source(mcdc):
         # Get a source particle and put into active bank
         # =====================================================================
 
-        # Check if lost source particles belong to this node
-        if mcdc["technique"]["domain_decomposition"]:
-            kernel.recover_lost_source(mcdc)
-            kernel.dd_particle_transfer(mcdc)
-
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
@@ -126,6 +121,12 @@ def loop_source(mcdc):
         # =====================================================================
         # Run the source particle and its secondaries
         # =====================================================================
+        
+        # Check if lost source particles belong to this node
+        if mcdc["technique"]["domain_decomposition"]:
+            kernel.recover_lost_source(mcdc)
+            kernel.dd_particle_transfer(mcdc)
+
 
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
@@ -142,6 +143,7 @@ def loop_source(mcdc):
 
             # Particle loop
             loop_particle(P, mcdc)
+
 
         # =====================================================================
         # Closeout
