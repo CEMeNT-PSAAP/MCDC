@@ -183,6 +183,7 @@ def make_type_surface(Nmax_slice):
             ("N_slice", int64),
             ("vacuum", bool_),
             ("reflective", bool_),
+            ("domain-crossing", bool_),
             ("A", float64),
             ("B", float64),
             ("C", float64),
@@ -640,6 +641,20 @@ def make_type_global(card):
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
+    if card.technique["domain_decomposition"]:
+        bank_domain_x_pos = particle_bank(card.technique["dd_bank_size"])
+        bank_domain_x_neg = particle_bank(card.technique["dd_bank_size"])
+        bank_domain_y_pos = particle_bank(card.technique["dd_bank_size"])
+        bank_domain_y_neg = particle_bank(card.technique["dd_bank_size"])
+        bank_domain_z_pos = particle_bank(card.technique["dd_bank_size"])
+        bank_domain_z_neg = particle_bank(card.technique["dd_bank_size"])
+    else:
+        bank_domain_x_pos = particle_bank(0)
+        bank_domain_x_neg = particle_bank(0)
+        bank_domain_y_pos = particle_bank(0)
+        bank_domain_y_neg = particle_bank(0)
+        bank_domain_z_pos = particle_bank(0)
+        bank_domain_z_neg = particle_bank(0)
 
     # Particle tracker
     N_track = 0
@@ -667,6 +682,12 @@ def make_type_global(card):
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
+            ("bank_domain_x_pos", bank_domain_x_pos),
+            ("bank_domain_x_neg", bank_domain_x_neg),
+            ("bank_domain_y_pos", bank_domain_y_pos),
+            ("bank_domain_y_neg", bank_domain_y_neg),
+            ("bank_domain_z_pos", bank_domain_z_pos),
+            ("bank_domain_z_neg", bank_domain_z_neg),
             ("rng_seed_base", int64),
             ("rng_seed", int64),
             ("rng_stride", int64),

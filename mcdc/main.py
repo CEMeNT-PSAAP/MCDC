@@ -25,6 +25,8 @@ def run():
     # Preparation:
     #   process input cards, make types, and allocate global variables
     preparation_start = MPI.Wtime()
+    if(input_card.technique['domain_decomposition']):
+        dd_prepare()
     prepare()
     input_card.reset()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
@@ -352,6 +354,13 @@ def prepare():
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+    # Domain banks
+    mcdc["bank_domain_x_pos"]["tag"] = "domain_x_pos"
+    mcdc["bank_domain_x_neg"]["tag"] = "domain_x_neg"
+    mcdc["bank_domain_y_pos"]["tag"] = "domain_y_pos"
+    mcdc["bank_domain_y_neg"]["tag"] = "domain_y_neg"
+    mcdc["bank_domain_z_pos"]["tag"] = "domain_z_pos"
+    mcdc["bank_domain_z_neg"]["tag"] = "domain_z_neg"
 
     # Distribute work to processors
     kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
@@ -372,6 +381,9 @@ def prepare():
     if not mcdc["setting"]["mode_eigenvalue"]:
         mcdc["cycle_active"] = True
 
+def dd_prepare():
+    #Delete everything that is outside of domain
+    print("TODO: clean input card before prepare")
 
 def generate_hdf5():
     if mcdc["mpi_master"]:

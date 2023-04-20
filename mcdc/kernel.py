@@ -920,7 +920,6 @@ def surface_bc(P, surface, trans):
     elif surface["reflective"]:
         surface_reflect(P, surface, trans)
 
-
 @njit
 def surface_reflect(P, surface, trans):
     ux = P["ux"]
@@ -1931,7 +1930,27 @@ def surface_crossing(P, mcdc):
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
             sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc)
-
+    
+    if surface["domain-crossing"]:
+        if (surface["type"] == "plane-x" and P['ux'] > 0):
+            add_particle(copy_particle(P), mcdc["bank_domain_x+"])
+            P["alive"] = False
+        elif (surface["type"] == "plane-x" and P['ux'] < 0):
+            add_particle(copy_particle(P), mcdc["bank_domain_x-"])
+            P["alive"] = False
+        elif (surface["type"] == "plane-y" and P['uy'] > 0):
+            add_particle(copy_particle(P), mcdc["bank_domain_y+"])
+            P["alive"] = False
+        elif (surface["type"] == "plane-y" and P['uy'] < 0):
+            add_particle(copy_particle(P), mcdc["bank_domain_y-"])
+            P["alive"] = False
+        elif (surface["type"] == "plane-z" and P['uz'] > 0):
+            add_particle(copy_particle(P), mcdc["bank_domain_z+"])
+            P["alive"] = False
+        elif (surface["type"] == "plane-z" and P['uz'] < 0):
+            add_particle(copy_particle(P), mcdc["bank_domain_z-"])
+            P["alive"] = False
+            
 
 # =============================================================================
 # Mesh crossing

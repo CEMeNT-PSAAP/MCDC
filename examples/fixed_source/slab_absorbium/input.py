@@ -42,7 +42,9 @@ mcdc.tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1e5)
+mcdc.setting(N_particle=1e3)
+mcdc.implicit_capture()
+mcdc.domain_decomposition(x=[1.3])
 
 # Run
 mcdc.run()

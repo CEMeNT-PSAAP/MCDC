@@ -149,6 +149,7 @@ class InputCard:
             },
             "sensitivity": 0,
             "sensitivity_N": 0,
+            "domain_decomposition": False,
         }
 
 
