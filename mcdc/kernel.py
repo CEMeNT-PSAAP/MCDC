@@ -1658,7 +1658,7 @@ def move_to_event(P, mcdc):
 
     # Distance to nearest geometry boundary (surface or lattice)
     # Also set particle material and speed
-    d_boundary, event_boundary = distance_to_boundary(P, mcdc)
+    d_boundary, event = distance_to_boundary(P, mcdc)
 
     # Distance to tally mesh
     d_mesh = INF
@@ -1691,7 +1691,6 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    event = event_boundary
     distance = d_boundary
     if d_time_boundary * PREC < distance:
         event = EVENT_TIME_BOUNDARY
@@ -1707,20 +1706,8 @@ def move_to_event(P, mcdc):
         distance = d_collision
 
     # Crossing both boundary and mesh
-    if d_boundary == d_mesh:
-        # Surface and mesh?
-        if event == EVENT_SURFACE:
-            surface = mcdc["surfaces"][P["surface_ID"]]
-            event = EVENT_SURFACE_N_MESH
-        elif event == EVENT_SURFACE_MOVE:
-            event = EVENT_SURFACE_MOVE_N_MESH
-        # Lattice and mesh?
-        elif event == EVENT_LATTICE:
-            event = EVENT_LATTICE_N_MESH
-
-    # Crossing both time census and mesh
-    if event == EVENT_CENSUS and d_time_census == d_mesh:
-        event = EVENT_CENSUS_N_MESH
+    if d_boundary == d_mesh or d_time_census == d_mesh:
+        event += EVENT_MESH
 
     # Assign event
     P["event"] = event
@@ -1779,7 +1766,6 @@ def distance_to_boundary(P, mcdc):
     """
 
     distance = INF
-    event = -1
 
     # Translation accumulator
     trans = np.zeros(3)
@@ -1802,7 +1788,7 @@ def distance_to_boundary(P, mcdc):
             P["translation"][:] = trans
 
             if surface_move:
-                event = EVENT_SURFACE_MOVE
+                event += EVENT_MOVE
 
         # Lattice cell?
         if cell["lattice"]:
@@ -1909,10 +1895,6 @@ def surface_crossing(P, mcdc):
     surface = mcdc["surfaces"][P["surface_ID"]]
     surface_bc(P, surface, trans)
 
-    # Trigger mesh crossing?
-    if surface["reflective"] and P["event"] == EVENT_SURFACE_N_MESH:
-        mesh_crossing(P, mcdc)
-
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
 
@@ -1958,7 +1940,7 @@ def mesh_crossing(P, mcdc):
             score_crossing_t(P, t, x, y, z, mcdc)
 
     # Shift particle if only mesh crossing occurs
-    if P["event"] == EVENT_MESH:
+    if P["event"] | ALL_EVENTS - EVENT_MESH:
         shift_particle(P, SHIFT)
 
 

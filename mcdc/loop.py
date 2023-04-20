@@ -176,7 +176,7 @@ def loop_particle(P, mcdc):
         event = P["event"]
 
         # Collision
-        if event == EVENT_COLLISION:
+        if event & EVENT_COLLISION:
             # Generate IC?
             if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
                 kernel.bank_IC(P, mcdc)
@@ -192,7 +192,7 @@ def loop_particle(P, mcdc):
                 event = P["event"]
 
                 # Perform collision
-                if event == EVENT_CAPTURE:
+                if event & EVENT_CAPTURE:
                     kernel.capture(P, mcdc)
                 elif event == EVENT_SCATTERING:
                     kernel.scattering(P, mcdc)
@@ -205,52 +205,29 @@ def loop_particle(P, mcdc):
                     kernel.sensitivity_material(P, mcdc)
 
         # Mesh crossing
-        elif event == EVENT_MESH:
+        elif event & EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)
 
         # Surface crossing
-        elif event == EVENT_SURFACE:
+        if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
 
         # Lattice crossing
-        elif event == EVENT_LATTICE:
+        elif event & EVENT_LATTICE:
             kernel.shift_particle(P, SHIFT)
 
         # Time boundary
-        elif event == EVENT_TIME_BOUNDARY:
+        elif event & EVENT_TIME_BOUNDARY:
             kernel.mesh_crossing(P, mcdc)
             kernel.time_boundary(P, mcdc)
 
         # Surface move
-        elif event == EVENT_SURFACE_MOVE:
+        elif event == EVENT_SURFACE + EVENT_MOVE:
             P["t"] += SHIFT
             P["cell_ID"] = -1
 
         # Time census
-        elif event == EVENT_CENSUS:
-            P["t"] += SHIFT
-            kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
-            P["alive"] = False
-
-        # Surface and mesh crossing
-        elif event == EVENT_SURFACE_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
-            kernel.surface_crossing(P, mcdc)
-
-        # Lattice and mesh crossing
-        elif event == EVENT_LATTICE_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
-            kernel.shift_particle(P, SHIFT)
-
-        # Surface move and mesh crossing
-        elif event == EVENT_SURFACE_MOVE_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
-            P["t"] += SHIFT
-            P["cell_ID"] = -1
-
-        # Time census and mesh crossing
-        elif event == EVENT_CENSUS_N_MESH:
-            kernel.mesh_crossing(P, mcdc)
+        elif event & EVENT_CENSUS:
             P["t"] += SHIFT
             kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
             P["alive"] = False
