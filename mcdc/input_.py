@@ -1243,11 +1243,12 @@ def weight_roulette(chance, wr_threshold):
     card["wr_chance"] = chance
     card["wr_threshold"] = wr_threshold
 
-def domain_decomposition(x=[-INF,INF], y=[-INF,INF], z=[-INF,INF], bank_size=1000):
+
+def domain_decomposition(x=[-INF, INF], y=[-INF, INF], z=[-INF, INF], bank_size=1000):
     card = mcdc.input_card.technique
     card["domain_decomposition"] = True
     card["dd_bank_size"] = bank_size
-    
+
     # Set mesh
     card["dd_mesh"]["x"] = np.array(x)
     card["dd_mesh"]["y"] = np.array(y)
@@ -1259,7 +1260,7 @@ def domain_decomposition(x=[-INF,INF], y=[-INF,INF], z=[-INF,INF], bank_size=100
         surface("plane-y", y=i, bc="domain-crossing")
     for i in z[1:-1]:
         surface("plane-z", z=i, bc="domain-crossing")
- 
+
     return card
 
 

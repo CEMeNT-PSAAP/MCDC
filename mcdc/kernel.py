@@ -555,56 +555,91 @@ def distribute_work(N, mcdc):
 
 @njit
 def recover_lost_source(mcdc):
-    #Check all lost source banks from MPI ranks
+    # Check all lost source banks from MPI ranks
     with objmode(size="int64"):
         # Create MPI-supported numpy object
         size = mcdc["bank_lost"]["size"]
         bank = np.array(mcdc["bank_lost"]["particles"][:size])
-        request = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]+1)%mcdc["mpi_size"])
+        request = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] + 1) % mcdc["mpi_size"]
+        )
         mcdc["bank_lost"]["size"] = 0
-        bank = MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]-1)%mcdc["mpi_size"])
+        bank = MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"] - 1) % mcdc["mpi_size"])
         request.Wait()
         size = bank.shape[0]
 
     # Set source bank from buffer
     for i in range(size):
-        add_particle(bank[i],mcdc["bank_active"])
+        add_particle(bank[i], mcdc["bank_active"])
+
 
 @njit
 def dd_particle_transfer(mcdc):
-    #Get particles from MPI ranks of adjacent nodes)
+    # Get particles from MPI ranks of adjacent nodes)
     with objmode(size="int64"):
         # Create MPI-supported numpy object
-        d_Nx = mcdc["technique"]["dd_mesh"]["x"].size-1
-        d_Ny = mcdc["technique"]["dd_mesh"]["y"].size-1
-        
+        d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
+        d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
+
         size = mcdc["bank_domain_x_pos"]["size"]
         bank = np.array(mcdc["bank_domain_x_pos"]["particles"][:size])
-        request1 = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]+1)%mcdc["mpi_size"])
+        request1 = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] + 1) % mcdc["mpi_size"]
+        )
         size = mcdc["bank_domain_x_neg"]["size"]
         bank = np.array(mcdc["bank_domain_x_neg"]["particles"][:size])
-        request2 = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]-1)%mcdc["mpi_size"])
+        request2 = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] - 1) % mcdc["mpi_size"]
+        )
         size = mcdc["bank_domain_y_pos"]["size"]
         bank = np.array(mcdc["bank_domain_y_pos"]["particles"][:size])
-        request3 = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]+d_Nx)%mcdc["mpi_size"])
+        request3 = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] + d_Nx) % mcdc["mpi_size"]
+        )
         size = mcdc["bank_domain_y_neg"]["size"]
         bank = np.array(mcdc["bank_domain_y_neg"]["particles"][:size])
-        request4 = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]-d_Nx)%mcdc["mpi_size"])
+        request4 = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] - d_Nx) % mcdc["mpi_size"]
+        )
         size = mcdc["bank_domain_z_pos"]["size"]
         bank = np.array(mcdc["bank_domain_z_pos"]["particles"][:size])
-        request5 = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]+d_Nx*d_Ny)%mcdc["mpi_size"])
+        request5 = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] + d_Nx * d_Ny) % mcdc["mpi_size"]
+        )
         size = mcdc["bank_domain_z_neg"]["size"]
         bank = np.array(mcdc["bank_domain_z_neg"]["particles"][:size])
-        request6 = MPI.COMM_WORLD.isend(bank, dest=(mcdc["mpi_rank"]-d_Nx*d_Ny)%mcdc["mpi_size"])
-        
+        request6 = MPI.COMM_WORLD.isend(
+            bank, dest=(mcdc["mpi_rank"] - d_Nx * d_Ny) % mcdc["mpi_size"]
+        )
+
         bank = mcdc["bank_active"]["particles"][:0]
-        bank = np.append(bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]-1)%mcdc["mpi_size"]))
-        bank = np.append(bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]+1)%mcdc["mpi_size"]))
-        bank = np.append(bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]-d_Nx)%mcdc["mpi_size"]))
-        bank = np.append(bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]+d_Nx)%mcdc["mpi_size"]))
-        bank = np.append(bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]-d_Nx*d_Ny)%mcdc["mpi_size"]))
-        bank = np.append(bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"]+d_Nx*d_Ny)%mcdc["mpi_size"]))
-        
+        bank = np.append(
+            bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"] - 1) % mcdc["mpi_size"])
+        )
+        bank = np.append(
+            bank, MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"] + 1) % mcdc["mpi_size"])
+        )
+        bank = np.append(
+            bank,
+            MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"] - d_Nx) % mcdc["mpi_size"]),
+        )
+        bank = np.append(
+            bank,
+            MPI.COMM_WORLD.recv(source=(mcdc["mpi_rank"] + d_Nx) % mcdc["mpi_size"]),
+        )
+        bank = np.append(
+            bank,
+            MPI.COMM_WORLD.recv(
+                source=(mcdc["mpi_rank"] - d_Nx * d_Ny) % mcdc["mpi_size"]
+            ),
+        )
+        bank = np.append(
+            bank,
+            MPI.COMM_WORLD.recv(
+                source=(mcdc["mpi_rank"] + d_Nx * d_Ny) % mcdc["mpi_size"]
+            ),
+        )
+
         mcdc["bank_domain_x_pos"]["size"] = 0
         request1.Wait()
         mcdc["bank_domain_x_neg"]["size"] = 0
@@ -621,8 +656,8 @@ def dd_particle_transfer(mcdc):
 
     # Set source bank from buffer
     for i in range(size):
-        add_particle(bank[i],mcdc["bank_active"])
-            
+        add_particle(bank[i], mcdc["bank_active"])
+
 
 # =============================================================================
 # IC generator
@@ -854,11 +889,9 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
         if cell_check(P, cell, trans, mcdc):
             return cell["ID"]
 
-    
-
     # Particle is not found
     add_particle(copy_particle(P), mcdc["bank_lost"])
-    #print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
+    # print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
     P["alive"] = False
     return -1
 
@@ -993,6 +1026,7 @@ def surface_bc(P, surface, trans):
         P["alive"] = False
     elif surface["reflective"]:
         surface_reflect(P, surface, trans)
+
 
 @njit
 def surface_reflect(P, surface, trans):
@@ -1991,24 +2025,24 @@ def surface_crossing(P, mcdc):
 
     # Record old material for sensitivity quantification
     material_ID_old = P["material_ID"]
-    
+
     if surface["domain-crossing"]:
-        if (surface["nx"] != 0 and P['ux'] > 0):
+        if surface["nx"] != 0 and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_x_pos"])
             P["alive"] = False
-        elif (surface["nx"] != 0 and P['ux'] < 0):
+        elif surface["nx"] != 0 and P["ux"] < 0:
             add_particle(copy_particle(P), mcdc["bank_domain_x_neg"])
             P["alive"] = False
-        elif (surface["ny"] != 0 and P['uy'] > 0):
+        elif surface["ny"] != 0 and P["uy"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_y_pos"])
             P["alive"] = False
-        elif (surface["ny"] != 0 and P['uy'] < 0):
+        elif surface["ny"] != 0 and P["uy"] < 0:
             add_particle(copy_particle(P), mcdc["bank_domain_y_neg"])
             P["alive"] = False
-        elif (surface["nz"] != 0 and P['uz'] > 0):
+        elif surface["nz"] != 0 and P["uz"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_z_pos"])
             P["alive"] = False
-        elif (surface["nz"] != 0 and P['uz'] < 0):
+        elif surface["nz"] != 0 and P["uz"] < 0:
             add_particle(copy_particle(P), mcdc["bank_domain_z_neg"])
             P["alive"] = False
 
@@ -2024,6 +2058,7 @@ def surface_crossing(P, mcdc):
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
             sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc)
+
 
 # =============================================================================
 # Mesh crossing

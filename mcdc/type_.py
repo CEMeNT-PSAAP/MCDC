@@ -606,13 +606,15 @@ def make_type_technique(card):
     ]
 
     ######################
-    #Domain Decomposition
+    # Domain Decomposition
     ######################
-    mesh = np.dtype([
-                ("x", float64, (len(card.technique["dd_mesh"]["x"]),)),
-                ("y", float64, (len(card.technique["dd_mesh"]["y"]),)),
-                ("z", float64, (len(card.technique["dd_mesh"]["z"]),)),
-            ])
+    mesh = np.dtype(
+        [
+            ("x", float64, (len(card.technique["dd_mesh"]["x"]),)),
+            ("y", float64, (len(card.technique["dd_mesh"]["y"]),)),
+            ("z", float64, (len(card.technique["dd_mesh"]["z"]),)),
+        ]
+    )
     struct += [("dd_mesh", mesh)]
 
     struct += [
@@ -621,6 +623,7 @@ def make_type_technique(card):
     ]
     # Finalize technique type
     technique = np.dtype(struct)
+
 
 # ==============================================================================
 # Global

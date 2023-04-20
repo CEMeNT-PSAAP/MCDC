@@ -25,7 +25,7 @@ def run():
     # Preparation:
     #   process input cards, make types, and allocate global variables
     preparation_start = MPI.Wtime()
-    if(input_card.technique["domain_decomposition"]):
+    if input_card.technique["domain_decomposition"]:
         dd_prepare()
     prepare()
     input_card.reset()
@@ -330,7 +330,7 @@ def prepare():
             N = mcdc["setting"]["N_particle"]
             np.random.seed(seed)
             mcdc["technique"]["lds"] = np.random.random((N, N_dim))
-    
+
     # =========================================================================
     # Domain Decomposition
     # =========================================================================
@@ -391,92 +391,102 @@ def prepare():
     if not mcdc["setting"]["mode_eigenvalue"]:
         mcdc["cycle_active"] = True
 
+
 def dd_prepare():
     print("TODO: clean input card before prepare")
-    
-    d_idx = MPI.COMM_WORLD.Get_rank()
-    d_Nx = input_card.technique["dd_mesh"]["x"].size-1
-    d_Ny = input_card.technique["dd_mesh"]["y"].size-1
-    d_Nz = input_card.technique["dd_mesh"]["z"].size-1
 
-    #Allocate MPI ranks to domains
-    d_ix = d_idx%d_Nx
-    d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
-    d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
-    
-    d_idx = MPI.COMM_WORLD.Get_rank()%(d_Nx*d_Ny*d_Nz)
+    d_idx = MPI.COMM_WORLD.Get_rank()
+    d_Nx = input_card.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_card.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_card.technique["dd_mesh"]["z"].size - 1
+
+    # Allocate MPI ranks to domains
+    d_ix = d_idx % d_Nx
+    d_iy = int(((d_idx - d_ix) / d_Nx) % d_Ny)
+    d_iz = int((((d_idx - d_ix) / d_Nx - d_iy) / d_Ny) % d_Nz)
+
+    d_idx = MPI.COMM_WORLD.Get_rank() % (d_Nx * d_Ny * d_Nz)
     input_card.technique["d_idx"] = d_idx
 
-    #Bounds of domain
+    # Bounds of domain
     x_min = input_card.technique["dd_mesh"]["x"][d_ix]
-    x_max = input_card.technique["dd_mesh"]["x"][d_ix+1]
+    x_max = input_card.technique["dd_mesh"]["x"][d_ix + 1]
     y_min = input_card.technique["dd_mesh"]["y"][d_iy]
-    y_max = input_card.technique["dd_mesh"]["y"][d_iy+1]
+    y_max = input_card.technique["dd_mesh"]["y"][d_iy + 1]
     z_min = input_card.technique["dd_mesh"]["z"][d_iz]
-    z_max = input_card.technique["dd_mesh"]["z"][d_iz+1]
-   
+    z_max = input_card.technique["dd_mesh"]["z"][d_iz + 1]
+
     #############################################
     # Delete everything that is outside of domain
     #############################################
 
-    #Replace existing surfaces on domain boundary with domain crossing surfaces
-    #If cell is entirely in domain, it can remain (volume of cell and domain == cell volume)
-    #if cell is partially in domain, remove surfaces from cell that do not intersect domain box and add dd surfaces
-    #if cell is not in domain, remove (volume of cell and domain == 0)
+    # Replace existing surfaces on domain boundary with domain crossing surfaces
+    # If cell is entirely in domain, it can remain (volume of cell and domain == cell volume)
+    # if cell is partially in domain, remove surfaces from cell that do not intersect domain box and add dd surfaces
+    # if cell is not in domain, remove (volume of cell and domain == 0)
     for cell in input_card.cells:
-        if (d_ix > 0):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+1-d_Nx+d_ix)
-            cell["positive_flags"] = np.append(cell["positive_flags"],True)
+        if d_ix > 0:
+            cell["surface_IDs"] = np.append(
+                cell["surface_IDs"], -d_Nz + 1 - d_Ny + 1 - d_Nx + d_ix
+            )
+            cell["positive_flags"] = np.append(cell["positive_flags"], True)
             cell["N_surface"] += 1
-        if (d_ix < d_Nx-1):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+1-d_Nx+d_ix+1)
-            cell["positive_flags"] = np.append(cell["positive_flags"],False)
+        if d_ix < d_Nx - 1:
+            cell["surface_IDs"] = np.append(
+                cell["surface_IDs"], -d_Nz + 1 - d_Ny + 1 - d_Nx + d_ix + 1
+            )
+            cell["positive_flags"] = np.append(cell["positive_flags"], False)
             cell["N_surface"] += 1
-        if (d_iy > 0):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+d_iy)
-            cell["positive_flags"] = np.append(cell["positive_flags"],True)
+        if d_iy > 0:
+            cell["surface_IDs"] = np.append(
+                cell["surface_IDs"], -d_Nz + 1 - d_Ny + d_iy
+            )
+            cell["positive_flags"] = np.append(cell["positive_flags"], True)
             cell["N_surface"] += 1
-        if (d_iy < d_Ny-1):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+1-d_Ny+d_iy+1)
-            cell["positive_flags"] = np.append(cell["positive_flags"],False)
+        if d_iy < d_Ny - 1:
+            cell["surface_IDs"] = np.append(
+                cell["surface_IDs"], -d_Nz + 1 - d_Ny + d_iy + 1
+            )
+            cell["positive_flags"] = np.append(cell["positive_flags"], False)
             cell["N_surface"] += 1
-        if (d_iz > 0):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+d_iz)
-            cell["positive_flags"] = np.append(cell["positive_flags"],True)
+        if d_iz > 0:
+            cell["surface_IDs"] = np.append(cell["surface_IDs"], -d_Nz + d_iz)
+            cell["positive_flags"] = np.append(cell["positive_flags"], True)
             cell["N_surface"] += 1
-        if (d_iz < d_Nz-1):
-            cell["surface_IDs"] = np.append(cell["surface_IDs"],-d_Nz+d_iz+1)
-            cell["positive_flags"] = np.append(cell["positive_flags"],False)
+        if d_iz < d_Nz - 1:
+            cell["surface_IDs"] = np.append(cell["surface_IDs"], -d_Nz + d_iz + 1)
+            cell["positive_flags"] = np.append(cell["positive_flags"], False)
             cell["N_surface"] += 1
+
+
 #        for i in range(cell["N_surface"]):
 #            sid = input_card["surfaces"][cell["surface_IDs"][i]]
 #            direction = cell["positive_flags"][i]
-    ##Surfaces
-    #eliminate surfaces that do not appear in surface IDs of cells
-    #decrement all surfaces IDs for surface IDs greater than the deleted surface
+##Surfaces
+# eliminate surfaces that do not appear in surface IDs of cells
+# decrement all surfaces IDs for surface IDs greater than the deleted surface
 
-    ##Lattices
-    #eliminate lattices that do not appear in the lattice IDS of the cells
+##Lattices
+# eliminate lattices that do not appear in the lattice IDS of the cells
 
-    ##Universes
-    #eliminate universes that do not appear in the universe IDs of lattices
+##Universes
+# eliminate universes that do not appear in the universe IDs of lattices
 
-    ##Materials
-    #eliminate materials that do not appear in either a cell or a lattice
+##Materials
+# eliminate materials that do not appear in either a cell or a lattice
 
-    ##Nuclides
-    #eliminate nuclides that do not appear in a material
-    
-    ##Sources
-    #If source is entirely in domain, copy
-    #if source is partially in domain, modify source shape and strength
-    #if source is not in domain, discard
-    # consideration needed for how to correct solution, since no longer uniformly sampling source
-    # Or sample from all input sources and distribute those particles to relevant nodes later
-    
-    ##Tallies
-    #Only include tally meshs to that overlap with subdomain
+##Nuclides
+# eliminate nuclides that do not appear in a material
 
+##Sources
+# If source is entirely in domain, copy
+# if source is partially in domain, modify source shape and strength
+# if source is not in domain, discard
+# consideration needed for how to correct solution, since no longer uniformly sampling source
+# Or sample from all input sources and distribute those particles to relevant nodes later
+
+##Tallies
+# Only include tally meshs to that overlap with subdomain
 
 
 def generate_hdf5():
