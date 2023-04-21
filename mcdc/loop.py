@@ -175,6 +175,8 @@ def loop_particle(P, mcdc):
         kernel.move_to_event(P, mcdc)
         event = P["event"]
 
+        # The & operator here is a bitwise and. It is used to determine if an event type is part of the particle event.
+
         # Collision
         if event & EVENT_COLLISION:
             # Generate IC?
@@ -203,25 +205,16 @@ def loop_particle(P, mcdc):
                 if material["sensitivity"] and P["sensitivity_ID"] == 0:
                     kernel.sensitivity_material(P, mcdc)
 
-        # Mesh crossing
-        elif event & EVENT_MESH:
+        # Mesh tally
+        if event & EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)
 
         # Surface crossing
         if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
 
-        # Lattice crossing
-        elif event & EVENT_LATTICE:
-            kernel.shift_particle(P, SHIFT)
-
-        # Time boundary
-        elif event & EVENT_TIME_BOUNDARY:
-            kernel.mesh_crossing(P, mcdc)
-            kernel.time_boundary(P, mcdc)
-
         # Surface move
-        elif event == EVENT_SURFACE + EVENT_MOVE:
+        elif event & EVENT_MOVE:
             P["t"] += SHIFT
             P["cell_ID"] = -1
 
@@ -230,6 +223,14 @@ def loop_particle(P, mcdc):
             P["t"] += SHIFT
             kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
             P["alive"] = False
+
+        # Shift particle
+        elif event & EVENT_LATTICE + EVENT_MESH:
+            kernel.shift_particle(P, SHIFT)
+
+        # Time boundary
+        if event & EVENT_TIME_BOUNDARY:
+            kernel.time_boundary(P, mcdc)
 
         # Apply weight window
         if mcdc["technique"]["weight_window"]:

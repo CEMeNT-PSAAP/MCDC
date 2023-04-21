@@ -1789,7 +1789,7 @@ def distance_to_boundary(P, mcdc):
             P["translation"][:] = trans
 
             if surface_move:
-                event += EVENT_MOVE
+                event = EVENT_MOVE
 
         # Lattice cell?
         if cell["lattice"]:
@@ -1939,10 +1939,6 @@ def mesh_crossing(P, mcdc):
             score_crossing_z(P, t, x, y, z, mcdc)
         if flag == MESH_T and mcdc["tally"]["crossing_t"]:
             score_crossing_t(P, t, x, y, z, mcdc)
-
-    # Shift particle if only mesh crossing occurs
-    if P["event"] == EVENT_MESH:
-        shift_particle(P, SHIFT)
 
 
 # =============================================================================

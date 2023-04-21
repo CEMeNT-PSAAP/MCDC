@@ -2,6 +2,7 @@ import math
 import numpy as np
 
 # Events
+# The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
 EVENT_COLLISION = 1 << 0
 EVENT_SURFACE = 1 << 1
 EVENT_CENSUS = 1 << 2
@@ -12,8 +13,6 @@ EVENT_CAPTURE = 1 << 6
 EVENT_TIME_BOUNDARY = 1 << 7
 EVENT_LATTICE = 1 << 8
 EVENT_MOVE = 1 << 9
-
-ALL_EVENTS = 1 << 10 - 1
 
 # Mesh crossing flags
 MESH_X = 0
