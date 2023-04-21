@@ -1766,6 +1766,7 @@ def distance_to_boundary(P, mcdc):
     """
 
     distance = INF
+    event = 0
 
     # Translation accumulator
     trans = np.zeros(3)
@@ -1940,7 +1941,7 @@ def mesh_crossing(P, mcdc):
             score_crossing_t(P, t, x, y, z, mcdc)
 
     # Shift particle if only mesh crossing occurs
-    if not P["event"] | ALL_EVENTS - EVENT_MESH:
+    if not P["event"] - EVENT_MESH:
         shift_particle(P, SHIFT)
 
 
