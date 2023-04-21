@@ -1691,23 +1691,21 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    distance = d_boundary
-    if d_time_boundary * PREC < distance:
-        event = EVENT_TIME_BOUNDARY
-        distance = d_time_boundary
-    if d_time_census * PREC < distance:
-        event = EVENT_CENSUS
-        distance = d_time_census
-    if d_mesh * PREC < distance:
-        event = EVENT_MESH
-        distance = d_mesh
-    if d_collision * PREC < distance:
-        event = EVENT_COLLISION
-        distance = d_collision
+    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision)
 
-    # Crossing both boundary and mesh
-    if d_boundary == d_mesh or d_time_census == d_mesh:
+    # Remove the boundary event if it is not the nearest
+    if d_boundary > distance * PREC:
+        event = 0
+
+    # Add each event if it is within PREC of the nearest event
+    if d_time_boundary <= distance * PREC:
+        event += EVENT_TIME_BOUNDARY
+    if d_time_census <= distance * PREC:
+        event += EVENT_CENSUS
+    if d_mesh <= distance * PREC:
         event += EVENT_MESH
+    if d_collision <= distance * PREC:
+        event = EVENT_COLLISION
 
     # Assign event
     P["event"] = event

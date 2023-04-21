@@ -209,6 +209,7 @@ def loop_particle(P, mcdc):
         if event & EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)
 
+        # Different Methods for shifting the particle
         # Surface crossing
         if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
