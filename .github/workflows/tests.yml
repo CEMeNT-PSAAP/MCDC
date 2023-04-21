@@ -17,7 +17,6 @@ jobs:
         ls
     - name: Install dependencies
       run: |
-        module avail MPI
         pip install numpy
         pip install numba
         pip install h5py
@@ -26,10 +25,12 @@ jobs:
         pip install pytest
         pip list
         pip install -e .
-        wget https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz
-        tar -zxf mpi4py-3.1.4.tar.gz
-        cd mpi4py-3.1.4
-        python setup.py install
+        pip install mpich
+        pip install mpi4py
+#        wget https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz
+#        tar -zxf mpi4py-3.1.4.tar.gz
+#        cd mpi4py-3.1.4
+#        python setup.py install
     - name: Run Unit Tests
       run: |
         pytest
