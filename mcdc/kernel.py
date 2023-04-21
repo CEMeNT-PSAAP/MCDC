@@ -1704,7 +1704,7 @@ def move_to_event(P, mcdc):
         event += EVENT_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
-    if d_collision <= distance * PREC:
+    if d_collision == distance:
         event = EVENT_COLLISION
 
     # Assign event
