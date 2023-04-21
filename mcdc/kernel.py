@@ -1941,7 +1941,7 @@ def mesh_crossing(P, mcdc):
             score_crossing_t(P, t, x, y, z, mcdc)
 
     # Shift particle if only mesh crossing occurs
-    if not P["event"] - EVENT_MESH:
+    if P["event"] == EVENT_MESH:
         shift_particle(P, SHIFT)
 
 
