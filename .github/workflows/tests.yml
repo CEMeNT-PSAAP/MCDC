@@ -23,13 +23,14 @@ jobs:
         pip install matplotlib
         pip install scipy
         pip install pytest
+        conda install -c conda-forge mpi4py mpich
         pip list
         pip install -e .
-        wget https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz
-        tar -zxf mpi4py-3.1.4.tar.gz
-        cd mpi4py-3.1.4
-        python setup.py install
-        cd ..
+#        wget https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz
+#        tar -zxf mpi4py-3.1.4.tar.gz
+#        cd mpi4py-3.1.4
+#        python setup.py install
+#        cd ..
     - name: Run Unit Tests
       run: |
         pytest
