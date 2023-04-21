@@ -17,6 +17,7 @@ jobs:
         ls
     - name: Install dependencies
       run: |
+        module load gcc/10.3 mpich/4.0h_gcc-10
         pip install numpy
         pip install numba
         pip install mpi4py
