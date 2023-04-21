@@ -23,10 +23,10 @@ jobs:
         conda install h5py
         conda install matplotlib
         conda install scipy
-        conda install pytest
+        pip install pytest
+        pip list
     - name: Run Unit Tests
       run: |
-        cd test
         pytest
       
       
