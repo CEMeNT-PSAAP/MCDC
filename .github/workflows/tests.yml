@@ -17,13 +17,12 @@ jobs:
         ls
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install numpy
-        pip install numba
-        pip install mpi4py
-        pip install h5py
-        pip install matplotlib
-        pip install scipy
+        conda install numpy
+        conda install numba
+        conda install mpi4py
+        conda install h5py
+        conda install matplotlib
+        conda install scipy
     - name: Run Unit Tests
       run: |
         pytest
