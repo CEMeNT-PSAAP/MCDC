@@ -190,7 +190,6 @@ def loop_particle(P, mcdc):
                 # Get collision type
                 kernel.collision(P, mcdc)
                 event = P["event"]
-
                 # Perform collision
                 if event & EVENT_CAPTURE:
                     kernel.capture(P, mcdc)
