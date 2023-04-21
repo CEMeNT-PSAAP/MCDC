@@ -25,6 +25,7 @@ jobs:
         pip install scipy
         pip install pytest
         pip list
+        pip install -e .
     - name: Run Unit Tests
       run: |
         pytest
