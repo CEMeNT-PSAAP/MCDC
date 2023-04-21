@@ -26,7 +26,7 @@ jobs:
         conda install pytest
     - name: Run Unit Tests
       run: |
-        cd ..
+        cd test
         pytest
       
       
