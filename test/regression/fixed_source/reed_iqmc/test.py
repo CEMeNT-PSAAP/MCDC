@@ -80,3 +80,7 @@ def test():
     answer.close()
 
     assert np.allclose(a, b)
+
+
+if __name__ == "__main__":
+    test()

@@ -1,6 +1,10 @@
 import numpy as np
 import h5py
 import mcdc
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 
 def test():
@@ -58,7 +62,7 @@ def test():
         generator=generator,
     )
     # Setting
-    mcdc.setting(N_particle=N)
+    mcdc.setting(N_particle=N, progress_bar=False)
     mcdc.eigenmode()
 
     # Run
@@ -67,20 +71,20 @@ def test():
     # =========================================================================
     # Check output
     # =========================================================================
+    if rank == 0:
+        output = h5py.File("output.h5", "r")
+        answer = h5py.File("answer.h5", "r")
 
-    output = h5py.File("output.h5", "r")
-    answer = h5py.File("answer.h5", "r")
+        a = answer["tally/iqmc_flux"][:]
+        b = output["tally/iqmc_flux"][:]
+        assert np.allclose(a, b)
 
-    a = answer["tally/iqmc_flux"][:]
-    b = output["tally/iqmc_flux"][:]
-    assert np.allclose(a, b)
+        a = output["k_eff"][()]
+        b = answer["k_eff"][()]
+        assert np.allclose(a, b)
 
-    a = output["k_eff"][()]
-    b = answer["k_eff"][()]
-    assert np.allclose(a, b)
-
-    output.close()
-    answer.close()
+        output.close()
+        answer.close()
 
 
 if __name__ == "__main__":

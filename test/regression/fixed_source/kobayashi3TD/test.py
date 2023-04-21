@@ -79,3 +79,7 @@ def test():
     output.close()
     answer.close()
     assert True
+
+
+if __name__ == "__main__":
+    test()

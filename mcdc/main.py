@@ -36,7 +36,6 @@ def run():
         print_header_eigenvalue(mcdc)
 
     # Run simulation
-    # TODO: add if iQMC execute iqmc_loop()
     simulation_start = MPI.Wtime()
 
     # iQMC loop

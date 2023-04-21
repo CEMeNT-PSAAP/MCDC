@@ -1,7 +1,10 @@
 import numpy as np
 import h5py
-
 import mcdc
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 
 def test():
@@ -83,31 +86,35 @@ def test():
     # =========================================================================
     # Check output
     # =========================================================================
+    if rank == 0:
+        output = h5py.File("output.h5", "r")
+        answer = h5py.File("answer.h5", "r")
+        for score in scores:
+            name = "tally/" + score + "/mean"
+            a = output[name][:]
+            b = answer[name][:]
+            assert np.allclose(a, b)
 
-    output = h5py.File("output.h5", "r")
-    answer = h5py.File("answer.h5", "r")
-    for score in scores:
-        name = "tally/" + score + "/mean"
-        a = output[name][:]
-        b = answer[name][:]
+            name = "tally/" + score + "/sdev"
+            a = output[name][:]
+            b = answer[name][:]
+            assert np.allclose(a, b)
+
+        a = output["k_cycle"][:]
+        b = answer["k_cycle"][:]
         assert np.allclose(a, b)
 
-        name = "tally/" + score + "/sdev"
-        a = output[name][:]
-        b = answer[name][:]
+        a = output["k_mean"][()]
+        b = answer["k_mean"][()]
         assert np.allclose(a, b)
 
-    a = output["k_cycle"][:]
-    b = answer["k_cycle"][:]
-    assert np.allclose(a, b)
+        a = output["gyration_radius"][:]
+        b = answer["gyration_radius"][:]
+        assert np.allclose(a, b)
 
-    a = output["k_mean"][()]
-    b = answer["k_mean"][()]
-    assert np.allclose(a, b)
+        output.close()
+        answer.close()
 
-    a = output["gyration_radius"][:]
-    b = answer["gyration_radius"][:]
-    assert np.allclose(a, b)
 
-    output.close()
-    answer.close()
+if __name__ == "__main__":
+    test()
