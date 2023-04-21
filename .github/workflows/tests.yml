@@ -17,6 +17,7 @@ jobs:
         ls
     - name: Install dependencies
       run: |
+        module avail MPI
         pip install numpy
         pip install numba
         pip install h5py
