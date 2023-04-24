@@ -1,0 +1,31 @@
+
+Run all test problems for regression / unit (in test/)
+==================================================
+pytest
+
+Run specific subset (unit, regression, smoke, etc.)
+==================================================
+pytest -m smoke
+
+Run specific mode (numba, python)
+==================================================
+pytest -k python
+
+Stop after first failure
+==================================================
+pytest -x
+
+Stop after N failures
+==================================================
+pytest --maxfail=<N>
+
+Pick N processors to use
+==================================================
+pytest --nprocess=<N>
+
+Run Verification directly after failure
+==================================================
+pytest --verify
+
+
+* I include the -v to see more description of the tests

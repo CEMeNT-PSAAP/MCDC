@@ -11,6 +11,7 @@ for task in os.scandir("./fixed_source"):
     os.system("python process.py %i %i" % (N_min, N_max))
     os.chdir(r"../..")
 
+
 # Eigenvalue
 """
 N_min = 1

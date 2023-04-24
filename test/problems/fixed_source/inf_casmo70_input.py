@@ -1,0 +1,57 @@
+import numpy as np
+import argparse
+
+import mcdc
+
+parser = argparse.ArgumentParser(description="Setting changeable parameters")
+parser.add_argument(
+    "--particles", action="store", dest="N_particle", type=int, default=100
+)
+parser.add_argument(
+    "--file", action="store", dest="output_file", type=str, default="output"
+)
+parser.add_argument("--mode", action="store", dest="mode", type=bool, default=False)
+args = parser.parse_args()
+
+# =========================================================================
+# Set model and run
+# =========================================================================
+
+with np.load("CASMO-70.npz") as data:
+    SigmaC = data["SigmaC"] * 1.5  # /cm
+    SigmaS = data["SigmaS"]
+    SigmaF = data["SigmaF"]
+    nu_p = data["nu_p"]
+    nu_d = data["nu_d"]
+    chi_p = data["chi_p"]
+    chi_d = data["chi_d"]
+    G = data["G"]
+    speed = data["v"]
+    lamd = data["lamd"]
+
+m = mcdc.material(
+    capture=SigmaC,
+    scatter=SigmaS,
+    fission=SigmaF,
+    nu_p=nu_p,
+    chi_p=chi_p,
+    nu_d=nu_d,
+    chi_d=chi_d,
+)
+
+s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
+s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
+
+c = mcdc.cell([+s1, -s2], m)
+
+energy = np.zeros(G)
+energy[-1] = 1.0
+source = mcdc.source(energy=energy)
+
+scores = ["flux"]
+mcdc.tally(scores=scores)
+
+mcdc.setting(N_particle=args.N_particle, progress_bar=False, output=args.output_file)
+
+
+mcdc.run()

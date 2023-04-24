@@ -1,6 +1,8 @@
 import numpy as np
 import os
 import sys
+import matplotlib.pyplot as plt
+
 
 if len(sys.argv) > 1:
     N_proc = int(sys.argv[1])
@@ -22,6 +24,7 @@ for task in os.scandir("./fixed_source"):
                     "srun -n %i python input.py --mode=numba %i" % (N_proc, N_hist)
                 )
     os.chdir(r"../..")
+
 
 # Eigenvalue
 """
