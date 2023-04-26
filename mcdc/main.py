@@ -561,7 +561,7 @@ def generate_hdf5():
     # Save particle?
     if mcdc["setting"]["save_particle"]:
         # Gather source bank
-        # TODO: Parallel HDF5
+        # TODO: Parallel HDF5 and mitigation of large data passing
         N = mcdc["bank_source"]["size"]
         neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
 
