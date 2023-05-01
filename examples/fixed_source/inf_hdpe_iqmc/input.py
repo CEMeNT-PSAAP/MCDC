@@ -41,7 +41,7 @@ mcdc.cell([+s1, -s2], m1)
 
 Nx = 5
 fixed_source = np.ones((G, Nx))
-material_idx = np.zeros(Nx, dtype=int)
+# material_idx = np.zeros(Nx, dtype=int)
 phi0 = np.ones((G, Nx))
 
 mcdc.iQMC(
@@ -49,7 +49,6 @@ mcdc.iQMC(
     x=np.linspace(LB, RB, num=Nx + 1),
     fixed_source=fixed_source,
     phi0=phi0,
-    material_idx=material_idx,
     maxitt=25,
     tol=1e-3,
     generator="halton",

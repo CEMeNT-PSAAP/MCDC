@@ -1,6 +1,7 @@
 import numba as nb
+from numba import njit
+import numpy as np
 import sys
-
 from mpi4py import MPI
 
 
@@ -80,7 +81,7 @@ def print_progress(percent, mcdc):
                 )
             else:
                 sys.stdout.write(
-                    " [%-32s] %d%%" % ("=" * int(percent * 32), percent * 100.0)
+                    "[%-32s] %d%%" % ("=" * int(percent * 32), percent * 100.0)
                 )
         sys.stdout.flush()
 
@@ -90,6 +91,9 @@ def print_header_eigenvalue(mcdc):
         if mcdc["setting"]["gyration_radius"]:
             print("\n #     k        GyRad.  k (avg)            ")
             print(" ==== ======= ====== ===================")
+        elif mcdc["technique"]["iQMC"]:
+            print("\n #     k        Residual         ")
+            print(" ==== ======= ===================")
         else:
             print("\n #     k        k (avg)            ")
             print(" ==== ======= ===================")
@@ -102,7 +106,6 @@ def print_progress_eigenvalue(mcdc):
         k_avg = mcdc["k_avg_running"]
         k_sdv = mcdc["k_sdv_running"]
         gr = mcdc["gyration_radius"][i_cycle]
-
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
             sys.stdout.write("\033[K")
@@ -111,7 +114,7 @@ def print_progress_eigenvalue(mcdc):
                 print(" %-4i  %.5f  %6.2f" % (i_cycle + 1, k_eff, gr))
             else:
                 print(
-                    " %-4i  %.5f  %6.2f  %.5f +/- %.5f"
+                    " %-2i  %.5f  %6.2f  %.5f +/- %.5f"
                     % (i_cycle + 1, k_eff, gr, k_avg, k_sdv)
                 )
         else:
@@ -119,7 +122,32 @@ def print_progress_eigenvalue(mcdc):
                 print(" %-4i  %.5f" % (i_cycle + 1, k_eff))
             else:
                 print(" %-4i  %.5f  %.5f +/- %.5f" % (i_cycle + 1, k_eff, k_avg, k_sdv))
-        sys.stdout.flush()
+
+
+@njit
+def print_iqmc_eigenvalue_progress(mcdc):
+    if master:
+        k_eff = mcdc["k_eff"]
+        itt = mcdc["technique"]["iqmc_itt_outter"]
+        res = mcdc["technique"]["iqmc_res_outter"]
+        print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
+
+
+@njit
+def print_iqmc_eigenvalue_exit_code(mcdc):
+    if master:
+        maxit = mcdc["technique"]["iqmc_maxitt"]
+        itt = mcdc["technique"]["iqmc_itt_outter"]
+        tol = mcdc["technique"]["iqmc_tol"]
+        res = mcdc["technique"]["iqmc_res_outter"]
+        if itt >= maxit:
+            print("\n ================================")
+            print(
+                " Power Iteration convergence to tolerance not achieved: Maximum number of iterations."
+            )
+        elif res <= tol:
+            print("\n ================================")
+            print("Successful Power Iteration convergence.")
 
 
 def print_runtime(mcdc):
@@ -164,7 +192,7 @@ def print_bank(bank, show_content=False):
     print("\n")
 
 
-@nb.njit
+@njit
 def print_progress_iqmc(mcdc):
     # TODO: function was not working with numba when structured like the
     # other print_progress functions
