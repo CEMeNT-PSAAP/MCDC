@@ -87,15 +87,19 @@ class InputCard:
             "rng_mod": 2**63,
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
-            "N_cycle_buff": 0,
             "k_init": 1.0,
             "output": "output",
             "progress_bar": True,
             "gyration_radius": False,
             "gyration_radius_type": GR_ALL,
-            "filed_source": False,
-            "source_file": "",
+            "source_file": False,
+            "source_file_name": "",
             "track_particle": False,
+            "save_particle": False,
+            "save_input_deck": True,
+            "IC_file": False,
+            "IC_file_name": "",
+            "N_precursor": 0,
         }
 
         self.technique = {
@@ -117,9 +121,6 @@ class InputCard:
             },
             "time_census": False,
             "census_time": np.array([INF]),
-            "IC_generator": False,
-            "IC_N_neutron": 0,
-            "IC_N_precursor": 0,
             "weight_roulette": False,
             "wr_threshold": 0.0,
             "wr_target": 1.0,
@@ -149,6 +150,14 @@ class InputCard:
             },
             "sensitivity": 0,
             "sensitivity_N": 0,
+            "IC_generator": False,
+            "IC_N_neutron": 0,
+            "IC_N_precursor": 0,
+            "IC_neutron_density": 0.0,
+            "IC_precursor_density": 0.0,
+            "IC_neutron_density_max": 0.0,
+            "IC_precursor_density_max": 0.0,
+            "IC_cycle_stretch": 1.0,
         }
 
 

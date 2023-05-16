@@ -90,13 +90,13 @@ def print_header_eigenvalue(mcdc):
     if master:
         if mcdc["setting"]["gyration_radius"]:
             print("\n #     k        GyRad.  k (avg)            ")
-            print(" ==== ======= ====== ===================")
+            print(" ====  =======  ======  ===================")
         elif mcdc["technique"]["iQMC"]:
             print("\n #     k        Residual         ")
             print(" ==== ======= ===================")
         else:
             print("\n #     k        k (avg)            ")
-            print(" ==== ======= ===================")
+            print(" ====  =======  ===================")
 
 
 def print_progress_eigenvalue(mcdc):
@@ -114,7 +114,7 @@ def print_progress_eigenvalue(mcdc):
                 print(" %-4i  %.5f  %6.2f" % (i_cycle + 1, k_eff, gr))
             else:
                 print(
-                    " %-2i  %.5f  %6.2f  %.5f +/- %.5f"
+                    " %-4i  %.5f  %6.2f  %.5f +/- %.5f"
                     % (i_cycle + 1, k_eff, gr, k_avg, k_sdv)
                 )
         else:
