@@ -26,7 +26,6 @@ def run():
     #   process input cards, make types, and allocate global variables
     preparation_start = MPI.Wtime()
     prepare()
-    input_card.reset()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -63,11 +62,15 @@ def prepare():
     global mcdc
 
     # =========================================================================
-    # Some numbers
+    # Sizes
+    #   We need this to determine the maximum size of model objects
     # =========================================================================
 
+    # Neutron and delayed neutron precursor group sizes
     G = input_card.materials[0]["G"]
     J = input_card.materials[0]["J"]
+
+    # Number of model objects
     N_nuclide = len(input_card.nuclides)
     N_material = len(input_card.materials)
     N_surface = len(input_card.surfaces)
@@ -75,21 +78,26 @@ def prepare():
     N_universe = len(input_card.universes)
     N_lattice = len(input_card.lattices)
     N_source = len(input_card.sources)
+
+    # Simulation parameters
     N_particle = input_card.setting["N_particle"]
     N_cycle = input_card.setting["N_cycle"]
-    # Derived numbers
+
+    # Maximum object reference
     Nmax_nuclide = 0
     Nmax_surface = 0
-    Nmax_slice = 0  # Surface time-dependence slice
     Nmax_cell = 0
     for material in input_card.materials:
         Nmax_nuclide = max(Nmax_nuclide, material["N_nuclide"])
-    for surface in input_card.surfaces:
-        Nmax_slice = max(Nmax_slice, surface["N_slice"])
     for cell in input_card.cells:
         Nmax_surface = max(Nmax_surface, cell["N_surface"])
     for universe in input_card.universes:
         Nmax_cell = max(Nmax_cell, universe["N_cell"])
+
+    # Maximum time-dependent surface slices
+    Nmax_slice = 0
+    for surface in input_card.surfaces:
+        Nmax_slice = max(Nmax_slice, surface["N_slice"])
 
     # =========================================================================
     # Default cards, if not given
@@ -247,17 +255,6 @@ def prepare():
         if name not in [
             "ww_mesh",
             "census_idx",
-            "IC_bank_neutron",
-            "IC_bank_precursor",
-            "IC_bank_neutron_local",
-            "IC_bank_precursor_local",
-            "IC_tally_n",
-            "IC_tally_C",
-            "IC_n_eff",
-            "IC_C_eff",
-            "IC_Pmax_n",
-            "IC_Pmax_C",
-            "IC_resample",
             "iqmc_flux_old",
             "iqmc_flux_outter",
             "iqmc_mesh",
@@ -269,6 +266,12 @@ def prepare():
             "iqmc_generator",
             "wr_chance",
             "wr_threshold",
+            "IC_bank_neutron",
+            "IC_bank_precursor",
+            "IC_bank_neutron_local",
+            "IC_bank_precursor_local",
+            "IC_fission_score",
+            "IC_fission",
         ]:
             mcdc["technique"][name] = input_card.technique[name]
 
@@ -287,7 +290,7 @@ def prepare():
         mcdc["technique"][name]["azi"] = input_card.technique[name]["azi"]
 
     # =========================================================================
-    # weight roulette
+    # Weight roulette
     # =========================================================================
     if input_card.technique["weight_roulette"]:
         mcdc["technique"]["wr_chance"] = input_card.technique["wr_chance"]
@@ -352,25 +355,104 @@ def prepare():
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+    if mcdc["technique"]["IC_generator"]:
+        mcdc["technique"]["IC_bank_neutron_local"]["tag"] = "neutron"
+        mcdc["technique"]["IC_bank_precursor_local"]["tag"] = "precursor"
+        mcdc["technique"]["IC_bank_neutron"]["tag"] = "neutron"
+        mcdc["technique"]["IC_bank_precursor"]["tag"] = "precursor"
 
     # Distribute work to processors
     kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
 
-    # TODO: Set source bank if using filed source
-    """
-    if mcdc['setting']['filed_source']:
-        start = mcdc['mpi_work_start']
-        end = start + mcdc['mpi_work_size']
-        # Load particles from file
-        with h5py.File(mcdc['setting']['source_file'], 'r') as f:
-            particles = f['IC/particles'][start:end]
-        for P in particles:
-            kernel.add_particle(P, mcdc['bank_source'])
-    """
-
     # Activate tally scoring for fixed-source
     if not mcdc["setting"]["mode_eigenvalue"]:
         mcdc["cycle_active"] = True
+
+    # All active eigenvalue cycle?
+    elif mcdc["setting"]["N_inactive"] == 0:
+        mcdc["cycle_active"] = True
+
+    # =========================================================================
+    # Source file
+    # =========================================================================
+
+    if mcdc["setting"]["source_file"]:
+        with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
+            # Get source particle size
+            N_particle = f["particles_size"][()]
+
+            # Redistribute work
+            kernel.distribute_work(N_particle, mcdc)
+            N_local = mcdc["mpi_work_size"]
+            start = mcdc["mpi_work_start"]
+            end = start + N_local
+
+            # Add particles to source bank
+            mcdc["bank_source"]["particles"][:N_local] = f["particles"][start:end]
+            mcdc["bank_source"]["size"] = N_local
+
+    # =========================================================================
+    # IC file
+    # =========================================================================
+
+    if mcdc["setting"]["IC_file"]:
+        with h5py.File(mcdc["setting"]["IC_file_name"], "r") as f:
+            # =================================================================
+            # Set neutron source
+            # =================================================================
+
+            # Get source particle size
+            N_particle = f["IC/neutrons_size"][()]
+
+            # Redistribute work
+            kernel.distribute_work(N_particle, mcdc)
+            N_local = mcdc["mpi_work_size"]
+            start = mcdc["mpi_work_start"]
+            end = start + N_local
+
+            # Add particles to source bank
+            mcdc["bank_source"]["particles"][:N_local] = f["IC/neutrons"][start:end]
+            mcdc["bank_source"]["size"] = N_local
+
+            # =================================================================
+            # Set precursor source
+            # =================================================================
+
+            # Get source particle size
+            N_precursor = f["IC/precursors_size"][()]
+
+            # Redistribute work
+            kernel.distribute_work(N_precursor, mcdc, True)  # precursor = True
+            N_local = mcdc["mpi_work_size_precursor"]
+            start = mcdc["mpi_work_start_precursor"]
+            end = start + N_local
+
+            # Add particles to source bank
+            mcdc["bank_precursor"]["precursors"][:N_local] = f["IC/precursors"][
+                start:end
+            ]
+            mcdc["bank_precursor"]["size"] = N_local
+
+            # Set precursor strength
+            if N_precursor > 0 and N_particle > 0:
+                mcdc["precursor_strength"] = mcdc["bank_precursor"]["precursors"][0][
+                    "w"
+                ]
+
+
+def dictlist_to_h5group(dictlist, input_group, name):
+    main_group = input_group.create_group(name + "s")
+    for item in dictlist:
+        group = main_group.create_group(name + "_%i" % item["ID"])
+        dict_to_h5group(item, group)
+
+
+def dict_to_h5group(dict_, group):
+    for k, v in dict_.items():
+        if type(v) == dict:
+            dict_to_h5group(dict_[k], group.create_group(k))
+        else:
+            group[k] = v
 
 
 def generate_hdf5():
@@ -380,6 +462,22 @@ def generate_hdf5():
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
+            # Input card
+            if mcdc["setting"]["save_input_deck"]:
+                input_group = f.create_group("input_deck")
+                dictlist_to_h5group(input_card.nuclides, input_group, "nuclide")
+                dictlist_to_h5group(input_card.materials, input_group, "material")
+                dictlist_to_h5group(input_card.surfaces, input_group, "surface")
+                dictlist_to_h5group(input_card.cells, input_group, "cell")
+                dictlist_to_h5group(input_card.universes, input_group, "universe")
+                dictlist_to_h5group(input_card.lattices, input_group, "lattice")
+                dictlist_to_h5group(input_card.sources, input_group, "source")
+                dict_to_h5group(input_card.tally, input_group.create_group("tally"))
+                dict_to_h5group(input_card.setting, input_group.create_group("setting"))
+                dict_to_h5group(
+                    input_card.technique, input_group.create_group("technique")
+                )
+
             # Tally
             T = mcdc["tally"]
             f.create_dataset("tally/grid/t", data=T["mesh"]["t"])
@@ -411,23 +509,16 @@ def generate_hdf5():
                     f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
                     f.create_dataset("k_mean", data=mcdc["k_avg_running"])
                     f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
+                    f.create_dataset("global_tally/neutron/mean", data=mcdc["n_avg"])
+                    f.create_dataset("global_tally/neutron/sdev", data=mcdc["n_sdv"])
+                    f.create_dataset("global_tally/neutron/max", data=mcdc["n_max"])
+                    f.create_dataset("global_tally/precursor/mean", data=mcdc["C_avg"])
+                    f.create_dataset("global_tally/precursor/sdev", data=mcdc["C_sdv"])
+                    f.create_dataset("global_tally/precursor/max", data=mcdc["C_max"])
                     if mcdc["setting"]["gyration_radius"]:
                         f.create_dataset(
                             "gyration_radius", data=mcdc["gyration_radius"][:N_cycle]
                         )
-
-            # IC generator
-            if mcdc["technique"]["IC_generator"]:
-                Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
-                Np = mcdc["technique"]["IC_bank_precursor"]["size"]
-                f.create_dataset(
-                    "IC/neutron",
-                    data=mcdc["technique"]["IC_bank_neutron"]["content"][:Nn],
-                )
-                f.create_dataset(
-                    "IC/precursor",
-                    data=mcdc["technique"]["IC_bank_precursor"]["content"][:Np],
-                )
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
@@ -449,6 +540,41 @@ def generate_hdf5():
                     N_track = mcdc["particle_track_N"]
                     f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
 
+            # IC generator
+            if mcdc["technique"]["IC_generator"]:
+                Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
+                Np = mcdc["technique"]["IC_bank_precursor"]["size"]
+                f.create_dataset(
+                    "IC/neutrons",
+                    data=mcdc["technique"]["IC_bank_neutron"]["particles"][:Nn],
+                )
+                f.create_dataset(
+                    "IC/precursors",
+                    data=mcdc["technique"]["IC_bank_precursor"]["precursors"][:Np],
+                )
+                f.create_dataset("IC/neutrons_size", data=Nn)
+                f.create_dataset("IC/precursors_size", data=Np)
+                f.create_dataset(
+                    "IC/fission", data=mcdc["technique"]["IC_fission"] / Nn
+                )
+
+    # Save particle?
+    if mcdc["setting"]["save_particle"]:
+        # Gather source bank
+        # TODO: Parallel HDF5 and mitigation of large data passing
+        N = mcdc["bank_source"]["size"]
+        neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
+
+        # Master saves the particle
+        if mcdc["mpi_master"]:
+            # Remove unwanted particle fields
+            neutrons = np.concatenate(neutrons[:])
+
+            # Create dataset
+            with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+                f.create_dataset("particles", data=neutrons[:])
+                f.create_dataset("particles_size", data=len(neutrons[:]))
+
 
 def closeout():
     # Runtime
@@ -462,7 +588,8 @@ def closeout():
                 "bank_management",
             ]:
                 f.create_dataset(
-                    "runtime_" + name, data=np.array([mcdc["runtime_" + name]])
+                    "runtime/" + name, data=np.array([mcdc["runtime_" + name]])
                 )
 
     print_runtime(mcdc)
+    input_card.reset()
