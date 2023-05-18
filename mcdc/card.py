@@ -100,13 +100,13 @@ class InputCard:
             "IC_file": False,
             "IC_file_name": "",
             "N_precursor": 0,
+            "N_sensitivity": 0,
         }
 
         self.technique = {
             "tag": "Technique",
             "weighted_emission": True,
             "implicit_capture": False,
-            "branchless_collision": False,
             "population_control": False,
             "pct": PCT_NONE,
             "weight_window": False,
@@ -119,11 +119,9 @@ class InputCard:
                 "mu": np.array([-1.0, 1.0]),
                 "azi": np.array([-PI, PI]),
             },
-            "time_census": False,
-            "census_time": np.array([INF]),
             "weight_roulette": False,
             "wr_threshold": 0.0,
-            "wr_target": 1.0,
+            "wr_chance": 1.0,
             "iQMC": False,
             "iqmc_generator": "sobol",
             "fixed_source_solver": "source_iteration",
@@ -148,8 +146,6 @@ class InputCard:
                 "mu": np.array([-1.0, 1.0]),
                 "azi": np.array([-PI, PI]),
             },
-            "sensitivity": 0,
-            "sensitivity_N": 0,
             "IC_generator": False,
             "IC_N_neutron": 0,
             "IC_N_precursor": 0,
@@ -158,6 +154,9 @@ class InputCard:
             "IC_neutron_density_max": 0.0,
             "IC_precursor_density_max": 0.0,
             "IC_cycle_stretch": 1.0,
+            "time_census": False,
+            "census_time": np.array([INF]),
+            "branchless_collision": False,
         }
 
 
