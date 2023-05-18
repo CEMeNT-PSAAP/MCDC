@@ -195,8 +195,8 @@ def nuclide(
         mcdc.input_card.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_card.technique["sensitivity_N"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
+        mcdc.input_card.setting["N_sensitivity"] += 1
+        card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
 
     # Push card
     mcdc.input_card.nuclides.append(card)
@@ -480,8 +480,8 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         mcdc.input_card.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_card.technique["sensitivity_N"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
+        mcdc.input_card.setting["N_sensitivity"] += 1
+        card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
 
     # ==========================================================================
     # Surface attributes
@@ -1233,7 +1233,7 @@ def weight_roulette(chance, wr_threshold):
 
     Parameters
     ----------
-    chance : probability of termination
+    chance : probability of survival
     wr_threshold : weight_roulette() is called on a particle
                     if P['w'] <= wr_threshold
 

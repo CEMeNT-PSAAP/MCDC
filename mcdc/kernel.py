@@ -1789,7 +1789,7 @@ def distance_to_boundary(P, mcdc):
             P["translation"][:] = trans
 
             if surface_move:
-                event = EVENT_MOVE
+                event = EVENT_SURFACE_MOVE
 
         # Lattice cell?
         if cell["lattice"]:
