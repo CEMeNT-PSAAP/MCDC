@@ -351,7 +351,7 @@ score_t_list = (
 score_list = score_tl_list + score_x_list + score_y_list + score_z_list + score_t_list
 
 
-def make_type_tally(Ng, Ns, card):
+def make_type_tally(Ns, card):
     global tally
 
     def make_type_score(shape):
@@ -374,7 +374,7 @@ def make_type_tally(Ng, Ns, card):
     ]
 
     # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card["mesh"])
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
     struct += [("mesh", mesh)]
 
     # Scores and shapes
@@ -499,7 +499,7 @@ def make_type_technique(N_particle, G, card):
     # =========================================================================
 
     # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card["ww_mesh"])
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["ww_mesh"])
     struct += [("ww_mesh", mesh)]
 
     # Window
@@ -518,7 +518,7 @@ def make_type_technique(N_particle, G, card):
 
     # Mesh (for qmc source tallies)
     if card["iQMC"]:
-        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh(card["iqmc_mesh"])
+        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["iqmc_mesh"])
         Ng = G
         N_dim = 6  # group, x, y, z, mu, phi
     else:
@@ -743,6 +743,35 @@ def make_type_mesh(card):
     Nt = len(card["t"]) - 1
     Nmu = len(card["mu"]) - 1
     N_azi = len(card["azi"]) - 1
+    Ng = len(card['g']) - 1
+    return (
+        np.dtype(
+            [
+                ("x", float64, (Nx + 1,)),
+                ("y", float64, (Ny + 1,)),
+                ("z", float64, (Nz + 1,)),
+                ("t", float64, (Nt + 1,)),
+                ("mu", float64, (Nmu + 1,)),
+                ("azi", float64, (N_azi + 1,)),
+                ("g", float64, (Ng + 1,)),
+            ]
+        ),
+        Nx,
+        Ny,
+        Nz,
+        Nt,
+        Nmu,
+        N_azi,
+        Ng
+    )
+
+def make_type_mesh_(card):
+    Nx = len(card["x"]) - 1
+    Ny = len(card["y"]) - 1
+    Nz = len(card["z"]) - 1
+    Nt = len(card["t"]) - 1
+    Nmu = len(card["mu"]) - 1
+    N_azi = len(card["azi"]) - 1
     return (
         np.dtype(
             [
@@ -763,4 +792,4 @@ def make_type_mesh(card):
     )
 
 
-mesh_names = ["x", "y", "z", "t", "mu", "azi"]
+mesh_names = ["x", "y", "z", "t", "mu", "azi", 'g']

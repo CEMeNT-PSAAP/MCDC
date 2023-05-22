@@ -56,7 +56,7 @@ def test_rn_basic():
     type_.make_type_universe(Nmax_cell)
     type_.make_type_lattice(input_card.lattices)
     type_.make_type_source(G)
-    type_.make_type_tally(G, 1, input_card.tally)
+    type_.make_type_tally(1, input_card.tally)
     type_.make_type_technique(0, 1, input_card.technique)
     type_.make_type_global(input_card)
 
