@@ -499,7 +499,7 @@ def make_type_technique(N_particle, G, card):
     # =========================================================================
 
     # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["ww_mesh"])
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww_mesh"])
     struct += [("ww_mesh", mesh)]
 
     # Window
