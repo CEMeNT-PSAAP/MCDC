@@ -55,7 +55,7 @@ ax.set_ylabel(r"Flux")
 ax.set_title(r"$\bar{\phi}_{k,j}$")
 (line1,) = ax.plot([], [], "-b", label="MC")
 (line2,) = ax.plot([], [], "--r", label="Ref.")
-fb = ax.fill_between([],[],[],[], alpha=0.2, color="b")
+fb = ax.fill_between([], [], [], [], alpha=0.2, color="b")
 text = ax.text(0.02, 0.9, "", transform=ax.transAxes)
 ax.legend()
 
@@ -64,7 +64,7 @@ def animate(k):
     global fb
     fb.remove()
     line1.set_data(x_mid, phi[k, :])
-    fb =ax.fill_between(
+    fb = ax.fill_between(
         x_mid, phi[k, :] - phi_sd[k, :], phi[k, :] + phi_sd[k, :], alpha=0.2, color="b"
     )
     line2.set_data(x_mid, phi_ref[k, :])
@@ -87,7 +87,7 @@ ax.set_ylabel(r"Flux")
 ax.set_title(r"$\bar{\phi}_{k}(x)$")
 (line1,) = ax.plot([], [], "-b", label="MC")
 (line2,) = ax.plot([], [], "--r", label="Ref.")
-fb = ax.fill_between([],[],[],[], alpha=0.2, color="b")
+fb = ax.fill_between([], [], [], [], alpha=0.2, color="b")
 text = ax.text(0.02, 0.9, "", transform=ax.transAxes)
 ax.legend()
 
@@ -123,7 +123,7 @@ ax.set_ylabel(r"Flux")
 ax.set_title(r"$\bar{\phi}_{j}(t)$")
 (line1,) = ax.plot([], [], "-b", label="MC")
 (line2,) = ax.plot([], [], "--r", label="Ref.")
-fb = ax.fill_between([],[],[],[], alpha=0.2, color="b")
+fb = ax.fill_between([], [], [], [], alpha=0.2, color="b")
 text = ax.text(0.02, 0.9, "", transform=ax.transAxes)
 ax.legend()
 
