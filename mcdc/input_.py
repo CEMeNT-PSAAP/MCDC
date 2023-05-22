@@ -900,9 +900,9 @@ def tally(
     card["mesh"]["azi"] = azi
 
     # Set energy group grid
-    if type(g) == type('string') and g == 'all':
-        G = mcdc.input_card.materials[0]['G']
-        card["mesh"]["g"] = np.linspace(0, G, G+1) - 0.5
+    if type(g) == type("string") and g == "all":
+        G = mcdc.input_card.materials[0]["G"]
+        card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
 

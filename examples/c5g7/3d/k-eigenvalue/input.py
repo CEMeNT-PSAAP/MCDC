@@ -10,6 +10,7 @@ import mcdc
 # Load material data
 lib = h5py.File("../../c5g7_xs.h5", "r")
 
+
 # Setter
 def set_mat(mat):
     return mcdc.material(
@@ -23,6 +24,7 @@ def set_mat(mat):
         speed=mat["speed"],
         decay=mat["decay"],
     )
+
 
 # Set the material
 mat_uo2 = set_mat(lib["uo2"])  # Fuel: UO2
@@ -289,7 +291,7 @@ y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1)
 z_grid = np.linspace(
     -(core_height / 2 + refl_thick), (core_height / 2 + refl_thick), 102 + 17 * 2 + 1
 )
-g_grid= np.array([-0.5, 3.5, 6.5]) # Collapsing to fast (1-4) and slow (5-7)
+g_grid = np.array([-0.5, 3.5, 6.5])  # Collapsing to fast (1-4) and slow (5-7)
 
 mcdc.tally(scores=["flux"], x=x_grid, y=y_grid, z=z_grid, g=g_grid)
 

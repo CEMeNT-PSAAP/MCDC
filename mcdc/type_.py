@@ -743,7 +743,7 @@ def make_type_mesh(card):
     Nt = len(card["t"]) - 1
     Nmu = len(card["mu"]) - 1
     N_azi = len(card["azi"]) - 1
-    Ng = len(card['g']) - 1
+    Ng = len(card["g"]) - 1
     return (
         np.dtype(
             [
@@ -762,8 +762,9 @@ def make_type_mesh(card):
         Nt,
         Nmu,
         N_azi,
-        Ng
+        Ng,
     )
+
 
 def make_type_mesh_(card):
     Nx = len(card["x"]) - 1
@@ -792,4 +793,4 @@ def make_type_mesh_(card):
     )
 
 
-mesh_names = ["x", "y", "z", "t", "mu", "azi", 'g']
+mesh_names = ["x", "y", "z", "t", "mu", "azi", "g"]

@@ -69,7 +69,7 @@ class InputCard:
                 "t": np.array([-INF, INF]),
                 "mu": np.array([-1.0, 1.0]),
                 "azi": np.array([-PI, PI]),
-                "g": np.array([-INF, INF])
+                "g": np.array([-INF, INF]),
             },
         }
 
