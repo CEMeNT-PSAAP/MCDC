@@ -128,7 +128,7 @@ def prepare():
     type_.make_type_universe(Nmax_cell)
     type_.make_type_lattice(input_card.lattices)
     type_.make_type_source(G)
-    type_.make_type_tally(G, N_tally_scores, input_card.tally)
+    type_.make_type_tally(N_tally_scores, input_card.tally)
     type_.make_type_technique(N_particle, G, input_card.technique)
     type_.make_type_global(input_card)
 
@@ -281,7 +281,7 @@ def prepare():
     # =========================================================================
 
     # WW mesh
-    for name in type_.mesh_names:
+    for name in type_.mesh_names[:-1]:
         mcdc["technique"]["ww_mesh"][name] = input_card.technique["ww_mesh"][name]
 
     # WW windows
@@ -522,6 +522,7 @@ def generate_hdf5():
             f.create_dataset("tally/grid/z", data=T["mesh"]["z"])
             f.create_dataset("tally/grid/mu", data=T["mesh"]["mu"])
             f.create_dataset("tally/grid/azi", data=T["mesh"]["azi"])
+            f.create_dataset("tally/grid/g", data=T["mesh"]["g"])
 
             # Scores
             for name in T["score"].dtype.names:

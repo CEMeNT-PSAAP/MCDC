@@ -1163,6 +1163,11 @@ def mesh_get_angular_index(P, mesh):
 
 
 @njit
+def mesh_get_energy_index(P, mesh):
+    return binary_search(P["g"], mesh["g"])
+
+
+@njit
 def mesh_uniform_get_index(P, mesh, trans):
     Px = P["x"] + trans[0]
     Py = P["y"] + trans[1]
@@ -1208,10 +1213,10 @@ def score_tracklength(P, distance, mcdc):
     material = mcdc["materials"][P["material_ID"]]
 
     # Get indices
-    g = P["g"]
     s = P["sensitivity_ID"]
     t, x, y, z, outside = mesh_get_index(P, tally["mesh"])
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
+    g = mesh_get_energy_index(P, tally["mesh"])
 
     # Outside grid?
     if outside:
@@ -1242,11 +1247,11 @@ def score_crossing_x(P, t, x, y, z, mcdc):
     material = mcdc["materials"][P["material_ID"]]
 
     # Get indices
-    g = P["g"]
     if P["ux"] > 0.0:
         x += 1
     s = P["sensitivity_ID"]
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
+    g = mesh_get_energy_index(P, tally["mesh"])
 
     # Score
     flux = P["w"] / abs(P["ux"])
@@ -1273,11 +1278,11 @@ def score_crossing_y(P, t, x, y, z, mcdc):
     material = mcdc["materials"][P["material_ID"]]
 
     # Get indices
-    g = P["g"]
     if P["uy"] > 0.0:
         y += 1
     s = P["sensitivity_ID"]
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
+    g = mesh_get_energy_index(P, tally["mesh"])
 
     # Score
     flux = P["w"] / abs(P["uy"])
@@ -1304,11 +1309,11 @@ def score_crossing_z(P, t, x, y, z, mcdc):
     material = mcdc["materials"][P["material_ID"]]
 
     # Get indices
-    g = P["g"]
     if P["uz"] > 0.0:
         z += 1
     s = P["sensitivity_ID"]
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
+    g = mesh_get_energy_index(P, tally["mesh"])
 
     # Score
     flux = P["w"] / abs(P["uz"])
@@ -1335,10 +1340,10 @@ def score_crossing_t(P, t, x, y, z, mcdc):
     material = mcdc["materials"][P["material_ID"]]
 
     # Get indices
-    g = P["g"]
     s = P["sensitivity_ID"]
     t += 1
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
+    g = mesh_get_energy_index(P, tally["mesh"])
 
     # Score
     flux = P["w"] * material["speed"][g]

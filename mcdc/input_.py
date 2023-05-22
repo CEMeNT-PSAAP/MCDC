@@ -886,6 +886,7 @@ def tally(
     t=np.array([-INF, INF]),
     mu=np.array([-1.0, 1.0]),
     azi=np.array([-PI, PI]),
+    g=np.array([-INF, INF]),
 ):
     # Get tally card
     card = mcdc.input_card.tally
@@ -897,6 +898,13 @@ def tally(
     card["mesh"]["t"] = t
     card["mesh"]["mu"] = mu
     card["mesh"]["azi"] = azi
+
+    # Set energy group grid
+    if type(g) == type('string') and g == 'all':
+        G = mcdc.input_card.materials[0]['G']
+        card["mesh"]["g"] = np.linspace(0, G, G+1) - 0.5
+    else:
+        card["mesh"]["g"] = g
 
     # Set score flags
     for s in scores:

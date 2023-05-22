@@ -3,14 +3,12 @@ import numpy as np
 
 import mcdc
 
-
 # =============================================================================
 # Materials
 # =============================================================================
 
 # Load material data
-lib = h5py.File("c5g7.h5", "r")
-
+lib = h5py.File("../../c5g7_xs.h5", "r")
 
 # Setter
 def set_mat(mat):
@@ -26,7 +24,7 @@ def set_mat(mat):
         decay=mat["decay"],
     )
 
-
+# Set the material
 mat_uo2 = set_mat(lib["uo2"])  # Fuel: UO2
 mat_mox43 = set_mat(lib["mox43"])  # Fuel: MOX 4.3%
 mat_mox7 = set_mat(lib["mox7"])  # Fuel: MOX 7.0%
@@ -48,14 +46,10 @@ refl_thick = 21.42
 # Control rod banks fractions
 #   All out: 0.0
 #   All in : 1.0
-cr1 = np.array([1.0, 1.0, 1.0, 0.84, 1.0])
-cr1_t = np.array([0.0, 5.0, 10.0, 15.0, 15.0 + 1.0 - cr1[-2]])
-cr2 = np.array([1.0, 1.0, 0.0, 0.0, 0.25])
-cr2_t = np.array([0.0, 5.0, 10.0, 15.0, 15.25])
-cr3 = np.array([1.0, 1.0, 0.0, 0.0, 1.0])
-cr3_t = np.array([0.0, 5.0, 10.0, 15.0, 16.0])
-cr4 = np.array([0.5, 0.5])
-cr4_t = np.array([0.0, 20.0])
+cr1 = 0.0
+cr2 = 0.0
+cr3 = 0.0
+cr4 = 0.0
 # Control rod banks interfaces
 cr1 = core_height * (0.5 - cr1)
 cr2 = core_height * (0.5 - cr2)
@@ -64,10 +58,10 @@ cr4 = core_height * (0.5 - cr4)
 
 # Surfaces
 cy = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=radius)
-z1 = mcdc.surface("plane-z", z=cr1, t=cr1_t)  # Control rod banks interfaces
-z2 = mcdc.surface("plane-z", z=cr2, t=cr2_t)
-z3 = mcdc.surface("plane-z", z=cr3, t=cr3_t)
-z4 = mcdc.surface("plane-z", z=cr4, t=cr4_t)
+z1 = mcdc.surface("plane-z", z=cr1)  # Control rod banks interfaces
+z2 = mcdc.surface("plane-z", z=cr2)
+z3 = mcdc.surface("plane-z", z=cr3)
+z4 = mcdc.surface("plane-z", z=cr4)
 zf = mcdc.surface("plane-z", z=core_height / 2)
 
 # Fission chamber
@@ -276,13 +270,13 @@ mcdc.universe(
 # =============================================================================
 # Set source
 # =============================================================================
-# At highest energy
-
-energy = np.zeros(7)
-energy[-1] = 1.0
+# Uniform in energy
 
 source = mcdc.source(
-    point=[pitch * 17 / 2, -pitch * 17 / 2, 0.0], time=[0.0, 15.0], energy=energy
+    x=[0.0, pitch * 17 * 2],
+    y=[-pitch * 17 * 2, 0.0],
+    z=[-core_height / 2, core_height / 2],
+    energy=np.ones(7),
 )
 
 # =============================================================================
@@ -295,14 +289,14 @@ y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1)
 z_grid = np.linspace(
     -(core_height / 2 + refl_thick), (core_height / 2 + refl_thick), 102 + 17 * 2 + 1
 )
-x_grid = np.linspace(0.0, pitch * 17 * 3, 2)
-y_grid = np.linspace(-pitch * 17 * 3, 0.0, 2)
-z_grid = np.linspace(-(core_height / 2 + refl_thick), (core_height / 2 + refl_thick), 2)
-t_grid = np.linspace(0.0, 20.0, 201)
-mcdc.tally(scores=["fission"], t=t_grid)
+g_grid= np.array([-0.5, 3.5, 6.5]) # Collapsing to fast (1-4) and slow (5-7)
+
+mcdc.tally(scores=["flux"], x=x_grid, y=y_grid, z=z_grid, g=g_grid)
 
 # Setting
-mcdc.setting(N_particle=1e5, active_bank_buff=10000)
+mcdc.setting(N_particle=1e3)
+mcdc.eigenmode(N_inactive=50, N_active=150, gyration_radius="all")
+mcdc.population_control()
 
 # Run
 mcdc.run()
