@@ -187,7 +187,8 @@ def loop_particle(P, mcdc):
         kernel.move_to_event(P, mcdc)
         event = P["event"]
 
-        # The & operator here is a bitwise and. It is used to determine if an event type is part of the particle event.
+        # The & operator here is a bitwise and.
+        # It is used to determine if an event type is part of the particle event.
 
         # Collision
         if event & EVENT_COLLISION:
@@ -227,7 +228,7 @@ def loop_particle(P, mcdc):
             kernel.surface_crossing(P, mcdc)
 
         # Surface move
-        elif event & EVENT_MOVE:
+        elif event & EVENT_SURFACE_MOVE:
             P["t"] += SHIFT
             P["cell_ID"] = -1
 

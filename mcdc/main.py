@@ -35,14 +35,11 @@ def run():
         print_header_eigenvalue(mcdc)
 
     # Run simulation
-    # TODO: add if iQMC execute iqmc_loop()
     simulation_start = MPI.Wtime()
-
-    # iQMC loop
-    if mcdc["technique"]["iQMC"]:
-        loop_iqmc(mcdc)
-    else:
+    if not mcdc["technique"]["iQMC"]:
         loop_main(mcdc)
+    else:
+        loop_iqmc(mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -67,6 +64,7 @@ def prepare():
     # =========================================================================
 
     # Neutron and delayed neutron precursor group sizes
+    #   We assume that all materials have the same group structures
     G = input_card.materials[0]["G"]
     J = input_card.materials[0]["J"]
 
@@ -83,21 +81,28 @@ def prepare():
     N_particle = input_card.setting["N_particle"]
     N_cycle = input_card.setting["N_cycle"]
 
-    # Maximum object reference
-    Nmax_nuclide = 0
-    Nmax_surface = 0
-    Nmax_cell = 0
-    for material in input_card.materials:
-        Nmax_nuclide = max(Nmax_nuclide, material["N_nuclide"])
-    for cell in input_card.cells:
-        Nmax_surface = max(Nmax_surface, cell["N_surface"])
-    for universe in input_card.universes:
-        Nmax_cell = max(Nmax_cell, universe["N_cell"])
+    # Maximum object references
+    # Maximum nuclides per material
+    Nmax_nuclide = max([material["N_nuclide"] for material in input_card.materials])
+    # Maximum surfaces per cell
+    Nmax_surface = max([cell["N_surface"] for cell in input_card.cells])
+    # Maximum cells per universe
+    Nmax_cell = max([universe["N_cell"] for universe in input_card.universes])
 
     # Maximum time-dependent surface slices
     Nmax_slice = 0
     for surface in input_card.surfaces:
         Nmax_slice = max(Nmax_slice, surface["N_slice"])
+
+    # =========================================================================
+    # Other parameters needed to set up MC/DC object types
+    # =========================================================================
+
+    # Flags
+    iQMC = input_card.technique["iQMC"]
+
+    # Numbers
+    N_tally_scores = input_card.setting["N_sensitivity"] + 1
 
     # =========================================================================
     # Default cards, if not given
@@ -114,8 +119,8 @@ def prepare():
     # Make types
     # =========================================================================
 
-    type_.make_type_particle(input_card)
-    type_.make_type_particle_record(input_card)
+    type_.make_type_particle(iQMC, G)
+    type_.make_type_particle_record(iQMC, G)
     type_.make_type_nuclide(G, J)
     type_.make_type_material(G, J, Nmax_nuclide)
     type_.make_type_surface(Nmax_slice)
@@ -123,11 +128,15 @@ def prepare():
     type_.make_type_universe(Nmax_cell)
     type_.make_type_lattice(input_card.lattices)
     type_.make_type_source(G)
-    type_.make_type_tally(input_card)
-    type_.make_type_technique(input_card)
+    type_.make_type_tally(N_tally_scores, input_card.tally)
+    type_.make_type_technique(N_particle, G, input_card.technique)
     type_.make_type_global(input_card)
 
-    # The global variable container
+    # =========================================================================
+    # Make the global variable container
+    #   TODO: Better alternative?
+    # =========================================================================
+
     mcdc = np.zeros(1, dtype=type_.global_)[0]
 
     # =========================================================================
@@ -152,10 +161,13 @@ def prepare():
 
     for i in range(N_surface):
         for name in type_.surface.names:
-            if name in ["J", "t"]:
-                shape = mcdc["surfaces"][i][name].shape
-                input_card.surfaces[i][name].resize(shape)
-            mcdc["surfaces"][i][name] = input_card.surfaces[i][name]
+            if name not in ["J", "t"]:
+                mcdc["surfaces"][i][name] = input_card.surfaces[i][name]
+
+        # Variables with possible different sizes
+        for name in ["J", "t"]:
+            N = len(input_card.surfaces[i][name])
+            mcdc["surfaces"][i][name][:N] = input_card.surfaces[i][name]
 
     # =========================================================================
     # Cells
@@ -163,11 +175,13 @@ def prepare():
 
     for i in range(N_cell):
         for name in type_.cell.names:
-            if name in ["surface_IDs", "positive_flags"]:
-                N = mcdc["cells"][i]["N_surface"]
-                mcdc["cells"][i][name][:N] = input_card.cells[i][name]
-            else:
+            if name not in ["surface_IDs", "positive_flags"]:
                 mcdc["cells"][i][name] = input_card.cells[i][name]
+
+        # Variables with possible different sizes
+        for name in ["surface_IDs", "positive_flags"]:
+            N = len(input_card.cells[i][name])
+            mcdc["cells"][i][name][:N] = input_card.cells[i][name]
 
     # =========================================================================
     # Universes
@@ -175,11 +189,13 @@ def prepare():
 
     for i in range(N_universe):
         for name in type_.universe.names:
-            if name in ["cell_IDs"]:
-                N = mcdc["universes"][i]["N_cell"]
-                mcdc["universes"][i][name][:N] = input_card.universes[i][name]
-            else:
+            if name not in ["cell_IDs"]:
                 mcdc["universes"][i][name] = input_card.universes[i][name]
+
+        # Variables with possible different sizes
+        for name in ["cell_IDs"]:
+            N = mcdc["universes"][i]["N_cell"]
+            mcdc["universes"][i][name][:N] = input_card.universes[i][name]
 
     # =========================================================================
     # Lattices
@@ -187,20 +203,13 @@ def prepare():
 
     for i in range(N_lattice):
         # Mesh
-        mcdc["lattices"][i]["mesh"]["x0"] = input_card.lattices[i]["mesh"]["x0"]
-        mcdc["lattices"][i]["mesh"]["dx"] = input_card.lattices[i]["mesh"]["dx"]
-        mcdc["lattices"][i]["mesh"]["Nx"] = input_card.lattices[i]["mesh"]["Nx"]
-        mcdc["lattices"][i]["mesh"]["y0"] = input_card.lattices[i]["mesh"]["y0"]
-        mcdc["lattices"][i]["mesh"]["dy"] = input_card.lattices[i]["mesh"]["dy"]
-        mcdc["lattices"][i]["mesh"]["Ny"] = input_card.lattices[i]["mesh"]["Ny"]
-        mcdc["lattices"][i]["mesh"]["z0"] = input_card.lattices[i]["mesh"]["z0"]
-        mcdc["lattices"][i]["mesh"]["dz"] = input_card.lattices[i]["mesh"]["dz"]
-        mcdc["lattices"][i]["mesh"]["Nz"] = input_card.lattices[i]["mesh"]["Nz"]
+        for name in type_.mesh_uniform.names:
+            mcdc["lattices"][i]["mesh"][name] = input_card.lattices[i]["mesh"][name]
 
         # Universe IDs
-        Nx = input_card.lattices[i]["mesh"]["Nx"]
-        Ny = input_card.lattices[i]["mesh"]["Ny"]
-        Nz = input_card.lattices[i]["mesh"]["Nz"]
+        Nx = mcdc["lattices"][i]["mesh"]["Nx"]
+        Ny = mcdc["lattices"][i]["mesh"]["Ny"]
+        Nz = mcdc["lattices"][i]["mesh"]["Nz"]
         mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_card.lattices[i][
             "universe_IDs"
         ]
@@ -227,14 +236,9 @@ def prepare():
     for name in type_.tally.names:
         if name not in ["score", "mesh"]:
             mcdc["tally"][name] = input_card.tally[name]
-
     # Set mesh
-    mcdc["tally"]["mesh"]["x"] = input_card.tally["mesh"]["x"]
-    mcdc["tally"]["mesh"]["y"] = input_card.tally["mesh"]["y"]
-    mcdc["tally"]["mesh"]["z"] = input_card.tally["mesh"]["z"]
-    mcdc["tally"]["mesh"]["t"] = input_card.tally["mesh"]["t"]
-    mcdc["tally"]["mesh"]["mu"] = input_card.tally["mesh"]["mu"]
-    mcdc["tally"]["mesh"]["azi"] = input_card.tally["mesh"]["azi"]
+    for name in type_.mesh_names:
+        mcdc["tally"]["mesh"][name] = input_card.tally["mesh"][name]
 
     # =========================================================================
     # Setting
@@ -243,7 +247,7 @@ def prepare():
     for name in type_.setting.names:
         mcdc["setting"][name] = input_card.setting[name]
 
-    # Check if time boundary matches the final tally mesh time grid
+    # Check if time boundary is above the final tally mesh time grid
     if mcdc["setting"]["time_boundary"] > mcdc["tally"]["mesh"]["t"][-1]:
         mcdc["setting"]["time_boundary"] = mcdc["tally"]["mesh"]["t"][-1]
 
@@ -251,54 +255,65 @@ def prepare():
     # Technique
     # =========================================================================
 
-    for name in type_.technique.names:
-        if name not in [
-            "ww_mesh",
-            "census_idx",
-            "iqmc_flux_old",
-            "iqmc_flux_outter",
-            "iqmc_mesh",
-            "iqmc_source",
-            "lds",
-            "iqmc_effective_scattering",
-            "iqmc_effective_fission",
-            "iqmc_res",
-            "iqmc_generator",
-            "wr_chance",
-            "wr_threshold",
-            "IC_bank_neutron",
-            "IC_bank_precursor",
-            "IC_bank_neutron_local",
-            "IC_bank_precursor_local",
-            "IC_fission_score",
-            "IC_fission",
-        ]:
-            mcdc["technique"][name] = input_card.technique[name]
+    # Flags
+    for name in [
+        "weighted_emission",
+        "implicit_capture",
+        "population_control",
+        "weight_window",
+        "weight_roulette",
+        "iQMC",
+        "IC_generator",
+        "time_census",
+        "branchless_collision",
+    ]:
+        mcdc["technique"][name] = input_card.technique[name]
 
-    # Set time census parameter
-    if mcdc["technique"]["time_census"]:
-        mcdc["technique"]["census_idx"] = 0
+    # =========================================================================
+    # Population control
+    # =========================================================================
 
-    # Set weight window mesh
-    if input_card.technique["weight_window"]:
-        name = "ww_mesh"
-        mcdc["technique"][name]["x"] = input_card.technique[name]["x"]
-        mcdc["technique"][name]["y"] = input_card.technique[name]["y"]
-        mcdc["technique"][name]["z"] = input_card.technique[name]["z"]
-        mcdc["technique"][name]["t"] = input_card.technique[name]["t"]
-        mcdc["technique"][name]["mu"] = input_card.technique[name]["mu"]
-        mcdc["technique"][name]["azi"] = input_card.technique[name]["azi"]
+    # Population control technique (PCT)
+    mcdc["technique"]["pct"] = input_card.technique["pct"]
+
+    # =========================================================================
+    # Weight window (WW)
+    # =========================================================================
+
+    # WW mesh
+    for name in type_.mesh_names[:-1]:
+        mcdc["technique"]["ww_mesh"][name] = input_card.technique["ww_mesh"][name]
+
+    # WW windows
+    mcdc["technique"]["ww"] = input_card.technique["ww"]
 
     # =========================================================================
     # Weight roulette
     # =========================================================================
-    if input_card.technique["weight_roulette"]:
-        mcdc["technique"]["wr_chance"] = input_card.technique["wr_chance"]
-        mcdc["technique"]["wr_threshold"] = input_card.technique["wr_threshold"]
+
+    # Threshold
+    mcdc["technique"]["wr_threshold"] = input_card.technique["wr_threshold"]
+
+    # Survival probability
+    mcdc["technique"]["wr_chance"] = input_card.technique["wr_chance"]
 
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
+
+    for name in type_.technique.names:
+        if name[:4] == "iqmc":
+            if name not in [
+                "iqmc_flux_old",
+                "iqmc_flux_outter",
+                "iqmc_mesh",
+                "iqmc_source",
+                "iqmc_effective_scattering",
+                "iqmc_effective_fission",
+                "iqmc_res",
+                "iqmc_generator",
+            ]:
+                mcdc["technique"][name] = input_card.technique[name]
 
     if input_card.technique["iQMC"]:
         mcdc["technique"]["iqmc_mesh"]["x"] = input_card.technique["iqmc_mesh"]["x"]
@@ -332,13 +347,17 @@ def prepare():
             mcdc["technique"]["lds"] = np.random.random((N, N_dim))
 
     # =========================================================================
-    # Global tally
+    # Time census
     # =========================================================================
 
-    mcdc["k_eff"] = mcdc["setting"]["k_init"]
+    # Census time
+    mcdc["technique"]["census_time"] = input_card.technique["census_time"]
+
+    # Census index
+    mcdc["technique"]["census_idx"] = 0
 
     # =========================================================================
-    # Misc.
+    # RNG
     # =========================================================================
 
     # RNG seed and stride
@@ -346,23 +365,40 @@ def prepare():
     mcdc["rng_seed"] = mcdc["setting"]["rng_seed"]
     mcdc["rng_stride"] = mcdc["setting"]["rng_stride"]
 
-    # Set MPI parameters
+    # =========================================================================
+    # MPI
+    # =========================================================================
+
+    # MPI parameters
     mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
     mcdc["mpi_rank"] = MPI.COMM_WORLD.Get_rank()
     mcdc["mpi_master"] = mcdc["mpi_rank"] == 0
+
+    # Distribute work to MPI ranks
+    kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
+
+    # =========================================================================
+    # Particle banks
+    # =========================================================================
 
     # Particle bank tags
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+
+    # IC generator banks
     if mcdc["technique"]["IC_generator"]:
         mcdc["technique"]["IC_bank_neutron_local"]["tag"] = "neutron"
         mcdc["technique"]["IC_bank_precursor_local"]["tag"] = "precursor"
         mcdc["technique"]["IC_bank_neutron"]["tag"] = "neutron"
         mcdc["technique"]["IC_bank_precursor"]["tag"] = "precursor"
 
-    # Distribute work to processors
-    kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
+    # =========================================================================
+    # Eigenvalue (or fixed-source)
+    # =========================================================================
+
+    # Initial guess
+    mcdc["k_eff"] = mcdc["setting"]["k_init"]
 
     # Activate tally scoring for fixed-source
     if not mcdc["setting"]["mode_eigenvalue"]:
@@ -486,6 +522,7 @@ def generate_hdf5():
             f.create_dataset("tally/grid/z", data=T["mesh"]["z"])
             f.create_dataset("tally/grid/mu", data=T["mesh"]["mu"])
             f.create_dataset("tally/grid/azi", data=T["mesh"]["azi"])
+            f.create_dataset("tally/grid/g", data=T["mesh"]["g"])
 
             # Scores
             for name in T["score"].dtype.names:

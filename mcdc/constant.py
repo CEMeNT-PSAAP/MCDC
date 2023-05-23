@@ -12,7 +12,7 @@ EVENT_FISSION = 1 << 5
 EVENT_CAPTURE = 1 << 6
 EVENT_TIME_BOUNDARY = 1 << 7
 EVENT_LATTICE = 1 << 8
-EVENT_MOVE = 1 << 9
+EVENT_SURFACE_MOVE = 1 << 9
 
 # Mesh crossing flags
 MESH_X = 0
