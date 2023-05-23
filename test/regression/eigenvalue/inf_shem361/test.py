@@ -50,7 +50,7 @@ def test():
 
     # Tally
     scores = ["flux"]
-    mcdc.tally(scores=scores)
+    mcdc.tally(scores=scores, g="all")
 
     # Setting
     mcdc.setting(N_particle=10, progress_bar=False)

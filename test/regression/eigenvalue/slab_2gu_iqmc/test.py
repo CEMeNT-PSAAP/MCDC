@@ -63,7 +63,7 @@ def test():
         generator=generator,
     )
     # Setting
-    mcdc.setting(N_particle=N, progresss_bar=False)
+    mcdc.setting(N_particle=N, progress_bar=False)
     mcdc.eigenmode()
 
     # Run

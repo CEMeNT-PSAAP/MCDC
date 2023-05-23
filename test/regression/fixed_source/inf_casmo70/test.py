@@ -41,7 +41,7 @@ def test():
     source = mcdc.source(energy=energy)
 
     scores = ["flux"]
-    mcdc.tally(scores=scores)
+    mcdc.tally(scores=scores, g="all")
 
     mcdc.setting(N_particle=2e1, progress_bar=False)
 
