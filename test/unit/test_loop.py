@@ -25,7 +25,7 @@ def loop_setup_test():
 
     # mcdc =
 
-    return (S, P, mcdc)
+    assert 0 == 0
 
 
 def test_loop_main():

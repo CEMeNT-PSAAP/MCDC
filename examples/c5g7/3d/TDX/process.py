@@ -23,17 +23,11 @@ t_mid = 0.5 * (t[:-1] + t[1:])
 dt = t[1:] - t[:-1]
 
 # Normalize
-norm = np.sum(fis_avg[:, 0]) / dt[0]
+norm = np.sum(fis_avg[0]) / dt[0]
 fis_avg /= norm
 fis_sd /= norm
-fis_ = np.zeros_like(fis_avg[0])
-fis__sd = np.zeros_like(fis_avg[0])
-for i in range(7):
-    fis_ += fis_avg[i]
-    fis__sd += np.square(fis_sd[i])
-fis__sd = np.sqrt(fis__sd)
-fis_ /= dt
-fis__sd /= dt
+fis_avg /= dt
+fis_sd /= dt
 
 # Reference
 with h5py.File("reference.h5", "r") as f:
@@ -58,8 +52,8 @@ plt.plot(t_mid, fis__ref, "-m", fillstyle="none", label="Ref. (MC)")
 plt.fill_between(
     t_mid, fis__ref - fis__sd_ref, fis__ref + fis__sd_ref, alpha=0.2, color="m"
 )
-plt.plot(t_mid, fis_, "ok", fillstyle="none", label="MC")
-plt.fill_between(t_mid, fis_ - fis__sd, fis_ + fis__sd, alpha=0.2, color="k")
+plt.plot(t_mid, fis_avg, "ok", fillstyle="none", label="MC")
+plt.fill_between(t_mid, fis_avg - fis_sd, fis_avg + fis_sd, alpha=0.2, color="k")
 plt.yscale("log")
 plt.ylabel("Normalized fission rate")
 plt.xlabel("time [s]")

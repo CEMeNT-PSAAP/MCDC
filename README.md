@@ -78,7 +78,7 @@ python input.py
 
 A more advanced input example that includes setting up multigroup (in energy and 
 delayed precursor) materials, lattice geometry, and continuous movements of 
-control rods is provided in `MCDC/example/fixed_source/C5G7-TDX`.
+control rods is provided in `MCDC/example/c5g7/3d/TDX`.
 
 ### Output
 

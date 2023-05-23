@@ -18,7 +18,7 @@ dt = t[1:] - t[:-1]
 K = len(dt)
 J = len(x_mid)
 
-data = np.load("azurv1_pl.npz")
+data = np.load("reference.npz")
 phi_x_ref = data["phi_x"]
 phi_t_ref = data["phi_t"]
 phi_ref = data["phi"]
@@ -55,14 +55,16 @@ ax.set_ylabel(r"Flux")
 ax.set_title(r"$\bar{\phi}_{k,j}$")
 (line1,) = ax.plot([], [], "-b", label="MC")
 (line2,) = ax.plot([], [], "--r", label="Ref.")
+fb = ax.fill_between([], [], [], [], alpha=0.2, color="b")
 text = ax.text(0.02, 0.9, "", transform=ax.transAxes)
 ax.legend()
 
 
 def animate(k):
+    global fb
+    fb.remove()
     line1.set_data(x_mid, phi[k, :])
-    ax.collections.clear()
-    ax.fill_between(
+    fb = ax.fill_between(
         x_mid, phi[k, :] - phi_sd[k, :], phi[k, :] + phi_sd[k, :], alpha=0.2, color="b"
     )
     line2.set_data(x_mid, phi_ref[k, :])
@@ -85,14 +87,16 @@ ax.set_ylabel(r"Flux")
 ax.set_title(r"$\bar{\phi}_{k}(x)$")
 (line1,) = ax.plot([], [], "-b", label="MC")
 (line2,) = ax.plot([], [], "--r", label="Ref.")
+fb = ax.fill_between([], [], [], [], alpha=0.2, color="b")
 text = ax.text(0.02, 0.9, "", transform=ax.transAxes)
 ax.legend()
 
 
 def animate(k):
+    global fb
+    fb.remove()
     line1.set_data(x, phi_x[k, :])
-    ax.collections.clear()
-    ax.fill_between(
+    fb = ax.fill_between(
         x,
         phi_x[k, :] - phi_x_sd[k, :],
         phi_x[k, :] + phi_x_sd[k, :],
@@ -119,15 +123,17 @@ ax.set_ylabel(r"Flux")
 ax.set_title(r"$\bar{\phi}_{j}(t)$")
 (line1,) = ax.plot([], [], "-b", label="MC")
 (line2,) = ax.plot([], [], "--r", label="Ref.")
+fb = ax.fill_between([], [], [], [], alpha=0.2, color="b")
 text = ax.text(0.02, 0.9, "", transform=ax.transAxes)
 ax.legend()
 
 
 def animate(k):
+    global fb
+    fb.remove()
     k += 1
     line1.set_data(x_mid, phi_t[k, :])
-    ax.collections.clear()
-    ax.fill_between(
+    fb = ax.fill_between(
         x_mid,
         phi_t[k, :] - phi_t_sd[k, :],
         phi_t[k, :] + phi_t_sd[k, :],

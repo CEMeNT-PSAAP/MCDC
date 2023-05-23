@@ -1,4 +1,5 @@
 """This module contains functions for setting MC/DC input cards."""
+
 import h5py, math
 import numpy as np
 
@@ -12,11 +13,6 @@ from mcdc.print_ import print_error
 
 # Get mcdc global variables/objects
 import mcdc.global_ as mcdc
-
-
-# ==============================================================================
-# Nuclide
-# ==============================================================================
 
 
 def nuclide(
@@ -199,17 +195,12 @@ def nuclide(
         mcdc.input_card.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_card.technique["sensitivity_N"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
+        mcdc.input_card.setting["N_sensitivity"] += 1
+        card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
 
     # Push card
     mcdc.input_card.nuclides.append(card)
     return card
-
-
-# ==============================================================================
-# Material
-# ==============================================================================
 
 
 def material(
@@ -379,11 +370,6 @@ def material(
     return card
 
 
-# ==============================================================================
-# Surface
-# ==============================================================================
-
-
 def surface(type_, bc="interface", sensitivity=False, **kw):
     """
     Create a surface card and return SurfaceHandle to define cell domain.
@@ -494,8 +480,8 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         mcdc.input_card.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_card.technique["sensitivity_N"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.technique["sensitivity_N"]
+        mcdc.input_card.setting["N_sensitivity"] += 1
+        card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
 
     # ==========================================================================
     # Surface attributes
@@ -509,7 +495,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         card["G"] = 1.0
         card["linear"] = True
         if type(kw.get("x")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("x"), kw.get("t"), card)
+            _set_J(kw.get("x"), kw.get("t"), card)
         else:
             card["J"][0, 0] = -kw.get("x")
     elif type_ == "plane-y":
@@ -517,7 +503,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         card["H"] = 1.0
         card["linear"] = True
         if type(kw.get("y")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("y"), kw.get("t"), card)
+            _set_J(kw.get("y"), kw.get("t"), card)
         else:
             card["J"][0, 0] = -kw.get("y")
     elif type_ == "plane-z":
@@ -525,7 +511,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         card["I"] = 1.0
         card["linear"] = True
         if type(kw.get("z")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("z"), kw.get("t"), card)
+            _set_J(kw.get("z"), kw.get("t"), card)
         else:
             card["J"][0, 0] = -kw.get("z")
     elif type_ == "plane":
@@ -604,7 +590,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
     return SurfaceHandle(card)
 
 
-def set_J(x, t, card):
+def _set_J(x, t, card):
     # Edit and add the edges
     t[0] = -SHIFT
     t = np.append(t, INF)
@@ -631,11 +617,6 @@ def set_J(x, t, card):
 
     card["J"] *= -1
     card["N_slice"] = len(card["J"])
-
-
-# =============================================================================
-# Cell
-# =============================================================================
 
 
 def cell(surfaces_flags, fill, lattice_center=None):
@@ -674,11 +655,6 @@ def cell(surfaces_flags, fill, lattice_center=None):
     return card
 
 
-# =============================================================================
-# Universe
-# =============================================================================
-
-
 def universe(cells, root=False):
     N_cell = len(cells)
 
@@ -701,11 +677,6 @@ def universe(cells, root=False):
         mcdc.input_card.universes.append(card)
 
     return card
-
-
-# =============================================================================
-# Lattice
-# =============================================================================
 
 
 def lattice(x=None, y=None, z=None, universes=None):
@@ -760,11 +731,6 @@ def lattice(x=None, y=None, z=None, universes=None):
     # Push card
     mcdc.input_card.lattices.append(card)
     return card
-
-
-# ==============================================================================
-# Source
-# ==============================================================================
 
 
 def source(**kw):
@@ -912,11 +878,6 @@ def source(**kw):
     return card
 
 
-# =============================================================================
-# Tally
-# =============================================================================
-
-
 def tally(
     scores,
     x=np.array([-INF, INF]),
@@ -925,6 +886,7 @@ def tally(
     t=np.array([-INF, INF]),
     mu=np.array([-1.0, 1.0]),
     azi=np.array([-PI, PI]),
+    g=np.array([-INF, INF]),
 ):
     # Get tally card
     card = mcdc.input_card.tally
@@ -936,6 +898,13 @@ def tally(
     card["mesh"]["t"] = t
     card["mesh"]["mu"] = mu
     card["mesh"]["azi"] = azi
+
+    # Set energy group grid
+    if type(g) == type("string") and g == "all":
+        G = mcdc.input_card.materials[0]["G"]
+        card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
+    else:
+        card["mesh"]["g"] = g
 
     # Set score flags
     for s in scores:
@@ -1272,7 +1241,7 @@ def weight_roulette(chance, wr_threshold):
 
     Parameters
     ----------
-    chance : probability of termination
+    chance : probability of survival
     wr_threshold : weight_roulette() is called on a particle
                     if P['w'] <= wr_threshold
 
