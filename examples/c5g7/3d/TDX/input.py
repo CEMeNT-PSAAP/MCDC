@@ -9,7 +9,7 @@ import mcdc
 # =============================================================================
 
 # Load material data
-lib = h5py.File("c5g7.h5", "r")
+lib = h5py.File("../../c5g7_xs.h5", "r")
 
 
 # Setter
@@ -48,14 +48,18 @@ refl_thick = 21.42
 # Control rod banks fractions
 #   All out: 0.0
 #   All in : 1.0
-cr1 = np.array([1.0, 1.0, 1.0, 0.84, 1.0])
+cr1 = np.array([1.0, 1.0, 1.0, 0.889, 1.0])
 cr1_t = np.array([0.0, 5.0, 10.0, 15.0, 15.0 + 1.0 - cr1[-2]])
-cr2 = np.array([1.0, 1.0, 0.0, 0.0, 0.25])
-cr2_t = np.array([0.0, 5.0, 10.0, 15.0, 15.25])
-cr3 = np.array([1.0, 1.0, 0.0, 0.0, 1.0])
-cr3_t = np.array([0.0, 5.0, 10.0, 15.0, 16.0])
-cr4 = np.array([0.5, 0.5])
-cr4_t = np.array([0.0, 20.0])
+
+cr2 = np.array([1.0, 1.0, 0.0, 0.0, 0.8])
+cr2_t = np.array([0.0, 5.0, 10.0, 15.0, 15.8])
+
+cr3 = np.array([0.75, 0.75, 1.0])
+cr3_t = np.array([0.0, 15.0, 15.25])
+
+cr4 = np.array([1.0, 1.0, 0.5, 0.5, 1.0])
+cr4_t = np.array([0.0, 5.0, 7.5, 15.0, 15.5])
+
 # Control rod banks interfaces
 cr1 = core_height * (0.5 - cr1)
 cr2 = core_height * (0.5 - cr2)
@@ -290,16 +294,8 @@ source = mcdc.source(
 # =============================================================================
 
 # Tally
-x_grid = np.linspace(0.0, pitch * 17 * 3, 17 * 3 + 1)
-y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1)
-z_grid = np.linspace(
-    -(core_height / 2 + refl_thick), (core_height / 2 + refl_thick), 102 + 17 * 2 + 1
-)
-x_grid = np.linspace(0.0, pitch * 17 * 3, 2)
-y_grid = np.linspace(-pitch * 17 * 3, 0.0, 2)
-z_grid = np.linspace(-(core_height / 2 + refl_thick), (core_height / 2 + refl_thick), 2)
 t_grid = np.linspace(0.0, 20.0, 201)
-mcdc.tally(scores=["fission"], t=t_grid)
+mcdc.tally(scores=["fission"], t=t_grid, g=g_grid)
 
 # Setting
 mcdc.setting(N_particle=1e5, active_bank_buff=10000)
