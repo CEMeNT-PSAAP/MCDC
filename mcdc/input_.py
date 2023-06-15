@@ -1181,12 +1181,14 @@ def iQMC(
     y=None,
     z=None,
     phi0=None,
+    krylov_restart=None,
     fixed_source=None,
     scramble=False,
     maxitt=25,
     tol=1e-6,
     N_dim=6,
     seed=12345,
+    preconditioner_sweeps=5,
     generator="halton",
     fixed_source_solver="source_iteration",
     eigenmode_solver="power_iteration",
@@ -1227,10 +1229,15 @@ def iQMC(
         fixed_source = np.expand_dims(fixed_source, axis=ax)
         phi0 = np.expand_dims(phi0, axis=ax)
 
+    if krylov_restart is None:
+        krylov_restart = maxitt
+
     card["iqmc_flux"] = phi0
     card["iqmc_fixed_source"] = fixed_source
-    card["fixed_source_solver"] = fixed_source_solver
-    card["eigenmode_solver"] = eigenmode_solver
+    card["iqmc_fixed_source_solver"] = fixed_source_solver
+    card["iqmc_eigenmode_solver"] = eigenmode_solver
+    card["iqmc_preconditioner_sweeps"] = preconditioner_sweeps
+    card["iqmc_krylov_restart"] = krylov_restart
 
 
 def weight_roulette(chance, wr_threshold):
