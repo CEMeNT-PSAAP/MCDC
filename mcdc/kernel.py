@@ -3007,8 +3007,9 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     #   Apply constant flux approximation for tangent direction
     #   [Dupree 2002, Eq. (7.39)]
     mu = abs(surface_normal_component(P, surface, trans))
-    if mu < 0.01:
-        mu = 0.01 / 2
+    epsilon = 0.01
+    if mu < epsilon:
+        mu = epsilon / 2
     flux = P["w"] / mu
 
     # Base weight
