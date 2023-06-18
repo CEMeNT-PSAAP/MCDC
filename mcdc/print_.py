@@ -179,13 +179,12 @@ def print_time(tag, t, percent):
 def print_bank(bank, show_content=False):
     tag = bank["tag"]
     size = bank["size"]
-    max_size = bank["max_size"]
     particles = bank["particles"]
 
     print("\n=============")
     print("Particle bank")
     print("  tag  :", tag)
-    print("  size :", size, "of", max_size)
+    print("  size :", size, "of", len(bank["particles"]))
     if show_content and size > 0:
         for i in range(size):
             print(" ", particles[i])

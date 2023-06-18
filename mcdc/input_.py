@@ -27,6 +27,7 @@ def nuclide(
     speed=None,
     decay=None,
     sensitivity=False,
+    dsm_Np=1.0,
 ):
     """
     Create a nuclide card.
@@ -55,6 +56,9 @@ def nuclide(
         Precursor group decay constant [/s]
     sensitivity : bool, optional
         Set to `True` to calculate sensitivities to the nuclide
+    dsm_Np : float
+        Average number of derivative particles produced at each
+        sensitivity nuclide collision
 
     Returns
     -------
@@ -110,6 +114,7 @@ def nuclide(
     card["chi_d"] = np.zeros([J, G])
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
+    card["dsm_Np"] = 1.0
 
     # Speed (vector of size G)
     if speed is not None:
@@ -198,6 +203,9 @@ def nuclide(
         mcdc.input_card.setting["N_sensitivity"] += 1
         card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
 
+        # Set dsm_Np
+        card["dsm_Np"] = dsm_Np
+
     # Push card
     mcdc.input_card.nuclides.append(card)
     return card
@@ -216,6 +224,7 @@ def material(
     speed=None,
     decay=None,
     sensitivity=False,
+    dsm_Np=1.0,
 ):
     """
     Create a material card.
@@ -249,6 +258,10 @@ def material(
         Precursor group decay constant [/s]
     sensitivity : bool, optional
         Set to `True` to calculate sensitivities to the material
+        (only relevant for single-nuclide material)
+    dsm_Np : float
+        Average number of derivative particles produced at each
+        sensitivity material collision (only relevant for single_nuclide material)
 
     Returns
     -------
@@ -274,6 +287,7 @@ def material(
             speed,
             decay,
             sensitivity,
+            dsm_Np,
         )
         nuclides = [[card_nuclide, 1.0]]
 
@@ -370,7 +384,7 @@ def material(
     return card
 
 
-def surface(type_, bc="interface", sensitivity=False, **kw):
+def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     """
     Create a surface card and return SurfaceHandle to define cell domain.
 
@@ -383,6 +397,9 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         Surface boundary condition.
     sensitivity : bool, optional
         Set to `True` to calculate sensitivities to the nuclide
+    dsm_Np : int
+        Average number of derivative particles produced at each
+        sensitivity surface crossing
 
     Other Parameters
     ----------------
@@ -438,6 +455,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
     card["nz"] = 0.0
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
+    card["dsm_Np"] = 1.0
 
     # Check if the selected type is supported
     type_ = check_support(
@@ -482,6 +500,9 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
         # Set ID
         mcdc.input_card.setting["N_sensitivity"] += 1
         card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
+
+        # Set dsm_Np
+        card["dsm_Np"] = dsm_Np
 
     # ==========================================================================
     # Surface attributes

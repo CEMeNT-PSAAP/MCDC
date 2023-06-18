@@ -218,6 +218,9 @@ def loop_particle(P, mcdc):
                 if material["sensitivity"] and P["sensitivity_ID"] == 0:
                     kernel.sensitivity_material(P, mcdc)
 
+                # print('Material')
+                # print(P)
+
         # Mesh tally
         if event & EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)

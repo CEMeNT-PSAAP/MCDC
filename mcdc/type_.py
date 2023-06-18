@@ -139,6 +139,7 @@ def make_type_nuclide(G, J):
             ("chi_d", float64, (J, G)),
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
+            ("dsm_Np", float64),
         ]
     )
 
@@ -200,6 +201,7 @@ def make_type_surface(Nmax_slice):
             ("nz", float64),
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
+            ("dsm_Np", float64),
         ]
     )
 
