@@ -287,7 +287,9 @@ def prepare():
 
     # WW windows
     mcdc["technique"]["ww"] = input_card.technique["ww"]
-    mcdc["technique"]["weight_window_width"] = input_card.technique["weight_window_width"]
+    mcdc["technique"]["weight_window_width"] = input_card.technique[
+        "weight_window_width"
+    ]
 
     # =========================================================================
     # Weight roulette
