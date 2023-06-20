@@ -275,6 +275,7 @@ def prepare():
 
     # Population control technique (PCT)
     mcdc["technique"]["pct"] = input_card.technique["pct"]
+    mcdc["technique"]["pc_factor"] = input_card.technique["pc_factor"]
 
     # =========================================================================
     # Weight window (WW)
@@ -286,6 +287,7 @@ def prepare():
 
     # WW windows
     mcdc["technique"]["ww"] = input_card.technique["ww"]
+    mcdc["technique"]["weight_window_width"] = input_card.technique["weight_window_width"]
 
     # =========================================================================
     # Weight roulette

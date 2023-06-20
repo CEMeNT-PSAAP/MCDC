@@ -672,6 +672,9 @@ def pct_combing(mcdc):
     # Teeth distance
     td = N / M
 
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= td
+
     # Tooth offset
     xi = rng(mcdc)
     offset = xi * td
@@ -705,6 +708,9 @@ def pct_combing_weight(mcdc):
 
     # Teeth distance
     td = W / M
+
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= td
 
     # Tooth offset
     xi = rng(mcdc)
@@ -2347,35 +2353,43 @@ def time_boundary(P, mcdc):
 def weight_window(P, mcdc):
     # Get indices
     t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
+    if not outside:
+        # Target weight
+        w_target = mcdc["technique"]["ww"][t, x, y, z]
 
-    # Target weight
-    w_target = mcdc["technique"]["ww"][t, x, y, z]
+        # Population control factor
+        w_target *= mcdc["technique"]["pc_factor"]
 
-    # Surviving probability
-    p = P["w"] / w_target
+        # Surviving probability
+        p = P["w"] / w_target
 
-    # Set target weight
-    P["w"] = w_target
+        # Window Width
+        width = mcdc["technique"]["weight_window_width"]
 
-    # If above target
-    if p > 1.0:
-        # Splitting (keep the original particle)
-        n_split = math.floor(p)
-        for i in range(n_split - 1):
-            add_particle(copy_particle(P), mcdc["bank_active"])
+        # If above target
+        if p > width:
+            # Set target weight
+            P["w"] = w_target
 
-        # Russian roulette
-        p -= n_split
-        xi = rng(mcdc)
-        if xi <= p:
-            add_particle(copy_particle(P), mcdc["bank_active"])
+            # Splitting (keep the original particle)
+            n_split = math.floor(p)
+            for i in range(n_split - 1):
+                add_particle(copy_particle(P), mcdc["bank_active"])
 
-    # Below target
-    else:
-        # Russian roulette
-        xi = rng(mcdc)
-        if xi > p:
-            P["alive"] = False
+            # Russian roulette
+            p -= n_split
+            xi = rng(mcdc)
+            if xi <= p:
+                add_particle(copy_particle(P), mcdc["bank_active"])
+
+        # Below target
+        elif p < 1.0/width:
+            # Russian roulette
+            xi = rng(mcdc)
+            if xi > p:
+                P["alive"] = False
+            else:
+                P["w"] = w_target
 
 
 # ==============================================================================
