@@ -2955,6 +2955,13 @@ def weight_roulette(P, mcdc):
 
 @njit
 def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
+    # Sample number of derivative sources
+    xi = surface["dsm_Np"]
+    if xi != 1.0:
+        Np = int(math.floor(xi + rng(mcdc)))
+    else:
+        Np = 1
+
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
     add_particle(copy_particle(P), mcdc["bank_active"])
@@ -3013,13 +3020,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     flux = P["w"] / mu
 
     # Base weight
-    w_hat = p_total * flux
-
-    # Sample number of derivative sources
-    if surface["dsm_Np"] != 1.0:
-        Np = int(math.floor(surface["dsm_Np"] + rng(mcdc)))
-    else:
-        Np = 1
+    w_hat = p_total * flux / xi
 
     # Sample the derivative sources
     for n in range(Np):
@@ -3038,27 +3039,27 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
             if tot > xi:
                 # Scattering source
                 total_scatter = nuSigmaS_old + nuSigmaS_new
-                w_hat *= total_scatter / p_scatter
+                w_s = w_hat * total_scatter / p_scatter
 
                 # Sample if it is from + or - component
                 if nuSigmaS_old > rng(mcdc) * total_scatter:
                     sample_phasespace_scattering(P, material_old, P_new, mcdc)
-                    P_new["w"] = w_hat * sign_old
+                    P_new["w"] = w_s * sign_old
                 else:
                     sample_phasespace_scattering(P, material_new, P_new, mcdc)
-                    P_new["w"] = w_hat * sign_new
+                    P_new["w"] = w_s * sign_new
             else:
                 # Fission source
                 total_fission = nuSigmaF_old + nuSigmaF_new
-                w_hat *= total_fission / p_fission
+                w_f = w_hat * total_fission / p_fission
 
                 # Sample if it is from + or - component
                 if nuSigmaF_old > rng(mcdc) * total_fission:
                     sample_phasespace_fission(P, material_old, P_new, mcdc)
-                    P_new["w"] = w_hat * sign_old
+                    P_new["w"] = w_f * sign_old
                 else:
                     sample_phasespace_fission(P, material_new, P_new, mcdc)
-                    P_new["w"] = w_hat * sign_new
+                    P_new["w"] = w_f * sign_new
 
         # Assign sensitivity_ID
         P_new["sensitivity_ID"] = ID
@@ -3092,6 +3093,13 @@ def sensitivity_material(P, mcdc):
     if not nuclide["sensitivity"]:
         return
 
+    # Sample number of derivative sources
+    xi = nuclide["dsm_Np"]
+    if xi != 1.0:
+        Np = int(math.floor(xi + rng(mcdc)))
+    else:
+        Np = 1
+
     # Get sensitivity ID
     ID = nuclide["sensitivity_ID"]
 
@@ -3112,13 +3120,7 @@ def sensitivity_material(P, mcdc):
 
     # Base weight
     total = SigmaT + nuSigmaS + nuSigmaF
-    w = total * P["w"] / SigmaT
-
-    # Sample number of derivative sources
-    if nuclide["dsm_Np"] != 1.0:
-        Np = int(math.floor(nuclide["dsm_Np"] + rng(mcdc)))
-    else:
-        Np = 1
+    w = total * P["w"] / SigmaT / xi
 
     # Sample the derivative sources
     for n in range(Np):
