@@ -2383,7 +2383,7 @@ def weight_window(P, mcdc):
                 add_particle(copy_particle(P), mcdc["bank_active"])
 
         # Below target
-        elif p < 1.0/width:
+        elif p < 1.0 / width:
             # Russian roulette
             xi = rng(mcdc)
             if xi > p:
