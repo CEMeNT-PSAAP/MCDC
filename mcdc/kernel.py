@@ -2353,7 +2353,7 @@ def time_boundary(P, mcdc):
 def weight_window(P, mcdc):
     # Get indices
     t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
-        
+
     # Target weight
     w_target = mcdc["technique"]["ww"][t, x, y, z]
 
@@ -2363,7 +2363,7 @@ def weight_window(P, mcdc):
     # Surviving probability
     p = P["w"] / w_target
 
-    # Window Width
+    # Window width
     width = mcdc["technique"]["weight_window_width"]
 
     # If above target
