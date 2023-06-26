@@ -1148,7 +1148,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
 
     # Set width
     if width is not None:
-        card["weight_window_width"] = width
+        card["ww_width"] = width
 
     # Set mesh
     if x is not None:

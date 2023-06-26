@@ -113,7 +113,7 @@ class InputCard:
             "pc_factor": 1.0,
             "weight_window": False,
             "ww": np.ones([1, 1, 1, 1]),
-            "weight_window_width": 2.5,
+            "ww_width": 2.5,
             "ww_mesh": {
                 "x": np.array([-INF, INF]),
                 "y": np.array([-INF, INF]),
