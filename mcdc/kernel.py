@@ -673,6 +673,9 @@ def pct_combing(mcdc):
     # Teeth distance
     td = N / M
 
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= td
+
     # Tooth offset
     xi = rng(mcdc)
     offset = xi * td
@@ -706,6 +709,9 @@ def pct_combing_weight(mcdc):
 
     # Teeth distance
     td = W / M
+
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= td
 
     # Tooth offset
     xi = rng(mcdc)
@@ -2349,14 +2355,20 @@ def weight_window(P, mcdc):
     # Target weight
     w_target = mcdc["technique"]["ww"][t, x, y, z]
 
+    # Population control factor
+    w_target *= mcdc["technique"]["pc_factor"]
+
     # Surviving probability
     p = P["w"] / w_target
 
-    # Set target weight
-    P["w"] = w_target
+    # Window width
+    width = mcdc["technique"]["ww_width"]
 
     # If above target
-    if p > 1.0:
+    if p > width:
+        # Set target weight
+        P["w"] = w_target
+
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
@@ -2369,11 +2381,13 @@ def weight_window(P, mcdc):
             add_particle(copy_particle(P), mcdc["bank_active"])
 
     # Below target
-    else:
+    elif p < 1.0 / width:
         # Russian roulette
         xi = rng(mcdc)
         if xi > p:
             P["alive"] = False
+        else:
+            P["w"] = w_target
 
 
 # ==============================================================================
