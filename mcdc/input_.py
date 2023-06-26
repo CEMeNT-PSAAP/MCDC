@@ -1163,9 +1163,13 @@ def census(t, pct="none"):
         population_control(pct)
 
 
-def weight_window(x=None, y=None, z=None, t=None, window=None):
+def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     card = mcdc.input_card.technique
     card["weight_window"] = True
+
+    # Set width
+    if width is not None:
+        card["ww_width"] = width
 
     # Set mesh
     if x is not None:
