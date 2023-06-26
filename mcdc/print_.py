@@ -50,7 +50,12 @@ def print_banner(mcdc):
         if mcdc["technique"]["iQMC"]:
             banner += "      Algorithm | iQMC\n"
             rng = mcdc["technique"]["iqmc_generator"]
+            if mcdc["setting"]["mode_eigenvalue"]:
+                solver = mcdc["technique"]["iqmc_eigenmode_solver"]
+            else:
+                solver = mcdc["technique"]["iqmc_fixed_source_solver"]
             banner += "            RNG | " + rng + "\n"
+            banner += "         Solver | " + solver + "\n"
         else:
             banner += "      Algorithm | History-based\n"
         banner += "  MPI Processes | %i\n" % size
@@ -140,14 +145,16 @@ def print_iqmc_eigenvalue_exit_code(mcdc):
         itt = mcdc["technique"]["iqmc_itt_outter"]
         tol = mcdc["technique"]["iqmc_tol"]
         res = mcdc["technique"]["iqmc_res_outter"]
+        solver = mcdc["technique"]["iqmc_eigenmode_solver"]
         if itt >= maxit:
-            print("\n ================================")
+            print("\n ================================\n ")
             print(
-                " Power Iteration convergence to tolerance not achieved: Maximum number of iterations."
+                solver
+                + " convergence to tolerance not achieved: Maximum number of iterations."
             )
         elif res <= tol:
-            print("\n ================================")
-            print("Successful Power Iteration convergence.")
+            print("\n ================================\n ")
+            print("Successful " + solver + " convergence.")
 
 
 def print_runtime(mcdc):
