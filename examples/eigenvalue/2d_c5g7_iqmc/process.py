@@ -8,10 +8,10 @@ import h5py
 # =============================================================================
 
 # Load iqmc result
-with h5py.File("davidson_output.h5", "r") as f:
+with h5py.File("PI_output.h5", "r") as f:
     x = f["iqmc/grid/x"][:]
     y = f["iqmc/grid/y"][:]
-    phi_avg = f["tally/iqmc_flux"][:]
+    phi_avg = f["iqmc/flux"][:]
     f.close()
 
 
@@ -21,25 +21,46 @@ y_mid = 0.5 * (y[1:] + y[:-1])
 Y, X = np.meshgrid(x_mid, y_mid)
 
 norm = np.sum(phi_avg)
-phi_avg = phi_avg.sum(axis=0) / norm
+phi_tot = phi_avg.sum(axis=0) / norm
+
+phi_fast = phi_avg[:5, :, :].sum(axis=0)
+norm = np.sum(phi_fast)
+phi_fast /= norm
+
+phi_slow = phi_avg[5:7, :, :].sum(axis=0)
+norm = np.sum(phi_slow)
+phi_slow /= norm
+
+
+plt.figure(dpi=300, figsize=(8, 4))
+plt.pcolormesh(X, Y, phi_tot, shading="nearest")
+plt.colorbar().set_label(r"Normalized Scalar Flux", rotation=270, labelpad=15)
+ax = plt.gca()
+ax.set_aspect("equal")
+plt.xlabel(r"$x$ [cm]")
+plt.ylabel(r"$y$ [cm]")
+plt.title(r"Total Neutron Flux")
+plt.show()
+plt.tight_layout()
+
 
 plt.figure(dpi=300)
-plt.pcolormesh(X, Y, phi_avg, shading="nearest")
+plt.pcolormesh(X, Y, phi_fast, shading="nearest")
 plt.colorbar()
 ax = plt.gca()
 ax.set_aspect("equal")
 plt.xlabel(r"$x$ [cm]")
 plt.ylabel(r"$y$ [cm]")
-plt.title(r"Neutron Flux")
+plt.title(r"Fast Neutron Flux")
 plt.show()
 
 
-Z = np.log10(np.abs(phi_avg / phi_avg.min()))
-fig, ax = plt.subplots(subplot_kw={"projection": "3d"}, dpi=300, figsize=(12, 10))
-ax.plot_surface(Y, X, Z, edgecolor="b", color="white", linewidth=0.5)
-
-ax.set_xlabel("x")
-ax.set_ylabel("y")
-ax.set_zlabel(r"log($\phi$)")
-
-ax.view_init(elev=15, azim=20)
+plt.figure(dpi=300)
+plt.pcolormesh(X, Y, phi_slow, shading="nearest")
+plt.colorbar()
+ax = plt.gca()
+ax.set_aspect("equal")
+plt.xlabel(r"$x$ [cm]")
+plt.ylabel(r"$y$ [cm]")
+plt.title(r"Thermal Neutron Flux")
+plt.show()
