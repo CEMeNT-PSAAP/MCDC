@@ -316,7 +316,14 @@ def make_type_source(G):
 
 
 # Score lists
-score_tl_list = ("flux", "current", "eddington", "density", "fission", "total")
+score_tl_list = (
+    "flux",
+    "current",
+    "eddington",
+    "density",
+    "fission",
+    "total",
+)
 score_x_list = (
     "flux_x",
     "current_x",
@@ -494,7 +501,7 @@ def make_type_technique(N_particle, G, card):
     # Population control
     # =========================================================================
 
-    struct += [("pct", int64)]
+    struct += [("pct", int64), ("pc_factor", float64)]
 
     # =========================================================================
     # Weight window
@@ -503,6 +510,7 @@ def make_type_technique(N_particle, G, card):
     # Mesh
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww_mesh"])
     struct += [("ww_mesh", mesh)]
+    struct += [("ww_width", float64)]
 
     # Window
     struct += [("ww", float64, (Nt, Nx, Ny, Nz))]
