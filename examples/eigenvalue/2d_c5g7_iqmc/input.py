@@ -171,17 +171,20 @@ mcdc.universe([core], root=True)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 500
-maxit = 1
+N = 1e5
+maxit = 10
 tol = 1e-3
-x_grid = np.linspace(0.0, pitch * 17 * 3, 17 * 3 + 1)
-y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1)
-# x_grid = np.linspace(0.0, pitch * 17 * 3, 20)
-# y_grid = np.linspace(-pitch * 17 * 3, 0.0, 20)
-generator = "halton"
-solver = "power_iteration"
+pre_sweeps = 9
+x_grid = np.linspace(0.0, pitch * 17 * 3, 17 * 3 * 2 + 1)
+y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 * 2 + 1)
 
-phi0 = np.ones((x_grid.size - 1, y_grid.size - 1))
+generator = "halton"
+solver = "davidson"
+
+phi0 = np.zeros((x_grid.size - 1, y_grid.size - 1))
+np.random.seed(123456)
+phi0[: int(pitch * 17 * 2), int(-pitch * 17 * 2) :] = np.random.random((42, 42))
+
 fixed_source = np.zeros_like(phi0)
 
 mcdc.iQMC(
@@ -190,7 +193,7 @@ mcdc.iQMC(
     phi0=phi0,
     fixed_source=fixed_source,
     eigenmode_solver=solver,
-    # preconditioner_sweeps=4,
+    preconditioner_sweeps=pre_sweeps,
     maxitt=maxit,
     tol=tol,
     generator=generator,
