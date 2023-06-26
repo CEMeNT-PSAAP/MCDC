@@ -222,9 +222,6 @@ def loop_particle(P, mcdc):
                 if material["sensitivity"] and P["sensitivity_ID"] == 0:
                     kernel.sensitivity_material(P, mcdc)
 
-                # print('Material')
-                # print(P)
-
         # Mesh tally
         if event & EVENT_MESH:
             kernel.mesh_crossing(P, mcdc)
@@ -328,7 +325,8 @@ def source_iteration(mcdc):
 
         # Print progres
         if not mcdc["setting"]["mode_eigenvalue"]:
-            print_progress_iqmc(mcdc)
+            with objmode():
+                print_progress_iqmc(mcdc)
 
         # set flux_old = current flux
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
@@ -463,7 +461,8 @@ def gmres(mcdc):
             mcdc["technique"]["iqmc_itt"] += 1
             mcdc["technique"]["iqmc_res"] = rel_resid
             if not mcdc["setting"]["mode_eigenvalue"]:
-                print_progress_iqmc(mcdc)
+                with objmode():
+                    print_progress_iqmc(mcdc)
         # end inner loop, back to outer loop
 
         # Find best update to X in Krylov Space V.  Solve inner X inner system.
@@ -479,7 +478,8 @@ def gmres(mcdc):
         mcdc["technique"]["iqmc_itt"] += 1
         mcdc["technique"]["iqmc_res"] = rel_resid
         if not mcdc["setting"]["mode_eigenvalue"]:
-            print_progress_iqmc(mcdc)
+            with objmode():
+                print_progress_iqmc(mcdc)
 
     # end outer loop
 
@@ -520,7 +520,8 @@ def power_iteration(mcdc):
         mcdc["technique"]["iqmc_itt_outter"] += 1
 
         if mcdc["setting"]["progress_bar"]:
-            print_iqmc_eigenvalue_progress(mcdc)
+            with objmode():
+                print_iqmc_eigenvalue_progress(mcdc)
 
         # iQMC convergence criteria
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
@@ -529,7 +530,8 @@ def power_iteration(mcdc):
             simulation_end = True
 
     if mcdc["setting"]["progress_bar"]:
-        print_iqmc_eigenvalue_exit_code(mcdc)
+        with objmode():
+            print_iqmc_eigenvalue_exit_code(mcdc)
 
 
 @njit
@@ -623,7 +625,8 @@ def davidson(mcdc):
         mcdc["technique"]["iqmc_res_outter"] = abs(mcdc["k_eff"] - k_old)
         k_old = mcdc["k_eff"]
         mcdc["technique"]["iqmc_itt_outter"] += 1
-        print_iqmc_eigenvalue_progress(mcdc)
+        with objmode():
+            print_iqmc_eigenvalue_progress(mcdc)
 
         # check convergence criteria
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
@@ -644,7 +647,8 @@ def davidson(mcdc):
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
 
-    print_iqmc_eigenvalue_exit_code(mcdc)
+    with objmode():
+        print_iqmc_eigenvalue_exit_code(mcdc)
 
     # normalize and save final scalar flux
     flux = np.reshape(
