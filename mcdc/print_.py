@@ -1,5 +1,4 @@
 import numba as nb
-from numba import njit
 import numpy as np
 import sys
 from mpi4py import MPI
@@ -129,7 +128,6 @@ def print_progress_eigenvalue(mcdc):
                 print(" %-4i  %.5f  %.5f +/- %.5f" % (i_cycle + 1, k_eff, k_avg, k_sdv))
 
 
-@njit
 def print_iqmc_eigenvalue_progress(mcdc):
     if master:
         k_eff = mcdc["k_eff"]
@@ -138,7 +136,6 @@ def print_iqmc_eigenvalue_progress(mcdc):
         print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
 
 
-@njit
 def print_iqmc_eigenvalue_exit_code(mcdc):
     if master:
         maxit = mcdc["technique"]["iqmc_maxitt"]
@@ -198,7 +195,6 @@ def print_bank(bank, show_content=False):
     print("\n")
 
 
-@njit
 def print_progress_iqmc(mcdc):
     # TODO: function was not working with numba when structured like the
     # other print_progress functions
