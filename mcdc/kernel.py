@@ -2364,7 +2364,7 @@ def weight_window(P, mcdc):
     p = P["w"] / w_target
 
     # Window width
-    width = mcdc["technique"]["weight_window_width"]
+    width = mcdc["technique"]["ww_width"]
 
     # If above target
     if p > width:

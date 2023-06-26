@@ -247,7 +247,7 @@ def loop_particle(P, mcdc):
             kernel.time_boundary(P, mcdc)
 
         # Apply weight window
-        if mcdc["technique"]["weight_window"]:
+        elif mcdc["technique"]["weight_window"]:
             kernel.weight_window(P, mcdc)
 
         # Apply weight roulette
