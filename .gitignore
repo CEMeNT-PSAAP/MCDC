@@ -15,6 +15,7 @@ __pycache__
 
 # Output
 output*.h5
+*_output.h5
 *.png
 *.mp4
 *.gif
