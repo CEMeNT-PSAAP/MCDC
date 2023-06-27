@@ -163,8 +163,9 @@ class InputCard:
 
 
 class SurfaceHandle:
-    def __init__(self, card):
+    def __init__(self, card, type):
         self.card = card
+        self.type = type
 
     def __pos__(self):
         return [self.card, True]

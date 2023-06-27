@@ -6,10 +6,14 @@ import numpy as np
 from mpi4py import MPI
 
 import mcdc.type_ as type_
+#import type_ as type_
 
 from mcdc.card import SurfaceHandle
+#from card import SurfaceHandle
 from mcdc.constant import *
+#from constant import *
 from mcdc.print_ import print_error
+#from print_ import print_error
 
 # Get mcdc global variables/objects
 import mcdc.global_ as mcdc
@@ -587,7 +591,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
 
     # Push card
     mcdc.input_card.surfaces.append(card)
-    return SurfaceHandle(card)
+    return SurfaceHandle(card, type_)
 
 
 def _set_J(x, t, card):
@@ -595,7 +599,6 @@ def _set_J(x, t, card):
     t[0] = -SHIFT
     t = np.append(t, INF)
     x = np.append(x, x[-1])
-
     # Reset the constants
     card["J"] = np.zeros([0, 2])
     card["t"] = np.array([-SHIFT])
