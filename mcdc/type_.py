@@ -9,7 +9,7 @@ float64 = np.float64
 int64 = np.int64
 uint64 = np.uint64
 bool_ = np.bool_
-str_ = "U30"  # np.str_
+str_ = "U30"
 
 # MC/DC types, will be defined by input card
 particle = None
@@ -314,7 +314,14 @@ def make_type_source(G):
 
 
 # Score lists
-score_tl_list = ("flux", "current", "eddington", "density", "fission", "total")
+score_tl_list = (
+    "flux",
+    "current",
+    "eddington",
+    "density",
+    "fission",
+    "total",
+)
 score_x_list = (
     "flux_x",
     "current_x",
@@ -492,7 +499,7 @@ def make_type_technique(N_particle, G, card):
     # Population control
     # =========================================================================
 
-    struct += [("pct", int64)]
+    struct += [("pct", int64), ("pc_factor", float64)]
 
     # =========================================================================
     # Weight window
@@ -501,6 +508,7 @@ def make_type_technique(N_particle, G, card):
     # Mesh
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww_mesh"])
     struct += [("ww_mesh", mesh)]
+    struct += [("ww_width", float64)]
 
     # Window
     struct += [("ww", float64, (Nt, Nx, Ny, Nz))]
@@ -527,7 +535,7 @@ def make_type_technique(N_particle, G, card):
     struct += [("iqmc_mesh", mesh)]
     # Low-discprenecy sequence
     # TODO: make N_dim an input setting
-    struct += [("lds", float64, (N_particle, N_dim))]
+    struct += [("iqmc_lds", float64, (N_particle, N_dim))]
 
     # Source
     struct += [("iqmc_source", float64, (Ng, Nt, Nx, Ny, Nz))]
@@ -537,10 +545,11 @@ def make_type_technique(N_particle, G, card):
     # flux tallies
     struct += [("iqmc_flux", float64, (Ng, Nt, Nx, Ny, Nz))]
     struct += [("iqmc_flux_old", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_effective_scattering", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_effective_fission", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # TODO: make outter flux size zero if not eigenmode
     struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
+    # if card.setting["mode_eigenvalue"]:
+    #     struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
+    # else:
+    #     struct += [("iqmc_flux_outter", float64, (0, 0, 0, 0, 0))]
 
     # Constants
     struct += [
@@ -554,8 +563,11 @@ def make_type_technique(N_particle, G, card):
         ("iqmc_scramble", bool_),
         ("iqmc_seed", int64),
         ("iqmc_generator", str_),
-        ("fixed_source_solver", str_),
-        ("eigenmode_solver", str_),
+        ("iqmc_fixed_source_solver", str_),
+        ("iqmc_eigenmode_solver", str_),
+        ("iqmc_krylov_restart", int64),
+        ("iqmc_preconditioner_sweeps", int64),
+        ("iqmc_sweep_counter", int64),
     ]
 
     # =========================================================================
