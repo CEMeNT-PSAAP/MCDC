@@ -14,6 +14,7 @@ __pycache__
 *.swp
 
 # Output
+*output.h5
 output*.h5
 *.png
 *.mp4
