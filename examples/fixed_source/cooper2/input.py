@@ -45,7 +45,7 @@ mcdc.source(x=[0.0, 1.0], y=[0.0, 1.0], isotropic=True)
 mcdc.tally(scores=["flux"], x=np.linspace(0.0, 4.0, 40), y=np.linspace(0.0, 4.0, 40))
 
 # Setting
-mcdc.setting(N_particle=1e10)
+mcdc.setting(N_particle=1e2)
 mcdc.implicit_capture()
 
 # Run
