@@ -275,6 +275,7 @@ def prepare():
 
     # Population control technique (PCT)
     mcdc["technique"]["pct"] = input_card.technique["pct"]
+    mcdc["technique"]["pc_factor"] = input_card.technique["pc_factor"]
 
     # =========================================================================
     # Weight window (WW)
@@ -286,6 +287,7 @@ def prepare():
 
     # WW windows
     mcdc["technique"]["ww"] = input_card.technique["ww"]
+    mcdc["technique"]["ww_width"] = input_card.technique["ww_width"]
 
     # =========================================================================
     # Weight roulette
@@ -308,10 +310,10 @@ def prepare():
                 "iqmc_flux_outter",
                 "iqmc_mesh",
                 "iqmc_source",
-                "iqmc_effective_scattering",
-                "iqmc_effective_fission",
                 "iqmc_res",
+                "iqmc_lds",
                 "iqmc_generator",
+                "iqmc_sweep_counter",
             ]:
                 mcdc["technique"][name] = input_card.technique[name]
 
@@ -329,7 +331,12 @@ def prepare():
             sampler = qmc.Sobol(d=N_dim, scramble=scramble)
             m = math.ceil(math.log(N, 2))
             mcdc["setting"]["N_particle"] = 2**m
-            mcdc["technique"]["lds"] = sampler.random_base2(m=m)
+            mcdc["technique"]["iqmc_lds"] = sampler.random_base2(m=m)
+            # first row of an unscrambled Sobol sequence is all zeros
+            # and throws off some of the algorithms. So we add small amount
+            # to avoid this issue
+            # mcdc["technique"]["lds"][0,:] += 1e-6
+            mcdc["technique"]["iqmc_lds"][mcdc["technique"]["iqmc_lds"] == 0.0] += 1e-6
             # lds is shape (2**m, d)
         if input_card.technique["iqmc_generator"] == "halton":
             scramble = mcdc["technique"]["iqmc_scramble"]
@@ -338,13 +345,13 @@ def prepare():
             N = mcdc["setting"]["N_particle"]
             sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
             sampler.fast_forward(1)
-            mcdc["technique"]["lds"] = sampler.random(N)
+            mcdc["technique"]["iqmc_lds"] = sampler.random(N)
         if input_card.technique["iqmc_generator"] == "random":
             seed = mcdc["technique"]["iqmc_seed"]
             N_dim = mcdc["technique"]["iqmc_N_dim"]
             N = mcdc["setting"]["N_particle"]
             np.random.seed(seed)
-            mcdc["technique"]["lds"] = np.random.random((N, N_dim))
+            mcdc["technique"]["iqmc_lds"] = np.random.random((N, N_dim))
 
     # =========================================================================
     # Time census
@@ -559,17 +566,26 @@ def generate_hdf5():
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
-                # TODO: dump time dependent tallies
+                # dump iQMC mesh
                 T = mcdc["technique"]
                 f.create_dataset("iqmc/grid/t", data=T["iqmc_mesh"]["t"])
                 f.create_dataset("iqmc/grid/x", data=T["iqmc_mesh"]["x"])
                 f.create_dataset("iqmc/grid/y", data=T["iqmc_mesh"]["y"])
                 f.create_dataset("iqmc/grid/z", data=T["iqmc_mesh"]["z"])
-
+                f.create_dataset("iqmc/material_idx", data=T["iqmc_material_idx"])
                 # dump x,y,z scalar flux across all groups
-                f.create_dataset(
-                    "tally/" + "iqmc_flux", data=np.squeeze(T["iqmc_flux"])
-                )
+                f.create_dataset("iqmc/flux", data=np.squeeze(T["iqmc_flux"]))
+                # iteration data
+                f.create_dataset("iqmc/itteration_count", data=T["iqmc_itt"])
+                f.create_dataset("iqmc/final_residual", data=T["iqmc_res"])
+                f.create_dataset("iqmc/sweep_count", data=T["iqmc_sweep_counter"])
+                if mcdc["setting"]["mode_eigenvalue"]:
+                    f.create_dataset(
+                        "iqmc/outter_itteration_count", data=T["iqmc_itt_outter"]
+                    )
+                    f.create_dataset(
+                        "iqmc/outter_final_residual", data=T["iqmc_res_outter"]
+                    )
 
             # Particle tracker
             if mcdc["setting"]["track_particle"]:
