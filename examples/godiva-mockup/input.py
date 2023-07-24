@@ -5,8 +5,8 @@ import mcdc, h5py
 # Materials
 # =============================================================================
 
-m_abs = mcdc.material(capture=np.array([1E5]), speed=np.array([1E3]))
-m_void = mcdc.material(capture=np.array([5e-5]), scatter=np.array([[5e-5]]), speed=np.array([1E3]))
+m_abs = mcdc.material(capture=np.array([1E5]), speed=np.array([1E3]), name = "test")
+m_void = mcdc.material(capture=np.array([5e-5]), scatter=np.array([[5e-5]]), speed=np.array([1E3]), name = "source")
 
 # =============================================================================
 # Set surfaces
@@ -66,11 +66,14 @@ mcdc.source(
     x=[-22.0, 22.0], time=[0.0, 5.0], isotropic=True
 )
 
+mcdc.visualize()
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
 # Tally: z-integrated flux (X-Y section view)
+
+'''
 mcdc.tally(
     scores=["flux"],
     x=np.linspace(-22.0, 22.0, 84+1),
@@ -83,3 +86,4 @@ mcdc.setting(N_particle=1e6)
 
 # Run
 mcdc.run()
+'''

@@ -220,6 +220,7 @@ def material(
     speed=None,
     decay=None,
     sensitivity=False,
+    name = None
 ):
     """
     Create a material card.
@@ -307,6 +308,11 @@ def material(
     card["chi_s"] = np.zeros([G, G])
     card["chi_p"] = np.zeros([G, G])
     card["sensitivity"] = False
+
+    if name is not None:
+        card["name"] = name
+    else:
+        card["name"] = card["ID"]
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
@@ -442,6 +448,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
     card["nz"] = 0.0
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
+    card["type"] = type_
 
     # Check if the selected type is supported
     type_ = check_support(
@@ -494,6 +501,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
 
     # Set up surface attributes
+
     if type_ == "plane-x":
         check_requirement("surface plane-x", kw, ["x"])
         card["G"] = 1.0
@@ -591,7 +599,7 @@ def surface(type_, bc="interface", sensitivity=False, **kw):
 
     # Push card
     mcdc.input_card.surfaces.append(card)
-    return SurfaceHandle(card, type_)
+    return SurfaceHandle(card)
 
 
 def _set_J(x, t, card):
@@ -636,6 +644,7 @@ def cell(surfaces_flags, fill, lattice_center=None):
     card["lattice"] = False
     card["lattice_ID"] = 0
     card["lattice_center"] = np.array([0.0, 0.0, 0.0])
+    card["material_name"] = fill["name"]
 
     # Surfaces and flags
     for i in range(N_surface):

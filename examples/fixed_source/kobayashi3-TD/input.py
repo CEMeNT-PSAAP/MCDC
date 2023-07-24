@@ -55,12 +55,13 @@ mcdc.cell([+sx1, -sx3, +sy4, -sy5, +sz1, -sz2], m)
 mcdc.source(
     x=[0.0, 10.0], y=[0.0, 10.0], z=[0.0, 10.0], time=[0.0, 50.0], isotropic=True
 )
-
+mcdc.visualize()
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
 # Tally: z-integrated flux (X-Y section view)
+'''
 mcdc.tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 61),
@@ -74,3 +75,4 @@ mcdc.implicit_capture()
 
 # Run
 mcdc.run()
+'''
