@@ -10,7 +10,7 @@ import math
 
 from tkinter import * #Tkinter is used to create the window for the time slider and color key
 import distinctipy #creates unlimited visually distinct colors for visualization
-from functools import partial
+
 
 # Get input_card and set global variables as "mcdc_"
 import mcdc.global_ as mcdc_
