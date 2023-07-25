@@ -10,6 +10,7 @@ import math
 
 from tkinter import * #Tkinter is used to create the window for the time slider and color key
 import distinctipy #creates unlimited visually distinct colors for visualization
+from functools import partial
 
 # Get input_card and set global variables as "mcdc_"
 import mcdc.global_ as mcdc_
@@ -17,25 +18,28 @@ import mcdc.global_ as mcdc_
 input_card = mcdc_.input_card
 
 #get a point on the plane based on the current time in the system
+#start and end times are zero by default
 #called with a plane is visualized in create_cell_geometry()
-def get_plane_current_position(surface, current_time):
+def get_plane_current_position(surface, current_time, start_time, end_time):
     
     if (len(surface["t"]) > 2):#check if shape moves
         #establish reference points
-        start_time = 0 #default start time is zero
-        end_time = surface["t"][1]
+        start_time = start_time #default start time is zero
+        end_time = end_time
         start_position = -surface["J"][0][0]
         end_position = -surface["J"][1][0]
 
         current_position = start_position + (((end_position-start_position)/(end_time-start_time))*current_time)
+
     else: 
         current_position = -surface["J"][0][0]
+
     return current_position
 
     
 #create the CSG geometry for a cell
 #called by draw_geometry()
-def create_cell_geometry(cell, current_time, surface_list):
+def create_cell_geometry(cell, current_time, surface_list, start_time, end_time):
     cell_shape_list = [] #list of shapes that make up the cell
     for i in range(0,len(cell["surface_IDs"])):
 
@@ -45,7 +49,7 @@ def create_cell_geometry(cell, current_time, surface_list):
         if (surface_list[surface_ID]["type"] == "plane-x"):
 
             #get reference point from the surface card
-            point = ((get_plane_current_position(surface_list[surface_ID], current_time)),0,0)
+            point = ((get_plane_current_position(surface_list[surface_ID], current_time, start_time=start_time, end_time=end_time)),0,0)
 
             #get normal vector from the surface card
             if (cell["positive_flags"][i]):
@@ -63,7 +67,7 @@ def create_cell_geometry(cell, current_time, surface_list):
         elif(surface_list[surface_ID]["type"] == "plane-y"):
 
             #get reference point from the surface card
-            point = (0, (get_plane_current_position(surface_list[surface_ID], current_time)),0)
+            point = (0, (get_plane_current_position(surface_list[surface_ID], current_time, start_time=start_time, end_time=end_time)),0)
 
             #get normal vector from the surface card
             if (cell["positive_flags"][i]):
@@ -81,7 +85,7 @@ def create_cell_geometry(cell, current_time, surface_list):
         elif(surface_list[surface_ID]["type"] == "plane-z"):
 
             #get reference point from the surface card
-            point = (0,0,(get_plane_current_position(surface_list[surface_ID], current_time)))
+            point = (0,0,(get_plane_current_position(surface_list[surface_ID], current_time, start_time=start_time, end_time=end_time)))
 
             #get normal vector from the surface card
             if (cell["positive_flags"][i]):
@@ -192,7 +196,7 @@ def create_cell_geometry(cell, current_time, surface_list):
        
 # visualizes the model at a specified time (current_time, type float)
 #called by visualize()
-def draw_Geometry(current_time):
+def draw_Geometry(current_time, start_time, end_time):
 
     #create lists that contain all cells and surfaces
     cell_list = input_card.cells
@@ -220,7 +224,8 @@ def draw_Geometry(current_time):
 
     #colors that should not be generated (ie, taken by preset materials or which are visually unappealing)
     #These colors are rgb values, more can be added by extending the list
-    input_colors = [(water_rgb[0], water_rgb[1], water_rgb[2]), #water - blue
+    input_colors = [
+                    (water_rgb[0], water_rgb[1], water_rgb[2]), #water - blue
                     (source_rgb[0], source_rgb[1], source_rgb[2]), #source - green
                     (1,1,1), #white
                     (0,0,0) #black
@@ -238,7 +243,7 @@ def draw_Geometry(current_time):
         cell = cell_list[cell_index]
 
         #create the geometry for the cell
-        cell_geometry = create_cell_geometry(cell, current_time, surface_list)
+        cell_geometry = create_cell_geometry(cell, current_time= current_time, surface_list=surface_list, start_time=start_time, end_time=end_time)
 
         #assign the material an rgb value
         cell_material_name = cell["material_name"]
@@ -261,6 +266,7 @@ def draw_Geometry(current_time):
     #draw the visualization
     geo.Draw()
     Redraw()
+    
     return color_key_list
 
 
@@ -272,7 +278,6 @@ def create_color_key(root, color_key_list):
     #for each material in the color_key_list display 
     # the material name and corresponding color to the user
     for material_index in range(0, len(color_key_list)):
-        
         material = color_key_list[material_index]
 
         #create label for the material name
@@ -294,28 +299,32 @@ def create_color_key(root, color_key_list):
  
 #triggered when time slider changed
 #it redraws the model at the new time
-def time_slider_changed(event):
-    draw_Geometry(float(event))
+def time_slider_changed(event, start_time, end_time):
+    draw_Geometry(current_time=float(event), start_time= start_time, end_time=end_time)
 
 #creates the time slider
 #called by visualize()
-def create_time_slider(root):
+def create_time_slider(root, start_time, end_time):
     root.title("Time Slider")
     
     time_label = Label(root, text = "Time")
     time_label.grid(row = 0, column = 0, columnspan=2)
-    time_scale = Scale(root, from_=0, to=5, orient=HORIZONTAL, tickinterval=1, command=time_slider_changed)
 
+    time_scale = Scale(root, from_=start_time, to=end_time, orient=HORIZONTAL, tickinterval=1, command=lambda event: time_slider_changed(event,start_time, end_time ))
     time_scale.grid(row = 1, column = 1)
 
-def visualize():
+#runs the visualization for a model
+#start and end times are default zero
+#called in input file
+def visualize(start_time = 0, end_time = 0):
     
-    color_key_list = draw_Geometry(0)
+    color_key_list = draw_Geometry(current_time=0, start_time=start_time, end_time=end_time)
     
 
     #Set up tkinter window
     root = Tk()
-    create_time_slider(root)
+    if (start_time != end_time):
+        create_time_slider(root, start_time, end_time)
     create_color_key(root, color_key_list )
     root.mainloop() #mainloop for tkinter window
 

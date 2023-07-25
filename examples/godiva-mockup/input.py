@@ -5,7 +5,7 @@ import mcdc, h5py
 # Materials
 # =============================================================================
 
-m_abs = mcdc.material(capture=np.array([1E5]), speed=np.array([1E3]), name = "test")
+m_abs = mcdc.material(capture=np.array([1E5]), speed=np.array([1E3]), name = "water")
 m_void = mcdc.material(capture=np.array([5e-5]), scatter=np.array([[5e-5]]), speed=np.array([1E3]), name = "source")
 
 # =============================================================================
@@ -66,7 +66,7 @@ mcdc.source(
     x=[-22.0, 22.0], time=[0.0, 5.0], isotropic=True
 )
 
-mcdc.visualize()
+mcdc.visualize(start_time=0, end_time=5)
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
