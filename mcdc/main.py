@@ -323,35 +323,41 @@ def prepare():
         mcdc["technique"]["iqmc_mesh"]["z"] = input_card.technique["iqmc_mesh"]["z"]
         mcdc["technique"]["iqmc_mesh"]["t"] = input_card.technique["iqmc_mesh"]["t"]
         mcdc["technique"]["iqmc_generator"] = input_card.technique["iqmc_generator"]
+        # variables to generate samples
+        scramble = mcdc["technique"]["iqmc_scramble"]
+        N_dim = mcdc["technique"]["iqmc_N_dim"]
+        seed = mcdc["technique"]["iqmc_seed"]
+        N = mcdc["setting"]["N_particle"]
+        size = MPI.COMM_WORLD.Get_size()
+        rank = MPI.COMM_WORLD.Get_rank()
+        N_work = math.ceil(N_particle / size)
+        # how many samples will we skip in the LDS
+        fast_forward = int((rank / size) * N)
         # generate lds
         if input_card.technique["iqmc_generator"] == "sobol":
-            scramble = mcdc["technique"]["iqmc_scramble"]
-            N_dim = mcdc["technique"]["iqmc_N_dim"]
-            N = mcdc["setting"]["N_particle"]
             sampler = qmc.Sobol(d=N_dim, scramble=scramble)
-            m = math.ceil(math.log(N, 2))
-            mcdc["setting"]["N_particle"] = 2**m
-            mcdc["technique"]["iqmc_lds"] = sampler.random_base2(m=m)
-            # first row of an unscrambled Sobol sequence is all zeros
-            # and throws off some of the algorithms. So we add small amount
-            # to avoid this issue
-            # mcdc["technique"]["lds"][0,:] += 1e-6
-            mcdc["technique"]["iqmc_lds"][mcdc["technique"]["iqmc_lds"] == 0.0] += 1e-6
-            # lds is shape (2**m, d)
+            if rank == 0:
+                # skip the first entry in Sobol sequence because its 0.0
+                sampler.fast_forward(1)
+            sampler.fast_forward(fast_forward)
+            mcdc["technique"]["iqmc_lds"] = sampler.random(N_work)
         if input_card.technique["iqmc_generator"] == "halton":
-            scramble = mcdc["technique"]["iqmc_scramble"]
-            N_dim = mcdc["technique"]["iqmc_N_dim"]
-            seed = mcdc["technique"]["iqmc_seed"]
-            N = mcdc["setting"]["N_particle"]
             sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
-            sampler.fast_forward(1)
-            mcdc["technique"]["iqmc_lds"] = sampler.random(N)
+            if rank == 0:
+                # skip the first entry in Halton sequence because its 0.0
+                sampler.fast_forward(1)
+            sampler.fast_forward(fast_forward)
+            mcdc["technique"]["iqmc_lds"] = sampler.random(N_work)
         if input_card.technique["iqmc_generator"] == "random":
-            seed = mcdc["technique"]["iqmc_seed"]
-            N_dim = mcdc["technique"]["iqmc_N_dim"]
-            N = mcdc["setting"]["N_particle"]
+            # this chunk of code uses the iqmc_seed to generate a number of
+            # seeds to be used  on each processor
+            # this way, each processor gets different samples, but if iQMC is run
+            # several times it will generate the same samples across runs
+            # 1e6 represents the maximum integer size generated
             np.random.seed(seed)
-            mcdc["technique"]["iqmc_lds"] = np.random.random((N, N_dim))
+            seeds = np.random.randint(1e6, size=size)
+            np.random.seed(seeds[rank])
+            mcdc["technique"]["iqmc_lds"] = np.random.random((N_work, N_dim))
 
     # =========================================================================
     # Time census
