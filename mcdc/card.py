@@ -163,6 +163,7 @@ class InputCard:
             "time_census": False,
             "census_time": np.array([INF]),
             "branchless_collision": False,
+            "dsm_order": 1,
         }
 
 

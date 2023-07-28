@@ -219,7 +219,11 @@ def loop_particle(P, mcdc):
 
                 # Sensitivity quantification for nuclide?
                 material = mcdc["materials"][P["material_ID"]]
-                if material["sensitivity"] and P["sensitivity_ID"] == 0:
+                if material["sensitivity"] and (
+                    P["sensitivity_ID"] == 0
+                    or mcdc["technique"]["dsm_order"] == 2
+                    and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
+                ):
                     kernel.sensitivity_material(P, mcdc)
 
         # Mesh tally
