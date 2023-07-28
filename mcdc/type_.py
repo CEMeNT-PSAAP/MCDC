@@ -472,6 +472,7 @@ setting = np.dtype(
         ("IC_file", bool_),
         ("IC_file_name", "U30"),
         ("N_precursor", int64),
+        ("N_sensitivity", int64),
     ]
 )
 
@@ -619,6 +620,14 @@ def make_type_technique(N_particle, G, card):
         ("IC_bank_precursor", bank_precursor),
         ("IC_fission_score", float64),
         ("IC_fission", float64),
+    ]
+
+    # =========================================================================
+    # Derivative Source Method
+    # =========================================================================
+
+    struct += [
+        ("dsm_order", int64),
     ]
 
     # Finalize technique type

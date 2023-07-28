@@ -34,8 +34,10 @@ from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eig
 
 # Get input_card and set global variables as "mcdc"
 import mcdc.global_ as mcdc_
+
 input_card = mcdc_.input_card
 mcdc = mcdc_.global_
+
 
 def run():
     # Command-line argument overrides
@@ -132,7 +134,12 @@ def prepare():
     iQMC = input_card.technique["iQMC"]
 
     # Numbers
-    N_tally_scores = input_card.setting["N_sensitivity"] + 1
+    N_sensitivity = input_card.setting["N_sensitivity"]
+    N_tally_scores = 1 + N_sensitivity
+    if input_card.technique["dsm_order"] == 2:
+        N_tally_scores = (
+            1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+        )
 
     # =========================================================================
     # Default cards, if not given
@@ -392,6 +399,13 @@ def prepare():
 
     # Census index
     mcdc["technique"]["census_idx"] = 0
+
+    # =========================================================================
+    # Derivative Source Method
+    # =========================================================================
+
+    # Threshold
+    mcdc["technique"]["dsm_order"] = input_card.technique["dsm_order"]
 
     # =========================================================================
     # RNG

@@ -491,7 +491,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card["reflective"] = True
 
     # Sensitivity
-    if sensitivity is not None and sensitivity:
+    if sensitivity:
         # Set flag
         card["sensitivity"] = True
         mcdc.input_card.technique["sensitivity"] = True
@@ -1288,11 +1288,6 @@ def weight_roulette(chance, wr_threshold):
     card["wr_threshold"] = wr_threshold
 
 
-# ==============================================================================
-# IC generator
-# ==============================================================================
-
-
 def IC_generator(
     N_neutron=0,
     N_precursor=0,
@@ -1365,6 +1360,13 @@ def IC_generator(
     N_cycle = max(N_cycle1, N_cycle2)
     card_setting["N_cycle"] = N_cycle
     card_setting["N_active"] = N_cycle
+
+
+def dsm(order=1):
+    card = mcdc.input_card.technique
+    if order > 2:
+        print_error("DSM currently only supports up to second-order sensitivities")
+    card["dsm_order"] = order
 
 
 # ==============================================================================
