@@ -3156,7 +3156,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     material_new = mcdc["materials"][material_ID_new]
 
     # Determine the plus and minus components and then their weight signs
-    trans = P['translation']
+    trans = P["translation"]
     sign_origin = surface_normal_component(P, surface, trans)
     if sign_origin > 0.0:
         # New is +, old is -
@@ -3254,13 +3254,13 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 
             # The shift
             if sign > 0.0:
-                P_new['x'] -= nx * 2*SHIFT
-                P_new['y'] -= ny * 2*SHIFT
-                P_new['z'] -= nz * 2*SHIFT
+                P_new["x"] -= nx * 2 * SHIFT
+                P_new["y"] -= ny * 2 * SHIFT
+                P_new["z"] -= nz * 2 * SHIFT
             else:
-                P_new['x'] += nx * 2*SHIFT
-                P_new['y'] += ny * 2*SHIFT
-                P_new['z'] += nz * 2*SHIFT
+                P_new["x"] += nx * 2 * SHIFT
+                P_new["y"] += ny * 2 * SHIFT
+                P_new["z"] += nz * 2 * SHIFT
 
         # Put the current particle into the secondary bank
         add_particle(P_new, mcdc["bank_active"])
@@ -3300,17 +3300,21 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
         # Sample term
         xi = rng(mcdc) * p_total
         tot = 0.0
-        for material_ID, sign in zip([material_ID_new, material_ID_old], [sign_new, sign_old]):
-            material = mcdc['materials'][material_ID]
+        for material_ID, sign in zip(
+            [material_ID_new, material_ID_old], [sign_new, sign_old]
+        ):
+            material = mcdc["materials"][material_ID]
             if material["sensitivity"]:
                 N_nuclide = material["N_nuclide"]
                 for i in range(N_nuclide):
                     nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
                     if nuclide["sensitivity"]:
                         # Source ID
-                        ID1 = min(nuclide["sensitivity_ID"], surface['sensitivity_ID'])
-                        ID2 = max(nuclide["sensitivity_ID"], surface['sensitivity_ID'])
-                        ID_source = get_DSM_ID(ID1, ID2, mcdc["setting"]["N_sensitivity"])
+                        ID1 = min(nuclide["sensitivity_ID"], surface["sensitivity_ID"])
+                        ID2 = max(nuclide["sensitivity_ID"], surface["sensitivity_ID"])
+                        ID_source = get_DSM_ID(
+                            ID1, ID2, mcdc["setting"]["N_sensitivity"]
+                        )
 
                         sigmaT = nuclide["total"][g]
                         sigmaS = nuclide["scatter"][g]
