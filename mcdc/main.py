@@ -1,8 +1,29 @@
+import argparse
+import numba as nb
+
+# Parse command-line arguments
+#   TODO: Will be inside run() once Python/Numba adapter is integrated
+parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
+parser.add_argument(
+    "--mode", type=str, help="Run mode", choices=["python", "numba"], default="python"
+)
+parser.add_argument("--N_particle", type=int, help="Number of particles")
+parser.add_argument("--output", type=str, help="Output file name")
+args, unargs = parser.parse_known_args()
+
+# Set mode
+#   Will be inside run() once Python/Numba adapter is integrated
+mode = args.mode
+if mode == "python":
+    nb.config.DISABLE_JIT = True
+elif mode == "numba":
+    nb.config.DISABLE_JIT = False
+
 import h5py
 import numpy as np
-from scipy.stats import qmc
 
 from mpi4py import MPI
+from scipy.stats import qmc
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
@@ -19,6 +40,9 @@ mcdc = mcdc_.global_
 
 
 def run():
+    # Command-line argument overrides
+    cmd_override()
+
     # Start timer
     total_start = MPI.Wtime()
 
@@ -53,6 +77,14 @@ def run():
 
     # Closout
     closeout()
+
+
+def cmd_override():
+    # Command-line argument overrides
+    if args.N_particle is not None:
+        input_card.setting["N_particle"] = args.N_particle
+    if args.output is not None:
+        input_card.setting["output"] = args.output
 
 
 def prepare():
@@ -102,7 +134,12 @@ def prepare():
     iQMC = input_card.technique["iQMC"]
 
     # Numbers
-    N_tally_scores = input_card.setting["N_sensitivity"] + 1
+    N_sensitivity = input_card.setting["N_sensitivity"]
+    N_tally_scores = 1 + N_sensitivity
+    if input_card.technique["dsm_order"] == 2:
+        N_tally_scores = (
+            1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+        )
 
     # =========================================================================
     # Default cards, if not given
@@ -362,6 +399,13 @@ def prepare():
 
     # Census index
     mcdc["technique"]["census_idx"] = 0
+
+    # =========================================================================
+    # Derivative Source Method
+    # =========================================================================
+
+    # Threshold
+    mcdc["technique"]["dsm_order"] = input_card.technique["dsm_order"]
 
     # =========================================================================
     # RNG
