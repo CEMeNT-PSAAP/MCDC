@@ -1,6 +1,7 @@
-"""This module contains functions for setting MC/DC input cards."""
+"""This module contains functions for setting MC/DC input decks."""
 
 import h5py, math
+
 import numpy as np
 
 from mpi4py import MPI
@@ -71,8 +72,8 @@ def nuclide(
     size of `capture`, `scatter`, or `fission`. Thus, at least `capture`, `scatter`,
     or `fission` needs to be provided. `nu_p` or `nu_d` is needed if `fission` is
     provided. `chi_p` and `chi_d` are needed if `nu_p` and `nu_d` are provided,
-    respectively, and G > 1. Delayed neutron precursor group size is determined by
-    the size of `nu_d`.
+    respectively, and G > 1. Delayed neutron precursor group size J is determined by
+    the size of `nu_d`; if `nu_d` is not given, J = 0.
 
     See also
     --------
