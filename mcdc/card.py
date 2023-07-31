@@ -159,6 +159,7 @@ class SurfaceHandle:
     def __neg__(self):
         return [self.card, False]
 
+
 def make_card_nuclide(G, J):
     card = {}
     card["tag"] = "Nuclide"
@@ -185,122 +186,122 @@ def make_card_nuclide(G, J):
 
 
 def make_card_material(N_nuclide, G, J):
-   card = {}
-   card["tag"] = "Material"
-   card["ID"] = -1
-   card["N_nuclide"] = N_nuclide
-   card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
-   card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
-   card["G"] = G
-   card["J"] = J
-   card["speed"] = np.zeros(G)
-   card["capture"] = np.zeros(G)
-   card["scatter"] = np.zeros(G)
-   card["fission"] = np.zeros(G)
-   card["total"] = np.zeros(G)
-   card["nu_s"] = np.ones(G)
-   card["nu_p"] = np.zeros(G)
-   card["nu_d"] = np.zeros([G, J])
-   card["nu_f"] = np.zeros(G)
-   card["chi_s"] = np.zeros([G, G])
-   card["chi_p"] = np.zeros([G, G])
-   card["sensitivity"] = False
-   return card
+    card = {}
+    card["tag"] = "Material"
+    card["ID"] = -1
+    card["N_nuclide"] = N_nuclide
+    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
+    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
+    card["G"] = G
+    card["J"] = J
+    card["speed"] = np.zeros(G)
+    card["capture"] = np.zeros(G)
+    card["scatter"] = np.zeros(G)
+    card["fission"] = np.zeros(G)
+    card["total"] = np.zeros(G)
+    card["nu_s"] = np.ones(G)
+    card["nu_p"] = np.zeros(G)
+    card["nu_d"] = np.zeros([G, J])
+    card["nu_f"] = np.zeros(G)
+    card["chi_s"] = np.zeros([G, G])
+    card["chi_p"] = np.zeros([G, G])
+    card["sensitivity"] = False
+    return card
 
 
 def make_card_surface():
-   card = {}
-   card["tag"] = "Surface"
-   card["ID"] = -1
-   card["vacuum"] = False
-   card["reflective"] = False
-   card["A"] = 0.0
-   card["B"] = 0.0
-   card["C"] = 0.0
-   card["D"] = 0.0
-   card["E"] = 0.0
-   card["F"] = 0.0
-   card["G"] = 0.0
-   card["H"] = 0.0
-   card["I"] = 0.0
-   card["J"] = np.array([[0.0, 0.0]])
-   card["t"] = np.array([-SHIFT, INF])
-   card["N_slice"] = 1
-   card["linear"] = False
-   card["nx"] = 0.0
-   card["ny"] = 0.0
-   card["nz"] = 0.0
-   card["sensitivity"] = False
-   card["sensitivity_ID"] = 0
-   card["dsm_Np"] = 1.0
-   return card
+    card = {}
+    card["tag"] = "Surface"
+    card["ID"] = -1
+    card["vacuum"] = False
+    card["reflective"] = False
+    card["A"] = 0.0
+    card["B"] = 0.0
+    card["C"] = 0.0
+    card["D"] = 0.0
+    card["E"] = 0.0
+    card["F"] = 0.0
+    card["G"] = 0.0
+    card["H"] = 0.0
+    card["I"] = 0.0
+    card["J"] = np.array([[0.0, 0.0]])
+    card["t"] = np.array([-SHIFT, INF])
+    card["N_slice"] = 1
+    card["linear"] = False
+    card["nx"] = 0.0
+    card["ny"] = 0.0
+    card["nz"] = 0.0
+    card["sensitivity"] = False
+    card["sensitivity_ID"] = 0
+    card["dsm_Np"] = 1.0
+    return card
 
 
 def make_card_cell(N_surface):
-   card = {}
-   card["tag"] = "Cell"
-   card["ID"] = -1
-   card["N_surface"] = N_surface
-   card["surface_IDs"] = np.zeros(N_surface, dtype=int)
-   card["positive_flags"] = np.zeros(N_surface, dtype=bool)
-   card["material_ID"] = 0
-   card["lattice"] = False
-   card["lattice_ID"] = 0
-   card["lattice_center"] = np.array([0.0, 0.0, 0.0])
-   return card
+    card = {}
+    card["tag"] = "Cell"
+    card["ID"] = -1
+    card["N_surface"] = N_surface
+    card["surface_IDs"] = np.zeros(N_surface, dtype=int)
+    card["positive_flags"] = np.zeros(N_surface, dtype=bool)
+    card["material_ID"] = 0
+    card["lattice"] = False
+    card["lattice_ID"] = 0
+    card["lattice_center"] = np.array([0.0, 0.0, 0.0])
+    return card
 
 
 def make_card_universe(N_cell):
-   card = {}
-   card["tag"] = "Universe"
-   card["ID"] = -1
-   card["N_cell"] = N_cell
-   card["cell_IDs"] = np.zeros(N_cell, dtype=int)
-   return card
+    card = {}
+    card["tag"] = "Universe"
+    card["ID"] = -1
+    card["N_cell"] = N_cell
+    card["cell_IDs"] = np.zeros(N_cell, dtype=int)
+    return card
 
 
 def make_card_lattice():
-   card = {}
-   card["tag"] = "Lattice"
-   card["ID"] = -1
-   card["mesh"] = {
-       "x0": -INF,
-       "dx": 2 * INF,
-       "Nx": 1,
-       "y0": -INF,
-       "dy": 2 * INF,
-       "Ny": 1,
-       "z0": -INF,
-       "dz": 2 * INF,
-       "Nz": 1,
-   }
-   card["universe_IDs"] = np.array([[[[0]]]])
-   return card
+    card = {}
+    card["tag"] = "Lattice"
+    card["ID"] = -1
+    card["mesh"] = {
+        "x0": -INF,
+        "dx": 2 * INF,
+        "Nx": 1,
+        "y0": -INF,
+        "dy": 2 * INF,
+        "Ny": 1,
+        "z0": -INF,
+        "dz": 2 * INF,
+        "Nz": 1,
+    }
+    card["universe_IDs"] = np.array([[[[0]]]])
+    return card
 
 
 def make_card_source():
-   card = {}
-   card["tag"] = "Source"
-   card["ID"] = -1
-   card["box"] = False
-   card["isotropic"] = True
-   card["white"] = False
-   card["x"] = 0.0
-   card["y"] = 0.0
-   card["z"] = 0.0
-   card["box_x"] = np.array([0.0, 0.0])
-   card["box_y"] = np.array([0.0, 0.0])
-   card["box_z"] = np.array([0.0, 0.0])
-   card["ux"] = 0.0
-   card["uy"] = 0.0
-   card["uz"] = 0.0
-   card["white_x"] = 0.0
-   card["white_y"] = 0.0
-   card["white_z"] = 0.0
-   card["group"] = np.array([1.0])
-   card["time"] = np.array([0.0, 0.0])
-   card["prob"] = 1.0
-   return card
+    card = {}
+    card["tag"] = "Source"
+    card["ID"] = -1
+    card["box"] = False
+    card["isotropic"] = True
+    card["white"] = False
+    card["x"] = 0.0
+    card["y"] = 0.0
+    card["z"] = 0.0
+    card["box_x"] = np.array([0.0, 0.0])
+    card["box_y"] = np.array([0.0, 0.0])
+    card["box_z"] = np.array([0.0, 0.0])
+    card["ux"] = 0.0
+    card["uy"] = 0.0
+    card["uz"] = 0.0
+    card["white_x"] = 0.0
+    card["white_y"] = 0.0
+    card["white_z"] = 0.0
+    card["group"] = np.array([1.0])
+    card["time"] = np.array([0.0, 0.0])
+    card["prob"] = 1.0
+    return card
 
 
 def make_card_mesh():
