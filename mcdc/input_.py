@@ -8,7 +8,16 @@ from mpi4py import MPI
 
 import mcdc.type_ as type_
 
-from mcdc.card import SurfaceHandle
+from mcdc.card import (
+    SurfaceHandle,
+    make_card_nuclide,
+    make_card_material,
+    make_card_surface,
+    make_card_cell,
+    make_card_universe,
+    make_card_lattice,
+    make_card_source,
+)
 from mcdc.constant import *
 from mcdc.print_ import print_error
 
@@ -94,28 +103,9 @@ def nuclide(
     if nu_d is not None:
         J = len(nu_d)
 
-    # Set default card values (c.f. type_.py)
-    card = {}
-    card["tag"] = "Nuclide"
+    # Make nuclide card
+    card = make_card_nuclide(G, J)
     card["ID"] = len(mcdc.input_card.nuclides)
-    card["G"] = G
-    card["J"] = J
-    card["speed"] = np.ones(G)
-    card["decay"] = np.ones(J) * INF
-    card["capture"] = np.zeros(G)
-    card["scatter"] = np.zeros(G)
-    card["fission"] = np.zeros(G)
-    card["total"] = np.zeros(G)
-    card["nu_s"] = np.ones(G)
-    card["nu_p"] = np.zeros(G)
-    card["nu_d"] = np.zeros([G, J])
-    card["nu_f"] = np.zeros(G)
-    card["chi_s"] = np.zeros([G, G])
-    card["chi_p"] = np.zeros([G, G])
-    card["chi_d"] = np.zeros([J, G])
-    card["sensitivity"] = False
-    card["sensitivity_ID"] = 0
-    card["dsm_Np"] = 1.0
 
     # Speed (vector of size G)
     if speed is not None:
@@ -297,27 +287,9 @@ def material(
     G = nuclides[0][0]["G"]
     J = nuclides[0][0]["J"]
 
-    # Set default card values (c.f. type_.py)
-    card = {}
-    card["tag"] = "Material"
+    # Make material card
+    card = make_card_material(N_nuclide, G, J)
     card["ID"] = len(mcdc.input_card.materials)
-    card["N_nuclide"] = N_nuclide
-    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
-    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
-    card["G"] = G
-    card["J"] = J
-    card["speed"] = np.zeros(G)
-    card["capture"] = np.zeros(G)
-    card["scatter"] = np.zeros(G)
-    card["fission"] = np.zeros(G)
-    card["total"] = np.zeros(G)
-    card["nu_s"] = np.ones(G)
-    card["nu_p"] = np.zeros(G)
-    card["nu_d"] = np.zeros([G, J])
-    card["nu_f"] = np.zeros(G)
-    card["chi_s"] = np.zeros([G, G])
-    card["chi_p"] = np.zeros([G, G])
-    card["sensitivity"] = False
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
@@ -432,31 +404,9 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     --------
     mcdc.cell : SurfaceHandle is used to define cell domain
     """
-    # Set default card values (c.f. type_.py)
-    card = {}
-    card["tag"] = "Surface"
+    # Make surface card
+    card = make_card_surface()
     card["ID"] = len(mcdc.input_card.surfaces)
-    card["vacuum"] = False
-    card["reflective"] = False
-    card["A"] = 0.0
-    card["B"] = 0.0
-    card["C"] = 0.0
-    card["D"] = 0.0
-    card["E"] = 0.0
-    card["F"] = 0.0
-    card["G"] = 0.0
-    card["H"] = 0.0
-    card["I"] = 0.0
-    card["J"] = np.array([[0.0, 0.0]])
-    card["t"] = np.array([-SHIFT, INF])
-    card["N_slice"] = 1
-    card["linear"] = False
-    card["nx"] = 0.0
-    card["ny"] = 0.0
-    card["nz"] = 0.0
-    card["sensitivity"] = False
-    card["sensitivity_ID"] = 0
-    card["dsm_Np"] = 1.0
 
     # Check if the selected type is supported
     type_ = check_support(
@@ -644,17 +594,9 @@ def _set_J(x, t, card):
 def cell(surfaces_flags, fill, lattice_center=None):
     N_surface = len(surfaces_flags)
 
-    # Set default card values (c.f. type_.py)
-    card = {}
-    card["tag"] = "Cell"
+    # Make cell card
+    card = make_card_cell(N_surface)
     card["ID"] = len(mcdc.input_card.cells)
-    card["N_surface"] = N_surface
-    card["surface_IDs"] = np.zeros(N_surface, dtype=int)
-    card["positive_flags"] = np.zeros(N_surface, dtype=bool)
-    card["material_ID"] = 0
-    card["lattice"] = False
-    card["lattice_ID"] = 0
-    card["lattice_center"] = np.array([0.0, 0.0, 0.0])
 
     # Surfaces and flags
     for i in range(N_surface):
@@ -682,13 +624,12 @@ def universe(cells, root=False):
 
     # Set default card values (c.f. type_.py)
     if not root:
-        card = {}
-        card["tag"] = "Universe"
+        card = make_card_universe(N_cell)
+        card["ID"] = len(mcdc.input_card.universes)
     else:
         card = mcdc.input_card.universes[0]
-    card["ID"] = len(mcdc.input_card.universes)
-    card["N_cell"] = N_cell
-    card["cell_IDs"] = np.zeros(N_cell, dtype=int)
+        card["N_cell"] = N_cell
+        card["cell_IDs"] = np.zeros(N_cell, dtype=int)
 
     # Cells
     for i in range(N_cell):
@@ -702,22 +643,9 @@ def universe(cells, root=False):
 
 
 def lattice(x=None, y=None, z=None, universes=None):
-    # Set default card values (c.f. type_.py)
-    card = {}
-    card["tag"] = "Lattice"
+    # Make lattice card
+    card = make_card_lattice()
     card["ID"] = len(mcdc.input_card.lattices)
-    card["mesh"] = {
-        "x0": -INF,
-        "dx": 2 * INF,
-        "Nx": 1,
-        "y0": -INF,
-        "dy": 2 * INF,
-        "Ny": 1,
-        "z0": -INF,
-        "dz": 2 * INF,
-        "Nz": 1,
-    }
-    card["universe_IDs"] = np.array([[[[0]]]])
 
     # Set mesh
     if x is not None:
@@ -821,28 +749,9 @@ def source(**kw):
     time = kw.get("time")
     prob = kw.get("prob")
 
-    # Set default card values (c.f. type_.py)
-    card = {}
-    card["tag"] = "Source"
+    # Make source card
+    card = make_card_source()
     card["ID"] = len(mcdc.input_card.sources)
-    card["box"] = False
-    card["isotropic"] = True
-    card["white"] = False
-    card["x"] = 0.0
-    card["y"] = 0.0
-    card["z"] = 0.0
-    card["box_x"] = np.array([0.0, 0.0])
-    card["box_y"] = np.array([0.0, 0.0])
-    card["box_z"] = np.array([0.0, 0.0])
-    card["ux"] = 0.0
-    card["uy"] = 0.0
-    card["uz"] = 0.0
-    card["white_x"] = 0.0
-    card["white_y"] = 0.0
-    card["white_z"] = 0.0
-    card["group"] = np.array([1.0])
-    card["time"] = np.array([0.0, 0.0])
-    card["prob"] = 1.0
 
     # Set position
     if point is not None:
