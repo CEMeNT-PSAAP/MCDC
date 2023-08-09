@@ -107,14 +107,16 @@ def loop_source(mcdc):
 
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
+            P = np.zeros(1, dtype=type_.particle_record)[0]
+            P["rng_seed"] = work_idx
             # Sample source
-            xi = kernel.rng(mcdc)
+            xi = kernel.local_rng(P,mcdc)
             tot = 0.0
             for S in mcdc["sources"]:
                 tot += S["prob"]
                 if tot >= xi:
                     break
-            P = kernel.source_particle(S, mcdc)
+            kernel.source_particle(P, S, mcdc)
 
         # Get from source bank
         else:

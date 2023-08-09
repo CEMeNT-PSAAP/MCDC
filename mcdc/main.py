@@ -17,6 +17,7 @@ import mcdc.global_ as mcdc_
 input_card = mcdc_.input_card
 mcdc = mcdc_.global_
 
+kernel.adapt_utils('cpu')
 
 def run():
     # Start timer
