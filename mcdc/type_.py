@@ -51,6 +51,7 @@ def make_type_particle(iQMC, G):
         ("translation", float64, (3,)),
         ("event", int64),
         ("sensitivity_ID", int64),
+        ("rng_seed", uint64),
     ]
     # iqmc vector of weights
     Ng = 1
@@ -74,6 +75,7 @@ def make_type_particle_record(iQMC, G):
         ("g", uint64),
         ("w", float64),
         ("sensitivity_ID", int64),
+        ("rng_seed", int64),
     ]
     # iqmc vector of weights
     Ng = 1
@@ -615,7 +617,7 @@ def make_type_technique(N_particle, G, card):
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
-        ("IC_fission_score", float64),
+        ("IC_fission_score", float64, (1,) ),
         ("IC_fission", float64),
     ]
 
@@ -717,9 +719,9 @@ def make_type_global(card):
             ("gyration_radius", float64, (N_cycle,)),
             ("i_cycle", int64),
             ("cycle_active", bool_),
-            ("eigenvalue_tally_nuSigmaF", float64),
-            ("eigenvalue_tally_n", float64),
-            ("eigenvalue_tally_C", float64),
+            ("eigenvalue_tally_nuSigmaF", float64, (0,)),
+            ("eigenvalue_tally_n", float64, (0,)),
+            ("eigenvalue_tally_C", float64, (0,)),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
