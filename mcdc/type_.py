@@ -11,7 +11,7 @@ uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"
 
-# MC/DC types, will be defined by input card
+# MC/DC types, will be defined by input deck
 particle = None
 particle_record = None
 nuclide = None

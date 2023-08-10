@@ -1,10 +1,10 @@
-"""This module contains functions for setting MC/DC input decks."""
+"""
+This module contains functions for setting MC/DC input deck.
+The input deck class is defined in `card.py` and instantiated in `global_.py`.
+"""
 
-import h5py, math
-
+import h5py, math, mpi4py
 import numpy as np
-
-from mpi4py import MPI
 
 import mcdc.type_ as type_
 
@@ -18,10 +18,24 @@ from mcdc.card import (
     make_card_lattice,
     make_card_source,
 )
-from mcdc.constant import *
+from mcdc.constant import (
+    GR_ALL,
+    GR_INFINITE_X,
+    GR_INFINITE_Y,
+    GR_INFINITE_Z,
+    GR_ONLY_X,
+    GR_ONLY_Y,
+    GR_ONLY_Z,
+    PCT_NONE,
+    PCT_COMBING,
+    PCT_COMBING_WEIGHT,
+    INF,
+    PI,
+    SHIFT,
+)
 from mcdc.print_ import print_error
 
-# Get mcdc global variables/objects
+# Get and rename mcdc global variables/objects
 import mcdc.global_ as mcdc
 
 
@@ -105,7 +119,7 @@ def nuclide(
 
     # Make nuclide card
     card = make_card_nuclide(G, J)
-    card["ID"] = len(mcdc.input_card.nuclides)
+    card["ID"] = len(mcdc.input_deck.nuclides)
 
     # Speed (vector of size G)
     if speed is not None:
@@ -187,18 +201,18 @@ def nuclide(
     if sensitivity:
         # Set flag
         card["sensitivity"] = True
-        mcdc.input_card.technique["sensitivity"] = True
-        mcdc.input_card.technique["weighted_emission"] = False
+        mcdc.input_deck.technique["sensitivity"] = True
+        mcdc.input_deck.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_card.setting["N_sensitivity"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
+        mcdc.input_deck.setting["N_sensitivity"] += 1
+        card["sensitivity_ID"] = mcdc.input_deck.setting["N_sensitivity"]
 
         # Set dsm_Np
         card["dsm_Np"] = dsm_Np
 
     # Push card
-    mcdc.input_card.nuclides.append(card)
+    mcdc.input_deck.nuclides.append(card)
     return card
 
 
@@ -289,7 +303,7 @@ def material(
 
     # Make material card
     card = make_card_material(N_nuclide, G, J)
-    card["ID"] = len(mcdc.input_card.materials)
+    card["ID"] = len(mcdc.input_deck.materials)
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
@@ -353,7 +367,7 @@ def material(
             card["nu_f"] += card["nu_d"][:, j]
 
     # Push card
-    mcdc.input_card.materials.append(card)
+    mcdc.input_deck.materials.append(card)
     return card
 
 
@@ -406,7 +420,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     """
     # Make surface card
     card = make_card_surface()
-    card["ID"] = len(mcdc.input_card.surfaces)
+    card["ID"] = len(mcdc.input_deck.surfaces)
 
     # Check if the selected type is supported
     type_ = check_support(
@@ -445,12 +459,12 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     if sensitivity:
         # Set flag
         card["sensitivity"] = True
-        mcdc.input_card.technique["sensitivity"] = True
-        mcdc.input_card.technique["weighted_emission"] = False
+        mcdc.input_deck.technique["sensitivity"] = True
+        mcdc.input_deck.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_card.setting["N_sensitivity"] += 1
-        card["sensitivity_ID"] = mcdc.input_card.setting["N_sensitivity"]
+        mcdc.input_deck.setting["N_sensitivity"] += 1
+        card["sensitivity_ID"] = mcdc.input_deck.setting["N_sensitivity"]
 
         # Set dsm_Np
         card["dsm_Np"] = dsm_Np
@@ -558,7 +572,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card["nz"] = nz / norm
 
     # Push card
-    mcdc.input_card.surfaces.append(card)
+    mcdc.input_deck.surfaces.append(card)
     return SurfaceHandle(card)
 
 
@@ -596,7 +610,7 @@ def cell(surfaces_flags, fill, lattice_center=None):
 
     # Make cell card
     card = make_card_cell(N_surface)
-    card["ID"] = len(mcdc.input_card.cells)
+    card["ID"] = len(mcdc.input_deck.cells)
 
     # Surfaces and flags
     for i in range(N_surface):
@@ -615,7 +629,7 @@ def cell(surfaces_flags, fill, lattice_center=None):
         card["material_ID"] = fill["ID"]
 
     # Push card
-    mcdc.input_card.cells.append(card)
+    mcdc.input_deck.cells.append(card)
     return card
 
 
@@ -625,9 +639,9 @@ def universe(cells, root=False):
     # Set default card values (c.f. type_.py)
     if not root:
         card = make_card_universe(N_cell)
-        card["ID"] = len(mcdc.input_card.universes)
+        card["ID"] = len(mcdc.input_deck.universes)
     else:
-        card = mcdc.input_card.universes[0]
+        card = mcdc.input_deck.universes[0]
         card["N_cell"] = N_cell
         card["cell_IDs"] = np.zeros(N_cell, dtype=int)
 
@@ -637,7 +651,7 @@ def universe(cells, root=False):
 
     # Push card
     if not root:
-        mcdc.input_card.universes.append(card)
+        mcdc.input_deck.universes.append(card)
 
     return card
 
@@ -645,7 +659,7 @@ def universe(cells, root=False):
 def lattice(x=None, y=None, z=None, universes=None):
     # Make lattice card
     card = make_card_lattice()
-    card["ID"] = len(mcdc.input_card.lattices)
+    card["ID"] = len(mcdc.input_deck.lattices)
 
     # Set mesh
     if x is not None:
@@ -679,7 +693,7 @@ def lattice(x=None, y=None, z=None, universes=None):
     card["universe_IDs"] = np.flip(tmp, axis=2)
 
     # Push card
-    mcdc.input_card.lattices.append(card)
+    mcdc.input_deck.lattices.append(card)
     return card
 
 
@@ -751,7 +765,7 @@ def source(**kw):
 
     # Make source card
     card = make_card_source()
-    card["ID"] = len(mcdc.input_card.sources)
+    card["ID"] = len(mcdc.input_deck.sources)
 
     # Set position
     if point is not None:
@@ -805,7 +819,7 @@ def source(**kw):
         card["prob"] = prob
 
     # Push card
-    mcdc.input_card.sources.append(card)
+    mcdc.input_deck.sources.append(card)
     return card
 
 
@@ -820,7 +834,7 @@ def tally(
     g=np.array([-INF, INF]),
 ):
     # Get tally card
-    card = mcdc.input_card.tally
+    card = mcdc.input_deck.tally
 
     # Set mesh
     card["mesh"]["x"] = x
@@ -832,7 +846,7 @@ def tally(
 
     # Set energy group grid
     if type(g) == type("string") and g == "all":
-        G = mcdc.input_card.materials[0]["G"]
+        G = mcdc.input_deck.materials[0]["G"]
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
@@ -922,7 +936,7 @@ def setting(**kw):
     IC_file = kw.get("IC_file")
 
     # Check if setting card has been initialized
-    card = mcdc.input_card.setting
+    card = mcdc.input_deck.setting
 
     # Number of particles
     if N_particle is not None:
@@ -961,10 +975,10 @@ def setting(**kw):
     # Particle tracker
     if particle_tracker is not None:
         card["track_particle"] = particle_tracker
-        if particle_tracker and MPI.COMM_WORLD.Get_size() > 1:
+        if particle_tracker and mpi4py.MPI.COMM_WORLD.Get_size() > 1:
             print_error("Particle tracker currently only runs on a single MPI rank")
 
-    # Save input card?
+    # Save input deck?
     if save_input_deck is not None:
         card["save_input_deck"] = save_input_deck
 
@@ -974,7 +988,7 @@ def setting(**kw):
         card["source_file_name"] = source_file
 
         # Set number of particles
-        card_setting = mcdc.input_card.setting
+        card_setting = mcdc.input_deck.setting
         with h5py.File(source_file, "r") as f:
             card_setting["N_particle"] = f["particles_size"][()]
 
@@ -984,7 +998,7 @@ def setting(**kw):
         card["IC_file_name"] = IC_file
 
         # Set number of particles
-        card_setting = mcdc.input_card.setting
+        card_setting = mcdc.input_deck.setting
         with h5py.File(IC_file, "r") as f:
             card_setting["N_particle"] = f["IC/neutrons_size"][()]
             card_setting["N_precursor"] = f["IC/precursors_size"][()]
@@ -998,7 +1012,7 @@ def eigenmode(
     N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, save_particle=False
 ):
     # Update setting card
-    card = mcdc.input_card.setting
+    card = mcdc.input_deck.setting
     card["N_inactive"] = N_inactive
     card["N_active"] = N_active
     card["N_cycle"] = N_inactive + N_active
@@ -1027,7 +1041,7 @@ def eigenmode(
             print_error("Unknown gyration radius type")
 
     # Update tally card
-    card = mcdc.input_card.tally
+    card = mcdc.input_deck.tally
     card["tracklength"] = True
 
 
@@ -1037,18 +1051,18 @@ def eigenmode(
 
 
 def implicit_capture():
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["implicit_capture"] = True
     card["weighted_emission"] = False
 
 
 def weighted_emission(flag):
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["weighted_emission"] = flag
 
 
 def population_control(pct="combing"):
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["population_control"] = True
     card["weighted_emission"] = False
     if pct == "combing":
@@ -1060,13 +1074,13 @@ def population_control(pct="combing"):
 
 
 def branchless_collision():
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["branchless_collision"] = True
     card["weighted_emission"] = False
 
 
 def census(t, pct="none"):
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["time_census"] = True
     card["census_time"] = t
     if pct != "none":
@@ -1074,7 +1088,7 @@ def census(t, pct="none"):
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["weight_window"] = True
 
     # Set width
@@ -1128,7 +1142,7 @@ def iQMC(
     fixed_source_solver="source_iteration",
     eigenmode_solver="power_iteration",
 ):
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["iQMC"] = True
     card["iqmc_tol"] = tol
     card["iqmc_maxitt"] = maxitt
@@ -1192,7 +1206,7 @@ def weight_roulette(chance, wr_threshold):
     None.
 
     """
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["weight_roulette"] = True
     card["wr_chance"] = chance
     card["wr_threshold"] = wr_threshold
@@ -1232,14 +1246,14 @@ def IC_generator(
     population_control()
 
     # Set parameters
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     card["IC_generator"] = True
     card["IC_N_neutron"] = N_neutron
     card["IC_N_precursor"] = N_precursor
     card["IC_cycle_stretch"] = cycle_stretch
 
     # Setting parameters
-    card_setting = mcdc.input_card.setting
+    card_setting = mcdc.input_deck.setting
     N_particle = card_setting["N_particle"]
 
     # Check optional parameters
@@ -1273,7 +1287,7 @@ def IC_generator(
 
 
 def dsm(order=1):
-    card = mcdc.input_card.technique
+    card = mcdc.input_deck.technique
     if order > 2:
         print_error("DSM currently only supports up to second-order sensitivities")
     card["dsm_order"] = order
@@ -1324,4 +1338,4 @@ def check_requirement(label, kw, required):
 
 
 def reset_cards():
-    mcdc.input_card.reset()
+    mcdc.input_deck.reset()

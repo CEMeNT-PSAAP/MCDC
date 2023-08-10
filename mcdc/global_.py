@@ -1,5 +1,7 @@
-from mcdc.card import InputCard
+"""This module contains the global variables."""
+
+from mcdc.card import InputDeck
 
 
-global_ = None  # Will be set in main.py, based on type_.global_
-input_card = InputCard()
+input_deck = InputDeck()
+global_ = None  # Will be instantiated in main.py, based on type_.global_
