@@ -1636,20 +1636,20 @@ def eigenvalue_tally_closeout_history(mcdc):
     buff_IC_fission = np.zeros(1, np.float64)
     with objmode():
         MPI.COMM_WORLD.Allreduce(
-            mcdc["eigenvalue_tally_nuSigmaF"], buff_nuSigmaF, MPI.SUM
+            np.array(mcdc["eigenvalue_tally_nuSigmaF"]), buff_nuSigmaF, MPI.SUM
         )
         if mcdc["cycle_active"]:
             MPI.COMM_WORLD.Allreduce(
-                mcdc["eigenvalue_tally_n"], buff_n, MPI.SUM
+                np.array(mcdc["eigenvalue_tally_n"]), buff_n, MPI.SUM
             )
             MPI.COMM_WORLD.Allreduce(np.array([mcdc["n_max"]]), buff_nmax, MPI.MAX)
             MPI.COMM_WORLD.Allreduce(
-                mcdc["eigenvalue_tally_C"], buff_C, MPI.SUM
+                np.array(mcdc["eigenvalue_tally_C"]), buff_C, MPI.SUM
             )
             MPI.COMM_WORLD.Allreduce(np.array([mcdc["C_max"]]), buff_Cmax, MPI.MAX)
             if mcdc["technique"]["IC_generator"]:
                 MPI.COMM_WORLD.Allreduce(
-                    np.array([mcdc["technique"]["IC_fission_score"]]),
+                    np.array(mcdc["technique"]["IC_fission_score"]),
                     buff_IC_fission,
                     MPI.SUM,
                 )
