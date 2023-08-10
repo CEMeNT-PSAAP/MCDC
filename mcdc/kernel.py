@@ -12,8 +12,78 @@ from mcdc.loop import loop_source
 
 
 # =============================================================================
-# Seperate GPU/CPU Functions for Global Accumulations
+# Seperate GPU/CPU Functions to Target Different Platforms
 # =============================================================================
+
+def device(prog):
+    pass
+
+@njit
+def device_cpu(prog):
+    return prog
+
+
+def group(prog):
+    pass
+
+@njit
+def group_cpu(prog):
+    return prog
+
+
+def thread(prog):
+    pass
+
+@njit
+def thread_cpu(prog):
+    return prog
+
+
+def add_active(prog, particle):
+    pass
+
+def add_source(prog, particle):
+    pass
+
+def add_census(prog, particle):
+    pass
+
+
+def add_active(prog, particle):
+    pass
+
+def add_source(prog, particle):
+    pass
+
+def add_census(prog, particle):
+    pass
+
+
+
+
+def local_particle():
+    pass
+
+@njit
+def local_particle_cpu():
+    return np.zeros(1, dtype=type_.particle)[0]
+
+@cuda.jit
+def local_particle_gpu():
+    return cuda.local.array(1, dtype=type_.particle)[0]
+    
+
+def local_particle_record():
+    pass
+
+@njit
+def local_particle_record_cpu():
+    return np.zeros(1, dtype=type_.particle_record)[0]
+
+@cuda.jit
+def local_particle_record_gpu():
+    return cuda.local.array(1, dtype=type_.particle_record)[0]
+
 
 def global_add(ary,idx,val):
     pass
@@ -47,13 +117,18 @@ def adapt_utils(target):
 
     global global_add, global_add_cpu, global_add_gpu
     global global_max, global_max_cpu, global_max_gpu
+    global local_particle, local_particle_cpu, local_particle_gpu
+    global local_particle_record, local_particle_record_cpu, local_particle_record_gpu
     
     if   target == 'cpu':
         global_add = global_add_cpu
         global_max = global_max_cpu
+        local_particle = local_particle_cpu
+        local_particle_record = local_particle_record_cpu
     elif target == 'gpu':
         global_add = global_add_gpu
         global_max = global_max_gpu
+        local_particle_record = local_particle_record_gpu
     else:
         print(f"ERROR: Unrecognized target '{target}'")
 
@@ -292,7 +367,8 @@ def get_particle(bank, mcdc):
     bank["size"] -= 1
 
     # Create in-flight particle
-    P = np.zeros(1, dtype=type_.particle)[0]
+    #P = np.zeros(1, dtype=type_.particle)[0]
+    P = local_particle()
 
     # Set attribute
     P_rec = bank["particles"][bank["size"]]
@@ -919,7 +995,8 @@ def get_particle_speed(P, mcdc):
 
 @njit
 def copy_particle(P):
-    P_new = np.zeros(1, dtype=type_.particle_record)[0]
+    #P_new = np.zeros(1, dtype=type_.particle_record)[0]
+    P_new = local_particle_record()
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -2147,7 +2224,8 @@ def scattering(P, mcdc):
 
     for n in range(N):
         # Create new particle
-        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        #P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        P_new = local_particle_record()
 
         # Set weight
         P_new["w"] = weight_new
@@ -2246,7 +2324,8 @@ def fission(P, mcdc):
 
     for n in range(N):
         # Create new particle
-        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        #P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        P_new = local_particle_record()
 
         # Set weight
         P_new["w"] = weight_new
@@ -2700,7 +2779,8 @@ def prepare_qmc_particles(mcdc):
 
     for n in range(start, stop):
         # Create new particle
-        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        #P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        P_new = local_particle_record()
         # assign direction
         P_new["x"] = sample_qmc_position(xa, xb, lds[n, 0])
         P_new["y"] = sample_qmc_position(ya, yb, lds[n, 4])
@@ -2975,7 +3055,8 @@ def generate_iqmc_material_idx(mcdc):
     # variables for cell finding functions
     trans = np.zeros((3,))
     # create particle to utilize cell finding functions
-    P_temp = np.zeros(1, dtype=type_.particle)[0]
+    #P_temp = np.zeros(1, dtype=type_.particle)[0]
+    P_temp = local_particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
