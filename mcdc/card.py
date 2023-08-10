@@ -3,7 +3,7 @@ import numpy as np
 from mcdc.constant import INF, GR_ALL, PCT_NONE, PI, SHIFT
 
 
-class InputCard:
+class InputDeck:
     def __init__(self):
         self.reset()
 
