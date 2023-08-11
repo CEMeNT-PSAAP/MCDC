@@ -4,7 +4,8 @@ from numba import njit, objmode, jit
 from scipy.linalg import eig
 
 import mcdc.kernel as kernel
-import mcdc.type_ as type_
+import mcdc.type_  as type_
+import mcdc.adapt  as adapt
 
 from mcdc.constant import *
 from mcdc.print_ import (
@@ -126,10 +127,12 @@ def loop_source(mcdc):
         census_idx = mcdc["technique"]["census_idx"]
         if P["t"] > mcdc["technique"]["census_time"][census_idx]:
             P["t"] += SHIFT
-            kernel.add_particle(P, mcdc["bank_census"])
+            #kernel.add_particle(P, mcdc["bank_census"])
+            adapt.add_census(mcdc,P)
         else:
             # Add the source particle into the active bank
-            kernel.add_particle(P, mcdc["bank_active"])
+            #kernel.add_particle(P, mcdc["bank_active"])
+            adapt.add_active(mcdc,P)
 
         # =====================================================================
         # Run the source particle and its secondaries
@@ -241,7 +244,7 @@ def loop_particle(P, mcdc):
         # Time census
         elif event & EVENT_CENSUS:
             P["t"] += SHIFT
-            kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
+            adapt.add_census(P,mcdc)
             P["alive"] = False
 
         # Shift particle
@@ -778,7 +781,8 @@ def loop_source_precursor(mcdc):
                 ) = kernel.sample_isotropic_direction(mcdc)
 
                 # Push to active bank
-                kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
+                #kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
+                adapt.add_active(mcdc,P_new)
 
                 # Loop until active bank is exhausted
                 while mcdc["bank_active"]["size"] > 0:

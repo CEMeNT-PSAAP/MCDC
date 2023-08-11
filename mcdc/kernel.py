@@ -10,127 +10,7 @@ from mcdc.print_ import print_error
 from mcdc.type_ import score_list
 from mcdc.loop import loop_source
 
-
-# =============================================================================
-# Seperate GPU/CPU Functions to Target Different Platforms
-# =============================================================================
-
-def device(prog):
-    pass
-
-@njit
-def device_cpu(prog):
-    return prog
-
-
-def group(prog):
-    pass
-
-@njit
-def group_cpu(prog):
-    return prog
-
-
-def thread(prog):
-    pass
-
-@njit
-def thread_cpu(prog):
-    return prog
-
-
-def add_active(prog, particle):
-    pass
-
-def add_source(prog, particle):
-    pass
-
-def add_census(prog, particle):
-    pass
-
-
-def add_active(prog, particle):
-    pass
-
-def add_source(prog, particle):
-    pass
-
-def add_census(prog, particle):
-    pass
-
-
-
-
-def local_particle():
-    pass
-
-@njit
-def local_particle_cpu():
-    return np.zeros(1, dtype=type_.particle)[0]
-
-@cuda.jit
-def local_particle_gpu():
-    return cuda.local.array(1, dtype=type_.particle)[0]
-    
-
-def local_particle_record():
-    pass
-
-@njit
-def local_particle_record_cpu():
-    return np.zeros(1, dtype=type_.particle_record)[0]
-
-@cuda.jit
-def local_particle_record_gpu():
-    return cuda.local.array(1, dtype=type_.particle_record)[0]
-
-
-def global_add(ary,idx,val):
-    pass
-
-@njit
-def global_add_cpu(ary,idx,val):
-    result    = ary[idx]
-    ary[idx] += val
-    return result
-
-@cuda.jit
-def global_add_gpu(ary,idx,val):
-    return cuda.atomic.add(ary,idx,val)
-
-def global_max(ary,idx,val):
-    pass
-
-@njit
-def global_max_cpu(ary,idx,val):
-    result    = ary[idx]
-    if ary[idx] < val :
-        ary[idx] = val
-    return result
-
-@cuda.jit
-def global_max_gpu(ary,idx,val):
-    return cuda.atomic.max(ary,idx,val)
-
-
-def adapt_utils(target):
-
-    global global_add, global_add_cpu, global_add_gpu
-    global global_max, global_max_cpu, global_max_gpu
-    global local_particle, local_particle_cpu, local_particle_gpu
-    global local_particle_record, local_particle_record_cpu, local_particle_record_gpu
-    
-    if   target == 'cpu':
-        global_add = global_add_cpu
-        global_max = global_max_cpu
-        local_particle = local_particle_cpu
-        local_particle_record = local_particle_record_cpu
-    elif target == 'gpu':
-        global_add = global_add_gpu
-        global_max = global_max_gpu
-        local_particle_record = local_particle_record_gpu
-    else:
-        print(f"ERROR: Unrecognized target '{target}'")
+import mcdc.adapt as adapt
 
 # =============================================================================
 # Random sampling
@@ -368,7 +248,7 @@ def get_particle(bank, mcdc):
 
     # Create in-flight particle
     #P = np.zeros(1, dtype=type_.particle)[0]
-    P = local_particle()
+    P = adapt.local_particle()
 
     # Set attribute
     P_rec = bank["particles"][bank["size"]]
@@ -738,15 +618,16 @@ def bank_IC(P, mcdc):
         P_new["w"] = 1.0
         P_new["t"] = 0.0
         #! Will need to be refactored for GPU
-        add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
+        #add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
+        adapt.add_IC(mcdc,P_new)
 
         # Accumulate fission
         SigmaF = material["fission"][g]
         
         #mcdc["technique"]["IC_fission_score"] += v * SigmaF
         
-        #! Refactored for global_add
-        global_add(mcdc["technique"]["IC_fission_score"],0,v * SigmaF)
+        #! Refactored for adapt.global_add
+        adapt.global_add(mcdc["technique"]["IC_fission_score"],0,v * SigmaF)
 
     # =========================================================================
     # Precursor
@@ -996,7 +877,7 @@ def get_particle_speed(P, mcdc):
 @njit
 def copy_particle(P):
     #P_new = np.zeros(1, dtype=type_.particle_record)[0]
-    P_new = local_particle_record()
+    P_new = adapt.local_particle_record()
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -1542,7 +1423,7 @@ def score_crossing_t(P, t, x, y, z, mcdc):
 @njit
 def score_flux(s, g, t, x, y, z, mu, azi, flux, score):
     #score["bin"][s, g, t, x, y, z, mu, azi] += flux
-    global_add(score["bin"],(s, g, t, x, y, z, mu, azi),flux)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, mu, azi),flux)
 
 
 
@@ -1551,9 +1432,9 @@ def score_current(s, g, t, x, y, z, flux, P, score):
     #score["bin"][s, g, t, x, y, z, 0] += flux * P["ux"]
     #score["bin"][s, g, t, x, y, z, 1] += flux * P["uy"]
     #score["bin"][s, g, t, x, y, z, 2] += flux * P["uz"]
-    global_add(score["bin"],(s, g, t, x, y, z, 0),flux * P["ux"])
-    global_add(score["bin"],(s, g, t, x, y, z, 1),flux * P["uy"])
-    global_add(score["bin"],(s, g, t, x, y, z, 2),flux * P["uz"])
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 0),flux * P["ux"])
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 1),flux * P["uy"])
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 2),flux * P["uz"])
 
 
 @njit
@@ -1567,12 +1448,12 @@ def score_eddington(s, g, t, x, y, z, flux, P, score):
     #score["bin"][s, g, t, x, y, z, 3] += flux * uy * uy
     #score["bin"][s, g, t, x, y, z, 4] += flux * uy * uz
     #score["bin"][s, g, t, x, y, z, 5] += flux * uz * uz
-    global_add(score["bin"],(s, g, t, x, y, z, 0),flux * ux * ux)
-    global_add(score["bin"],(s, g, t, x, y, z, 1),flux * ux * uy)
-    global_add(score["bin"],(s, g, t, x, y, z, 2),flux * ux * uz)
-    global_add(score["bin"],(s, g, t, x, y, z, 3),flux * uy * uy)
-    global_add(score["bin"],(s, g, t, x, y, z, 4),flux * uy * uz)
-    global_add(score["bin"],(s, g, t, x, y, z, 5),flux * uz * uz)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 0),flux * ux * ux)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 1),flux * ux * uy)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 2),flux * ux * uz)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 3),flux * uy * uy)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 4),flux * uy * uz)
+    adapt.global_add(score["bin"],(s, g, t, x, y, z, 5),flux * uz * uz)
 
 
 #! Don't worry about this
@@ -1664,7 +1545,7 @@ def eigenvalue_tally(P, distance, mcdc):
     #mcdc["eigenvalue_tally_nuSigmaF"] += flux * nuSigmaF
 
     #! Requires refactor of eigenvalue_tally_nuSigmaF to an array
-    global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
+    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
 
     if mcdc["cycle_active"]:
         # Neutron density
@@ -1673,7 +1554,7 @@ def eigenvalue_tally(P, distance, mcdc):
         #mcdc["eigenvalue_tally_n"] += n_density
 
         #! Requires refactor of eigenvalue_tally_n to an array
-        global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
+        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
 
         # Maximum neutron density
         if mcdc["n_max"] < n_density:
@@ -1691,7 +1572,7 @@ def eigenvalue_tally(P, distance, mcdc):
         #mcdc["eigenvalue_tally_C"] += C_density
 
         #! Requires refactor of eigenvalue_tally_n to an array
-        global_add(mcdc["eigenvalue_tally_C"],0,C_density)
+        adapt.global_add(mcdc["eigenvalue_tally_C"],0,C_density)
 
         # Maximum precursor density
         if mcdc["C_max"] < C_density:
@@ -2225,7 +2106,7 @@ def scattering(P, mcdc):
     for n in range(N):
         # Create new particle
         #P_new = np.zeros(1, dtype=type_.particle_record)[0]
-        P_new = local_particle_record()
+        P_new = adapt.local_particle_record()
 
         # Set weight
         P_new["w"] = weight_new
@@ -2239,7 +2120,8 @@ def scattering(P, mcdc):
         sample_phasespace_scattering(P, material, P_new, mcdc)
 
         # Bank
-        add_particle(P_new, mcdc["bank_active"])
+        #add_particle(P_new, mcdc["bank_active"])
+        adapt.add_active(mcdc,P_new)
 
 
 @njit
@@ -2325,7 +2207,7 @@ def fission(P, mcdc):
     for n in range(N):
         # Create new particle
         #P_new = np.zeros(1, dtype=type_.particle_record)[0]
-        P_new = local_particle_record()
+        P_new = adapt.local_particle_record()
 
         # Set weight
         P_new["w"] = weight_new
@@ -2344,9 +2226,11 @@ def fission(P, mcdc):
 
         # Bank
         if mcdc["setting"]["mode_eigenvalue"]:
-            add_particle(P_new, mcdc["bank_census"])
+            #add_particle(P_new, mcdc["bank_census"])
+            adapt.add_census(mcdc,P_new)
         else:
-            add_particle(P_new, mcdc["bank_active"])
+            #add_particle(P_new, mcdc["bank_active"])
+            adapt.add_active(mcdc,P_new)
 
 
 @njit
@@ -2585,13 +2469,15 @@ def weight_window(P, mcdc):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            add_particle(copy_particle(P), mcdc["bank_active"])
+            #add_particle(copy_particle(P), mcdc["bank_active"])
+            adapt.add_active(mcdc,P)
 
         # Russian roulette
         p -= n_split
         xi = local_rng(P,mcdc)
         if xi <= p:
-            add_particle(copy_particle(P), mcdc["bank_active"])
+            #add_particle(copy_particle(P), mcdc["bank_active"])
+            adapt.add_active(mcdc,P)
 
     # Below target
     elif p < 1.0 / width:
@@ -2780,7 +2666,7 @@ def prepare_qmc_particles(mcdc):
     for n in range(start, stop):
         # Create new particle
         #P_new = np.zeros(1, dtype=type_.particle_record)[0]
-        P_new = local_particle_record()
+        P_new = adapt.local_particle_record()
         # assign direction
         P_new["x"] = sample_qmc_position(xa, xb, lds[n, 0])
         P_new["y"] = sample_qmc_position(ya, yb, lds[n, 4])
@@ -2805,7 +2691,8 @@ def prepare_qmc_particles(mcdc):
         #! Set per-particle seed
         P_new["rng_seed"]
         # add to source bank
-        add_particle(P_new, mcdc["bank_source"])
+        #add_particle(P_new, mcdc["bank_source"])
+        adapt.add_source(mcdc,P_new)
 
 
 @njit
@@ -3056,7 +2943,7 @@ def generate_iqmc_material_idx(mcdc):
     trans = np.zeros((3,))
     # create particle to utilize cell finding functions
     #P_temp = np.zeros(1, dtype=type_.particle)[0]
-    P_temp = local_particle()
+    P_temp = adapt.local_particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
@@ -3346,7 +3233,8 @@ def weight_roulette(P, mcdc):
 @njit
 def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     # Put the current particle into the secondary bank
-    add_particle(copy_particle(P), mcdc["bank_active"])
+    #add_particle(copy_particle(P), mcdc["bank_active"])
+    adapt.add_active(mcdc,P)
 
     # Assign sensitivity_ID
     P["sensitivity_ID"] = surface["sensitivity_ID"]
