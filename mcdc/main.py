@@ -17,7 +17,8 @@ import mcdc.global_ as mcdc_
 input_card = mcdc_.input_card
 mcdc = mcdc_.global_
 
-kernel.adapt_utils('cpu')
+import mcdc.adapt as adapt
+
 
 def run():
     # Start timer
@@ -132,6 +133,8 @@ def prepare():
     type_.make_type_tally(N_tally_scores, input_card.tally)
     type_.make_type_technique(N_particle, G, input_card.technique)
     type_.make_type_global(input_card)
+
+    adapt.adapt_to('cpu')
 
     # =========================================================================
     # Make the global variable container
