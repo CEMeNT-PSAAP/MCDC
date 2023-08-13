@@ -238,6 +238,7 @@ def add_particle(P, bank):
 
 @njit
 def get_particle(bank, mcdc):
+
     # Check if bank is empty
     if bank["size"] == 0:
         with objmode():
@@ -465,6 +466,7 @@ def total_weight(bank):
     return buff[0]
 
 
+#! Don't worry about this
 @njit
 def bank_rebalance(mcdc):
     # Scan the bank
@@ -582,8 +584,9 @@ def distribute_work(N, mcdc, precursor=False):
 
 
 @njit
-def bank_IC(P, mcdc):
+def bank_IC(P, prog):
     # TODO: Consider multi-nuclide material
+    mcdc = adapt.device(prog)
     material = mcdc["nuclides"][P["material_ID"]]
 
     # =========================================================================
@@ -619,7 +622,7 @@ def bank_IC(P, mcdc):
         P_new["t"] = 0.0
         #! Will need to be refactored for GPU
         #add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
-        adapt.add_IC(mcdc,P_new)
+        adapt.add_IC(prog,P_new)
 
         # Accumulate fission
         SigmaF = material["fission"][g]
@@ -1980,7 +1983,8 @@ def distance_to_mesh(P, mesh, mcdc):
 
 
 @njit
-def surface_crossing(P, mcdc):
+def surface_crossing(P, prog):
+    mcdc = adapt.device(prog)
     trans = P["translation"]
 
     # Implement BC
@@ -2004,7 +2008,7 @@ def surface_crossing(P, mcdc):
     if surface["sensitivity"] and P["sensitivity_ID"] == 0:
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
-            sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc)
+            sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog)
 
 
 # =============================================================================
@@ -2072,7 +2076,7 @@ def collision(P, mcdc):
 
 
 @njit
-def capture(P, mcdc):
+def capture(P, prog):
     # Kill the current particle
     P["alive"] = False
 
@@ -2083,7 +2087,8 @@ def capture(P, mcdc):
 
 
 @njit
-def scattering(P, mcdc):
+def scattering(P, prog):
+    mcdc = adapt.device(prog)
     # Kill the current particle
     P["alive"] = False
 
@@ -2121,7 +2126,7 @@ def scattering(P, mcdc):
 
         # Bank
         #add_particle(P_new, mcdc["bank_active"])
-        adapt.add_active(mcdc,P_new)
+        adapt.add_active(prog,P_new)
 
 
 @njit
@@ -2184,7 +2189,10 @@ def sample_phasespace_scattering(P, material, P_new, mcdc):
 
 
 @njit
-def fission(P, mcdc):
+def fission(P, prog):
+
+    mcdc = adapt.device(prog)
+
     # Kill the current particle
     P["alive"] = False
 
@@ -2227,10 +2235,10 @@ def fission(P, mcdc):
         # Bank
         if mcdc["setting"]["mode_eigenvalue"]:
             #add_particle(P_new, mcdc["bank_census"])
-            adapt.add_census(mcdc,P_new)
+            adapt.add_census(prog,P_new)
         else:
             #add_particle(P_new, mcdc["bank_active"])
-            adapt.add_active(mcdc,P_new)
+            adapt.add_active(prog,P_new)
 
 
 @njit
@@ -2445,7 +2453,9 @@ def time_boundary(P, mcdc):
 
 
 @njit
-def weight_window(P, mcdc):
+def weight_window(P, prog):
+    mcdc = adapt.device(prog)
+
     # Get indices
     t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
 
@@ -2470,14 +2480,14 @@ def weight_window(P, mcdc):
         n_split = math.floor(p)
         for i in range(n_split - 1):
             #add_particle(copy_particle(P), mcdc["bank_active"])
-            adapt.add_active(mcdc,P)
+            adapt.add_active(prog,P)
 
         # Russian roulette
         p -= n_split
         xi = local_rng(P,mcdc)
         if xi <= p:
             #add_particle(copy_particle(P), mcdc["bank_active"])
-            adapt.add_active(mcdc,P)
+            adapt.add_active(prog,P)
 
     # Below target
     elif p < 1.0 / width:
@@ -2632,12 +2642,14 @@ def prepare_qmc_fission_source(mcdc):
 
 
 @njit
-def prepare_qmc_particles(mcdc):
+def prepare_qmc_particles(prog):
     """
     Create N_particles assigning the position, direction, and group from the
     QMC Low-Discrepency Sequence. Particles are added to the bank_source.
 
     """
+    mcdc = adapt.device(prog)
+
     # determine which portion of particles to loop through
     N_particle = mcdc["setting"]["N_particle"]
     N_work = mcdc["mpi_work_size"]
@@ -2692,7 +2704,7 @@ def prepare_qmc_particles(mcdc):
         P_new["rng_seed"]
         # add to source bank
         #add_particle(P_new, mcdc["bank_source"])
-        adapt.add_source(mcdc,P_new)
+        adapt.add_source(prog,P_new)
 
 
 @njit
@@ -3042,10 +3054,11 @@ def modified_gram_schmidt(V, u):
 
 
 @njit
-def AxV(phi, b, mcdc):
+def AxV(phi, b, prog):
     """
     Linear operator to be used with GMRES.
     """
+    mcdc = adapt.device(prog)
     matrix_shape = mcdc["technique"]["iqmc_flux"].shape
     vector_size = mcdc["technique"]["iqmc_flux"].size
 
@@ -3057,7 +3070,7 @@ def AxV(phi, b, mcdc):
 
     # QMC Sweep
     prepare_qmc_source(mcdc)
-    prepare_qmc_particles(mcdc)
+    prepare_qmc_particles(prog)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(mcdc)
     # sum resultant flux on all processors
@@ -3070,11 +3083,12 @@ def AxV(phi, b, mcdc):
 
 
 @njit
-def RHS(mcdc):
+def RHS(prog):
     """
     We solve A x = b with a Krylov method. This function extracts
     b by doing a transport sweep of the fixed-source.
     """
+    mcdc = adapt.device(prog)
     # reshape v and assign to iqmc_flux
     Nt = mcdc["technique"]["iqmc_flux"].size
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
@@ -3085,7 +3099,7 @@ def RHS(mcdc):
 
     # QMC Sweep
     prepare_qmc_source(mcdc)
-    prepare_qmc_particles(mcdc)
+    prepare_qmc_particles(prog)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(mcdc)
     # sum resultant flux on all processors
@@ -3097,11 +3111,12 @@ def RHS(mcdc):
 
 
 @njit
-def HxV(V, mcdc):
+def HxV(V, prog):
     """
     Linear operator for Davidson method,
     scattering + streaming terms -> (I-L^(-1)S)*phi
     """
+    mcdc = adapt.device(prog)
     # flux input is most recent iteration of eigenvector
     v = V[:, -1]
     # reshape v and assign to iqmc_flux
@@ -3114,7 +3129,7 @@ def HxV(V, mcdc):
 
     # QMC Sweep
     prepare_qmc_scattering_source(mcdc)
-    prepare_qmc_particles(mcdc)
+    prepare_qmc_particles(prog)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(mcdc)
     # sum resultant flux on all processors
@@ -3128,11 +3143,12 @@ def HxV(V, mcdc):
 
 
 @njit
-def FxV(V, mcdc):
+def FxV(V, prog):
     """
     Linear operator for Davidson method,
     fission term -> (L^(-1)F*phi)
     """
+    mcdc = adapt.device(prog)
     # flux input is most recent iteration of eigenvector
     v = V[:, -1]
     # reshape v and assign to iqmc_flux
@@ -3146,7 +3162,7 @@ def FxV(V, mcdc):
 
     # QMC Sweep
     prepare_qmc_fission_source(mcdc)
-    prepare_qmc_particles(mcdc)
+    prepare_qmc_particles(prog)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(mcdc)
     # sum resultant flux on all processors
@@ -3158,13 +3174,14 @@ def FxV(V, mcdc):
 
 
 @njit
-def preconditioner(V, mcdc, num_sweeps=3):
+def preconditioner(V, prog, num_sweeps=3):
     """
     Linear operator approximation of (I-L^(-1)S)*phi
 
     In this case the preconditioner is a specified number of purely scattering
     transport sweeps.
     """
+    mcdc = adapt.device(prog)
     # flux input is most recent iteration of eigenvector
     v = V[:, -1]
     # reshape v and assign to iqmc_flux
@@ -3181,7 +3198,7 @@ def preconditioner(V, mcdc, num_sweeps=3):
 
         # QMC Sweep
         prepare_qmc_scattering_source(mcdc)
-        prepare_qmc_particles(mcdc)
+        prepare_qmc_particles(prog)
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
         loop_source(mcdc)
         # sum resultant flux on all processors
@@ -3231,10 +3248,11 @@ def weight_roulette(P, mcdc):
 
 
 @njit
-def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
+def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
     # Put the current particle into the secondary bank
     #add_particle(copy_particle(P), mcdc["bank_active"])
-    adapt.add_active(mcdc,P)
+    mcdc = adapt.device(prog)
+    adapt.add_active(prog,P)
 
     # Assign sensitivity_ID
     P["sensitivity_ID"] = surface["sensitivity_ID"]

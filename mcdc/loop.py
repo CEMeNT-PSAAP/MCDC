@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import ascontiguousarray as cga
-from numba import njit, objmode, jit
+from numba import njit, objmode, jit, uintp
 from scipy.linalg import eig
 
 import mcdc.kernel as kernel
@@ -83,6 +83,7 @@ def loop_main(mcdc):
 
 @njit
 def loop_source(mcdc):
+    prog = mcdc
     # Rebase rng skip_ahead seed
     kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"], mcdc)
     kernel.rng_rebase(mcdc)
@@ -128,11 +129,11 @@ def loop_source(mcdc):
         if P["t"] > mcdc["technique"]["census_time"][census_idx]:
             P["t"] += SHIFT
             #kernel.add_particle(P, mcdc["bank_census"])
-            adapt.add_census(mcdc,P)
+            adapt.add_census(prog,P)
         else:
             # Add the source particle into the active bank
             #kernel.add_particle(P, mcdc["bank_active"])
-            adapt.add_active(mcdc,P)
+            adapt.add_active(prog,P)
 
         # =====================================================================
         # Run the source particle and its secondaries
@@ -145,7 +146,7 @@ def loop_source(mcdc):
 
             # Apply weight window
             if mcdc["technique"]["weight_window"]:
-                kernel.weight_window(P, mcdc)
+                kernel.weight_window(P, prog)
 
             # Particle tracker
             if mcdc["setting"]["track_particle"]:
@@ -181,93 +182,103 @@ def loop_source(mcdc):
 
 
 @njit
-def loop_particle(P, mcdc):
+def loop_particle(P, prog):
+    mcdc = adapt.device(prog)
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.track_particle(P, mcdc)
 
     while P["alive"]:
-        # Find cell from root universe if unknown
-        if P["cell_ID"] == -1:
-            trans = np.zeros(3)
-            P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
-
-        # Determine and move to event
-        kernel.move_to_event(P, mcdc)
-        event = P["event"]
-
-        # The & operator here is a bitwise and.
-        # It is used to determine if an event type is part of the particle event.
-
-        # Collision
-        if event & EVENT_COLLISION:
-            # Generate IC?
-            if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-                kernel.bank_IC(P, mcdc)
-
-            # Branchless collision?
-            if mcdc["technique"]["branchless_collision"]:
-                kernel.branchless_collision(P, mcdc)
-
-            # Analog collision
-            else:
-                # Get collision type
-                kernel.collision(P, mcdc)
-                event = P["event"]
-                # Perform collision
-                if event & EVENT_CAPTURE:
-                    kernel.capture(P, mcdc)
-                elif event == EVENT_SCATTERING:
-                    kernel.scattering(P, mcdc)
-                elif event == EVENT_FISSION:
-                    kernel.fission(P, mcdc)
-
-                # Sensitivity quantification for nuclide?
-                material = mcdc["materials"][P["material_ID"]]
-                if material["sensitivity"] and P["sensitivity_ID"] == 0:
-                    kernel.sensitivity_material(P, mcdc)
-
-        # Mesh tally
-        if event & EVENT_MESH:
-            kernel.mesh_crossing(P, mcdc)
-
-        # Different Methods for shifting the particle
-        # Surface crossing
-        if event & EVENT_SURFACE:
-            kernel.surface_crossing(P, mcdc)
-
-        # Surface move
-        elif event & EVENT_SURFACE_MOVE:
-            P["t"] += SHIFT
-            P["cell_ID"] = -1
-
-        # Time census
-        elif event & EVENT_CENSUS:
-            P["t"] += SHIFT
-            adapt.add_census(P,mcdc)
-            P["alive"] = False
-
-        # Shift particle
-        elif event & EVENT_LATTICE + EVENT_MESH:
-            kernel.shift_particle(P, SHIFT)
-
-        # Time boundary
-        if event & EVENT_TIME_BOUNDARY:
-            kernel.time_boundary(P, mcdc)
-
-        # Apply weight window
-        elif mcdc["technique"]["weight_window"]:
-            kernel.weight_window(P, mcdc)
-
-        # Apply weight roulette
-        if mcdc["technique"]["weight_roulette"]:
-            # check if weight has fallen below threshold
-            if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
-                kernel.weight_roulette(P, mcdc)
+        step_particle(P,prog)
 
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.track_particle(P, mcdc)
+
+
+
+
+def step_particle(P : adapt.particle, prog : uintp):
+    mcdc = adapt.device(prog)
+
+    # Find cell from root universe if unknown
+    if P["cell_ID"] == -1:
+        trans = np.zeros(3)
+        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+
+    # Determine and move to event
+    kernel.move_to_event(P, mcdc)
+    event = P["event"]
+
+    # The & operator here is a bitwise and.
+    # It is used to determine if an event type is part of the particle event.
+
+    # Collision
+    if event & EVENT_COLLISION:
+        # Generate IC?
+        if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+            kernel.bank_IC(P, prog)
+
+        # Branchless collision?
+        if mcdc["technique"]["branchless_collision"]:
+            kernel.branchless_collision(P, mcdc)
+
+        # Analog collision
+        else:
+            # Get collision type
+            kernel.collision(P, mcdc)
+            event = P["event"]
+            # Perform collision
+            if event & EVENT_CAPTURE:
+                kernel.capture(P, prog)
+            elif event == EVENT_SCATTERING:
+                kernel.scattering(P, prog)
+            elif event == EVENT_FISSION:
+                kernel.fission(P, prog)
+
+            # Sensitivity quantification for nuclide?
+            material = mcdc["materials"][P["material_ID"]]
+            if material["sensitivity"] and P["sensitivity_ID"] == 0:
+                kernel.sensitivity_material(P, mcdc)
+
+    # Mesh tally
+    if event & EVENT_MESH:
+        kernel.mesh_crossing(P, mcdc)
+
+    # Different Methods for shifting the particle
+    # Surface crossing
+    if event & EVENT_SURFACE:
+        kernel.surface_crossing(P, prog)
+
+    # Surface move
+    elif event & EVENT_SURFACE_MOVE:
+        P["t"] += SHIFT
+        P["cell_ID"] = -1
+
+    # Time census
+    elif event & EVENT_CENSUS:
+        P["t"] += SHIFT
+        adapt.add_census(prog,P)
+        P["alive"] = False
+
+    # Shift particle
+    elif event & EVENT_LATTICE + EVENT_MESH:
+        kernel.shift_particle(P, SHIFT)
+
+    # Time boundary
+    if event & EVENT_TIME_BOUNDARY:
+        kernel.time_boundary(P, mcdc)
+
+    # Apply weight window
+    elif mcdc["technique"]["weight_window"]:
+        kernel.weight_window(P, prog)
+
+    # Apply weight roulette
+    if mcdc["technique"]["weight_roulette"]:
+        # check if weight has fallen below threshold
+        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
+            kernel.weight_roulette(P, mcdc)
+
 
 
 # =============================================================================
@@ -276,25 +287,27 @@ def loop_particle(P, mcdc):
 
 
 @njit
-def loop_iqmc(mcdc):
+def loop_iqmc(prog):
+    mcdc = adapt.device(prog)
     # generate material index
     kernel.generate_iqmc_material_idx(mcdc)
     # function calls from specified solvers
     if mcdc["setting"]["mode_eigenvalue"]:
         if mcdc["technique"]["iqmc_eigenmode_solver"] == "davidson":
-            davidson(mcdc)
+            davidson(prog)
         if mcdc["technique"]["iqmc_eigenmode_solver"] == "power_iteration":
-            power_iteration(mcdc)
+            power_iteration(prog)
     else:
         if mcdc["technique"]["iqmc_fixed_source_solver"] == "source_iteration":
-            source_iteration(mcdc)
+            source_iteration(prog)
         if mcdc["technique"]["iqmc_fixed_source_solver"] == "gmres":
-            gmres(mcdc)
+            gmres(prog)
 
 
 @njit
-def source_iteration(mcdc):
+def source_iteration(prog):
     simulation_end = False
+    mcdc = adapt.device(prog)
 
     while not simulation_end:
         # reset particle bank size
@@ -306,7 +319,7 @@ def source_iteration(mcdc):
         # set bank source
         kernel.prepare_qmc_source(mcdc)
         # initialize particles with LDS
-        kernel.prepare_qmc_particles(mcdc)
+        kernel.prepare_qmc_particles(prog)
 
         # prepare source for next iteration
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
@@ -337,7 +350,7 @@ def source_iteration(mcdc):
 
 
 @njit
-def gmres(mcdc):
+def gmres(prog):
     """
     GMRES solver for iQMC fixed-source problems.
     ----------
@@ -352,6 +365,7 @@ def gmres(mcdc):
     code adapted from: https://github.com/pygbe/pygbe/blob/master/pygbe/gmres.py
 
     """
+    mcdc = adapt.device(prog)
     max_iter = mcdc["technique"]["iqmc_maxitt"]
     R = mcdc["technique"]["iqmc_krylov_restart"]
     tol = mcdc["technique"]["iqmc_tol"]
@@ -373,8 +387,8 @@ def gmres(mcdc):
     max_outer = int(np.ceil(max_iter / max_inner))
 
     # initial residual
-    b = kernel.RHS(mcdc)
-    r = b - kernel.AxV(X, b, mcdc)
+    b = kernel.RHS(prog)
+    r = b - kernel.AxV(X, b, prog)
     normr = np.linalg.norm(r)
 
     # Check initial guess ( scaling by b, if b != 0, must account for
@@ -411,7 +425,7 @@ def gmres(mcdc):
         for inner in range(max_inner):
             # New search direction
             v = V[inner + 1, :]
-            v[:] = kernel.AxV(vs[-1], b, mcdc)
+            v[:] = kernel.AxV(vs[-1], b, prog)
             vs.append(v)
 
             # Modified Gram Schmidt
@@ -472,7 +486,7 @@ def gmres(mcdc):
         y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
         update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
         X = X + update
-        aux = kernel.AxV(X, b, mcdc)
+        aux = kernel.AxV(X, b, prog)
         r = b - aux
 
         normr = np.linalg.norm(r)
@@ -487,7 +501,8 @@ def gmres(mcdc):
 
 
 @njit
-def power_iteration(mcdc):
+def power_iteration(prog):
+    mcdc = adapt.device(prog)
     simulation_end = False
 
     # iteration tolerance
@@ -501,9 +516,9 @@ def power_iteration(mcdc):
     while not simulation_end:
         # iterate over scattering source
         if solver == "source_iteration":
-            source_iteration(mcdc)
+            source_iteration(prog)
         if solver == "gmres":
-            gmres(mcdc)
+            gmres(prog)
         # reset counter for inner iteration
         mcdc["technique"]["iqmc_itt"] = 0
 
@@ -535,7 +550,7 @@ def power_iteration(mcdc):
 
 
 @njit
-def davidson(mcdc):
+def davidson(prog):
     """
     The generalized Davidson method is a Krylov subspace method for solving
     the generalized eigenvalue problem. The algorithm here is based on the
@@ -546,6 +561,7 @@ def davidson(mcdc):
         energy 38.12 (2011): 2818-2823.
 
     """
+    mcdc = adapt.device(prog)
     # TODO: handle imaginary eigenvalues
 
     # Davidson parameters
@@ -565,7 +581,7 @@ def davidson(mcdc):
     # initial scalar flux guess comes from power iteration
     mcdc["technique"]["iqmc_maxitt"] = 3
     mcdc["setting"]["progress_bar"] = False
-    power_iteration(mcdc)
+    power_iteration(prog)
     mcdc["setting"]["progress_bar"] = True
     mcdc["technique"]["iqmc_maxitt"] = maxit
     mcdc["technique"]["iqmc_itt_outter"] = 0
@@ -592,10 +608,10 @@ def davidson(mcdc):
     # Davidson Routine
     while not simulation_end:
         # Calculate V*H*V (HxV is scattering linear operator function)
-        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)[:, 0]
+        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], prog)[:, 0]
         VHV = np.dot(cga(V[:, :Vsize].T), cga(HV[:, :Vsize]))
         # Calculate V*F*V (FxV is fission linear operator function)
-        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)[:, 0]
+        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], prog)[:, 0]
         VFV = np.dot(cga(V[:, :Vsize].T), cga(FV[:, :Vsize]))
         # solve for eigenvalues and vectors
         with objmode(Lambda="complex128[:]", w="complex128[:,:]"):
@@ -621,7 +637,7 @@ def davidson(mcdc):
         # Ritz vector
         u = np.dot(cga(V[:, :Vsize]), cga(w))
         # residual
-        res = kernel.FxV(u, mcdc) - Lambda * kernel.HxV(u, mcdc)
+        res = kernel.FxV(u, prog) - Lambda * kernel.HxV(u, prog)
         mcdc["technique"]["iqmc_res_outter"] = abs(mcdc["k_eff"] - k_old)
         k_old = mcdc["k_eff"]
         mcdc["technique"]["iqmc_itt_outter"] += 1
@@ -635,7 +651,7 @@ def davidson(mcdc):
             break
         else:
             # Precondition for next iteration
-            t = kernel.preconditioner(res, mcdc, num_sweeps)
+            t = kernel.preconditioner(res, prog, num_sweeps)
             # check restart condition
             if Vsize <= m - l:
                 # appends new orthogonalization to V
@@ -782,7 +798,7 @@ def loop_source_precursor(mcdc):
 
                 # Push to active bank
                 #kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
-                adapt.add_active(mcdc,P_new)
+                adapt.add_active(prog,P_new)
 
                 # Loop until active bank is exhausted
                 while mcdc["bank_active"]["size"] > 0:
@@ -791,7 +807,7 @@ def loop_source_precursor(mcdc):
 
                     # Apply weight window
                     if mcdc["technique"]["weight_window"]:
-                        kernel.weight_window(P, mcdc)
+                        kernel.weight_window(P, prog)
 
                     # Particle tracker
                     if mcdc["setting"]["track_particle"]:
