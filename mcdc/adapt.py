@@ -1,8 +1,9 @@
 import numpy as np
-from numba import njit, objmode, literal_unroll, cuda
+from numba import njit, jit, objmode, literal_unroll, cuda
 import numba
 import mcdc.type_  as type_
 import mcdc.kernel as kernel
+import mcdc.loop   as loop
 
 path_to_harmonize='/home/brax/harmonize/code/'
 import sys
@@ -302,6 +303,38 @@ def harmonize_factory():
 # =========================================================================
 
 
+def sim_particles(P,prog):
+    pass
+
+def sim_particle(P,prog):
+    loop.loop_particle()
+
+def particle_loop_gpu():
+    
+
+
+# =========================================================================
+# Compilation and Main Adapter
+# =========================================================================
+
+
+def compiler(func, target):
+    if target == 'cpu':
+        return jit(func, nopython=True, nogil=True)#, parallel=True)
+    elif target == 'cpus':
+        return jit(func, nopython=True, nogil=True, parallel=True)
+    elif target == 'gpu_device':
+        return cuda.jit(func,device=True)
+    elif target == 'gpu':
+        return cuda.jit(func)
+    else:
+        print(f"[ERROR] Unrecognized target '{target}'.")
+
+def make_loops(target):
+    if target == 'cpu':
+        loop.step_particle = loop
+    else:
+        loop.step_particle = 
 
 
 def adapt_to(target):
@@ -309,6 +342,7 @@ def adapt_to(target):
     make_types(target)
     make_states(target)
     make_spec(target)
+    make_loops(target)
 
 
 
