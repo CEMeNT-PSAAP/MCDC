@@ -72,7 +72,7 @@ class InputDeck:
             "mode_eigenvalue": False,
             "time_boundary": INF,
             "rng_seed": 1,
-            "rng_stride": 152917,
+            "rng_stride": 131071,
             "rng_g": 2806196910506780709,
             "rng_c": 1,
             "rng_mod": 2**63,
