@@ -70,6 +70,8 @@ def loop_main(mcdc):
         else:
             simulation_end = True
 
+        mcdc["cycle_index"] += 1
+
     # Tally closeout
     kernel.tally_closeout(mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
@@ -84,8 +86,6 @@ def loop_main(mcdc):
 @njit
 def loop_source(mcdc):
     # Rebase rng skip_ahead seed
-    kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"], mcdc)
-    kernel.rng_rebase(mcdc)
 
     # Progress bar indicator
     N_prog = 0
@@ -95,12 +95,13 @@ def loop_source(mcdc):
 
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
+
+        kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"]*524287+work_idx*1299708, mcdc)
+        kernel.rng_rebase(mcdc)
+
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
             mcdc["particle_track_history_ID"] += 1
-
-        # Initialize RNG wrt work index
-        kernel.rng_skip_ahead_strides(work_idx, mcdc)
 
         # =====================================================================
         # Get a source particle and put into active bank
@@ -109,13 +110,14 @@ def loop_source(mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            xi = kernel.rng(mcdc)
+            seed = kernel.spawn_seed(work_idx,mcdc)
+            xi = kernel.stateless_rng(seed+1,mcdc)
             tot = 0.0
             for S in mcdc["sources"]:
                 tot += S["prob"]
                 if tot >= xi:
                     break
-            P = kernel.source_particle(S, mcdc)
+            P = kernel.source_particle(S, seed, mcdc)
 
         # Get from source bank
         else:
@@ -705,7 +707,8 @@ def loop_source_precursor(mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        if kernel.rng(mcdc) < w - N:
+        seed = kernel.spawn_seed(work_idx,mcdc)
+        if kernel.stateless_rng(seed,mcdc) < w - N:
             N += 1
         DNP["w"] = N
 
@@ -732,9 +735,6 @@ def loop_source_precursor(mcdc):
             material = mcdc["materials"][material_ID]
             G = material["G"]
 
-            # Initialize RNG wrt particle current running index
-            kernel.rng_skip_ahead_strides(particle_idx, mcdc)
-
             # Sample nuclide and get spectrum and decay constant
             N_nuclide = material["N_nuclide"]
             if N_nuclide == 1:
@@ -744,7 +744,7 @@ def loop_source_precursor(mcdc):
             else:
                 SigmaF = material["fission"][g]
                 nu_d = material["nu_d"][g]
-                xi = kernel.rng(mcdc) * nu_d[j] * SigmaF
+                xi = kernel.local_rng(P,mcdc) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
                     nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -757,7 +757,7 @@ def loop_source_precursor(mcdc):
                         break
 
             # Sample emission time
-            P_new["t"] = -math.log(kernel.rng(mcdc)) / decay
+            P_new["t"] = -math.log(kernel.local_rng(P,mcdc)) / decay
             census_idx = mcdc["technique"]["census_idx"]
             if census_idx > 0:
                 P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
