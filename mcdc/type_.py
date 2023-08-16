@@ -51,6 +51,7 @@ def make_type_particle(iQMC, G):
         ("translation", float64, (3,)),
         ("event", int64),
         ("sensitivity_ID", int64),
+        ("rng_seed", int64),
     ]
     # iqmc vector of weights
     Ng = 1
@@ -74,6 +75,7 @@ def make_type_particle_record(iQMC, G):
         ("g", uint64),
         ("w", float64),
         ("sensitivity_ID", int64),
+        ("rng_seed", int64),
     ]
     # iqmc vector of weights
     Ng = 1
@@ -713,6 +715,9 @@ def make_type_global(card):
             ("rng_seed_base", int64),
             ("rng_seed", int64),
             ("rng_stride", int64),
+            ("rng_spawn_stride", int64),
+            ("rng_cycle_stride", int64),
+            ("cycle_index", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),

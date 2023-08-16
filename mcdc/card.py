@@ -76,6 +76,9 @@ class InputDeck:
             "rng_g": 2806196910506780709,
             "rng_c": 1,
             "rng_mod": 2**63,
+            "cycle_index" : 0,
+            "rng_cycle_stride": 9999999967, # largest prime less than a billion
+            "rng_spawn_stride": 8191,        # a somewhat large mersenne prime
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
             "k_init": 1.0,
