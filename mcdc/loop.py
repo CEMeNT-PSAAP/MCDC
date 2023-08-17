@@ -70,7 +70,6 @@ def loop_main(mcdc):
         else:
             simulation_end = True
 
-        mcdc["cycle_index"] += 1
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
@@ -111,7 +110,7 @@ def loop_source(mcdc):
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
             seed = kernel.spawn_seed(work_idx,mcdc)
-            xi = kernel.stateless_rng(seed+1,mcdc)
+            xi = kernel.stateless_rng(seed+524287,mcdc)
             tot = 0.0
             for S in mcdc["sources"]:
                 tot += S["prob"]
@@ -719,6 +718,8 @@ def loop_source_precursor(mcdc):
         for particle_idx in range(N):
             # Create new particle
             P_new = np.zeros(1, dtype=type_.particle)[0]
+            seed = kernel.spawn_seed(work_idx+particle_idx*8191,mcdc)
+            P_new["rng_seed"] = seed
             P_new["alive"] = True
             P_new["w"] = 1.0
             P_new["sensitivity_ID"] = 0
@@ -744,7 +745,7 @@ def loop_source_precursor(mcdc):
             else:
                 SigmaF = material["fission"][g]
                 nu_d = material["nu_d"][g]
-                xi = kernel.local_rng(P,mcdc) * nu_d[j] * SigmaF
+                xi = kernel.stateful_rng(P_new,mcdc) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
                     nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -757,7 +758,7 @@ def loop_source_precursor(mcdc):
                         break
 
             # Sample emission time
-            P_new["t"] = -math.log(kernel.local_rng(P,mcdc)) / decay
+            P_new["t"] = -math.log(kernel.stateful_rng(P_new,mcdc)) / decay
             census_idx = mcdc["technique"]["census_idx"]
             if census_idx > 0:
                 P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
@@ -772,7 +773,7 @@ def loop_source_precursor(mcdc):
                     continue
 
                 # Sample energy
-                xi = kernel.rng(mcdc)
+                xi = kernel.stateful_rng(P_new,mcdc)
                 tot = 0.0
                 for g_out in range(G):
                     tot += spectrum[g_out]
@@ -785,7 +786,7 @@ def loop_source_precursor(mcdc):
                     P_new["ux"],
                     P_new["uy"],
                     P_new["uz"],
-                ) = kernel.sample_isotropic_direction(mcdc)
+                ) = kernel.sample_isotropic_direction(P_new,mcdc)
 
                 # Push to active bank
                 kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
