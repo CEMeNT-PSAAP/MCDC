@@ -100,18 +100,18 @@ def rng_skip_ahead(n, mcdc):
 
 
 
-@njit(signature=numba.uint64(numba.uint64))
+@njit(numba.uint64(numba.uint64))
 def bot_64(a):
     half_mask = 0xFFFFFFFF
     return a & half_mask
 
-@njit(signature=numba.uint64(numba.uint64))
+@njit(numba.uint64(numba.uint64))
 def top_64(a):
     half_mask = 0xFFFFFFFF
     return ( a >> 32 ) & half_mask
     
 
-@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+@njit(numba.uint64(numba.uint64,numba.uint64))
 def wrapping_mul_(a,b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -127,13 +127,13 @@ def wrapping_mul_(a,b):
     result = (top << 32) | bot
     return result
 
-@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+@njit(numba.uint64(numba.uint64,numba.uint64))
 def wrapping_mul(a,b):
     mask = numba.uint64(0xFFFFFFFFFFFFFFFF)
     return (a * b) & mask
 
     
-@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+@njit(numba.uint64(numba.uint64,numba.uint64))
 def wrapping_add(a,b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -151,7 +151,7 @@ def wrapping_add(a,b):
 
 
 
-@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+@njit(numba.uint64(numba.uint64,numba.uint64))
 def murmur_hash64a(key,seed):
     multiplier = numba.uint64(0xc6a4a7935bd1e995)
     length     = numba.uint64(8) 
@@ -172,11 +172,11 @@ def murmur_hash64a(key,seed):
     hash_value ^= hash_value >> rotator
     return hash_value
 
-@njit(signature=numba.uint64(numba.uint64))
+@njit(numba.uint64(numba.uint64))
 def int_hash(value):
     return murmur_hash64a(value,0)
 
-@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+@njit(numba.uint64(numba.uint64,numba.uint64))
 def int_hash_combo(value,seed):
     return murmur_hash64a(value,seed)
 
