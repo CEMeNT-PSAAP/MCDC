@@ -690,6 +690,8 @@ def loop_source_precursor(mcdc):
     kernel.rng_skip_ahead_strides(idx_start, mcdc)
     kernel.rng_rebase(mcdc)
 
+    cyc_seed = kernel.cycle_seed(mcdc)
+
     # =========================================================================
     # Loop over precursor sources
     # =========================================================================
@@ -706,8 +708,8 @@ def loop_source_precursor(mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        seed = kernel.source_seed(work_idx,mcdc)
-        if kernel.stateless_rng(seed,mcdc) < w - N:
+        src_seed = kernel.source_seed(work_idx,cyc_seed)
+        if kernel.stateless_rng(src_seed,mcdc) < w - N:
             N += 1
         DNP["w"] = N
 
@@ -718,8 +720,8 @@ def loop_source_precursor(mcdc):
         for particle_idx in range(N):
             # Create new particle
             P_new = np.zeros(1, dtype=type_.particle)[0]
-            seed = kernel.source_particle_seed(work_idx,particle_idx,mcdc)
-            P_new["rng_seed"] = seed
+            part_seed = kernel.source_particle_seed(particle_idx,src_seed)
+            P_new["rng_seed"] = part_seed
             P_new["alive"] = True
             P_new["w"] = 1.0
             P_new["sensitivity_ID"] = 0
