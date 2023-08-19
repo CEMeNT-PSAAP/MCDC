@@ -57,12 +57,12 @@
      inkscape:pagecheckerboard="0"
      inkscape:document-units="pt"
      showgrid="false"
-     inkscape:zoom="0.45254834"
-     inkscape:cx="3697.9475"
-     inkscape:cy="3263.7397"
+     inkscape:zoom="0.64"
+     inkscape:cx="4235.1563"
+     inkscape:cy="1696.875"
      inkscape:window-width="1720"
      inkscape:window-height="1371"
-     inkscape:window-x="0"
+     inkscape:window-x="1720"
      inkscape:window-y="32"
      inkscape:window-maximized="0"
      inkscape:current-layer="graph0" />
@@ -476,19 +476,22 @@
     <!-- mcdc_DOT_loop_DOT_loop_source&#45;&gt;mcdc_DOT_kernel_DOT_rng_rebase -->
     <g
        id="edge197"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title139">mcdc_DOT_loop_DOT_loop_source-&gt;mcdc_DOT_kernel_DOT_rng_rebase</title>
       <path
          fill="none"
          stroke="black"
          d="M1887.09,-882.72C1887.44,-1048.49 1898.35,-2295.95 2147.63,-2545.5 2286.06,-2684.09 2430.99,-2490.07 2583.09,-2613.5 2618.15,-2641.96 2584.42,-2679.58 2619.09,-2708.5 2632.58,-2719.76 2648.74,-2727.58 2665.69,-2732.94"
-         id="path141" />
+         id="path141"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2665.17,-2736.44 2675.74,-2735.82 2667.09,-2729.71 2665.17,-2736.44"
-         id="polygon143" />
+         id="polygon143"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_rng_skip_ahead_strides -->
     <g
@@ -515,19 +518,22 @@
     <!-- mcdc_DOT_loop_DOT_loop_source&#45;&gt;mcdc_DOT_kernel_DOT_rng_skip_ahead_strides -->
     <g
        id="edge192"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title153">mcdc_DOT_loop_DOT_loop_source-&gt;mcdc_DOT_kernel_DOT_rng_skip_ahead_strides</title>
       <path
          fill="none"
          stroke="black"
          d="M1905.05,-882.47C1944.76,-920.97 2044.72,-1011.21 2147.63,-1051.5 2164.76,-1058.21 2183.19,-1063.35 2201.8,-1067.27"
-         id="path155" />
+         id="path155"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2201.36,-1070.75 2211.85,-1069.27 2202.72,-1063.88 2201.36,-1070.75"
-         id="polygon157" />
+         id="polygon157"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_source_particle -->
     <g
@@ -634,7 +640,7 @@
     <g
        id="edge196"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title195">mcdc_DOT_loop_DOT_loop_source-&gt;mcdc_DOT_adapt_DOT_add_active</title>
       <path
@@ -642,13 +648,13 @@
          stroke="black"
          d="M1958.76,-878.54C2010.98,-888.42 2083.5,-901.46 2147.63,-910.5 2158.98,-912.11 2960.68,-989.36 2968.76,-997.5 3026.63,-1055.84 2946.85,-1307.22 3004.76,-1365.5 3069.65,-1430.82 3325.29,-1398.61 3416.82,-1408.5 3471.32,-1414.4 3532.02,-1421.16 3581.89,-1426.78"
          id="path197"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3581.71,-1430.28 3592.03,-1427.92 3582.49,-1423.33 3581.71,-1430.28"
          id="polygon199"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_adapt_DOT_add_census -->
     <g
@@ -677,7 +683,7 @@
     <g
        id="edge189"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title209">mcdc_DOT_loop_DOT_loop_source-&gt;mcdc_DOT_adapt_DOT_add_census</title>
       <path
@@ -685,13 +691,13 @@
          stroke="black"
          d="M2001.42,-864.34C2139.4,-864.71 2378.4,-867.17 2583.09,-878.5 2771.33,-888.93 3288.98,-896.94 3416.82,-1035.5 3475.69,-1099.32 3394.17,-1163.49 3452.82,-1227.5 3481.25,-1258.53 3523.14,-1275.22 3563.56,-1284.04"
          id="path211"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3563.02,-1287.5 3573.52,-1286.06 3564.42,-1280.64 3563.02,-1287.5"
          id="polygon213"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_weight_window -->
     <g
@@ -1053,19 +1059,22 @@
     <!-- mcdc_DOT_loop_DOT_loop_source_precursor&#45;&gt;mcdc_DOT_kernel_DOT_rng_rebase -->
     <g
        id="edge231"
-       class="edge">
+       class="edge"
+       style="stroke:#ff002b;stroke-opacity:1">
       <title
          id="title335">mcdc_DOT_loop_DOT_loop_source_precursor-&gt;mcdc_DOT_kernel_DOT_rng_rebase</title>
       <path
          fill="none"
          stroke="black"
          d="M2014.99,-2605.79C2214.28,-2623.47 2576.97,-2656.04 2583.09,-2659.5 2606.61,-2672.82 2596.19,-2694.16 2619.09,-2708.5 2635.26,-2718.63 2653.82,-2725.73 2672.67,-2730.67"
-         id="path337" />
+         id="path337"
+         style="stroke:#ff002b;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2671.99,-2734.1 2682.54,-2733.06 2673.64,-2727.3 2671.99,-2734.1"
-         id="polygon339" />
+         id="polygon339"
+         style="stroke:#ff002b;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_loop_DOT_loop_source_precursor&#45;&gt;mcdc_DOT_kernel_DOT_rng_skip_ahead_strides -->
     <g
@@ -1127,19 +1136,22 @@
     <!-- mcdc_DOT_loop_DOT_loop_source_precursor&#45;&gt;mcdc_DOT_kernel_DOT_bank_scanning_DNP -->
     <g
        id="edge226"
-       class="edge">
+       class="edge"
+       style="stroke:#ff0000;stroke-opacity:1">
       <title
          id="title363">mcdc_DOT_loop_DOT_loop_source_precursor-&gt;mcdc_DOT_kernel_DOT_bank_scanning_DNP</title>
       <path
          fill="none"
          stroke="black"
          d="M2042.47,-2600.39C2066.32,-2604.9 2090.13,-2611.63 2111.63,-2621.5 2131.35,-2630.57 2128.03,-2645.18 2147.63,-2654.5 2167.52,-2663.97 2189.51,-2670.8 2211.63,-2675.69"
-         id="path365" />
+         id="path365"
+         style="stroke:#ff0000;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2210.94,-2679.12 2221.45,-2677.73 2212.37,-2672.27 2210.94,-2679.12"
-         id="polygon367" />
+         id="polygon367"
+         style="stroke:#ff0000;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_get_particle_cell -->
     <g
@@ -5777,7 +5789,7 @@
     <g
        id="edge132"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0008;stroke-opacity:1">
       <title
          id="title2029">mcdc_DOT_kernel_DOT_surface_crossing-&gt;mcdc_DOT_kernel_DOT_sensitivity_surface</title>
       <path
@@ -5785,13 +5797,13 @@
          stroke="black"
          d="M2912.42,-1181.74C2963.85,-1177.03 3024.43,-1171.48 3077.44,-1166.63"
          id="path2031"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0008;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3077.96,-1170.1 3087.59,-1165.7 3077.32,-1163.12 3077.96,-1170.1"
          id="polygon2033"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0008;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_sensitivity_surface&#45;&gt;mcdc_DOT_adapt_DOT_device -->
     <g
@@ -5943,7 +5955,7 @@
     <g
        id="edge140"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0000;stroke-opacity:1">
       <title
          id="title2092">mcdc_DOT_kernel_DOT_sensitivity_surface-&gt;mcdc_DOT_adapt_DOT_add_active</title>
       <path
@@ -5951,13 +5963,13 @@
          stroke="black"
          d="M3366.79,-1156.93C3385.47,-1163.15 3402.85,-1172.58 3416.82,-1186.5 3488.57,-1257.98 3379.69,-1341.45 3452.82,-1411.5 3489.85,-1446.97 3546.87,-1454.02 3595.16,-1452.06"
          id="path2094"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0000;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3595.52,-1455.54 3605.32,-1451.51 3595.14,-1448.55 3595.52,-1455.54"
          id="polygon2096"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0000;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_sample_phasespace_fission&#45;&gt;mcdc_DOT_kernel_DOT_sample_isotropic_direction -->
     <g
@@ -6662,19 +6674,22 @@
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_source&#45;&gt;mcdc_DOT_kernel_DOT_scattering_source -->
     <g
        id="edge170"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2358">mcdc_DOT_kernel_DOT_prepare_qmc_source-&gt;mcdc_DOT_kernel_DOT_scattering_source</title>
       <path
          fill="none"
          stroke="black"
          d="M2052.01,-514.5C2100.56,-514.5 2153.62,-514.5 2202.01,-514.5"
-         id="path2360" />
+         id="path2360"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2202.26,-518.01 2212.26,-514.5 2202.26,-511.01 2202.26,-518.01"
-         id="polygon2362" />
+         id="polygon2362"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_fission_source -->
     <g
@@ -6701,19 +6716,22 @@
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_source&#45;&gt;mcdc_DOT_kernel_DOT_fission_source -->
     <g
        id="edge171"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2372">mcdc_DOT_kernel_DOT_prepare_qmc_source-&gt;mcdc_DOT_kernel_DOT_fission_source</title>
       <path
          fill="none"
          stroke="black"
          d="M2022.06,-504.21C2051.84,-500.29 2083.03,-494.91 2111.63,-487.5 2187.68,-467.81 2271.24,-430.42 2320.68,-406.52"
-         id="path2374" />
+         id="path2374"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2322.34,-409.6 2329.8,-402.07 2319.28,-403.31 2322.34,-409.6"
-         id="polygon2376" />
+         id="polygon2376"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_scattering_source -->
     <g
@@ -6740,19 +6758,22 @@
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_scattering_source&#45;&gt;mcdc_DOT_kernel_DOT_scattering_source -->
     <g
        id="edge172"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2386">mcdc_DOT_kernel_DOT_prepare_qmc_scattering_source-&gt;mcdc_DOT_kernel_DOT_scattering_source</title>
       <path
          fill="none"
          stroke="black"
          d="M2017.05,-236.97C2051.55,-246.52 2086.22,-262.12 2111.63,-287.5 2152.22,-328.07 2110.45,-367.79 2147.63,-411.5 2183.54,-453.72 2240.66,-479.88 2287.24,-495.26"
-         id="path2388" />
+         id="path2388"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2286.42,-498.67 2297.01,-498.38 2288.55,-492.01 2286.42,-498.67"
-         id="polygon2390" />
+         id="polygon2390"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_fission_source -->
     <g
@@ -6779,87 +6800,102 @@
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_fission_source&#45;&gt;mcdc_DOT_kernel_DOT_fission_source -->
     <g
        id="edge173"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2400">mcdc_DOT_kernel_DOT_prepare_qmc_fission_source-&gt;mcdc_DOT_kernel_DOT_fission_source</title>
       <path
          fill="none"
          stroke="black"
          d="M2018.4,-144.02C2052.82,-153.56 2087.12,-169.39 2111.63,-195.5 2162.11,-249.28 2093.06,-307.88 2147.63,-357.5 2174.42,-381.87 2211.4,-391.82 2247.22,-394.71"
-         id="path2402" />
+         id="path2402"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2247.09,-398.2 2257.29,-395.34 2247.53,-391.22 2247.09,-398.2"
-         id="polygon2404" />
+         id="polygon2404"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_particles&#45;&gt;mcdc_DOT_adapt_DOT_device -->
     <g
        id="edge180"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2407">mcdc_DOT_kernel_DOT_prepare_qmc_particles-&gt;mcdc_DOT_adapt_DOT_device</title>
       <path
          fill="none"
          stroke="black"
          d="M2004.83,-381.79C2039.44,-386.63 2077.23,-392.85 2111.63,-400.5 2127.96,-404.14 2131.13,-408.75 2147.63,-411.5 2704.35,-504.33 2884.42,-267.14 3416.82,-454.5 3521.66,-491.4 3619.39,-585.09 3662.29,-630.32"
-         id="path2409" />
+         id="path2409"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3659.78,-632.76 3669.18,-637.66 3664.89,-627.97 3659.78,-632.76"
-         id="polygon2411" />
+         id="polygon2411"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_particles&#45;&gt;mcdc_DOT_adapt_DOT_local_particle_record -->
     <g
        id="edge176"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2414">mcdc_DOT_kernel_DOT_prepare_qmc_particles-&gt;mcdc_DOT_adapt_DOT_local_particle_record</title>
       <path
          fill="none"
          stroke="black"
          d="M2019.18,-380.3C2053.93,-389.78 2088.21,-406.01 2111.63,-433.5 2196.71,-533.38 2064.4,-625.08 2147.63,-726.5 2391.41,-1023.6 2732.5,-694.4 2968.76,-997.5 3036.97,-1085.02 2927.08,-1416.27 3004.76,-1495.5 3069.14,-1561.17 3328.67,-1507.32 3416.82,-1533.5 3434.16,-1538.66 3435.6,-1546.96 3452.82,-1552.5 3481.03,-1561.58 3511.97,-1568.08 3541.82,-1572.74"
-         id="path2416" />
+         id="path2416"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3541.49,-1576.23 3551.89,-1574.25 3542.52,-1569.3 3541.49,-1576.23"
-         id="polygon2418" />
+         id="polygon2418"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_particles&#45;&gt;mcdc_DOT_kernel_DOT_mesh_get_index -->
     <g
        id="edge179"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2421">mcdc_DOT_kernel_DOT_prepare_qmc_particles-&gt;mcdc_DOT_kernel_DOT_mesh_get_index</title>
       <path
          fill="none"
          stroke="black"
          d="M2023.42,-379.72C2057.28,-389.29 2090.02,-405.71 2111.63,-433.5 2187.42,-531.02 2095.47,-1432.55 2147.63,-1544.5 2266.51,-1799.69 2359.33,-1859 2619.09,-1967.5 2701.03,-2001.73 3339.24,-1972.3 3416.82,-2015.5 3441.06,-2029 3429,-2052.29 3452.82,-2066.5 3476.67,-2080.74 3504.35,-2089.36 3532.11,-2094.37"
-         id="path2423" />
+         id="path2423"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3531.89,-2097.88 3542.33,-2096.05 3533.03,-2090.97 3531.89,-2097.88"
-         id="polygon2425" />
+         id="polygon2425"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_particles&#45;&gt;mcdc_DOT_kernel_DOT_iqmc_cell_volume -->
     <g
        id="edge175"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2428">mcdc_DOT_kernel_DOT_prepare_qmc_particles-&gt;mcdc_DOT_kernel_DOT_iqmc_cell_volume</title>
       <path
          fill="none"
          stroke="black"
          d="M2008.25,-381.45C2045.34,-390.79 2083.68,-406.65 2111.63,-433.5 2148.11,-468.56 2113.75,-503.92 2147.63,-541.5 2415.88,-839.1 2729.66,-592.02 2968.76,-913.5 3040.48,-1009.94 2918.03,-1098.31 3004.76,-1181.5 3071.12,-1245.16 3353.11,-1153.19 3416.82,-1219.5 3470.24,-1275.11 3400.67,-1855.72 3452.82,-1912.5 3482.4,-1944.71 3528.04,-1955.52 3571.07,-1957.23"
-         id="path2430" />
+         id="path2430"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3570.99,-1960.73 3581.07,-1957.47 3571.15,-1953.73 3570.99,-1960.73"
-         id="polygon2432" />
+         id="polygon2432"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_adapt_DOT_add_source -->
     <g
@@ -6929,19 +6965,22 @@
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_particles&#45;&gt;mcdc_DOT_kernel_DOT_sample_qmc_position -->
     <g
        id="edge177"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2456">mcdc_DOT_kernel_DOT_prepare_qmc_particles-&gt;mcdc_DOT_kernel_DOT_sample_qmc_position</title>
       <path
          fill="none"
          stroke="black"
          d="M2061.11,-366.93C2079.34,-361.28 2096.65,-353.1 2111.63,-341.5 2146.35,-314.63 2112.97,-276.46 2147.63,-249.5 2159.66,-240.15 2173.26,-233.07 2187.63,-227.77"
-         id="path2458" />
+         id="path2458"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2188.83,-231.06 2197.18,-224.55 2186.59,-224.43 2188.83,-231.06"
-         id="polygon2460" />
+         id="polygon2460"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_sample_qmc_isotropic_direction -->
     <g
@@ -6968,19 +7007,22 @@
     <!-- mcdc_DOT_kernel_DOT_prepare_qmc_particles&#45;&gt;mcdc_DOT_kernel_DOT_sample_qmc_isotropic_direction -->
     <g
        id="edge178"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2470">mcdc_DOT_kernel_DOT_prepare_qmc_particles-&gt;mcdc_DOT_kernel_DOT_sample_qmc_isotropic_direction</title>
       <path
          fill="none"
          stroke="black"
          d="M2025.14,-357.51C2079.03,-353.22 2141.3,-348.27 2197.66,-343.78"
-         id="path2472" />
+         id="path2472"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2198.05,-347.26 2207.74,-342.97 2197.5,-340.28 2198.05,-347.26"
-         id="polygon2474" />
+         id="polygon2474"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_sample_qmc_group -->
     <g
@@ -7187,7 +7229,7 @@
     <g
        id="edge248"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2554">mcdc_DOT_loop_DOT_loop_particle-&gt;mcdc_DOT_kernel_DOT_surface_crossing</title>
       <path
@@ -7195,13 +7237,13 @@
          stroke="black"
          d="M2376.05,-1499.32C2405.04,-1446.88 2496.7,-1294.67 2619.09,-1224.5 2633.09,-1216.48 2648.67,-1210.4 2664.6,-1205.81"
          id="path2556"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="2665.8,-1209.11 2674.55,-1203.14 2663.98,-1202.35 2665.8,-1209.11"
          id="polygon2558"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_loop_DOT_loop_particle&#45;&gt;mcdc_DOT_kernel_DOT_mesh_crossing -->
     <g
@@ -7258,7 +7300,7 @@
     <g
        id="edge236"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2582">mcdc_DOT_loop_DOT_loop_particle-&gt;mcdc_DOT_kernel_DOT_scattering</title>
       <path
@@ -7266,19 +7308,19 @@
          stroke="black"
          d="M2423.52,-1501.69C2474.39,-1488.48 2551.05,-1470.69 2619.09,-1463.5 2783.84,-1446.1 2975.88,-1452.65 3095.17,-1459.86"
          id="path2584"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3095.21,-1463.37 3105.41,-1460.49 3095.64,-1456.38 3095.21,-1463.37"
          id="polygon2586"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_loop_DOT_loop_particle&#45;&gt;mcdc_DOT_kernel_DOT_fission -->
     <g
        id="edge242"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2589">mcdc_DOT_loop_DOT_loop_particle-&gt;mcdc_DOT_kernel_DOT_fission</title>
       <path
@@ -7286,19 +7328,19 @@
          stroke="black"
          d="M2419.73,-1501.36C2470.64,-1486.35 2549.62,-1464.01 2619.09,-1448.5 2773.06,-1414.14 2813.74,-1416.78 2968.76,-1387.5 3024.68,-1376.95 3087.7,-1364.1 3135.27,-1354.21"
          id="path2591"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3136.1,-1357.61 3145.18,-1352.15 3134.68,-1350.76 3136.1,-1357.61"
          id="polygon2593"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_loop_DOT_loop_particle&#45;&gt;mcdc_DOT_adapt_DOT_add_census -->
     <g
        id="edge238"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2596">mcdc_DOT_loop_DOT_loop_particle-&gt;mcdc_DOT_adapt_DOT_add_census</title>
       <path
@@ -7306,13 +7348,13 @@
          stroke="black"
          d="M2383.24,-1499.61C2421.08,-1460.87 2517.38,-1369.84 2619.09,-1333.5 2788.57,-1272.95 3315.06,-1280.71 3558.88,-1287.96"
          id="path2598"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="3559.11,-1291.46 3569.21,-1288.27 3559.32,-1284.47 3559.11,-1291.46"
          id="polygon2600"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_loop_DOT_loop_particle&#45;&gt;mcdc_DOT_kernel_DOT_branchless_collision -->
     <g
@@ -7768,7 +7810,7 @@
     <g
        id="edge214"
        class="edge"
-       style="stroke:#ff0000;stroke-opacity:1;stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0">
+       style="stroke:#0000ff;stroke-opacity:1;stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0">
       <title
          id="title2771">mcdc_DOT_kernel_DOT_preconditioner-&gt;mcdc_DOT_loop_DOT_loop_source</title>
       <path
@@ -7776,13 +7818,13 @@
          stroke="black"
          d="M1556.16,-384.06C1580.64,-392.65 1606.56,-405.75 1624.57,-425.5 1660.94,-465.39 1636.89,-493 1660.57,-541.5 1719.02,-661.22 1818.75,-786.03 1862.92,-838.66"
          id="path2773"
-         style="stroke:#ff0000;stroke-opacity:1;stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0" />
+         style="stroke:#0000ff;stroke-opacity:1;stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0" />
       <polygon
          fill="black"
          stroke="black"
          points="1860.4,-841.1 1869.52,-846.48 1865.75,-836.58 1860.4,-841.1"
          id="polygon2775"
-         style="stroke:#ff0000;stroke-opacity:1;stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0" />
+         style="stroke:#0000ff;stroke-opacity:1;stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_preconditioner&#45;&gt;mcdc_DOT_adapt_DOT_device -->
     <g
@@ -7804,25 +7846,28 @@
     <!-- mcdc_DOT_kernel_DOT_preconditioner&#45;&gt;mcdc_DOT_kernel_DOT_prepare_qmc_scattering_source -->
     <g
        id="edge216"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2785">mcdc_DOT_kernel_DOT_preconditioner-&gt;mcdc_DOT_kernel_DOT_prepare_qmc_scattering_source</title>
       <path
          fill="none"
          stroke="black"
          d="M1596.75,-357.57C1606.8,-353.53 1616.29,-348.28 1624.57,-341.5 1656.94,-314.99 1627.51,-280.16 1660.57,-254.5 1670.11,-247.1 1680.58,-241.01 1691.63,-236.03"
-         id="path2787" />
+         id="path2787"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="1693.16,-239.18 1701.04,-232.1 1690.46,-232.73 1693.16,-239.18"
-         id="polygon2789" />
+         id="polygon2789"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_preconditioner&#45;&gt;mcdc_DOT_kernel_DOT_prepare_qmc_particles -->
     <g
        id="edge217"
        class="edge"
-       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0000;stroke-opacity:1">
+       style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2792">mcdc_DOT_kernel_DOT_preconditioner-&gt;mcdc_DOT_kernel_DOT_prepare_qmc_particles</title>
       <path
@@ -7830,30 +7875,33 @@
          stroke="black"
          d="M1624.65,-368.5C1649.04,-368.5 1674.8,-368.5 1700.26,-368.5"
          id="path2794"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0000;stroke-opacity:1" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="1700.37,-372.01 1710.37,-368.5 1700.37,-365.01 1700.37,-372.01"
          id="polygon2796"
-         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#ff0000;stroke-opacity:1" />
+         style="stroke-width:2.99993506;stroke-miterlimit:4;stroke-dasharray:none;stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_preconditioner&#45;&gt;mcdc_DOT_kernel_DOT_iqmc_distribute_flux -->
     <g
        id="edge215"
-       class="edge">
+       class="edge"
+       style="stroke:#0000ff;stroke-opacity:1">
       <title
          id="title2799">mcdc_DOT_kernel_DOT_preconditioner-&gt;mcdc_DOT_kernel_DOT_iqmc_distribute_flux</title>
       <path
          fill="none"
          stroke="black"
          d="M1573.5,-354.45C1601.27,-350.1 1632.19,-345.42 1660.57,-341.5 1693.17,-337.01 1728.5,-332.56 1761.27,-328.61"
-         id="path2801" />
+         id="path2801"
+         style="stroke:#0000ff;stroke-opacity:1" />
       <polygon
          fill="black"
          stroke="black"
          points="1761.84,-332.07 1771.35,-327.41 1761.01,-325.12 1761.84,-332.07"
-         id="polygon2803" />
+         id="polygon2803"
+         style="stroke:#0000ff;stroke-opacity:1" />
     </g>
     <!-- mcdc_DOT_kernel_DOT_weight_roulette&#45;&gt;mcdc_DOT_kernel_DOT_local_rng -->
     <g
@@ -8877,5 +8925,49 @@
          style="font-size:9.99978px;stroke-width:0.749984"
          x="3232.4102"
          y="-1267.0789">for i in range(n_split - 1)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:11.9997px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:none;stroke-width:0.749984"
+       x="2044.0703"
+       y="-522.13611"
+       id="text114113"><tspan
+         sodipodi:role="line"
+         id="tspan114111"
+         style="font-size:11.9997px;stroke-width:0.749984"
+         x="2044.0703"
+         y="-522.13611">for i/j/k in x/y/z</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:11.9997px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:none;stroke-width:0.749984"
+       x="1971.0593"
+       y="-251.86687"
+       id="text114113-9"><tspan
+         sodipodi:role="line"
+         id="tspan114111-2"
+         style="font-size:11.9997px;stroke-width:0.749984"
+         x="1971.0593"
+         y="-251.86687">for i/j/k in x/y/z</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:11.9997px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:none;stroke-width:0.749984"
+       x="2041.656"
+       y="-142.64191"
+       id="text114113-9-0"><tspan
+         sodipodi:role="line"
+         id="tspan114111-2-2"
+         style="font-size:11.9997px;stroke-width:0.749984"
+         x="2041.656"
+         y="-142.64191">for i/j/k in x/y/z</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:11.9997px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:none;stroke-width:0.749984"
+       x="2018.3416"
+       y="-481.3941"
+       id="text114113-8"><tspan
+         sodipodi:role="line"
+         id="tspan114111-7"
+         style="font-size:11.9997px;stroke-width:0.749984"
+         x="2018.3416"
+         y="-481.3941">for i/j/k in x/y/z</tspan></text>
   </g>
 </svg>
