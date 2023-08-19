@@ -100,19 +100,19 @@ def rng_skip_ahead(n, mcdc):
 
 
 
-@njit(signature=numba.int64(numba.int64))
+@njit(signature=numba.uint64(numba.uint64))
 def bot_64(a):
     half_mask = 0xFFFFFFFF
     return a & half_mask
 
-@njit(signature=numba.int64(numba.int64))
+@njit(signature=numba.uint64(numba.uint64))
 def top_64(a):
     half_mask = 0xFFFFFFFF
     return ( a >> 32 ) & half_mask
     
 
-@njit(signature=numba.int64(numba.int64,numba.int64))
-def wrapping_mul(a,b):
+@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+def wrapping_mul_(a,b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
     b_lo = bot_64(b)
@@ -127,9 +127,13 @@ def wrapping_mul(a,b):
     result = (top << 32) | bot
     return result
 
+@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+def wrapping_mul(a,b):
+    mask = numba.uint64(0xFFFFFFFFFFFFFFFF)
+    return (a * b) & mask
 
     
-@njit(signature=numba.int64(numba.int64,numba.int64))
+@njit(signature=numba.uint64(numba.uint64,numba.uint64))
 def wrapping_add(a,b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -147,33 +151,34 @@ def wrapping_add(a,b):
 
 
 
-@njit(signature=numba.int64(numba.int64,numba.int64))
+@njit(signature=numba.uint64(numba.uint64,numba.uint64))
 def murmur_hash64a(key,seed):
-    m = 0xc6a4a7935bd1e995
-    r = 47
+    multiplier = numba.uint64(0xc6a4a7935bd1e995)
+    length     = numba.uint64(8) 
+    rotator    = numba.uint64(47)
+    key        = numba.uint64(key)
+    seed       = numba.uint64(seed)
 
-    h = seed ^ wrapping_mul(8,m)
-    k = key
+    hash_value = numba.uint64(seed) ^ wrapping_mul(length,multiplier)
 
-    k  = wrapping_mul(k,m)
-    k ^= k >> r
-    k  = wrapping_mul(k,m)
-    h ^= k
-    h  = wrapping_mul(h,m)
+    key  = wrapping_mul(key,multiplier)
+    key ^= key >> rotator
+    key  = wrapping_mul(key,multiplier)
+    hash_value ^= key
+    hash_value  = wrapping_mul(hash_value,multiplier)
 
-    h ^= h >> r
-    h  = wrapping_mul(h,m)
-    h ^= h >> r
-    return h
+    hash_value ^= hash_value >> rotator
+    hash_value  = wrapping_mul(hash_value,multiplier)
+    hash_value ^= hash_value >> rotator
+    return hash_value
 
-@njit
+@njit(signature=numba.uint64(numba.uint64))
 def int_hash(value):
+    return murmur_hash64a(value,0)
 
-    pass
-
-@njit
-def int_hash_combo(a,b):
-    pass
+@njit(signature=numba.uint64(numba.uint64,numba.uint64))
+def int_hash_combo(value,seed):
+    return murmur_hash64a(value,seed)
 
 @njit
 def rng_skip_ahead_(n, mcdc):
@@ -211,14 +216,16 @@ def stateful_rng(state,mcdc):
 
 
 @njit
-def spawn_seed(spawn_idx,mcdc):
-    return  int(mcdc["rng_seed"]) + \
-            int(mcdc["rng_cycle_stride"]) * int(mcdc["cycle_index"]) + \
-            int(mcdc["rng_spawn_stride"]) * int(spawn_idx)
+def source_seed(source_idx,mcdc):
+    return  int_hash_combo(source_idx,int_hash_combo(mcdc["cycle_index"],mcdc["rng_seed"]))
+
+@njit
+def source_particle_seed(source_idx,particle_idx,mcdc):
+    return  int_hash_combo(particle_idx,source_seed(source_idx,mcdc))
 
 @njit
 def pct_seed(mcdc):
-    return  spawn_seed(-1,mcdc)
+    return  int_hash_combo(mcdc["cycle_index"],mcdc["rng_seed"])
 
 @njit
 def stateless_rng(seed,mcdc):
@@ -794,6 +801,7 @@ def pct_combing(mcdc):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
         P = copy_particle(bank_census["particles"][idx])
+        #! P = split_particle(bank_census["particles"][idx])
         # Set weight
         P["w"] *= td
         add_particle(P, bank_source)
@@ -832,6 +840,7 @@ def pct_combing_weight(mcdc):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
         P = copy_particle(bank_census["particles"][idx])
+        #! P = split_particle(bank_census["particles"][idx])
         # Set weight
         P["w"] = td
         add_particle(P, bank_source)
@@ -949,8 +958,8 @@ def copy_particle(P):
 @njit
 def split_particle(P,offset,mcdc):
     P_new = copy_particle(P)
-    P_new["rng_seed"] = int(P_new["rng_seed"]) + int(offset) * int(mcdc["rng_split_stride"])
-    stateful_rng(P_new,mcdc)
+    P_new["rng_seed"] = int_hash(P["rng_seed"])
+    #print(P["rng_seed"]," -> ",P_new["rng_seed"])
     stateful_rng(P,mcdc)
     return P_new
 
@@ -3268,6 +3277,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
     add_particle(copy_particle(P), mcdc["bank_active"])
+    #! add_particle(split_particle(P), mcdc["bank_active"])
 
     # Get sensitivity ID
     ID = surface["sensitivity_ID"]
