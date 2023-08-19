@@ -95,8 +95,8 @@ def loop_source(mcdc):
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
 
-        kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"]*524287+work_idx*1299708, mcdc)
-        kernel.rng_rebase(mcdc)
+        #kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"]*524287+work_idx*1299708, mcdc)
+        #kernel.rng_rebase(mcdc)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -109,8 +109,8 @@ def loop_source(mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            seed = kernel.spawn_seed(work_idx,mcdc)
-            xi = kernel.stateless_rng(seed+524287,mcdc)
+            seed = kernel.int_hash_combo(work_idx,mcdc["cycle_index"])
+            xi = kernel.stateless_rng(kernel.int_hash_combo(seed,0),mcdc)
             tot = 0.0
             for S in mcdc["sources"]:
                 tot += S["prob"]
@@ -168,8 +168,8 @@ def loop_source(mcdc):
 
     # Re-sync RNG
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-    kernel.rng_skip_ahead_strides(skip, mcdc)
-    kernel.rng_rebase(mcdc)
+    #kernel.rng_skip_ahead_strides(skip, mcdc)
+    #kernel.rng_rebase(mcdc)
 
 
 # =========================================================================
@@ -706,7 +706,7 @@ def loop_source_precursor(mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        seed = kernel.spawn_seed(work_idx,mcdc)
+        seed = kernel.source_seed(work_idx,mcdc)
         if kernel.stateless_rng(seed,mcdc) < w - N:
             N += 1
         DNP["w"] = N
@@ -718,7 +718,7 @@ def loop_source_precursor(mcdc):
         for particle_idx in range(N):
             # Create new particle
             P_new = np.zeros(1, dtype=type_.particle)[0]
-            seed = kernel.spawn_seed(work_idx+particle_idx*8191,mcdc)
+            seed = kernel.source_particle_seed(work_idx,particle_idx,mcdc)
             P_new["rng_seed"] = seed
             P_new["alive"] = True
             P_new["w"] = 1.0
