@@ -214,18 +214,22 @@ def stateful_rng(state,mcdc):
     result =  state["rng_seed"] / mod
     return result
 
-
 @njit
-def source_seed(source_idx,mcdc):
-    return  int_hash_combo(source_idx,int_hash_combo(mcdc["cycle_index"],mcdc["rng_seed"]))
-
-@njit
-def source_particle_seed(source_idx,particle_idx,mcdc):
-    return  int_hash_combo(particle_idx,source_seed(source_idx,mcdc))
-
-@njit
-def pct_seed(mcdc):
+def cycle_seed(mcdc):
     return  int_hash_combo(mcdc["cycle_index"],mcdc["rng_seed"])
+
+@njit
+def pct_seed(cycle_seed):
+    return  int_hash_combo(-1,cycle_seed)
+
+@njit
+def source_seed(source_idx,cycle_seed):
+    return  int_hash_combo(source_idx,cycle_seed)
+
+@njit
+def source_particle_seed(particle_idx,source_seed):
+    return  int_hash_combo(particle_idx,source_seed)
+
 
 @njit
 def stateless_rng(seed,mcdc):
@@ -786,7 +790,8 @@ def pct_combing(mcdc):
     mcdc["technique"]["pc_factor"] *= td
 
     # Tooth offset
-    xi = stateless_rng(pct_seed(mcdc),mcdc)
+    cyc_seed = cycle_seed(mcdc)
+    xi = stateless_rng(pct_seed(cyc_seed),mcdc)
     offset = xi * td
 
     # First hiting tooth
@@ -824,7 +829,8 @@ def pct_combing_weight(mcdc):
     mcdc["technique"]["pc_factor"] *= td
 
     # Tooth offset
-    xi = stateless_rng(pct_seed(mcdc),mcdc)
+    cyc_seed = cycle_seed(mcdc)
+    xi = stateless_rng(pct_seed(cyc_seed),mcdc)
     offset = xi * td
 
     # First hiting tooth
