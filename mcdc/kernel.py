@@ -204,11 +204,11 @@ def rng_skip_ahead_(n, mcdc):
 
 @njit
 def stateful_rng(state,mcdc):
-    seed = int(state["rng_seed"])
-    g = int(mcdc["setting"]["rng_g"])
-    c = int(mcdc["setting"]["rng_c"])
-    mod = int(mcdc["setting"]["rng_mod"])
-    mod_mask = int(mod - 1)
+    seed = state["rng_seed"]
+    g = mcdc["setting"]["rng_g"]
+    c = mcdc["setting"]["rng_c"]
+    mod = mcdc["setting"]["rng_mod"]
+    mod_mask = mod - numba.uint64(1)
 
     state["rng_seed"] = (g * seed + c) & mod_mask
     result =  state["rng_seed"] / mod
@@ -233,12 +233,12 @@ def source_particle_seed(particle_idx,source_seed):
 
 @njit
 def stateless_rng(seed,mcdc):
-    g = int(mcdc["setting"]["rng_g"])
-    c = int(mcdc["setting"]["rng_c"])
-    mod = int(mcdc["setting"]["rng_mod"])
-    mod_mask = int(mod - 1)
+    g   = mcdc["setting"]["rng_g"]
+    c   = mcdc["setting"]["rng_c"]
+    mod = mcdc["setting"]["rng_mod"]
+    mod_mask = mod - numba.uint64(1)
 
-    seed = (g * int(seed) + c) & mod_mask
+    seed = (g * seed + c) & mod_mask
     return seed / mod
 
 
