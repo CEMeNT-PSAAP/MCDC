@@ -9,7 +9,7 @@ else:
 
 # Fixed source
 N_min = 3
-N_max = 7
+N_max = 5
 for task in os.scandir("./fixed_source"):
     os.chdir(task)
     for N_hist in np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1):
