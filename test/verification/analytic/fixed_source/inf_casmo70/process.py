@@ -7,7 +7,6 @@ sys.path.append("../../util")
 from plotter import plot_convergence
 
 
-
 N_min = int(sys.argv[1])
 N_max = int(sys.argv[2])
 N_particle_list = np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1)
