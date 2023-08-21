@@ -183,12 +183,12 @@ def int_hash_combo(value,seed):
 @njit
 def rng_skip_ahead_(n, mcdc):
     seed_base = mcdc["rng_seed_base"]
-    g = int(mcdc["setting"]["rng_g"])
-    c = int(mcdc["setting"]["rng_c"])
-    g_new = 1
-    c_new = 0
-    mod = int(mcdc["setting"]["rng_mod"])
-    mod_mask = int(mod - 1)
+    g = mcdc["setting"]["rng_g"]
+    c = mcdc["setting"]["rng_c"]
+    g_new = numba.uint64(1)
+    c_new = numba.uint64(0)
+    mod = mcdc["setting"]["rng_mod"]
+    mod_mask = mod - numba.uint64(1)
 
     n = n & mod_mask
     while n > 0:
@@ -196,7 +196,7 @@ def rng_skip_ahead_(n, mcdc):
             g_new = g_new * g & mod_mask
             c_new = (c_new * g + c) & mod_mask
 
-        c = (g + 1) * c & mod_mask
+        c = (g + numba.uint64(1)) * c & mod_mask
         g = g * g & mod_mask
         n >>= 1
 
