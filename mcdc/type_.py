@@ -718,7 +718,6 @@ def make_type_global(card):
             ("rng_spawn_stride", int64),
             ("rng_cycle_stride", int64),
             ("rng_split_stride", int64),
-            ("cycle_index", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
