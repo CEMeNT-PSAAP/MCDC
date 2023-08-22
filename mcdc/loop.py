@@ -7,6 +7,8 @@ from scipy.linalg import eig
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
+import mcdc.print_ as print_module
+
 from mcdc.constant import *
 from mcdc.print_ import (
     print_progress,
@@ -75,7 +77,7 @@ def loop_main(mcdc):
         else:
             simulation_end = True
 
-        mcdc["cycle_index"] += 1
+        loop_index += numba.uint64(1)
 
 
     # Tally closeout
@@ -338,10 +340,8 @@ def source_iteration(seed, mcdc):
         ):
             simulation_end = True
 
-        # Print progres
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            with objmode():
-                print_progress_iqmc(mcdc)
+        # Print progress
+        print_progress_iqmc(mcdc)
 
         # set flux_old = current flux
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
@@ -485,9 +485,7 @@ def gmres(seed, mcdc):
 
             mcdc["technique"]["iqmc_itt"] += 1
             mcdc["technique"]["iqmc_res"] = rel_resid
-            if not mcdc["setting"]["mode_eigenvalue"]:
-                with objmode():
-                    print_progress_iqmc(mcdc)
+            print_progress_iqmc(mcdc)
         # end inner loop, back to outer loop
 
         # Find best update to X in Krylov Space V.  Solve inner X inner system.
@@ -503,10 +501,7 @@ def gmres(seed, mcdc):
         mcdc["technique"]["iqmc_itt"] += 1
         mcdc["technique"]["iqmc_res"] = rel_resid
 
-        #! This breaks type inference terribly and mysteriously
-        #if not mcdc["setting"]["mode_eigenvalue"]:
-        #    with objmode():
-        #        print_progress_iqmc(mcdc)
+        print_progress_iqmc(mcdc)
 
     # end outer loop
 
@@ -562,9 +557,7 @@ def power_iteration(seed, mcdc):
 
         loop_index += numba.uint64(1)
 
-    if mcdc["setting"]["progress_bar"]:
-        with objmode():
-            print_iqmc_eigenvalue_exit_code(mcdc)
+    print_iqmc_eigenvalue_exit_code(mcdc)
     
 
 
@@ -599,7 +592,7 @@ def davidson(seed, mcdc):
     # initial scalar flux guess comes from power iteration
     mcdc["technique"]["iqmc_maxitt"] = 3
     mcdc["setting"]["progress_bar"] = False
-    power_iteration(seed, mcdc)
+    #power_iteration(seed, mcdc)
     mcdc["setting"]["progress_bar"] = True
     mcdc["technique"]["iqmc_maxitt"] = maxit
     mcdc["technique"]["iqmc_itt_outter"] = 0
@@ -674,7 +667,7 @@ def davidson(seed, mcdc):
             break
         else:
             # Precondition for next iteration
-            t = kernel.preconditioner(res, mcdc, num_sweeps)
+            t = kernel.preconditioner(res, cycle_seed, mcdc, num_sweeps)
             # check restart condition
             if Vsize <= m - l:
                 # appends new orthogonalization to V
@@ -687,8 +680,7 @@ def davidson(seed, mcdc):
         
         loop_index += numba.uint64(1)
 
-    with objmode():
-        print_iqmc_eigenvalue_exit_code(mcdc)
+    print_iqmc_eigenvalue_exit_code(mcdc)
 
     # normalize and save final scalar flux
     flux = np.reshape(

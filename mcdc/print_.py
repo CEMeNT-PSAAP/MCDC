@@ -135,7 +135,7 @@ def print_iqmc_eigenvalue_progress(mcdc):
         res = mcdc["technique"]["iqmc_res_outter"]
         print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
 
-
+@nb.njit
 def print_iqmc_eigenvalue_exit_code(mcdc):
     if master:
         maxit = mcdc["technique"]["iqmc_maxitt"]
@@ -195,6 +195,7 @@ def print_bank(bank, show_content=False):
     print("\n")
 
 
+@nb.njit
 def print_progress_iqmc(mcdc):
     # TODO: function was not working with numba when structured like the
     # other print_progress functions
