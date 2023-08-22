@@ -1397,17 +1397,7 @@ def score_eddington(s, g, t, x, y, z, flux, P, score):
 
 
 @njit
-def score_closeout_history(score, mcdc):
-    # Normalize if eigenvalue mode
-    if mcdc["setting"]["mode_eigenvalue"]:
-        score["bin"][:] /= mcdc["setting"]["N_particle"]
-
-        # MPI Reduce
-        buff = np.zeros_like(score["bin"])
-        with objmode():
-            MPI.COMM_WORLD.Reduce(np.array(score["bin"]), buff, MPI.SUM, 0)
-        score["bin"][:] = buff
-
+def score_closeout_history(score):
     # Accumulate score and square of score into mean and sdev
     score["mean"][:] += score["bin"]
     score["sdev"][:] += np.square(score["bin"])
@@ -1440,12 +1430,31 @@ def score_closeout(score, mcdc):
 
 
 @njit
+def tally_reduce_bin(mcdc):
+    '''For eigenvalue mode. Performed at each cycle or history closeout'''
+    tally = mcdc["tally"]
+
+    for name in literal_unroll(score_list):
+        if tally[name]:
+            score = tally["score"][name]
+
+            # Normalize
+            score["bin"][:] /= mcdc["setting"]["N_particle"]
+
+            # MPI Reduce
+            buff = np.zeros_like(score["bin"])
+            with objmode():
+                MPI.COMM_WORLD.Reduce(np.array(score["bin"]), buff, MPI.SUM, 0)
+            score["bin"][:] = buff
+
+
+@njit
 def tally_closeout_history(mcdc):
     tally = mcdc["tally"]
 
     for name in literal_unroll(score_list):
         if tally[name]:
-            score_closeout_history(tally["score"][name], mcdc)
+            score_closeout_history(tally["score"][name])
 
 
 @njit

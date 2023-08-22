@@ -37,6 +37,7 @@ def loop_main(mcdc):
             # Tally history closeout
             kernel.eigenvalue_tally_closeout_history(mcdc)
             if mcdc["cycle_active"]:
+                kernel.tally_reduce_bin(mcdc)
                 kernel.tally_closeout_history(mcdc)
 
             # Print progress

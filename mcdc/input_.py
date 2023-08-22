@@ -35,7 +35,7 @@ from mcdc.constant import (
 )
 from mcdc.print_ import print_error
 
-# Get and rename mcdc global variables/objects
+# Get and rename mcdc global variables
 import mcdc.global_ as mcdc
 
 
