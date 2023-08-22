@@ -3,8 +3,7 @@ from mcdc import type_
 from mcdc.kernel import rng, rng_skip_ahead_
 import mcdc.global_ as mcdc_
 
-input_card = mcdc_.input_card
-mcdc = mcdc_.global_
+input_deck = mcdc_.input_deck
 
 
 def test_rn_basic():
@@ -47,18 +46,18 @@ def test_rn_basic():
     Nmax_surface = 1
     Nmax_cell = 1
     # need a psuedo material for mcdc container
-    input_card.materials.append({"G": 1, "J": 1})
+    input_deck.materials.append({"G": 1, "J": 1})
 
     # Make types for dummy mcdc container
     type_.make_type_material(G, J, 1)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)
-    type_.make_type_lattice(input_card.lattices)
+    type_.make_type_lattice(input_deck.lattices)
     type_.make_type_source(G)
-    type_.make_type_tally(1, input_card.tally)
-    type_.make_type_technique(0, 1, input_card.technique)
-    type_.make_type_global(input_card)
+    type_.make_type_tally(1, input_deck.tally)
+    type_.make_type_technique(0, 1, input_deck.technique)
+    type_.make_type_global(input_deck)
 
     # The dummy container
     mcdc = np.zeros(1, dtype=type_.global_)[0]
