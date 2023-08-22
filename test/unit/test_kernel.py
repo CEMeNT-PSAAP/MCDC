@@ -4,7 +4,6 @@ from mcdc.kernel import rng, rng_skip_ahead_
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
-mcdc = mcdc_.global_
 
 
 def test_rn_basic():
