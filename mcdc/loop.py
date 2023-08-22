@@ -1,4 +1,5 @@
 import numpy as np
+import numba
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode, jit
 from scipy.linalg import eig
@@ -24,13 +25,17 @@ from mcdc.print_ import (
 @njit
 def loop_main(mcdc):
     simulation_end = False
+    
+    loop_index = numba.uint64(0)
     while not simulation_end:
+
+        cycle_seed = kernel.int_hash_combo(loop_index,mcdc["rng_seed"])
         # Loop over source particles
-        loop_source(mcdc)
+        loop_source(cycle_seed, mcdc)
 
         # Loop over source precursors
         if mcdc["bank_precursor"]["size"] > 0:
-            loop_source_precursor(mcdc)
+            loop_source_precursor(cycle_seed, mcdc)
 
         # Eigenvalue cycle closeout
         if mcdc["setting"]["mode_eigenvalue"]:
@@ -45,7 +50,7 @@ def loop_main(mcdc):
                 print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
-            kernel.manage_particle_banks(mcdc)
+            kernel.manage_particle_banks(cycle_seed,mcdc)
 
             # Cycle management
             mcdc["i_cycle"] += 1
@@ -61,7 +66,7 @@ def loop_main(mcdc):
             < len(mcdc["technique"]["census_time"]) - 1
         ):
             # Manage particle banks
-            kernel.manage_particle_banks(mcdc)
+            kernel.manage_particle_banks(cycle_seed,mcdc)
 
             # Increment census index
             mcdc["technique"]["census_idx"] += 1
@@ -69,6 +74,8 @@ def loop_main(mcdc):
         # Fixed-source closeout
         else:
             simulation_end = True
+
+        mcdc["cycle_index"] += 1
 
 
     # Tally closeout
@@ -83,8 +90,7 @@ def loop_main(mcdc):
 
 
 @njit
-def loop_source(mcdc):
-    # Rebase rng skip_ahead seed
+def loop_source(seed, mcdc):
 
     # Progress bar indicator
     N_prog = 0
@@ -95,8 +101,7 @@ def loop_source(mcdc):
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
 
-        #kernel.rng_skip_ahead_strides(mcdc["mpi_work_start"]*524287+work_idx*1299708, mcdc)
-        #kernel.rng_rebase(mcdc)
+        src_seed = kernel.source_seed(work_idx,seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -109,14 +114,13 @@ def loop_source(mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            seed = kernel.int_hash_combo(work_idx,mcdc["cycle_index"])
-            xi = kernel.stateless_rng(kernel.int_hash_combo(seed,0),mcdc)
+            xi = kernel.stateless_rng(kernel.int_hash_combo(src_seed,numba.uint64(0)),mcdc)
             tot = 0.0
             for S in mcdc["sources"]:
                 tot += S["prob"]
                 if tot >= xi:
                     break
-            P = kernel.source_particle(S, seed, mcdc)
+            P = kernel.source_particle(S, src_seed, mcdc)
 
         # Get from source bank
         else:
@@ -168,8 +172,6 @@ def loop_source(mcdc):
 
     # Re-sync RNG
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-    #kernel.rng_skip_ahead_strides(skip, mcdc)
-    #kernel.rng_rebase(mcdc)
 
 
 # =========================================================================
@@ -280,24 +282,31 @@ def loop_particle(P, mcdc):
 def loop_iqmc(mcdc):
     # generate material index
     kernel.generate_iqmc_material_idx(mcdc)
+
+    seed = numba.uint64(mcdc["rng_seed"])
     # function calls from specified solvers
     if mcdc["setting"]["mode_eigenvalue"]:
         if mcdc["technique"]["iqmc_eigenmode_solver"] == "davidson":
-            davidson(mcdc)
-        if mcdc["technique"]["iqmc_eigenmode_solver"] == "power_iteration":
-            power_iteration(mcdc)
+            davidson(seed, mcdc)
+        elif mcdc["technique"]["iqmc_eigenmode_solver"] == "power_iteration":
+            power_iteration(seed, mcdc)
     else:
         if mcdc["technique"]["iqmc_fixed_source_solver"] == "source_iteration":
-            source_iteration(mcdc)
-        if mcdc["technique"]["iqmc_fixed_source_solver"] == "gmres":
-            gmres(mcdc)
+            source_iteration(seed, mcdc)
+        elif mcdc["technique"]["iqmc_fixed_source_solver"] == "gmres":
+            gmres(seed, mcdc)
 
 
 @njit
-def source_iteration(mcdc):
+def source_iteration(seed, mcdc):
     simulation_end = False
 
+    
+    loop_index = numba.uint64(0)
     while not simulation_end:
+
+        cycle_seed = kernel.int_hash_combo(loop_index,seed)
+
         # reset particle bank size
         mcdc["bank_source"]["size"] = 0
         mcdc["technique"]["iqmc_source"] = np.zeros_like(
@@ -307,13 +316,13 @@ def source_iteration(mcdc):
         # set bank source
         kernel.prepare_qmc_source(mcdc)
         # initialize particles with LDS
-        kernel.prepare_qmc_particles(mcdc)
+        kernel.prepare_qmc_particles(cycle_seed, mcdc)
 
         # prepare source for next iteration
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
 
         # sweep particles
-        loop_source(mcdc)
+        loop_source(cycle_seed,mcdc)
         # sum resultant flux on all processors
         kernel.iqmc_distribute_flux(mcdc)
         mcdc["technique"]["iqmc_itt"] += 1
@@ -337,9 +346,12 @@ def source_iteration(mcdc):
         # set flux_old = current flux
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
 
+        loop_index += numba.uint64(1)
 
+
+#@njit(numba.void(numba.uint64,numba.from_dtype(type_.global_)))
 @njit
-def gmres(mcdc):
+def gmres(seed, mcdc):
     """
     GMRES solver for iQMC fixed-source problems.
     ----------
@@ -375,8 +387,8 @@ def gmres(mcdc):
     max_outer = int(np.ceil(max_iter / max_inner))
 
     # initial residual
-    b = kernel.RHS(mcdc)
-    r = b - kernel.AxV(X, b, mcdc)
+    b = kernel.RHS(seed, mcdc)
+    r = b - kernel.AxV(X, b, seed, mcdc)
     normr = np.linalg.norm(r)
 
     # Check initial guess ( scaling by b, if b != 0, must account for
@@ -385,12 +397,16 @@ def gmres(mcdc):
     if normb == 0.0:
         normb = 1.0
     if normr < tol * normb:
-        return X, 0
+       return #X, 0
 
     iteration = 0
 
     # GMRES starts here
     for outer in range(max_outer):
+
+        outer64 = numba.uint64(outer)
+        outer_seed = kernel.int_hash_combo(outer64,seed)
+
         # Preallocate for Givens Rotations, Hessenberg matrix and Krylov Space
         Q = []
         H = np.zeros((max_inner + 1, max_inner + 1), dtype=xtype)
@@ -411,9 +427,12 @@ def gmres(mcdc):
         g[0] = normr
 
         for inner in range(max_inner):
+            inner64 = numba.uint64(inner)
+            inner_seed = kernel.int_hash_combo(inner64,outer_seed)
+
             # New search direction
             v = V[inner + 1, :]
-            v[:] = kernel.AxV(vs[-1], b, mcdc)
+            v[:] = kernel.AxV(vs[-1], b, inner_seed, mcdc)
             vs.append(v)
 
             # Modified Gram Schmidt
@@ -475,7 +494,7 @@ def gmres(mcdc):
         y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
         update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
         X = X + update
-        aux = kernel.AxV(X, b, mcdc)
+        aux = kernel.AxV(X, b, outer_seed, mcdc)
         r = b - aux
 
         normr = np.linalg.norm(r)
@@ -483,15 +502,17 @@ def gmres(mcdc):
 
         mcdc["technique"]["iqmc_itt"] += 1
         mcdc["technique"]["iqmc_res"] = rel_resid
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            with objmode():
-                print_progress_iqmc(mcdc)
+
+        #! This breaks type inference terribly and mysteriously
+        #if not mcdc["setting"]["mode_eigenvalue"]:
+        #    with objmode():
+        #        print_progress_iqmc(mcdc)
 
     # end outer loop
 
 
 @njit
-def power_iteration(mcdc):
+def power_iteration(seed, mcdc):
     simulation_end = False
 
     # iteration tolerance
@@ -502,12 +523,16 @@ def power_iteration(mcdc):
     k_old = mcdc["k_eff"]
     solver = mcdc["technique"]["iqmc_fixed_source_solver"]
 
+    loop_index = numba.uint64(0)
     while not simulation_end:
+
+        cycle_seed = kernel.int_hash_combo(loop_index,seed) 
+        
         # iterate over scattering source
         if solver == "source_iteration":
-            source_iteration(mcdc)
-        if solver == "gmres":
-            gmres(mcdc)
+            source_iteration(cycle_seed, mcdc)
+        elif solver == "gmres":
+            gmres(cycle_seed, mcdc)
         # reset counter for inner iteration
         mcdc["technique"]["iqmc_itt"] = 0
 
@@ -535,13 +560,16 @@ def power_iteration(mcdc):
         ):
             simulation_end = True
 
+        loop_index += numba.uint64(1)
+
     if mcdc["setting"]["progress_bar"]:
         with objmode():
             print_iqmc_eigenvalue_exit_code(mcdc)
+    
 
 
 @njit
-def davidson(mcdc):
+def davidson(seed, mcdc):
     """
     The generalized Davidson method is a Krylov subspace method for solving
     the generalized eigenvalue problem. The algorithm here is based on the
@@ -571,7 +599,7 @@ def davidson(mcdc):
     # initial scalar flux guess comes from power iteration
     mcdc["technique"]["iqmc_maxitt"] = 3
     mcdc["setting"]["progress_bar"] = False
-    power_iteration(mcdc)
+    power_iteration(seed, mcdc)
     mcdc["setting"]["progress_bar"] = True
     mcdc["technique"]["iqmc_maxitt"] = maxit
     mcdc["technique"]["iqmc_itt_outter"] = 0
@@ -595,13 +623,17 @@ def davidson(mcdc):
         # unless specified there is no restart parameter
         m = maxit + 1
 
+    loop_index = numba.uint64(0)
     # Davidson Routine
     while not simulation_end:
+
+        cycle_seed = kernel.int_hash_combo(loop_index,seed)
+
         # Calculate V*H*V (HxV is scattering linear operator function)
-        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)[:, 0]
+        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], cycle_seed, mcdc)[:, 0]
         VHV = np.dot(cga(V[:, :Vsize].T), cga(HV[:, :Vsize]))
         # Calculate V*F*V (FxV is fission linear operator function)
-        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)[:, 0]
+        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], cycle_seed, mcdc)[:, 0]
         VFV = np.dot(cga(V[:, :Vsize].T), cga(FV[:, :Vsize]))
         # solve for eigenvalues and vectors
         with objmode(Lambda="complex128[:]", w="complex128[:,:]"):
@@ -627,7 +659,7 @@ def davidson(mcdc):
         # Ritz vector
         u = np.dot(cga(V[:, :Vsize]), cga(w))
         # residual
-        res = kernel.FxV(u, mcdc) - Lambda * kernel.HxV(u, mcdc)
+        res = kernel.FxV(u, cycle_seed, mcdc) - Lambda * kernel.HxV(u, cycle_seed, mcdc)
         mcdc["technique"]["iqmc_res_outter"] = abs(mcdc["k_eff"] - k_old)
         k_old = mcdc["k_eff"]
         mcdc["technique"]["iqmc_itt_outter"] += 1
@@ -652,6 +684,8 @@ def davidson(mcdc):
                 # "restarts" by appending to a new array
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
+        
+        loop_index += numba.uint64(1)
 
     with objmode():
         print_iqmc_eigenvalue_exit_code(mcdc)
@@ -671,7 +705,7 @@ def davidson(mcdc):
 
 
 @njit
-def loop_source_precursor(mcdc):
+def loop_source_precursor(seed, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
     # Progress bar indicator
@@ -685,12 +719,6 @@ def loop_source_precursor(mcdc):
     idx_start, N_local, N_global = kernel.bank_scanning_DNP(
         mcdc["bank_precursor"], mcdc
     )
-
-    # Skip ahead and rebase
-    kernel.rng_skip_ahead_strides(idx_start, mcdc)
-    kernel.rng_rebase(mcdc)
-
-    cyc_seed = kernel.cycle_seed(mcdc)
 
     # =========================================================================
     # Loop over precursor sources
@@ -708,7 +736,7 @@ def loop_source_precursor(mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        src_seed = kernel.source_seed(work_idx,cyc_seed)
+        src_seed = kernel.source_seed(work_idx,seed)
         if kernel.stateless_rng(src_seed,mcdc) < w - N:
             N += 1
         DNP["w"] = N
@@ -826,5 +854,3 @@ def loop_source_precursor(mcdc):
 
     # Re-sync RNG
     skip = N_global - idx_start
-    kernel.rng_skip_ahead_strides(skip, mcdc)
-    kernel.rng_rebase(mcdc)
