@@ -76,7 +76,6 @@ class InputDeck:
             "rng_g": 2806196910506780709,
             "rng_c": 1,
             "rng_mod": 0x8000000000000000,
-            "cycle_index" : 0,
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
             "k_init": 1.0,
