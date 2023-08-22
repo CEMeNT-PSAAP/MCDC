@@ -1431,7 +1431,7 @@ def score_closeout(score, mcdc):
 
 @njit
 def tally_reduce_bin(mcdc):
-    '''For eigenvalue mode. Performed at each cycle or history closeout'''
+    """For eigenvalue mode. Performed at each cycle or history closeout"""
     tally = mcdc["tally"]
 
     for name in literal_unroll(score_list):
