@@ -62,7 +62,6 @@ def run():
         print_header_eigenvalue(mcdc)
 
 
-    mcdc["rng_seed"] = nb.uint64(mcdc["rng_seed"])
     # Run simulation
     simulation_start = MPI.Wtime()
     if not mcdc["technique"]["iQMC"]:

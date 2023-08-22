@@ -1,6 +1,6 @@
 import numpy as np
 from mcdc import type_
-from mcdc.kernel import rng, rng_skip_ahead_
+from mcdc.kernel import stateful_rng, rng_skip_ahead_
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
@@ -71,7 +71,7 @@ def test_rn_basic():
 
     # run through the first five seeds (1-5)
     for i in range(5):
-        seed = rng(mcdc) * mod
+        seed = stateful_rng(mcdc,mcdc) * mod
         assert seed == ref_data[i]
 
     # skip to 123456-123460
@@ -79,4 +79,4 @@ def test_rn_basic():
     seed = mcdc["rng_seed"]
     for i in range(5, 10):
         assert seed == ref_data[i]
-        seed = rng(mcdc) * mod
+        seed = stateful_rng(mcdc,mcdc) * mod
