@@ -12,7 +12,7 @@ parser.add_argument("--output", type=str, help="Output file name")
 args, unargs = parser.parse_known_args()
 
 # Set mode
-#   Will be inside run() once Python/Numba adapter is integrated
+#   TODO: Will be inside run() once Python/Numba adapter is integrated
 mode = args.mode
 if mode == "python":
     nb.config.DISABLE_JIT = True
@@ -32,24 +32,27 @@ from mcdc.constant import *
 from mcdc.loop import loop_main, loop_iqmc
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
-# Get input_deck and set global variables as "mcdc"
+# Get input_deck
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
-mcdc = mcdc_.global_
 
 
 def run():
-    # Command-line argument overrides
-    cmd_override()
+    # Override input deck with command-line argument, if given
+    if args.N_particle is not None:
+        input_deck.setting["N_particle"] = args.N_particle
+    if args.output is not None:
+        input_deck.setting["output"] = args.output
 
     # Start timer
     total_start = MPI.Wtime()
 
-    # Preparation:
-    #   process input decks, make types, and allocate global variables
+    # Preparation
+    #   Set up and get the global variable container `mcdc` based on
+    #   input deck
     preparation_start = MPI.Wtime()
-    prepare()
+    mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -68,7 +71,7 @@ def run():
 
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
-    generate_hdf5()
+    generate_hdf5(mcdc)
     mcdc["runtime_output"] = MPI.Wtime() - output_start
 
     # Stop timer
@@ -76,19 +79,16 @@ def run():
     mcdc["runtime_total"] = MPI.Wtime() - total_start
 
     # Closout
-    closeout()
-
-
-def cmd_override():
-    # Command-line argument overrides
-    if args.N_particle is not None:
-        input_deck.setting["N_particle"] = args.N_particle
-    if args.output is not None:
-        input_deck.setting["output"] = args.output
+    closeout(mcdc)
 
 
 def prepare():
-    global mcdc
+    """
+    Preparing the MC transport simulation:
+      (1) Process input deck
+      (2) Make types
+      (3) Set up and return the global variable container `mcdc`
+    """
 
     # =========================================================================
     # Sizes
@@ -526,6 +526,8 @@ def prepare():
                     "w"
                 ]
 
+    return mcdc
+
 
 def dictlist_to_h5group(dictlist, input_group, name):
     main_group = input_group.create_group(name + "s")
@@ -542,7 +544,7 @@ def dict_to_h5group(dict_, group):
             group[k] = v
 
 
-def generate_hdf5():
+def generate_hdf5(mcdc):
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
             print_msg("")
@@ -673,7 +675,7 @@ def generate_hdf5():
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 
 
-def closeout():
+def closeout(mcdc):
     # Runtime
     if mcdc["mpi_master"]:
         with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
