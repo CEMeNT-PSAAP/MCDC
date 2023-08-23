@@ -48,8 +48,8 @@ def loop_main(mcdc):
                 kernel.tally_closeout_history(mcdc)
 
             # Print progress
-            with objmode():
-                print_progress_eigenvalue(mcdc)
+            #with objmode():
+                #print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
             kernel.manage_particle_banks(cycle_seed,mcdc)
@@ -737,7 +737,7 @@ def loop_source_precursor(seed, mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        src_seed = kernel.source_seed(work_idx,seed)
+        src_seed = kernel.int_hash_combo(numba.uint64(work_idx),seed)
         if kernel.stateless_rng(src_seed,mcdc) < w - N:
             N += 1
         DNP["w"] = N
@@ -749,7 +749,7 @@ def loop_source_precursor(seed, mcdc):
         for particle_idx in range(N):
             # Create new particle
             P_new = np.zeros(1, dtype=type_.particle)[0]
-            part_seed = kernel.source_particle_seed(particle_idx,src_seed)
+            part_seed = kernel.int_hash_combo(particle_idx,src_seed)
             P_new["rng_seed"] = part_seed
             P_new["alive"] = True
             P_new["w"] = 1.0

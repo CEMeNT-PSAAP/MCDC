@@ -32,5 +32,6 @@ with h5py.File("output_%i.h5" % int(N_particle_list[0]), "r") as ref_file:
     for N_particle in N_particle_list:
         # Get results
         with h5py.File("output_%i.h5" % int(N_particle), "r") as run_file:
-
+            handle_run(run_file)
+            
 plot_convergence("slab_isoBeam_td_flux_t", N_particle_list, error_t)
