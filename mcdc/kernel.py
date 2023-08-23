@@ -530,6 +530,10 @@ def bank_rebalance(mcdc):
     idx_end = idx_start + N_local
 
     distribute_work(N, mcdc)
+    
+    # Rebalance not needed if there is only one rank
+    if mcdc["mpi_size"] <= 1:
+        return
 
     # Some constants
     work_start = mcdc["mpi_work_start"]
