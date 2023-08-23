@@ -37,7 +37,6 @@ import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
 
-
 def run():
     # Override input deck with command-line argument, if given
     if args.N_particle is not None:
