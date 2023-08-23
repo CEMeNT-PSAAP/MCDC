@@ -10,6 +10,7 @@ def test():
     # =========================================================================
 
     lib = h5py.File("c5g7.h5", "r")
+    print(lib)
 
     def set_mat(mat):
         return mcdc.material(
