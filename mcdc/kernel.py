@@ -1547,18 +1547,18 @@ def tally_reduce_bin(mcdc):
     """For eigenvalue mode. Performed at each cycle or history closeout"""
     tally = mcdc["tally"]
 
-    for name in literal_unroll(score_list):
-        if tally[name]:
-            score = tally["score"][name]
+    with objmode():
+        for name in literal_unroll(score_list):
+            if tally[name]:
+                score = tally["score"][name]
 
-            # Normalize
-            score["bin"][:] /= mcdc["setting"]["N_particle"]
+                # Normalize
+                score["bin"][:] /= mcdc["setting"]["N_particle"]
 
-            # MPI Reduce
-            buff = np.zeros_like(score["bin"])
-            with objmode():
+                # MPI Reduce
+                buff = np.zeros_like(score["bin"])
                 MPI.COMM_WORLD.Reduce(np.array(score["bin"]), buff, MPI.SUM, 0)
-            score["bin"][:] = buff
+                score["bin"][:] = buff
 
 
 @njit
