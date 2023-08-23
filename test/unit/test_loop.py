@@ -4,9 +4,9 @@ import mcdc.type_ as type_
 import mcdc.card
 from mcdc.constant import INF
 
-
 def loop_setup_test():
     type_.make_type_surface(1)
+    type_.make_type_particle(False,0)
     P = np.zeros(1, dtype=type_.particle)[0]
     S = np.zeros(1, dtype=type_.surface)[0]
 
