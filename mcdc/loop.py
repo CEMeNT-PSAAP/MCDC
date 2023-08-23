@@ -103,7 +103,7 @@ def loop_source(seed, mcdc):
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
 
-        src_seed = kernel.source_seed(work_idx,seed)
+        src_seed = kernel.int_hash_combo(numba.uint64(work_idx),seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -341,7 +341,9 @@ def source_iteration(seed, mcdc):
             simulation_end = True
 
         # Print progress
-        print_progress_iqmc(mcdc)
+        if not mcdc["setting"]["mode_eigenvalue"]:
+            with objmode():
+                print_progress_iqmc(mcdc)
 
         # set flux_old = current flux
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
@@ -485,7 +487,9 @@ def gmres(seed, mcdc):
 
             mcdc["technique"]["iqmc_itt"] += 1
             mcdc["technique"]["iqmc_res"] = rel_resid
-            print_progress_iqmc(mcdc)
+            if not mcdc["setting"]["mode_eigenvalue"]:
+                with objmode():
+                    print_progress_iqmc(mcdc)
         # end inner loop, back to outer loop
 
         # Find best update to X in Krylov Space V.  Solve inner X inner system.
@@ -501,7 +505,9 @@ def gmres(seed, mcdc):
         mcdc["technique"]["iqmc_itt"] += 1
         mcdc["technique"]["iqmc_res"] = rel_resid
 
-        print_progress_iqmc(mcdc)
+        if not mcdc["setting"]["mode_eigenvalue"]:
+            with objmode():
+                print_progress_iqmc(mcdc)
 
     # end outer loop
 
@@ -555,9 +561,12 @@ def power_iteration(seed, mcdc):
         ):
             simulation_end = True
 
-        loop_index += numba.uint64(1)
 
-    print_iqmc_eigenvalue_exit_code(mcdc)
+        if not mcdc["setting"]["mode_eigenvalue"]:
+            with objmode():
+                print_progress_iqmc(mcdc)
+
+        loop_index += numba.uint64(1)
     
 
 

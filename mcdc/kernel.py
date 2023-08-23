@@ -216,27 +216,6 @@ def stateful_rng(state,mcdc):
 
 
 @njit
-def pct_seed(cycle_seed):
-    return  int_hash_combo(-1,cycle_seed)
-
-@njit
-def RHS_seed(cycle_seed):
-    return  int_hash_combo(-2,cycle_seed)
-
-@njit
-def AxV_base_seed(cycle_seed):
-    return  int_hash_combo(-3,cycle_seed)
-
-@njit
-def source_seed(source_idx,cycle_seed):
-    return  int_hash_combo(source_idx,cycle_seed)
-
-@njit
-def source_particle_seed(particle_idx,source_seed):
-    return  int_hash_combo(particle_idx,source_seed)
-
-
-@njit
 def stateless_rng(seed,mcdc):
     g   = mcdc["setting"]["rng_g"]
     c   = mcdc["setting"]["rng_c"]
@@ -816,7 +795,7 @@ def pct_combing(seed,mcdc):
 
 
 @njit
-def pct_combing_weight(mcdc):
+def pct_combing_weight(seed,mcdc):
     bank_census = mcdc["bank_census"]
     M = mcdc["setting"]["N_particle"]
     bank_source = mcdc["bank_source"]
@@ -832,8 +811,7 @@ def pct_combing_weight(mcdc):
     mcdc["technique"]["pc_factor"] *= td
 
     # Tooth offset
-    cyc_seed = cycle_seed(mcdc)
-    xi = stateless_rng(pct_seed(cyc_seed),mcdc)
+    xi = stateless_rng(seed,mcdc)
     offset = xi * td
 
     # First hiting tooth
@@ -898,7 +876,8 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
             return cell["ID"]
 
     # Particle is not found
-    print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
+    with objmode():
+        print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
     P["alive"] = False
     return -1
 
@@ -2713,7 +2692,7 @@ def prepare_qmc_particles(seed,mcdc):
     for n in range(start, stop):
         # Create new particle
         P_new = np.zeros(1, dtype=type_.particle_record)[0]
-        P_new["rng_seed"] = source_particle_seed(n,seed)
+        P_new["rng_seed"] = int_hash_combo(n,seed)
         #P_new = split_particle(P,n,mcdc)
         # assign direction
         P_new["x"] = sample_qmc_position(xa, xb, lds[n, 0])
