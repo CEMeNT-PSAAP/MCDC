@@ -47,8 +47,8 @@ def loop_main(mcdc):
                 kernel.tally_closeout_history(mcdc)
 
             # Print progress
-            # with objmode():
-            # print_progress_eigenvalue(mcdc)
+            with objmode():
+                print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
             kernel.manage_particle_banks(cycle_seed, mcdc)
@@ -288,12 +288,12 @@ def loop_iqmc(mcdc):
     if mcdc["setting"]["mode_eigenvalue"]:
         if mcdc["technique"]["iqmc_eigenmode_solver"] == "davidson":
             davidson(seed, mcdc)
-        elif mcdc["technique"]["iqmc_eigenmode_solver"] == "power_iteration":
+        if mcdc["technique"]["iqmc_eigenmode_solver"] == "power_iteration":
             power_iteration(seed, mcdc)
     else:
         if mcdc["technique"]["iqmc_fixed_source_solver"] == "source_iteration":
             source_iteration(seed, mcdc)
-        elif mcdc["technique"]["iqmc_fixed_source_solver"] == "gmres":
+        if mcdc["technique"]["iqmc_fixed_source_solver"] == "gmres":
             gmres(seed, mcdc)
 
 
@@ -395,7 +395,7 @@ def gmres(seed, mcdc):
     if normb == 0.0:
         normb = 1.0
     if normr < tol * normb:
-        return  # X, 0
+        return  X, 0
 
     iteration = 0
 
@@ -555,9 +555,9 @@ def power_iteration(seed, mcdc):
         ):
             simulation_end = True
 
-        if not mcdc["setting"]["mode_eigenvalue"]:
+        if mcdc["setting"]["progress_bar"]:
             with objmode():
-                print_progress_iqmc(mcdc)
+                print_iqmc_eigenvalue_exit_code(mcdc)
 
         loop_index += numba.uint64(1)
 
@@ -593,7 +593,7 @@ def davidson(seed, mcdc):
     # initial scalar flux guess comes from power iteration
     mcdc["technique"]["iqmc_maxitt"] = 3
     mcdc["setting"]["progress_bar"] = False
-    # power_iteration(seed, mcdc)
+    power_iteration(seed, mcdc)
     mcdc["setting"]["progress_bar"] = True
     mcdc["technique"]["iqmc_maxitt"] = maxit
     mcdc["technique"]["iqmc_itt_outter"] = 0
@@ -680,7 +680,8 @@ def davidson(seed, mcdc):
 
         loop_index += numba.uint64(1)
 
-    print_iqmc_eigenvalue_exit_code(mcdc)
+    with objmode():
+        print_iqmc_eigenvalue_exit_code(mcdc)
 
     # normalize and save final scalar flux
     flux = np.reshape(
