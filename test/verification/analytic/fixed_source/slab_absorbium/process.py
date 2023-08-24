@@ -13,11 +13,10 @@ N_particle_list = np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1)
 
 
 def handle_run(file):
-    psi   = file["tally/flux/mean"]
+    psi = file["tally/flux/mean"]
     psi_z = file["tally/flux-z/mean"]
-    J     = file["tally/current/mean"][:, 2]
-    J_z   = file["tally/current-z/mean"][:, 2]
-
+    J = file["tally/current/mean"][:, 2]
+    J_z = file["tally/current-z/mean"][:, 2]
 
     I = len(z) - 1
     N = len(mu) - 1
@@ -46,7 +45,6 @@ def handle_run(file):
     # error_psi_z.append(np.linalg.norm((psi_z - psi_z_ref) / psi_z_ref))
 
 
-
 # Reference solution
 with h5py.File("output_%i.h5" % int(N_particle_list[0]), "r") as ref_file:
     z = ref_file["tally/grid/z"]
@@ -72,6 +70,6 @@ with h5py.File("output_%i.h5" % int(N_particle_list[0]), "r") as ref_file:
     plot_convergence("slab_absorbium_current", N_particle_list, error_J)
     plot_convergence("slab_absorbium_current_z", N_particle_list, error_Jz)
     plot_convergence("slab_absorbium_angular_flux", N_particle_list, error_psi)
-    
+
     # This is currently broken - error message: `ValueError: Data has no positive values, and therefore can not be log-scaled.`
-    #plot_convergence("slab_absorbium_angular_flux_z", N_particle_list, error_psi_z)
+    # plot_convergence("slab_absorbium_angular_flux_z", N_particle_list, error_psi_z)
