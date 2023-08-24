@@ -71,7 +71,7 @@ def test_rn_basic():
 
     # run through the first five seeds (1-5)
     for i in range(5):
-        seed = stateful_rng(mcdc,mcdc) * mod
+        seed = stateful_rng(mcdc, mcdc) * mod
         assert seed == ref_data[i]
 
     # skip to 123456-123460
@@ -79,4 +79,4 @@ def test_rn_basic():
     seed = mcdc["rng_seed"]
     for i in range(5, 10):
         assert seed == ref_data[i]
-        seed = stateful_rng(mcdc,mcdc) * mod
+        seed = stateful_rng(mcdc, mcdc) * mod

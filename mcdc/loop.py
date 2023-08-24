@@ -27,11 +27,10 @@ from mcdc.print_ import (
 @njit
 def loop_main(mcdc):
     simulation_end = False
-    
+
     loop_index = numba.uint64(0)
     while not simulation_end:
-
-        cycle_seed = kernel.int_hash_combo(loop_index,mcdc["rng_seed"])
+        cycle_seed = kernel.int_hash_combo(loop_index, mcdc["rng_seed"])
         # Loop over source particles
         loop_source(cycle_seed, mcdc)
 
@@ -48,11 +47,11 @@ def loop_main(mcdc):
                 kernel.tally_closeout_history(mcdc)
 
             # Print progress
-            #with objmode():
-                #print_progress_eigenvalue(mcdc)
+            # with objmode():
+            # print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
-            kernel.manage_particle_banks(cycle_seed,mcdc)
+            kernel.manage_particle_banks(cycle_seed, mcdc)
 
             # Cycle management
             mcdc["i_cycle"] += 1
@@ -68,7 +67,7 @@ def loop_main(mcdc):
             < len(mcdc["technique"]["census_time"]) - 1
         ):
             # Manage particle banks
-            kernel.manage_particle_banks(cycle_seed,mcdc)
+            kernel.manage_particle_banks(cycle_seed, mcdc)
 
             # Increment census index
             mcdc["technique"]["census_idx"] += 1
@@ -78,7 +77,6 @@ def loop_main(mcdc):
             simulation_end = True
 
         loop_index += numba.uint64(1)
-
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
@@ -93,7 +91,6 @@ def loop_main(mcdc):
 
 @njit
 def loop_source(seed, mcdc):
-
     # Progress bar indicator
     N_prog = 0
 
@@ -102,8 +99,7 @@ def loop_source(seed, mcdc):
 
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
-
-        src_seed = kernel.int_hash_combo(numba.uint64(work_idx),seed)
+        src_seed = kernel.int_hash_combo(numba.uint64(work_idx), seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -116,7 +112,9 @@ def loop_source(seed, mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            xi = kernel.stateless_rng(kernel.int_hash_combo(src_seed,numba.uint64(0)),mcdc)
+            xi = kernel.stateless_rng(
+                kernel.int_hash_combo(src_seed, numba.uint64(0)), mcdc
+            )
             tot = 0.0
             for S in mcdc["sources"]:
                 tot += S["prob"]
@@ -303,11 +301,9 @@ def loop_iqmc(mcdc):
 def source_iteration(seed, mcdc):
     simulation_end = False
 
-    
     loop_index = numba.uint64(0)
     while not simulation_end:
-
-        cycle_seed = kernel.int_hash_combo(loop_index,seed)
+        cycle_seed = kernel.int_hash_combo(loop_index, seed)
 
         # reset particle bank size
         mcdc["bank_source"]["size"] = 0
@@ -324,7 +320,7 @@ def source_iteration(seed, mcdc):
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
 
         # sweep particles
-        loop_source(cycle_seed,mcdc)
+        loop_source(cycle_seed, mcdc)
         # sum resultant flux on all processors
         kernel.iqmc_distribute_flux(mcdc)
         mcdc["technique"]["iqmc_itt"] += 1
@@ -351,7 +347,7 @@ def source_iteration(seed, mcdc):
         loop_index += numba.uint64(1)
 
 
-#@njit(numba.void(numba.uint64,numba.from_dtype(type_.global_)))
+# @njit(numba.void(numba.uint64,numba.from_dtype(type_.global_)))
 @njit
 def gmres(seed, mcdc):
     """
@@ -399,15 +395,14 @@ def gmres(seed, mcdc):
     if normb == 0.0:
         normb = 1.0
     if normr < tol * normb:
-       return #X, 0
+        return  # X, 0
 
     iteration = 0
 
     # GMRES starts here
     for outer in range(max_outer):
-
         outer64 = numba.uint64(outer)
-        outer_seed = kernel.int_hash_combo(outer64,seed)
+        outer_seed = kernel.int_hash_combo(outer64, seed)
 
         # Preallocate for Givens Rotations, Hessenberg matrix and Krylov Space
         Q = []
@@ -430,7 +425,7 @@ def gmres(seed, mcdc):
 
         for inner in range(max_inner):
             inner64 = numba.uint64(inner)
-            inner_seed = kernel.int_hash_combo(inner64,outer_seed)
+            inner_seed = kernel.int_hash_combo(inner64, outer_seed)
 
             # New search direction
             v = V[inner + 1, :]
@@ -526,9 +521,8 @@ def power_iteration(seed, mcdc):
 
     loop_index = numba.uint64(0)
     while not simulation_end:
+        cycle_seed = kernel.int_hash_combo(loop_index, seed)
 
-        cycle_seed = kernel.int_hash_combo(loop_index,seed) 
-        
         # iterate over scattering source
         if solver == "source_iteration":
             source_iteration(cycle_seed, mcdc)
@@ -561,13 +555,11 @@ def power_iteration(seed, mcdc):
         ):
             simulation_end = True
 
-
         if not mcdc["setting"]["mode_eigenvalue"]:
             with objmode():
                 print_progress_iqmc(mcdc)
 
         loop_index += numba.uint64(1)
-    
 
 
 @njit
@@ -601,7 +593,7 @@ def davidson(seed, mcdc):
     # initial scalar flux guess comes from power iteration
     mcdc["technique"]["iqmc_maxitt"] = 3
     mcdc["setting"]["progress_bar"] = False
-    #power_iteration(seed, mcdc)
+    # power_iteration(seed, mcdc)
     mcdc["setting"]["progress_bar"] = True
     mcdc["technique"]["iqmc_maxitt"] = maxit
     mcdc["technique"]["iqmc_itt_outter"] = 0
@@ -628,8 +620,7 @@ def davidson(seed, mcdc):
     loop_index = numba.uint64(0)
     # Davidson Routine
     while not simulation_end:
-
-        cycle_seed = kernel.int_hash_combo(loop_index,seed)
+        cycle_seed = kernel.int_hash_combo(loop_index, seed)
 
         # Calculate V*H*V (HxV is scattering linear operator function)
         HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], cycle_seed, mcdc)[:, 0]
@@ -686,7 +677,7 @@ def davidson(seed, mcdc):
                 # "restarts" by appending to a new array
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-        
+
         loop_index += numba.uint64(1)
 
     print_iqmc_eigenvalue_exit_code(mcdc)
@@ -737,8 +728,8 @@ def loop_source_precursor(seed, mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        src_seed = kernel.int_hash_combo(numba.uint64(work_idx),seed)
-        if kernel.stateless_rng(src_seed,mcdc) < w - N:
+        src_seed = kernel.int_hash_combo(numba.uint64(work_idx), seed)
+        if kernel.stateless_rng(src_seed, mcdc) < w - N:
             N += 1
         DNP["w"] = N
 
@@ -749,7 +740,7 @@ def loop_source_precursor(seed, mcdc):
         for particle_idx in range(N):
             # Create new particle
             P_new = np.zeros(1, dtype=type_.particle)[0]
-            part_seed = kernel.int_hash_combo(particle_idx,src_seed)
+            part_seed = kernel.int_hash_combo(particle_idx, src_seed)
             P_new["rng_seed"] = part_seed
             P_new["alive"] = True
             P_new["w"] = 1.0
@@ -776,7 +767,7 @@ def loop_source_precursor(seed, mcdc):
             else:
                 SigmaF = material["fission"][g]
                 nu_d = material["nu_d"][g]
-                xi = kernel.stateful_rng(P_new,mcdc) * nu_d[j] * SigmaF
+                xi = kernel.stateful_rng(P_new, mcdc) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
                     nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -789,7 +780,7 @@ def loop_source_precursor(seed, mcdc):
                         break
 
             # Sample emission time
-            P_new["t"] = -math.log(kernel.stateful_rng(P_new,mcdc)) / decay
+            P_new["t"] = -math.log(kernel.stateful_rng(P_new, mcdc)) / decay
             census_idx = mcdc["technique"]["census_idx"]
             if census_idx > 0:
                 P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
@@ -804,7 +795,7 @@ def loop_source_precursor(seed, mcdc):
                     continue
 
                 # Sample energy
-                xi = kernel.stateful_rng(P_new,mcdc)
+                xi = kernel.stateful_rng(P_new, mcdc)
                 tot = 0.0
                 for g_out in range(G):
                     tot += spectrum[g_out]
@@ -817,7 +808,7 @@ def loop_source_precursor(seed, mcdc):
                     P_new["ux"],
                     P_new["uy"],
                     P_new["uz"],
-                ) = kernel.sample_isotropic_direction(P_new,mcdc)
+                ) = kernel.sample_isotropic_direction(P_new, mcdc)
 
                 # Push to active bank
                 kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
