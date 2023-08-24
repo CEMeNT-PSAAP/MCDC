@@ -20,7 +20,11 @@ for task in os.scandir("./fixed_source"):
         if not os.path.isfile("output_" + str(int(N_hist)) + ".h5"):
             print(task, int(N_hist))
             if N_proc == 1:
-                waitlist.append(subprocess.Popen(("python input.py --mode=numba %i" % (N_hist)).split()))
+                waitlist.append(
+                    subprocess.Popen(
+                        ("python input.py --mode=numba %i" % (N_hist)).split()
+                    )
+                )
             else:
                 os.system(
                     "srun -n %i python input.py --mode=numba %i" % (N_proc, N_hist)
