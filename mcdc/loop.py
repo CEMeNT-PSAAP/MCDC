@@ -395,7 +395,7 @@ def gmres(seed, mcdc):
     if normb == 0.0:
         normb = 1.0
     if normr < tol * normb:
-        return  X, 0
+        return X, 0
 
     iteration = 0
 
@@ -554,13 +554,12 @@ def power_iteration(seed, mcdc):
             mcdc["technique"]["iqmc_res_outter"] <= tol
         ):
             simulation_end = True
-        
+
         loop_index += numba.uint64(1)
 
     if mcdc["setting"]["progress_bar"]:
         with objmode():
             print_iqmc_eigenvalue_exit_code(mcdc)
-
 
 
 @njit
