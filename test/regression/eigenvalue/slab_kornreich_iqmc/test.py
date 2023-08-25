@@ -2,6 +2,8 @@ import numpy as np
 import h5py
 import mcdc
 
+import numba as nb
+nb.config.DISABLE_JIT = True
 
 def pi_test():
     # =========================================================================
@@ -157,7 +159,11 @@ def davidson_test():
 
     a = answer["iqmc/flux"][:]
     b = output["iqmc/flux"][:]
+    print(a)
+    print(b)
     assert np.allclose(a, b)
+
+    assert False
 
     a = output["k_eff"][()]
     b = answer["k_eff"][()]

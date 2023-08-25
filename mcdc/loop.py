@@ -526,7 +526,7 @@ def power_iteration(seed, mcdc):
         # iterate over scattering source
         if solver == "source_iteration":
             source_iteration(cycle_seed, mcdc)
-        elif solver == "gmres":
+        if solver == "gmres":
             gmres(cycle_seed, mcdc)
         # reset counter for inner iteration
         mcdc["technique"]["iqmc_itt"] = 0
@@ -554,12 +554,13 @@ def power_iteration(seed, mcdc):
             mcdc["technique"]["iqmc_res_outter"] <= tol
         ):
             simulation_end = True
-
-        if mcdc["setting"]["progress_bar"]:
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
-
+        
         loop_index += numba.uint64(1)
+
+    if mcdc["setting"]["progress_bar"]:
+        with objmode():
+            print_iqmc_eigenvalue_exit_code(mcdc)
+
 
 
 @njit
@@ -600,6 +601,7 @@ def davidson(seed, mcdc):
 
     # resulting guess
     phi0 = mcdc["technique"]["iqmc_flux"].copy()
+    print(phi0)
     Nt = phi0.size
     phi0 = np.reshape(phi0, (Nt,))
 
@@ -659,6 +661,12 @@ def davidson(seed, mcdc):
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
 
+        print("U:")
+        print(u)
+        print("HV:")
+        print(HV)
+        print("FV:")
+        print(FV)
         # check convergence criteria
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
             mcdc["technique"]["iqmc_res_outter"] <= tol
