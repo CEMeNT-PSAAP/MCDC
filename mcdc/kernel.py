@@ -227,7 +227,7 @@ def rng_from_seed(seed):
 
 
 @njit
-def source_particle(source, seed, mcdc):
+def source_particle(source, seed):
     P = np.zeros(1, dtype=type_.particle_record)[0]
     P["rng_seed"] = seed
 
@@ -671,7 +671,7 @@ def bank_IC(P, mcdc):
 
     # Sample particle
     if rng(P) < Pn:
-        P_new = split_particle(P, 1, mcdc)
+        P_new = split_particle(P)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
         add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
@@ -939,7 +939,7 @@ def copy_particle(P):
 
 
 @njit
-def split_particle(P, offset, mcdc):
+def split_particle(P):
     P_new = copy_particle(P)
     P_new["rng_seed"] = int_hash(P["rng_seed"])
     rng(P)
@@ -2140,7 +2140,7 @@ def scattering(P, mcdc):
 
     for n in range(N):
         # Create new particle
-        P_new = split_particle(P, n, mcdc)
+        P_new = split_particle(P)
 
         # Set weight
         P_new["w"] = weight_new
@@ -2234,7 +2234,7 @@ def fission(P, mcdc):
 
     for n in range(N):
         # Create new particle
-        P_new = split_particle(P, n, mcdc)
+        P_new = split_particle(P)
 
         # Set weight
         P_new["w"] = weight_new
@@ -2489,13 +2489,13 @@ def weight_window(P, mcdc):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            add_particle(split_particle(P, i, mcdc), mcdc["bank_active"])
+            add_particle(split_particle(P), mcdc["bank_active"])
 
         # Russian roulette
         p -= n_split
         xi = rng(P)
         if xi <= p:
-            add_particle(split_particle(P, -1, mcdc), mcdc["bank_active"])
+            add_particle(split_particle(P), mcdc["bank_active"])
 
     # Below target
     elif p < 1.0 / width:
@@ -3322,7 +3322,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new = split_particle(P, n, mcdc)
+        P_new = split_particle(P)
 
         # Sample source type
         xi = rng(P) * p_total
@@ -3410,7 +3410,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
         source_obtained = False
 
         # Create new particle
-        P_new = split_particle(P, n, mcdc)
+        P_new = split_particle(P)
 
         # Sample term
         xi = rng(P_new) * p_total
@@ -3540,7 +3540,7 @@ def sensitivity_material(P, mcdc):
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new = split_particle(P, n, mcdc)
+        P_new = split_particle(P)
 
         # Sample source type
         xi = rng(P_new) * total

@@ -122,7 +122,7 @@ def loop_source(seed, mcdc):
                 tot += S["prob"]
                 if tot >= xi:
                     break
-            P = kernel.source_particle(S, src_seed, mcdc)
+            P = kernel.source_particle(S, src_seed)
 
         # Get from source bank
         else:
