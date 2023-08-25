@@ -750,10 +750,8 @@ def bank_IC(P, mcdc):
 def population_control(seed, mcdc):
     if mcdc["technique"]["pct"] == PCT_COMBING:
         pct_combing(seed, mcdc)
-        rng_rebase(mcdc)
     elif mcdc["technique"]["pct"] == PCT_COMBING_WEIGHT:
         pct_combing_weight(seed, mcdc)
-        rng_rebase(mcdc)
 
 
 @njit
