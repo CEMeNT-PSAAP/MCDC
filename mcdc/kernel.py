@@ -207,6 +207,7 @@ def rng_skip_ahead_(n, mcdc):
 
 @njit
 def stateful_rng(state, mcdc):
+    print("\n\nstateful\n\n")
     seed = state["rng_seed"]
     g = mcdc["setting"]["rng_g"]
     c = mcdc["setting"]["rng_c"]
@@ -220,6 +221,7 @@ def stateful_rng(state, mcdc):
 
 @njit
 def stateless_rng(seed, mcdc):
+    print("\n\nstateless\n\n")
     g = mcdc["setting"]["rng_g"]
     c = mcdc["setting"]["rng_c"]
     mod = mcdc["setting"]["rng_mod"]
