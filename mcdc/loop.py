@@ -601,7 +601,6 @@ def davidson(seed, mcdc):
 
     # resulting guess
     phi0 = mcdc["technique"]["iqmc_flux"].copy()
-    print(phi0)
     Nt = phi0.size
     phi0 = np.reshape(phi0, (Nt,))
 
@@ -661,12 +660,6 @@ def davidson(seed, mcdc):
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
 
-        print("U:")
-        print(u)
-        print("HV:")
-        print(HV)
-        print("FV:")
-        print(FV)
         # check convergence criteria
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
             mcdc["technique"]["iqmc_res_outter"] <= tol
