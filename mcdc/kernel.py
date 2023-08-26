@@ -2650,7 +2650,7 @@ def prepare_qmc_fission_source(mcdc):
 
 
 @njit
-def prepare_qmc_particles(seed, mcdc):
+def prepare_qmc_particles(mcdc):
     """
     Create N_particles assigning the position, direction, and group from the
     QMC Low-Discrepency Sequence. Particles are added to the bank_source.
@@ -2684,7 +2684,7 @@ def prepare_qmc_particles(seed, mcdc):
     for n in range(start, stop):
         # Create new particle
         P_new = np.zeros(1, dtype=type_.particle_record)[0]
-        P_new["rng_seed"] = int_hash_combo(n, seed)
+        P_new["rng_seed"] = 0
         # assign direction
         P_new["x"] = sample_qmc_position(xa, xb, lds[n, 0])
         P_new["y"] = sample_qmc_position(ya, yb, lds[n, 4])
@@ -3056,7 +3056,7 @@ def modified_gram_schmidt(V, u):
 
 
 @njit
-def AxV(phi, b, seed, mcdc):
+def AxV(phi, b, mcdc):
     """
     Linear operator to be used with GMRES.
     """
@@ -3071,9 +3071,9 @@ def AxV(phi, b, seed, mcdc):
 
     # QMC Sweep
     prepare_qmc_source(mcdc)
-    prepare_qmc_particles(seed, mcdc)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
-    loop_source(seed, mcdc)
+    loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
 
@@ -3084,7 +3084,7 @@ def AxV(phi, b, seed, mcdc):
 
 
 @njit
-def RHS(seed, mcdc):
+def RHS(mcdc):
     """
     We solve A x = b with a Krylov method. This function extracts
     b by doing a transport sweep of the fixed-source.
@@ -3099,9 +3099,9 @@ def RHS(seed, mcdc):
 
     # QMC Sweep
     prepare_qmc_source(mcdc)
-    prepare_qmc_particles(seed, mcdc)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
-    loop_source(seed, mcdc)
+    loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
 
@@ -3111,7 +3111,7 @@ def RHS(seed, mcdc):
 
 
 @njit
-def HxV(V, seed, mcdc):
+def HxV(V, mcdc):
     """
     Linear operator for Davidson method,
     scattering + streaming terms -> (I-L^(-1)S)*phi
@@ -3128,9 +3128,9 @@ def HxV(V, seed, mcdc):
 
     # QMC Sweep
     prepare_qmc_scattering_source(mcdc)
-    prepare_qmc_particles(seed, mcdc)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
-    loop_source(seed, mcdc)
+    loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
 
@@ -3142,7 +3142,7 @@ def HxV(V, seed, mcdc):
 
 
 @njit
-def FxV(V, seed, mcdc):
+def FxV(V, mcdc):
     """
     Linear operator for Davidson method,
     fission term -> (L^(-1)F*phi)
@@ -3160,9 +3160,9 @@ def FxV(V, seed, mcdc):
 
     # QMC Sweep
     prepare_qmc_fission_source(mcdc)
-    prepare_qmc_particles(seed, mcdc)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
-    loop_source(seed, mcdc)
+    loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
 
@@ -3172,7 +3172,7 @@ def FxV(V, seed, mcdc):
 
 
 @njit
-def preconditioner(V, seed, mcdc, num_sweeps=3):
+def preconditioner(V, mcdc, num_sweeps=3):
     """
     Linear operator approximation of (I-L^(-1)S)*phi
 
@@ -3193,13 +3193,11 @@ def preconditioner(V, seed, mcdc, num_sweeps=3):
             mcdc["technique"]["iqmc_source"]
         )
 
-        cycle_seed = int_hash_combo(numba.uint64(i), seed)
-
         # QMC Sweep
         prepare_qmc_scattering_source(mcdc)
-        prepare_qmc_particles(cycle_seed, mcdc)
+        prepare_qmc_particles(mcdc)
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
-        loop_source(cycle_seed, mcdc)
+        loop_source(0, mcdc)
         # sum resultant flux on all processors
         iqmc_distribute_flux(mcdc)
 
