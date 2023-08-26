@@ -13,18 +13,20 @@ waitlist = []
 
 # Fixed source
 N_min = 3
-N_max = 6
+N_max = 7
 for task in os.scandir("./fixed_source"):
     os.chdir(task)
     for N_hist in np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1):
         if not os.path.isfile("output_" + str(int(N_hist)) + ".h5"):
             print(task, int(N_hist))
-            if N_proc == 1:
+            if N_proc == 0:
                 waitlist.append(
                     subprocess.Popen(
                         ("python input.py --mode=numba %i" % (N_hist)).split()
                     )
                 )
+            elif N_proc == 1:
+                os.system("python input.py --mode=numba %i" % (N_hist))
             else:
                 os.system(
                     "srun -n %i python input.py --mode=numba %i" % (N_proc, N_hist)

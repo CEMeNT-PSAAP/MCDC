@@ -1,6 +1,6 @@
 import numpy as np
 from mcdc import type_
-from mcdc.kernel import stateful_rng, rng_skip_ahead_
+from mcdc.kernel import rng, rng_skip_ahead_
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
@@ -20,22 +20,17 @@ def test_rn_basic():
     """
     ref_data = np.array(
         (
-            3512401965023503517,
-            5461769869401032777,
-            1468184805722937541,
-            5160872062372652241,
-            6637647758174943277,
-            794206257475890433,
-            4662153896835267997,
-            6075201270501039433,
-            889694366662031813,
-            7299299962545529297,
+            1,
+            2806196910506780710,
+            6924308458965941631,
+            7093833571386932060,
+            4133560638274335821,
         )
     )
 
     # PRNG parameters from [1]
-    g = 3512401965023503517
-    c = 0
+    g = 2806196910506780709
+    c = 1
     seed0 = 1
     mod = 2**63
 
@@ -62,21 +57,9 @@ def test_rn_basic():
     # The dummy container
     mcdc = np.zeros(1, dtype=type_.global_)[0]
 
-    # Change mcdc PRNG parameters
-    mcdc["setting"]["rng_g"] = g
-    mcdc["setting"]["rng_c"] = c
-    mcdc["setting"]["rng_mod"] = mod
-    mcdc["rng_seed_base"] = seed0
-    mcdc["rng_seed"] = seed0
+    mcdc["rng_seed"]
 
     # run through the first five seeds (1-5)
     for i in range(5):
-        seed = stateful_rng(mcdc, mcdc) * mod
-        assert seed == ref_data[i]
-
-    # skip to 123456-123460
-    rng_skip_ahead_(123456, mcdc)
-    seed = mcdc["rng_seed"]
-    for i in range(5, 10):
-        assert seed == ref_data[i]
-        seed = stateful_rng(mcdc, mcdc) * mod
+        rng(mcdc)
+        assert mcdc["rng_seed"] == ref_data[i]
