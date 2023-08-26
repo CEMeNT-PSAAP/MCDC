@@ -1,8 +1,29 @@
+import argparse
+import numba as nb
+
+# Parse command-line arguments
+#   TODO: Will be inside run() once Python/Numba adapter is integrated
+parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
+parser.add_argument(
+    "--mode", type=str, help="Run mode", choices=["python", "numba"], default="python"
+)
+parser.add_argument("--N_particle", type=int, help="Number of particles")
+parser.add_argument("--output", type=str, help="Output file name")
+args, unargs = parser.parse_known_args()
+
+# Set mode
+#   TODO: Will be inside run() once Python/Numba adapter is integrated
+mode = args.mode
+if mode == "python":
+    nb.config.DISABLE_JIT = True
+elif mode == "numba":
+    nb.config.DISABLE_JIT = False
+
 import h5py
 import numpy as np
-from scipy.stats import qmc
 
 from mpi4py import MPI
+from scipy.stats import qmc
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
@@ -11,23 +32,29 @@ from mcdc.constant import *
 from mcdc.loop import loop_main, loop_iqmc
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
-# Get input_card and set global variables as "mcdc"
+# Get input_deck
 import mcdc.global_ as mcdc_
 
-input_card = mcdc_.input_card
-mcdc = mcdc_.global_
+input_deck = mcdc_.input_deck
 
 import mcdc.adapt as adapt
 
 
 def run():
+    # Override input deck with command-line argument, if given
+    if args.N_particle is not None:
+        input_deck.setting["N_particle"] = args.N_particle
+    if args.output is not None:
+        input_deck.setting["output"] = args.output
+
     # Start timer
     total_start = MPI.Wtime()
 
-    # Preparation:
-    #   process input cards, make types, and allocate global variables
+    # Preparation
+    #   Set up and get the global variable container `mcdc` based on
+    #   input deck
     preparation_start = MPI.Wtime()
-    prepare()
+    mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -46,7 +73,7 @@ def run():
 
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
-    generate_hdf5()
+    generate_hdf5(mcdc)
     mcdc["runtime_output"] = MPI.Wtime() - output_start
 
     # Stop timer
@@ -54,11 +81,16 @@ def run():
     mcdc["runtime_total"] = MPI.Wtime() - total_start
 
     # Closout
-    closeout()
+    closeout(mcdc)
 
 
 def prepare():
-    global mcdc
+    """
+    Preparing the MC transport simulation:
+      (1) Process input deck
+      (2) Make types
+      (3) Set up and return the global variable container `mcdc`
+    """
 
     # =========================================================================
     # Sizes
@@ -67,33 +99,33 @@ def prepare():
 
     # Neutron and delayed neutron precursor group sizes
     #   We assume that all materials have the same group structures
-    G = input_card.materials[0]["G"]
-    J = input_card.materials[0]["J"]
+    G = input_deck.materials[0]["G"]
+    J = input_deck.materials[0]["J"]
 
     # Number of model objects
-    N_nuclide = len(input_card.nuclides)
-    N_material = len(input_card.materials)
-    N_surface = len(input_card.surfaces)
-    N_cell = len(input_card.cells)
-    N_universe = len(input_card.universes)
-    N_lattice = len(input_card.lattices)
-    N_source = len(input_card.sources)
+    N_nuclide = len(input_deck.nuclides)
+    N_material = len(input_deck.materials)
+    N_surface = len(input_deck.surfaces)
+    N_cell = len(input_deck.cells)
+    N_universe = len(input_deck.universes)
+    N_lattice = len(input_deck.lattices)
+    N_source = len(input_deck.sources)
 
     # Simulation parameters
-    N_particle = input_card.setting["N_particle"]
-    N_cycle = input_card.setting["N_cycle"]
+    N_particle = input_deck.setting["N_particle"]
+    N_cycle = input_deck.setting["N_cycle"]
 
     # Maximum object references
     # Maximum nuclides per material
-    Nmax_nuclide = max([material["N_nuclide"] for material in input_card.materials])
+    Nmax_nuclide = max([material["N_nuclide"] for material in input_deck.materials])
     # Maximum surfaces per cell
-    Nmax_surface = max([cell["N_surface"] for cell in input_card.cells])
+    Nmax_surface = max([cell["N_surface"] for cell in input_deck.cells])
     # Maximum cells per universe
-    Nmax_cell = max([universe["N_cell"] for universe in input_card.universes])
+    Nmax_cell = max([universe["N_cell"] for universe in input_deck.universes])
 
     # Maximum time-dependent surface slices
     Nmax_slice = 0
-    for surface in input_card.surfaces:
+    for surface in input_deck.surfaces:
         Nmax_slice = max(Nmax_slice, surface["N_slice"])
 
     # =========================================================================
@@ -101,10 +133,15 @@ def prepare():
     # =========================================================================
 
     # Flags
-    iQMC = input_card.technique["iQMC"]
+    iQMC = input_deck.technique["iQMC"]
 
     # Numbers
-    N_tally_scores = input_card.setting["N_sensitivity"] + 1
+    N_sensitivity = input_deck.setting["N_sensitivity"]
+    N_tally_scores = 1 + N_sensitivity
+    if input_deck.technique["dsm_order"] == 2:
+        N_tally_scores = (
+            1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+        )
 
     # =========================================================================
     # Default cards, if not given
@@ -113,7 +150,7 @@ def prepare():
     # Default root universe
     if N_universe == 1:
         Nmax_cell = N_cell
-        card = input_card.universes[0]
+        card = input_deck.universes[0]
         card["N_cell"] = N_cell
         card["cell_IDs"] = np.arange(N_cell)
 
@@ -128,11 +165,11 @@ def prepare():
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)
     type_.make_type_universe(Nmax_cell)
-    type_.make_type_lattice(input_card.lattices)
+    type_.make_type_lattice(input_deck.lattices)
     type_.make_type_source(G)
-    type_.make_type_tally(N_tally_scores, input_card.tally)
-    type_.make_type_technique(N_particle, G, input_card.technique)
-    type_.make_type_global(input_card)
+    type_.make_type_tally(N_tally_scores, input_deck.tally)
+    type_.make_type_technique(N_particle, G, input_deck.technique)
+    type_.make_type_global(input_deck)
 
     adapt.adapt_to('cpu')
 
@@ -149,7 +186,7 @@ def prepare():
 
     for i in range(N_nuclide):
         for name in type_.nuclide.names:
-            mcdc["nuclides"][i][name] = input_card.nuclides[i][name]
+            mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
 
     # =========================================================================
     # Materials
@@ -157,7 +194,7 @@ def prepare():
 
     for i in range(N_material):
         for name in type_.material.names:
-            mcdc["materials"][i][name] = input_card.materials[i][name]
+            mcdc["materials"][i][name] = input_deck.materials[i][name]
 
     # =========================================================================
     # Surfaces
@@ -166,12 +203,12 @@ def prepare():
     for i in range(N_surface):
         for name in type_.surface.names:
             if name not in ["J", "t"]:
-                mcdc["surfaces"][i][name] = input_card.surfaces[i][name]
+                mcdc["surfaces"][i][name] = input_deck.surfaces[i][name]
 
         # Variables with possible different sizes
         for name in ["J", "t"]:
-            N = len(input_card.surfaces[i][name])
-            mcdc["surfaces"][i][name][:N] = input_card.surfaces[i][name]
+            N = len(input_deck.surfaces[i][name])
+            mcdc["surfaces"][i][name][:N] = input_deck.surfaces[i][name]
 
     # =========================================================================
     # Cells
@@ -180,12 +217,12 @@ def prepare():
     for i in range(N_cell):
         for name in type_.cell.names:
             if name not in ["surface_IDs", "positive_flags"]:
-                mcdc["cells"][i][name] = input_card.cells[i][name]
+                mcdc["cells"][i][name] = input_deck.cells[i][name]
 
         # Variables with possible different sizes
         for name in ["surface_IDs", "positive_flags"]:
-            N = len(input_card.cells[i][name])
-            mcdc["cells"][i][name][:N] = input_card.cells[i][name]
+            N = len(input_deck.cells[i][name])
+            mcdc["cells"][i][name][:N] = input_deck.cells[i][name]
 
     # =========================================================================
     # Universes
@@ -194,12 +231,12 @@ def prepare():
     for i in range(N_universe):
         for name in type_.universe.names:
             if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = input_card.universes[i][name]
+                mcdc["universes"][i][name] = input_deck.universes[i][name]
 
         # Variables with possible different sizes
         for name in ["cell_IDs"]:
             N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = input_card.universes[i][name]
+            mcdc["universes"][i][name][:N] = input_deck.universes[i][name]
 
     # =========================================================================
     # Lattices
@@ -208,13 +245,13 @@ def prepare():
     for i in range(N_lattice):
         # Mesh
         for name in type_.mesh_uniform.names:
-            mcdc["lattices"][i]["mesh"][name] = input_card.lattices[i]["mesh"][name]
+            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i]["mesh"][name]
 
         # Universe IDs
         Nx = mcdc["lattices"][i]["mesh"]["Nx"]
         Ny = mcdc["lattices"][i]["mesh"]["Ny"]
         Nz = mcdc["lattices"][i]["mesh"]["Nz"]
-        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_card.lattices[i][
+        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[i][
             "universe_IDs"
         ]
 
@@ -224,7 +261,7 @@ def prepare():
 
     for i in range(N_source):
         for name in type_.source.names:
-            mcdc["sources"][i][name] = input_card.sources[i][name]
+            mcdc["sources"][i][name] = input_deck.sources[i][name]
 
     # Normalize source probabilities
     tot = 0.0
@@ -239,17 +276,17 @@ def prepare():
 
     for name in type_.tally.names:
         if name not in ["score", "mesh"]:
-            mcdc["tally"][name] = input_card.tally[name]
+            mcdc["tally"][name] = input_deck.tally[name]
     # Set mesh
     for name in type_.mesh_names:
-        mcdc["tally"]["mesh"][name] = input_card.tally["mesh"][name]
+        mcdc["tally"]["mesh"][name] = input_deck.tally["mesh"][name]
 
     # =========================================================================
     # Setting
     # =========================================================================
 
     for name in type_.setting.names:
-        mcdc["setting"][name] = input_card.setting[name]
+        mcdc["setting"][name] = input_deck.setting[name]
 
     # Check if time boundary is above the final tally mesh time grid
     if mcdc["setting"]["time_boundary"] > mcdc["tally"]["mesh"]["t"][-1]:
@@ -271,15 +308,15 @@ def prepare():
         "time_census",
         "branchless_collision",
     ]:
-        mcdc["technique"][name] = input_card.technique[name]
+        mcdc["technique"][name] = input_deck.technique[name]
 
     # =========================================================================
     # Population control
     # =========================================================================
 
     # Population control technique (PCT)
-    mcdc["technique"]["pct"] = input_card.technique["pct"]
-    mcdc["technique"]["pc_factor"] = input_card.technique["pc_factor"]
+    mcdc["technique"]["pct"] = input_deck.technique["pct"]
+    mcdc["technique"]["pc_factor"] = input_deck.technique["pc_factor"]
 
     # =========================================================================
     # Weight window (WW)
@@ -287,21 +324,21 @@ def prepare():
 
     # WW mesh
     for name in type_.mesh_names[:-1]:
-        mcdc["technique"]["ww_mesh"][name] = input_card.technique["ww_mesh"][name]
+        mcdc["technique"]["ww_mesh"][name] = input_deck.technique["ww_mesh"][name]
 
     # WW windows
-    mcdc["technique"]["ww"] = input_card.technique["ww"]
-    mcdc["technique"]["ww_width"] = input_card.technique["ww_width"]
+    mcdc["technique"]["ww"] = input_deck.technique["ww"]
+    mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
 
     # =========================================================================
     # Weight roulette
     # =========================================================================
 
     # Threshold
-    mcdc["technique"]["wr_threshold"] = input_card.technique["wr_threshold"]
+    mcdc["technique"]["wr_threshold"] = input_deck.technique["wr_threshold"]
 
     # Survival probability
-    mcdc["technique"]["wr_chance"] = input_card.technique["wr_chance"]
+    mcdc["technique"]["wr_chance"] = input_deck.technique["wr_chance"]
 
     # =========================================================================
     # Quasi Monte Carlo
@@ -319,16 +356,16 @@ def prepare():
                 "iqmc_generator",
                 "iqmc_sweep_counter",
             ]:
-                mcdc["technique"][name] = input_card.technique[name]
+                mcdc["technique"][name] = input_deck.technique[name]
 
-    if input_card.technique["iQMC"]:
-        mcdc["technique"]["iqmc_mesh"]["x"] = input_card.technique["iqmc_mesh"]["x"]
-        mcdc["technique"]["iqmc_mesh"]["y"] = input_card.technique["iqmc_mesh"]["y"]
-        mcdc["technique"]["iqmc_mesh"]["z"] = input_card.technique["iqmc_mesh"]["z"]
-        mcdc["technique"]["iqmc_mesh"]["t"] = input_card.technique["iqmc_mesh"]["t"]
-        mcdc["technique"]["iqmc_generator"] = input_card.technique["iqmc_generator"]
+    if input_deck.technique["iQMC"]:
+        mcdc["technique"]["iqmc_mesh"]["x"] = input_deck.technique["iqmc_mesh"]["x"]
+        mcdc["technique"]["iqmc_mesh"]["y"] = input_deck.technique["iqmc_mesh"]["y"]
+        mcdc["technique"]["iqmc_mesh"]["z"] = input_deck.technique["iqmc_mesh"]["z"]
+        mcdc["technique"]["iqmc_mesh"]["t"] = input_deck.technique["iqmc_mesh"]["t"]
+        mcdc["technique"]["iqmc_generator"] = input_deck.technique["iqmc_generator"]
         # generate lds
-        if input_card.technique["iqmc_generator"] == "sobol":
+        if input_deck.technique["iqmc_generator"] == "sobol":
             scramble = mcdc["technique"]["iqmc_scramble"]
             N_dim = mcdc["technique"]["iqmc_N_dim"]
             N = mcdc["setting"]["N_particle"]
@@ -342,7 +379,7 @@ def prepare():
             # mcdc["technique"]["lds"][0,:] += 1e-6
             mcdc["technique"]["iqmc_lds"][mcdc["technique"]["iqmc_lds"] == 0.0] += 1e-6
             # lds is shape (2**m, d)
-        if input_card.technique["iqmc_generator"] == "halton":
+        if input_deck.technique["iqmc_generator"] == "halton":
             scramble = mcdc["technique"]["iqmc_scramble"]
             N_dim = mcdc["technique"]["iqmc_N_dim"]
             seed = mcdc["technique"]["iqmc_seed"]
@@ -350,7 +387,7 @@ def prepare():
             sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
             sampler.fast_forward(1)
             mcdc["technique"]["iqmc_lds"] = sampler.random(N)
-        if input_card.technique["iqmc_generator"] == "random":
+        if input_deck.technique["iqmc_generator"] == "random":
             seed = mcdc["technique"]["iqmc_seed"]
             N_dim = mcdc["technique"]["iqmc_N_dim"]
             N = mcdc["setting"]["N_particle"]
@@ -362,10 +399,17 @@ def prepare():
     # =========================================================================
 
     # Census time
-    mcdc["technique"]["census_time"] = input_card.technique["census_time"]
+    mcdc["technique"]["census_time"] = input_deck.technique["census_time"]
 
     # Census index
     mcdc["technique"]["census_idx"] = 0
+
+    # =========================================================================
+    # Derivative Source Method
+    # =========================================================================
+
+    # Threshold
+    mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
 
     # =========================================================================
     # RNG
@@ -486,6 +530,8 @@ def prepare():
                     "w"
                 ]
 
+    return mcdc
+
 
 def dictlist_to_h5group(dictlist, input_group, name):
     main_group = input_group.create_group(name + "s")
@@ -502,27 +548,27 @@ def dict_to_h5group(dict_, group):
             group[k] = v
 
 
-def generate_hdf5():
+def generate_hdf5(mcdc):
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
             print_msg("")
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
-            # Input card
+            # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
-                dictlist_to_h5group(input_card.nuclides, input_group, "nuclide")
-                dictlist_to_h5group(input_card.materials, input_group, "material")
-                dictlist_to_h5group(input_card.surfaces, input_group, "surface")
-                dictlist_to_h5group(input_card.cells, input_group, "cell")
-                dictlist_to_h5group(input_card.universes, input_group, "universe")
-                dictlist_to_h5group(input_card.lattices, input_group, "lattice")
-                dictlist_to_h5group(input_card.sources, input_group, "source")
-                dict_to_h5group(input_card.tally, input_group.create_group("tally"))
-                dict_to_h5group(input_card.setting, input_group.create_group("setting"))
+                dictlist_to_h5group(input_deck.nuclides, input_group, "nuclide")
+                dictlist_to_h5group(input_deck.materials, input_group, "material")
+                dictlist_to_h5group(input_deck.surfaces, input_group, "surface")
+                dictlist_to_h5group(input_deck.cells, input_group, "cell")
+                dictlist_to_h5group(input_deck.universes, input_group, "universe")
+                dictlist_to_h5group(input_deck.lattices, input_group, "lattice")
+                dictlist_to_h5group(input_deck.sources, input_group, "source")
+                dict_to_h5group(input_deck.tally, input_group.create_group("tally"))
+                dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
-                    input_card.technique, input_group.create_group("technique")
+                    input_deck.technique, input_group.create_group("technique")
                 )
 
             # Tally
@@ -633,7 +679,7 @@ def generate_hdf5():
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 
 
-def closeout():
+def closeout(mcdc):
     # Runtime
     if mcdc["mpi_master"]:
         with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
@@ -649,4 +695,4 @@ def closeout():
                 )
 
     print_runtime(mcdc)
-    input_card.reset()
+    input_deck.reset()

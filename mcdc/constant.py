@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import numba as nb
 
 # Events
 # The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
@@ -40,3 +41,9 @@ PI = math.acos(-1.0)
 SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
+
+
+RNG_G = nb.uint64(2806196910506780709)
+RNG_C = nb.uint64(1)
+RNG_MOD_MASK = nb.uint64(0x7FFFFFFFFFFFFFFF)
+RNG_MOD = nb.uint64(0x8000000000000000)

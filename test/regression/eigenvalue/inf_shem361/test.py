@@ -53,7 +53,7 @@ def test():
     mcdc.tally(scores=scores, g="all")
 
     # Setting
-    mcdc.setting(N_particle=10, progress_bar=False)
+    mcdc.setting(N_particle=10, progress_bar=False, census_bank_buff=30)
     mcdc.eigenmode(N_inactive=1, N_active=2)
     mcdc.population_control()
 

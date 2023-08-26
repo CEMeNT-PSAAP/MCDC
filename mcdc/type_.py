@@ -11,7 +11,7 @@ uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"
 
-# MC/DC types, will be defined by input card
+# MC/DC types, will be defined by input deck
 particle = None
 particle_record = None
 nuclide = None
@@ -75,7 +75,7 @@ def make_type_particle_record(iQMC, G):
         ("g", uint64),
         ("w", float64),
         ("sensitivity_ID", int64),
-        ("rng_seed", int64),
+        ("rng_seed", uint64),
     ]
     # iqmc vector of weights
     Ng = 1
@@ -141,6 +141,7 @@ def make_type_nuclide(G, J):
             ("chi_d", float64, (J, G)),
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
+            ("dsm_Np", float64),
         ]
     )
 
@@ -202,6 +203,7 @@ def make_type_surface(Nmax_slice):
             ("nz", float64),
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
+            ("dsm_Np", float64),
         ]
     )
 
@@ -451,10 +453,10 @@ setting = np.dtype(
         ("N_inactive", int64),
         ("N_active", int64),
         ("N_cycle", int64),
-        ("rng_seed", int64),
-        ("rng_stride", int64),
-        ("rng_g", int64),
-        ("rng_c", int64),
+        ("rng_seed", uint64),
+        ("rng_stride", uint64),
+        ("rng_g", uint64),
+        ("rng_c", uint64),
         ("rng_mod", uint64),
         ("time_boundary", float64),
         ("bank_active_buff", int64),
@@ -472,6 +474,7 @@ setting = np.dtype(
         ("IC_file", bool_),
         ("IC_file_name", "U30"),
         ("N_precursor", int64),
+        ("N_sensitivity", int64),
     ]
 )
 
@@ -621,6 +624,14 @@ def make_type_technique(N_particle, G, card):
         ("IC_fission", float64),
     ]
 
+    # =========================================================================
+    # Derivative Source Method
+    # =========================================================================
+
+    struct += [
+        ("dsm_order", int64),
+    ]
+
     # Finalize technique type
     technique = np.dtype(struct)
 
@@ -701,8 +712,8 @@ def make_type_global(card):
             ("bank_census", bank_census),
             ("bank_source", bank_source),
             ("bank_precursor", bank_precursor),
-            ("rng_seed_base", int64),
-            ("rng_seed", int64),
+            ("rng_seed_base", uint64),
+            ("rng_seed", uint64),
             ("rng_stride", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),

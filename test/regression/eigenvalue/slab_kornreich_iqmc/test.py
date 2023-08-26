@@ -2,6 +2,10 @@ import numpy as np
 import h5py
 import mcdc
 
+import numba as nb
+
+nb.config.DISABLE_JIT = True
+
 
 def pi_test():
     # =========================================================================
@@ -73,7 +77,7 @@ def pi_test():
     output = h5py.File("pi_output.h5", "r")
     answer = h5py.File("pi_answer.h5", "r")
 
-    a = answer["tally/iqmc_flux"][:]
+    a = answer["iqmc/flux"][:]
     b = output["iqmc/flux"][:]
     assert np.allclose(a, b)
 
