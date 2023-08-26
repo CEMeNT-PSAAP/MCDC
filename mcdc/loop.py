@@ -32,12 +32,12 @@ def loop_main(mcdc):
     while not simulation_end:
         cycle_seed = kernel.int_hash_combo(loop_index, mcdc["rng_seed"])
         # Loop over source particles
-        ls_seed = kernel.int_hash_combo(cycle_seed,0x43616D696C6C65)
+        ls_seed = kernel.int_hash_combo(cycle_seed, 0x43616D696C6C65)
         loop_source(ls_seed, mcdc)
 
         # Loop over source precursors
         if mcdc["bank_precursor"]["size"] > 0:
-            lsp_seed = kernel.int_hash_combo(cycle_seed,0x546f6464)
+            lsp_seed = kernel.int_hash_combo(cycle_seed, 0x546F6464)
             loop_source_precursor(lsp_seed, mcdc)
 
         # Eigenvalue cycle closeout
@@ -53,7 +53,7 @@ def loop_main(mcdc):
                 print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
-            mpb_seed = kernel.int_hash_combo(cycle_seed,0x5279616E)
+            mpb_seed = kernel.int_hash_combo(cycle_seed, 0x5279616E)
             kernel.manage_particle_banks(mpb_seed, mcdc)
 
             # Cycle management
@@ -318,7 +318,7 @@ def source_iteration(mcdc):
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
 
         # sweep particles
-        loop_source(0,mcdc)
+        loop_source(0, mcdc)
         # sum resultant flux on all processors
         kernel.iqmc_distribute_flux(mcdc)
         mcdc["technique"]["iqmc_itt"] += 1
@@ -343,6 +343,7 @@ def source_iteration(mcdc):
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
 
         loop_index += numba.uint64(1)
+
 
 @njit
 def gmres(mcdc):
@@ -391,7 +392,7 @@ def gmres(mcdc):
     if normb == 0.0:
         normb = 1.0
     if normr < tol * normb:
-        return  X, 0
+        return X, 0
 
     iteration = 0
 
