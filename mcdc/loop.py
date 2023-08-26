@@ -284,7 +284,6 @@ def loop_particle(P, mcdc):
 def loop_iqmc(mcdc):
     # generate material index
     kernel.generate_iqmc_material_idx(mcdc)
-
     # function calls from specified solvers
     if mcdc["setting"]["mode_eigenvalue"]:
         if mcdc["technique"]["iqmc_eigenmode_solver"] == "davidson":
@@ -345,7 +344,6 @@ def source_iteration(mcdc):
 
         loop_index += numba.uint64(1)
 
-
 @njit
 def gmres(mcdc):
     """
@@ -399,7 +397,6 @@ def gmres(mcdc):
 
     # GMRES starts here
     for outer in range(max_outer):
-
         # Preallocate for Givens Rotations, Hessenberg matrix and Krylov Space
         Q = []
         H = np.zeros((max_inner + 1, max_inner + 1), dtype=xtype)
@@ -420,7 +417,6 @@ def gmres(mcdc):
         g[0] = normr
 
         for inner in range(max_inner):
-
             # New search direction
             v = V[inner + 1, :]
             v[:] = kernel.AxV(vs[-1], b, mcdc)
@@ -493,7 +489,6 @@ def gmres(mcdc):
 
         mcdc["technique"]["iqmc_itt"] += 1
         mcdc["technique"]["iqmc_res"] = rel_resid
-
         if not mcdc["setting"]["mode_eigenvalue"]:
             with objmode():
                 print_progress_iqmc(mcdc)
@@ -514,7 +509,6 @@ def power_iteration(mcdc):
     solver = mcdc["technique"]["iqmc_fixed_source_solver"]
 
     while not simulation_end:
-
         # iterate over scattering source
         if solver == "source_iteration":
             source_iteration(mcdc)
@@ -546,12 +540,9 @@ def power_iteration(mcdc):
             mcdc["technique"]["iqmc_res_outter"] <= tol
         ):
             simulation_end = True
-        
-
     if mcdc["setting"]["progress_bar"]:
         with objmode():
             print_iqmc_eigenvalue_exit_code(mcdc)
-
 
 
 @njit
@@ -666,7 +657,6 @@ def davidson(mcdc):
                 # "restarts" by appending to a new array
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-
 
     with objmode():
         print_iqmc_eigenvalue_exit_code(mcdc)
