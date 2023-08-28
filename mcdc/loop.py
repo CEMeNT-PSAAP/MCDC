@@ -116,14 +116,7 @@ def loop_source(seed, mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            seed_sample = kernel.split_seed(seed_work, 0x496C68616D)
-            xi = kernel.rng_from_seed(seed_sample)
-            tot = 0.0
-            for S in mcdc["sources"]:
-                tot += S["prob"]
-                if tot >= xi:
-                    break
-            P = kernel.source_particle(S, seed_work)
+            P = kernel.source_particle(seed_work, mcdc)
 
         # Get from source bank
         else:
