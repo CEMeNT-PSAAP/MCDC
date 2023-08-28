@@ -212,8 +212,7 @@ def source_particle(seed, mcdc):
     P["rng_seed"] = seed
 
     # Sample source
-    seed_sample = split_seed(seed, 0x496C68616D)
-    xi = rng_from_seed(seed_sample)
+    xi = rng(P)
     tot = 0.0
     for source in mcdc["sources"]:
         tot += source["prob"]
