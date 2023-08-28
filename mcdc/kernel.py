@@ -207,9 +207,18 @@ def rng_from_seed(seed):
 
 
 @njit
-def source_particle(source, seed):
+def source_particle(seed, mcdc):
     P = np.zeros(1, dtype=type_.particle_record)[0]
     P["rng_seed"] = seed
+
+    # Sample source
+    seed_sample = split_seed(seed, 0x496C68616D)
+    xi = rng_from_seed(seed_sample)
+    tot = 0.0
+    for source in mcdc["sources"]:
+        tot += source["prob"]
+        if tot >= xi:
+            break
 
     # Position
     if source["box"]:
