@@ -78,24 +78,9 @@ def sample_discrete(group, P):
 
 
 # =============================================================================
-# Random number generator operations
+# Random number generator
+#   LCG with hash seed-split
 # =============================================================================
-# TODO: make g, c, and mod constants
-
-
-@njit
-def rng_rebase(mcdc):
-    mcdc["rng_seed_base"] = mcdc["rng_seed"]
-
-
-@njit
-def rng_skip_ahead_strides(n, mcdc):
-    rng_skip_ahead_(int(n * mcdc["rng_stride"]), mcdc)
-
-
-@njit
-def rng_skip_ahead(n, mcdc):
-    rng_skip_ahead_(int(n), mcdc)
 
 
 @njit(numba.uint64(numba.uint64))

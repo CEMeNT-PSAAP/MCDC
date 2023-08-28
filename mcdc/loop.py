@@ -1,5 +1,4 @@
 import numpy as np
-import numba
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode, jit
 from scipy.linalg import eig
@@ -28,7 +27,7 @@ from mcdc.print_ import (
 def loop_main(mcdc):
     simulation_end = False
 
-    loop_index = numba.uint64(0)
+    loop_index = 0
     while not simulation_end:
         cycle_seed = kernel.int_hash_combo(loop_index, mcdc["rng_seed"])
         # Loop over source particles
@@ -79,7 +78,7 @@ def loop_main(mcdc):
         else:
             simulation_end = True
 
-        loop_index += numba.uint64(1)
+        loop_index += 1
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
@@ -102,7 +101,7 @@ def loop_source(seed, mcdc):
 
     # Loop over particle sources
     for work_idx in range(mcdc["mpi_work_size"]):
-        src_seed = kernel.int_hash_combo(numba.uint64(work_idx), seed)
+        src_seed = kernel.int_hash_combo(work_idx, seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -301,7 +300,7 @@ def loop_iqmc(mcdc):
 def source_iteration(mcdc):
     simulation_end = False
 
-    loop_index = numba.uint64(0)
+    loop_index = 0
     while not simulation_end:
         # reset particle bank size
         mcdc["bank_source"]["size"] = 0
@@ -342,7 +341,7 @@ def source_iteration(mcdc):
         # set flux_old = current flux
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
 
-        loop_index += numba.uint64(1)
+        loop_index += 1
 
 
 @njit
@@ -708,7 +707,7 @@ def loop_source_precursor(seed, mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        src_seed = kernel.int_hash_combo(numba.uint64(work_idx), seed)
+        src_seed = kernel.int_hash_combo(work_idx, seed)
         if kernel.rng_from_seed(src_seed) < w - N:
             N += 1
         DNP["w"] = N
