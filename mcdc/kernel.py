@@ -156,13 +156,8 @@ def murmur_hash64a(key, seed):
     return hash_value
 
 
-@njit(numba.uint64(numba.uint64))
-def int_hash(value):
-    return murmur_hash64a(value, 0)
-
-
 @njit(numba.uint64(numba.uint64, numba.uint64))
-def int_hash_combo(value, seed):
+def split_seed(value, seed):
     return murmur_hash64a(value, seed)
 
 
@@ -926,7 +921,7 @@ def copy_particle(P):
 @njit
 def split_particle(P):
     P_new = copy_particle(P)
-    P_new["rng_seed"] = int_hash(P["rng_seed"])
+    P_new["rng_seed"] = split_seed(P["rng_seed"], 0)
     rng(P)
     return P_new
 
