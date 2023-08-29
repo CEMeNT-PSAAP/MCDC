@@ -84,23 +84,26 @@ def sample_discrete(group, P):
 
 
 @njit(numba.uint64(numba.uint64, numba.uint64))
-def wrapping_mul(a,b):
+def wrapping_mul(a, b):
     return a * b
+
 
 @njit(numba.uint64(numba.uint64, numba.uint64))
 def wrapping_add(a, b):
     return a + b
 
-def wrapping_mul_python(a,b):
+
+def wrapping_mul_python(a, b):
     a = numba.uint64(a)
     b = numba.uint64(b)
-    with np.errstate(all='ignore'):
+    with np.errstate(all="ignore"):
         return a * b
+
 
 def wrapping_add_python(a, b):
     a = numba.uint64(a)
     b = numba.uint64(b)
-    with np.errstate(all='ignore'):
+    with np.errstate(all="ignore"):
         return a + b
 
 
@@ -109,8 +112,6 @@ def adapt_rng(object_mode=False):
     if object_mode:
         wrapping_add = wrapping_add_python
         wrapping_mul = wrapping_mul_python
-
-
 
 
 @njit(numba.uint64(numba.uint64, numba.uint64))
@@ -166,7 +167,7 @@ def rng_skip_ahead_(n, mcdc):
 
 @njit(numba.uint64(numba.uint64))
 def rng_(seed):
-    return wrapping_add(wrapping_mul(RNG_G,seed), RNG_C) & RNG_MOD_MASK
+    return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
 
 
 @njit
