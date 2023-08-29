@@ -121,7 +121,6 @@ def loop_source(seed, mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             P = np.zeros(1, dtype=type_.particle_record)[0]
-            P["rng_seed"] = work_idx * 524287
             # Sample source
             sample_seed = kernel.int_hash_combo(src_seed, 0x496C68616D)
             xi = kernel.rng_from_seed(sample_seed)

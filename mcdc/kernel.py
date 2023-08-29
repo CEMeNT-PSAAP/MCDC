@@ -2209,11 +2209,6 @@ def scattering(P, prog):
 
         # Set weight
         P_new["w"] = weight_new
-        #! Offset seed by multiple of large prime to try to get rid
-        #- of any correlation between rng sequences of siblings.
-        #- If this does not work, some more agressive hashing may be
-        #- required.
-        P_new["rng_seed"] = P["rng_seed"] + n * 524287
 
         # Sample scattering phase space
         sample_phasespace_scattering(P, material, P_new)
@@ -2312,11 +2307,6 @@ def fission(P, prog):
 
         # Set weight
         P_new["w"] = weight_new
-        #! Offset seed by multiple of large prime to try to get rid
-        #- of any correlation between rng sequences of siblings.
-        #- If this does not work, some more agressive hashing may be
-        #- required.
-        P_new["rng_seed"] = P["rng_seed"] + n * 524287
 
         # Sample scattering phase space
         sample_phasespace_fission(P, material, P_new, mcdc)
