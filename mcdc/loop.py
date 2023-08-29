@@ -216,13 +216,19 @@ def step_particle(P : adapt.particle, prog : uintp):
         trans = np.zeros(3)
         P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
+    with objmode():
+        print('X')
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
     event = P["event"]
+    with objmode():
+        print('Y')
 
     # The & operator here is a bitwise and.
     # It is used to determine if an event type is part of the particle event.
 
+    with objmode():
+        print('A')
     # Collision
     if event & EVENT_COLLISION:
         # Generate IC?
@@ -254,11 +260,15 @@ def step_particle(P : adapt.particle, prog : uintp):
                     and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
                 ):
                     kernel.sensitivity_material(P, mcdc)
+    with objmode():
+        print('B')
 
     # Mesh tally
     if event & EVENT_MESH:
         kernel.mesh_crossing(P, mcdc)
 
+    with objmode():
+        print('C')
     # Different Methods for shifting the particle
     # Surface crossing
     if event & EVENT_SURFACE:
@@ -279,6 +289,8 @@ def step_particle(P : adapt.particle, prog : uintp):
     elif event & EVENT_LATTICE + EVENT_MESH:
         kernel.shift_particle(P, SHIFT)
 
+    with objmode():
+        print('D')
     # Time boundary
     if event & EVENT_TIME_BOUNDARY:
         kernel.time_boundary(P, mcdc)
@@ -704,6 +716,8 @@ def davidson(prog):
 @njit
 def loop_source_precursor(seed, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
+
+    prog = mcdc
 
     # Progress bar indicator
     N_prog = 0

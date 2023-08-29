@@ -167,6 +167,7 @@ def make_utils(target):
     global add_active, add_active_cpu, add_active_gpu
     global add_source, add_source_cpu, add_source_gpu
     global add_census, add_census_cpu, add_census_gpu
+    global add_IC, add_IC_cpu, add_IC_gpu
     
     if   target == 'cpu':
         global_add = global_add_cpu
@@ -179,6 +180,7 @@ def make_utils(target):
         add_active = add_active_cpu
         add_source = add_source_cpu
         add_census = add_census_cpu
+        add_IC = add_IC_cpu
     elif target == 'gpu':
         global_add = global_add_gpu
         global_max = global_max_gpu
@@ -189,6 +191,7 @@ def make_utils(target):
         add_active = add_active_gpu
         add_source = add_source_gpu
         add_census = add_census_gpu
+        add_IC = add_IC_gpu
     else:
         print(f"ERROR: Unrecognized target '{target}'")
 
@@ -310,7 +313,7 @@ def sim_particle(P,prog):
     loop.loop_particle()
 
 def particle_loop_gpu():
-    
+    pass
 
 
 # =========================================================================
@@ -331,10 +334,7 @@ def compiler(func, target):
         print(f"[ERROR] Unrecognized target '{target}'.")
 
 def make_loops(target):
-    if target == 'cpu':
-        loop.step_particle = loop
-    else:
-        loop.step_particle = 
+    loop.step_particle = compiler(loop.step_particle,target)
 
 
 def adapt_to(target):

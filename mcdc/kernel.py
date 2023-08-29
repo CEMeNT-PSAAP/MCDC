@@ -101,19 +101,19 @@ def rng_skip_ahead(n, mcdc):
     rng_skip_ahead_(int(n), mcdc)
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def bot_64(a):
     half_mask = 0xFFFFFFFF
     return a & half_mask
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def top_64(a):
     half_mask = 0xFFFFFFFF
     return (a >> 32) & half_mask
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def wrapping_mul_32_bit(a, b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -130,13 +130,13 @@ def wrapping_mul_32_bit(a, b):
     return result
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def wrapping_mul(a, b):
-    mask = numba.uint64(0xFFFFFFFFFFFFFFFF)
+    mask = nb.uint64(0xFFFFFFFFFFFFFFFF)
     return (a * b) & mask
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def wrapping_add_32_bit(a, b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -152,15 +152,15 @@ def wrapping_add_32_bit(a, b):
     return result
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def murmur_hash64a(key, seed):
-    multiplier = numba.uint64(0xC6A4A7935BD1E995)
-    length = numba.uint64(8)
-    rotator = numba.uint64(47)
-    key = numba.uint64(key)
-    seed = numba.uint64(seed)
+    multiplier = nb.uint64(0xC6A4A7935BD1E995)
+    length = nb.uint64(8)
+    rotator = nb.uint64(47)
+    key = nb.uint64(key)
+    seed = nb.uint64(seed)
 
-    hash_value = numba.uint64(seed) ^ wrapping_mul(length, multiplier)
+    hash_value = nb.uint64(seed) ^ wrapping_mul(length, multiplier)
 
     key = wrapping_mul(key, multiplier)
     key ^= key >> rotator
@@ -174,29 +174,29 @@ def murmur_hash64a(key, seed):
     return hash_value
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def int_hash(value):
     return murmur_hash64a(value, 0)
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def int_hash_combo(value, seed):
     return murmur_hash64a(value, seed)
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def bot_64(a):
     half_mask = 0xFFFFFFFF
     return a & half_mask
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def top_64(a):
     half_mask = 0xFFFFFFFF
     return (a >> 32) & half_mask
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def wrapping_mul_32_bit(a, b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -213,13 +213,13 @@ def wrapping_mul_32_bit(a, b):
     return result
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def wrapping_mul(a, b):
-    mask = numba.uint64(0xFFFFFFFFFFFFFFFF)
+    mask = nb.uint64(0xFFFFFFFFFFFFFFFF)
     return (a * b) & mask
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def wrapping_add_32_bit(a, b):
     a_lo = bot_64(a)
     a_hi = top_64(a)
@@ -235,15 +235,15 @@ def wrapping_add_32_bit(a, b):
     return result
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def murmur_hash64a(key, seed):
-    multiplier = numba.uint64(0xC6A4A7935BD1E995)
-    length = numba.uint64(8)
-    rotator = numba.uint64(47)
-    key = numba.uint64(key)
-    seed = numba.uint64(seed)
+    multiplier = nb.uint64(0xC6A4A7935BD1E995)
+    length = nb.uint64(8)
+    rotator = nb.uint64(47)
+    key = nb.uint64(key)
+    seed = nb.uint64(seed)
 
-    hash_value = numba.uint64(seed) ^ wrapping_mul(length, multiplier)
+    hash_value = nb.uint64(seed) ^ wrapping_mul(length, multiplier)
 
     key = wrapping_mul(key, multiplier)
     key ^= key >> rotator
@@ -257,41 +257,41 @@ def murmur_hash64a(key, seed):
     return hash_value
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def int_hash(value):
     return murmur_hash64a(value, 0)
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit(nb.uint64(nb.uint64, nb.uint64))
 def int_hash_combo(value, seed):
     return murmur_hash64a(value, seed)
 
 
 @njit
 def rng_skip_ahead_(n, mcdc):
-    n = numba.uint64(n)
+    n = nb.uint64(n)
     seed_base = mcdc["rng_seed_base"]
     g = mcdc["setting"]["rng_g"]
     c = mcdc["setting"]["rng_c"]
-    g_new = numba.uint64(1)
-    c_new = numba.uint64(0)
+    g_new = nb.uint64(1)
+    c_new = nb.uint64(0)
     mod = mcdc["setting"]["rng_mod"]
-    mod_mask = mod - numba.uint64(1)
+    mod_mask = mod - nb.uint64(1)
 
     n = n & mod_mask
     while n > 0:
-        if n & numba.uint64(1):
+        if n & nb.uint64(1):
             g_new = g_new * g & mod_mask
             c_new = (c_new * g + c) & mod_mask
 
-        c = (g + numba.uint64(1)) * c & mod_mask
+        c = (g + nb.uint64(1)) * c & mod_mask
         g = g * g & mod_mask
-        n >>= numba.uint64(1)
+        n >>= nb.uint64(1)
 
     mcdc["rng_seed"] = (g_new * seed_base + c_new) & mod_mask
 
 
-@njit(numba.uint64(numba.uint64))
+@njit(nb.uint64(nb.uint64))
 def rng_(seed):
     return (RNG_G * seed + RNG_C) & RNG_MOD_MASK
 
@@ -355,6 +355,7 @@ def source_particle(source, seed):
     P["w"] = 1.0
 
     P["sensitivity_ID"] = 0
+    return P
 
 
 
@@ -1224,9 +1225,14 @@ def surface_distance(P, surface, trans, mcdc):
         t_max = surface["t"][idx + 1]
         d_max = (t_max - P["t"]) * v
 
+        with objmode():
+            denom = G * ux + H * uy + I_ * uz + J1 / v
+            print(f"[{G} * {ux} + {H} * {uy} + {I_} * {uz} + {J1} / {v}")
         distance = -surface_evaluate(P, surface, trans) / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
+        with objmode():
+            print(']')
 
         # Go beyond current movement slice?
         if distance > d_max:
@@ -1241,6 +1247,7 @@ def surface_distance(P, surface, trans, mcdc):
             return INF, surface_move
         else:
             return distance, surface_move
+
 
     x = P["x"] + trans[0]
     y = P["y"] + trans[1]
@@ -1909,9 +1916,13 @@ def move_to_event(P, mcdc):
     # Get distances to events
     # =========================================================================
 
+    with objmode():
+        print('>')
     # Distance to nearest geometry boundary (surface or lattice)
     # Also set particle material and speed
     d_boundary, event = distance_to_boundary(P, mcdc)
+    with objmode():
+        print('<')
 
     # Distance to tally mesh
     d_mesh = INF
@@ -1930,6 +1941,7 @@ def move_to_event(P, mcdc):
     # Distance to census time
     idx = mcdc["technique"]["census_idx"]
     d_time_census = speed * (mcdc["technique"]["census_time"][idx] - P["t"])
+
 
     # Distance to collision
     if mcdc["technique"]["iQMC"]:
@@ -2028,9 +2040,13 @@ def distance_to_boundary(P, mcdc):
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
         # Distance to nearest surface
+        with objmode():
+            print('{')
         d_surface, surface_ID, surface_move = distance_to_nearest_surface(
             P, cell, trans, mcdc
         )
+        with objmode():
+            print('}')
 
         # Check if smaller
         if d_surface * PREC < distance:
