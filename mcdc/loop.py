@@ -1,5 +1,4 @@
 import numpy as np
-import numba
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode, jit, uintp
 from scipy.linalg import eig
@@ -29,17 +28,18 @@ from mcdc.print_ import (
 def loop_main(mcdc):
     simulation_end = False
 
-    loop_index = numba.uint64(0)
+    idx_cycle = 0
     while not simulation_end:
-        cycle_seed = kernel.int_hash_combo(loop_index, mcdc["rng_seed"])
+        seed_cycle = kernel.split_seed(idx_cycle, mcdc["rng_seed"])
+
         # Loop over source particles
-        ls_seed = kernel.int_hash_combo(cycle_seed, 0x43616D696C6C65)
-        loop_source(ls_seed, mcdc)
+        seed_source = kernel.split_seed(seed_cycle, 0x43616D696C6C65)
+        loop_source(seed_source, mcdc)
 
         # Loop over source precursors
         if mcdc["bank_precursor"]["size"] > 0:
-            lsp_seed = kernel.int_hash_combo(cycle_seed, 0x546F6464)
-            loop_source_precursor(lsp_seed, mcdc)
+            seed_source_precursor = kernel.split_seed(seed_cycle, 0x546F6464)
+            loop_source_precursor(seed_source_precursor, mcdc)
 
         # Eigenvalue cycle closeout
         if mcdc["setting"]["mode_eigenvalue"]:
@@ -54,8 +54,8 @@ def loop_main(mcdc):
                 print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
-            mpb_seed = kernel.int_hash_combo(cycle_seed, 0x5279616E)
-            kernel.manage_particle_banks(mpb_seed, mcdc)
+            seed_bank = kernel.split_seed(seed_cycle, 0x5279616E)
+            kernel.manage_particle_banks(seed_bank, mcdc)
 
             # Cycle management
             mcdc["i_cycle"] += 1
@@ -71,7 +71,8 @@ def loop_main(mcdc):
             < len(mcdc["technique"]["census_time"]) - 1
         ):
             # Manage particle banks
-            kernel.manage_particle_banks(cycle_seed, mcdc)
+            seed_bank = kernel.split_seed(seed_cycle, 0x5279616E)
+            kernel.manage_particle_banks(seed_cycle, mcdc)
 
             # Increment census index
             mcdc["technique"]["census_idx"] += 1
@@ -80,7 +81,7 @@ def loop_main(mcdc):
         else:
             simulation_end = True
 
-        loop_index += numba.uint64(1)
+        idx_cycle += 1
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
@@ -107,8 +108,8 @@ def loop_source(seed, mcdc):
         mcdc["technique"]["iqmc_sweep_counter"] += 1
 
     # Loop over particle sources
-    for work_idx in range(mcdc["mpi_work_size"]):
-        src_seed = kernel.int_hash_combo(numba.uint64(work_idx), seed)
+    for idx_work in range(mcdc["mpi_work_size"]):
+        seed_work = kernel.split_seed(idx_work, seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -122,18 +123,11 @@ def loop_source(seed, mcdc):
         if mcdc["bank_source"]["size"] == 0:
             P = np.zeros(1, dtype=type_.particle_record)[0]
             # Sample source
-            sample_seed = kernel.int_hash_combo(src_seed, 0x496C68616D)
-            xi = kernel.rng_from_seed(sample_seed)
-            tot = 0.0
-            for S in mcdc["sources"]:
-                tot += S["prob"]
-                if tot >= xi:
-                    break
-            P = kernel.source_particle(S, src_seed)
+            P = kernel.source_particle(seed_work, mcdc)
 
         # Get from source bank
         else:
-            P = mcdc["bank_source"]["particles"][work_idx]
+            P = mcdc["bank_source"]["particles"][idx_work]
 
         # Check if it is beyond current census index
         census_idx = mcdc["technique"]["census_idx"]
@@ -175,7 +169,7 @@ def loop_source(seed, mcdc):
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
+        percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
@@ -334,7 +328,7 @@ def source_iteration(prog):
     simulation_end = False
     mcdc = adapt.device(prog)
 
-    loop_index = numba.uint64(0)
+    loop_index = 0
     while not simulation_end:
         # reset particle bank size
         mcdc["bank_source"]["size"] = 0
@@ -375,7 +369,7 @@ def source_iteration(prog):
         # set flux_old = current flux
         mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
 
-        loop_index += numba.uint64(1)
+        loop_index += 1
 
 
 @njit
@@ -734,9 +728,9 @@ def loop_source_precursor(seed, mcdc):
     # Loop over precursor sources
     # =========================================================================
 
-    for work_idx in range(mcdc["mpi_work_size_precursor"]):
+    for idx_work in range(mcdc["mpi_work_size_precursor"]):
         # Get precursor
-        DNP = mcdc["bank_precursor"]["precursors"][work_idx]
+        DNP = mcdc["bank_precursor"]["precursors"][idx_work]
 
         # Set groups
         j = DNP["g"]
@@ -746,8 +740,8 @@ def loop_source_precursor(seed, mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        src_seed = kernel.int_hash_combo(numba.uint64(work_idx), seed)
-        if kernel.rng_from_seed(src_seed) < w - N:
+        seed_work = kernel.split_seed(idx_work, seed)
+        if kernel.rng_from_seed(seed_work) < w - N:
             N += 1
         DNP["w"] = N
 
@@ -758,7 +752,7 @@ def loop_source_precursor(seed, mcdc):
         for particle_idx in range(N):
             # Create new particle
             P_new = np.zeros(1, dtype=type_.particle)[0]
-            part_seed = kernel.int_hash_combo(particle_idx, src_seed)
+            part_seed = kernel.split_seed(particle_idx, seed_work)
             P_new["rng_seed"] = part_seed
             P_new["alive"] = True
             P_new["w"] = 1.0
@@ -857,7 +851,7 @@ def loop_source_precursor(seed, mcdc):
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        percent = (work_idx + 1.0) / mcdc["mpi_work_size_precursor"]
+        percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():

@@ -78,78 +78,40 @@ def sample_discrete(group, P):
 
 
 # =============================================================================
-# Random number generator operations
+# Random number generator
+#   LCG with hash seed-split
 # =============================================================================
-# TODO: make g, c, and mod constants
 
 
-#! Revise - make rng state per-particle
-@njit
-def rng_rebase(mcdc):
-    mcdc["rng_seed_base"] = mcdc["rng_seed"]
-
-
-#! Revise - make rng state per-particle
-@njit
-def rng_skip_ahead_strides(n, mcdc):
-    rng_skip_ahead_(int(n * mcdc["rng_stride"]), mcdc)
-
-
-#! Revise - make rng state per-particle
-@njit
-def rng_skip_ahead(n, mcdc):
-    rng_skip_ahead_(int(n), mcdc)
-
-
-@njit(nb.uint64(nb.uint64))
-def bot_64(a):
-    half_mask = 0xFFFFFFFF
-    return a & half_mask
-
-
-@njit(nb.uint64(nb.uint64))
-def top_64(a):
-    half_mask = 0xFFFFFFFF
-    return (a >> 32) & half_mask
-
-
-@njit(nb.uint64(nb.uint64, nb.uint64))
-def wrapping_mul_32_bit(a, b):
-    a_lo = bot_64(a)
-    a_hi = top_64(a)
-    b_lo = bot_64(b)
-    b_hi = top_64(b)
-    x = a_lo * b_lo
-    x_lo = bot_64(x)
-    x_hi = top_64(x)
-    y = bot_64(a_lo * b_hi)
-    z = bot_64(a_hi * b_lo)
-    top = bot_64(x_hi + y + z)
-    bot = x_lo
-    result = (top << 32) | bot
-    return result
-
-
-@njit(nb.uint64(nb.uint64, nb.uint64))
+@njit(numba.uint64(numba.uint64, numba.uint64))
 def wrapping_mul(a, b):
-    mask = nb.uint64(0xFFFFFFFFFFFFFFFF)
-    return (a * b) & mask
+    return a * b
 
 
-@njit(nb.uint64(nb.uint64, nb.uint64))
-def wrapping_add_32_bit(a, b):
-    a_lo = bot_64(a)
-    a_hi = top_64(a)
-    b_lo = bot_64(b)
-    b_hi = top_64(b)
-    x = a_lo + b_lo
-    x_lo = bot_64(x)
-    x_hi = top_64(x)
-    y = bot_64(a_hi + b_hi)
-    top = bot_64(x_hi + y)
-    bot = x_lo
-    result = (top << 32) | bot
-    return result
+@njit(numba.uint64(numba.uint64, numba.uint64))
+def wrapping_add(a, b):
+    return a + b
+
+
+def wrapping_mul_python(a, b):
+    a = numba.uint64(a)
+    b = numba.uint64(b)
+    with np.errstate(all="ignore"):
+        return a * b
+
+
+def wrapping_add_python(a, b):
+    a = numba.uint64(a)
+    b = numba.uint64(b)
+    with np.errstate(all="ignore"):
+        return a + b
+
+
+def adapt_rng(object_mode=False):
+    global wrapping_add, wrapping_mul
+    if object_mode:
+        wrapping_add = wrapping_add_python
+        wrapping_mul = wrapping_mul_python
 
 
 @njit(nb.uint64(nb.uint64, nb.uint64))
@@ -174,13 +136,8 @@ def murmur_hash64a(key, seed):
     return hash_value
 
 
-@njit(nb.uint64(nb.uint64))
-def int_hash(value):
-    return murmur_hash64a(value, 0)
-
-
-@njit(nb.uint64(nb.uint64, nb.uint64))
-def int_hash_combo(value, seed):
+@njit(numba.uint64(numba.uint64, numba.uint64))
+def split_seed(value, seed):
     return murmur_hash64a(value, seed)
 
 
@@ -210,7 +167,7 @@ def rng_skip_ahead_(n, mcdc):
 
 @njit(nb.uint64(nb.uint64))
 def rng_(seed):
-    return (RNG_G * seed + RNG_C) & RNG_MOD_MASK
+    return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
 
 
 @njit
@@ -230,9 +187,17 @@ def rng_from_seed(seed):
 
 
 @njit
-def source_particle(source, seed):
+def source_particle(seed, mcdc):
     P = np.zeros(1, dtype=type_.particle_record)[0]
     P["rng_seed"] = seed
+
+    # Sample source
+    xi = rng(P)
+    tot = 0.0
+    for source in mcdc["sources"]:
+        tot += source["prob"]
+        if tot >= xi:
+            break
 
     # Position
     if source["box"]:
@@ -959,7 +924,7 @@ def copy_particle(P):
 @njit
 def split_particle(P):
     P_new = copy_particle(P)
-    P_new["rng_seed"] = int_hash(P["rng_seed"])
+    P_new["rng_seed"] = split_seed(P["rng_seed"], 0)
     rng(P)
     return P_new
 
