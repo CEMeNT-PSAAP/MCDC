@@ -43,7 +43,7 @@ mcdc.tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1e3)
+mcdc.setting(N_particle=1e4,active_bank_buff=100000)
 
 # Run
 mcdc.run()

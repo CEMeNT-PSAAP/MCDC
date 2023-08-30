@@ -130,6 +130,7 @@ def global_add(ary,idx,val):
 def global_add_cpu(ary,idx,val):
     result    = ary[idx]
     ary[idx] += val
+    #print(ary[idx])
     return result
 
 @cuda.jit
@@ -284,7 +285,7 @@ def make_spec(target):
     if target == 'gpu':
         state_spec = (dev_state_type,grp_state_type,thd_state_type) 
         one_event_fns   = [iterate]
-        multi_event_fns = [source,move,scattering,fission,leakage,bcollision]
+        #multi_event_fns = [source,move,scattering,fission,leakage,bcollision]
         device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
         iterate_async, = harm.RuntimeSpec.async_dispatch(iterate)
     elif target != 'cpu':
@@ -334,7 +335,9 @@ def compiler(func, target):
         print(f"[ERROR] Unrecognized target '{target}'.")
 
 def make_loops(target):
+    #pass
     loop.step_particle = compiler(loop.step_particle,target)
+    
 
 
 def adapt_to(target):
