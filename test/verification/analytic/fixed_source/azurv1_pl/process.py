@@ -1,9 +1,9 @@
-from plotter import plot_convergence
 import numpy as np
 import h5py
 import sys
 
 sys.path.append("../../util")
+from plotter import plot_convergence
 
 
 N_min = int(sys.argv[1])

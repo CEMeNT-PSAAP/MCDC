@@ -168,6 +168,7 @@ def prepare():
     type_.make_type_tally(N_tally_scores, input_deck.tally)
     type_.make_type_technique(N_particle, G, input_deck.technique)
     type_.make_type_global(input_deck)
+    kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     # =========================================================================
     # Make the global variable container
