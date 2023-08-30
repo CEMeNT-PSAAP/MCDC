@@ -1,7 +1,8 @@
 import math
 
 from mpi4py import MPI
-from numba import njit, objmode, literal_unroll, cuda
+from numba import njit, objmode, literal_unroll
+import numba
 
 import mcdc.type_ as type_
 
@@ -9,14 +10,14 @@ from mcdc.constant import *
 from mcdc.print_ import print_error
 from mcdc.type_ import score_list
 from mcdc.loop import loop_source
-
 import mcdc.adapt as adapt
+
 
 # =============================================================================
 # Random sampling
 # =============================================================================
 
-# Needs refactor for per-particle rng
+
 @njit
 def sample_isotropic_direction(P):
     # Sample polar cosine and azimuthal angle uniformly
@@ -114,15 +115,15 @@ def adapt_rng(object_mode=False):
         wrapping_mul = wrapping_mul_python
 
 
-@njit(nb.uint64(nb.uint64, nb.uint64))
+@njit(numba.uint64(numba.uint64, numba.uint64))
 def murmur_hash64a(key, seed):
-    multiplier = nb.uint64(0xC6A4A7935BD1E995)
-    length = nb.uint64(8)
-    rotator = nb.uint64(47)
-    key = nb.uint64(key)
-    seed = nb.uint64(seed)
+    multiplier = numba.uint64(0xC6A4A7935BD1E995)
+    length = numba.uint64(8)
+    rotator = numba.uint64(47)
+    key = numba.uint64(key)
+    seed = numba.uint64(seed)
 
-    hash_value = nb.uint64(seed) ^ wrapping_mul(length, multiplier)
+    hash_value = numba.uint64(seed) ^ wrapping_mul(length, multiplier)
 
     key = wrapping_mul(key, multiplier)
     key ^= key >> rotator
@@ -143,29 +144,29 @@ def split_seed(value, seed):
 
 @njit
 def rng_skip_ahead_(n, mcdc):
-    n = nb.uint64(n)
+    n = numba.uint64(n)
     seed_base = mcdc["rng_seed_base"]
     g = mcdc["setting"]["rng_g"]
     c = mcdc["setting"]["rng_c"]
-    g_new = nb.uint64(1)
-    c_new = nb.uint64(0)
+    g_new = numba.uint64(1)
+    c_new = numba.uint64(0)
     mod = mcdc["setting"]["rng_mod"]
-    mod_mask = mod - nb.uint64(1)
+    mod_mask = mod - numba.uint64(1)
 
     n = n & mod_mask
     while n > 0:
-        if n & nb.uint64(1):
+        if n & numba.uint64(1):
             g_new = g_new * g & mod_mask
             c_new = (c_new * g + c) & mod_mask
 
-        c = (g + nb.uint64(1)) * c & mod_mask
+        c = (g + numba.uint64(1)) * c & mod_mask
         g = g * g & mod_mask
-        n >>= nb.uint64(1)
+        n >>= numba.uint64(1)
 
     mcdc["rng_seed"] = (g_new * seed_base + c_new) & mod_mask
 
 
-@njit(nb.uint64(nb.uint64))
+@njit(numba.uint64(numba.uint64))
 def rng_(seed):
     return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
 
@@ -237,8 +238,8 @@ def source_particle(seed, mcdc):
     P["w"] = 1.0
 
     P["sensitivity_ID"] = 0
-    return P
 
+    return P
 
 
 # =============================================================================
@@ -262,7 +263,6 @@ def add_particle(P, bank):
 
 @njit
 def get_particle(bank, mcdc):
-
     # Check if bank is empty
     if bank["size"] == 0:
         with objmode():
@@ -272,15 +272,14 @@ def get_particle(bank, mcdc):
     bank["size"] -= 1
 
     # Create in-flight particle
-    #P = np.zeros(1, dtype=type_.particle)[0]
-    P = adapt.local_particle()
+    P = np.zeros(1, dtype=type_.particle)[0]
 
     # Set attribute
     P_rec = bank["particles"][bank["size"]]
-    P["x"]  = P_rec["x"]
-    P["y"]  = P_rec["y"]
-    P["z"]  = P_rec["z"]
-    P["t"]  = P_rec["t"]
+    P["x"] = P_rec["x"]
+    P["y"] = P_rec["y"]
+    P["z"] = P_rec["z"]
+    P["t"] = P_rec["t"]
     P["ux"] = P_rec["ux"]
     P["uy"] = P_rec["uy"]
     P["uz"] = P_rec["uz"]
@@ -301,8 +300,7 @@ def get_particle(bank, mcdc):
     P["event"] = -1
     return P
 
-
-#! Don't worry about this
+#! Don't touch for now
 @njit
 def manage_particle_banks(seed, mcdc):
     # Record time
@@ -342,7 +340,7 @@ def manage_particle_banks(seed, mcdc):
         mcdc["runtime_bank_management"] += time_end - time_start
 
 
-#! Don't worry about this
+#! Don't touch for now
 @njit
 def manage_IC_bank(mcdc):
     # Buffer bank
@@ -490,7 +488,6 @@ def total_weight(bank):
     return buff[0]
 
 
-#! Don't worry about this
 @njit
 def bank_rebalance(mcdc):
     # Scan the bank
@@ -612,9 +609,8 @@ def distribute_work(N, mcdc, precursor=False):
 
 
 @njit
-def bank_IC(P, prog):
+def bank_IC(P, mcdc):
     # TODO: Consider multi-nuclide material
-    mcdc = adapt.device(prog)
     material = mcdc["nuclides"][P["material_ID"]]
 
     # =========================================================================
@@ -648,16 +644,11 @@ def bank_IC(P, prog):
         P_new = split_particle(P)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
-        #! Will need to be refactored for GPU
-        #add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
-        adapt.add_IC(prog,P_new)
+        add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
 
         # Accumulate fission
         SigmaF = material["fission"][g]
-        
-        #mcdc["technique"]["IC_fission_score"] += v * SigmaF
-        
-        #! Refactored for adapt.global_add
+        #mcdc["technique"]["IC_fission_score"][0] += v * SigmaF
         adapt.global_add(mcdc["technique"]["IC_fission_score"],0,v * SigmaF)
 
     # =========================================================================
@@ -703,6 +694,7 @@ def bank_IC(P, prog):
         precursor["y"] = P["y"]
         precursor["z"] = P["z"]
         precursor["w"] = wp_prime / wn_prime
+        #! Ask Ilham about this
         mcdc["technique"]["IC_bank_precursor_local"]["size"] += 1
 
         # Sample group
@@ -726,7 +718,6 @@ def bank_IC(P, prog):
 #       required due to pure-Python behavior of taking things by reference.
 
 
-#! Don't worry about this
 @njit
 def population_control(seed, mcdc):
     if mcdc["technique"]["pct"] == PCT_COMBING:
@@ -734,7 +725,7 @@ def population_control(seed, mcdc):
     elif mcdc["technique"]["pct"] == PCT_COMBING_WEIGHT:
         pct_combing_weight(seed, mcdc)
 
-#! Don't worry about this
+
 @njit
 def pct_combing(seed, mcdc):
     bank_census = mcdc["bank_census"]
@@ -771,7 +762,6 @@ def pct_combing(seed, mcdc):
         add_particle(P, bank_source)
 
 
-#! Don't worry about this
 @njit
 def pct_combing_weight(seed, mcdc):
     bank_census = mcdc["bank_census"]
@@ -905,8 +895,7 @@ def get_particle_speed(P, mcdc):
 
 @njit
 def copy_particle(P):
-    #P_new = np.zeros(1, dtype=type_.particle_record)[0]
-    P_new = adapt.local_particle_record()
+    P_new = np.zeros(1, dtype=type_.particle_record)[0]
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -1107,14 +1096,9 @@ def surface_distance(P, surface, trans, mcdc):
         t_max = surface["t"][idx + 1]
         d_max = (t_max - P["t"]) * v
 
-        with objmode():
-            denom = G * ux + H * uy + I_ * uz + J1 / v
-            print(f"[{G} * {ux} + {H} * {uy} + {I_} * {uz} + {J1} / {v}")
         distance = -surface_evaluate(P, surface, trans) / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
-        with objmode():
-            print(']')
 
         # Go beyond current movement slice?
         if distance > d_max:
@@ -1129,7 +1113,6 @@ def surface_distance(P, surface, trans, mcdc):
             return INF, surface_move
         else:
             return distance, surface_move
-
 
     x = P["x"] + trans[0]
     y = P["y"] + trans[1]
@@ -1469,7 +1452,6 @@ def score_flux(s, g, t, x, y, z, mu, azi, flux, score):
     adapt.global_add(score["bin"],(s, g, t, x, y, z, mu, azi),flux)
 
 
-
 @njit
 def score_current(s, g, t, x, y, z, flux, P, score):
     #score["bin"][s, g, t, x, y, z, 0] += flux * P["ux"]
@@ -1498,9 +1480,7 @@ def score_eddington(s, g, t, x, y, z, flux, P, score):
     adapt.global_add(score["bin"],(s, g, t, x, y, z, 4),flux * uy * uz)
     adapt.global_add(score["bin"],(s, g, t, x, y, z, 5),flux * uz * uz)
 
-
-#! Don't worry about this
-# Cannot be called on the GPU without significant refactoring
+#! Don't touch for now
 @njit
 def score_closeout_history(score):
     # Accumulate score and square of score into mean and sdev
@@ -1510,9 +1490,7 @@ def score_closeout_history(score):
     # Reset bin
     score["bin"].fill(0.0)
 
-
-#! Don't worry about this
-# Cannot be called on the GPU without significant refactoring
+#! Don't touch for now
 @njit
 def score_closeout(score, mcdc):
     N_history = mcdc["setting"]["N_particle"]
@@ -1594,20 +1572,15 @@ def eigenvalue_tally(P, distance, mcdc):
     nuSigmaF = nu * SigmaF
 
     # Fission production (needed even during inactive cycle)
-    #mcdc["eigenvalue_tally_nuSigmaF"] += flux * nuSigmaF
-
-    #! Requires refactor of eigenvalue_tally_nuSigmaF to an array
-    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
+    #mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
+    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"],0,flux*nuSigmaF)
 
     if mcdc["cycle_active"]:
         # Neutron density
         v = get_particle_speed(P, mcdc)
         n_density = flux / v
-        #mcdc["eigenvalue_tally_n"] += n_density
-
-        #! Requires refactor of eigenvalue_tally_n to an array
-        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
-
+        #mcdc["eigenvalue_tally_n"][0] += n_density
+        adapt.global_add(mcdc["eigenvalue_tally_n"],0,n_density)
         # Maximum neutron density
         if mcdc["n_max"] < n_density:
             mcdc["n_max"] = n_density
@@ -1620,17 +1593,13 @@ def eigenvalue_tally(P, distance, mcdc):
         for j in range(J):
             total += nu_d[j] / decay[j]
         C_density = flux * total * SigmaF / mcdc["k_eff"]
-
-        #mcdc["eigenvalue_tally_C"] += C_density
-
-        #! Requires refactor of eigenvalue_tally_n to an array
+        #mcdc["eigenvalue_tally_C"][0] += C_density
         adapt.global_add(mcdc["eigenvalue_tally_C"],0,C_density)
-
         # Maximum precursor density
         if mcdc["C_max"] < C_density:
             mcdc["C_max"] = C_density
 
-
+#! Don't touch for now
 @njit
 def eigenvalue_tally_closeout_history(mcdc):
     N_particle = mcdc["setting"]["N_particle"]
@@ -1638,11 +1607,11 @@ def eigenvalue_tally_closeout_history(mcdc):
     i_cycle = mcdc["i_cycle"]
 
     # MPI Allreduce
-    buff_nuSigmaF  = np.zeros(1, np.float64)
-    buff_n         = np.zeros(1, np.float64)
-    buff_nmax      = np.zeros(1, np.float64)
-    buff_C         = np.zeros(1, np.float64)
-    buff_Cmax      = np.zeros(1, np.float64)
+    buff_nuSigmaF = np.zeros(1, np.float64)
+    buff_n = np.zeros(1, np.float64)
+    buff_nmax = np.zeros(1, np.float64)
+    buff_C = np.zeros(1, np.float64)
+    buff_Cmax = np.zeros(1, np.float64)
     buff_IC_fission = np.zeros(1, np.float64)
     with objmode():
         MPI.COMM_WORLD.Allreduce(
@@ -1798,13 +1767,9 @@ def move_to_event(P, mcdc):
     # Get distances to events
     # =========================================================================
 
-    with objmode():
-        print('>')
     # Distance to nearest geometry boundary (surface or lattice)
     # Also set particle material and speed
     d_boundary, event = distance_to_boundary(P, mcdc)
-    with objmode():
-        print('<')
 
     # Distance to tally mesh
     d_mesh = INF
@@ -1823,7 +1788,6 @@ def move_to_event(P, mcdc):
     # Distance to census time
     idx = mcdc["technique"]["census_idx"]
     d_time_census = speed * (mcdc["technique"]["census_time"][idx] - P["t"])
-
 
     # Distance to collision
     if mcdc["technique"]["iQMC"]:
@@ -1866,7 +1830,6 @@ def move_to_event(P, mcdc):
         material = mcdc["materials"][P["material_ID"]]
         w = P["iqmc_w"]
         SigmaT = material["total"][:]
-        #! Modifies global data:  mcdc["technique"]["iqmc_flux"][:, t, x, y, z] += flux
         score_iqmc_flux(P, distance, mcdc)
         w_final = continuous_weight_reduction(w, distance, SigmaT)
         P["iqmc_w"] = w_final
@@ -1874,10 +1837,8 @@ def move_to_event(P, mcdc):
 
     # Score tracklength tallies
     if mcdc["tally"]["tracklength"] and mcdc["cycle_active"]:
-        #! Modifies global data: loads of accumulations
         score_tracklength(P, distance, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
-        #! Modifies global data: some accumulations and a maximum
         eigenvalue_tally(P, distance, mcdc)
 
     # Move particle
@@ -1922,13 +1883,9 @@ def distance_to_boundary(P, mcdc):
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
         # Distance to nearest surface
-        with objmode():
-            print('{')
         d_surface, surface_ID, surface_move = distance_to_nearest_surface(
             P, cell, trans, mcdc
         )
-        with objmode():
-            print('}')
 
         # Check if smaller
         if d_surface * PREC < distance:
@@ -2038,8 +1995,7 @@ def distance_to_mesh(P, mesh, mcdc):
 
 
 @njit
-def surface_crossing(P, prog):
-    mcdc = adapt.device(prog)
+def surface_crossing(P, mcdc):
     trans = P["translation"]
 
     # Implement BC
@@ -2136,7 +2092,7 @@ def collision(P, mcdc):
 
 
 @njit
-def capture(P, prog):
+def capture(P, mcdc):
     # Kill the current particle
     P["alive"] = False
 
@@ -2147,8 +2103,7 @@ def capture(P, prog):
 
 
 @njit
-def scattering(P, prog):
-    mcdc = adapt.device(prog)
+def scattering(P, mcdc):
     # Kill the current particle
     P["alive"] = False
 
@@ -2179,8 +2134,7 @@ def scattering(P, prog):
         sample_phasespace_scattering(P, material, P_new)
 
         # Bank
-        #add_particle(P_new, mcdc["bank_active"])
-        adapt.add_active(prog,P_new)
+        add_particle(P_new, mcdc["bank_active"])
 
 
 @njit
@@ -2243,10 +2197,7 @@ def sample_phasespace_scattering(P, material, P_new):
 
 
 @njit
-def fission(P, prog):
-
-    mcdc = adapt.device(prog)
-
+def fission(P, mcdc):
     # Kill the current particle
     P["alive"] = False
 
@@ -2282,11 +2233,9 @@ def fission(P, prog):
 
         # Bank
         if mcdc["setting"]["mode_eigenvalue"]:
-            #add_particle(P_new, mcdc["bank_census"])
-            adapt.add_census(prog,P_new)
+            add_particle(P_new, mcdc["bank_census"])
         else:
-            #add_particle(P_new, mcdc["bank_active"])
-            adapt.add_active(prog,P_new)
+            add_particle(P_new, mcdc["bank_active"])
 
 
 @njit
@@ -2501,9 +2450,7 @@ def time_boundary(P, mcdc):
 
 
 @njit
-def weight_window(P, prog):
-    mcdc = adapt.device(prog)
-
+def weight_window(P, mcdc):
     # Get indices
     t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
 
@@ -2688,14 +2635,12 @@ def prepare_qmc_fission_source(mcdc):
 
 
 @njit
-def prepare_qmc_particles(prog):
+def prepare_qmc_particles(mcdc):
     """
     Create N_particles assigning the position, direction, and group from the
     QMC Low-Discrepency Sequence. Particles are added to the bank_source.
 
     """
-    mcdc = adapt.device(prog)
-
     # determine which portion of particles to loop through
     N_particle = mcdc["setting"]["N_particle"]
     N_work = mcdc["mpi_work_size"]
@@ -2746,11 +2691,8 @@ def prepare_qmc_particles(prog):
         # Set weight
         P_new["iqmc_w"] = Q[:, t, x, y, z] * dV * Nt / N_particle
         P_new["w"] = (P_new["iqmc_w"]).sum()
-        #! Set per-particle seed
-        P_new["rng_seed"]
         # add to source bank
-        #add_particle(P_new, mcdc["bank_source"])
-        adapt.add_source(prog,P_new)
+        add_particle(P_new, mcdc["bank_source"])
 
 
 @njit
@@ -2881,6 +2823,7 @@ def score_iqmc_flux(P, distance, mcdc):
         flux = w * (1 - np.exp(-(distance * SigmaT))) / (SigmaT * dV)
     else:
         flux = distance * w / dV
+    #! May need to be refactored to a for loop
     mcdc["technique"]["iqmc_flux"][:, t, x, y, z] += flux
 
 
@@ -3000,8 +2943,7 @@ def generate_iqmc_material_idx(mcdc):
     # variables for cell finding functions
     trans = np.zeros((3,))
     # create particle to utilize cell finding functions
-    #P_temp = np.zeros(1, dtype=type_.particle)[0]
-    P_temp = adapt.local_particle()
+    P_temp = np.zeros(1, dtype=type_.particle)[0]
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
@@ -3100,11 +3042,10 @@ def modified_gram_schmidt(V, u):
 
 
 @njit
-def AxV(phi, b, prog):
+def AxV(phi, b, mcdc):
     """
     Linear operator to be used with GMRES.
     """
-    mcdc = adapt.device(prog)
     matrix_shape = mcdc["technique"]["iqmc_flux"].shape
     vector_size = mcdc["technique"]["iqmc_flux"].size
 
@@ -3116,7 +3057,7 @@ def AxV(phi, b, prog):
 
     # QMC Sweep
     prepare_qmc_source(mcdc)
-    prepare_qmc_particles(prog)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(0, mcdc)
     # sum resultant flux on all processors
@@ -3129,12 +3070,11 @@ def AxV(phi, b, prog):
 
 
 @njit
-def RHS(prog):
+def RHS(mcdc):
     """
     We solve A x = b with a Krylov method. This function extracts
     b by doing a transport sweep of the fixed-source.
     """
-    mcdc = adapt.device(prog)
     # reshape v and assign to iqmc_flux
     Nt = mcdc["technique"]["iqmc_flux"].size
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
@@ -3145,7 +3085,7 @@ def RHS(prog):
 
     # QMC Sweep
     prepare_qmc_source(mcdc)
-    prepare_qmc_particles(prog)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(0, mcdc)
     # sum resultant flux on all processors
@@ -3157,12 +3097,11 @@ def RHS(prog):
 
 
 @njit
-def HxV(V, prog):
+def HxV(V, mcdc):
     """
     Linear operator for Davidson method,
     scattering + streaming terms -> (I-L^(-1)S)*phi
     """
-    mcdc = adapt.device(prog)
     # flux input is most recent iteration of eigenvector
     v = V[:, -1]
     # reshape v and assign to iqmc_flux
@@ -3175,7 +3114,7 @@ def HxV(V, prog):
 
     # QMC Sweep
     prepare_qmc_scattering_source(mcdc)
-    prepare_qmc_particles(prog)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(0, mcdc)
     # sum resultant flux on all processors
@@ -3189,12 +3128,11 @@ def HxV(V, prog):
 
 
 @njit
-def FxV(V, prog):
+def FxV(V, mcdc):
     """
     Linear operator for Davidson method,
     fission term -> (L^(-1)F*phi)
     """
-    mcdc = adapt.device(prog)
     # flux input is most recent iteration of eigenvector
     v = V[:, -1]
     # reshape v and assign to iqmc_flux
@@ -3208,7 +3146,7 @@ def FxV(V, prog):
 
     # QMC Sweep
     prepare_qmc_fission_source(mcdc)
-    prepare_qmc_particles(prog)
+    prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
     loop_source(0, mcdc)
     # sum resultant flux on all processors
@@ -3220,14 +3158,13 @@ def FxV(V, prog):
 
 
 @njit
-def preconditioner(V, prog, num_sweeps=3):
+def preconditioner(V, mcdc, num_sweeps=3):
     """
     Linear operator approximation of (I-L^(-1)S)*phi
 
     In this case the preconditioner is a specified number of purely scattering
     transport sweeps.
     """
-    mcdc = adapt.device(prog)
     # flux input is most recent iteration of eigenvector
     v = V[:, -1]
     # reshape v and assign to iqmc_flux
@@ -3244,7 +3181,7 @@ def preconditioner(V, prog, num_sweeps=3):
 
         # QMC Sweep
         prepare_qmc_scattering_source(mcdc)
-        prepare_qmc_particles(prog)
+        prepare_qmc_particles(mcdc)
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
         loop_source(0, mcdc)
         # sum resultant flux on all processors
