@@ -16,7 +16,8 @@ N_particle_list = np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1)
 phi_ref = reference()
 
 # Error container
-error = []
+error = np.zeros(len(N_particle_list))
+error_max = np.zeros(len(N_particle_list))
 
 # Calculate error
 for k, N_particle in enumerate(N_particle_list):
@@ -28,4 +29,4 @@ for k, N_particle in enumerate(N_particle_list):
     error_max[k] = tool.error_max(phi, phi_ref)
 
 # Plot
-tool.plot_convergence("inf_shem361_flux", N_particle_list, error)
+tool.plot_convergence("inf_shem361_flux", N_particle_list, error, error_max)
