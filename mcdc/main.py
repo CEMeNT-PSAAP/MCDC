@@ -409,15 +409,6 @@ def prepare():
     mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
 
     # =========================================================================
-    # RNG
-    # =========================================================================
-
-    # RNG seed and stride
-    mcdc["rng_seed_base"] = mcdc["setting"]["rng_seed"]
-    mcdc["rng_seed"] = mcdc["setting"]["rng_seed"]
-    mcdc["rng_stride"] = mcdc["setting"]["rng_stride"]
-
-    # =========================================================================
     # MPI
     # =========================================================================
 

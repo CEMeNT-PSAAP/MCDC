@@ -54,7 +54,7 @@ source = mcdc.source(energy=energy)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=["flux"], g='all')
+mcdc.tally(scores=["flux"], g="all")
 
 # Setting
 mcdc.setting(

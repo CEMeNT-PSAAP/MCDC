@@ -42,8 +42,14 @@ SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
 
-
+# RNG LCG parameters
 RNG_G = nb.uint64(2806196910506780709)
 RNG_C = nb.uint64(1)
 RNG_MOD_MASK = nb.uint64(0x7FFFFFFFFFFFFFFF)
 RNG_MOD = nb.uint64(0x8000000000000000)
+
+# RNG splitter seeds
+SEED_SPLIT_SOURCE = nb.uint64(0x43616D696C6C65)
+SEED_SPLIT_SOURCE_PRECURSOR = nb.uint64(0x546F6464)
+SEED_SPLIT_BANK = nb.uint64(0x5279616E)
+SEED_SPLIT_PARTICLE = nb.uint64(0)
