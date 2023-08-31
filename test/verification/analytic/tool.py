@@ -3,17 +3,19 @@ import numpy as np
 
 
 def error(val, ref):
-    return np.sqrt(np.average((val - ref)**2)/np.sum(ref**2))
+    return np.sqrt(np.average((val - ref) ** 2) / np.sum(ref**2))
+
 
 def error_max(val, ref):
-    return np.max(val - ref)/np.max(ref)
+    return np.max(val - ref) / np.max(ref)
+
 
 def plot_convergence(name, N_particle, error, error_max):
     mid = int(len(N_particle) / 2)
 
-    plt.plot(N_particle, error, "bo", fillstyle="none", label='2-norm')
+    plt.plot(N_particle, error, "bo", fillstyle="none", label="2-norm")
 
-    plt.plot(N_particle, error_max, "gD", fillstyle="none", label='max')
+    plt.plot(N_particle, error_max, "gD", fillstyle="none", label="max")
 
     line = 1.0 / np.sqrt(N_particle)
     line *= error[mid] / line[mid]

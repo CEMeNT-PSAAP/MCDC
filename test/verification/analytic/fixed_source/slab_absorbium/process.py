@@ -85,6 +85,12 @@ for k, N_particle in enumerate(N_particle_list):
 tool.plot_convergence("slab_absorbium_flux", N_particle_list, error, error_max)
 tool.plot_convergence("slab_absorbium_flux_z", N_particle_list, error_z, error_max_z)
 tool.plot_convergence("slab_absorbium_current", N_particle_list, error_J, error_max_J)
-tool.plot_convergence("slab_absorbium_current_z", N_particle_list, error_J_z, error_max_J_z)
-tool.plot_convergence("slab_absorbium_angular_flux", N_particle_list, error_psi, error_max_psi)
-tool.plot_convergence("slab_absorbium_angular_flux_z", N_particle_list, error_psi_z, error_max_psi_z)
+tool.plot_convergence(
+    "slab_absorbium_current_z", N_particle_list, error_J_z, error_max_J_z
+)
+tool.plot_convergence(
+    "slab_absorbium_angular_flux", N_particle_list, error_psi, error_max_psi
+)
+tool.plot_convergence(
+    "slab_absorbium_angular_flux_z", N_particle_list, error_psi_z, error_max_psi_z
+)

@@ -906,7 +906,6 @@ def setting(**kw):
                 "N_particle",
                 "time_boundary",
                 "rng_seed",
-                "rng_stride",
                 "output",
                 "progress_bar",
                 "k_eff",
@@ -924,7 +923,6 @@ def setting(**kw):
     N_particle = kw.get("N_particle")
     time_boundary = kw.get("time_boundary")
     rng_seed = kw.get("rng_seed")
-    rng_stride = kw.get("rng_stride")
     output = kw.get("output")
     progress_bar = kw.get("progress_bar")
     k_eff = kw.get("k_eff")
@@ -949,8 +947,6 @@ def setting(**kw):
     # RNG seed and stride
     if rng_seed is not None:
         card["rng_seed"] = rng_seed
-    if rng_stride is not None:
-        card["rng_stride"] = rng_stride
 
     # Output .h5 file name
     if output is not None:
