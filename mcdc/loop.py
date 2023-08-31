@@ -73,7 +73,7 @@ def loop_main(mcdc):
         ):
             # Manage particle banks
             seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
-            kernel.manage_particle_banks(seed_cycle, mcdc)
+            kernel.manage_particle_banks(seed_bank, mcdc)
 
             # Increment census index
             mcdc["technique"]["census_idx"] += 1
