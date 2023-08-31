@@ -1,6 +1,6 @@
 import numpy as np
 from mcdc import type_
-from mcdc.kernel import rng, rng_skip_ahead_
+from mcdc.kernel import rng
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
@@ -57,9 +57,7 @@ def test_rn_basic():
     # The dummy container
     mcdc = np.zeros(1, dtype=type_.global_)[0]
 
-    mcdc["rng_seed"]
-
     # run through the first five seeds (1-5)
     for i in range(5):
-        rng(mcdc)
-        assert mcdc["rng_seed"] == ref_data[i]
+        rng(mcdc["setting"])
+        assert mcdc["setting"]["rng_seed"] == ref_data[i]
