@@ -42,7 +42,7 @@ mcdc.tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1e5)
+mcdc.setting(N_particle=1e3)
 
 # Run
 mcdc.run()

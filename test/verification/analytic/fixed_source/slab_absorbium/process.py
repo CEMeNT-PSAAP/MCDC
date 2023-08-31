@@ -57,6 +57,7 @@ for k, N_particle in enumerate(N_particle_list):
         phi_z[i] += np.sum(psi_z[i, :])
     phi_z[I] += np.sum(psi_z[I, :])
 
+    psi_norm = np.zeros(psi.shape)
     # Normalize
     phi /= dz
     J /= dz
