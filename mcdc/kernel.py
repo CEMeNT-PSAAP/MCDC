@@ -115,7 +115,8 @@ def adapt_rng(object_mode=False):
 
 
 @njit(numba.uint64(numba.uint64, numba.uint64))
-def murmur_hash64a(key, seed):
+def split_seed(key, seed):
+    """murmur_hash64a"""
     multiplier = numba.uint64(0xC6A4A7935BD1E995)
     length = numba.uint64(8)
     rotator = numba.uint64(47)
@@ -134,35 +135,6 @@ def murmur_hash64a(key, seed):
     hash_value = wrapping_mul(hash_value, multiplier)
     hash_value ^= hash_value >> rotator
     return hash_value
-
-
-@njit(numba.uint64(numba.uint64, numba.uint64))
-def split_seed(value, seed):
-    return murmur_hash64a(value, seed)
-
-
-@njit
-def rng_skip_ahead_(n, mcdc):
-    n = numba.uint64(n)
-    seed_base = mcdc["rng_seed_base"]
-    g = mcdc["setting"]["rng_g"]
-    c = mcdc["setting"]["rng_c"]
-    g_new = numba.uint64(1)
-    c_new = numba.uint64(0)
-    mod = mcdc["setting"]["rng_mod"]
-    mod_mask = mod - numba.uint64(1)
-
-    n = n & mod_mask
-    while n > 0:
-        if n & numba.uint64(1):
-            g_new = g_new * g & mod_mask
-            c_new = (c_new * g + c) & mod_mask
-
-        c = (g + numba.uint64(1)) * c & mod_mask
-        g = g * g & mod_mask
-        n >>= numba.uint64(1)
-
-    mcdc["rng_seed"] = (g_new * seed_base + c_new) & mod_mask
 
 
 @njit(numba.uint64(numba.uint64))
@@ -909,7 +881,7 @@ def copy_particle(P):
 @njit
 def split_particle(P):
     P_new = copy_particle(P)
-    P_new["rng_seed"] = split_seed(P["rng_seed"], 0)
+    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
     return P_new
 
@@ -1468,6 +1440,18 @@ def score_eddington(s, g, t, x, y, z, flux, P, score):
 
 
 @njit
+def score_reduce_bin(score, mcdc):
+    # Normalize
+    score["bin"][:] /= mcdc["setting"]["N_particle"]
+
+    # MPI Reduce
+    buff = np.zeros_like(score["bin"])
+    with objmode():
+        MPI.COMM_WORLD.Reduce(np.array(score["bin"]), buff, MPI.SUM, 0)
+    score["bin"][:] = buff
+
+
+@njit
 def score_closeout_history(score):
     # Accumulate score and square of score into mean and sdev
     score["mean"][:] += score["bin"]
@@ -1502,21 +1486,11 @@ def score_closeout(score, mcdc):
 
 @njit
 def tally_reduce_bin(mcdc):
-    """For eigenvalue mode. Performed at each cycle or history closeout"""
     tally = mcdc["tally"]
 
-    with objmode():
-        for name in literal_unroll(score_list):
-            if tally[name]:
-                score = tally["score"][name]
-
-                # Normalize
-                score["bin"][:] /= mcdc["setting"]["N_particle"]
-
-                # MPI Reduce
-                buff = np.zeros_like(score["bin"])
-                MPI.COMM_WORLD.Reduce(np.array(score["bin"]), buff, MPI.SUM, 0)
-                score["bin"][:] = buff
+    for name in literal_unroll(score_list):
+        if tally[name]:
+            score_reduce_bin(tally["score"][name], mcdc)
 
 
 @njit

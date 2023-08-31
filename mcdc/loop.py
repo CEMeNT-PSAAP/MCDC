@@ -29,15 +29,17 @@ def loop_main(mcdc):
 
     idx_cycle = 0
     while not simulation_end:
-        seed_cycle = kernel.split_seed(idx_cycle, mcdc["rng_seed"])
+        seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
 
         # Loop over source particles
-        seed_source = kernel.split_seed(seed_cycle, 0x43616D696C6C65)
+        seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
         loop_source(seed_source, mcdc)
 
         # Loop over source precursors
         if mcdc["bank_precursor"]["size"] > 0:
-            seed_source_precursor = kernel.split_seed(seed_cycle, 0x546F6464)
+            seed_source_precursor = kernel.split_seed(
+                seed_cycle, SEED_SPLIT_SOURCE_PRECURSOR
+            )
             loop_source_precursor(seed_source_precursor, mcdc)
 
         # Eigenvalue cycle closeout
@@ -53,7 +55,7 @@ def loop_main(mcdc):
                 print_progress_eigenvalue(mcdc)
 
             # Manage particle banks
-            seed_bank = kernel.split_seed(seed_cycle, 0x5279616E)
+            seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
             kernel.manage_particle_banks(seed_bank, mcdc)
 
             # Cycle management
@@ -70,8 +72,8 @@ def loop_main(mcdc):
             < len(mcdc["technique"]["census_time"]) - 1
         ):
             # Manage particle banks
-            seed_bank = kernel.split_seed(seed_cycle, 0x5279616E)
-            kernel.manage_particle_banks(seed_cycle, mcdc)
+            seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
+            kernel.manage_particle_banks(seed_bank, mcdc)
 
             # Increment census index
             mcdc["technique"]["census_idx"] += 1
