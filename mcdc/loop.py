@@ -37,7 +37,9 @@ def loop_main(mcdc):
 
         # Loop over source precursors
         if mcdc["bank_precursor"]["size"] > 0:
-            seed_source_precursor = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE_PRECURSOR)
+            seed_source_precursor = kernel.split_seed(
+                seed_cycle, SEED_SPLIT_SOURCE_PRECURSOR
+            )
             loop_source_precursor(seed_source_precursor, mcdc)
 
         # Eigenvalue cycle closeout
