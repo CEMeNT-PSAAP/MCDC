@@ -59,5 +59,5 @@ def test_rn_basic():
 
     # run through the first five seeds (1-5)
     for i in range(5):
-        rng(mcdc['setting'])
-        assert mcdc['setting']["rng_seed"] == ref_data[i]
+        rng(mcdc["setting"])
+        assert mcdc["setting"]["rng_seed"] == ref_data[i]
