@@ -134,6 +134,7 @@ def prepare():
 
     # Flags
     iQMC = input_deck.technique["iQMC"]
+    track_particle = input_deck.setting["track_particle"]
 
     # Numbers
     N_sensitivity = input_deck.setting["N_sensitivity"]
@@ -158,8 +159,8 @@ def prepare():
     # Make types
     # =========================================================================
 
-    type_.make_type_particle(iQMC, G)
-    type_.make_type_particle_record(iQMC, G)
+    type_.make_type_particle(iQMC, G, track_particle)
+    type_.make_type_particle_record(iQMC, G, track_particle)
     type_.make_type_nuclide(G, J)
     type_.make_type_material(G, J, Nmax_nuclide)
     type_.make_type_surface(Nmax_slice)
@@ -171,8 +172,11 @@ def prepare():
     type_.make_type_technique(N_particle, G, input_deck.technique)
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
-
+    
     adapt.adapt_to('cpu')
+    adapt.set_toggle("particle_tracker",track_particle)
+    adapt.target_for('cpu')
+    adapt.eval_toggle()
 
     # =========================================================================
     # Make the global variable container
@@ -641,7 +645,7 @@ def generate_hdf5(mcdc):
             # Particle tracker
             if mcdc["setting"]["track_particle"]:
                 with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
-                    N_track = mcdc["particle_track_N"]
+                    N_track = mcdc["particle_track_N"][0]
                     f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
 
             # IC generator

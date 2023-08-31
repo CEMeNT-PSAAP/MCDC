@@ -17,6 +17,7 @@ from mcdc.print_ import (
     print_iqmc_eigenvalue_exit_code,
 )
 
+import mcdc.adapt as adapt
 
 # =========================================================================
 # Main loop
@@ -36,7 +37,7 @@ def loop_main(mcdc):
         loop_source(seed_source, mcdc)
 
         # Loop over source precursors
-        if mcdc["bank_precursor"]["size"] > 0:
+        if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
             seed_source_precursor = kernel.split_seed(seed_cycle, 0x546F6464)
             loop_source_precursor(seed_source_precursor, mcdc)
 
@@ -93,67 +94,99 @@ def loop_main(mcdc):
 # =============================================================================
 
 
+
+
+
 @njit
-def exhaust_active(mcdc):
+def prep_particle(P,mcdc):
+    # Apply weight window
+    if mcdc["technique"]["weight_window"]:
+        kernel.weight_window(P, mcdc)
+
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.allocate_pid(P,mcdc)
+    
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
+
+
+
+
+@njit
+def generate_source_particle(idx_work, seed, mcdc):
+    seed_work = kernel.split_seed(idx_work, seed)
+
+    # =====================================================================
+    # Get a source particle and put into active bank
+    # =====================================================================
+
+    # Get from fixed-source?
+    if kernel.get_bank_size(mcdc["bank_source"]) == 0:
+        # Sample source
+        P = kernel.source_particle(seed_work, mcdc)
+
+    # Get from source bank
+    else:
+        P = mcdc["bank_source"]["particles"][idx_work]
+    
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.allocate_hid(P,mcdc)
+
+    # Check if it is beyond current census index
+    census_idx = mcdc["technique"]["census_idx"]
+    if P["t"] > mcdc["technique"]["census_time"][census_idx]:
+        P["t"] += SHIFT
+        adapt.add_census(P, mcdc)
+    else:
+        # Add the source particle into the active bank
+        adapt.add_active(P, mcdc)
+
+
+
+@njit
+def exhaust_active_bank(mcdc):
     # Loop until active bank is exhausted
-    while mcdc["bank_active"]["size"] > 0:
-        # Get particle from active bank
-        P = kernel.get_particle(mcdc["bank_active"], mcdc)
+    P = np.zeros(1, dtype=type_.particle)[0]
+    while kernel.get_particle(P, mcdc["bank_active"], mcdc):
+        prep_particle(P,mcdc)
+        while P["alive"]:
+            step_particle(P,mcdc)
+    kernel.set_bank_size(mcdc["bank_active"],0)
 
-        # Apply weight window
-        if mcdc["technique"]["weight_window"]:
-            kernel.weight_window(P, mcdc)
 
-        # Particle tracker
-        if mcdc["setting"]["track_particle"]:
-            mcdc["particle_track_particle_ID"] += 1
 
-        # Particle loop
-        loop_particle(P, mcdc)
+def process_sources(seed,mcdc):
+    # Progress bar indicator
+    N_prog = 0
 
+    # Loop over particle sources
+    for idx_work in range(mcdc["mpi_work_size"]):
+        generate_source_particle(idx_work,seed,mcdc)
+
+        # Loop until active bank is exhausted
+        exhaust_active_bank(mcdc)
+
+        # Progress printout
+        percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
+
+
+    
 
 
 @njit
 def loop_source(seed, mcdc):
-    # Progress bar indicator
-    N_prog = 0
 
     if mcdc["technique"]["iQMC"]:
         mcdc["technique"]["iqmc_sweep_counter"] += 1
 
-    # Loop over particle sources
-    for idx_work in range(mcdc["mpi_work_size"]):
-        seed_work = kernel.split_seed(idx_work, seed)
-        # Particle tracker
-        if mcdc["setting"]["track_particle"]:
-            mcdc["particle_track_history_ID"] += 1
-
-        # =====================================================================
-        # Get a source particle and put into active bank
-        # =====================================================================
-
-        # Get from fixed-source?
-        if mcdc["bank_source"]["size"] == 0:
-            # Sample source
-            P = kernel.source_particle(seed_work, mcdc)
-
-        # Get from source bank
-        else:
-            P = mcdc["bank_source"]["particles"][idx_work]
-
-        # Check if it is beyond current census index
-        census_idx = mcdc["technique"]["census_idx"]
-        if P["t"] > mcdc["technique"]["census_time"][census_idx]:
-            P["t"] += SHIFT
-            kernel.add_particle(P, mcdc["bank_census"])
-        else:
-            # Add the source particle into the active bank
-            kernel.add_particle(P, mcdc["bank_active"])
-
-        # =====================================================================
-        # Run the source particle and its secondaries
-        # =====================================================================
-        exhaust_active(mcdc)
+    process_sources(seed,mcdc)
 
     # =====================================================================
     # Closeout
@@ -163,12 +196,6 @@ def loop_source(seed, mcdc):
     if not mcdc["setting"]["mode_eigenvalue"]:
         kernel.tally_closeout_history(mcdc)
 
-    # Progress printout
-    percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
-    if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-        N_prog += 1
-        with objmode():
-            print_progress(percent, mcdc)
 
     # Re-sync RNG
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
@@ -177,18 +204,6 @@ def loop_source(seed, mcdc):
 # =========================================================================
 # Particle loop
 # =========================================================================
-
-
-@njit
-def loop_particle(P, mcdc):
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
-    while P["alive"]:
-        step_particle(P,mcdc)
-    
-
 
 
 def step_particle(P,mcdc):
@@ -253,7 +268,7 @@ def step_particle(P,mcdc):
     # Time census
     elif event & EVENT_CENSUS:
         P["t"] += SHIFT
-        kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
+        adapt.add_census(kernel.copy_particle(P), mcdc)
         P["alive"] = False
 
     # Shift particle
@@ -309,7 +324,7 @@ def source_iteration(mcdc):
     loop_index = 0
     while not simulation_end:
         # reset particle bank size
-        mcdc["bank_source"]["size"] = 0
+        kernel.set_bank_size(mcdc["bank_source"],0)
         mcdc["technique"]["iqmc_source"] = np.zeros_like(
             mcdc["technique"]["iqmc_source"]
         )
@@ -680,34 +695,98 @@ def davidson(mcdc):
 # Precursor source loop
 # =============================================================================
 
-
 @njit
-def loop_source_precursor(seed, mcdc):
-    # TODO: censussed neutrons seeding is still not reproducible
+def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
 
+    # Set groups
+    j = DNP["g"]
+    g = DNP["n_g"]
+
+    # Create new particle
+    P_new = np.zeros(1, dtype=type_.particle)[0]
+    part_seed = kernel.split_seed(particle_idx, seed_work)
+    P_new["rng_seed"] = part_seed
+    P_new["alive"] = True
+    P_new["w"] = 1.0
+    P_new["sensitivity_ID"] = 0
+
+    # Set position
+    P_new["x"] = DNP["x"]
+    P_new["y"] = DNP["y"]
+    P_new["z"] = DNP["z"]
+
+    # Get material
+    trans = np.zeros(3)
+    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
+    material_ID = kernel.get_particle_material(P_new, mcdc)
+    material = mcdc["materials"][material_ID]
+    G = material["G"]
+
+    # Sample nuclide and get spectrum and decay constant
+    N_nuclide = material["N_nuclide"]
+    if N_nuclide == 1:
+        nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
+        spectrum = nuclide["chi_d"][j]
+        decay = nuclide["decay"][j]
+    else:
+        SigmaF = material["fission"][g]
+        nu_d = material["nu_d"][g]
+        xi = kernel.rng(P_new) * nu_d[j] * SigmaF
+        tot = 0.0
+        for i in range(N_nuclide):
+            nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+            density = material["nuclide_densities"][i]
+            tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
+            if xi < tot:
+                # Nuclide determined, now get the constant and spectruum
+                spectrum = nuclide["chi_d"][j]
+                decay = nuclide["decay"][j]
+                break
+
+    # Sample emission time
+    P_new["t"] = -math.log(kernel.rng(P_new)) / decay
+    census_idx = mcdc["technique"]["census_idx"]
+    if census_idx > 0:
+        P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
+
+    # Accept if it is inside current census index
+    if P_new["t"] < mcdc["technique"]["census_time"][census_idx]:
+        # Reduce precursor weight
+        DNP["w"] -= 1.0
+
+        # Skip if it's beyond time boundary
+        if P_new["t"] <= mcdc["setting"]["time_boundary"]:
+            # Sample energy
+            xi = kernel.rng(P_new)
+            tot = 0.0
+            for g_out in range(G):
+                tot += spectrum[g_out]
+                if tot > xi:
+                    break
+            P_new["g"] = g_out
+
+            # Sample direction
+            (
+                P_new["ux"],
+                P_new["uy"],
+                P_new["uz"],
+            ) = kernel.sample_isotropic_direction(P_new)
+
+            # Push to active bank
+            adapt.add_active(kernel.copy_particle(P_new), mcdc)
+
+
+
+
+def process_source_precursors(seed,mcdc):
+    
     # Progress bar indicator
     N_prog = 0
-
-    # =========================================================================
-    # Sync. RNG skip ahead for reproducibility
-    # =========================================================================
-
-    # Exscan upper estimate of number of particles generated locally
-    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
-        mcdc["bank_precursor"], mcdc
-    )
-
-    # =========================================================================
-    # Loop over precursor sources
-    # =========================================================================
 
     for idx_work in range(mcdc["mpi_work_size_precursor"]):
         # Get precursor
         DNP = mcdc["bank_precursor"]["precursors"][idx_work]
 
-        # Set groups
-        j = DNP["g"]
-        g = DNP["n_g"]
 
         # Determine number of particles to be generated
         w = DNP["w"]
@@ -723,83 +802,37 @@ def loop_source_precursor(seed, mcdc):
         # =====================================================================
 
         for particle_idx in range(N):
-            # Create new particle
-            P_new = np.zeros(1, dtype=type_.particle)[0]
-            part_seed = kernel.split_seed(particle_idx, seed_work)
-            P_new["rng_seed"] = part_seed
-            P_new["alive"] = True
-            P_new["w"] = 1.0
-            P_new["sensitivity_ID"] = 0
+            generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
+            # Loop until active bank is exhausted
+            exhaust_active_bank(mcdc)
+    
+        # Progress printout
+        percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
 
-            # Set position
-            P_new["x"] = DNP["x"]
-            P_new["y"] = DNP["y"]
-            P_new["z"] = DNP["z"]
 
-            # Get material
-            trans = np.zeros(3)
-            P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
-            material_ID = kernel.get_particle_material(P_new, mcdc)
-            material = mcdc["materials"][material_ID]
-            G = material["G"]
+@njit
+def loop_source_precursor(seed, mcdc):
+    # TODO: censussed neutrons seeding is still not reproducible
 
-            # Sample nuclide and get spectrum and decay constant
-            N_nuclide = material["N_nuclide"]
-            if N_nuclide == 1:
-                nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
-                spectrum = nuclide["chi_d"][j]
-                decay = nuclide["decay"][j]
-            else:
-                SigmaF = material["fission"][g]
-                nu_d = material["nu_d"][g]
-                xi = kernel.rng(P_new) * nu_d[j] * SigmaF
-                tot = 0.0
-                for i in range(N_nuclide):
-                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
-                    density = material["nuclide_densities"][i]
-                    tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
-                    if xi < tot:
-                        # Nuclide determined, now get the constant and spectruum
-                        spectrum = nuclide["chi_d"][j]
-                        decay = nuclide["decay"][j]
-                        break
 
-            # Sample emission time
-            P_new["t"] = -math.log(kernel.rng(P_new)) / decay
-            census_idx = mcdc["technique"]["census_idx"]
-            if census_idx > 0:
-                P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
+    # =========================================================================
+    # Sync. RNG skip ahead for reproducibility
+    # =========================================================================
 
-            # Accept if it is inside current census index
-            if P_new["t"] < mcdc["technique"]["census_time"][census_idx]:
-                # Reduce precursor weight
-                DNP["w"] -= 1.0
+    # Exscan upper estimate of number of particles generated locally
+    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
+        mcdc["bank_precursor"], mcdc
+    )
 
-                # Skip if it's beyond time boundary
-                if P_new["t"] > mcdc["setting"]["time_boundary"]:
-                    continue
+    # =========================================================================
+    # Loop over precursor sources
+    # =========================================================================
 
-                # Sample energy
-                xi = kernel.rng(P_new)
-                tot = 0.0
-                for g_out in range(G):
-                    tot += spectrum[g_out]
-                    if tot > xi:
-                        break
-                P_new["g"] = g_out
-
-                # Sample direction
-                (
-                    P_new["ux"],
-                    P_new["uy"],
-                    P_new["uz"],
-                ) = kernel.sample_isotropic_direction(P_new)
-
-                # Push to active bank
-                kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
-
-                # Loop until active bank is exhausted
-                exhaust_active(mcdc)
+    process_source_precursors(seed,mcdc)
 
     # =====================================================================
     # Closeout
@@ -809,12 +842,6 @@ def loop_source_precursor(seed, mcdc):
     if not mcdc["setting"]["mode_eigenvalue"]:
         kernel.tally_closeout_history(mcdc)
 
-    # Progress printout
-    percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
-    if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-        N_prog += 1
-        with objmode():
-            print_progress(percent, mcdc)
 
     # Re-sync RNG
     skip = N_global - idx_start

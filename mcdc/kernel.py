@@ -246,36 +246,48 @@ def source_particle(seed, mcdc):
 # Particle bank operations
 # =============================================================================
 
+@njit
+def get_bank_size(bank):
+    return bank["size"][0]
+
+@njit
+def set_bank_size(bank,value):
+    bank["size"][0] = value
+
+@njit
+def add_bank_size(bank,value):
+    return adapt.global_add(bank["size"],0,value)
+
 
 @njit
 def add_particle(P, bank):
+
+    idx = add_bank_size(bank,1)
+
     # Check if bank is full
-    if bank["size"] == bank["particles"].shape[0]:
+    if idx >= bank["particles"].shape[0]:
         with objmode():
             print_error("Particle %s bank is full." % bank["tag"])
 
     # Set particle
-    bank["particles"][bank["size"]] = P
+    bank["particles"][idx] = P
 
-    # Increment size
-    bank["size"] += 1
+
 
 
 @njit
-def get_particle(bank, mcdc):
+def get_particle(P, bank, mcdc):
+    
+    idx = add_bank_size(bank,-1) - 1
+
     # Check if bank is empty
-    if bank["size"] == 0:
+    if idx < 0:
+        return False
         with objmode():
             print_error("Particle %s bank is empty." % bank["tag"])
 
-    # Decrement size
-    bank["size"] -= 1
-
-    # Create in-flight particle
-    P = np.zeros(1, dtype=type_.particle)[0]
-
     # Set attribute
-    P_rec = bank["particles"][bank["size"]]
+    P_rec = bank["particles"][idx]
     P["x"] = P_rec["x"]
     P["y"] = P_rec["y"]
     P["z"] = P_rec["z"]
@@ -298,7 +310,7 @@ def get_particle(bank, mcdc):
     P["cell_ID"] = -1
     P["surface_ID"] = -1
     P["event"] = -1
-    return P
+    return True
 
 #! Don't touch for now
 @njit
@@ -317,8 +329,8 @@ def manage_particle_banks(seed, mcdc):
         population_control(seed, mcdc)
     else:
         # Swap census and source bank
-        size = mcdc["bank_census"]["size"]
-        mcdc["bank_source"]["size"] = size
+        size = get_bank_size(mcdc["bank_census"])
+        set_bank_size(mcdc["bank_source"],size)
         mcdc["bank_source"]["particles"][:size] = mcdc["bank_census"]["particles"][
             :size
         ]
@@ -327,7 +339,7 @@ def manage_particle_banks(seed, mcdc):
     bank_rebalance(mcdc)
 
     # Zero out census bank
-    mcdc["bank_census"]["size"] = 0
+    set_bank_size(mcdc["bank_census"],0)
 
     # Manage IC bank
     if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
@@ -355,8 +367,8 @@ def manage_IC_bank(mcdc):
 
     with objmode(Nn="int64", Np="int64"):
         # Create MPI-supported numpy object
-        Nn = mcdc["technique"]["IC_bank_neutron_local"]["size"]
-        Np = mcdc["technique"]["IC_bank_precursor_local"]["size"]
+        Nn = get_bank_size(mcdc["technique"]["IC_bank_neutron_local"])
+        Np = get_bank_size(mcdc["technique"]["IC_bank_precursor_local"])
 
         neutrons = MPI.COMM_WORLD.gather(
             mcdc["technique"]["IC_bank_neutron_local"]["particles"][:Nn]
@@ -379,10 +391,8 @@ def manage_IC_bank(mcdc):
 
     # Set global bank from buffer
     if mcdc["mpi_master"]:
-        start_n = mcdc["technique"]["IC_bank_neutron"]["size"]
-        start_p = mcdc["technique"]["IC_bank_precursor"]["size"]
-        mcdc["technique"]["IC_bank_neutron"]["size"] += Nn
-        mcdc["technique"]["IC_bank_precursor"]["size"] += Np
+        start_n = add_bank_size(mcdc["technique"]["IC_bank_neutron"],Nn)
+        start_p = add_bank_size(mcdc["technique"]["IC_bank_precursor"],Np)
         for i in range(Nn):
             mcdc["technique"]["IC_bank_neutron"]["particles"][start_n + i] = buff_n[i]
         for i in range(Np):
@@ -391,13 +401,13 @@ def manage_IC_bank(mcdc):
             ]
 
     # Reset local banks
-    mcdc["technique"]["IC_bank_neutron_local"]["size"] = 0
-    mcdc["technique"]["IC_bank_precursor_local"]["size"] = 0
+    set_bank_size(mcdc["technique"]["IC_bank_neutron_local"],0)
+    set_bank_size(mcdc["technique"]["IC_bank_precursor_local"],0)
 
 
 @njit
 def bank_scanning(bank, mcdc):
-    N_local = bank["size"]
+    N_local = get_bank_size(bank)
 
     # Starting index
     buff = np.zeros(1, dtype=np.int64)
@@ -417,7 +427,7 @@ def bank_scanning(bank, mcdc):
 @njit
 def bank_scanning_weight(bank, mcdc):
     # Local weight CDF
-    N_local = bank["size"]
+    N_local = get_bank_size(bank)
     w_cdf = np.zeros(N_local + 1)
     for i in range(N_local):
         w_cdf[i + 1] = w_cdf[i] + bank["particles"][i]["w"]
@@ -441,7 +451,7 @@ def bank_scanning_weight(bank, mcdc):
 
 @njit
 def bank_scanning_DNP(bank, mcdc):
-    N_DNP_local = bank["size"]
+    N_DNP_local = get_bank_size(bank)
 
     # Get sum of ceil-ed local DNP weights
     N_local = 0
@@ -478,7 +488,7 @@ def normalize_weight(bank, norm):
 def total_weight(bank):
     # Local total weight
     W_local = np.zeros(1)
-    for i in range(bank["size"]):
+    for i in range(get_bank_size(bank)):
         W_local[0] += bank["particles"][i]["w"]
 
     # MPI Allreduce
@@ -523,7 +533,7 @@ def bank_rebalance(mcdc):
 
     with objmode(size="int64"):
         # Create MPI-supported numpy object
-        size = mcdc["bank_source"]["size"]
+        size = get_bank_size(mcdc["bank_source"])
         bank = np.array(mcdc["bank_source"]["particles"][:size])
 
         # If offside, need to receive first
@@ -564,7 +574,7 @@ def bank_rebalance(mcdc):
             buff[i] = bank[i]
 
     # Set source bank from buffer
-    mcdc["bank_source"]["size"] = size
+    set_bank_size(mcdc["bank_source"],size)
     for i in range(size):
         mcdc["bank_source"]["particles"][i] = buff[i]
 
@@ -644,7 +654,7 @@ def bank_IC(P, mcdc):
         P_new = split_particle(P)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
-        add_particle(P_new, mcdc["technique"]["IC_bank_neutron_local"])
+        adapt.add_IC(P_new, mcdc)
 
         # Accumulate fission
         SigmaF = material["fission"][g]
@@ -688,14 +698,13 @@ def bank_IC(P, mcdc):
 
     # Sample precursor
     if rng(P) < Pp:
-        idx = mcdc["technique"]["IC_bank_precursor_local"]["size"]
+        idx = add_bank_size(mcdc["technique"]["IC_bank_precursor_local"],1)
         precursor = mcdc["technique"]["IC_bank_precursor_local"]["precursors"][idx]
         precursor["x"] = P["x"]
         precursor["y"] = P["y"]
         precursor["z"] = P["z"]
         precursor["w"] = wp_prime / wn_prime
         #! Ask Ilham about this
-        mcdc["technique"]["IC_bank_precursor_local"]["size"] += 1
 
         # Sample group
         xi = rng(P) * total
@@ -752,14 +761,14 @@ def pct_combing(seed, mcdc):
     tooth_end = math.floor((idx_end - offset) / td) + 1
 
     # Locally sample particles from census bank
-    bank_source["size"] = 0
+    set_bank_size(bank_source,0)
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
         P = copy_particle(bank_census["particles"][idx])
         # Set weight
         P["w"] *= td
-        add_particle(P, bank_source)
+        adapt.add_source(P, mcdc)
 
 
 @njit
@@ -789,7 +798,7 @@ def pct_combing_weight(seed, mcdc):
     tooth_end = math.floor((w_end - offset) / td) + 1
 
     # Locally sample particles from census bank
-    bank_source["size"] = 0
+    set_bank_size(bank_source,0)
     idx = 0
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
@@ -797,7 +806,7 @@ def pct_combing_weight(seed, mcdc):
         P = copy_particle(bank_census["particles"][idx])
         # Set weight
         P["w"] = td
-        add_particle(P, bank_source)
+        adapt.add_source(P, mcdc)
 
 
 # =============================================================================
@@ -907,6 +916,7 @@ def copy_particle(P):
     P_new["w"] = P["w"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
+    copy_track_data(P_new,P)
     return P_new
 
 
@@ -1679,7 +1689,7 @@ def eigenvalue_tally_closeout_history(mcdc):
 
     if mcdc["setting"]["gyration_radius"]:
         # Center of mass
-        N_local = mcdc["bank_census"]["size"]
+        N_local = get_bank_size(mcdc["bank_census"])
         total_local = np.zeros(4, np.float64)  # [x,y,z,W]
         total = np.zeros(4, np.float64)
         for i in range(N_local):
@@ -2134,7 +2144,7 @@ def scattering(P, mcdc):
         sample_phasespace_scattering(P, material, P_new)
 
         # Bank
-        add_particle(P_new, mcdc["bank_active"])
+        adapt.add_active(P_new, mcdc)
 
 
 @njit
@@ -2233,9 +2243,9 @@ def fission(P, mcdc):
 
         # Bank
         if mcdc["setting"]["mode_eigenvalue"]:
-            add_particle(P_new, mcdc["bank_census"])
+            adapt.add_census(P_new, mcdc)
         else:
-            add_particle(P_new, mcdc["bank_active"])
+            adapt.add_active(P_new, mcdc)
 
 
 @njit
@@ -2474,13 +2484,13 @@ def weight_window(P, mcdc):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            add_particle(split_particle(P), mcdc["bank_active"])
+            adapt.add_active(split_particle(P), mcdc)
 
         # Russian roulette
         p -= n_split
         xi = rng(P)
         if xi <= p:
-            add_particle(split_particle(P), mcdc["bank_active"])
+            adapt.add_active(split_particle(P), mcdc)
 
     # Below target
     elif p < 1.0 / width:
@@ -2692,7 +2702,7 @@ def prepare_qmc_particles(mcdc):
         P_new["iqmc_w"] = Q[:, t, x, y, z] * dV * Nt / N_particle
         P_new["w"] = (P_new["iqmc_w"]).sum()
         # add to source bank
-        add_particle(P_new, mcdc["bank_source"])
+        adapt.add_source(P_new, mcdc)
 
 
 @njit
@@ -3052,7 +3062,7 @@ def AxV(phi, b, mcdc):
     mcdc["technique"]["iqmc_flux"] = np.reshape(phi, matrix_shape)
 
     # reset bank size
-    mcdc["bank_source"]["size"] = 0
+    set_bank_size(mcdc["bank_source"],0)
     mcdc["technique"]["iqmc_source"] = np.zeros_like(mcdc["technique"]["iqmc_source"])
 
     # QMC Sweep
@@ -3080,7 +3090,7 @@ def RHS(mcdc):
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
 
     # reset bank size
-    mcdc["bank_source"]["size"] = 0
+    set_bank_size(mcdc["bank_source"],0)
     mcdc["technique"]["iqmc_source"] = np.zeros_like(mcdc["technique"]["iqmc_source"])
 
     # QMC Sweep
@@ -3109,7 +3119,7 @@ def HxV(V, mcdc):
     matrix_shape = mcdc["technique"]["iqmc_flux"].shape
     mcdc["technique"]["iqmc_flux"] = np.reshape(v.copy(), matrix_shape)
     # reset bank size
-    mcdc["bank_source"]["size"] = 0
+    set_bank_size(mcdc["bank_source"],0)
     mcdc["technique"]["iqmc_source"] = np.zeros_like(mcdc["technique"]["iqmc_source"])
 
     # QMC Sweep
@@ -3141,7 +3151,7 @@ def FxV(V, mcdc):
     mcdc["technique"]["iqmc_flux"] = np.reshape(v.copy(), matrix_shape)
 
     # reset bank size
-    mcdc["bank_source"]["size"] = 0
+    set_bank_size(mcdc["bank_source"],0)
     mcdc["technique"]["iqmc_source"] = np.zeros_like(mcdc["technique"]["iqmc_source"])
 
     # QMC Sweep
@@ -3174,7 +3184,7 @@ def preconditioner(V, mcdc, num_sweeps=3):
 
     for i in range(num_sweeps):
         # reset bank size
-        mcdc["bank_source"]["size"] = 0
+        set_bank_size(mcdc["bank_source"],0)
         mcdc["technique"]["iqmc_source"] = np.zeros_like(
             mcdc["technique"]["iqmc_source"]
         )
@@ -3241,7 +3251,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
-    add_particle(copy_particle(P), mcdc["bank_active"])
+    adapt.add_active(copy_particle(P), mcdc)
 
     # Get sensitivity ID
     ID = surface["sensitivity_ID"]
@@ -3362,7 +3372,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                 P_new["z"] += nz * 2 * SHIFT
 
         # Put the current particle into the secondary bank
-        add_particle(P_new, mcdc["bank_active"])
+        adapt.add_active(P_new, mcdc)
 
     # Sample potential second-order sensitivity particles?
     if mcdc["technique"]["dsm_order"] < 2 or P["sensitivity_ID"] > 0:
@@ -3428,7 +3438,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                             # Delta source
                             P_new["w"] = -w * sign
                             P_new["sensitivity_ID"] = ID_source
-                            add_particle(P_new, mcdc["bank_active"])
+                            adapt.add_active(P_new, mcdc)
                             source_obtained = True
                         else:
                             P_new["w"] = w * sign
@@ -3438,7 +3448,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                                 # Scattering source
                                 sample_phasespace_scattering(P, nuclide, P_new)
                                 P_new["sensitivity_ID"] = ID_source
-                                add_particle(P_new, mcdc["bank_active"])
+                                adapt.add_active(P_new, mcdc)
                                 source_obtained = True
                             else:
                                 tot += nusigmaF
@@ -3448,7 +3458,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                                         P, nuclide, P_new, mcdc
                                     )
                                     P_new["sensitivity_ID"] = ID_source
-                                    add_particle(P_new, mcdc["bank_active"])
+                                    adapt.add_active(P_new, mcdc)
                                     source_obtained = True
                     if source_obtained:
                         break
@@ -3547,7 +3557,7 @@ def sensitivity_material(P, mcdc):
         P_new["sensitivity_ID"] = ID
 
         # Put the current particle into the secondary bank
-        add_particle(P_new, mcdc["bank_active"])
+        adapt.add_active(P_new, mcdc)
 
 
 # ==============================================================================
@@ -3555,18 +3565,37 @@ def sensitivity_material(P, mcdc):
 # ==============================================================================
 
 
+@adapt.toggle("particle_tracker")
 @njit
 def track_particle(P, mcdc):
-    idx = mcdc["particle_track_N"]
-    mcdc["particle_track"][idx, 0] = mcdc["particle_track_history_ID"]
-    mcdc["particle_track"][idx, 1] = mcdc["particle_track_particle_ID"]
+    idx = adapt.global_add(mcdc["particle_track_N"],0,1)
+    mcdc["particle_track"][idx, 0] = P["track_hid"]
+    mcdc["particle_track"][idx, 1] = P["track_pid"]
     mcdc["particle_track"][idx, 2] = P["g"] + 1
     mcdc["particle_track"][idx, 3] = P["t"]
     mcdc["particle_track"][idx, 4] = P["x"]
     mcdc["particle_track"][idx, 5] = P["y"]
     mcdc["particle_track"][idx, 6] = P["z"]
     mcdc["particle_track"][idx, 7] = P["w"]
-    mcdc["particle_track_N"] += 1
+
+
+@adapt.toggle("particle_tracker")
+@njit
+def copy_track_data(P_new, P):
+    P_new["track_hid"] = P["track_hid"]
+    P_new["track_pid"] = P["track_pid"]
+
+
+@adapt.toggle("particle_tracker")
+@njit
+def allocate_hid(P,mcdc):
+    P["track_hid"] = adapt.global_add(mcdc["particle_track_history_ID"],0,1)
+
+@adapt.toggle("particle_tracker")
+@njit
+def allocate_pid(P,mcdc):
+    P["track_pid"] = adapt.global_add(mcdc["particle_track_particle_ID"],0,1)
+
 
 
 # ==============================================================================

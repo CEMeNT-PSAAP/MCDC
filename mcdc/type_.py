@@ -32,7 +32,7 @@ global_ = None
 
 
 # Particle (in-flight)
-def make_type_particle(iQMC, G):
+def make_type_particle(iQMC, G, tracked):
     global particle
     struct = [
         ("x", float64),
@@ -58,11 +58,13 @@ def make_type_particle(iQMC, G):
     if iQMC:
         Ng = G
     struct += [("iqmc_w", float64, (Ng,))]
+    if tracked:
+        struct += [("track_pid",int64),("track_hid",int64)]
     particle = np.dtype(struct)
 
 
 # Particle record (in-bank)
-def make_type_particle_record(iQMC, G):
+def make_type_particle_record(iQMC, G, tracked):
     global particle_record
     struct = [
         ("x", float64),
@@ -81,6 +83,8 @@ def make_type_particle_record(iQMC, G):
     Ng = 1
     if iQMC:
         Ng = G
+    if tracked:
+        struct += [("track_pid",int64),("track_hid",int64)]
     struct += [("iqmc_w", float64, (Ng,))]
     particle_record = np.dtype(struct)
 
@@ -104,13 +108,13 @@ precursor = np.dtype(
 
 def particle_bank(max_size):
     return np.dtype(
-        [("particles", particle_record, (max_size,)), ("size", int64), ("tag", "U10")]
+        [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U10")]
     )
 
 
 def precursor_bank(max_size):
     return np.dtype(
-        [("precursors", precursor, (max_size,)), ("size", int64), ("tag", "U10")]
+        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U10")]
     )
 
 
@@ -748,9 +752,9 @@ def make_type_global(card):
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
             ("particle_track", float64, (N_track, 8)),
-            ("particle_track_N", int64),
-            ("particle_track_history_ID", int64),
-            ("particle_track_particle_ID", int64),
+            ("particle_track_N", int64, (1,)),
+            ("particle_track_history_ID", int64, (1,)),
+            ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
         ]
     )
