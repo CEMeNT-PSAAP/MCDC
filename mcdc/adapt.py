@@ -35,6 +35,23 @@ target_rosters = {}
 
 late_jit_roster = set()
 
+do_nothing_id = 0
+
+
+def generate_do_nothing(arg_count):
+    global do_nothing_id
+    name = f"do_nothing_{do_nothing_id}"
+    args = ", ".join([f"arg_{i}" for i in range(arg_count)])
+    source  =  "@njit\n"
+    source += f"def {name}({args}):\n"
+    source +=  "    pass\n"
+    print(source)
+    exec(source)
+    result = eval(name)
+    do_nothing_id += 1
+    return result
+
+
 def overwrite_func(func,revised_func):
     mod_name = func.__module__
     fn_name  = func.__name__
@@ -57,9 +74,6 @@ def set_toggle(flag,val):
 
 
 
-@njit
-def do_nothing(*args):
-    pass
 
 def eval_toggle():
     global toggle_rosters
@@ -70,7 +84,8 @@ def eval_toggle():
             if val:
                 overwrite_func(func,numba.njit(func))
             else:
-                overwrite_func(func,do_nothing)
+                arg_count = len(inspect.signature(func).parameters)
+                overwrite_func(func,generate_do_nothing(arg_count))
 
 
 def for_(target,on_target=[]):
@@ -85,10 +100,10 @@ def for_(target,on_target=[]):
 
 
 def for_cpu(on_target =[]):
-    return for_('cpu',on_target)
+    return for_('cpu',on_target=on_target)
 
 def for_gpu(on_target=[]):
-    return for_('gpu',on_target)
+    return for_('gpu',on_target=on_target)
 
 def target_for(target):
 
@@ -139,6 +154,42 @@ def universal_arrays(target):
 
 
 
+# =============================================================================
+# GPU Type / Extern Functions Forward Declarations
+# =============================================================================
+
+
+none_type = None
+mcdc_type = None
+state_spec = None
+device_gpu = None
+group_gpu = None
+thread_gpu = None
+particle_gpu = None
+prep_gpu = None
+step_gpu = None
+
+
+
+def gpu_forward_declare():
+
+    global none_type, mcdc_type, state_spec
+    global device_gpu, group_gpu, thread_gpu
+    global particle_gpu, particle_record_gpu
+    global step_gpu
+
+    none_type = numba.from_dtype(np.dtype([ ]))
+    mcdc_type = numba.from_dtype(type_.global_)
+    state_spec = (mcdc_type,none_type,none_type)
+    device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
+    particle_gpu = numba.from_dtype(type_.particle)
+    particle_record_gpu = numba.from_dtype(type_.particle_record)
+
+    def step(prog: numba.uintp, P: particle_gpu):
+        pass
+
+    step_gpu, =  adapt.harm.RuntimeSpec.async_dispatch(step)
+
 
 # =============================================================================
 # Seperate GPU/CPU Functions to Target Different Platforms
@@ -184,11 +235,13 @@ def thread(prog):
 def add_active(particle,prog):
     kernel.add_particle(particle, prog["bank_active"])
 
+
+
 @for_gpu()
 @cuda.jit
 def add_active(particle,prog):
-    #iterate_async(prog,particle)
-    kernel.add_particle(particle, prog["bank_active"])
+    particle["fresh"] = True
+    step_gpu(prog,particle)
 
 
 @for_cpu()
@@ -246,6 +299,16 @@ def local_translate():
     return trans
 
 
+@for_cpu()
+@njit
+def local_group_array():
+    return np.zeros(1, dtype=type_.group_array)[0]
+    
+@for_gpu()
+@cuda.jit
+def local_group_array():
+    return cuda.local.array(1, type_.group_array)[0]
+
 
 @for_cpu()
 @njit
@@ -299,59 +362,6 @@ def global_max(ary,idx,val):
 
 
 
-# =========================================================================
-# Base Async Functions
-# =========================================================================
-
-
-def initialize(prog: numba.uintp):
-    pass
-
-def finalize(prog: numba.uintp):
-    pass
-
-@njit
-def make_work_source(prog):
-    mcdc = device(prog)
-
-    idx_work = global_add(mcdc["mpi_work_iter"],1)
-
-    if idx_work >= mcdc["mpi_work_size"]:
-        return False
-    
-    loop.generate_source_particle(idx_work,mcdc["source_seed"],mcdc)
-    loop.exhaust_active_bank(mcdc)
-
-    return True
-
-
-@njit
-def make_work_source_precursor(prog):
-    mcdc = device(prog)
-
-    idx_work = global_add(mcdc["mpi_work_iter"],1)
-
-    if idx_work >= mcdc["mpi_work_size_precursor"]:
-        return False
-
-    # Get precursor
-    DNP = mcdc["bank_precursor"]["precursors"][idx_work]
-
-    # Determine number of particles to be generated
-    w = DNP["w"]
-    N = math.floor(w)
-    # "Roulette" the last particle
-    seed_work = kernel.split_seed(idx_work, mcdc["source_precursor_seed"])
-    if kernel.rng_from_seed(seed_work) < w - N:
-        N += 1
-    DNP["w"] = N
-
-    for particle_idx in range(N):
-        loop.generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
-
-    return True
-
-
 
 # =========================================================================
 # Program Specifications
@@ -380,8 +390,11 @@ def make_spec(target):
         unknown_target(target)
 
 
+@njit
+def empty_base_func(prog):
+    pass
 
-def make_gpu_loop(state_spec,work_make_fn,step_fn,check_fn,arg_type,initial_fn=do_nothing,final_fn=do_nothing):
+def make_gpu_loop(state_spec,work_make_fn,step_fn,check_fn,arg_type,initial_fn=empty_base_func,final_fn=empty_base_func):
     async_fn_list = [step_fn]
     device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
     def make_work(prog: numba.uintp) -> numba.boolean:
@@ -396,30 +409,6 @@ def make_gpu_loop(state_spec,work_make_fn,step_fn,check_fn,arg_type,initial_fn=d
 
     step_async, = harm.RuntimeSpec.async_dispatch(step)
 
-    pass
-
-
-# =========================================================================
-# Program Instance Generation
-# =========================================================================
-
-
-def harmonize_factory():
-    pass
-
-
-# =========================================================================
-# Main loop
-# =========================================================================
-
-
-def sim_particles(P,prog):
-    pass
-
-def sim_particle(P,prog):
-    loop.loop_particle()
-
-def particle_loop_gpu():
     pass
 
 
@@ -439,21 +428,4 @@ def compiler(func, target):
         return cuda.jit(func)
     else:
         unknown_target(target)
-
-
-@njit
-def local_array(a,b):
-    pass
-
-def manual_target(target):
-    global local_array
-    if   target == 'cpu':
-        local_array = np.empty
-    elif target == 'gpu':
-        local_array = numba.cuda.jit(numba.cuda.local.array)
-    else:
-        unknown_target(target)
-
-
-
 

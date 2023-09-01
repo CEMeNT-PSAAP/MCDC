@@ -98,7 +98,10 @@ def loop_main(mcdc):
 # =========================================================================
 
 @njit
-def step_particle(P,mcdc):
+def step_particle(P, prog):
+
+    mcdc = adapt.device(prog)
+
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
         trans_struct = adapt.local_translate()
@@ -131,9 +134,9 @@ def step_particle(P,mcdc):
             if event & EVENT_CAPTURE:
                 kernel.capture(P, mcdc)
             elif event == EVENT_SCATTERING:
-                kernel.scattering(P, mcdc)
+                kernel.scattering(P, prog)
             elif event == EVENT_FISSION:
-                kernel.fission(P, mcdc)
+                kernel.fission(P, prog)
 
             # Sensitivity quantification for nuclide?
             material = mcdc["materials"][P["material_ID"]]
@@ -142,7 +145,7 @@ def step_particle(P,mcdc):
                 or mcdc["technique"]["dsm_order"] == 2
                 and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
             ):
-                kernel.sensitivity_material(P, mcdc)
+                kernel.sensitivity_material(P, prog)
 
     # Mesh tally
     if event & EVENT_MESH:
@@ -151,7 +154,7 @@ def step_particle(P,mcdc):
     # Different Methods for shifting the particle
     # Surface crossing
     if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, mcdc)
+        kernel.surface_crossing(P, prog)
 
     # Surface move
     elif event & EVENT_SURFACE_MOVE:
@@ -161,7 +164,7 @@ def step_particle(P,mcdc):
     # Time census
     elif event & EVENT_CENSUS:
         P["t"] += SHIFT
-        adapt.add_census(kernel.copy_particle(P), mcdc)
+        adapt.add_census(kernel.copy_record(P), mcdc)
         P["alive"] = False
 
     # Shift particle
@@ -174,7 +177,7 @@ def step_particle(P,mcdc):
 
     # Apply weight window
     elif mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, mcdc)
+        kernel.weight_window(P, prog)
 
     # Apply weight roulette
     if mcdc["technique"]["weight_roulette"]:
@@ -198,10 +201,13 @@ def step_particle(P,mcdc):
 
 
 @njit
-def prep_particle(P,mcdc):
+def prep_particle(P,prog):
+
+    mcdc = adapt.device(prog)
+
     # Apply weight window
     if mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, mcdc)
+        kernel.weight_window(P, prog)
 
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
@@ -215,7 +221,10 @@ def prep_particle(P,mcdc):
 
 
 @njit
-def generate_source_particle(idx_work, seed, mcdc):
+def generate_source_particle(idx_work, seed, prog):
+
+    mcdc = adapt.device(prog)
+
     seed_work = kernel.split_seed(idx_work, seed)
 
     # =====================================================================
@@ -242,14 +251,14 @@ def generate_source_particle(idx_work, seed, mcdc):
         adapt.add_census(P, mcdc)
     else:
         # Add the source particle into the active bank
-        adapt.add_active(P, mcdc)
+        adapt.add_active(P, prog)
 
 
 
 @njit
 def exhaust_active_bank(mcdc):
     # Loop until active bank is exhausted
-    P = np.zeros(1, dtype=type_.particle)[0]
+    P = adapt.local_particle()
     while kernel.get_particle(P, mcdc["bank_active"], mcdc):
         prep_particle(P,mcdc)
         while P["alive"]:
@@ -284,11 +293,6 @@ source_gpu_rt = None
 
 def make_gpu_process_sources(precursor):
     def inner(func):
-        async_fns = [step_particle]
-        none_type = nb.from_dtype(np.dtype([ ]))
-        mcdc_type = nb.from_dtype(type_.global_)
-        state_spec = (mcdc_type,none_type,none_type)
-        device, group, thread = adapt.harm.RuntimeSpec.access_fns(state_spec)
 
         def work_maker(prog):
             pass
@@ -307,7 +311,7 @@ def make_gpu_process_sources(precursor):
             work_maker = make_work
         else:
             def make_work(prog: nb.uintp) -> nb.boolean:
-                mcdc = device(prog)
+                mcdc = adapt.device(prog)
 
                 idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
 
@@ -327,7 +331,7 @@ def make_gpu_process_sources(precursor):
                 DNP["w"] = N
 
                 for particle_idx in range(N):
-                    generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
+                    generate_precursor_particle(DNP,particle_idx,seed_work,prog)
 
                 return True
             work_maker = make_work
@@ -340,18 +344,18 @@ def make_gpu_process_sources(precursor):
         def finalize(prog: nb.uintp):
             pass
 
-        particle = nb.from_dtype(type_.particle)
-
-        def step(prog: nb.uintp, P: particle):
-            mcdc = device(prog)
-            step_particle(P,mcdc)
+        def step(prog: nb.uintp, P: adapt.particle_gpu):
+            mcdc = adapt.device(prog)
+            if P["fresh"]:
+                prep_particle(P,prog)
+            P["fresh"] = False
+            step_particle(P,prog)
             if P["alive"]:
-                step_async(P)
+                adapt.step_gpu(prog,P)
 
-        step_async, = adapt.harm.RuntimeSpec.async_dispatch(step)
-
+        async_fns = [step]
         base_fns = (initialize,finalize, work_maker)
-        loop_spec = adapt.harm.RuntimeSpec("collaz",state_spec,base_fns,async_fns)
+        loop_spec = adapt.harm.RuntimeSpec("collaz",adapt.state_spec,base_fns,async_fns)
 
         
         global source_gpu_rt
@@ -802,7 +806,9 @@ def davidson(mcdc):
 
 
 @njit
-def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
+def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
+
+    mcdc = adapt.device(prog)
 
     # Set groups
     j = DNP["g"]
@@ -881,12 +887,13 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
             ) = kernel.sample_isotropic_direction(P_new)
 
             # Push to active bank
-            adapt.add_active(kernel.copy_particle(P_new), mcdc)
+            adapt.add_active(kernel.copy_record(P_new), prog)
 
 
 @for_cpu()
 @njit
 def process_source_precursors(seed,mcdc):
+
     # Progress bar indicator
     N_prog = 0
 
