@@ -11,7 +11,7 @@ from mcdc.print_ import print_error
 from mcdc.type_ import score_list
 from mcdc.loop import loop_source
 import mcdc.adapt as adapt
-
+from mcdc.adapt import toggle, for_cpu, for_gpu
 
 # =============================================================================
 # Random sampling
@@ -84,12 +84,12 @@ def sample_discrete(group, P):
 # =============================================================================
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit
 def wrapping_mul(a, b):
     return a * b
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit
 def wrapping_add(a, b):
     return a + b
 
@@ -115,7 +115,7 @@ def adapt_rng(object_mode=False):
         wrapping_mul = wrapping_mul_python
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit
 def murmur_hash64a(key, seed):
     multiplier = numba.uint64(0xC6A4A7935BD1E995)
     length = numba.uint64(8)
@@ -137,8 +137,10 @@ def murmur_hash64a(key, seed):
     return hash_value
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit
 def split_seed(value, seed):
+    value = numba.uint64(value)
+    seed  = numba.uint64(seed)
     return murmur_hash64a(value, seed)
 
 
@@ -166,8 +168,9 @@ def rng_skip_ahead_(n, mcdc):
     mcdc["rng_seed"] = (g_new * seed_base + c_new) & mod_mask
 
 
-@njit(numba.uint64(numba.uint64))
+@njit
 def rng_(seed):
+    seed = numba.uint64(seed)
     return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
 
 
@@ -839,6 +842,19 @@ def shift_particle(P, shift):
     P["t"] += shift
 
 
+@for_cpu()
+@njit
+def lost_particle(P):
+    with objmode():
+        print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
+
+
+@for_gpu()
+@njit
+def lost_particle(P):
+    pass
+
+
 @njit
 def get_particle_cell(P, universe_ID, trans, mcdc):
     """
@@ -851,9 +867,8 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
         if cell_check(P, cell, trans, mcdc):
             return cell["ID"]
 
+    lost_particle(P)
     # Particle is not found
-    with objmode():
-        print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
     P["alive"] = False
     return -1
 
@@ -861,7 +876,8 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
 @njit
 def get_particle_material(P, mcdc):
     # Translation accumulator
-    trans = np.zeros(3)
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
 
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
@@ -874,7 +890,8 @@ def get_particle_material(P, mcdc):
             lattice = mcdc["lattices"][cell["lattice_ID"]]
 
             # Get lattice center for translation)
-            trans -= cell["lattice_center"]
+            for i in range(3):
+                trans[i] -= cell["lattice_center"][i]
 
             # Get universe
             mesh = lattice["mesh"]
@@ -1264,9 +1281,9 @@ def mesh_uniform_get_index(P, mesh, trans):
     Px = P["x"] + trans[0]
     Py = P["y"] + trans[1]
     Pz = P["z"] + trans[2]
-    x = math.floor((Px - mesh["x0"]) / mesh["dx"])
-    y = math.floor((Py - mesh["y0"]) / mesh["dy"])
-    z = math.floor((Pz - mesh["z0"]) / mesh["dz"])
+    x = numba.int64(math.floor((Px - mesh["x0"]) / mesh["dx"]))
+    y = numba.int64(math.floor((Py - mesh["y0"]) / mesh["dy"]))
+    z = numba.int64(math.floor((Pz - mesh["z0"]) / mesh["dz"]))
     return x, y, z
 
 
@@ -1885,7 +1902,8 @@ def distance_to_boundary(P, mcdc):
     event = 0
 
     # Translation accumulator
-    trans = np.zeros(3)
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
 
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
@@ -2006,6 +2024,9 @@ def distance_to_mesh(P, mesh, mcdc):
 
 @njit
 def surface_crossing(P, mcdc):
+
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
     trans = P["translation"]
 
     # Implement BC
@@ -2022,7 +2043,8 @@ def surface_crossing(P, mcdc):
     if P["alive"] and not surface["reflective"]:
         cell = mcdc["cells"][P["cell_ID"]]
         if not cell_check(P, cell, trans, mcdc):
-            trans = np.zeros(3)
+            trans_struct = adapt.local_translate()
+            trans = trans_struct["values"]
             P["cell_ID"] = get_particle_cell(P, 0, trans, mcdc)
 
     # Sensitivity quantification for surface?
@@ -2951,7 +2973,8 @@ def generate_iqmc_material_idx(mcdc):
     dx = dy = dz = 1
     t = 0
     # variables for cell finding functions
-    trans = np.zeros((3,))
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
     # create particle to utilize cell finding functions
     P_temp = np.zeros(1, dtype=type_.particle)[0]
     # set default attributes
@@ -3565,8 +3588,7 @@ def sensitivity_material(P, mcdc):
 # ==============================================================================
 
 
-@adapt.toggle("particle_tracker")
-@njit
+@toggle("particle_tracker")
 def track_particle(P, mcdc):
     idx = adapt.global_add(mcdc["particle_track_N"],0,1)
     mcdc["particle_track"][idx, 0] = P["track_hid"]
@@ -3579,20 +3601,17 @@ def track_particle(P, mcdc):
     mcdc["particle_track"][idx, 7] = P["w"]
 
 
-@adapt.toggle("particle_tracker")
-@njit
+@toggle("particle_tracker")
 def copy_track_data(P_new, P):
     P_new["track_hid"] = P["track_hid"]
     P_new["track_pid"] = P["track_pid"]
 
 
-@adapt.toggle("particle_tracker")
-@njit
+@toggle("particle_tracker")
 def allocate_hid(P,mcdc):
     P["track_hid"] = adapt.global_add(mcdc["particle_track_history_ID"],0,1)
 
-@adapt.toggle("particle_tracker")
-@njit
+@toggle("particle_tracker")
 def allocate_pid(P,mcdc):
     P["track_pid"] = adapt.global_add(mcdc["particle_track_particle_ID"],0,1)
 

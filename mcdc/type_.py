@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import sys
+from mcdc.print_ import print_error
 
 from mpi4py import MPI
 
@@ -8,8 +9,9 @@ from mpi4py import MPI
 float64 = np.float64
 int64 = np.int64
 uint64 = np.uint64
+uint8 = np.uint8
 bool_ = np.bool_
-str_ = "U30"
+str_ = "U32"
 
 # MC/DC types, will be defined by input deck
 particle = None
@@ -23,8 +25,68 @@ lattice = None
 source = None
 tally = None
 technique = None
+translate = None
 global_ = None
 
+
+
+# ==============================================================================
+# Alignment Logic
+# ==============================================================================
+
+
+
+def align(field_list):
+    result = []
+    offset = 0
+    pad_id = 0
+    for field in field_list:
+        if len(field) > 3:
+            print_error("Unexpected struct field specification. Specifications \
+                        usually only consist of 3 or fewer members")
+        multiplier = 1
+        if len(field) == 3:
+            dims = field[2]
+            for d in dims:
+                multiplier *= d
+        kind = np.dtype(field[1])
+        size = kind.itemsize
+
+        print(f"Kind {kind} has size {size}")
+
+        if kind.isbuiltin == 0:
+            alignment = 8
+        elif kind.isbuiltin == 1:
+            alignment = size
+        else:
+            print_error("Unexpected field item type")
+        
+        size *= multiplier
+
+        if offset % alignment != 0:
+            pad_size = alignment - (offset%alignment)
+            result.append((f"padding_{pad_id}", uint8, (pad_size,)))
+            pad_id += 1
+            offset += pad_size
+
+        result.append(field)
+        offset += size
+    
+    if offset % 8 != 0:
+        pad_size = alignment - (offset%8)
+        result.append(("padding_"+pad_id, uint8, (pad_size,)))
+        pad_id += 1
+
+    print(result) 
+    return result
+
+        
+
+
+def into_dtype(field_list):
+    return np.dtype(align(field_list))
+         
+        
 
 # ==============================================================================
 # Particle
@@ -60,7 +122,7 @@ def make_type_particle(iQMC, G, tracked):
     struct += [("iqmc_w", float64, (Ng,))]
     if tracked:
         struct += [("track_pid",int64),("track_hid",int64)]
-    particle = np.dtype(struct)
+    particle = into_dtype(struct)
 
 
 # Particle record (in-bank)
@@ -86,10 +148,10 @@ def make_type_particle_record(iQMC, G, tracked):
     if tracked:
         struct += [("track_pid",int64),("track_hid",int64)]
     struct += [("iqmc_w", float64, (Ng,))]
-    particle_record = np.dtype(struct)
+    particle_record = into_dtype(struct)
 
 
-precursor = np.dtype(
+precursor = into_dtype(
     [
         ("x", float64),
         ("y", float64),
@@ -107,13 +169,13 @@ precursor = np.dtype(
 
 
 def particle_bank(max_size):
-    return np.dtype(
+    return into_dtype(
         [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U10")]
     )
 
 
 def precursor_bank(max_size):
-    return np.dtype(
+    return into_dtype(
         [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U10")]
     )
 
@@ -184,7 +246,7 @@ def make_type_material(G, J, Nmax_nuclide):
 def make_type_surface(Nmax_slice):
     global surface
 
-    surface = np.dtype(
+    surface = into_dtype(
         [
             ("ID", int64),
             ("N_slice", int64),
@@ -212,6 +274,7 @@ def make_type_surface(Nmax_slice):
     )
 
 
+
 # ==============================================================================
 # Cell
 # ==============================================================================
@@ -220,7 +283,7 @@ def make_type_surface(Nmax_slice):
 def make_type_cell(Nmax_surface):
     global cell
 
-    cell = np.dtype(
+    cell = into_dtype(
         [
             ("ID", int64),
             ("N_surface", int64),
@@ -242,7 +305,7 @@ def make_type_cell(Nmax_surface):
 def make_type_universe(Nmax_cell):
     global universe
 
-    universe = np.dtype(
+    universe = into_dtype(
         [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
     )
 
@@ -252,7 +315,7 @@ def make_type_universe(Nmax_cell):
 # ==============================================================================
 
 
-mesh_uniform = np.dtype(
+mesh_uniform = into_dtype(
     [
         ("x0", float64),
         ("dx", float64),
@@ -279,7 +342,7 @@ def make_type_lattice(cards):
         Nmax_y = max(Nmax_y, card["mesh"]["Ny"])
         Nmax_z = max(Nmax_z, card["mesh"]["Nz"])
 
-    lattice = np.dtype(
+    lattice = into_dtype(
         [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
     )
 
@@ -291,7 +354,7 @@ def make_type_lattice(cards):
 
 def make_type_source(G):
     global source
-    source = np.dtype(
+    source = into_dtype(
         [
             ("ID", int64),
             ("box", bool_),
@@ -370,7 +433,7 @@ def make_type_tally(Ns, card):
     global tally
 
     def make_type_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("bin", float64, shape),
                 ("mean", float64, shape),
@@ -439,11 +502,11 @@ def make_type_tally(Ns, card):
         if not card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    tally = np.dtype(struct)
+    tally = into_dtype(struct)
 
 
 # ==============================================================================
@@ -451,7 +514,7 @@ def make_type_tally(Ns, card):
 # ==============================================================================
 
 
-setting = np.dtype(
+setting = into_dtype(
     [
         ("N_particle", int64),
         ("N_inactive", int64),
@@ -468,15 +531,15 @@ setting = np.dtype(
         ("k_init", float64),
         ("gyration_radius", bool_),
         ("gyration_radius_type", int64),
-        ("output", "U30"),
+        ("output", str_),
         ("progress_bar", bool_),
         ("source_file", bool_),
-        ("source_file_name", "U30"),
+        ("source_file_name", str_),
         ("track_particle", bool_),
         ("save_particle", bool_),
         ("save_input_deck", bool_),
         ("IC_file", bool_),
-        ("IC_file_name", "U30"),
+        ("IC_file_name", str_),
         ("N_precursor", int64),
         ("N_sensitivity", int64),
     ]
@@ -637,7 +700,7 @@ def make_type_technique(N_particle, G, card):
     ]
 
     # Finalize technique type
-    technique = np.dtype(struct)
+    technique = into_dtype(struct)
 
 
 # ==============================================================================
@@ -700,7 +763,7 @@ def make_type_global(card):
         bank_source = particle_bank(N_work)
 
     # GLobal type
-    global_ = np.dtype(
+    global_ = into_dtype(
         [
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
@@ -718,6 +781,8 @@ def make_type_global(card):
             ("bank_precursor", bank_precursor),
             ("rng_seed_base", uint64),
             ("rng_seed", uint64),
+            ("source_seed", uint64),
+            ("source_precursor_seed", uint64),
             ("rng_stride", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
@@ -756,6 +821,7 @@ def make_type_global(card):
             ("particle_track_history_ID", int64, (1,)),
             ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
+            ("mpi_work_iter", int64, (1,)),
         ]
     )
 
@@ -763,6 +829,10 @@ def make_type_global(card):
 # ==============================================================================
 # Util
 # ==============================================================================
+
+def make_type_translate():
+    global translate
+    translate = into_dtype([("values", float64, (3,))])
 
 
 def make_type_mesh(card):
@@ -774,7 +844,7 @@ def make_type_mesh(card):
     N_azi = len(card["azi"]) - 1
     Ng = len(card["g"]) - 1
     return (
-        np.dtype(
+        into_dtype(
             [
                 ("x", float64, (Nx + 1,)),
                 ("y", float64, (Ny + 1,)),
@@ -803,7 +873,7 @@ def make_type_mesh_(card):
     Nmu = len(card["mu"]) - 1
     N_azi = len(card["azi"]) - 1
     return (
-        np.dtype(
+        into_dtype(
             [
                 ("x", float64, (Nx + 1,)),
                 ("y", float64, (Ny + 1,)),
