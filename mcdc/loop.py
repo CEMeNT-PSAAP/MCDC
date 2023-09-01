@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import ascontiguousarray as cga
-from numba import njit, objmode, jit
+from numba import njit, objmode, jit, cuda
 from scipy.linalg import eig
 
 import mcdc.kernel as kernel
@@ -18,6 +18,7 @@ from mcdc.print_ import (
 )
 
 import mcdc.adapt as adapt
+from mcdc.adapt import toggle, for_gpu, for_cpu, universal_arrays
 
 # =========================================================================
 # Main loop
@@ -89,127 +90,19 @@ def loop_main(mcdc):
         kernel.eigenvalue_tally_closeout(mcdc)
 
 
-# =============================================================================
-# Source loop
-# =============================================================================
 
-
-
-
-
-@njit
-def prep_particle(P,mcdc):
-    # Apply weight window
-    if mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, mcdc)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_pid(P,mcdc)
-    
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
-
-
-
-@njit
-def generate_source_particle(idx_work, seed, mcdc):
-    seed_work = kernel.split_seed(idx_work, seed)
-
-    # =====================================================================
-    # Get a source particle and put into active bank
-    # =====================================================================
-
-    # Get from fixed-source?
-    if kernel.get_bank_size(mcdc["bank_source"]) == 0:
-        # Sample source
-        P = kernel.source_particle(seed_work, mcdc)
-
-    # Get from source bank
-    else:
-        P = mcdc["bank_source"]["particles"][idx_work]
-    
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_hid(P,mcdc)
-
-    # Check if it is beyond current census index
-    census_idx = mcdc["technique"]["census_idx"]
-    if P["t"] > mcdc["technique"]["census_time"][census_idx]:
-        P["t"] += SHIFT
-        adapt.add_census(P, mcdc)
-    else:
-        # Add the source particle into the active bank
-        adapt.add_active(P, mcdc)
-
-
-
-@njit
-def exhaust_active_bank(mcdc):
-    # Loop until active bank is exhausted
-    P = np.zeros(1, dtype=type_.particle)[0]
-    while kernel.get_particle(P, mcdc["bank_active"], mcdc):
-        prep_particle(P,mcdc)
-        while P["alive"]:
-            step_particle(P,mcdc)
-    kernel.set_bank_size(mcdc["bank_active"],0)
-
-
-
-def process_sources(seed,mcdc):
-    # Progress bar indicator
-    N_prog = 0
-
-    # Loop over particle sources
-    for idx_work in range(mcdc["mpi_work_size"]):
-        generate_source_particle(idx_work,seed,mcdc)
-
-        # Loop until active bank is exhausted
-        exhaust_active_bank(mcdc)
-
-        # Progress printout
-        percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
-        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-            N_prog += 1
-            with objmode():
-                print_progress(percent, mcdc)
-
-
-    
-
-
-@njit
-def loop_source(seed, mcdc):
-
-    if mcdc["technique"]["iQMC"]:
-        mcdc["technique"]["iqmc_sweep_counter"] += 1
-
-    process_sources(seed,mcdc)
-
-    # =====================================================================
-    # Closeout
-    # =====================================================================
-
-    # Tally history closeout for fixed-source simulation
-    if not mcdc["setting"]["mode_eigenvalue"]:
-        kernel.tally_closeout_history(mcdc)
-
-
-    # Re-sync RNG
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
 
 # =========================================================================
 # Particle loop
 # =========================================================================
 
-
+@njit
 def step_particle(P,mcdc):
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans = np.zeros(3)
+        trans_struct = adapt.local_translate()
+        trans = trans_struct["values"]
         P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
     # Determine and move to event
@@ -295,12 +188,224 @@ def step_particle(P,mcdc):
 
 
 
+
+# =============================================================================
+# Source loop
+# =============================================================================
+
+
+
+
+
+@njit
+def prep_particle(P,mcdc):
+    # Apply weight window
+    if mcdc["technique"]["weight_window"]:
+        kernel.weight_window(P, mcdc)
+
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.allocate_pid(P,mcdc)
+    
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
+
+
+
+
+@njit
+def generate_source_particle(idx_work, seed, mcdc):
+    seed_work = kernel.split_seed(idx_work, seed)
+
+    # =====================================================================
+    # Get a source particle and put into active bank
+    # =====================================================================
+
+    # Get from fixed-source?
+    if kernel.get_bank_size(mcdc["bank_source"]) == 0:
+        # Sample source
+        P = kernel.source_particle(seed_work, mcdc)
+
+    # Get from source bank
+    else:
+        P = mcdc["bank_source"]["particles"][idx_work]
+    
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.allocate_hid(P,mcdc)
+
+    # Check if it is beyond current census index
+    census_idx = mcdc["technique"]["census_idx"]
+    if P["t"] > mcdc["technique"]["census_time"][census_idx]:
+        P["t"] += SHIFT
+        adapt.add_census(P, mcdc)
+    else:
+        # Add the source particle into the active bank
+        adapt.add_active(P, mcdc)
+
+
+
+@njit
+def exhaust_active_bank(mcdc):
+    # Loop until active bank is exhausted
+    P = np.zeros(1, dtype=type_.particle)[0]
+    while kernel.get_particle(P, mcdc["bank_active"], mcdc):
+        prep_particle(P,mcdc)
+        while P["alive"]:
+            step_particle(P,mcdc)
+    kernel.set_bank_size(mcdc["bank_active"],0)
+
+
+@for_cpu()
+@njit
+def process_sources(seed,mcdc):
+    # Progress bar indicator
+    N_prog = 0
+
+    # Loop over particle sources
+    for idx_work in range(mcdc["mpi_work_size"]):
+        generate_source_particle(idx_work,seed,mcdc)
+
+        # Loop until active bank is exhausted
+        exhaust_active_bank(mcdc)
+
+        # Progress printout
+        percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
+
+
+source_gpu_rt = None
+
+
+
+def make_gpu_process_sources(precursor):
+    def inner(func):
+        async_fns = [step_particle]
+        none_type = nb.from_dtype(np.dtype([ ]))
+        mcdc_type = nb.from_dtype(type_.global_)
+        state_spec = (mcdc_type,none_type,none_type)
+        device, group, thread = adapt.harm.RuntimeSpec.access_fns(state_spec)
+
+        def work_maker(prog):
+            pass
+
+        if precursor:
+            def make_work(prog: nb.uintp) -> nb.boolean:
+                mcdc = adapt.device(prog)
+
+                idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
+
+                if idx_work >= mcdc["mpi_work_size"]:
+                    return False
+                
+                generate_source_particle(nb.uint64(idx_work),mcdc["source_seed"],mcdc)
+                return True
+            work_maker = make_work
+        else:
+            def make_work(prog: nb.uintp) -> nb.boolean:
+                mcdc = device(prog)
+
+                idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
+
+                if idx_work >= mcdc["mpi_work_size_precursor"]:
+                    return False
+
+                # Get precursor
+                DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+
+                # Determine number of particles to be generated
+                w = DNP["w"]
+                N = math.floor(w)
+                # "Roulette" the last particle
+                seed_work = kernel.split_seed(nb.uint64(idx_work), mcdc["source_precursor_seed"])
+                if kernel.rng_from_seed(seed_work) < w - N:
+                    N += 1
+                DNP["w"] = N
+
+                for particle_idx in range(N):
+                    generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
+
+                return True
+            work_maker = make_work
+
+
+
+        def initialize(prog: nb.uintp):
+            pass
+
+        def finalize(prog: nb.uintp):
+            pass
+
+        particle = nb.from_dtype(type_.particle)
+
+        def step(prog: nb.uintp, P: particle):
+            mcdc = device(prog)
+            step_particle(P,mcdc)
+            if P["alive"]:
+                step_async(P)
+
+        step_async, = adapt.harm.RuntimeSpec.async_dispatch(step)
+
+        base_fns = (initialize,finalize, work_maker)
+        loop_spec = adapt.harm.RuntimeSpec("collaz",state_spec,base_fns,async_fns)
+
+        
+        global source_gpu_rt
+        source_gpu_rt = loop_spec.harmonize_instance()
+
+        @njit
+        def gpu_process_sources(seed,mcdc):
+            if(precursor):
+                mcdc["source_seed"] = seed
+            else:
+                mcdc["source_precursor_seed"] = seed
+            mcdc["mpi_work_iter"][0] = 0
+            source_gpu_rt.store_state(mcdc)
+            source_gpu_rt.init(4096)
+            source_gpu_rt.exec(65536,288)
+            mcdc = source_gpu_rt.load_state()[0]
+
+        return gpu_process_sources
+    return inner
+
+
+@for_gpu(on_target=[make_gpu_process_sources(precursor=False)])
+def process_sources(seed,mcdc):
+    pass
+
+
+@njit
+def loop_source(seed, mcdc):
+
+    if mcdc["technique"]["iQMC"]:
+        mcdc["technique"]["iqmc_sweep_counter"] += 1
+
+    process_sources(seed,mcdc)
+
+    # =====================================================================
+    # Closeout
+    # =====================================================================
+
+    # Tally history closeout for fixed-source simulation
+    if not mcdc["setting"]["mode_eigenvalue"]:
+        kernel.tally_closeout_history(mcdc)
+
+
+    # Re-sync RNG
+    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
+
+
+
+
 # =============================================================================
 # iQMC Loops
 # =============================================================================
 
-
-@njit
+@toggle("iQMC")
 def loop_iqmc(mcdc):
     # generate material index
     kernel.generate_iqmc_material_idx(mcdc)
@@ -365,7 +470,7 @@ def source_iteration(mcdc):
         loop_index += 1
 
 
-@njit
+@toggle("iQMC")
 def gmres(mcdc):
     """
     GMRES solver for iQMC fixed-source problems.
@@ -517,7 +622,7 @@ def gmres(mcdc):
     # end outer loop
 
 
-@njit
+@toggle("iQMC")
 def power_iteration(mcdc):
     simulation_end = False
 
@@ -566,7 +671,7 @@ def power_iteration(mcdc):
             print_iqmc_eigenvalue_exit_code(mcdc)
 
 
-@njit
+@toggle("iQMC")
 def davidson(mcdc):
     """
     The generalized Davidson method is a Krylov subspace method for solving
@@ -695,6 +800,7 @@ def davidson(mcdc):
 # Precursor source loop
 # =============================================================================
 
+
 @njit
 def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
 
@@ -703,7 +809,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
     g = DNP["n_g"]
 
     # Create new particle
-    P_new = np.zeros(1, dtype=type_.particle)[0]
+    P_new = adapt.local_particle()
     part_seed = kernel.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
@@ -716,7 +822,9 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
     P_new["z"] = DNP["z"]
 
     # Get material
-    trans = np.zeros(3)
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
+
     P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
     material_ID = kernel.get_particle_material(P_new, mcdc)
     material = mcdc["materials"][material_ID]
@@ -776,10 +884,9 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, mcdc):
             adapt.add_active(kernel.copy_particle(P_new), mcdc)
 
 
-
-
+@for_cpu()
+@njit
 def process_source_precursors(seed,mcdc):
-    
     # Progress bar indicator
     N_prog = 0
 
@@ -845,3 +952,9 @@ def loop_source_precursor(seed, mcdc):
 
     # Re-sync RNG
     skip = N_global - idx_start
+
+
+@for_gpu(on_target=[make_gpu_process_sources(precursor=True)])
+def process_source_precursors(seed,mcdc):
+    pass
+

@@ -159,6 +159,7 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_translate()
     type_.make_type_particle(iQMC, G, track_particle)
     type_.make_type_particle_record(iQMC, G, track_particle)
     type_.make_type_nuclide(G, J)
@@ -173,9 +174,9 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
     
-    adapt.adapt_to('cpu')
+    adapt.set_toggle("iQMC",iQMC)
     adapt.set_toggle("particle_tracker",track_particle)
-    adapt.target_for('cpu')
+    adapt.target_for("gpu")
     adapt.eval_toggle()
 
     # =========================================================================
@@ -207,7 +208,7 @@ def prepare():
 
     for i in range(N_surface):
         for name in type_.surface.names:
-            if name not in ["J", "t"]:
+            if name not in ["J", "t", "padding"]:
                 mcdc["surfaces"][i][name] = input_deck.surfaces[i][name]
 
         # Variables with possible different sizes
