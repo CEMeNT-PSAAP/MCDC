@@ -26,6 +26,7 @@ source = None
 tally = None
 technique = None
 translate = None
+group_array = None
 global_ = None
 
 
@@ -52,7 +53,6 @@ def align(field_list):
         kind = np.dtype(field[1])
         size = kind.itemsize
 
-        print(f"Kind {kind} has size {size}")
 
         if kind.isbuiltin == 0:
             alignment = 8
@@ -77,7 +77,6 @@ def align(field_list):
         result.append(("padding_"+pad_id, uint8, (pad_size,)))
         pad_id += 1
 
-    print(result) 
     return result
 
         
@@ -107,6 +106,7 @@ def make_type_particle(iQMC, G, tracked):
         ("g", uint64),
         ("w", float64),
         ("alive", bool_),
+        ("fresh", bool_),
         ("material_ID", int64),
         ("cell_ID", int64),
         ("surface_ID", int64),
@@ -833,6 +833,12 @@ def make_type_global(card):
 def make_type_translate():
     global translate
     translate = into_dtype([("values", float64, (3,))])
+
+
+
+def make_type_group_array(G):
+    global group_array
+    group_array = into_dtype([("values", float64, (G,))])
 
 
 def make_type_mesh(card):

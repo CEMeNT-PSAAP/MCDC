@@ -159,6 +159,7 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_group_array(G)
     type_.make_type_translate()
     type_.make_type_particle(iQMC, G, track_particle)
     type_.make_type_particle_record(iQMC, G, track_particle)
@@ -174,10 +175,14 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
     
+    target = "cpu"
+    if target == "gpu":
+        adapt.gpu_forward_declare()
+
     adapt.set_toggle("iQMC",iQMC)
     adapt.set_toggle("particle_tracker",track_particle)
-    adapt.target_for("gpu")
     adapt.eval_toggle()
+    adapt.target_for(target)
 
     # =========================================================================
     # Make the global variable container
@@ -208,7 +213,9 @@ def prepare():
 
     for i in range(N_surface):
         for name in type_.surface.names:
-            if name not in ["J", "t", "padding"]:
+            if "padding" in name:
+                continue
+            if name not in ["J", "t"]:
                 mcdc["surfaces"][i][name] = input_deck.surfaces[i][name]
 
         # Variables with possible different sizes
@@ -222,6 +229,8 @@ def prepare():
 
     for i in range(N_cell):
         for name in type_.cell.names:
+            if "padding" in name:
+                continue
             if name not in ["surface_IDs", "positive_flags"]:
                 mcdc["cells"][i][name] = input_deck.cells[i][name]
 
@@ -267,6 +276,8 @@ def prepare():
 
     for i in range(N_source):
         for name in type_.source.names:
+            if "padding" in name:
+                continue
             mcdc["sources"][i][name] = input_deck.sources[i][name]
 
     # Normalize source probabilities
@@ -281,6 +292,8 @@ def prepare():
     # =========================================================================
 
     for name in type_.tally.names:
+        if "padding" in name:
+            continue
         if name not in ["score", "mesh"]:
             mcdc["tally"][name] = input_deck.tally[name]
     # Set mesh
@@ -292,6 +305,8 @@ def prepare():
     # =========================================================================
 
     for name in type_.setting.names:
+        if "padding" in name:
+            continue
         mcdc["setting"][name] = input_deck.setting[name]
 
     # Check if time boundary is above the final tally mesh time grid

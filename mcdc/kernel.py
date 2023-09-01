@@ -192,7 +192,7 @@ def rng_from_seed(seed):
 
 @njit
 def source_particle(seed, mcdc):
-    P = np.zeros(1, dtype=type_.particle_record)[0]
+    P = adapt.local_particle_record()
     P["rng_seed"] = seed
 
     # Sample source
@@ -262,6 +262,8 @@ def add_bank_size(bank,value):
     return adapt.global_add(bank["size"],0,value)
 
 
+
+@for_cpu()
 @njit
 def add_particle(P, bank):
 
@@ -726,7 +728,7 @@ def bank_IC(P, mcdc):
 # Population control techniques
 # =============================================================================
 # TODO: Make it a stand-alone function that takes (bank_init, bank_final, M).
-#       The challenge is in the use of type-dependent copy_particle which is
+#       The challenge is in the use of type-dependent copy_record which is
 #       required due to pure-Python behavior of taking things by reference.
 
 
@@ -768,7 +770,7 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        P = copy_particle(bank_census["particles"][idx])
+        P = copy_record(bank_census["particles"][idx])
         # Set weight
         P["w"] *= td
         adapt.add_source(P, mcdc)
@@ -806,7 +808,7 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        P = copy_particle(bank_census["particles"][idx])
+        P = copy_record(bank_census["particles"][idx])
         # Set weight
         P["w"] = td
         adapt.add_source(P, mcdc)
@@ -920,8 +922,25 @@ def get_particle_speed(P, mcdc):
 
 
 @njit
+def copy_record(P):
+    P_new = adapt.local_particle_record()
+    P_new["x"] = P["x"]
+    P_new["y"] = P["y"]
+    P_new["z"] = P["z"]
+    P_new["t"] = P["t"]
+    P_new["ux"] = P["ux"]
+    P_new["uy"] = P["uy"]
+    P_new["uz"] = P["uz"]
+    P_new["g"] = P["g"]
+    P_new["w"] = P["w"]
+    P_new["rng_seed"] = P["rng_seed"]
+    P_new["sensitivity_ID"] = P["sensitivity_ID"]
+    copy_track_data(P_new,P)
+    return P_new
+
+@njit
 def copy_particle(P):
-    P_new = np.zeros(1, dtype=type_.particle_record)[0]
+    P_new = adapt.local_particle_record()
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -939,7 +958,7 @@ def copy_particle(P):
 
 @njit
 def split_particle(P):
-    P_new = copy_particle(P)
+    P_new = copy_record(P)
     P_new["rng_seed"] = split_seed(P["rng_seed"], 0)
     rng(P)
     return P_new
@@ -1920,7 +1939,8 @@ def distance_to_boundary(P, mcdc):
             distance = d_surface
             event = EVENT_SURFACE
             P["surface_ID"] = surface_ID
-            P["translation"][:] = trans
+            for i in range(3):
+                P["translation"][i] = trans[i]
 
             if surface_move:
                 event = EVENT_SURFACE_MOVE
@@ -1931,7 +1951,8 @@ def distance_to_boundary(P, mcdc):
             lattice = mcdc["lattices"][cell["lattice_ID"]]
 
             # Get lattice center for translation)
-            trans -= cell["lattice_center"]
+            for i in range(3):
+                trans[i] -= cell["lattice_center"][i]
 
             # Distance to lattice
             d_lattice = distance_to_lattice(P, lattice, trans)
@@ -2023,7 +2044,9 @@ def distance_to_mesh(P, mesh, mcdc):
 
 
 @njit
-def surface_crossing(P, mcdc):
+def surface_crossing(P, prog):
+
+    mcdc = adapt.device(prog)
 
     trans_struct = adapt.local_translate()
     trans = trans_struct["values"]
@@ -2056,7 +2079,7 @@ def surface_crossing(P, mcdc):
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
             # Sample derivative source particles
-            sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc)
+            sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog)
 
 
 # =============================================================================
@@ -2135,7 +2158,8 @@ def capture(P, mcdc):
 
 
 @njit
-def scattering(P, mcdc):
+def scattering(P, prog):
+    mcdc = adapt.device(prog)
     # Kill the current particle
     P["alive"] = False
 
@@ -2166,7 +2190,7 @@ def scattering(P, mcdc):
         sample_phasespace_scattering(P, material, P_new)
 
         # Bank
-        adapt.add_active(P_new, mcdc)
+        adapt.add_active(P_new, prog)
 
 
 @njit
@@ -2229,7 +2253,9 @@ def sample_phasespace_scattering(P, material, P_new):
 
 
 @njit
-def fission(P, mcdc):
+def fission(P, prog):
+    mcdc = adapt.device(prog)
+
     # Kill the current particle
     P["alive"] = False
 
@@ -2267,7 +2293,7 @@ def fission(P, mcdc):
         if mcdc["setting"]["mode_eigenvalue"]:
             adapt.add_census(P_new, mcdc)
         else:
-            adapt.add_active(P_new, mcdc)
+            adapt.add_active(P_new, prog)
 
 
 @njit
@@ -2482,7 +2508,9 @@ def time_boundary(P, mcdc):
 
 
 @njit
-def weight_window(P, mcdc):
+def weight_window(P, prog):
+    mcdc = adapt.device(prog)
+
     # Get indices
     t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
 
@@ -2506,13 +2534,13 @@ def weight_window(P, mcdc):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            adapt.add_active(split_particle(P), mcdc)
+            adapt.add_active(split_particle(P), prog)
 
         # Russian roulette
         p -= n_split
         xi = rng(P)
         if xi <= p:
-            adapt.add_active(split_particle(P), mcdc)
+            adapt.add_active(split_particle(P), prog)
 
     # Below target
     elif p < 1.0 / width:
@@ -2700,7 +2728,7 @@ def prepare_qmc_particles(mcdc):
 
     for n in range(start, stop):
         # Create new particle
-        P_new = np.zeros(1, dtype=type_.particle_record)[0]
+        P_new = adapt.local_particle_record()
         P_new["rng_seed"] = 0
         # assign direction
         P_new["x"] = sample_qmc_position(xa, xb, lds[n, 0])
@@ -2976,7 +3004,7 @@ def generate_iqmc_material_idx(mcdc):
     trans_struct = adapt.local_translate()
     trans = trans_struct["values"]
     # create particle to utilize cell finding functions
-    P_temp = np.zeros(1, dtype=type_.particle)[0]
+    P_temp = adapt.local_particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
@@ -3264,7 +3292,10 @@ def weight_roulette(P, mcdc):
 
 
 @njit
-def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
+def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
+
+    mcdc = adapt.device(prog)
+
     # Sample number of derivative sources
     xi = surface["dsm_Np"]
     if xi != 1.0:
@@ -3274,7 +3305,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
-    adapt.add_active(copy_particle(P), mcdc)
+    adapt.add_active(copy_record(P), prog)
 
     # Get sensitivity ID
     ID = surface["sensitivity_ID"]
@@ -3395,7 +3426,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                 P_new["z"] += nz * 2 * SHIFT
 
         # Put the current particle into the secondary bank
-        adapt.add_active(P_new, mcdc)
+        adapt.add_active(P_new, prog)
 
     # Sample potential second-order sensitivity particles?
     if mcdc["technique"]["dsm_order"] < 2 or P["sensitivity_ID"] > 0:
@@ -3461,7 +3492,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                             # Delta source
                             P_new["w"] = -w * sign
                             P_new["sensitivity_ID"] = ID_source
-                            adapt.add_active(P_new, mcdc)
+                            adapt.add_active(P_new, prog)
                             source_obtained = True
                         else:
                             P_new["w"] = w * sign
@@ -3471,7 +3502,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                                 # Scattering source
                                 sample_phasespace_scattering(P, nuclide, P_new)
                                 P_new["sensitivity_ID"] = ID_source
-                                adapt.add_active(P_new, mcdc)
+                                adapt.add_active(P_new, prog)
                                 source_obtained = True
                             else:
                                 tot += nusigmaF
@@ -3481,7 +3512,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                                         P, nuclide, P_new, mcdc
                                     )
                                     P_new["sensitivity_ID"] = ID_source
-                                    adapt.add_active(P_new, mcdc)
+                                    adapt.add_active(P_new, prog)
                                     source_obtained = True
                     if source_obtained:
                         break
@@ -3490,7 +3521,10 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 
 
 @njit
-def sensitivity_material(P, mcdc):
+def sensitivity_material(P, prog):
+
+    mcdc = adapt.device(prog)
+
     # The incident particle is already terminated
 
     # Get material
@@ -3580,7 +3614,7 @@ def sensitivity_material(P, mcdc):
         P_new["sensitivity_ID"] = ID
 
         # Put the current particle into the secondary bank
-        adapt.add_active(P_new, mcdc)
+        adapt.add_active(P_new, prog)
 
 
 # ==============================================================================
