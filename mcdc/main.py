@@ -29,7 +29,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_main, loop_iqmc
+from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_deck
@@ -63,10 +63,12 @@ def run():
 
     # Run simulation
     simulation_start = MPI.Wtime()
-    if not mcdc["technique"]["iQMC"]:
-        loop_main(mcdc)
-    else:
+    if mcdc["technique"]["iQMC"]:
         loop_iqmc(mcdc)
+    elif mcdc["setting"]["mode_eigenvalue"]:
+        loop_eigenvalue(mcdc)
+    else:
+        loop_fixed_source(mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -166,6 +168,7 @@ def prepare():
     type_.make_type_lattice(input_deck.lattices)
     type_.make_type_source(G)
     type_.make_type_tally(N_tally_scores, input_deck.tally)
+    type_.make_type_setting(input_deck)
     type_.make_type_technique(N_particle, G, input_deck.technique)
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
@@ -302,7 +305,6 @@ def prepare():
         "weight_roulette",
         "iQMC",
         "IC_generator",
-        "time_census",
         "branchless_collision",
     ]:
         mcdc["technique"][name] = input_deck.technique[name]
@@ -390,16 +392,6 @@ def prepare():
             N = mcdc["setting"]["N_particle"]
             np.random.seed(seed)
             mcdc["technique"]["iqmc_lds"] = np.random.random((N, N_dim))
-
-    # =========================================================================
-    # Time census
-    # =========================================================================
-
-    # Census time
-    mcdc["technique"]["census_time"] = input_deck.technique["census_time"]
-
-    # Census index
-    mcdc["technique"]["census_idx"] = 0
 
     # =========================================================================
     # Derivative Source Method
@@ -542,7 +534,7 @@ def generate_hdf5(mcdc):
             print_msg("")
         print_msg(" Generating output HDF5 files...")
 
-        with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
+        with h5py.File(mcdc["setting"]["output_name"] + ".h5", "w") as f:
             # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
@@ -670,7 +662,7 @@ def generate_hdf5(mcdc):
 def closeout(mcdc):
     # Runtime
     if mcdc["mpi_master"]:
-        with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+        with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:
             for name in [
                 "total",
                 "preparation",

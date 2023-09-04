@@ -14,7 +14,7 @@ from mcdc.input_ import (
     weighted_emission,
     population_control,
     branchless_collision,
-    census,
+    time_census,
     weight_window,
     iQMC,
     weight_roulette,
