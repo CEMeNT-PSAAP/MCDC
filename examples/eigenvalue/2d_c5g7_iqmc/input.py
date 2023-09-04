@@ -205,7 +205,7 @@ mcdc.iQMC(
 
 
 # Setting
-mcdc.setting(N_particle=N, output="davidson_output")
+mcdc.setting(N_particle=N, output_name="davidson_output")
 mcdc.eigenmode()
 
 # Run

@@ -64,7 +64,7 @@ def pi_test():
         eigenmode_solver=solver,
     )
     # Setting
-    mcdc.setting(N_particle=N, output="pi_output")
+    mcdc.setting(N_particle=N, output_name="pi_output")
     mcdc.eigenmode()
 
     # Run
@@ -146,7 +146,7 @@ def davidson_test():
         eigenmode_solver=solver,
     )
     # Setting
-    mcdc.setting(N_particle=N, output="davidson_output")
+    mcdc.setting(N_particle=N, output_name="davidson_output")
     mcdc.eigenmode()
 
     # Run
