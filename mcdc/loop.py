@@ -19,75 +19,79 @@ from mcdc.print_ import (
 
 
 # =========================================================================
-# Main loop
+# Fixed-source loop
 # =========================================================================
 
 
 @njit
-def loop_main(mcdc):
+def loop_fixed_source(mcdc):
+    # Loop over time censuses
+    for idx_census in range(mcdc["setting"]["N_census"]):
+        mcdc["idx_census"] = idx_census
+        seed_census = kernel.split_seed(idx_census, mcdc["setting"]["rng_seed"])
+
+        # Loop over source particles
+        seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
+        loop_source(seed_source, mcdc)
+
+        # Loop over source precursors
+        if mcdc["bank_precursor"]["size"] > 0:
+            seed_source_precursor = kernel.split_seed(
+                seed_census, SEED_SPLIT_SOURCE_PRECURSOR
+            )
+            loop_source_precursor(seed_source_precursor, mcdc)
+
+        # Time census closeout
+        if idx_census < mcdc["setting"]["N_census"] - 1:
+            # TODO: Output tally (optional)
+
+            # Manage particle banks: population control and work rebalance
+            seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            kernel.manage_particle_banks(seed_bank, mcdc)
+
+    # Tally closeout
+    kernel.tally_closeout(mcdc)
+
+
+# =========================================================================
+# Eigenvalue loop
+# =========================================================================
+
+
+@njit
+def loop_eigenvalue(mcdc):
     simulation_end = False
 
-    idx_cycle = 0
-    while not simulation_end:
+    # Loop over power iteration cycles
+    for idx_cycle in range(mcdc["setting"]["N_cycle"]):
         seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
 
         # Loop over source particles
         seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
         loop_source(seed_source, mcdc)
 
-        # Loop over source precursors
-        if mcdc["bank_precursor"]["size"] > 0:
-            seed_source_precursor = kernel.split_seed(
-                seed_cycle, SEED_SPLIT_SOURCE_PRECURSOR
-            )
-            loop_source_precursor(seed_source_precursor, mcdc)
+        # Tally "history" closeout
+        kernel.eigenvalue_tally_closeout_history(mcdc)
+        if mcdc["cycle_active"]:
+            kernel.tally_reduce_bin(mcdc)
+            kernel.tally_closeout_history(mcdc)
 
-        # Eigenvalue cycle closeout
-        if mcdc["setting"]["mode_eigenvalue"]:
-            # Tally history closeout
-            kernel.eigenvalue_tally_closeout_history(mcdc)
-            if mcdc["cycle_active"]:
-                kernel.tally_reduce_bin(mcdc)
-                kernel.tally_closeout_history(mcdc)
+        # Print progress
+        with objmode():
+            print_progress_eigenvalue(mcdc)
 
-            # Print progress
-            with objmode():
-                print_progress_eigenvalue(mcdc)
+        # Manage particle banks
+        seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
+        kernel.manage_particle_banks(seed_bank, mcdc)
 
-            # Manage particle banks
-            seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
-            kernel.manage_particle_banks(seed_bank, mcdc)
-
-            # Cycle management
-            mcdc["i_cycle"] += 1
-            if mcdc["i_cycle"] == mcdc["setting"]["N_cycle"]:
-                simulation_end = True
-            elif mcdc["i_cycle"] >= mcdc["setting"]["N_inactive"]:
-                mcdc["cycle_active"] = True
-
-        # Time census closeout
-        elif (
-            mcdc["technique"]["time_census"]
-            and mcdc["technique"]["census_idx"]
-            < len(mcdc["technique"]["census_time"]) - 1
-        ):
-            # Manage particle banks
-            seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
-            kernel.manage_particle_banks(seed_bank, mcdc)
-
-            # Increment census index
-            mcdc["technique"]["census_idx"] += 1
-
-        # Fixed-source closeout
-        else:
-            simulation_end = True
-
-        idx_cycle += 1
+        # Entering active cycle?
+        mcdc["idx_cycle"] += 1
+        if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
+            mcdc["cycle_active"] = True
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
-    if mcdc["setting"]["mode_eigenvalue"]:
-        kernel.eigenvalue_tally_closeout(mcdc)
+    kernel.eigenvalue_tally_closeout(mcdc)
 
 
 # =============================================================================
@@ -125,8 +129,8 @@ def loop_source(seed, mcdc):
             P = mcdc["bank_source"]["particles"][idx_work]
 
         # Check if it is beyond current census index
-        census_idx = mcdc["technique"]["census_idx"]
-        if P["t"] > mcdc["technique"]["census_time"][census_idx]:
+        idx_census = mcdc["idx_census"]
+        if P["t"] > mcdc["setting"]["census_time"][idx_census]:
             P["t"] += SHIFT
             kernel.add_particle(P, mcdc["bank_census"])
         else:
@@ -757,12 +761,12 @@ def loop_source_precursor(seed, mcdc):
 
             # Sample emission time
             P_new["t"] = -math.log(kernel.rng(P_new)) / decay
-            census_idx = mcdc["technique"]["census_idx"]
-            if census_idx > 0:
-                P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
+            idx_census = mcdc["idx_census"]
+            if idx_census > 0:
+                P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
 
             # Accept if it is inside current census index
-            if P_new["t"] < mcdc["technique"]["census_time"][census_idx]:
+            if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
                 # Reduce precursor weight
                 DNP["w"] -= 1.0
 
