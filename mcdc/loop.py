@@ -43,11 +43,9 @@ def loop_fixed_source(mcdc):
 
         # Time census closeout
         if idx_census < mcdc["setting"]["N_census"] - 1:
-            # TODO: Make census actions optional
+            # TODO: Output tally (optional)
 
-            # Output tally
-
-            # Manage particle banks: population control and wor rebalance
+            # Manage particle banks: population control and work rebalance
             seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
             kernel.manage_particle_banks(seed_bank, mcdc)
 
