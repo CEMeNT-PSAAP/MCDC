@@ -19,13 +19,13 @@ from mcdc.card import (
     make_card_source,
 )
 from mcdc.constant import (
-    GR_ALL,
-    GR_INFINITE_X,
-    GR_INFINITE_Y,
-    GR_INFINITE_Z,
-    GR_ONLY_X,
-    GR_ONLY_Y,
-    GR_ONLY_Z,
+    GYRATION_RADIUS_ALL,
+    GYRATION_RADIUS_INFINITE_X,
+    GYRATION_RADIUS_INFINITE_Y,
+    GYRATION_RADIUS_INFINITE_Z,
+    GYRATION_RADIUS_ONLY_X,
+    GYRATION_RADIUS_ONLY_Y,
+    GYRATION_RADIUS_ONLY_Z,
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
@@ -900,21 +900,21 @@ def setting(**kw):
     # Check the suplied keyword arguments
     for key in kw.keys():
         check_support(
-            "source parameter",
+            "setting parameter",
             key,
             [
-                "N_particle",
-                "time_boundary",
-                "rng_seed",
-                "output",
                 "progress_bar",
-                "k_eff",
-                "active_bank_buff",
-                "census_bank_buff",
-                "source_file",
+                "N_particle",
+                "rng_seed",
+                "time_boundary",
                 "particle_tracker",
                 "save_input_deck",
+                "output_name",
+                "source_file",
                 "IC_file",
+                "active_bank_buff",
+                "census_bank_buff",
+                "k_eff",
             ],
             False,
         )
@@ -923,7 +923,7 @@ def setting(**kw):
     N_particle = kw.get("N_particle")
     time_boundary = kw.get("time_boundary")
     rng_seed = kw.get("rng_seed")
-    output = kw.get("output")
+    output = kw.get("output_name")
     progress_bar = kw.get("progress_bar")
     k_eff = kw.get("k_eff")
     bank_active_buff = kw.get("active_bank_buff")
@@ -950,7 +950,7 @@ def setting(**kw):
 
     # Output .h5 file name
     if output is not None:
-        card["output"] = output
+        card["output_name"] = output
 
     # Progress bar
     if progress_bar is not None:
@@ -1020,19 +1020,19 @@ def eigenmode(
     if gyration_radius is not None:
         card["gyration_radius"] = True
         if gyration_radius == "all":
-            card["gyration_radius_type"] = GR_ALL
+            card["gyration_radius_type"] = GYRATION_RADIUS_ALL
         elif gyration_radius == "infinite-x":
-            card["gyration_radius_type"] = GR_INFINITE_X
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_X
         elif gyration_radius == "infinite-y":
-            card["gyration_radius_type"] = GR_INFINITE_Y
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_Y
         elif gyration_radius == "infinite-z":
-            card["gyration_radius_type"] = GR_INFINITE_Z
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_Z
         elif gyration_radius == "only-x":
-            card["gyration_radius_type"] = GR_ONLY_X
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_X
         elif gyration_radius == "only-y":
-            card["gyration_radius_type"] = GR_ONLY_Y
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Y
         elif gyration_radius == "only-z":
-            card["gyration_radius_type"] = GR_ONLY_Z
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Z
         else:
             print_error("Unknown gyration radius type")
 
@@ -1075,12 +1075,21 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def census(t, pct="none"):
-    card = mcdc.input_deck.technique
-    card["time_census"] = True
+def time_census(t):
+    # Remove census beyond the final tally time grid point
+    while True:
+        if t[-1] >= mcdc.input_deck.tally["mesh"]["t"][-1]:
+            t = t[:-1]
+        else:
+            break
+
+    # Add the default, final census-at-infinity
+    t = np.append(t, INF)
+
+    # Set the time census parameters
+    card = mcdc.input_deck.setting
     card["census_time"] = t
-    if pct != "none":
-        population_control(pct)
+    card["N_census"] = len(t)
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):

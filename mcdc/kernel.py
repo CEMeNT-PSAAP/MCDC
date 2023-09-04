@@ -1561,7 +1561,7 @@ def eigenvalue_tally(P, distance, mcdc):
 def eigenvalue_tally_closeout_history(mcdc):
     N_particle = mcdc["setting"]["N_particle"]
 
-    i_cycle = mcdc["i_cycle"]
+    idx_cycle = mcdc["idx_cycle"]
 
     # MPI Allreduce
     buff_nuSigmaF = np.zeros(1, np.float64)
@@ -1592,7 +1592,7 @@ def eigenvalue_tally_closeout_history(mcdc):
 
     # Update and store k_eff
     mcdc["k_eff"] = buff_nuSigmaF[0] / N_particle
-    mcdc["k_cycle"][i_cycle] = mcdc["k_eff"]
+    mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
 
     # Normalize other eigenvalue/global tallies
     tally_n = buff_n[0] / N_particle
@@ -1612,7 +1612,7 @@ def eigenvalue_tally_closeout_history(mcdc):
         mcdc["C_avg"] += tally_C
         mcdc["C_sdv"] += tally_C * tally_C
 
-        N = 1 + mcdc["i_cycle"] - mcdc["setting"]["N_inactive"]
+        N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
         mcdc["k_avg_running"] = mcdc["k_avg"] / N
         if N == 1:
             mcdc["k_sdv_running"] = 0.0
@@ -1658,7 +1658,7 @@ def eigenvalue_tally_closeout_history(mcdc):
         rms_local = np.zeros(1, np.float64)
         rms = np.zeros(1, np.float64)
         gr_type = mcdc["setting"]["gyration_radius_type"]
-        if gr_type == GR_ALL:
+        if gr_type == GYRATION_RADIUS_ALL:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += (
@@ -1666,27 +1666,27 @@ def eigenvalue_tally_closeout_history(mcdc):
                     + (P["y"] - com_y) ** 2
                     + (P["z"] - com_z) ** 2
                 ) * P["w"]
-        elif gr_type == GR_INFINITE_X:
+        elif gr_type == GYRATION_RADIUS_INFINITE_X:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += ((P["y"] - com_y) ** 2 + (P["z"] - com_z) ** 2) * P["w"]
-        elif gr_type == GR_INFINITE_Y:
+        elif gr_type == GYRATION_RADIUS_INFINITE_Y:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += ((P["x"] - com_x) ** 2 + (P["z"] - com_z) ** 2) * P["w"]
-        elif gr_type == GR_INFINITE_Z:
+        elif gr_type == GYRATION_RADIUS_INFINITE_Z:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += ((P["x"] - com_x) ** 2 + (P["y"] - com_y) ** 2) * P["w"]
-        elif gr_type == GR_ONLY_X:
+        elif gr_type == GYRATION_RADIUS_ONLY_X:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += ((P["x"] - com_x) ** 2) * P["w"]
-        elif gr_type == GR_ONLY_Y:
+        elif gr_type == GYRATION_RADIUS_ONLY_Y:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += ((P["y"] - com_y) ** 2) * P["w"]
-        elif gr_type == GR_ONLY_Z:
+        elif gr_type == GYRATION_RADIUS_ONLY_Z:
             for i in range(N_local):
                 P = mcdc["bank_census"]["particles"][i]
                 rms_local[0] += ((P["z"] - com_z) ** 2) * P["w"]
@@ -1697,7 +1697,7 @@ def eigenvalue_tally_closeout_history(mcdc):
         rms = math.sqrt(rms[0] / W)
 
         # Gyration radius
-        mcdc["gyration_radius"][i_cycle] = rms
+        mcdc["gyration_radius"][idx_cycle] = rms
 
 
 @njit
@@ -1743,8 +1743,8 @@ def move_to_event(P, mcdc):
     d_time_boundary = speed * (mcdc["setting"]["time_boundary"] - P["t"])
 
     # Distance to census time
-    idx = mcdc["technique"]["census_idx"]
-    d_time_census = speed * (mcdc["technique"]["census_time"][idx] - P["t"])
+    idx = mcdc["idx_census"]
+    d_time_census = speed * (mcdc["setting"]["census_time"][idx] - P["t"])
 
     # Distance to collision
     if mcdc["technique"]["iQMC"]:

@@ -67,13 +67,13 @@ def print_progress(percent, mcdc):
     if master:
         sys.stdout.write("\r")
         if not mcdc["setting"]["mode_eigenvalue"]:
-            if not mcdc["technique"]["time_census"]:
+            if mcdc["setting"]["N_census"] == 1:
                 sys.stdout.write(
                     " [%-28s] %d%%" % ("=" * int(percent * 28), percent * 100.0)
                 )
             else:
-                idx = mcdc["technique"]["census_idx"] + 1
-                N = len(mcdc["technique"]["census_time"])
+                idx = mcdc["idx_census"] + 1
+                N = len(mcdc["setting"]["census_time"])
                 sys.stdout.write(
                     " Census %i/%i: [%-28s] %d%%"
                     % (idx, N, "=" * int(percent * 28), percent * 100.0)
@@ -105,27 +105,29 @@ def print_header_eigenvalue(mcdc):
 
 def print_progress_eigenvalue(mcdc):
     if master:
-        i_cycle = mcdc["i_cycle"]
+        idx_cycle = mcdc["idx_cycle"]
         k_eff = mcdc["k_eff"]
         k_avg = mcdc["k_avg_running"]
         k_sdv = mcdc["k_sdv_running"]
-        gr = mcdc["gyration_radius"][i_cycle]
+        gr = mcdc["gyration_radius"][idx_cycle]
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
             sys.stdout.write("\033[K")
         if mcdc["setting"]["gyration_radius"]:
             if not mcdc["cycle_active"]:
-                print(" %-4i  %.5f  %6.2f" % (i_cycle + 1, k_eff, gr))
+                print(" %-4i  %.5f  %6.2f" % (idx_cycle + 1, k_eff, gr))
             else:
                 print(
                     " %-4i  %.5f  %6.2f  %.5f +/- %.5f"
-                    % (i_cycle + 1, k_eff, gr, k_avg, k_sdv)
+                    % (idx_cycle + 1, k_eff, gr, k_avg, k_sdv)
                 )
         else:
             if not mcdc["cycle_active"]:
-                print(" %-4i  %.5f" % (i_cycle + 1, k_eff))
+                print(" %-4i  %.5f" % (idx_cycle + 1, k_eff))
             else:
-                print(" %-4i  %.5f  %.5f +/- %.5f" % (i_cycle + 1, k_eff, k_avg, k_sdv))
+                print(
+                    " %-4i  %.5f  %.5f +/- %.5f" % (idx_cycle + 1, k_eff, k_avg, k_sdv)
+                )
 
 
 def print_iqmc_eigenvalue_progress(mcdc):

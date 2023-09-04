@@ -11,7 +11,7 @@ uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"
 
-# MC/DC types, will be defined by input deck
+# MC/DC types, will be defined based on input deck
 particle = None
 particle_record = None
 nuclide = None
@@ -21,6 +21,7 @@ cell = None
 universe = None
 lattice = None
 source = None
+setting = None
 tally = None
 technique = None
 global_ = None
@@ -447,32 +448,45 @@ def make_type_tally(Ns, card):
 # ==============================================================================
 
 
-setting = np.dtype(
-    [
-        ("N_particle", int64),
-        ("N_inactive", int64),
-        ("N_active", int64),
-        ("N_cycle", int64),
+def make_type_setting(deck):
+    global setting
+
+    card = deck.setting
+    struct = [
+        # Basic MC simulation parameters
+        ("N_particle", uint64),
         ("rng_seed", uint64),
         ("time_boundary", float64),
-        ("bank_active_buff", int64),
+        # Misc.
+        ("progress_bar", bool_),
+        ("output_name", "U30"),
+        ("save_input_deck", bool_),
+        ("track_particle", bool_),
+        # Eigenvalue mode
         ("mode_eigenvalue", bool_),
         ("k_init", float64),
+        ("N_inactive", uint64),
+        ("N_active", uint64),
+        ("N_cycle", uint64),
+        ("save_particle", bool_),
         ("gyration_radius", bool_),
-        ("gyration_radius_type", int64),
-        ("output", "U30"),
-        ("progress_bar", bool_),
+        ("gyration_radius_type", uint64),
+        # Time census
+        ("N_census", uint64),
+        ("census_time", float64, (card["N_census"],)),
+        # Particle source file
         ("source_file", bool_),
         ("source_file_name", "U30"),
-        ("track_particle", bool_),
-        ("save_particle", bool_),
-        ("save_input_deck", bool_),
+        # Initial condition source file
         ("IC_file", bool_),
         ("IC_file_name", "U30"),
-        ("N_precursor", int64),
-        ("N_sensitivity", int64),
+        ("N_precursor", uint64),
+        # TODO: Move to technique
+        ("N_sensitivity", uint64),
     ]
-)
+
+    # Finalize setting type
+    setting = np.dtype(struct)
 
 
 # ==============================================================================
@@ -492,7 +506,6 @@ def make_type_technique(N_particle, G, card):
         ("weight_roulette", bool_),
         ("iQMC", bool_),
         ("IC_generator", bool_),
-        ("time_census", bool_),
         ("branchless_collision", bool_),
     ]
 
@@ -569,15 +582,6 @@ def make_type_technique(N_particle, G, card):
         ("iqmc_krylov_restart", int64),
         ("iqmc_preconditioner_sweeps", int64),
         ("iqmc_sweep_counter", int64),
-    ]
-
-    # =========================================================================
-    # Time census
-    # =========================================================================
-
-    struct += [
-        ("census_time", float64, (len(card["census_time"]),)),
-        ("census_idx", int64),
     ]
 
     # =========================================================================
@@ -659,7 +663,7 @@ def make_type_global(card):
 
     # Particle bank types
     bank_active = particle_bank(1 + bank_active_buff)
-    if card.setting["mode_eigenvalue"] or card.technique["time_census"]:
+    if card.setting["mode_eigenvalue"] or card.setting["N_census"] > 1:
         bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
         bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
     else:
@@ -721,11 +725,12 @@ def make_type_global(card):
             ("k_avg_running", float64),
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
-            ("i_cycle", int64),
+            ("idx_cycle", int64),
             ("cycle_active", bool_),
             ("eigenvalue_tally_nuSigmaF", float64),
             ("eigenvalue_tally_n", float64),
             ("eigenvalue_tally_C", float64),
+            ("idx_census", int64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
