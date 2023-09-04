@@ -49,7 +49,7 @@ mcdc.tally(scores=["flux", "flux-x"], x=np.linspace(0.0, 8.0, 41))
 
 # Setting
 mcdc.setting(
-    N_particle=N_particle, output="output_" + str(N_particle), progress_bar=False
+    N_particle=N_particle, output_name="output_" + str(N_particle), progress_bar=False
 )
 
 # Run
