@@ -3015,6 +3015,7 @@ def AxV(phi, b, mcdc):
     prepare_qmc_source(mcdc)
     prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+    mcdc["technique"]["iqmc_sweep_counter"] += 1
     loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
@@ -3043,6 +3044,7 @@ def RHS(mcdc):
     prepare_qmc_source(mcdc)
     prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+    mcdc["technique"]["iqmc_sweep_counter"] += 1
     loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
@@ -3072,6 +3074,7 @@ def HxV(V, mcdc):
     prepare_qmc_scattering_source(mcdc)
     prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+    mcdc["technique"]["iqmc_sweep_counter"] += 1
     loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
@@ -3104,6 +3107,7 @@ def FxV(V, mcdc):
     prepare_qmc_fission_source(mcdc)
     prepare_qmc_particles(mcdc)
     mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+    mcdc["technique"]["iqmc_sweep_counter"] += 1
     loop_source(0, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_flux(mcdc)
@@ -3139,6 +3143,7 @@ def preconditioner(V, mcdc, num_sweeps=3):
         prepare_qmc_scattering_source(mcdc)
         prepare_qmc_particles(mcdc)
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+        mcdc["technique"]["iqmc_sweep_counter"] += 1
         loop_source(0, mcdc)
         # sum resultant flux on all processors
         iqmc_distribute_flux(mcdc)

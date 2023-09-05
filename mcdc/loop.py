@@ -104,9 +104,6 @@ def loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
 
-    if mcdc["technique"]["iQMC"]:
-        mcdc["technique"]["iqmc_sweep_counter"] += 1
-
     # Loop over particle sources
     for idx_work in range(mcdc["mpi_work_size"]):
         seed_work = kernel.split_seed(idx_work, seed)
@@ -318,7 +315,9 @@ def source_iteration(mcdc):
         mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
 
         # sweep particles
+        mcdc["technique"]["iqmc_sweep_counter"] += 1
         loop_source(0, mcdc)
+
         # sum resultant flux on all processors
         kernel.iqmc_distribute_flux(mcdc)
         mcdc["technique"]["iqmc_itt"] += 1
