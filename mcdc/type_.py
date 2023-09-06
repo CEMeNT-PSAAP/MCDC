@@ -86,8 +86,6 @@ def align(field_list):
         result.append((f"padding_{pad_id}", uint8, (pad_size,)))
         pad_id += 1
 
-    print(result)
-
     return result
 
         
