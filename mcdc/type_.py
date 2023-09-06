@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import sys
+from numba import njit
 from mcdc.print_ import print_error
 
 from mpi4py import MPI
@@ -27,6 +28,7 @@ tally = None
 technique = None
 translate = None
 group_array = None
+j_array = None
 global_ = None
 
 
@@ -34,6 +36,10 @@ global_ = None
 # ==============================================================================
 # Alignment Logic
 # ==============================================================================
+
+
+def fixup_dims(dim_tuple):
+    return tuple([max(d,1) for d in dim_tuple])
 
 
 
@@ -47,8 +53,8 @@ def align(field_list):
                         usually only consist of 3 or fewer members")
         multiplier = 1
         if len(field) == 3:
-            dims = field[2]
-            for d in dims:
+            field = ( field[0], field[1], fixup_dims(field[2]) )
+            for d in field[2]:
                 multiplier *= d
         kind = np.dtype(field[1])
         size = kind.itemsize
@@ -60,6 +66,9 @@ def align(field_list):
             alignment = size
         else:
             print_error("Unexpected field item type")
+
+        if multiplier == 0:
+            multiplier = 1
         
         size *= multiplier
 
@@ -73,9 +82,11 @@ def align(field_list):
         offset += size
     
     if offset % 8 != 0:
-        pad_size = alignment - (offset%8)
-        result.append(("padding_"+pad_id, uint8, (pad_size,)))
+        pad_size = 8 - (offset%8)
+        result.append((f"padding_{pad_id}", uint8, (pad_size,)))
         pad_id += 1
+
+    print(result)
 
     return result
 
@@ -83,13 +94,43 @@ def align(field_list):
 
 
 def into_dtype(field_list):
-    return np.dtype(align(field_list))
+    return np.dtype(align(field_list),align)
          
-        
+
+
+# ==============================================================================
+# Copy Logic
+# ==============================================================================
+
+
+type_roster = {}
+
+
+def copy_fn_for(kind,name):
+    code = f"@njit\ndef copy_{name}(dst,src):\n"
+    for f_name, spec in kind.fields.items():
+        f_dtype = spec[0]
+        if f_dtype in type_roster:
+            kind_name = type_roster[f_dtype]["name"]
+            code += f"    copy_{kind_name}(dst['{f_name}'],src['{f_name}'])"
+        else:
+            code += f"    dst['{f_name}'] = src['{f_name}']\n"
+    type_roster[kind] = {}
+    type_roster[kind]["name"] = name
+    exec(code)
+    return eval(f'copy_{name}')
+
+
+
+
+
 
 # ==============================================================================
 # Particle
 # ==============================================================================
+
+
+
 
 
 # Particle (in-flight)
@@ -170,13 +211,13 @@ precursor = into_dtype(
 
 def particle_bank(max_size):
     return into_dtype(
-        [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U10")]
+        [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U16")]
     )
 
 
 def precursor_bank(max_size):
     return into_dtype(
-        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U10")]
+        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U16")]
     )
 
 
@@ -187,7 +228,7 @@ def precursor_bank(max_size):
 
 def make_type_nuclide(G, J):
     global nuclide
-    nuclide = np.dtype(
+    nuclide = into_dtype(
         [
             ("ID", int64),
             ("G", int64),
@@ -214,7 +255,7 @@ def make_type_nuclide(G, J):
 
 def make_type_material(G, J, Nmax_nuclide):
     global material
-    material = np.dtype(
+    material = into_dtype(
         [
             ("ID", int64),
             ("N_nuclide", int64),
@@ -707,6 +748,8 @@ def make_type_technique(N_particle, G, card):
 # Global
 # ==============================================================================
 
+def copy_global(dst,src):
+    pass
 
 def make_type_global(card):
     global global_
@@ -826,6 +869,7 @@ def make_type_global(card):
     )
 
 
+
 # ==============================================================================
 # Util
 # ==============================================================================
@@ -839,6 +883,11 @@ def make_type_translate():
 def make_type_group_array(G):
     global group_array
     group_array = into_dtype([("values", float64, (G,))])
+
+
+def make_type_j_array(J):
+    global j_array
+    j_array = into_dtype([("values", float64, (J,))])
 
 
 def make_type_mesh(card):

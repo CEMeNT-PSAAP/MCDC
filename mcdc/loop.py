@@ -20,6 +20,8 @@ from mcdc.print_ import (
 import mcdc.adapt as adapt
 from mcdc.adapt import toggle, for_gpu, for_cpu, universal_arrays
 
+import numba as nb
+
 # =========================================================================
 # Main loop
 # =========================================================================
@@ -112,6 +114,7 @@ def step_particle(P, prog):
     kernel.move_to_event(P, mcdc)
     event = P["event"]
 
+
     # The & operator here is a bitwise and.
     # It is used to determine if an event type is part of the particle event.
 
@@ -119,7 +122,7 @@ def step_particle(P, prog):
     if event & EVENT_COLLISION:
         # Generate IC?
         if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-            kernel.bank_IC(P, mcdc)
+            kernel.bank_IC(P, prog)
 
         # Branchless collision?
         if mcdc["technique"]["branchless_collision"]:
@@ -164,7 +167,7 @@ def step_particle(P, prog):
     # Time census
     elif event & EVENT_CENSUS:
         P["t"] += SHIFT
-        adapt.add_census(kernel.copy_record(P), mcdc)
+        adapt.add_census(kernel.copy_record(P), prog)
         P["alive"] = False
 
     # Shift particle
@@ -234,11 +237,11 @@ def generate_source_particle(idx_work, seed, prog):
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
         # Sample source
-        P = kernel.source_particle(seed_work, mcdc)
+        P : type_.particle_record = kernel.source_particle(seed_work, mcdc)
 
     # Get from source bank
     else:
-        P = mcdc["bank_source"]["particles"][idx_work]
+        P : type_.particle_record = mcdc["bank_source"]["particles"][idx_work]
     
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
@@ -248,7 +251,7 @@ def generate_source_particle(idx_work, seed, prog):
     census_idx = mcdc["technique"]["census_idx"]
     if P["t"] > mcdc["technique"]["census_time"][census_idx]:
         P["t"] += SHIFT
-        adapt.add_census(P, mcdc)
+        adapt.add_census(P, prog)
     else:
         # Add the source particle into the active bank
         adapt.add_active(P, prog)
@@ -266,8 +269,8 @@ def exhaust_active_bank(mcdc):
     kernel.set_bank_size(mcdc["bank_active"],0)
 
 
+
 @for_cpu()
-@njit
 def process_sources(seed,mcdc):
     # Progress bar indicator
     N_prog = 0
@@ -287,99 +290,9 @@ def process_sources(seed,mcdc):
                 print_progress(percent, mcdc)
 
 
-source_gpu_rt = None
 
 
 
-def make_gpu_process_sources(precursor):
-    def inner(func):
-
-        def work_maker(prog):
-            pass
-
-        if precursor:
-            def make_work(prog: nb.uintp) -> nb.boolean:
-                mcdc = adapt.device(prog)
-
-                idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
-
-                if idx_work >= mcdc["mpi_work_size"]:
-                    return False
-                
-                generate_source_particle(nb.uint64(idx_work),mcdc["source_seed"],mcdc)
-                return True
-            work_maker = make_work
-        else:
-            def make_work(prog: nb.uintp) -> nb.boolean:
-                mcdc = adapt.device(prog)
-
-                idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
-
-                if idx_work >= mcdc["mpi_work_size_precursor"]:
-                    return False
-
-                # Get precursor
-                DNP = mcdc["bank_precursor"]["precursors"][idx_work]
-
-                # Determine number of particles to be generated
-                w = DNP["w"]
-                N = math.floor(w)
-                # "Roulette" the last particle
-                seed_work = kernel.split_seed(nb.uint64(idx_work), mcdc["source_precursor_seed"])
-                if kernel.rng_from_seed(seed_work) < w - N:
-                    N += 1
-                DNP["w"] = N
-
-                for particle_idx in range(N):
-                    generate_precursor_particle(DNP,particle_idx,seed_work,prog)
-
-                return True
-            work_maker = make_work
-
-
-
-        def initialize(prog: nb.uintp):
-            pass
-
-        def finalize(prog: nb.uintp):
-            pass
-
-        def step(prog: nb.uintp, P: adapt.particle_gpu):
-            mcdc = adapt.device(prog)
-            if P["fresh"]:
-                prep_particle(P,prog)
-            P["fresh"] = False
-            step_particle(P,prog)
-            if P["alive"]:
-                adapt.step_gpu(prog,P)
-
-        async_fns = [step]
-        base_fns = (initialize,finalize, work_maker)
-        loop_spec = adapt.harm.RuntimeSpec("collaz",adapt.state_spec,base_fns,async_fns)
-
-        
-        global source_gpu_rt
-        source_gpu_rt = loop_spec.harmonize_instance()
-
-        @njit
-        def gpu_process_sources(seed,mcdc):
-            if(precursor):
-                mcdc["source_seed"] = seed
-            else:
-                mcdc["source_precursor_seed"] = seed
-            mcdc["mpi_work_iter"][0] = 0
-            source_gpu_rt.store_state(mcdc)
-            source_gpu_rt.init(4096)
-            source_gpu_rt.exec(65536,288)
-            mcdc = source_gpu_rt.load_state()[0]
-
-        return gpu_process_sources
-    return inner
-
-
-@for_gpu(on_target=[make_gpu_process_sources(precursor=False)])
-def process_sources(seed,mcdc):
-    pass
 
 
 @njit
@@ -388,7 +301,9 @@ def loop_source(seed, mcdc):
     if mcdc["technique"]["iQMC"]:
         mcdc["technique"]["iqmc_sweep_counter"] += 1
 
+    print('\n\nBefore source\n\n',mcdc)
     process_sources(seed,mcdc)
+    print('\n\nAfter source\n\n',mcdc)
 
     # =====================================================================
     # Closeout
@@ -891,7 +806,6 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
 
 @for_cpu()
-@njit
 def process_source_precursors(seed,mcdc):
 
     # Progress bar indicator
@@ -961,7 +875,256 @@ def loop_source_precursor(seed, mcdc):
     skip = N_global - idx_start
 
 
-@for_gpu(on_target=[make_gpu_process_sources(precursor=True)])
-def process_source_precursors(seed,mcdc):
-    pass
+
+source_gpu_rt = None
+precursor_gpu_rt = None
+
+
+def run_source_gpu_rt(mcdc):
+    source_gpu_rt.store_state(mcdc)
+    source_gpu_rt.init(4096)
+    source_gpu_rt.exec(65536,288)
+    return source_gpu_rt.load_state()
+
+def run_precursor_gpu_rt(mcdc):
+    precursor_gpu_rt.store_state(mcdc)
+    precursor_gpu_rt.init(4096)
+    precursor_gpu_rt.exec(65536,288)
+    return precursor_gpu_rt.load_state(mcdc)
+
+
+def make_gpu_process_sources(precursor):
+
+    def work_maker(prog):
+        pass
+
+    if precursor:
+        def make_work(prog: nb.uintp) -> nb.boolean:
+            mcdc = adapt.device(prog)
+
+            idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
+
+            if idx_work >= mcdc["mpi_work_size_precursor"]:
+                return False
+
+            # Get precursor
+            DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+
+            # Determine number of particles to be generated
+            w = DNP["w"]
+            N = math.floor(w)
+            # "Roulette" the last particle
+            seed_work = kernel.split_seed(nb.uint64(idx_work), mcdc["source_precursor_seed"])
+            if kernel.rng_from_seed(seed_work) < w - N:
+                N += 1
+            DNP["w"] = N
+
+            for particle_idx in range(N):
+                generate_precursor_particle(DNP,particle_idx,seed_work,prog)
+
+            return True
+        work_maker = make_work
+    else:
+        def make_work(prog: nb.uintp) -> nb.boolean:
+            mcdc = adapt.device(prog)
+
+            idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
+
+            if idx_work >= mcdc["mpi_work_size"]:
+                return False
+
+            generate_source_particle(nb.uint64(idx_work),mcdc["source_seed"],prog)
+            return True
+        work_maker = make_work
+
+
+
+    def initialize(prog: nb.uintp):
+        pass
+
+    def finalize(prog: nb.uintp):
+        pass
+
+    def step(prog: nb.uintp, P: adapt.particle_gpu):
+        mcdc = adapt.device(prog)
+        if P["fresh"]:
+            prep_particle(P,prog)
+        P["fresh"] = False
+        step_particle(P,prog)
+        if P["alive"]:
+            adapt.step_gpu(prog,P)
+
+    async_fns = [step]
+    base_fns = (initialize,finalize, work_maker)
+
+    spec_name = "mcdc"
+    if precursor:
+        spec_name += "_precursor"
+    else:
+        spec_name += "_source"
+    loop_spec = adapt.harm.RuntimeSpec(spec_name,adapt.state_spec,base_fns,async_fns)
+
+    
+    global source_gpu_rt, precursor_gpu_rt
+
+    if precursor:
+        precursor_gpu_rt = loop_spec.harmonize_instance()
+    else:
+        source_gpu_rt = loop_spec.harmonize_instance()
+
+
+
+    if precursor:
+        @njit
+        def process_source_precursors(seed,mcdc):
+            mcdc["mpi_work_iter"][0] = 0
+            mcdc["source_precursor_seed"] = seed
+            
+            with objmode(mcdc_new = adapt.mcdc_type):
+                mcdc_new = run_precursor_gpu_rt(mcdc)
+            
+            #mcdc["nuclides"] = mcdc_new["nuclides"]
+            #mcdc["materials"] = mcdc_new["materials"]
+            #mcdc["surfaces"] = mcdc_new["surfaces"]
+            #mcdc["cells"] = mcdc_new["cells"]
+            #mcdc["universes"] = mcdc_new["universes"]
+            #mcdc["lattices"] = mcdc_new["lattices"]
+            #mcdc["sources"] = mcdc_new["sources"]
+            mcdc["tally"] = mcdc_new["tally"]
+            mcdc["setting"] = mcdc_new["setting"]
+            mcdc["technique"] = mcdc_new["technique"]
+            mcdc["bank_active"] = mcdc_new["bank_active"]
+            mcdc["bank_census"] = mcdc_new["bank_census"]
+            mcdc["bank_source"] = mcdc_new["bank_source"]
+            mcdc["bank_precursor"] = mcdc_new["bank_precursor"]
+            #mcdc["rng_seed_base"] = mcdc_new["rng_seed_base"]
+            #mcdc["rng_seed"] = mcdc_new["rng_seed"]
+            #mcdc["source_seed"] = mcdc_new["source_seed"]
+            #mcdc["source_precursor_seed"] = mcdc_new["source_precursor_seed"]
+            #mcdc["rng_stride"] = mcdc_new["rng_stride"]
+            #mcdc["k_eff"] = mcdc_new["k_eff"]
+            #mcdc["k_cycle"] = mcdc_new["k_cycle"]
+            #mcdc["k_avg"] = mcdc_new["k_avg"]
+            #mcdc["k_sdv"] = mcdc_new["k_sdv"]
+            #mcdc["n_avg"] = mcdc_new["n_avg"]
+            #mcdc["n_sdv"] = mcdc_new["n_sdv"]
+            #mcdc["n_max"] = mcdc_new["n_max"]
+            #mcdc["C_avg"] = mcdc_new["C_avg"]
+            #mcdc["C_sdv"] = mcdc_new["C_sdv"]
+            #mcdc["C_max"] = mcdc_new["C_max"]
+            #mcdc["k_avg_running"] = mcdc_new["k_avg_running"]
+            #mcdc["k_sdv_running"] = mcdc_new["k_sdv_running"]
+            #mcdc["gyration_radius"] = mcdc_new["gyration_radius"]
+            mcdc["i_cycle"] = mcdc_new["i_cycle"]
+            mcdc["cycle_active"] = mcdc_new["cycle_active"]
+            mcdc["eigenvalue_tally_nuSigmaF"] = mcdc_new["eigenvalue_tally_nuSigmaF"]
+            mcdc["eigenvalue_tally_n"] = mcdc_new["eigenvalue_tally_n"]
+            mcdc["eigenvalue_tally_C"] = mcdc_new["eigenvalue_tally_C"]
+            #mcdc["mpi_size"] = mcdc_new["mpi_size"]
+            #mcdc["mpi_rank"] = mcdc_new["mpi_rank"]
+            #mcdc["mpi_master"] = mcdc_new["mpi_master"]
+            #mcdc["mpi_work_start"] = mcdc_new["mpi_work_start"]
+            #mcdc["mpi_work_size"] = mcdc_new["mpi_work_size"]
+            #mcdc["mpi_work_size_total"] = mcdc_new["mpi_work_size_total"]
+            #mcdc["mpi_work_start_precursor"] = mcdc_new["mpi_work_start_precursor"]
+            #mcdc["mpi_work_size_precursor"] = mcdc_new["mpi_work_size_precursor"]
+            #mcdc["mpi_work_size_total_precursor"] = mcdc_new["mpi_work_size_total_precursor"]
+            mcdc["runtime_total"] = mcdc_new["runtime_total"]
+            mcdc["runtime_preparation"] = mcdc_new["runtime_preparation"]
+            mcdc["runtime_simulation"] = mcdc_new["runtime_simulation"]
+            mcdc["runtime_output"] = mcdc_new["runtime_output"]
+            mcdc["runtime_bank_management"] = mcdc_new["runtime_bank_management"]
+            mcdc["particle_track"] = mcdc_new["particle_track"]
+            mcdc["particle_track_N"] = mcdc_new["particle_track_N"]
+            mcdc["particle_track_history_ID"] = mcdc_new["particle_track_history_ID"]
+            mcdc["particle_track_particle_ID"] = mcdc_new["particle_track_particle_ID"]
+            #mcdc["precursor_strength"] = mcdc_new["precursor_strength"]
+            #mcdc["mpi_work_iter"] = mcdc_new["mpi_work_iter"]
+            
+            kernel.set_bank_size(mcdc["bank_active"],0)
+        return process_source_precursors
+    else:
+        @njit
+        def process_sources(seed,mcdc):
+            mcdc["mpi_work_iter"][0] = 0
+            mcdc["source_seed"] = seed
+            
+            with objmode(mcdc_new = adapt.mcdc_type):
+                mcdc_new = run_source_gpu_rt(mcdc)
+                print("\n\nIn njit\n\n",mcdc_new)
+
+            #mcdc["nuclides"] = mcdc_new["nuclides"]
+            #mcdc["materials"] = mcdc_new["materials"]
+            #mcdc["surfaces"] = mcdc_new["surfaces"]
+            #mcdc["cells"] = mcdc_new["cells"]
+            #mcdc["universes"] = mcdc_new["universes"]
+            #mcdc["lattices"] = mcdc_new["lattices"]
+            #mcdc["sources"] = mcdc_new["sources"]
+            mcdc["tally"] = mcdc_new["tally"]
+            mcdc["setting"] = mcdc_new["setting"]
+            mcdc["technique"] = mcdc_new["technique"]
+            mcdc["bank_active"] = mcdc_new["bank_active"]
+            mcdc["bank_census"] = mcdc_new["bank_census"]
+            mcdc["bank_source"] = mcdc_new["bank_source"]
+            mcdc["bank_precursor"] = mcdc_new["bank_precursor"]
+            #mcdc["rng_seed_base"] = mcdc_new["rng_seed_base"]
+            #mcdc["rng_seed"] = mcdc_new["rng_seed"]
+            #mcdc["source_seed"] = mcdc_new["source_seed"]
+            #mcdc["source_precursor_seed"] = mcdc_new["source_precursor_seed"]
+            #mcdc["rng_stride"] = mcdc_new["rng_stride"]
+            #mcdc["k_eff"] = mcdc_new["k_eff"]
+            #mcdc["k_cycle"] = mcdc_new["k_cycle"]
+            #mcdc["k_avg"] = mcdc_new["k_avg"]
+            #mcdc["k_sdv"] = mcdc_new["k_sdv"]
+            #mcdc["n_avg"] = mcdc_new["n_avg"]
+            #mcdc["n_sdv"] = mcdc_new["n_sdv"]
+            #mcdc["n_max"] = mcdc_new["n_max"]
+            #mcdc["C_avg"] = mcdc_new["C_avg"]
+            #mcdc["C_sdv"] = mcdc_new["C_sdv"]
+            #mcdc["C_max"] = mcdc_new["C_max"]
+            #mcdc["k_avg_running"] = mcdc_new["k_avg_running"]
+            #mcdc["k_sdv_running"] = mcdc_new["k_sdv_running"]
+            #mcdc["gyration_radius"] = mcdc_new["gyration_radius"]
+            mcdc["i_cycle"] = mcdc_new["i_cycle"]
+            mcdc["cycle_active"] = mcdc_new["cycle_active"]
+            mcdc["eigenvalue_tally_nuSigmaF"] = mcdc_new["eigenvalue_tally_nuSigmaF"]
+            mcdc["eigenvalue_tally_n"] = mcdc_new["eigenvalue_tally_n"]
+            mcdc["eigenvalue_tally_C"] = mcdc_new["eigenvalue_tally_C"]
+            #mcdc["mpi_size"] = mcdc_new["mpi_size"]
+            #mcdc["mpi_rank"] = mcdc_new["mpi_rank"]
+            #mcdc["mpi_master"] = mcdc_new["mpi_master"]
+            #mcdc["mpi_work_start"] = mcdc_new["mpi_work_start"]
+            #mcdc["mpi_work_size"] = mcdc_new["mpi_work_size"]
+            #mcdc["mpi_work_size_total"] = mcdc_new["mpi_work_size_total"]
+            #mcdc["mpi_work_start_precursor"] = mcdc_new["mpi_work_start_precursor"]
+            #mcdc["mpi_work_size_precursor"] = mcdc_new["mpi_work_size_precursor"]
+            #mcdc["mpi_work_size_total_precursor"] = mcdc_new["mpi_work_size_total_precursor"]
+            mcdc["runtime_total"] = mcdc_new["runtime_total"]
+            mcdc["runtime_preparation"] = mcdc_new["runtime_preparation"]
+            mcdc["runtime_simulation"] = mcdc_new["runtime_simulation"]
+            mcdc["runtime_output"] = mcdc_new["runtime_output"]
+            mcdc["runtime_bank_management"] = mcdc_new["runtime_bank_management"]
+            mcdc["particle_track"] = mcdc_new["particle_track"]
+            mcdc["particle_track_N"] = mcdc_new["particle_track_N"]
+            mcdc["particle_track_history_ID"] = mcdc_new["particle_track_history_ID"]
+            mcdc["particle_track_particle_ID"] = mcdc_new["particle_track_particle_ID"]
+            #mcdc["precursor_strength"] = mcdc_new["precursor_strength"]
+            #mcdc["mpi_work_iter"] = mcdc_new["mpi_work_iter"]
+
+            print("\n\nAfter njit\n\n",mcdc_new) 
+            kernel.set_bank_size(mcdc["bank_active"],0)
+        return process_sources
+
+
+
+
+
+
+
+def build_gpu_progs():
+    print("\n\n\nBuilding gpu progs \n\n\n")
+    global process_sources, process_source_precursors
+    process_sources = make_gpu_process_sources(False)
+    process_source_precursors = make_gpu_process_sources(True)
+
 

@@ -38,14 +38,15 @@ late_jit_roster = set()
 do_nothing_id = 0
 
 
-def generate_do_nothing(arg_count):
+def generate_do_nothing(arg_count,crash_on_call=None):
     global do_nothing_id
     name = f"do_nothing_{do_nothing_id}"
     args = ", ".join([f"arg_{i}" for i in range(arg_count)])
-    source  =  "@njit\n"
-    source += f"def {name}({args}):\n"
-    source +=  "    pass\n"
-    print(source)
+    source  = f"def {name}({args}):\n"
+    if crash_on_call != None:
+        source +=  f"    assert False, '{crash_on_call}'\n"
+    else:
+        source +=  "    pass\n"
     exec(source)
     result = eval(name)
     do_nothing_id += 1
@@ -55,6 +56,8 @@ def generate_do_nothing(arg_count):
 def overwrite_func(func,revised_func):
     mod_name = func.__module__
     fn_name  = func.__name__
+    new_fn_name = revised_func.__name__
+    #print(f"Overwriting function {fn_name} in module {mod_name} with {new_fn_name}")
     module = __import__(mod_name,fromlist=[fn_name])
     setattr(module, fn_name, revised_func)
 
@@ -84,44 +87,83 @@ def eval_toggle():
             if val:
                 overwrite_func(func,numba.njit(func))
             else:
+                global do_nothing_id
+                name = func.__name__
+                #print(f"do_nothing_{do_nothing_id} for {name}")
                 arg_count = len(inspect.signature(func).parameters)
-                overwrite_func(func,generate_do_nothing(arg_count))
+                overwrite_func(func,numba.njit(generate_do_nothing(arg_count)))
+
+blankout_roster = {}
+
+def blankout_fn(func):
+    global blankout_roster
+
+    mod_name = func.__module__
+    fn_name  = func.__name__
+    id = (mod_name,fn_name)
+    
+    if id not in blankout_roster:
+        global do_nothing_id
+        name = func.__name__
+        #print(f"do_nothing_{do_nothing_id} for {name}")
+        arg_count = len(inspect.signature(func).parameters)
+        blankout_roster[id] = generate_do_nothing(arg_count,crash_on_call=f"blankout fn for {name} should never be called")
+    
+    blank = blankout_roster[id]
+
+    return blank
+    
+
 
 
 def for_(target,on_target=[]):
+    #print(f"{target}")
     def for_inner(func):
         global target_rosters
+        mod_name = func.__module__
+        fn_name  = func.__name__
+        #print(f"{target} {mod_name} {fn_name}")
+        params = inspect.signature(func).parameters
         if target not in target_rosters:
             target_rosters[target] = {}
-        target_rosters[target][func] = on_target
-        return func
+        target_rosters[target][(mod_name,fn_name)] = func
+        #blank = blankout_fn(func)
+        param_str = ", ".join( p for p in params)
+        jit_str = f"def jit_func({param_str}):\n    global target_rosters\n    return target_rosters['{target}'][('{mod_name}','{fn_name}')]"
+        #print(jit_str)
+        exec(jit_str,globals(),locals())
+        result = eval("jit_func")
+        blank = blankout_fn(func)
+        numba.core.extending.overload(blank,target=target)(result)
+        return blank
     return for_inner
 
 
 
-def for_cpu(on_target =[]):
+def for_cpu(on_target=[]):
     return for_('cpu',on_target=on_target)
 
 def for_gpu(on_target=[]):
     return for_('gpu',on_target=on_target)
 
 def target_for(target):
-
-    for func in late_jit_roster:
-        if target == 'cpu':
-            overwrite_func(func,numba.njit)
-        elif target == 'gpu':
-            overwrite_func(func,numba.cuda.jit)
-        else:
-            unknown_target(target)
-
-    for func, on_target in target_rosters[target].items():
-        transformed = func
-        for transformer in on_target:
-            transformed = transformer(transformed)
-        name = func.__name__
-        print(f"Overwriting func {name} for target {target}")
-        overwrite_func(func, transformed)
+    pass
+#
+#    for func in late_jit_roster:
+#        if target == 'cpu':
+#            overwrite_func(func,numba.njit)
+#        elif target == 'gpu':
+#            overwrite_func(func,numba.cuda.jit)
+#        else:
+#            unknown_target(target)
+#
+#    for func, on_target in target_rosters[target].items():
+#        transformed = func
+#        for transformer in on_target:
+#            transformed = transformer(transformed)
+#        name = func.__name__
+#        print(f"Overwriting func {name} for target {target}")
+#        overwrite_func(func, transformed)
 
 def jit_on_target():
     def jit_on_target_inner(func):
@@ -129,7 +171,14 @@ def jit_on_target():
         return func
     return jit_on_target_inner
 
-
+def nopython_mode(is_on):
+    if is_on:
+        return
+    if not isinstance(target_rosters['cpu'],dict):
+        return
+    
+    for impl in target_rosters['cpu'].values():
+        overwrite_func(impl,impl)
 
 
 # Function adapted from Phillip Eller's `myjit` solution to the GPU/CPU array
@@ -143,7 +192,7 @@ def universal_arrays(target):
                     source = '\n'.join(source[idx+1:]) + '\n'
                     break
             source = source.replace('np.empty','cuda.local.array')
-            print(source)
+            #print(source)
             exec(source)
             revised_func = eval(func.__name__)
             overwrite_func(func,revised_func)
@@ -196,34 +245,28 @@ def gpu_forward_declare():
 # =============================================================================
 
 @for_cpu()
-@njit
 def device(prog):
     return prog
 
 @for_gpu()
-@cuda.jit
 def device(prog):
     return device_gpu(prog)
 
 
 @for_cpu()
-@njit
 def group(prog):
     return prog
 
 @for_gpu()
-@cuda.jit
 def group(prog):
     return group_gpu(prog)
 
 
 @for_cpu()
-@njit
 def thread(prog):
     return prog
 
 @for_gpu()
-@cuda.jit
 def thread(prog):
     return thread_gpu(prog)
 
@@ -231,26 +274,22 @@ def thread(prog):
 
 
 @for_cpu()
-@njit
 def add_active(particle,prog):
     kernel.add_particle(particle, prog["bank_active"])
 
 
 
 @for_gpu()
-@cuda.jit
 def add_active(particle,prog):
-    particle["fresh"] = True
-    step_gpu(prog,particle)
+    P = kernel.recordlike_to_particle(particle)
+    step_gpu(prog,P)
 
 
 @for_cpu()
-@njit
 def add_source(particle, prog):
     kernel.add_particle(particle, prog["bank_source"])
 
 @for_gpu()
-@cuda.jit
 def add_source(particle, prog):
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["bank_source"])
@@ -258,12 +297,10 @@ def add_source(particle, prog):
 
 
 @for_cpu()
-@njit
 def add_census(particle, prog):
     kernel.add_particle(particle, prog["bank_census"])
 
 @for_gpu()
-@cuda.jit
 def add_census(particle, prog):
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["bank_census"])
@@ -272,12 +309,10 @@ def add_census(particle, prog):
 
 
 @for_cpu()
-@njit
 def add_IC(particle, prog):
     kernel.add_particle(particle, prog["technique"]["IC_bank_neutron_local"])
 
 @for_gpu()
-@cuda.jit
 def add_IC(particle, prog):
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
@@ -286,12 +321,10 @@ def add_IC(particle, prog):
 
 
 @for_cpu()
-@njit
 def local_translate():
     return np.zeros(1, dtype=type_.translate)[0]
     
 @for_gpu()
-@cuda.jit
 def local_translate():
     trans = cuda.local.array(1, type_.translate)[0]
     for i in range(3):
@@ -300,47 +333,47 @@ def local_translate():
 
 
 @for_cpu()
-@njit
 def local_group_array():
     return np.zeros(1, dtype=type_.group_array)[0]
     
 @for_gpu()
-@cuda.jit
 def local_group_array():
     return cuda.local.array(1, type_.group_array)[0]
 
 
 @for_cpu()
-@njit
+def local_j_array():
+    return np.zeros(1, dtype=type_.j_array)[0]
+    
+@for_gpu()
+def local_j_array():
+    return cuda.local.array(1, type_.j_array)[0]
+
+@for_cpu()
 def local_particle():
     return np.zeros(1, dtype=type_.particle)[0]
 
 @for_gpu()
-@cuda.jit
 def local_particle():
     return cuda.local.array(1, dtype=type_.particle)[0]
 
 
 @for_cpu()
-@njit
 def local_particle_record():
     return np.zeros(1, dtype=type_.particle_record)[0]
 
 @for_gpu()
-@cuda.jit
 def local_particle_record():
     return cuda.local.array(1, dtype=type_.particle_record)[0]
 
 
 @for_cpu()
-@njit
 def global_add(ary,idx,val):
     result    = ary[idx]
     ary[idx] += val
     return result
 
 @for_gpu()
-@cuda.jit
 def global_add(ary,idx,val):
     return cuda.atomic.add(ary,idx,val)
 
@@ -348,7 +381,6 @@ def global_add(ary,idx,val):
 
 
 @for_cpu()
-@njit
 def global_max(ary,idx,val):
     result    = ary[idx]
     if ary[idx] < val :
@@ -356,7 +388,6 @@ def global_max(ary,idx,val):
     return result
 
 @for_gpu()
-@cuda.jit
 def global_max(ary,idx,val):
     return cuda.atomic.max(ary,idx,val)
 
