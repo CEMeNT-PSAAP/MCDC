@@ -29,7 +29,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_main, loop_iqmc
+from mcdc.loop import loop_main, loop_iqmc, build_gpu_progs
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_deck
@@ -160,6 +160,7 @@ def prepare():
     # =========================================================================
 
     type_.make_type_group_array(G)
+    type_.make_type_j_array(J)
     type_.make_type_translate()
     type_.make_type_particle(iQMC, G, track_particle)
     type_.make_type_particle_record(iQMC, G, track_particle)
@@ -174,15 +175,19 @@ def prepare():
     type_.make_type_technique(N_particle, G, input_deck.technique)
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
+
     
-    target = "cpu"
+    target = "gpu"
     if target == "gpu":
         adapt.gpu_forward_declare()
 
     adapt.set_toggle("iQMC",iQMC)
     adapt.set_toggle("particle_tracker",track_particle)
     adapt.eval_toggle()
+    if target == "gpu":
+        build_gpu_progs()
     adapt.target_for(target)
+    adapt.nopython_mode(mode=="numba")
 
     # =========================================================================
     # Make the global variable container
@@ -197,6 +202,10 @@ def prepare():
 
     for i in range(N_nuclide):
         for name in type_.nuclide.names:
+            if "padding" in name:
+                continue
+            if isinstance(input_deck.nuclides[i][name],np.ndarray) and input_deck.nuclides[i][name].shape != mcdc["nuclides"][i][name].shape:
+                continue
             mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
 
     # =========================================================================
@@ -205,6 +214,10 @@ def prepare():
 
     for i in range(N_material):
         for name in type_.material.names:
+            if "padding" in name:
+                continue
+            if isinstance(input_deck.materials[i][name],np.ndarray) and input_deck.materials[i][name].shape != mcdc["materials"][i][name].shape:
+                continue
             mcdc["materials"][i][name] = input_deck.materials[i][name]
 
     # =========================================================================

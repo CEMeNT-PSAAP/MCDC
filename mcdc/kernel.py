@@ -192,7 +192,7 @@ def rng_from_seed(seed):
 
 @njit
 def source_particle(seed, mcdc):
-    P = adapt.local_particle_record()
+    P : type_.particle_record = adapt.local_particle_record()
     P["rng_seed"] = seed
 
     # Sample source
@@ -262,8 +262,17 @@ def add_bank_size(bank,value):
     return adapt.global_add(bank["size"],0,value)
 
 
-
 @for_cpu()
+def full_bank_print(bank):
+    with objmode():
+        print_error("Particle %s bank is full." % bank["tag"])
+
+
+@for_gpu()
+def full_bank_print(bank):
+    pass
+
+
 @njit
 def add_particle(P, bank):
 
@@ -271,8 +280,7 @@ def add_particle(P, bank):
 
     # Check if bank is full
     if idx >= bank["particles"].shape[0]:
-        with objmode():
-            print_error("Particle %s bank is full." % bank["tag"])
+        full_bank_print(bank)
 
     # Set particle
     bank["particles"][idx] = P
@@ -288,8 +296,8 @@ def get_particle(P, bank, mcdc):
     # Check if bank is empty
     if idx < 0:
         return False
-        with objmode():
-            print_error("Particle %s bank is empty." % bank["tag"])
+        #with objmode():
+        #    print_error("Particle %s bank is empty." % bank["tag"])
 
     # Set attribute
     P_rec = bank["particles"][idx]
@@ -623,8 +631,32 @@ def distribute_work(N, mcdc, precursor=False):
 # =============================================================================
 
 
+@for_cpu()
+def pn_over_one():
+    with objmode():
+        print_error("Pn > 1.0.")
+
+
+@for_gpu()
+def pn_over_one():
+    pass
+
+@for_cpu()
+def pp_over_one():
+    with objmode():
+        print_error("Pp > 1.0.")
+
+
+@for_gpu()
+def pp_over_one():
+    pass
+
+
 @njit
-def bank_IC(P, mcdc):
+def bank_IC(P, prog):
+
+    mcdc = adapt.device(prog)
+
     # TODO: Consider multi-nuclide material
     material = mcdc["nuclides"][P["material_ID"]]
 
@@ -651,15 +683,14 @@ def bank_IC(P, mcdc):
 
     # TODO: Splitting for Pn > 1.0
     if Pn > 1.0:
-        with objmode():
-            print_error("Pn > 1.0.")
+        pn_over_one()
 
     # Sample particle
     if rng(P) < Pn:
         P_new = split_particle(P)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
-        adapt.add_IC(P_new, mcdc)
+        adapt.add_IC(P_new, prog)
 
         # Accumulate fission
         SigmaF = material["fission"][g]
@@ -698,8 +729,7 @@ def bank_IC(P, mcdc):
 
     # TODO: Splitting for Pp > 1.0
     if Pp > 1.0:
-        with objmode():
-            print_error("Pp > 1.0.")
+        pp_over_one()
 
     # Sample precursor
     if rng(P) < Pp:
@@ -845,14 +875,12 @@ def shift_particle(P, shift):
 
 
 @for_cpu()
-@njit
 def lost_particle(P):
     with objmode():
         print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
 
 
 @for_gpu()
-@njit
 def lost_particle(P):
     pass
 
@@ -918,29 +946,54 @@ def get_particle_material(P, mcdc):
 
 @njit
 def get_particle_speed(P, mcdc):
-    return mcdc["materials"][P["material_ID"]]["speed"][P["g"]]
+
+    # Added to fix buffer underrun on gpu
+    # This behaviour appears to be a bug, considering that
+    # negative indexes seem to indicate an undefined material
+    idx = P["material_ID"]
+    if P["material_ID"] < 0:
+        idx = len(mcdc["materials"])+idx
+
+    return mcdc["materials"][idx]["speed"][P["g"]]
+
+@njit
+def copy_recordlike(P_new, P):
+    P_new["x"] = P["x"]
+    P_new["y"] = P["y"]
+    P_new["z"] = P["z"]
+    P_new["t"] = P["t"]
+    P_new["ux"] = P["ux"]
+    P_new["uy"] = P["uy"]
+    P_new["uz"] = P["uz"]
+    P_new["g"] = P["g"]
+    P_new["w"] = P["w"]
+    P_new["rng_seed"] = P["rng_seed"]
+    P_new["sensitivity_ID"] = P["sensitivity_ID"]
+    P_new["iqmc_w"] = P["iqmc_w"]
+    copy_track_data(P_new,P)
 
 
 @njit
 def copy_record(P):
     P_new = adapt.local_particle_record()
-    P_new["x"] = P["x"]
-    P_new["y"] = P["y"]
-    P_new["z"] = P["z"]
-    P_new["t"] = P["t"]
-    P_new["ux"] = P["ux"]
-    P_new["uy"] = P["uy"]
-    P_new["uz"] = P["uz"]
-    P_new["g"] = P["g"]
-    P_new["w"] = P["w"]
-    P_new["rng_seed"] = P["rng_seed"]
-    P_new["sensitivity_ID"] = P["sensitivity_ID"]
-    copy_track_data(P_new,P)
+    copy_recordlike(P_new,P)
+    return P_new
+
+@njit
+def recordlike_to_particle(P_rec):
+    P_new = adapt.local_particle()
+    copy_recordlike(P_new,P_rec)
+    P_new["fresh"] = True
+    P_new["alive"] = True
+    P_new["material_ID"] = -1
+    P_new["cell_ID"] = -1
+    P_new["surface_ID"] = -1
+    P_new["event"] = -1
     return P_new
 
 @njit
 def copy_particle(P):
-    P_new = adapt.local_particle_record()
+    P_new = adapt.local_particle()
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -950,8 +1003,16 @@ def copy_particle(P):
     P_new["uz"] = P["uz"]
     P_new["g"] = P["g"]
     P_new["w"] = P["w"]
-    P_new["rng_seed"] = P["rng_seed"]
+    P_new["alive"] = P["alive"]
+    P_new["fresh"] = P["fresh"]
+    P_new["material_ID"] = P["material_ID"]
+    P_new["cell_ID"] = P["cell_ID"]
+    P_new["surface_ID"] = P["surface_ID"]
+    P_new["translation"] = P["translation"]
+    P_new["event"] = P["event"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
+    P_new["rng_seed"] = P["rng_seed"]
+    P_new["iqmc_w"] = P["iqmc_w"]
     copy_track_data(P_new,P)
     return P_new
 
@@ -1817,6 +1878,7 @@ def move_to_event(P, mcdc):
     # Also set particle material and speed
     d_boundary, event = distance_to_boundary(P, mcdc)
 
+    #print(P["material_ID"])
     # Distance to tally mesh
     d_mesh = INF
     if mcdc["cycle_active"]:
@@ -1878,8 +1940,10 @@ def move_to_event(P, mcdc):
         SigmaT = material["total"][:]
         score_iqmc_flux(P, distance, mcdc)
         w_final = continuous_weight_reduction(w, distance, SigmaT)
-        P["iqmc_w"] = w_final
-        P["w"] = w_final.sum()
+        P["iqmc_w"] = w_final["values"]
+        P["w"] = 0
+        for val in w_final["values"]:
+            P["w"] += val
 
     # Score tracklength tallies
     if mcdc["tally"]["tracklength"] and mcdc["cycle_active"]:
@@ -2291,7 +2355,7 @@ def fission(P, prog):
 
         # Bank
         if mcdc["setting"]["mode_eigenvalue"]:
-            adapt.add_census(P_new, mcdc)
+            adapt.add_census(P_new, prog)
         else:
             adapt.add_active(P_new, prog)
 
@@ -2436,7 +2500,10 @@ def branchless_collision(P, mcdc):
     SigmaS = material["scatter"][g]
     nu_s = material["nu_s"][g]
     nu_p = material["nu_p"][g] / mcdc["k_eff"]
-    nu_d = material["nu_d"][g] / mcdc["k_eff"]
+    nu_d_struct = adapt.local_j_array()
+    nu_d = nu_d_struct["values"]
+    for idx, val in enumerate(material["nu_d"][g]):
+        nu_d[idx] = val / mcdc["k_eff"]
     J = material["J"]
     G = material["G"]
 
@@ -2577,7 +2644,10 @@ def continuous_weight_reduction(w, distance, SigmaT):
     float64
         New particle weight
     """
-    return w * np.exp(-distance * SigmaT)
+    result = adapt.local_group_array()
+    for idx, val in enumerate(SigmaT):
+        result["values"][idx] = w[idx] * math.exp(-distance * val)
+    return result
 
 
 @njit
@@ -2879,12 +2949,18 @@ def score_iqmc_flux(P, distance, mcdc):
         return
     dV = iqmc_cell_volume(x, y, z, mesh)
     # Score
-    if SigmaT.all() > 0.0:
-        flux = w * (1 - np.exp(-(distance * SigmaT))) / (SigmaT * dV)
-    else:
-        flux = distance * w / dV
+    
+    all_pos = True
+    for val in SigmaT:
+        if val <= 0.0 :
+            all_pos = False
+    
+    for idx in range(len(SigmaT)):
+        if all_pos:
+            mcdc["technique"]["iqmc_flux"][idx, t, x, y, z] += w[idx] * (1 - math.exp(-(distance * SigmaT[idx]))) / (SigmaT[idx] * dV)
+        else:
+            mcdc["technique"]["iqmc_flux"][idx, t, x, y, z] += distance * w[idx] / dV
     #! May need to be refactored to a for loop
-    mcdc["technique"]["iqmc_flux"][:, t, x, y, z] += flux
 
 
 @njit
@@ -3280,7 +3356,8 @@ def weight_roulette(P, mcdc):
     chance = mcdc["technique"]["wr_chance"]
     x = rng(P)
     if x <= chance:
-        P["iqmc_w"] /= chance
+        for idx in range(len(P["iqmc_w"])):
+            P["iqmc_w"][idx] /= chance
         P["w"] /= chance
     else:
         P["alive"] = False
@@ -3463,9 +3540,17 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
         # Sample term
         xi = rng(P_new) * p_total
         tot = 0.0
-        for material_ID, sign in zip(
-            [material_ID_new, material_ID_old], [sign_new, sign_old]
-        ):
+
+
+        for idx in range(2):
+        
+            if idx == 0:
+                material_ID = material_ID_old
+                sign = sign_old
+            else:
+                material_ID = material_ID_new
+                sign = sign_new
+
             material = mcdc["materials"][material_ID]
             if material["sensitivity"]:
                 N_nuclide = material["N_nuclide"]
