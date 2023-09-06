@@ -103,6 +103,12 @@ def print_header_eigenvalue(mcdc):
             print(" ====  =======  ===================")
 
 
+def print_header_batch(mcdc):
+    idx_batch = mcdc["idx_batch"]
+    if master:
+        print("\nBatch %i/%i" % (idx_batch + 1, mcdc["setting"]["N_batch"]))
+
+
 def print_progress_eigenvalue(mcdc):
     if master:
         idx_cycle = mcdc["idx_cycle"]

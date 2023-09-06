@@ -66,6 +66,7 @@ class InputDeck:
         self.setting = {
             "tag": "Setting",
             "N_particle": 0,
+            "N_batch": 1,
             "rng_seed": 1,
             "time_boundary": INF,
             "progress_bar": True,
