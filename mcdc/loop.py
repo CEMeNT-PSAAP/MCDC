@@ -301,9 +301,7 @@ def loop_source(seed, mcdc):
     if mcdc["technique"]["iQMC"]:
         mcdc["technique"]["iqmc_sweep_counter"] += 1
 
-    print('\n\nBefore source\n\n',mcdc)
     process_sources(seed,mcdc)
-    print('\n\nAfter source\n\n',mcdc)
 
     # =====================================================================
     # Closeout
@@ -883,13 +881,13 @@ precursor_gpu_rt = None
 def run_source_gpu_rt(mcdc):
     source_gpu_rt.store_state(mcdc)
     source_gpu_rt.init(4096)
-    source_gpu_rt.exec(65536,288)
+    source_gpu_rt.exec(2000000,288)
     return source_gpu_rt.load_state()
 
 def run_precursor_gpu_rt(mcdc):
     precursor_gpu_rt.store_state(mcdc)
     precursor_gpu_rt.init(4096)
-    precursor_gpu_rt.exec(65536,288)
+    precursor_gpu_rt.exec(2000000,288)
     return precursor_gpu_rt.load_state(mcdc)
 
 
@@ -1051,7 +1049,6 @@ def make_gpu_process_sources(precursor):
             
             with objmode(mcdc_new = adapt.mcdc_type):
                 mcdc_new = run_source_gpu_rt(mcdc)
-                print("\n\nIn njit\n\n",mcdc_new)
 
             #mcdc["nuclides"] = mcdc_new["nuclides"]
             #mcdc["materials"] = mcdc_new["materials"]
@@ -1111,7 +1108,6 @@ def make_gpu_process_sources(precursor):
             #mcdc["precursor_strength"] = mcdc_new["precursor_strength"]
             #mcdc["mpi_work_iter"] = mcdc_new["mpi_work_iter"]
 
-            print("\n\nAfter njit\n\n",mcdc_new) 
             kernel.set_bank_size(mcdc["bank_active"],0)
         return process_sources
 
