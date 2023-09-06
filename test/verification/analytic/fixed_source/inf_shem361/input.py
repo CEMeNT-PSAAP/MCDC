@@ -60,7 +60,7 @@ mcdc.tally(scores=["flux"], g="all")
 mcdc.setting(
     N_particle=N_particle,
     output_name="output_" + str(N_particle),
-    active_bank_buff=1000,
+    active_bank_buff=10000,
     progress_bar=False,
 )
 

@@ -10,6 +10,7 @@ import mcdc.print_ as print_module
 
 from mcdc.constant import *
 from mcdc.print_ import (
+    print_header_batch,
     print_progress,
     print_progress_eigenvalue,
     print_progress_iqmc,
@@ -25,29 +26,45 @@ from mcdc.print_ import (
 
 @njit
 def loop_fixed_source(mcdc):
-    # Loop over time censuses
-    for idx_census in range(mcdc["setting"]["N_census"]):
-        mcdc["idx_census"] = idx_census
-        seed_census = kernel.split_seed(idx_census, mcdc["setting"]["rng_seed"])
+    # Loop over batches
+    for idx_batch in range(mcdc["setting"]["N_batch"]):
+        mcdc["idx_batch"] = idx_batch
+        seed_batch = kernel.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
 
-        # Loop over source particles
-        seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-        loop_source(seed_source, mcdc)
+        # Print multi-batch header
+        if mcdc["setting"]["N_batch"] > 1:
+            with objmode():
+                print_header_batch(mcdc)
 
-        # Loop over source precursors
-        if mcdc["bank_precursor"]["size"] > 0:
-            seed_source_precursor = kernel.split_seed(
-                seed_census, SEED_SPLIT_SOURCE_PRECURSOR
-            )
-            loop_source_precursor(seed_source_precursor, mcdc)
+        # Loop over time censuses
+        for idx_census in range(mcdc["setting"]["N_census"]):
+            mcdc["idx_census"] = idx_census
+            seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
-        # Time census closeout
-        if idx_census < mcdc["setting"]["N_census"] - 1:
-            # TODO: Output tally (optional)
+            # Loop over source particles
+            seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
+            loop_source(seed_source, mcdc)
 
-            # Manage particle banks: population control and work rebalance
-            seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
-            kernel.manage_particle_banks(seed_bank, mcdc)
+            # Loop over source precursors
+            if mcdc["bank_precursor"]["size"] > 0:
+                seed_source_precursor = kernel.split_seed(
+                    seed_census, SEED_SPLIT_SOURCE_PRECURSOR
+                )
+                loop_source_precursor(seed_source_precursor, mcdc)
+
+            # Time census closeout
+            if idx_census < mcdc["setting"]["N_census"] - 1:
+                # TODO: Output tally (optional)
+
+                # Manage particle banks: population control and work rebalance
+                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+                kernel.manage_particle_banks(seed_bank, mcdc)
+
+        # Multi-batch closeout
+        if mcdc["setting"]["N_batch"] > 1:
+            # Tally history closeout
+            kernel.tally_reduce_bin(mcdc)
+            kernel.tally_closeout_history(mcdc)
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
@@ -60,8 +77,6 @@ def loop_fixed_source(mcdc):
 
 @njit
 def loop_eigenvalue(mcdc):
-    simulation_end = False
-
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
         seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
@@ -158,8 +173,8 @@ def loop_source(seed, mcdc):
         # Closeout
         # =====================================================================
 
-        # Tally history closeout for fixed-source simulation
-        if not mcdc["setting"]["mode_eigenvalue"]:
+        # Tally history closeout for one-batch fixed-source simulation
+        if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
