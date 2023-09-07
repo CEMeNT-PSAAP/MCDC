@@ -99,6 +99,53 @@ def loop_main(mcdc):
 # Particle loop
 # =========================================================================
 
+
+
+@njit
+def find_particle_cell(P,prog):
+    mcdc = adapt.device(prog)
+
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
+    P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+
+
+@njit
+def evaluate_collision(P,prog):
+    mcdc = adapt.device(prog)
+
+    # Generate IC?
+    if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+        kernel.bank_IC(P, prog)
+
+    # Branchless collision?
+    if mcdc["technique"]["branchless_collision"]:
+        kernel.branchless_collision(P, mcdc)
+
+    # Analog collision
+    else:
+        # Get collision type
+        kernel.collision(P, mcdc)
+        event = P["event"]
+        # Perform collision
+        if event & EVENT_CAPTURE:
+            kernel.capture(P, mcdc)
+        elif event == EVENT_SCATTERING:
+            kernel.scattering(P, prog)
+        elif event == EVENT_FISSION:
+            kernel.fission(P, prog)
+
+        # Sensitivity quantification for nuclide?
+        material = mcdc["materials"][P["material_ID"]]
+        if material["sensitivity"] and (
+            P["sensitivity_ID"] == 0
+            or mcdc["technique"]["dsm_order"] == 2
+            and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
+        ):
+            kernel.sensitivity_material(P, prog)
+
+
+
 @njit
 def step_particle(P, prog):
 
@@ -106,9 +153,8 @@ def step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+        find_particle_cell(P,prog)
+
 
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
@@ -120,39 +166,14 @@ def step_particle(P, prog):
 
     # Collision
     if event & EVENT_COLLISION:
-        # Generate IC?
-        if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-            kernel.bank_IC(P, prog)
+        evaluate_collision(P,prog)
 
-        # Branchless collision?
-        if mcdc["technique"]["branchless_collision"]:
-            kernel.branchless_collision(P, mcdc)
-
-        # Analog collision
-        else:
-            # Get collision type
-            kernel.collision(P, mcdc)
-            event = P["event"]
-            # Perform collision
-            if event & EVENT_CAPTURE:
-                kernel.capture(P, mcdc)
-            elif event == EVENT_SCATTERING:
-                kernel.scattering(P, prog)
-            elif event == EVENT_FISSION:
-                kernel.fission(P, prog)
-
-            # Sensitivity quantification for nuclide?
-            material = mcdc["materials"][P["material_ID"]]
-            if material["sensitivity"] and (
-                P["sensitivity_ID"] == 0
-                or mcdc["technique"]["dsm_order"] == 2
-                and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
-            ):
-                kernel.sensitivity_material(P, prog)
 
     # Mesh tally
     if event & EVENT_MESH:
         kernel.mesh_crossing(P, mcdc)
+
+
 
     # Different Methods for shifting the particle
     # Surface crossing
@@ -174,6 +195,9 @@ def step_particle(P, prog):
     elif event & EVENT_LATTICE + EVENT_MESH:
         kernel.shift_particle(P, SHIFT)
 
+
+
+
     # Time boundary
     if event & EVENT_TIME_BOUNDARY:
         kernel.time_boundary(P, mcdc)
@@ -181,6 +205,7 @@ def step_particle(P, prog):
     # Apply weight window
     elif mcdc["technique"]["weight_window"]:
         kernel.weight_window(P, prog)
+
 
     # Apply weight roulette
     if mcdc["technique"]["weight_roulette"]:
@@ -881,13 +906,13 @@ precursor_gpu_rt = None
 def run_source_gpu_rt(mcdc):
     source_gpu_rt.store_state(mcdc)
     source_gpu_rt.init(4096)
-    source_gpu_rt.exec(2000000,288)
+    source_gpu_rt.exec(20000000,288)
     return source_gpu_rt.load_state()
 
 def run_precursor_gpu_rt(mcdc):
     precursor_gpu_rt.store_state(mcdc)
     precursor_gpu_rt.init(4096)
-    precursor_gpu_rt.exec(2000000,288)
+    precursor_gpu_rt.exec(20000000,288)
     return precursor_gpu_rt.load_state(mcdc)
 
 
@@ -941,34 +966,155 @@ def make_gpu_process_sources(precursor):
         pass
 
     def finalize(prog: nb.uintp):
-        pass
+        pass 
 
-    def step(prog: nb.uintp, P: adapt.particle_gpu):
+    @njit
+    def hit_surface(P):
+        result = (P["event"] & EVENT_SURFACE)
+        result = result or (P["event"] & EVENT_SURFACE_MOVE)
+        result = result or (P["event"] & EVENT_CENSUS)
+        result = result or (P["event"] & EVENT_LATTICE + EVENT_MESH)
+        return result
+
+    def find_cell(prog: nb.uintp, P: adapt.particle_gpu):
         mcdc = adapt.device(prog)
         if P["fresh"]:
             prep_particle(P,prog)
-        P["fresh"] = False
-        step_particle(P,prog)
-        if P["alive"]:
-            adapt.step_gpu(prog,P)
+            P["fresh"] = False
+        # Find cell from root universe if unknown
+        #if P["cell_ID"] == -1:
+        find_particle_cell(P,prog)
 
-    async_fns = [step]
-    base_fns = (initialize,finalize, work_maker)
+        adapt.step_async(prog,P)
+        
+    def step(prog: nb.uintp, P: adapt.particle_gpu):
+        mcdc = adapt.device(prog)
+        # Determine and move to event
+        kernel.move_to_event(P, mcdc)
+        
+        if P["event"] & EVENT_COLLISION:
+            collision_async(prog,P)
+        elif P["event"] & EVENT_MESH:
+            mesh_async(prog,P)
+        elif hit_surface(P):
+            surface_async(prog,P)
+        else:
+            wrapup_async(prog,P)
+
+    def collision(prog: nb.uintp, P: adapt.particle_gpu):
+        # Collision
+        evaluate_collision(P,prog)
+        if P["event"] & EVENT_MESH:
+            mesh_async(prog,P)
+        elif hit_surface(P):
+            surface_async(prog,P)
+        else:
+            wrapup_async(prog,P)
+
+    def mesh(prog: nb.uintp, P: adapt.particle_gpu):
+        mcdc = adapt.device(prog)
+
+        kernel.mesh_crossing(P, mcdc)
+        
+        if hit_surface(P):
+            surface_async(prog,P)
+        else:
+            wrapup_async(prog,P)
+
+    def surface(prog: nb.uintp, P: adapt.particle_gpu):
+        mcdc = adapt.device(prog)
+        
+        # Different Methods for shifting the particle
+        # Surface crossing
+        if P["event"] & EVENT_SURFACE:
+            kernel.surface_crossing(P, prog)
+
+        # Surface move
+        elif P["event"] & EVENT_SURFACE_MOVE:
+            P["t"] += SHIFT
+            P["cell_ID"] = -1
+
+        # Time census
+        elif P["event"] & EVENT_CENSUS:
+            P["t"] += SHIFT
+            adapt.add_census(kernel.copy_record(P), prog)
+            P["alive"] = False
+
+        # Shift particle
+        elif P["event"] & EVENT_LATTICE + EVENT_MESH:
+            kernel.shift_particle(P, SHIFT)
+
+        wrapup_async(prog,P)
+
+
+    def wrapup(prog: nb.uintp, P: adapt.particle_gpu):
+        mcdc = adapt.device(prog)
+
+        # Time boundary
+        if P["event"] & EVENT_TIME_BOUNDARY:
+            kernel.time_boundary(P, mcdc)
+
+        # Apply weight window
+        elif mcdc["technique"]["weight_window"]:
+            kernel.weight_window(P, prog)
+
+
+        # Apply weight roulette
+        if mcdc["technique"]["weight_roulette"]:
+            # check if weight has fallen below threshold
+            if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
+                kernel.weight_roulette(P, mcdc)
+
+        # Particle tracker
+        if mcdc["setting"]["track_particle"] and not P["alive"]:
+            kernel.track_particle(P, mcdc)
+
+        if P["alive"]:
+            if P["cell_ID"] == -1:
+                find_cell_async(prog,P)
+            else:
+                adapt.step_async(prog,P)
+
 
     spec_name = "mcdc"
     if precursor:
         spec_name += "_precursor"
     else:
         spec_name += "_source"
-    loop_spec = adapt.harm.RuntimeSpec(spec_name,adapt.state_spec,base_fns,async_fns)
+
+    spec = None
+
+    if adapt.SIMPLE_ASYNC:
+        base_fns = (initialize,finalize, work_maker)
+
+        def step(prog: nb.uintp, P: adapt.particle_gpu):
+            mcdc = adapt.device(prog)
+            if P["fresh"]:
+                prep_particle(P,prog)
+            P["fresh"] = False
+            step_particle(P,prog)
+            if P["alive"]:
+                adapt.step_async(prog,P)
+
+        async_fns = [step]
+        spec = adapt.harm.RuntimeSpec(spec_name,adapt.state_spec,base_fns,async_fns)
+
+    else:
+        base_fns = (initialize,finalize, work_maker)
+
+        async_fns = [find_cell,step,collision,mesh,surface,wrapup]
+        find_cell_async, collision_async = adapt.harm.RuntimeSpec.async_dispatch(find_cell,collision)
+        mesh_async, surface_async, wrapup_async = adapt.harm.RuntimeSpec.async_dispatch(mesh,surface,wrapup)
+        spec = adapt.harm.RuntimeSpec(spec_name,adapt.state_spec,base_fns,async_fns)
+
 
     
     global source_gpu_rt, precursor_gpu_rt
 
     if precursor:
-        precursor_gpu_rt = loop_spec.harmonize_instance()
+        precursor_gpu_rt = spec.harmonize_instance()
     else:
-        source_gpu_rt = loop_spec.harmonize_instance()
+        source_gpu_rt = spec.harmonize_instance()
 
 
 
@@ -981,13 +1127,6 @@ def make_gpu_process_sources(precursor):
             with objmode(mcdc_new = adapt.mcdc_type):
                 mcdc_new = run_precursor_gpu_rt(mcdc)
             
-            #mcdc["nuclides"] = mcdc_new["nuclides"]
-            #mcdc["materials"] = mcdc_new["materials"]
-            #mcdc["surfaces"] = mcdc_new["surfaces"]
-            #mcdc["cells"] = mcdc_new["cells"]
-            #mcdc["universes"] = mcdc_new["universes"]
-            #mcdc["lattices"] = mcdc_new["lattices"]
-            #mcdc["sources"] = mcdc_new["sources"]
             mcdc["tally"] = mcdc_new["tally"]
             mcdc["setting"] = mcdc_new["setting"]
             mcdc["technique"] = mcdc_new["technique"]
@@ -995,38 +1134,11 @@ def make_gpu_process_sources(precursor):
             mcdc["bank_census"] = mcdc_new["bank_census"]
             mcdc["bank_source"] = mcdc_new["bank_source"]
             mcdc["bank_precursor"] = mcdc_new["bank_precursor"]
-            #mcdc["rng_seed_base"] = mcdc_new["rng_seed_base"]
-            #mcdc["rng_seed"] = mcdc_new["rng_seed"]
-            #mcdc["source_seed"] = mcdc_new["source_seed"]
-            #mcdc["source_precursor_seed"] = mcdc_new["source_precursor_seed"]
-            #mcdc["rng_stride"] = mcdc_new["rng_stride"]
-            #mcdc["k_eff"] = mcdc_new["k_eff"]
-            #mcdc["k_cycle"] = mcdc_new["k_cycle"]
-            #mcdc["k_avg"] = mcdc_new["k_avg"]
-            #mcdc["k_sdv"] = mcdc_new["k_sdv"]
-            #mcdc["n_avg"] = mcdc_new["n_avg"]
-            #mcdc["n_sdv"] = mcdc_new["n_sdv"]
-            #mcdc["n_max"] = mcdc_new["n_max"]
-            #mcdc["C_avg"] = mcdc_new["C_avg"]
-            #mcdc["C_sdv"] = mcdc_new["C_sdv"]
-            #mcdc["C_max"] = mcdc_new["C_max"]
-            #mcdc["k_avg_running"] = mcdc_new["k_avg_running"]
-            #mcdc["k_sdv_running"] = mcdc_new["k_sdv_running"]
-            #mcdc["gyration_radius"] = mcdc_new["gyration_radius"]
             mcdc["i_cycle"] = mcdc_new["i_cycle"]
             mcdc["cycle_active"] = mcdc_new["cycle_active"]
             mcdc["eigenvalue_tally_nuSigmaF"] = mcdc_new["eigenvalue_tally_nuSigmaF"]
             mcdc["eigenvalue_tally_n"] = mcdc_new["eigenvalue_tally_n"]
             mcdc["eigenvalue_tally_C"] = mcdc_new["eigenvalue_tally_C"]
-            #mcdc["mpi_size"] = mcdc_new["mpi_size"]
-            #mcdc["mpi_rank"] = mcdc_new["mpi_rank"]
-            #mcdc["mpi_master"] = mcdc_new["mpi_master"]
-            #mcdc["mpi_work_start"] = mcdc_new["mpi_work_start"]
-            #mcdc["mpi_work_size"] = mcdc_new["mpi_work_size"]
-            #mcdc["mpi_work_size_total"] = mcdc_new["mpi_work_size_total"]
-            #mcdc["mpi_work_start_precursor"] = mcdc_new["mpi_work_start_precursor"]
-            #mcdc["mpi_work_size_precursor"] = mcdc_new["mpi_work_size_precursor"]
-            #mcdc["mpi_work_size_total_precursor"] = mcdc_new["mpi_work_size_total_precursor"]
             mcdc["runtime_total"] = mcdc_new["runtime_total"]
             mcdc["runtime_preparation"] = mcdc_new["runtime_preparation"]
             mcdc["runtime_simulation"] = mcdc_new["runtime_simulation"]
@@ -1036,8 +1148,6 @@ def make_gpu_process_sources(precursor):
             mcdc["particle_track_N"] = mcdc_new["particle_track_N"]
             mcdc["particle_track_history_ID"] = mcdc_new["particle_track_history_ID"]
             mcdc["particle_track_particle_ID"] = mcdc_new["particle_track_particle_ID"]
-            #mcdc["precursor_strength"] = mcdc_new["precursor_strength"]
-            #mcdc["mpi_work_iter"] = mcdc_new["mpi_work_iter"]
             
             kernel.set_bank_size(mcdc["bank_active"],0)
         return process_source_precursors
@@ -1050,13 +1160,6 @@ def make_gpu_process_sources(precursor):
             with objmode(mcdc_new = adapt.mcdc_type):
                 mcdc_new = run_source_gpu_rt(mcdc)
 
-            #mcdc["nuclides"] = mcdc_new["nuclides"]
-            #mcdc["materials"] = mcdc_new["materials"]
-            #mcdc["surfaces"] = mcdc_new["surfaces"]
-            #mcdc["cells"] = mcdc_new["cells"]
-            #mcdc["universes"] = mcdc_new["universes"]
-            #mcdc["lattices"] = mcdc_new["lattices"]
-            #mcdc["sources"] = mcdc_new["sources"]
             mcdc["tally"] = mcdc_new["tally"]
             mcdc["setting"] = mcdc_new["setting"]
             mcdc["technique"] = mcdc_new["technique"]
@@ -1064,38 +1167,11 @@ def make_gpu_process_sources(precursor):
             mcdc["bank_census"] = mcdc_new["bank_census"]
             mcdc["bank_source"] = mcdc_new["bank_source"]
             mcdc["bank_precursor"] = mcdc_new["bank_precursor"]
-            #mcdc["rng_seed_base"] = mcdc_new["rng_seed_base"]
-            #mcdc["rng_seed"] = mcdc_new["rng_seed"]
-            #mcdc["source_seed"] = mcdc_new["source_seed"]
-            #mcdc["source_precursor_seed"] = mcdc_new["source_precursor_seed"]
-            #mcdc["rng_stride"] = mcdc_new["rng_stride"]
-            #mcdc["k_eff"] = mcdc_new["k_eff"]
-            #mcdc["k_cycle"] = mcdc_new["k_cycle"]
-            #mcdc["k_avg"] = mcdc_new["k_avg"]
-            #mcdc["k_sdv"] = mcdc_new["k_sdv"]
-            #mcdc["n_avg"] = mcdc_new["n_avg"]
-            #mcdc["n_sdv"] = mcdc_new["n_sdv"]
-            #mcdc["n_max"] = mcdc_new["n_max"]
-            #mcdc["C_avg"] = mcdc_new["C_avg"]
-            #mcdc["C_sdv"] = mcdc_new["C_sdv"]
-            #mcdc["C_max"] = mcdc_new["C_max"]
-            #mcdc["k_avg_running"] = mcdc_new["k_avg_running"]
-            #mcdc["k_sdv_running"] = mcdc_new["k_sdv_running"]
-            #mcdc["gyration_radius"] = mcdc_new["gyration_radius"]
             mcdc["i_cycle"] = mcdc_new["i_cycle"]
             mcdc["cycle_active"] = mcdc_new["cycle_active"]
             mcdc["eigenvalue_tally_nuSigmaF"] = mcdc_new["eigenvalue_tally_nuSigmaF"]
             mcdc["eigenvalue_tally_n"] = mcdc_new["eigenvalue_tally_n"]
             mcdc["eigenvalue_tally_C"] = mcdc_new["eigenvalue_tally_C"]
-            #mcdc["mpi_size"] = mcdc_new["mpi_size"]
-            #mcdc["mpi_rank"] = mcdc_new["mpi_rank"]
-            #mcdc["mpi_master"] = mcdc_new["mpi_master"]
-            #mcdc["mpi_work_start"] = mcdc_new["mpi_work_start"]
-            #mcdc["mpi_work_size"] = mcdc_new["mpi_work_size"]
-            #mcdc["mpi_work_size_total"] = mcdc_new["mpi_work_size_total"]
-            #mcdc["mpi_work_start_precursor"] = mcdc_new["mpi_work_start_precursor"]
-            #mcdc["mpi_work_size_precursor"] = mcdc_new["mpi_work_size_precursor"]
-            #mcdc["mpi_work_size_total_precursor"] = mcdc_new["mpi_work_size_total_precursor"]
             mcdc["runtime_total"] = mcdc_new["runtime_total"]
             mcdc["runtime_preparation"] = mcdc_new["runtime_preparation"]
             mcdc["runtime_simulation"] = mcdc_new["runtime_simulation"]
@@ -1105,8 +1181,6 @@ def make_gpu_process_sources(precursor):
             mcdc["particle_track_N"] = mcdc_new["particle_track_N"]
             mcdc["particle_track_history_ID"] = mcdc_new["particle_track_history_ID"]
             mcdc["particle_track_particle_ID"] = mcdc_new["particle_track_particle_ID"]
-            #mcdc["precursor_strength"] = mcdc_new["precursor_strength"]
-            #mcdc["mpi_work_iter"] = mcdc_new["mpi_work_iter"]
 
             kernel.set_bank_size(mcdc["bank_active"],0)
         return process_sources
