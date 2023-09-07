@@ -1465,8 +1465,12 @@ def score_closeout_history(score):
 def score_closeout(score, mcdc):
     N_history = mcdc["setting"]["N_particle"]
 
-    if mcdc["setting"]["mode_eigenvalue"]:
+    if mcdc["setting"]["N_batch"] > 1:
+        N_history = mcdc["setting"]["N_batch"]
+
+    elif mcdc["setting"]["mode_eigenvalue"]:
         N_history = mcdc["setting"]["N_active"]
+
     else:
         # MPI Reduce
         buff = np.zeros_like(score["mean"])
