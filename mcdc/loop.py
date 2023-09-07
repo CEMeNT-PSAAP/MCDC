@@ -905,14 +905,26 @@ precursor_gpu_rt = None
 
 def run_source_gpu_rt(mcdc):
     source_gpu_rt.store_state(mcdc)
-    source_gpu_rt.init(4096)
-    source_gpu_rt.exec(20000000,288)
+    count = 0
+    while True:
+        source_gpu_rt.init(4096)
+        source_gpu_rt.exec(65536,288)
+        #print(f"({count})")
+        count += 1
+        if source_gpu_rt.halted():
+            break
     return source_gpu_rt.load_state()
 
 def run_precursor_gpu_rt(mcdc):
     precursor_gpu_rt.store_state(mcdc)
-    precursor_gpu_rt.init(4096)
-    precursor_gpu_rt.exec(20000000,288)
+    count = 0
+    while True:
+        precursor_gpu_rt.init(4096)
+        precursor_gpu_rt.exec(65536,288)
+        #print(f"({count})")
+        count += 1
+        if source_gpu_rt.halted():
+            break
     return precursor_gpu_rt.load_state(mcdc)
 
 
@@ -1192,7 +1204,6 @@ def make_gpu_process_sources(precursor):
 
 
 def build_gpu_progs():
-    print("\n\n\nBuilding gpu progs \n\n\n")
     global process_sources, process_source_precursors
     process_sources = make_gpu_process_sources(False)
     process_source_precursors = make_gpu_process_sources(True)
