@@ -208,6 +208,8 @@ def universal_arrays(target):
 # =============================================================================
 
 
+SIMPLE_ASYNC = True
+
 none_type = None
 mcdc_type = None
 state_spec = None
@@ -216,7 +218,8 @@ group_gpu = None
 thread_gpu = None
 particle_gpu = None
 prep_gpu = None
-step_gpu = None
+step_async = None
+find_cell_async = None
 
 
 
@@ -225,7 +228,7 @@ def gpu_forward_declare():
     global none_type, mcdc_type, state_spec
     global device_gpu, group_gpu, thread_gpu
     global particle_gpu, particle_record_gpu
-    global step_gpu
+    global step_async, find_cell_async
 
     none_type = numba.from_dtype(np.dtype([ ]))
     mcdc_type = numba.from_dtype(type_.global_)
@@ -236,8 +239,10 @@ def gpu_forward_declare():
 
     def step(prog: numba.uintp, P: particle_gpu):
         pass
+    def find_cell(prog: numba.uintp, P: particle_gpu):
+        pass
 
-    step_gpu, =  adapt.harm.RuntimeSpec.async_dispatch(step)
+    step_async, find_cell_async =  adapt.harm.RuntimeSpec.async_dispatch(step,find_cell)
 
 
 # =============================================================================
@@ -282,7 +287,10 @@ def add_active(particle,prog):
 @for_gpu()
 def add_active(particle,prog):
     P = kernel.recordlike_to_particle(particle)
-    step_gpu(prog,P)
+    if SIMPLE_ASYNC:
+        step_async(prog,P)
+    else:
+        find_cell_async(prog,P)
 
 
 @for_cpu()

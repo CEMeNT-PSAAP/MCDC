@@ -7,6 +7,9 @@ parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
 parser.add_argument(
     "--mode", type=str, help="Run mode", choices=["python", "numba"], default="python"
 )
+parser.add_argument(
+    "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
+)
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 args, unargs = parser.parse_known_args()
@@ -14,6 +17,7 @@ args, unargs = parser.parse_known_args()
 # Set mode
 #   TODO: Will be inside run() once Python/Numba adapter is integrated
 mode = args.mode
+target = args.target
 if mode == "python":
     nb.config.DISABLE_JIT = True
 elif mode == "numba":
@@ -177,7 +181,6 @@ def prepare():
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     
-    target = "gpu"
     if target == "gpu":
         adapt.gpu_forward_declare()
 
