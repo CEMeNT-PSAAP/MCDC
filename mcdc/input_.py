@@ -903,35 +903,37 @@ def setting(**kw):
             "setting parameter",
             key,
             [
-                "progress_bar",
                 "N_particle",
+                "N_batch",
                 "rng_seed",
                 "time_boundary",
-                "particle_tracker",
-                "save_input_deck",
+                "progress_bar",
                 "output_name",
+                "save_input_deck",
+                "particle_tracker",
+                "k_eff",
                 "source_file",
                 "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
-                "k_eff",
             ],
             False,
         )
 
     # Get keyword arguments
     N_particle = kw.get("N_particle")
-    time_boundary = kw.get("time_boundary")
+    N_batch = kw.get("N_batch")
     rng_seed = kw.get("rng_seed")
-    output = kw.get("output_name")
+    time_boundary = kw.get("time_boundary")
     progress_bar = kw.get("progress_bar")
+    output = kw.get("output_name")
+    save_input_deck = kw.get("save_input_deck")
+    particle_tracker = kw.get("particle_tracker")
     k_eff = kw.get("k_eff")
+    source_file = kw.get("source_file")
+    IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
-    source_file = kw.get("source_file")
-    particle_tracker = kw.get("particle_tracker")
-    save_input_deck = kw.get("save_input_deck")
-    IC_file = kw.get("IC_file")
 
     # Check if setting card has been initialized
     card = mcdc.input_deck.setting
@@ -939,6 +941,10 @@ def setting(**kw):
     # Number of particles
     if N_particle is not None:
         card["N_particle"] = int(N_particle)
+
+    # Number of batches
+    if N_batch is not None:
+        card["N_batch"] = int(N_batch)
 
     # Time boundary
     if time_boundary is not None:

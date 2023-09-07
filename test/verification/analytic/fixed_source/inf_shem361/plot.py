@@ -6,9 +6,6 @@ import sys
 from reference import reference
 
 
-# Reference solution
-phi_ref = reference() / dE * E_mid
-
 # Load results
 output = sys.argv[1]
 with np.load("SHEM-361.npz") as data:
@@ -19,6 +16,9 @@ with np.load("SHEM-361.npz") as data:
 with h5py.File(output, "r") as f:
     phi = f["tally/flux/mean"][:] / dE * E_mid
     phi_sd = f["tally/flux/sdev"][:] / dE * E_mid
+
+# Reference solution
+phi_ref = reference() / dE * E_mid
 
 # Flux
 plt.step(E_mid, phi, "-b", label="MC", where="mid")

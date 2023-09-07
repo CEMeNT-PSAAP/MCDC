@@ -455,6 +455,7 @@ def make_type_setting(deck):
     struct = [
         # Basic MC simulation parameters
         ("N_particle", uint64),
+        ("N_batch", uint64),
         ("rng_seed", uint64),
         ("time_boundary", float64),
         # Misc.
@@ -731,6 +732,7 @@ def make_type_global(card):
             ("eigenvalue_tally_n", float64),
             ("eigenvalue_tally_C", float64),
             ("idx_census", int64),
+            ("idx_batch", int64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
