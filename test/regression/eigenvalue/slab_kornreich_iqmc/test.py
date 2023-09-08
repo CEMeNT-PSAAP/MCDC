@@ -2,6 +2,10 @@ import numpy as np
 import h5py
 import mcdc
 
+import numba as nb
+
+nb.config.DISABLE_JIT = True
+
 
 def pi_test():
     # =========================================================================
@@ -60,7 +64,7 @@ def pi_test():
         eigenmode_solver=solver,
     )
     # Setting
-    mcdc.setting(N_particle=N, output="pi_output")
+    mcdc.setting(N_particle=N, output_name="pi_output")
     mcdc.eigenmode()
 
     # Run
@@ -73,7 +77,7 @@ def pi_test():
     output = h5py.File("pi_output.h5", "r")
     answer = h5py.File("pi_answer.h5", "r")
 
-    a = answer["tally/iqmc_flux"][:]
+    a = answer["iqmc/flux"][:]
     b = output["iqmc/flux"][:]
     assert np.allclose(a, b)
 
@@ -142,7 +146,7 @@ def davidson_test():
         eigenmode_solver=solver,
     )
     # Setting
-    mcdc.setting(N_particle=N, output="davidson_output")
+    mcdc.setting(N_particle=N, output_name="davidson_output")
     mcdc.eigenmode()
 
     # Run
