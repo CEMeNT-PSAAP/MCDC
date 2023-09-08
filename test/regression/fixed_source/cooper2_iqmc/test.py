@@ -67,7 +67,7 @@ def si_test():
     # Set tally, setting, and run mcdc
     # =============================================================================
     # Setting
-    mcdc.setting(N_particle=N, progress_bar=False, output="si_output")
+    mcdc.setting(N_particle=N, progress_bar=False, output_name="si_output")
     # Run
     mcdc.run()
     # =========================================================================
@@ -147,7 +147,7 @@ def gmres_test():
     # Set tally, setting, and run mcdc
     # =============================================================================
     # Setting
-    mcdc.setting(N_particle=N, progress_bar=False, output="gmres_output")
+    mcdc.setting(N_particle=N, progress_bar=False, output_name="gmres_output")
     # Run
     mcdc.run()
     # =========================================================================
