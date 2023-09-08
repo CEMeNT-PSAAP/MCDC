@@ -357,12 +357,12 @@ def prepare():
             ]:
                 mcdc["technique"][name] = input_deck.technique[name]
 
-    if input_card.technique["iQMC"]:
-        mcdc["technique"]["iqmc_mesh"]["x"] = input_card.technique["iqmc_mesh"]["x"]
-        mcdc["technique"]["iqmc_mesh"]["y"] = input_card.technique["iqmc_mesh"]["y"]
-        mcdc["technique"]["iqmc_mesh"]["z"] = input_card.technique["iqmc_mesh"]["z"]
-        mcdc["technique"]["iqmc_mesh"]["t"] = input_card.technique["iqmc_mesh"]["t"]
-        mcdc["technique"]["iqmc_generator"] = input_card.technique["iqmc_generator"]
+    if input_deck.technique["iQMC"]:
+        mcdc["technique"]["iqmc_mesh"]["x"] = input_deck.technique["iqmc_mesh"]["x"]
+        mcdc["technique"]["iqmc_mesh"]["y"] = input_deck.technique["iqmc_mesh"]["y"]
+        mcdc["technique"]["iqmc_mesh"]["z"] = input_deck.technique["iqmc_mesh"]["z"]
+        mcdc["technique"]["iqmc_mesh"]["t"] = input_deck.technique["iqmc_mesh"]["t"]
+        mcdc["technique"]["iqmc_generator"] = input_deck.technique["iqmc_generator"]
         # variables to generate samples
         scramble = mcdc["technique"]["iqmc_scramble"]
         N_dim = mcdc["technique"]["iqmc_N_dim"]
@@ -374,21 +374,20 @@ def prepare():
         # how many samples will we skip in the LDS
         fast_forward = int((rank / size) * N)
         # generate lds
-        if input_card.technique["iqmc_generator"] == "sobol":
+        if input_deck.technique["iqmc_generator"] == "sobol":
             sampler = qmc.Sobol(d=N_dim, scramble=scramble)
-            if rank == 0:
-                # skip the first entry in Sobol sequence because its 0.0
-                sampler.fast_forward(1)
+            # skip first two entries in Sobol sequence because
+            # they map to x = 0.0 and ux = 0.0 respectively
+            sampler.fast_forward(2)
             sampler.fast_forward(fast_forward)
             mcdc["technique"]["iqmc_lds"] = sampler.random(N_work)
-        if input_card.technique["iqmc_generator"] == "halton":
+        if input_deck.technique["iqmc_generator"] == "halton":
             sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
-            if rank == 0:
-                # skip the first entry in Halton sequence because its 0.0
-                sampler.fast_forward(1)
+            # skip first entry in Halton because it maps to x = 0.0
+            sampler.fast_forward(1)
             sampler.fast_forward(fast_forward)
             mcdc["technique"]["iqmc_lds"] = sampler.random(N_work)
-        if input_card.technique["iqmc_generator"] == "random":
+        if input_deck.technique["iqmc_generator"] == "random":
             # this chunk of code uses the iqmc_seed to generate a number of
             # seeds to be used  on each processor
             # this way, each processor gets different samples, but if iQMC is run
