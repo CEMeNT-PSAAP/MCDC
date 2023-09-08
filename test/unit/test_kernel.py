@@ -7,6 +7,7 @@ import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
 
+
 def iqmc_dummy_mcdc_variable():
     """
     This function returns the global "mcdc" container. Inputs are
@@ -26,17 +27,16 @@ def iqmc_dummy_mcdc_variable():
         fission=np.array([0.12]),
         nu_p=np.array([2.5]),
     )
-    
+
     # Set surfaces
     s1 = MCDC.surface("plane-x", x=0.0, bc="vacuum")
     s2 = MCDC.surface("plane-x", x=1.5)
     s3 = MCDC.surface("plane-x", x=2.5, bc="vacuum")
-    
+
     # Set cells
     MCDC.cell([+s1, -s2], m1)
     MCDC.cell([+s2, -s3], m2)
-    
-    
+
     # =============================================================================
     # iQMC Parameters
     # =============================================================================
@@ -49,11 +49,11 @@ def iqmc_dummy_mcdc_variable():
     solver = "davidson"
     fixed_source = np.zeros(Nx)
     phi0 = np.ones((Nx))
-    
+
     # =============================================================================
     # Set tally, setting, and run mcdc
     # =============================================================================
-    
+
     MCDC.iQMC(
         x=x,
         fixed_source=fixed_source,
@@ -82,7 +82,7 @@ def test_rn_basic():
 
     """
     MCDC.reset_cards()
-    
+
     ref_data = np.array(
         (
             1,
@@ -99,25 +99,24 @@ def test_rn_basic():
     for i in range(5):
         assert mcdc["setting"]["rng_seed"] == ref_data[i]
         rng(mcdc["setting"])
-    
 
 
 def test_AxV_linearity():
     """
-    AxV is the linear operator used for GMRES in iQMC. 
-    
+    AxV is the linear operator used for GMRES in iQMC.
+
     Linear operators must satisfy conditions of additivity and multiplicity
     defined as:
             - Additivity: f(x+y) = f(x) + f(y)
             - Multiplicity: f(cx) = cf(x)
-            
+
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
     MCDC.reset_cards()
-    
+
     mcdc = iqmc_dummy_mcdc_variable()
-    
+
     size = mcdc["technique"]["iqmc_flux"].size
     np.random.seed(123456)
     a = np.random.random()
@@ -125,100 +124,99 @@ def test_AxV_linearity():
     x = np.random.random((size,))
     y = np.random.random((size,))
     rhs = np.zeros((size,))
-    
-    F1 = AxV((a*x + b*y), rhs, mcdc)
-    F2 = a*AxV(x, rhs, mcdc) + b*AxV(y, rhs, mcdc)
+
+    F1 = AxV((a * x + b * y), rhs, mcdc)
+    F2 = a * AxV(x, rhs, mcdc) + b * AxV(y, rhs, mcdc)
     assert np.allclose(F1, F2, rtol=1e-10)
-    
+
 
 def test_FxV_linearity():
     """
-    FxV is a linear operator used for Davidson in iQMC. 
-    
+    FxV is a linear operator used for Davidson in iQMC.
+
     Linear operators must satisfy conditions of additivity and multiplicity
     defined as:
             - Additivity: f(x+y) = f(x) + f(y)
             - Multiplicity: f(cx) = cf(x)
-            
+
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
     MCDC.reset_cards()
-    
+
     mcdc = iqmc_dummy_mcdc_variable()
-    
+
     size = mcdc["technique"]["iqmc_flux"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
-    x = np.random.random((size,1))
-    y = np.random.random((size,1))
-    
-    F1 = FxV((a*x + b*y), mcdc)
-    F2 = a*FxV(x, mcdc) + b*FxV(y, mcdc)
+    x = np.random.random((size, 1))
+    y = np.random.random((size, 1))
+
+    F1 = FxV((a * x + b * y), mcdc)
+    F2 = a * FxV(x, mcdc) + b * FxV(y, mcdc)
     assert np.allclose(F1, F2, rtol=1e-10)
 
 
 def test_HxV_linearity():
     """
-    HxV is a linear operator used for Davidson in iQMC. 
-    
+    HxV is a linear operator used for Davidson in iQMC.
+
     Linear operators must satisfy conditions of additivity and multiplicity
     defined as:
             - Additivity: f(x+y) = f(x) + f(y)
             - Multiplicity: f(cx) = cf(x)
-            
+
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
     MCDC.reset_cards()
-    
+
     mcdc = iqmc_dummy_mcdc_variable()
-    
+
     size = mcdc["technique"]["iqmc_flux"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
-    x = np.random.random((size,1))
-    y = np.random.random((size,1))
-    
-    F1 = HxV((a*x + b*y), mcdc)
-    F2 = a*HxV(x, mcdc) + b*HxV(y, mcdc)
+    x = np.random.random((size, 1))
+    y = np.random.random((size, 1))
+
+    F1 = HxV((a * x + b * y), mcdc)
+    F2 = a * HxV(x, mcdc) + b * HxV(y, mcdc)
     assert np.allclose(F1, F2, rtol=1e-10)
 
 
 def test_preconditioner_linearity():
     """
-    perconditioner is a linear operator used for Davidson in iQMC. 
-    
+    perconditioner is a linear operator used for Davidson in iQMC.
+
     Linear operators must satisfy conditions of additivity and multiplicity
     defined as:
             - Additivity: f(x+y) = f(x) + f(y)
             - Multiplicity: f(cx) = cf(x)
-            
+
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
     MCDC.reset_cards()
-    
+
     mcdc = iqmc_dummy_mcdc_variable()
-    
+
     size = mcdc["technique"]["iqmc_flux"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
-    x = np.random.random((size,1))
-    y = np.random.random((size,1))
-    
-    F1 = preconditioner((a*x + b*y), mcdc)
-    F2 = a*preconditioner(x, mcdc) + b*preconditioner(y, mcdc)
+    x = np.random.random((size, 1))
+    y = np.random.random((size, 1))
+
+    F1 = preconditioner((a * x + b * y), mcdc)
+    F2 = a * preconditioner(x, mcdc) + b * preconditioner(y, mcdc)
     assert np.allclose(F1, F2, rtol=1e-10)
-    
-    
+
 
 # if __name__ == "__main__":
-    # test_rn_basic()
-    # test_AxV_linearity()
+# test_rn_basic()
+# test_AxV_linearity()
 #     test_FxV_linearity()
 #     test_HxV_linearity()
 #     test_preconditioner_linearity()
