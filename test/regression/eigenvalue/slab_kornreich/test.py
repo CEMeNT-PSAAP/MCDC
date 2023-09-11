@@ -74,7 +74,7 @@ def test():
     mcdc.tally(scores=scores, x=x)
 
     # Setting
-    mcdc.setting(N_particle=10, progress_bar=False)
+    mcdc.setting(N_particle=100, progress_bar=False)
     mcdc.eigenmode(N_inactive=1, N_active=2, gyration_radius="only-x")
 
     # Run
@@ -107,6 +107,8 @@ def test():
 
     a = output["gyration_radius"][:]
     b = answer["gyration_radius"][:]
+    print(a)
+    print(b)
     assert np.allclose(a, b)
 
     output.close()

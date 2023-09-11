@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import numba as nb
 
 # Events
 # The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
@@ -21,13 +22,13 @@ MESH_Z = 2
 MESH_T = 3
 
 # Gyration raius type
-GR_ALL = 0
-GR_INFINITE_X = 1
-GR_INFINITE_Y = 2
-GR_INFINITE_Z = 3
-GR_ONLY_X = 4
-GR_ONLY_Y = 5
-GR_ONLY_Z = 6
+GYRATION_RADIUS_ALL = 0
+GYRATION_RADIUS_INFINITE_X = 1
+GYRATION_RADIUS_INFINITE_Y = 2
+GYRATION_RADIUS_INFINITE_Z = 3
+GYRATION_RADIUS_ONLY_X = 4
+GYRATION_RADIUS_ONLY_Y = 5
+GYRATION_RADIUS_ONLY_Z = 6
 
 # Population control
 PCT_NONE = 0
@@ -40,3 +41,16 @@ PI = math.acos(-1.0)
 SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
+
+# RNG LCG parameters
+RNG_G = nb.uint64(2806196910506780709)
+RNG_C = nb.uint64(1)
+RNG_MOD_MASK = nb.uint64(0x7FFFFFFFFFFFFFFF)
+RNG_MOD = nb.uint64(0x8000000000000000)
+
+# RNG splitter seeds
+SEED_SPLIT_CENSUS = nb.uint64(0x43454D654E54)
+SEED_SPLIT_SOURCE = nb.uint64(0x43616D696C6C65)
+SEED_SPLIT_SOURCE_PRECURSOR = nb.uint64(0x546F6464)
+SEED_SPLIT_BANK = nb.uint64(0x5279616E)
+SEED_SPLIT_PARTICLE = nb.uint64(0)
