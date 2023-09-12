@@ -23,4 +23,4 @@ from mcdc.input_ import (
     print_card,
     reset_cards,
 )
-from mcdc.main import run
+from mcdc.main import run, prepare
