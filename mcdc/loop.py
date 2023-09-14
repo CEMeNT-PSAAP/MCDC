@@ -43,10 +43,29 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
+
             if mcdc["technique"]["domain_decomp"]:
                 loop_source_dd(seed_source, mcdc)
             else:
                 loop_source(seed_source, mcdc)
+            # Loop over source precursors
+            if mcdc["bank_precursor"]["size"] > 0:
+                seed_source_precursor = kernel.split_seed(
+                    seed_census, SEED_SPLIT_SOURCE_PRECURSOR
+                )
+                loop_source_precursor(seed_source_precursor, mcdc)
+
+            # Time census closeout
+            if idx_census < mcdc["setting"]["N_census"] - 1:
+                # TODO: Output tally (optional)
+
+                # Manage particle banks: population control and work rebalance
+                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+                kernel.manage_particle_banks(seed_bank, mcdc)
+
+
+            loop_source(seed_source, mcdc)
+
             # Loop over source precursors
             if mcdc["bank_precursor"]["size"] > 0:
                 seed_source_precursor = kernel.split_seed(
@@ -190,7 +209,6 @@ def loop_source(seed, mcdc):
 
     # Re-sync RNG
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-
 
 # =============================================================================
 # DD Source loop
@@ -441,10 +459,6 @@ def loop_particle(P, mcdc):
         if event & EVENT_TIME_BOUNDARY:
             kernel.time_boundary(P, mcdc)
 
-        # Domain boundary
-        if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
-            
         # Apply weight window
         elif mcdc["technique"]["weight_window"]:
             kernel.weight_window(P, mcdc)
