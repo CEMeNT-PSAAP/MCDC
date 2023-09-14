@@ -290,7 +290,7 @@ def loop_source_dd(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-    #kernel.dd_particle_send(mcdc)
+    kernel.dd_particle_send(mcdc)
     #MPI.COMM_WORLD.barrier()
     terminated = False
 
@@ -324,7 +324,7 @@ def loop_source_dd(seed, mcdc):
 
                 # Particle loop
                 loop_particle(P, mcdc)
-        
+        kernel.dd_particle_send(mcdc)
         kernel.dd_particle_receive(mcdc)
         if mcdc["bank_active"]["size"]==0:
             completed = 1
