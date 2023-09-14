@@ -9,7 +9,7 @@ data = np.load("reference.npz")
 phi_ref = data["phi"]
 
 # Get results
-with h5py.File('output.h5', "r") as f:
+with h5py.File("output.h5", "r") as f:
     x = f["tally/grid/x"][:]
     dx = x[1:] - x[:-1]
     x_mid = 0.5 * (x[:-1] + x[1:])
