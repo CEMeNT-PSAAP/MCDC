@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.linalg import expm
+from scipy.integrate import trapz
 
 # Time grid
 t = np.insert(np.logspace(-8, 1, 100), 0, 0.0)
-K = len(t)
+K = len(t) - 1
 
 # Load material data
 with np.load("SHEM-361.npz") as data:
@@ -25,7 +26,6 @@ SigmaT += SigmaC * 0.28
 
 # Matrix and RHS source
 A = np.zeros([G + J, G + J])
-Q = np.zeros(G + J)
 
 # Top-left [GxG]: phi --> phi
 A[:G, :G] = SigmaS + nuSigmaF_p - np.diag(SigmaT)
@@ -47,22 +47,25 @@ AV[:G, :] = np.dot(np.diag(v), A[:G, :])
 PHI_init = np.zeros(G + J)
 PHI_init[G - 1] = v[-1]
 
-# Analytical particular solution
-PHI_p = np.dot(np.linalg.inv(-A), Q)
-
 # Allocate solution
 PHI = np.zeros([K, G + J])
 
 # Analytical solution
+PHI_OLD = PHI_init
 for k in range(K):
     print(k)
-    # Flux
-    PHI_h = np.dot(expm(AV * t[k]), (PHI_init - PHI_p))
-    PHI[k, :] = PHI_h + PHI_p
+    t1 = t[k]
+    t2 = t[k + 1]
+    dt = t2 - t1
+
+    # Fluxes
+    PHI_NEW = np.dot(expm(AV * dt), PHI_OLD)
+    PHI[k, :] = np.dot(np.linalg.inv(AV), (PHI_NEW - PHI_OLD) / dt)
+    PHI_OLD[:] = PHI_NEW[:]
 phi = PHI[:, :G]
 
 # Density
-n = np.zeros(len(t))
+n = np.zeros(K)
 for k in range(K):
     n[k] = np.sum(phi[k, :] / v)
 

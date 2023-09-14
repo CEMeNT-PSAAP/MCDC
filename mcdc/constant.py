@@ -15,12 +15,6 @@ EVENT_TIME_BOUNDARY = 1 << 7
 EVENT_LATTICE = 1 << 8
 EVENT_SURFACE_MOVE = 1 << 9
 
-# Mesh crossing flags
-MESH_X = 0
-MESH_Y = 1
-MESH_Z = 2
-MESH_T = 3
-
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
 GYRATION_RADIUS_INFINITE_X = 1
