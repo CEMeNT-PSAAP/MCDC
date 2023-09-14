@@ -17,7 +17,6 @@ from mcdc.loop import loop_source
 # =============================================================================
 
 
-
 # =============================================================================
 # Domain crossing event
 # =============================================================================
@@ -65,7 +64,7 @@ def domain_crossing(P, mcdc):
 # =============================================================================
 
 def dd_particle_send(mcdc):
-    #dd_particle_receive(mcdc)
+
     with objmode(size="int64"):
         
         for i in range(max(len(mcdc["technique"]["xp_neigh"]),
@@ -358,18 +357,6 @@ def domain_work(mcdc,domain,N):
 
 @njit
 def source_particle_dd(seed,mcdc):
-    P = np.zeros(1, dtype=type_.particle_record)[0]
-    P["rng_seed"] = seed
-
-    # Sample source
-    xi = rng(P)
-    tot = 0.0
-    for source in mcdc["sources"]:
-        if source_in_domain(source,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):      
-            tot += source["prob"]
-            if tot >= xi:
-                break
-
     domain_mesh = mcdc["technique"]["domain_mesh"]
     d_idx = mcdc["d_idx"]
 
@@ -385,6 +372,17 @@ def source_particle_dd(seed,mcdc):
     d_y = [domain_mesh["y"][d_iy],domain_mesh["y"][d_iy+1]]
     d_z = [domain_mesh["z"][d_iz],domain_mesh["z"][d_iz+1]]
 
+    P = np.zeros(1, dtype=type_.particle_record)[0]
+
+    P["rng_seed"] = seed
+    # Sample source
+    xi = rng(P)
+    tot = 0.0
+    for source in mcdc["sources"]:
+        if source_in_domain(source,domain_mesh,d_idx):
+            tot += source["prob"]
+            if tot >= xi:
+                break
 
     # Position
     if source["box"]:
@@ -1687,16 +1685,15 @@ def mesh_uniform_get_index(P, mesh, trans):
 @njit
 def mesh_crossing_evaluate(P, mesh):
     # Shift backward
-
     shift_particle(P, -2*SHIFT)
-    t1, x1, y1, z1, outside = mesh_get_index(P, mesh)
+    t1, x1, y1, z1, outside1 = mesh_get_index(P, mesh)
 
     # Double shift forward
     shift_particle(P, 4 * SHIFT)
-    t2, x2, y2, z2, outside = mesh_get_index(P, mesh)
+    t2, x2, y2, z2, outside2 = mesh_get_index(P, mesh)
 
     # Return particle to initial position
-    shift_particle(P, -SHIFT)
+    shift_particle(P, -2*SHIFT)
 
     # Determine dimension crossed
     if x1 != x2:
@@ -1746,129 +1743,6 @@ def score_tracklength(P, distance, mcdc):
         score_current(s, g, t, x, y, z, flux, P, tally["score"]["current"])
     if tally["eddington"]:
         score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington"])
-
-
-@njit
-def score_crossing_x(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    if P["ux"] > 0.0:
-        x += 1
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] / abs(P["ux"])
-    if tally["flux_x"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_x"])
-    if tally["density_x"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_x"])
-    if tally["fission_x"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_x"])
-    if tally["total_x"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_x"])
-    if tally["current_x"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_x"])
-    if tally["eddington_x"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_x"])
-
-
-@njit
-def score_crossing_y(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    if P["uy"] > 0.0:
-        y += 1
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] / abs(P["uy"])
-    if tally["flux_y"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_y"])
-    if tally["density_y"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_y"])
-    if tally["fission_y"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_y"])
-    if tally["total_y"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_y"])
-    if tally["current_y"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_y"])
-    if tally["eddington_y"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_y"])
-
-
-@njit
-def score_crossing_z(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    if P["uz"] > 0.0:
-        z += 1
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] / abs(P["uz"])
-    if tally["flux_z"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_z"])
-    if tally["density_z"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_z"])
-    if tally["fission_z"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_z"])
-    if tally["total_z"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_z"])
-    if tally["current_z"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_z"])
-    if tally["eddington_z"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_z"])
-
-
-@njit
-def score_crossing_t(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    s = P["sensitivity_ID"]
-    t += 1
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] * material["speed"][g]
-    if tally["flux_t"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_t"])
-    if tally["density_t"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_t"])
-    if tally["fission_t"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_t"])
-    if tally["total_t"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_t"])
-    if tally["current_t"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_t"])
-    if tally["eddington_t"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_t"])
 
 
 @njit
@@ -2193,6 +2067,10 @@ def move_to_event(P, mcdc):
     d_mesh = INF
     if mcdc["cycle_active"]:
         d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
+    
+    d_domain = INF
+    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomp"]:
+        d_domain = distance_to_mesh(P, mcdc["technique"]["domain_mesh"], mcdc)
 
     if mcdc["technique"]["iQMC"]:
         d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc_mesh"], mcdc)
@@ -2220,7 +2098,7 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision)
+    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision,d_domain)
 
     # Remove the boundary event if it is not the nearest
     if d_boundary > distance * PREC:
@@ -2233,6 +2111,8 @@ def move_to_event(P, mcdc):
         event += EVENT_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
+    if d_domain <= distance * PREC:
+        event += EVENT_DOMAIN
     if d_collision == distance:
         event = EVENT_COLLISION
 
@@ -2446,31 +2326,6 @@ def surface_crossing(P, mcdc):
 
 
 # =============================================================================
-# Mesh crossing
-# =============================================================================
-
-
-@njit
-def mesh_crossing(P, mcdc):
-    # Tally mesh crossing
-    if mcdc["tally"]["crossing"] and mcdc["cycle_active"]:
-        mesh = mcdc["tally"]["mesh"]
-
-        # Determine which dimension is crossed
-        x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
-
-        # Score on tally
-        if flag == MESH_X and mcdc["tally"]["crossing_x"]:
-            score_crossing_x(P, t, x, y, z, mcdc)
-        if flag == MESH_Y and mcdc["tally"]["crossing_y"]:
-            score_crossing_y(P, t, x, y, z, mcdc)
-        if flag == MESH_Z and mcdc["tally"]["crossing_z"]:
-            score_crossing_z(P, t, x, y, z, mcdc)
-        if flag == MESH_T and mcdc["tally"]["crossing_t"]:
-            score_crossing_t(P, t, x, y, z, mcdc)
-
-
-# =============================================================================
 # Collision
 # =============================================================================
 
@@ -2502,6 +2357,13 @@ def collision(P, mcdc):
         else:
             event = EVENT_CAPTURE
     P["event"] = event
+
+    # =========================================================================
+    # Implement minor events
+    # =========================================================================
+
+    if event & EVENT_CAPTURE:
+        P["alive"] = False
 
 
 # =============================================================================
@@ -2850,16 +2712,6 @@ def branchless_collision(P, mcdc):
 
     # Set direction (TODO: anisotropic scattering)
     P["ux"], P["uy"], P["uz"] = sample_isotropic_direction(P)
-
-
-# =============================================================================
-# Time boundary
-# =============================================================================
-
-
-@njit
-def time_boundary(P, mcdc):
-    P["alive"] = False
 
 
 # =============================================================================

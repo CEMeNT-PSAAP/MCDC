@@ -43,28 +43,10 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-
             if mcdc["technique"]["domain_decomp"]:
                 loop_source_dd(seed_source, mcdc)
             else:
                 loop_source(seed_source, mcdc)
-            # Loop over source precursors
-            if mcdc["bank_precursor"]["size"] > 0:
-                seed_source_precursor = kernel.split_seed(
-                    seed_census, SEED_SPLIT_SOURCE_PRECURSOR
-                )
-                loop_source_precursor(seed_source_precursor, mcdc)
-
-            # Time census closeout
-            if idx_census < mcdc["setting"]["N_census"] - 1:
-                # TODO: Output tally (optional)
-
-                # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
-                kernel.manage_particle_banks(seed_bank, mcdc)
-
-
-            loop_source(seed_source, mcdc)
 
             # Loop over source precursors
             if mcdc["bank_precursor"]["size"] > 0:
@@ -210,6 +192,7 @@ def loop_source(seed, mcdc):
     # Re-sync RNG
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
+
 # =============================================================================
 # DD Source loop
 # =============================================================================
@@ -232,8 +215,8 @@ def loop_source_dd(seed, mcdc):
 
     print("pre_term",terminated,"sum",result_0)
     for work_idx in range(mcdc["mpi_work_size"]):
-        
         seed_work = kernel.split_seed(work_idx, seed)
+
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
             mcdc["particle_track_history_ID"] += 1
@@ -251,13 +234,11 @@ def loop_source_dd(seed, mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-           
+            
             
             #if kernel.source_in_domain(S,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):      
             P = kernel.source_particle_dd(seed_work,mcdc)
             #print(S["box_z"],mcdc["d_idx"])
-
-
 
         # Get from source bank
         else:
@@ -271,6 +252,8 @@ def loop_source_dd(seed, mcdc):
         else:
             # Add the source particle into the active bank
             kernel.add_particle(P, mcdc["bank_active"])
+
+
 
 
  
@@ -307,7 +290,7 @@ def loop_source_dd(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-    kernel.dd_particle_send(mcdc)
+    #kernel.dd_particle_send(mcdc)
     #MPI.COMM_WORLD.barrier()
     terminated = False
 
@@ -341,7 +324,7 @@ def loop_source_dd(seed, mcdc):
 
                 # Particle loop
                 loop_particle(P, mcdc)
-        kernel.dd_particle_send(mcdc)
+        
         kernel.dd_particle_receive(mcdc)
         if mcdc["bank_active"]["size"]==0:
             completed = 1
@@ -399,7 +382,7 @@ def loop_particle(P, mcdc):
         # The & operator here is a bitwise and.
         # It is used to determine if an event type is part of the particle event.
 
-        # Collision
+        # Collision events
         if event & EVENT_COLLISION:
             # Generate IC?
             if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
@@ -414,10 +397,9 @@ def loop_particle(P, mcdc):
                 # Get collision type
                 kernel.collision(P, mcdc)
                 event = P["event"]
+
                 # Perform collision
-                if event & EVENT_CAPTURE:
-                    kernel.capture(P, mcdc)
-                elif event == EVENT_SCATTERING:
+                if event == EVENT_SCATTERING:
                     kernel.scattering(P, mcdc)
                 elif event == EVENT_FISSION:
                     kernel.fission(P, mcdc)
@@ -431,40 +413,37 @@ def loop_particle(P, mcdc):
                 ):
                     kernel.sensitivity_material(P, mcdc)
 
-        # Mesh tally
-        if event & EVENT_MESH:
-            kernel.mesh_crossing(P, mcdc)
-
-        # Different Methods for shifting the particle
         # Surface crossing
         if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
 
-        # Surface move
-        elif event & EVENT_SURFACE_MOVE:
+        # Lattice or mesh crossing (skipped if surface crossing)
+        elif event & EVENT_LATTICE or event & EVENT_MESH:
+            kernel.shift_particle(P, SHIFT)
+
+        # Moving surface transition
+        if event & EVENT_SURFACE_MOVE:
             P["t"] += SHIFT
             P["cell_ID"] = -1
 
-        # Time census
-        elif event & EVENT_CENSUS:
+        # Census time crossing
+        if event & EVENT_CENSUS:
             P["t"] += SHIFT
             kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
             P["alive"] = False
 
-        # Shift particle
-        elif event & EVENT_LATTICE + EVENT_MESH:
-            kernel.shift_particle(P, SHIFT)
-
-        # Time boundary
+        # Time boundary crossing
         if event & EVENT_TIME_BOUNDARY:
-            kernel.time_boundary(P, mcdc)
-
+            P["alive"] = False
+        # Domain boundary
+        if event & EVENT_DOMAIN:
+            kernel.domain_crossing(P, mcdc)
         # Apply weight window
-        elif mcdc["technique"]["weight_window"]:
+        if P["alive"] and mcdc["technique"]["weight_window"]:
             kernel.weight_window(P, mcdc)
 
         # Apply weight roulette
-        if mcdc["technique"]["weight_roulette"]:
+        if P["alive"] and mcdc["technique"]["weight_roulette"]:
             # check if weight has fallen below threshold
             if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
                 kernel.weight_roulette(P, mcdc)
