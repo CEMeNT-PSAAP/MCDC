@@ -206,14 +206,13 @@ def loop_source_dd(seed, mcdc):
         mcdc["technique"]["iqmc_sweep_counter"] += 1
 
     # Loop over particle sources
-    sourced_num=0
+    sourced_num = 0
 
     kernel.dd_particle_receive(mcdc)
     completed = 0
-    result_0=MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
-    terminated=result_0>0
+    result_0 = MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
+    terminated = result_0 > 0
 
-    print("pre_term",terminated,"sum",result_0)
     for work_idx in range(mcdc["mpi_work_size"]):
         seed_work = kernel.split_seed(work_idx, seed)
 
@@ -226,19 +225,18 @@ def loop_source_dd(seed, mcdc):
         # =====================================================================
 
         # Nonblocking recieve if domain decomp
-        #kernel.dd_particle_receive(mcdc)
+        # kernel.dd_particle_receive(mcdc)
         completed = 0
-        result_0=MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
-        terminated=result_0>0
+        result_0 = MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
+        terminated = result_0 > 0
 
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            
-            
-            #if kernel.source_in_domain(S,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):      
-            P = kernel.source_particle_dd(seed_work,mcdc)
-            #print(S["box_z"],mcdc["d_idx"])
+
+            # if kernel.source_in_domain(S,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):
+            P = kernel.source_particle_dd(seed_work, mcdc)
+            # print(S["box_z"],mcdc["d_idx"])
 
         # Get from source bank
         else:
@@ -253,11 +251,6 @@ def loop_source_dd(seed, mcdc):
             # Add the source particle into the active bank
             kernel.add_particle(P, mcdc["bank_active"])
 
-
-
-
- 
-
         # =====================================================================
         # Run the source particle and its secondaries
         # =====================================================================
@@ -268,9 +261,9 @@ def loop_source_dd(seed, mcdc):
             P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
             if mcdc["technique"]["domain_decomp"]:
-                if not kernel.particle_in_domain(P,mcdc) and P["alive"]==True:
-                    #print("particle not in domain active, x, domain idx:",P["x"],',',mcdc["d_idx"])
-                    P["alive"]=False
+                if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                    # print("particle not in domain active, x, domain idx:",P["x"],',',mcdc["d_idx"])
+                    P["alive"] = False
 
             # Apply weight window
             if mcdc["technique"]["weight_window"]:
@@ -283,7 +276,6 @@ def loop_source_dd(seed, mcdc):
             # Particle loop
             loop_particle(P, mcdc)
 
-
         # Progress printout
         percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
@@ -291,28 +283,27 @@ def loop_source_dd(seed, mcdc):
             with objmode():
                 print_progress(percent, mcdc)
     kernel.dd_particle_send(mcdc)
-    #MPI.COMM_WORLD.barrier()
+    # MPI.COMM_WORLD.barrier()
     terminated = False
 
     rank = MPI.COMM_WORLD.Get_rank()
     kernel.dd_particle_receive(mcdc)
     done = True
-    print("pre_1term",terminated,"sum",result_0)
+    print("pre_1term", terminated, "sum", result_0)
     while not terminated:
-        
-    #for i in range(0,500):
-        #print("pre_in",terminated,"sum",result_0)
+        # for i in range(0,500):
+        # print("pre_in",terminated,"sum",result_0)
         kernel.dd_particle_receive(mcdc)
-        if mcdc["bank_active"]["size"]>0:
+        if mcdc["bank_active"]["size"] > 0:
             print("running recieved particles")
             # Loop until active bank is exhausted
             while mcdc["bank_active"]["size"] > 0:
                 P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
                 if mcdc["technique"]["domain_decomp"]:
-                    if not kernel.particle_in_domain(P,mcdc) and P["alive"]==True:
-                        #print("particle not in domain tre, x, domain idx:",P["x"],',',mcdc["d_idx"])
-                        P["alive"]=False
+                    if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                        # print("particle not in domain tre, x, domain idx:",P["x"],',',mcdc["d_idx"])
+                        P["alive"] = False
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
@@ -326,26 +317,24 @@ def loop_source_dd(seed, mcdc):
                 loop_particle(P, mcdc)
         kernel.dd_particle_send(mcdc)
         kernel.dd_particle_receive(mcdc)
-        if mcdc["bank_active"]["size"]==0:
+        if mcdc["bank_active"]["size"] == 0:
             completed = 1
 
-            #MPI.COMM_WORLD.Allreduce()
-            #kernel.send_terminate(mcdc,True)
-            #kernel.check_finished(mcdc,done)
+            # MPI.COMM_WORLD.Allreduce()
+            # kernel.send_terminate(mcdc,True)
+            # kernel.check_finished(mcdc,done)
         else:
             completed = 0
-       
-        #result_0=[0,0,0,0,0,0]
-        
-        result_0=MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
-        terminated=result_0>MPI.COMM_WORLD.Get_size()-1
-        #print("term",terminated,"sum",result_0)
-        #print("checking termination, domain",mcdc["d_idx"])
- #   kernel.send_terminate(mcdc,True)
 
+        # result_0=[0,0,0,0,0,0]
+
+        result_0 = MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
+        terminated = result_0 > MPI.COMM_WORLD.Get_size() - 1
+        # print("term",terminated,"sum",result_0)
+        # print("checking termination, domain",mcdc["d_idx"])
+    #   kernel.send_terminate(mcdc,True)
 
     print("terminated")
-
 
     # =====================================================================
     # Closeout
