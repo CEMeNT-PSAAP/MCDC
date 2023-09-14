@@ -1,6 +1,6 @@
 import numpy as np
 
-from mcdc.constant import INF, GR_ALL, PCT_NONE, PI, SHIFT
+from mcdc.constant import INF, GYRATION_RADIUS_ALL, PCT_NONE, PI, SHIFT
 
 
 class InputDeck:
@@ -66,31 +66,32 @@ class InputDeck:
         self.setting = {
             "tag": "Setting",
             "N_particle": 0,
+            "N_batch": 1,
+            "rng_seed": 1,
+            "time_boundary": INF,
+            "progress_bar": True,
+            "output_name": "output",
+            "save_input_deck": True,
+            "track_particle": False,
+            "mode_eigenvalue": False,
+            "k_init": 1.0,
             "N_inactive": 0,
             "N_active": 0,
             "N_cycle": 0,
-            "mode_eigenvalue": False,
-            "time_boundary": INF,
-            "rng_seed": 1,
-            "rng_stride": 131071,
-            "rng_g": 2806196910506780709,
-            "rng_c": 1,
-            "rng_mod": 0x8000000000000000,
-            "bank_active_buff": 100,
-            "bank_census_buff": 1.0,
-            "k_init": 1.0,
-            "output": "output",
-            "progress_bar": True,
+            "save_particle": False,
             "gyration_radius": False,
-            "gyration_radius_type": GR_ALL,
+            "gyration_radius_type": GYRATION_RADIUS_ALL,
+            "N_census": 1,
+            "census_time": np.array([INF]),
             "source_file": False,
             "source_file_name": "",
-            "track_particle": False,
-            "save_particle": False,
-            "save_input_deck": True,
             "IC_file": False,
             "IC_file_name": "",
             "N_precursor": 0,
+            # Below are parameters not copied to mcdc.setting
+            "bank_active_buff": 100,
+            "bank_census_buff": 1.0,
+            # TODO: Move to technique
             "N_sensitivity": 0,
         }
 
@@ -108,11 +109,6 @@ class InputDeck:
             "weight_roulette": False,
             "wr_threshold": 0.0,
             "wr_chance": 1.0,
-            "domain_decomp": False,
-            "d_idx": 0,
-            "domain_mesh": make_card_mesh(),
-            "exchange_rate": 0,
-            "work_ratio": np.array([1]),
             "iQMC": False,
             "iqmc_generator": "sobol",
             "iqmc_fixed_source_solver": "source_iteration",
@@ -147,11 +143,8 @@ class InputDeck:
             "IC_neutron_density_max": 0.0,
             "IC_precursor_density_max": 0.0,
             "IC_cycle_stretch": 1.0,
-            "time_census": False,
-            "census_time": np.array([INF]),
             "branchless_collision": False,
             "dsm_order": 1,
-
         }
 
 
