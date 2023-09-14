@@ -11,7 +11,7 @@ uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"
 
-# MC/DC types, will be defined by input deck
+# MC/DC types, will be defined based on input deck
 particle = None
 particle_record = None
 nuclide = None
@@ -21,6 +21,7 @@ cell = None
 universe = None
 lattice = None
 source = None
+setting = None
 tally = None
 technique = None
 global_ = None
@@ -447,36 +448,46 @@ def make_type_tally(Ns, card):
 # ==============================================================================
 
 
-setting = np.dtype(
-    [
-        ("N_particle", int64),
-        ("N_inactive", int64),
-        ("N_active", int64),
-        ("N_cycle", int64),
+def make_type_setting(deck):
+    global setting
+
+    card = deck.setting
+    struct = [
+        # Basic MC simulation parameters
+        ("N_particle", uint64),
+        ("N_batch", uint64),
         ("rng_seed", uint64),
-        ("rng_stride", uint64),
-        ("rng_g", uint64),
-        ("rng_c", uint64),
-        ("rng_mod", uint64),
         ("time_boundary", float64),
-        ("bank_active_buff", int64),
+        # Misc.
+        ("progress_bar", bool_),
+        ("output_name", "U30"),
+        ("save_input_deck", bool_),
+        ("track_particle", bool_),
+        # Eigenvalue mode
         ("mode_eigenvalue", bool_),
         ("k_init", float64),
+        ("N_inactive", uint64),
+        ("N_active", uint64),
+        ("N_cycle", uint64),
+        ("save_particle", bool_),
         ("gyration_radius", bool_),
-        ("gyration_radius_type", int64),
-        ("output", "U30"),
-        ("progress_bar", bool_),
+        ("gyration_radius_type", uint64),
+        # Time census
+        ("N_census", uint64),
+        ("census_time", float64, (card["N_census"],)),
+        # Particle source file
         ("source_file", bool_),
         ("source_file_name", "U30"),
-        ("track_particle", bool_),
-        ("save_particle", bool_),
-        ("save_input_deck", bool_),
+        # Initial condition source file
         ("IC_file", bool_),
         ("IC_file_name", "U30"),
-        ("N_precursor", int64),
-        ("N_sensitivity", int64),
+        ("N_precursor", uint64),
+        # TODO: Move to technique
+        ("N_sensitivity", uint64),
     ]
-)
+
+    # Finalize setting type
+    setting = np.dtype(struct)
 
 
 # ==============================================================================
@@ -493,11 +504,9 @@ def make_type_technique(N_particle, G, card):
         ("implicit_capture", bool_),
         ("population_control", bool_),
         ("weight_window", bool_),
-        ("domain_decomp", bool_),
         ("weight_roulette", bool_),
         ("iQMC", bool_),
         ("IC_generator", bool_),
-        ("time_census", bool_),
         ("branchless_collision", bool_),
     ]
 
@@ -506,23 +515,6 @@ def make_type_technique(N_particle, G, card):
     # =========================================================================
 
     struct += [("pct", int64), ("pc_factor", float64)]
-
-    # =========================================================================
-    # domain decomp
-    # =========================================================================
-    if card["domain_decomp"]:
-        # Mesh
-        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["domain_mesh"])
-        struct += [("domain_mesh", mesh)]
-        struct += [("d_idx", int64)]
-        struct += [("work_ratio", int64, (len(card["work_ratio"]),))]
-        struct += [("exchange_rate", int64)]
-        struct += [("xp_neigh", int64, (len(card["xp_neigh"]),))]
-        struct += [("xn_neigh", int64, (len(card["xn_neigh"]),))]
-        struct += [("yp_neigh", int64, (len(card["yp_neigh"]),))]
-        struct += [("yn_neigh", int64, (len(card["yn_neigh"]),))]
-        struct += [("zp_neigh", int64, (len(card["zp_neigh"]),))]
-        struct += [("zn_neigh", int64, (len(card["zn_neigh"]),))]
 
     # =========================================================================
     # Weight window
@@ -558,7 +550,8 @@ def make_type_technique(N_particle, G, card):
     struct += [("iqmc_mesh", mesh)]
     # Low-discprenecy sequence
     # TODO: make N_dim an input setting
-    struct += [("iqmc_lds", float64, (N_particle, N_dim))]
+    N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
+    struct += [("iqmc_lds", float64, (N_work, N_dim))]
 
     # Source
     struct += [("iqmc_source", float64, (Ng, Nt, Nx, Ny, Nz))]
@@ -591,15 +584,6 @@ def make_type_technique(N_particle, G, card):
         ("iqmc_krylov_restart", int64),
         ("iqmc_preconditioner_sweeps", int64),
         ("iqmc_sweep_counter", int64),
-    ]
-
-    # =========================================================================
-    # Time census
-    # =========================================================================
-
-    struct += [
-        ("census_time", float64, (len(card["census_time"]),)),
-        ("census_idx", int64),
     ]
 
     # =========================================================================
@@ -681,7 +665,7 @@ def make_type_global(card):
 
     # Particle bank types
     bank_active = particle_bank(1 + bank_active_buff)
-    if card.setting["mode_eigenvalue"] or card.technique["time_census"]:
+    if card.setting["mode_eigenvalue"] or card.setting["N_census"] > 1:
         bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
         bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
     else:
@@ -689,22 +673,6 @@ def make_type_global(card):
         bank_source = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
-    # Domain banks if needed
-    if card.technique["domain_decomp"]:
-        bank_domain_xp = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_xn = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_yp = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_yn = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_zp = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_zn = particle_bank(card.technique["domain_bank_size"])
-    else:
-        bank_domain_xp = particle_bank(0)
-        bank_domain_xn = particle_bank(0)
-        bank_domain_yp = particle_bank(0)
-        bank_domain_yn = particle_bank(0)
-        bank_domain_zp = particle_bank(0)
-        bank_domain_zn = particle_bank(0)
-        bank_lost = particle_bank(0)
     # Particle tracker
     N_track = 0
     if card.setting["track_particle"]:
@@ -745,17 +713,7 @@ def make_type_global(card):
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
-            ("bank_domain_xp", bank_domain_xp),
-            ("bank_domain_xn", bank_domain_xn),
-            ("bank_domain_yp", bank_domain_yp),
-            ("bank_domain_yn", bank_domain_yn),
-            ("bank_domain_zp", bank_domain_zp),
-            ("bank_domain_zn", bank_domain_zn),
             ("bank_precursor", bank_precursor),
-            ("d_idx",int64),
-            ("rng_seed_base", uint64),
-            ("rng_seed", uint64),
-            ("rng_stride", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
@@ -769,11 +727,13 @@ def make_type_global(card):
             ("k_avg_running", float64),
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
-            ("i_cycle", int64),
+            ("idx_cycle", int64),
             ("cycle_active", bool_),
             ("eigenvalue_tally_nuSigmaF", float64),
             ("eigenvalue_tally_n", float64),
             ("eigenvalue_tally_C", float64),
+            ("idx_census", int64),
+            ("idx_batch", int64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
             ("mpi_master", bool_),
