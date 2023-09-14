@@ -1108,14 +1108,9 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
 
     return card
 
+
 def domain_decomp(
-    x=None, 
-    y=None, 
-    z=None, 
-    t=None, 
-    exchange_rate=100, 
-    bank_size=1e5,
-    work_ratio=None
+    x=None, y=None, z=None, t=None, exchange_rate=100, bank_size=1e5, work_ratio=None
 ):
     card = mcdc.input_deck.technique
     card["domain_decomp"] = True
@@ -1137,17 +1132,18 @@ def domain_decomp(
         dom_num += len(t)
     # Set work ratio
     if work_ratio is None:
-        card["work_ratio"]=None
+        card["work_ratio"] = None
     elif work_ratio is not None:
-        card["work_ratio"]=work_ratio
-    card["d_idx"]=0
-    card["xp_neigh"]=[]
-    card["xn_neigh"]=[]
-    card["yp_neigh"]=[]
-    card["yn_neigh"]=[]
-    card["zp_neigh"]=[]
-    card["zn_neigh"]=[]
+        card["work_ratio"] = work_ratio
+    card["d_idx"] = 0
+    card["xp_neigh"] = []
+    card["xn_neigh"] = []
+    card["yp_neigh"] = []
+    card["yn_neigh"] = []
+    card["zp_neigh"] = []
+    card["zn_neigh"] = []
     return card
+
 
 def iQMC(
     g=None,
