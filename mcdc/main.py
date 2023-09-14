@@ -29,7 +29,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_main, loop_iqmc
+from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_deck
@@ -52,8 +52,6 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
-    if input_deck.technique["domain_decomp"]:
-        dd_prepare()
     mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
@@ -65,11 +63,12 @@ def run():
 
     # Run simulation
     simulation_start = MPI.Wtime()
-    if not mcdc["technique"]["iQMC"]:
-        loop_main(mcdc)
-    else:
+    if mcdc["technique"]["iQMC"]:
         loop_iqmc(mcdc)
-
+    elif mcdc["setting"]["mode_eigenvalue"]:
+        loop_eigenvalue(mcdc)
+    else:
+        loop_fixed_source(mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -83,84 +82,7 @@ def run():
 
     # Closout
     closeout(mcdc)
-    
-# =============================================================================
-# prepare domain decomposition
-# =============================================================================
 
-def dd_prepare():
-    d_idx = MPI.COMM_WORLD.Get_rank()
-    work_ratio = input_deck.technique["work_ratio"]
-    d_Nx = input_deck.technique["domain_mesh"]["x"].size - 1
-    d_Ny = input_deck.technique["domain_mesh"]["y"].size - 1
-    d_Nz = input_deck.technique["domain_mesh"]["z"].size - 1
-    
-    # Assigning domain index
-    if input_deck.technique["work_ratio"] is not None:
-        domain = 0
-        count = 0
-        neighbors =[]
-        ranks = []
-        while domain <(len(work_ratio)):
-            temp = []
-            for i in range(work_ratio[domain]):
-                if MPI.COMM_WORLD.Get_rank()==count:
-                    d_idx = domain
-                temp.append(count)
-                count += 1
-            ranks.append(temp)
-            domain += 1
-            if domain == (len(work_ratio)) and count<=MPI.COMM_WORLD.Get_rank():
-                domain = 0
-        # Determining neighbors
-        domain = 0
-        count = 0
-        while domain <(len(work_ratio)):
-            if abs(d_idx - domain) == 1:
-                neighbors.append(domain)
-            domain += 1
-        neighbor_ranks=[]
-
-        d_ix = d_idx % d_Nx
-        d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
-        d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
-
-        for i in range(len(neighbors)):
-            temp =[]
-            for rank in ranks[neighbors[i]]:
-                temp.append(rank)
-            neighbor_ranks.append(np.array(temp))
-        neighbor_ranks_o=[[],[],[],[],[],[]]
-
-        for i in range(len(neighbors)):
-            n_ix = neighbors[i] % d_Nx
-            n_iy = int(((neighbors[i]-d_ix)/d_Nx)%d_Ny)
-            n_iz = int((((neighbors[i]-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
-            if n_ix-d_ix==1:
-                neighbor_ranks_o[0]=neighbor_ranks[i]
-            if n_ix-d_ix==-1:
-                neighbor_ranks_o[1]=neighbor_ranks[i]
-            if n_iy-d_iy==1:
-                neighbor_ranks_o[2]=neighbor_ranks[i]
-            if n_iy-d_iy==-1:
-                neighbor_ranks_o[3]=neighbor_ranks[i]
-            if n_iz-d_iz==1:
-                neighbor_ranks_o[4]=neighbor_ranks[i]
-            if n_iz-d_iz==-1:
-                neighbor_ranks_o[5]=neighbor_ranks[i]
-
-
-    elif input_deck.technique["work_ratio"] is None:
-        d_idx = MPI.COMM_WORLD.Get_rank() % (d_Nx * d_Ny * d_Nz)
-    print("domain:",d_idx,"rank:",MPI.COMM_WORLD.Get_rank(),"neighbors",neighbors,"neigh_ranks",neighbor_ranks,"ordered:",neighbor_ranks_o)
-
-    input_deck.technique["d_idx"]=d_idx
-    input_deck.technique["xp_neigh"]=neighbor_ranks_o[0]
-    input_deck.technique["xn_neigh"]=neighbor_ranks_o[1]
-    input_deck.technique["yp_neigh"]=neighbor_ranks_o[2]
-    input_deck.technique["yn_neigh"]=neighbor_ranks_o[3]
-    input_deck.technique["zp_neigh"]=neighbor_ranks_o[4]
-    input_deck.technique["zn_neigh"]=neighbor_ranks_o[5]
 
 def prepare():
     """
@@ -246,8 +168,10 @@ def prepare():
     type_.make_type_lattice(input_deck.lattices)
     type_.make_type_source(G)
     type_.make_type_tally(N_tally_scores, input_deck.tally)
+    type_.make_type_setting(input_deck)
     type_.make_type_technique(N_particle, G, input_deck.technique)
     type_.make_type_global(input_deck)
+    kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     # =========================================================================
     # Make the global variable container
@@ -337,11 +261,8 @@ def prepare():
 
     for i in range(N_source):
         for name in type_.source.names:
-            if mcdc["technique"]["domain_decomp"]:
-                if kernel.source_in_domain(input_deck.sources[i][name],mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):
-                    mcdc["sources"][i][name] = input_deck.sources[i][name]
-            else:
-                mcdc["sources"][i][name] = input_deck.sources[i][name]
+            mcdc["sources"][i][name] = input_deck.sources[i][name]
+
     # Normalize source probabilities
     tot = 0.0
     for S in mcdc["sources"]:
@@ -381,13 +302,10 @@ def prepare():
         "implicit_capture",
         "population_control",
         "weight_window",
-        "domain_decomp",
         "weight_roulette",
         "iQMC",
         "IC_generator",
-        "time_census",
         "branchless_collision",
-        
     ]:
         mcdc["technique"][name] = input_deck.technique[name]
 
@@ -420,30 +338,6 @@ def prepare():
 
     # Survival probability
     mcdc["technique"]["wr_chance"] = input_deck.technique["wr_chance"]
-    # =========================================================================
-    # Domain Decomposition
-    # =========================================================================
-  
-    # Set domain mesh
-    if input_deck.technique["domain_decomp"]:
-        name = "domain_mesh"
-        mcdc["technique"][name]["x"] = input_deck.technique[name]["x"]
-        mcdc["technique"][name]["y"] = input_deck.technique[name]["y"]
-        mcdc["technique"][name]["z"] = input_deck.technique[name]["z"]
-        mcdc["technique"][name]["t"] = input_deck.technique[name]["t"]
-        mcdc["technique"][name]["mu"] = input_deck.technique[name]["mu"]
-        mcdc["technique"][name]["azi"] = input_deck.technique[name]["azi"]
-        # Set exchange rate
-        mcdc["technique"]["exchange_rate"] = input_deck.technique["exchange_rate"]
-        # Set domain index
-        mcdc["d_idx"]=input_deck.technique["d_idx"]
-        mcdc["technique"]["xp_neigh"]=input_deck.technique["xp_neigh"]
-        mcdc["technique"]["xn_neigh"]=input_deck.technique["xn_neigh"]
-        mcdc["technique"]["yp_neigh"]=input_deck.technique["yp_neigh"]
-        mcdc["technique"]["yn_neigh"]=input_deck.technique["yn_neigh"]
-        mcdc["technique"]["zp_neigh"]=input_deck.technique["zp_neigh"]
-        mcdc["technique"]["zn_neigh"]=input_deck.technique["zn_neigh"]
-        mcdc["technique"]["work_ratio"]=input_deck.technique["work_ratio"]
 
     # =========================================================================
     # Quasi Monte Carlo
@@ -469,45 +363,40 @@ def prepare():
         mcdc["technique"]["iqmc_mesh"]["z"] = input_deck.technique["iqmc_mesh"]["z"]
         mcdc["technique"]["iqmc_mesh"]["t"] = input_deck.technique["iqmc_mesh"]["t"]
         mcdc["technique"]["iqmc_generator"] = input_deck.technique["iqmc_generator"]
+        # variables to generate samples
+        scramble = mcdc["technique"]["iqmc_scramble"]
+        N_dim = mcdc["technique"]["iqmc_N_dim"]
+        seed = mcdc["technique"]["iqmc_seed"]
+        N = mcdc["setting"]["N_particle"]
+        size = MPI.COMM_WORLD.Get_size()
+        rank = MPI.COMM_WORLD.Get_rank()
+        N_work = math.ceil(N_particle / size)
+        # how many samples will we skip in the LDS
+        fast_forward = int((rank / size) * N)
         # generate lds
         if input_deck.technique["iqmc_generator"] == "sobol":
-            scramble = mcdc["technique"]["iqmc_scramble"]
-            N_dim = mcdc["technique"]["iqmc_N_dim"]
-            N = mcdc["setting"]["N_particle"]
             sampler = qmc.Sobol(d=N_dim, scramble=scramble)
-            m = math.ceil(math.log(N, 2))
-            mcdc["setting"]["N_particle"] = 2**m
-            mcdc["technique"]["iqmc_lds"] = sampler.random_base2(m=m)
-            # first row of an unscrambled Sobol sequence is all zeros
-            # and throws off some of the algorithms. So we add small amount
-            # to avoid this issue
-            # mcdc["technique"]["lds"][0,:] += 1e-6
-            mcdc["technique"]["iqmc_lds"][mcdc["technique"]["iqmc_lds"] == 0.0] += 1e-6
-            # lds is shape (2**m, d)
+            # skip first two entries in Sobol sequence because
+            # they map to x = 0.0 and ux = 0.0 respectively
+            sampler.fast_forward(2)
+            sampler.fast_forward(fast_forward)
+            mcdc["technique"]["iqmc_lds"] = sampler.random(N_work)
         if input_deck.technique["iqmc_generator"] == "halton":
-            scramble = mcdc["technique"]["iqmc_scramble"]
-            N_dim = mcdc["technique"]["iqmc_N_dim"]
-            seed = mcdc["technique"]["iqmc_seed"]
-            N = mcdc["setting"]["N_particle"]
             sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
+            # skip first entry in Halton because it maps to x = 0.0
             sampler.fast_forward(1)
-            mcdc["technique"]["iqmc_lds"] = sampler.random(N)
+            sampler.fast_forward(fast_forward)
+            mcdc["technique"]["iqmc_lds"] = sampler.random(N_work)
         if input_deck.technique["iqmc_generator"] == "random":
-            seed = mcdc["technique"]["iqmc_seed"]
-            N_dim = mcdc["technique"]["iqmc_N_dim"]
-            N = mcdc["setting"]["N_particle"]
+            # this chunk of code uses the iqmc_seed to generate a number of
+            # seeds to be used  on each processor
+            # this way, each processor gets different samples, but if iQMC is run
+            # several times it will generate the same samples across runs
+            # 1e6 represents the maximum integer size generated
             np.random.seed(seed)
-            mcdc["technique"]["iqmc_lds"] = np.random.random((N, N_dim))
-
-    # =========================================================================
-    # Time census
-    # =========================================================================
-
-    # Census time
-    mcdc["technique"]["census_time"] = input_deck.technique["census_time"]
-
-    # Census index
-    mcdc["technique"]["census_idx"] = 0
+            seeds = np.random.randint(1e6, size=size)
+            np.random.seed(seeds[rank])
+            mcdc["technique"]["iqmc_lds"] = np.random.random((N_work, N_dim))
 
     # =========================================================================
     # Derivative Source Method
@@ -515,15 +404,6 @@ def prepare():
 
     # Threshold
     mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
-
-    # =========================================================================
-    # RNG
-    # =========================================================================
-
-    # RNG seed and stride
-    mcdc["rng_seed_base"] = mcdc["setting"]["rng_seed"]
-    mcdc["rng_seed"] = mcdc["setting"]["rng_seed"]
-    mcdc["rng_stride"] = mcdc["setting"]["rng_stride"]
 
     # =========================================================================
     # MPI
@@ -535,11 +415,7 @@ def prepare():
     mcdc["mpi_master"] = mcdc["mpi_rank"] == 0
 
     # Distribute work to MPI ranks
-    if mcdc["technique"]["domain_decomp"]:
-        kernel.distribute_work_dd(mcdc["setting"]["N_particle"], mcdc)
-    else:
-        kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
-    print("RANK",mcdc["mpi_rank"],"work size",mcdc["mpi_work_size"])
+    kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
 
     # =========================================================================
     # Particle banks
@@ -663,7 +539,7 @@ def generate_hdf5(mcdc):
             print_msg("")
         print_msg(" Generating output HDF5 files...")
 
-        with h5py.File(mcdc["setting"]["output"] + ".h5", "w") as f:
+        with h5py.File(mcdc["setting"]["output_name"] + ".h5", "w") as f:
             # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
@@ -791,7 +667,7 @@ def generate_hdf5(mcdc):
 def closeout(mcdc):
     # Runtime
     if mcdc["mpi_master"]:
-        with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+        with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:
             for name in [
                 "total",
                 "preparation",

@@ -19,13 +19,13 @@ from mcdc.card import (
     make_card_source,
 )
 from mcdc.constant import (
-    GR_ALL,
-    GR_INFINITE_X,
-    GR_INFINITE_Y,
-    GR_INFINITE_Z,
-    GR_ONLY_X,
-    GR_ONLY_Y,
-    GR_ONLY_Z,
+    GYRATION_RADIUS_ALL,
+    GYRATION_RADIUS_INFINITE_X,
+    GYRATION_RADIUS_INFINITE_Y,
+    GYRATION_RADIUS_INFINITE_Z,
+    GYRATION_RADIUS_ONLY_X,
+    GYRATION_RADIUS_ONLY_Y,
+    GYRATION_RADIUS_ONLY_Z,
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
@@ -900,40 +900,40 @@ def setting(**kw):
     # Check the suplied keyword arguments
     for key in kw.keys():
         check_support(
-            "source parameter",
+            "setting parameter",
             key,
             [
                 "N_particle",
-                "time_boundary",
+                "N_batch",
                 "rng_seed",
-                "rng_stride",
-                "output",
+                "time_boundary",
                 "progress_bar",
+                "output_name",
+                "save_input_deck",
+                "particle_tracker",
                 "k_eff",
+                "source_file",
+                "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
-                "source_file",
-                "particle_tracker",
-                "save_input_deck",
-                "IC_file",
             ],
             False,
         )
 
     # Get keyword arguments
     N_particle = kw.get("N_particle")
-    time_boundary = kw.get("time_boundary")
+    N_batch = kw.get("N_batch")
     rng_seed = kw.get("rng_seed")
-    rng_stride = kw.get("rng_stride")
-    output = kw.get("output")
+    time_boundary = kw.get("time_boundary")
     progress_bar = kw.get("progress_bar")
+    output = kw.get("output_name")
+    save_input_deck = kw.get("save_input_deck")
+    particle_tracker = kw.get("particle_tracker")
     k_eff = kw.get("k_eff")
+    source_file = kw.get("source_file")
+    IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
-    source_file = kw.get("source_file")
-    particle_tracker = kw.get("particle_tracker")
-    save_input_deck = kw.get("save_input_deck")
-    IC_file = kw.get("IC_file")
 
     # Check if setting card has been initialized
     card = mcdc.input_deck.setting
@@ -942,6 +942,10 @@ def setting(**kw):
     if N_particle is not None:
         card["N_particle"] = int(N_particle)
 
+    # Number of batches
+    if N_batch is not None:
+        card["N_batch"] = int(N_batch)
+
     # Time boundary
     if time_boundary is not None:
         card["time_boundary"] = time_boundary
@@ -949,12 +953,10 @@ def setting(**kw):
     # RNG seed and stride
     if rng_seed is not None:
         card["rng_seed"] = rng_seed
-    if rng_stride is not None:
-        card["rng_stride"] = rng_stride
 
     # Output .h5 file name
     if output is not None:
-        card["output"] = output
+        card["output_name"] = output
 
     # Progress bar
     if progress_bar is not None:
@@ -1024,19 +1026,19 @@ def eigenmode(
     if gyration_radius is not None:
         card["gyration_radius"] = True
         if gyration_radius == "all":
-            card["gyration_radius_type"] = GR_ALL
+            card["gyration_radius_type"] = GYRATION_RADIUS_ALL
         elif gyration_radius == "infinite-x":
-            card["gyration_radius_type"] = GR_INFINITE_X
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_X
         elif gyration_radius == "infinite-y":
-            card["gyration_radius_type"] = GR_INFINITE_Y
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_Y
         elif gyration_radius == "infinite-z":
-            card["gyration_radius_type"] = GR_INFINITE_Z
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_Z
         elif gyration_radius == "only-x":
-            card["gyration_radius_type"] = GR_ONLY_X
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_X
         elif gyration_radius == "only-y":
-            card["gyration_radius_type"] = GR_ONLY_Y
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Y
         elif gyration_radius == "only-z":
-            card["gyration_radius_type"] = GR_ONLY_Z
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Z
         else:
             print_error("Unknown gyration radius type")
 
@@ -1079,12 +1081,21 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def census(t, pct="none"):
-    card = mcdc.input_deck.technique
-    card["time_census"] = True
+def time_census(t):
+    # Remove census beyond the final tally time grid point
+    while True:
+        if t[-1] >= mcdc.input_deck.tally["mesh"]["t"][-1]:
+            t = t[:-1]
+        else:
+            break
+
+    # Add the default, final census-at-infinity
+    t = np.append(t, INF)
+
+    # Set the time census parameters
+    card = mcdc.input_deck.setting
     card["census_time"] = t
-    if pct != "none":
-        population_control(pct)
+    card["N_census"] = len(t)
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
@@ -1122,46 +1133,6 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
 
     return card
 
-def domain_decomp(
-    x=None, 
-    y=None, 
-    z=None, 
-    t=None, 
-    exchange_rate=100, 
-    bank_size=1e5,
-    work_ratio=None
-):
-    card = mcdc.input_deck.technique
-    card["domain_decomp"] = True
-    card["domain_bank_size"] = int(1e5)
-    card["exchange_rate"] = int(exchange_rate)
-    dom_num = 1
-    # Set mesh
-    if x is not None:
-        card["domain_mesh"]["x"] = x
-        dom_num *= len(x)
-    if y is not None:
-        card["domain_mesh"]["y"] = y
-        dom_num *= len(y)
-    if z is not None:
-        card["domain_mesh"]["z"] = z
-        dom_num += len(z)
-    if t is not None:
-        card["domain_mesh"]["t"] = t
-        dom_num += len(t)
-    # Set work ratio
-    if work_ratio is None:
-        card["work_ratio"]=None
-    elif work_ratio is not None:
-        card["work_ratio"]=work_ratio
-    card["d_idx"]=0
-    card["xp_neigh"]=[]
-    card["xn_neigh"]=[]
-    card["yp_neigh"]=[]
-    card["yn_neigh"]=[]
-    card["zp_neigh"]=[]
-    card["zn_neigh"]=[]
-    return card
 
 def iQMC(
     g=None,
