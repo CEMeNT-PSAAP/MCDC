@@ -110,8 +110,6 @@ with h5py.File("output.h5", "r") as f:
     # Note the spatial (dx) and source strength (100+1) normalization
     phi = f["tally/flux/mean"][:] / dx * 101.0
     phi_sd = f["tally/flux/sdev"][:] / dx * 101.0
-    phi_x = f["tally/flux-z/mean"][1:] * 101.0
-    phi_x_sd = f["tally/flux-z/sdev"][1:] * 101.0
 
 # Flux - spatial average
 plt.plot(x_mid, phi, "-b", label="MC")
@@ -124,13 +122,3 @@ plt.legend()
 plt.title(r"$\bar{\phi}_i$")
 plt.show()
 
-# Flux - spatial grid
-plt.plot(x[1:], phi_x, "-b", label="MC")
-plt.fill_between(x[1:], phi_x - phi_x_sd, phi_x + phi_x_sd, alpha=0.2, color="b")
-plt.plot(x[:], phi_x_ref, "--r", label="ref.")
-plt.xlabel(r"$x$, cm")
-plt.ylabel("Flux")
-plt.grid()
-plt.legend()
-plt.title(r"$\phi(x)$")
-plt.show()
