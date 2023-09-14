@@ -29,7 +29,7 @@ def test():
 
     mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 
-    scores = ["flux", "flux-x"]
+    scores = ["flux"]
     mcdc.tally(scores=scores, x=np.linspace(0.0, 8.0, 41))
 
     mcdc.setting(N_particle=1e2, progress_bar=False)

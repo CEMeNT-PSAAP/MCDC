@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import sys
-import subprocess
 
 if len(sys.argv) > 1:
     N_proc = int(sys.argv[1])
@@ -19,22 +18,17 @@ for task in os.scandir("./fixed_source"):
     for N_hist in np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1):
         if not os.path.isfile("output_" + str(int(N_hist)) + ".h5"):
             print(task, int(N_hist))
-            if N_proc == 0:
-                waitlist.append(
-                    subprocess.Popen(
-                        ("python input.py --mode=numba %i" % (N_hist)).split()
-                    )
+            if N_proc == 1:
+                os.system(
+                    "python input.py --mode=numba --N_particle=%i --output=output_%i"
+                    % (N_hist, N_hist)
                 )
-            elif N_proc == 1:
-                os.system("python input.py --mode=numba %i" % (N_hist))
             else:
                 os.system(
-                    "srun -n %i python input.py --mode=numba %i" % (N_proc, N_hist)
+                    "srun -n %i python input.py --mode=numba --N_particle=%i --output=output_%i"
+                    % (N_proc, N_hist, N_hist)
                 )
     os.chdir(r"../..")
-
-for proc in waitlist:
-    proc.wait()
 
 # Eigenvalue
 """
