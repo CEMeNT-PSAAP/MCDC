@@ -18,6 +18,7 @@ from mcdc.input_ import (
     weight_window,
     iQMC,
     weight_roulette,
+    domain_decomp,
     IC_generator,
     dsm,
     print_card,
