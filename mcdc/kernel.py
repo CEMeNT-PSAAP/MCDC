@@ -13,6 +13,462 @@ from mcdc.loop import loop_source
 
 
 # =============================================================================
+# Domain Decomposition
+# =============================================================================
+
+
+
+# =============================================================================
+# Domain crossing event
+# =============================================================================
+
+@njit
+def domain_crossing(P, mcdc):
+    # Domain mesh crossing
+    max_size=mcdc["technique"]["exchange_rate"]#/1e4)*mcdc["mpi_work_size"])
+    if mcdc["technique"]["domain_decomp"] and P["alive"] == True:
+        mesh = mcdc["technique"]["domain_mesh"]
+        # Determine which dimension is crossed
+        x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
+        # Score on tally
+        if flag == MESH_X and P["ux"] > 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_xp"])
+            if mcdc["bank_domain_xp"]["size"]==max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_X and P["ux"] < 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_xn"])
+            if mcdc["bank_domain_xn"]["size"]==max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Y and P["uy"] > 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_yp"])
+            if mcdc["bank_domain_yp"]["size"]==max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Y and P["uy"] < 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_yn"])
+            if mcdc["bank_domain_yn"]["size"]==max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Z and P["uz"] > 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_zp"])
+            if mcdc["bank_domain_zp"]["size"]==max_size:
+                dd_particle_send(mcdc)
+            
+        if flag == MESH_Z and P["uz"] < 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_zn"])
+            if mcdc["bank_domain_zn"]["size"]==max_size:
+                dd_particle_send(mcdc)
+        P["alive"]=False
+    
+
+
+# =============================================================================
+# Send full domain bank
+# =============================================================================
+
+def dd_particle_send(mcdc):
+    #dd_particle_receive(mcdc)
+    with objmode(size="int64"):
+        
+        for i in range(max(len(mcdc["technique"]["xp_neigh"]),
+                           len(mcdc["technique"]["xn_neigh"]),
+                           len(mcdc["technique"]["yp_neigh"]),
+                           len(mcdc["technique"]["yn_neigh"]),
+                           len(mcdc["technique"]["zp_neigh"]),
+                           len(mcdc["technique"]["zn_neigh"]),)):
+            
+            if mcdc["technique"]["xp_neigh"].size>i:
+                size = mcdc["bank_domain_xp"]["size"]
+                bank = np.array(mcdc["bank_domain_xp"]["particles"][:size])
+                for particle in bank:
+                    particle["w"]/=int(len(mcdc["technique"]["xp_neigh"]))
+                request1 = MPI.COMM_WORLD.send(bank, dest=mcdc["technique"]["xp_neigh"][i],tag=5)
+
+            if mcdc["technique"]["xn_neigh"].size>i:
+                size = mcdc["bank_domain_xn"]["size"]
+                bank = np.array(mcdc["bank_domain_xn"]["particles"][:size])
+                for particle in bank:
+                    particle["w"]/=int(len(mcdc["technique"]["xn_neigh"]))
+                request2 = MPI.COMM_WORLD.send(bank, dest=mcdc["technique"]["xn_neigh"][i],tag=5)
+
+            if mcdc["technique"]["yp_neigh"].size>i:
+                size = mcdc["bank_domain_yp"]["size"]
+                bank = np.array(mcdc["bank_domain_yp"]["particles"][:size])
+                for particle in bank:
+                    particle["w"]/=int(len(mcdc["technique"]["yp_neigh"]))
+                request3 = MPI.COMM_WORLD.send(bank, dest=mcdc["technique"]["yp_neigh"][i],tag=5)
+
+            if mcdc["technique"]["yn_neigh"].size>i:
+                size = mcdc["bank_domain_yn"]["size"]
+                bank = np.array(mcdc["bank_domain_yn"]["particles"][:size])
+                for particle in bank:
+                    particle["w"]/=int(len(mcdc["technique"]["yn_neigh"]))
+                request4 = MPI.COMM_WORLD.send(bank, dest=mcdc["technique"]["yn_neigh"][i],tag=5)
+            
+            if mcdc["technique"]["zp_neigh"].size>i:
+                size = mcdc["bank_domain_zp"]["size"]
+                bank = np.array(mcdc["bank_domain_zp"]["particles"][:size])
+                for particle in bank:
+                    particle["w"]/=int(len(mcdc["technique"]["zp_neigh"]))
+                request5 = MPI.COMM_WORLD.send(bank, dest=mcdc["technique"]["zp_neigh"][i],tag=5)
+
+            if mcdc["technique"]["zn_neigh"].size>i:
+                size = mcdc["bank_domain_zn"]["size"]
+                bank = np.array(mcdc["bank_domain_zn"]["particles"][:size])
+                for particle in bank:
+                    particle["w"]/=int(len(mcdc["technique"]["zn_neigh"]))
+                request6 = MPI.COMM_WORLD.send(bank, dest=mcdc["technique"]["zn_neigh"][i],tag=5)
+
+        mcdc["bank_domain_xp"]["size"] = 0
+        mcdc["bank_domain_xn"]["size"] = 0
+        mcdc["bank_domain_yp"]["size"] = 0
+        mcdc["bank_domain_yn"]["size"] = 0
+        mcdc["bank_domain_zp"]["size"] = 0
+        mcdc["bank_domain_zn"]["size"] = 0
+        
+
+# =============================================================================
+# Recieve particles and clear banks
+# =============================================================================
+      
+def dd_particle_receive(mcdc):
+
+        buff = np.zeros(
+            mcdc["bank_domain_xp"]["particles"].shape[0], dtype=type_.particle_record
+        )
+
+        with objmode(size="int64"):
+            bankr = mcdc["bank_active"]["particles"][:0]
+            size_old= bankr.shape[0]
+            for i in range(max(len(mcdc["technique"]["xp_neigh"]),
+                        len(mcdc["technique"]["xn_neigh"]),
+                        len(mcdc["technique"]["yp_neigh"]),
+                        len(mcdc["technique"]["yn_neigh"]),
+                        len(mcdc["technique"]["zp_neigh"]),
+                        len(mcdc["technique"]["zn_neigh"]),)):
+                
+                if mcdc["technique"]["xp_neigh"].size>i:
+                    received1 = MPI.COMM_WORLD.irecv(source=mcdc["technique"]["xp_neigh"][i],tag=5)
+                    if received1.Get_status():
+                        bankr = np.append(bankr,received1.wait())
+                    else:
+                        MPI.Request.cancel(received1)
+                if mcdc["technique"]["xn_neigh"].size>i:
+                    received2 = MPI.COMM_WORLD.irecv(source=mcdc["technique"]["xn_neigh"][i],tag=5)
+                    if received2.Get_status():
+                        bankr = np.append(bankr,received2.wait())
+                    else:
+                        MPI.Request.cancel(received2)
+                if mcdc["technique"]["yp_neigh"].size>i:
+                    received3 = MPI.COMM_WORLD.irecv(source=mcdc["technique"]["yp_neigh"][i],tag=5)
+                    if received3.Get_status():
+                        bankr = np.append(bankr,received3.wait())
+                    else:
+                        MPI.Request.cancel(received3)    
+                if mcdc["technique"]["yn_neigh"].size>i:
+                    received4 = MPI.COMM_WORLD.irecv(source=mcdc["technique"]["yn_neigh"][i],tag=5)
+                    if received4.Get_status():
+                        bankr = np.append(bankr,received4.wait())
+                    else:
+                        MPI.Request.cancel(received4)    
+                if mcdc["technique"]["zp_neigh"].size>i:
+                    received5 = MPI.COMM_WORLD.irecv(source=mcdc["technique"]["zp_neigh"][i],tag=5)
+                    if received5.Get_status():
+                        bankr = np.append(bankr,received5.wait())
+                    else:
+                        MPI.Request.cancel(received5)
+
+                if mcdc["technique"]["zn_neigh"].size>i:
+                    received6 = MPI.COMM_WORLD.irecv(source=mcdc["technique"]["zn_neigh"][i],tag=5)
+                    if received6.Get_status():
+                        bankr = np.append(bankr, received6.wait())
+                    else:
+                        MPI.Request.cancel(received6)
+
+
+            size = bankr.shape[0]
+            # Set output buffer
+            for i in range(size):
+                buff[i] = bankr[i]
+            #if (size-size_old)>0:
+                #print("recieved",size-size_old,"particles")
+        # Set source bank from buffer
+        for i in range(size):
+            add_particle(buff[i], mcdc["bank_active"])
+
+# =============================================================================
+# Particle in domain
+# =============================================================================
+
+# Check if particle is in domain
+def particle_in_domain(P,mcdc):
+    d_idx = mcdc["d_idx"]
+    d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
+    d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
+    d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
+    d_ix = d_idx % d_Nx
+    d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
+    d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
+
+    x_cell=binary_search(P["x"],mcdc["technique"]["domain_mesh"]["x"])
+    y_cell=binary_search(P["y"],mcdc["technique"]["domain_mesh"]["y"])
+    z_cell=binary_search(P["z"],mcdc["technique"]["domain_mesh"]["z"])
+    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
+    if d_ix == x_cell:
+        if d_iy == y_cell:
+            if d_iz ==z_cell:
+                return True
+    else:
+        return False
+
+# =============================================================================
+# Source in domain
+# =============================================================================
+
+# Check for source in domain
+def source_in_domain(source,domain_mesh,d_idx):
+    d_Nx = domain_mesh["x"].size - 1
+    d_Ny = domain_mesh["y"].size - 1
+    d_Nz = domain_mesh["z"].size - 1
+
+    d_ix = d_idx % d_Nx
+    d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
+    d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
+
+    d_x = [domain_mesh["x"][d_ix],domain_mesh["x"][d_ix+1]]
+    d_y = [domain_mesh["y"][d_iy],domain_mesh["y"][d_iy+1]]
+    d_z = [domain_mesh["z"][d_iz],domain_mesh["z"][d_iz+1]]
+
+    #print("domain:",d_idx,"d_x:",d_x,"d_y:",d_y,"d_z:",d_z,domain_mesh["z"],source["box_x"],source["box_y"],source["box_z"])
+
+    if d_x[0]<= source["box_x"][0]<= d_x[1]  or d_x[0]<= source["box_x"][1]<= d_x[1] or (source["box_x"][0]<d_x[0] and source["box_x"][1]>d_x[1]):
+        if d_y[0]<= source["box_y"][0]<= d_y[1]  or d_y[0]<= source["box_y"][1]<= d_y[1] or (source["box_y"][0]<d_y[0] and source["box_y"][1]>d_y[1]):
+            if d_z[0]<= source["box_z"][0]<= d_z[1]  or d_z[0]<= source["box_z"][1]<= d_z[1] or (source["box_z"][0]<d_z[0] and source["box_z"][1]>d_z[1]):
+                return True
+            else:
+                return False
+        else: 
+            return False
+    else:
+        return False
+# =============================================================================
+# Compute domain load
+# =============================================================================
+
+def domain_work(mcdc,domain,N):
+    domain_mesh = mcdc["technique"]["domain_mesh"]
+
+    d_Nx = domain_mesh["x"].size - 1
+    d_Ny = domain_mesh["y"].size - 1
+    d_Nz = domain_mesh["z"].size - 1
+    work_start=0
+    for d_idx in range(domain):
+        d_ix = d_idx % d_Nx
+        d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
+        d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
+
+        d_x = [domain_mesh["x"][d_ix],domain_mesh["x"][d_ix+1]]
+        d_y = [domain_mesh["y"][d_iy],domain_mesh["y"][d_iy+1]]
+        d_z = [domain_mesh["z"][d_iz],domain_mesh["z"][d_iz+1]]
+        # Compute volumes of sources and numbers of particles
+
+        Psum=0
+
+        Nm=0
+        num_source=0
+        for source in mcdc["sources"]:
+            Psum+=source["prob"]
+            num_source += 1
+        Vi=np.zeros(num_source)
+        Vim=np.zeros(num_source)
+        Ni=np.zeros(num_source)            
+        i=0    
+        for source in mcdc["sources"]:
+            Ni[i]=N*source["prob"]/Psum
+            Vi[i]=1
+            Vim[i]=1
+
+            xV=(source["box_x"][1]-source["box_x"][0])
+            if xV !=0:
+                Vi[i]*=xV
+                Vim[i]*=(min(source["box_x"][1],d_x[1])-max(source["box_x"][0],d_x[0]))
+            yV=(source["box_y"][1]-source["box_y"][0])
+            if yV !=0:
+                Vi[i]*=yV
+                Vim[i]*=(min(source["box_y"][1],d_y[1])-max(source["box_y"][0],d_y[0]))
+            zV=(source["box_z"][1]-source["box_z"][0])
+            if zV !=0:
+                Vi[i]*=zV
+                Vim[i]*=(min(source["box_z"][1],d_z[1])-max(source["box_z"][0],d_z[0]))
+            if not source_in_domain(source,domain_mesh,d_idx):
+                Vim[i]=0
+            i+=1
+        for source in range(num_source):
+            Nm+=Ni[source]*Vim[source]/Vi[source]
+        work_start+=(Nm)
+    d_idx=domain
+    d_ix = d_idx % d_Nx
+    d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
+    d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
+
+    d_x = [domain_mesh["x"][d_ix],domain_mesh["x"][d_ix+1]]
+    d_y = [domain_mesh["y"][d_iy],domain_mesh["y"][d_iy+1]]
+    d_z = [domain_mesh["z"][d_iz],domain_mesh["z"][d_iz+1]]
+    # Compute volumes of sources and numbers of particles
+    num_source = len(mcdc["sources"])
+    Vi=np.zeros(num_source)
+    Vim=np.zeros(num_source)
+    Ni=np.zeros(num_source)
+    Psum=0
+
+    Nm=0
+    for source in mcdc["sources"]:
+        Psum+=source["prob"]
+    i=0    
+    for source in mcdc["sources"]:
+        Ni[i]=N*source["prob"]/Psum
+        Vi[i]=1
+        Vim[i]=1
+
+        xV=(source["box_x"][1]-source["box_x"][0])
+        if xV !=0:
+            Vi[i]*=xV
+            Vim[i]*=(min(source["box_x"][1],d_x[1])-max(source["box_x"][0],d_x[0]))
+        yV=(source["box_y"][1]-source["box_y"][0])
+        if yV !=0:
+            Vi[i]*=yV
+            Vim[i]*=(min(source["box_y"][1],d_y[1])-max(source["box_y"][0],d_y[0]))
+        zV=(source["box_z"][1]-source["box_z"][0])
+        if zV !=0:
+            Vi[i]*=zV
+            Vim[i]*=(min(source["box_z"][1],d_z[1])-max(source["box_z"][0],d_z[0]))
+        if not source_in_domain(source,domain_mesh,d_idx):
+            Vim[i]=0
+        i+=1
+    for source in range(num_source):
+        Nm+=Ni[source]*Vim[source]/Vi[source]
+    Nm/=mcdc["technique"]["work_ratio"][domain]
+    rank = MPI.COMM_WORLD.Get_rank()
+    if mcdc["technique"]["work_ratio"][domain]>1:
+        work_start+=Nm*(rank-np.sum(mcdc["technique"]["work_ratio"][0:d_idx]))
+    print("domain:",d_idx,", Nm:",int(Nm),", work_start:",int(work_start))
+    return(int(Nm),int(work_start))
+
+# =============================================================================
+# Source particle in domain only
+# =============================================================================
+
+@njit
+def source_particle_dd(seed,mcdc):
+    P = np.zeros(1, dtype=type_.particle_record)[0]
+    P["rng_seed"] = seed
+
+    # Sample source
+    xi = rng(P)
+    tot = 0.0
+    for source in mcdc["sources"]:
+        if source_in_domain(source,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):      
+            tot += source["prob"]
+            if tot >= xi:
+                break
+
+    domain_mesh = mcdc["technique"]["domain_mesh"]
+    d_idx = mcdc["d_idx"]
+
+    d_Nx = domain_mesh["x"].size - 1
+    d_Ny = domain_mesh["y"].size - 1
+    d_Nz = domain_mesh["z"].size - 1
+
+    d_ix = d_idx % d_Nx
+    d_iy = int(((d_idx-d_ix)/d_Nx)%d_Ny)
+    d_iz = int((((d_idx-d_ix)/d_Nx-d_iy)/d_Ny)%d_Nz)
+
+    d_x = [domain_mesh["x"][d_ix],domain_mesh["x"][d_ix+1]]
+    d_y = [domain_mesh["y"][d_iy],domain_mesh["y"][d_iy+1]]
+    d_z = [domain_mesh["z"][d_iz],domain_mesh["z"][d_iz+1]]
+
+
+    # Position
+    if source["box"]:
+        x = sample_uniform(max(source["box_x"][0],d_x[0]), min(source["box_x"][1],d_x[1]), P)
+        y = sample_uniform(max(source["box_y"][0],d_y[0]), min(source["box_y"][1],d_y[1]), P)
+        z = sample_uniform(max(source["box_z"][0],d_z[0]), min(source["box_z"][1],d_z[1]), P)
+        #print("left",max(source["box_z"][0],d_z[0]), 'right',min(source["box_z"][1],d_z[1]))
+    else:
+        x = source["x"]
+        y = source["y"]
+        z = source["z"]
+
+    # Direction
+    if source["isotropic"]:
+        ux, uy, uz = sample_isotropic_direction(P)
+    elif source["white"]:
+        ux, uy, uz = sample_white_direction(
+            source["white_x"], source["white_y"], source["white_z"], P
+        )
+    else:
+        ux = source["ux"]
+        uy = source["uy"]
+        uz = source["uz"]
+
+    # Energy and time
+    g = sample_discrete(source["group"], P)
+    t = sample_uniform(source["time"][0], source["time"][1], P)
+
+    # Make and return particle
+    P["x"] = x
+    P["y"] = y
+    P["z"] = z
+    P["t"] = t
+    P["ux"] = ux
+    P["uy"] = uy
+    P["uz"] = uz
+    P["g"] = g
+    P["w"] =1#/(mcdc["technique"]["work_ratio"][mcdc["d_idx"]])
+    #P["w"] =np.sum(mcdc["technique"]["work_ratio"])/(mcdc["technique"]["work_ratio"][d_idx])#len(mcdc["sources"])*(1+(np.sum(mcdc["technique"]["work_ratio"])-len(mcdc["technique"]["work_ratio"]))/len(mcdc["technique"]["work_ratio"]))/(mcdc["technique"]["work_ratio"][d_idx])
+
+    P["sensitivity_ID"] = 0
+    return P
+
+@njit
+def distribute_work_dd(N, mcdc, precursor=False):
+    size = mcdc["mpi_size"]
+    rank = mcdc["mpi_rank"]
+
+    source_alloc = int(N*len(mcdc["sources"])/(len(mcdc["technique"]["work_ratio"])))
+    print("source-alloc",source_alloc)
+    # Total # of work
+    work_size_total = N
+    if rank ==0:
+    # Evenly distribute work
+        work_size = 0
+        for source in mcdc["sources"]:
+            if source_in_domain(source,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):
+                work_size+=source_alloc
+        work_start=0
+    else:
+        work_start = MPI.COMM_WORLD.recv(source=rank-1,tag=0)
+        print("WORK_START",work_start)
+        work_size = 0
+        for source in mcdc["sources"]:
+            if source_in_domain(source,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):
+                work_size+=int(source_alloc*source["prob"])
+
+    work_finish = work_size+work_start
+    if rank<size-1:
+        send = MPI.COMM_WORLD.send(work_finish,dest=rank+1,tag=0)
+    work_size, work_start = domain_work(mcdc,mcdc["d_idx"],N)
+    if not precursor:
+        mcdc["mpi_work_start"] = work_start
+        mcdc["mpi_work_size"] = work_size
+        mcdc["mpi_work_size_total"] = work_size_total
+    else:
+        mcdc["mpi_work_start_precursor"] = work_start
+        mcdc["mpi_work_size_precursor"] = work_size
+        mcdc["mpi_work_size_total_precursor"] = work_size_total
+
+    print("Rank",rank,"work_size:",work_size,"work_start:",work_start,"work_size_total:",work_size_total)
+
+
+# =============================================================================
 # Random sampling
 # =============================================================================
 
@@ -1231,15 +1687,15 @@ def mesh_uniform_get_index(P, mesh, trans):
 @njit
 def mesh_crossing_evaluate(P, mesh):
     # Shift backward
-    shift_particle(P, -SHIFT)
+    shift_particle(P, -2*SHIFT)
     t1, x1, y1, z1, outside = mesh_get_index(P, mesh)
 
     # Double shift forward
-    shift_particle(P, 2 * SHIFT)
+    shift_particle(P, 4 * SHIFT)
     t2, x2, y2, z2, outside = mesh_get_index(P, mesh)
 
     # Return particle to initial position
-    shift_particle(P, -SHIFT)
+    shift_particle(P, -2*SHIFT)
 
     # Determine dimension crossed
     if x1 != x2:
@@ -1736,6 +2192,10 @@ def move_to_event(P, mcdc):
     d_mesh = INF
     if mcdc["cycle_active"]:
         d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
+    
+    d_domain = INF
+    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomp"]:
+        d_domain = distance_to_mesh(P, mcdc["technique"]["domain_mesh"], mcdc)
 
     if mcdc["technique"]["iQMC"]:
         d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc_mesh"], mcdc)
@@ -1763,7 +2223,7 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision)
+    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision,d_domain)
 
     # Remove the boundary event if it is not the nearest
     if d_boundary > distance * PREC:
@@ -1776,6 +2236,8 @@ def move_to_event(P, mcdc):
         event += EVENT_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
+    if d_domain <= distance * PREC:
+        event += EVENT_DOMAIN
     if d_collision == distance:
         event = EVENT_COLLISION
 
