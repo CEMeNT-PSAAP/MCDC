@@ -70,7 +70,7 @@ def test():
             2.5,
         ]
     )
-    scores = ["flux-x"]
+    scores = ["flux"]
     mcdc.tally(scores=scores, x=x)
 
     # Setting

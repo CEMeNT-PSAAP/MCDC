@@ -1228,30 +1228,6 @@ def mesh_uniform_get_index(P, mesh, trans):
     return x, y, z
 
 
-@njit
-def mesh_crossing_evaluate(P, mesh):
-    # Shift backward
-    shift_particle(P, -SHIFT)
-    t1, x1, y1, z1, outside = mesh_get_index(P, mesh)
-
-    # Double shift forward
-    shift_particle(P, 2 * SHIFT)
-    t2, x2, y2, z2, outside = mesh_get_index(P, mesh)
-
-    # Return particle to initial position
-    shift_particle(P, -SHIFT)
-
-    # Determine dimension crossed
-    if x1 != x2:
-        return x1, y1, z1, t1, MESH_X
-    elif y1 != y2:
-        return x1, y1, z1, t1, MESH_Y
-    elif z1 != z2:
-        return x1, y1, z1, t1, MESH_Z
-    elif t1 != t2:
-        return x1, y1, z1, t1, MESH_T
-
-
 # =============================================================================
 # Tally operations
 # =============================================================================
@@ -1289,129 +1265,6 @@ def score_tracklength(P, distance, mcdc):
         score_current(s, g, t, x, y, z, flux, P, tally["score"]["current"])
     if tally["eddington"]:
         score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington"])
-
-
-@njit
-def score_crossing_x(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    if P["ux"] > 0.0:
-        x += 1
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] / abs(P["ux"])
-    if tally["flux_x"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_x"])
-    if tally["density_x"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_x"])
-    if tally["fission_x"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_x"])
-    if tally["total_x"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_x"])
-    if tally["current_x"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_x"])
-    if tally["eddington_x"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_x"])
-
-
-@njit
-def score_crossing_y(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    if P["uy"] > 0.0:
-        y += 1
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] / abs(P["uy"])
-    if tally["flux_y"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_y"])
-    if tally["density_y"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_y"])
-    if tally["fission_y"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_y"])
-    if tally["total_y"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_y"])
-    if tally["current_y"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_y"])
-    if tally["eddington_y"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_y"])
-
-
-@njit
-def score_crossing_z(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    if P["uz"] > 0.0:
-        z += 1
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] / abs(P["uz"])
-    if tally["flux_z"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_z"])
-    if tally["density_z"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_z"])
-    if tally["fission_z"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_z"])
-    if tally["total_z"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_z"])
-    if tally["current_z"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_z"])
-    if tally["eddington_z"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_z"])
-
-
-@njit
-def score_crossing_t(P, t, x, y, z, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    # Get indices
-    s = P["sensitivity_ID"]
-    t += 1
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
-
-    # Score
-    flux = P["w"] * material["speed"][g]
-    if tally["flux_t"]:
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux_t"])
-    if tally["density_t"]:
-        flux /= material["speed"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density_t"])
-    if tally["fission_t"]:
-        flux *= material["fission"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission_t"])
-    if tally["total_t"]:
-        flux *= material["total"][g]
-        score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total_t"])
-    if tally["current_t"]:
-        score_current(s, g, t, x, y, z, flux, P, tally["score"]["current_t"])
-    if tally["eddington_t"]:
-        score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington_t"])
 
 
 @njit
@@ -1989,31 +1842,6 @@ def surface_crossing(P, mcdc):
 
 
 # =============================================================================
-# Mesh crossing
-# =============================================================================
-
-
-@njit
-def mesh_crossing(P, mcdc):
-    # Tally mesh crossing
-    if mcdc["tally"]["crossing"] and mcdc["cycle_active"]:
-        mesh = mcdc["tally"]["mesh"]
-
-        # Determine which dimension is crossed
-        x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
-
-        # Score on tally
-        if flag == MESH_X and mcdc["tally"]["crossing_x"]:
-            score_crossing_x(P, t, x, y, z, mcdc)
-        if flag == MESH_Y and mcdc["tally"]["crossing_y"]:
-            score_crossing_y(P, t, x, y, z, mcdc)
-        if flag == MESH_Z and mcdc["tally"]["crossing_z"]:
-            score_crossing_z(P, t, x, y, z, mcdc)
-        if flag == MESH_T and mcdc["tally"]["crossing_t"]:
-            score_crossing_t(P, t, x, y, z, mcdc)
-
-
-# =============================================================================
 # Collision
 # =============================================================================
 
@@ -2045,6 +1873,13 @@ def collision(P, mcdc):
         else:
             event = EVENT_CAPTURE
     P["event"] = event
+
+    # =========================================================================
+    # Implement minor events
+    # =========================================================================
+
+    if event & EVENT_CAPTURE:
+        P["alive"] = False
 
 
 # =============================================================================
@@ -2393,16 +2228,6 @@ def branchless_collision(P, mcdc):
 
     # Set direction (TODO: anisotropic scattering)
     P["ux"], P["uy"], P["uz"] = sample_isotropic_direction(P)
-
-
-# =============================================================================
-# Time boundary
-# =============================================================================
-
-
-@njit
-def time_boundary(P, mcdc):
-    P["alive"] = False
 
 
 # =============================================================================

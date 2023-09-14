@@ -10,6 +10,14 @@ def error_max(val, ref):
     return np.max(val - ref) / np.max(ref)
 
 
+def rerror(val, ref):
+    return np.sqrt(np.sum(((val - ref) / ref) ** 2)) / ref.size
+
+
+def rerror_max(val, ref):
+    return np.max(np.abs((val - ref) / ref))
+
+
 def plot_convergence(name, N_particle, error, error_max):
     mid = int(len(N_particle) / 2)
 

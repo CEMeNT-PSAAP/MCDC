@@ -43,7 +43,7 @@ def run():
     if args.N_particle is not None:
         input_deck.setting["N_particle"] = args.N_particle
     if args.output is not None:
-        input_deck.setting["output"] = args.output
+        input_deck.setting["output_name"] = args.output
 
     # Start timer
     total_start = MPI.Wtime()
