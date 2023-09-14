@@ -856,37 +856,12 @@ def tally(
         found = False
         for score_name in type_.score_list:
             if s.replace("-", "_") == score_name:
+                card["tracklength"] = True
                 card[score_name] = True
                 found = True
                 break
         if not found:
             print_error("Unknown tally score %s" % s)
-
-    # Set estimator flags
-    for score_name in type_.score_tl_list:
-        if card[score_name]:
-            card["tracklength"] = True
-            break
-    for score_name in type_.score_x_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_x"] = True
-            break
-    for score_name in type_.score_y_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_y"] = True
-            break
-    for score_name in type_.score_z_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_z"] = True
-            break
-    for score_name in type_.score_t_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_t"] = True
-            break
 
     return card
 

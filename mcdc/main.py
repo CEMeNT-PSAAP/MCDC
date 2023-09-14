@@ -43,7 +43,7 @@ def run():
     if args.N_particle is not None:
         input_deck.setting["N_particle"] = args.N_particle
     if args.output is not None:
-        input_deck.setting["output"] = args.output
+        input_deck.setting["output_name"] = args.output
 
     # Start timer
     total_start = MPI.Wtime()
@@ -52,8 +52,9 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
+    if input_deck.technique["domain_decomp"]:
+        dd_prepare()
     mcdc = prepare()
-
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
