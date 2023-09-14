@@ -319,52 +319,21 @@ def make_type_source(G):
 
 
 # Score lists
-score_tl_list = (
+score_list = (
     "flux",
-    "current",
-    "eddington",
     "density",
     "fission",
     "total",
+    "current",
+    "eddington",
 )
-score_x_list = (
-    "flux_x",
-    "current_x",
-    "eddington_x",
-    "density_x",
-    "fission_x",
-    "total_x",
-)
-score_y_list = (
-    "flux_y",
-    "current_y",
-    "eddington_y",
-    "density_y",
-    "fission_y",
-    "total_y",
-)
-score_z_list = (
-    "flux_z",
-    "current_z",
-    "eddington_z",
-    "density_z",
-    "fission_z",
-    "total_z",
-)
-score_t_list = (
-    "flux_t",
-    "current_t",
-    "eddington_t",
-    "density_t",
-    "fission_t",
-    "total_t",
-)
-
-score_list = score_tl_list + score_x_list + score_y_list + score_z_list + score_t_list
 
 
 def make_type_tally(Ns, card):
     global tally
+
+    # Tally estimator flags
+    struct = [("tracklength", bool_)]
 
     def make_type_score(shape):
         return np.dtype(
@@ -374,16 +343,6 @@ def make_type_tally(Ns, card):
                 ("sdev", float64, shape),
             ]
         )
-
-    # Estimator flags
-    struct = [
-        ("tracklength", bool_),
-        ("crossing", bool_),
-        ("crossing_x", bool_),
-        ("crossing_y", bool_),
-        ("crossing_z", bool_),
-        ("crossing_t", bool_),
-    ]
 
     # Mesh
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
@@ -395,32 +354,8 @@ def make_type_tally(Ns, card):
         ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
         ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
         ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["flux_x", (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
-        ["density_x", (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
-        ["fission_x", (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
-        ["total_x", (Ns, Ng, Nt, Nx + 1, Ny, Nz, Nmu, N_azi)],
-        ["flux_y", (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
-        ["density_y", (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
-        ["fission_y", (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
-        ["total_y", (Ns, Ng, Nt, Nx, Ny + 1, Nz, Nmu, N_azi)],
-        ["flux_z", (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
-        ["density_z", (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
-        ["fission_z", (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
-        ["total_z", (Ns, Ng, Nt, Nx, Ny, Nz + 1, Nmu, N_azi)],
-        ["flux_t", (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density_t", (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission_t", (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total_t", (Ns, Ng, Nt + 1, Nx, Ny, Nz, Nmu, N_azi)],
         ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["current_x", (Ns, Ng, Nt, Nx + 1, Ny, Nz, 3)],
-        ["current_y", (Ns, Ng, Nt, Nx, Ny + 1, Nz, 3)],
-        ["current_z", (Ns, Ng, Nt, Nx, Ny, Nz + 1, 3)],
-        ["current_t", (Ns, Ng, Nt + 1, Nx, Ny, Nz, 3)],
         ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["eddington_x", (Ns, Ng, Nt, Nx + 1, Ny, Nz, 6)],
-        ["eddington_y", (Ns, Ng, Nt, Nx, Ny + 1, Nz, 6)],
-        ["eddington_z", (Ns, Ng, Nt, Nx, Ny, Nz + 1, 6)],
-        ["eddington_t", (Ns, Ng, Nt + 1, Nx, Ny, Nz, 6)],
     ]
 
     # Add score flags to structure

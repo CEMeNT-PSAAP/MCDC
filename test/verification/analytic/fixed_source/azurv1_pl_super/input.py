@@ -3,8 +3,6 @@ import sys
 
 import mcdc
 
-N_particle = int(sys.argv[2])
-
 # =============================================================================
 # Set model
 # =============================================================================
@@ -32,7 +30,7 @@ mcdc.cell([+s1, -s2], m)
 # =============================================================================
 # Isotropic pulse at x=t=0
 
-mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
+mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True, time=[1e-10, 1e-10])
 
 # =============================================================================
 # Set tally, setting, and run mcdc
@@ -40,15 +38,13 @@ mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
 
 # Tally: cell-average, cell-edge, and time-edge scalar fluxes
 mcdc.tally(
-    scores=["flux", "flux-x", "flux-t"],
+    scores=["flux"],
     x=np.linspace(-20.5, 20.5, 202),
     t=np.linspace(0.0, 20.0, 21),
 )
 
 # Setting
-mcdc.setting(
-    N_particle=N_particle, output_name="output_" + str(N_particle), progress_bar=False
-)
+mcdc.setting(N_particle=1000)
 
 # Run
 mcdc.run()

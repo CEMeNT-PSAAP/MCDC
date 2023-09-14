@@ -20,7 +20,7 @@ def test():
         point=[1e-10, 0.0, 0.0], time=[0.0, 5.0], white_direction=[1.0, 0.0, 0.0]
     )
 
-    scores = ["flux", "flux-x", "flux-t"]
+    scores = ["flux"]
     mcdc.tally(scores=scores, x=np.linspace(0.0, 5.0, 51), t=np.linspace(0.0, 5.0, 51))
 
     mcdc.setting(N_particle=1e2, progress_bar=False)
