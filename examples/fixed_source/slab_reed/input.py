@@ -45,8 +45,8 @@ mcdc.source(z=[5.0, 6.0], isotropic=True, prob=0.5)
 mcdc.tally(scores=["flux"], z=np.linspace(0.0, 8.0, 81))
 
 # Setting
-mcdc.setting(N_particle=1e4,active_bank_buff=1000000,N_batch=10)
-#mcdc.domain_decomp(z=np.linspace(0.0,8.0,5), exchange_rate=100,work_ratio=([5,1,1,1]))
+mcdc.setting(N_particle=1e6,active_bank_buff=1000000)
+mcdc.domain_decomp(z=np.linspace(0.0,8.0,5), exchange_rate=100,work_ratio=([5,1,1,1]))
 
 # Run
 mcdc.run()

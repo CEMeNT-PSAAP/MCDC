@@ -21,9 +21,9 @@ with h5py.File(output, "r") as f:
 phi_ref = reference() / dE * E_mid
 
 # Flux
-plt.step(E_mid, phi, "-b", label="MC", where="mid")
-plt.fill_between(E_mid, phi - phi_sd, phi + phi_sd, alpha=0.2, color="b", step="mid")
-plt.step(E_mid, phi_ref, "--r", label="analytical", where="mid")
+plt.plot(E_mid, phi, "-b", label="MC")
+plt.fill_between(E_mid, phi - phi_sd, phi + phi_sd, alpha=0.2, color="b")
+plt.plot(E_mid, phi_ref, "--r", label="analytical")
 plt.xscale("log")
 plt.xlabel(r"$E$, eV")
 plt.ylabel(r"$E\phi(E)$")
