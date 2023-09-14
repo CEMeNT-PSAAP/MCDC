@@ -14,9 +14,8 @@ from mcdc.input_ import (
     weighted_emission,
     population_control,
     branchless_collision,
-    census,
+    time_census,
     weight_window,
-    domain_decomp,
     iQMC,
     weight_roulette,
     IC_generator,
@@ -24,4 +23,4 @@ from mcdc.input_ import (
     print_card,
     reset_cards,
 )
-from mcdc.main import run
+from mcdc.main import run, prepare
