@@ -1687,6 +1687,7 @@ def mesh_uniform_get_index(P, mesh, trans):
 @njit
 def mesh_crossing_evaluate(P, mesh):
     # Shift backward
+
     shift_particle(P, -2*SHIFT)
     t1, x1, y1, z1, outside = mesh_get_index(P, mesh)
 
@@ -1695,7 +1696,7 @@ def mesh_crossing_evaluate(P, mesh):
     t2, x2, y2, z2, outside = mesh_get_index(P, mesh)
 
     # Return particle to initial position
-    shift_particle(P, -2*SHIFT)
+    shift_particle(P, -SHIFT)
 
     # Determine dimension crossed
     if x1 != x2:
@@ -2192,10 +2193,6 @@ def move_to_event(P, mcdc):
     d_mesh = INF
     if mcdc["cycle_active"]:
         d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
-    
-    d_domain = INF
-    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomp"]:
-        d_domain = distance_to_mesh(P, mcdc["technique"]["domain_mesh"], mcdc)
 
     if mcdc["technique"]["iQMC"]:
         d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc_mesh"], mcdc)
@@ -2223,7 +2220,7 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision,d_domain)
+    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision)
 
     # Remove the boundary event if it is not the nearest
     if d_boundary > distance * PREC:
@@ -2236,8 +2233,6 @@ def move_to_event(P, mcdc):
         event += EVENT_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
-    if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN
     if d_collision == distance:
         event = EVENT_COLLISION
 

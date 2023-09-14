@@ -52,8 +52,6 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
-    if input_deck.technique["domain_decomp"]:
-        dd_prepare()
     mcdc = prepare()
 
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start

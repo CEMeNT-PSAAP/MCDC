@@ -503,8 +503,8 @@ def make_type_technique(N_particle, G, card):
         ("weighted_emission", bool_),
         ("implicit_capture", bool_),
         ("population_control", bool_),
-        ("weight_window", bool_),
         ("domain_decomp", bool_),
+        ("weight_window", bool_),
         ("weight_roulette", bool_),
         ("iQMC", bool_),
         ("IC_generator", bool_),
@@ -755,7 +755,6 @@ def make_type_global(card):
             ("bank_domain_zn", bank_domain_zn),
             ("bank_precursor", bank_precursor),
             ("d_idx",int64),
-
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
