@@ -16,6 +16,6 @@ scores = ["flux","current"]
 mcdc.tally(scores=scores, x=np.linspace(0.0, 5.0, 51))
 
 mcdc.setting(N_particle=10,active_bank_buff=1000000)
-#mcdc.domain_decomp(x=np.linspace(0.0,5.0,6), exchange_rate=1,work_ratio=([1,1,1,1,1]))
+mcdc.domain_decomp(x=np.linspace(0.0,5.0,6), exchange_rate=1,work_ratio=([1,1,1,1,1]))
 
 mcdc.run()

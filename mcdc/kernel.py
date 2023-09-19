@@ -85,7 +85,7 @@ def dd_particle_send(mcdc):
                 request1 = MPI.COMM_WORLD.send(
                     bank, dest=mcdc["technique"]["xp_neigh"][i], tag=1
                 )
-                print("sent xp",(size_s),"in domain",mcdc["d_idx"])
+    
 
             if mcdc["technique"]["xn_neigh"].size > i:
                 size = mcdc["bank_domain_xn"]["size"]
@@ -95,7 +95,6 @@ def dd_particle_send(mcdc):
                 request2 = MPI.COMM_WORLD.send(
                     bank, dest=mcdc["technique"]["xn_neigh"][i], tag=2
                 )
-                print("sent xn",(size -bank.size),"in domain",mcdc["d_idx"])
 
             if mcdc["technique"]["yp_neigh"].size > i:
                 size = mcdc["bank_domain_yp"]["size"]
