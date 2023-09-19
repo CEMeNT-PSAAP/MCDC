@@ -154,6 +154,36 @@ def dd_prepare():
 
     elif input_deck.technique["work_ratio"] is None:
         d_idx = MPI.COMM_WORLD.Get_rank() % (d_Nx * d_Ny * d_Nz)
+    '''
+    if d_idx == 0:
+        neighbor_ranks_o[0] = np.array([1])
+        neighbor_ranks_o[1] =[]
+        neighbor_ranks_o[2] = []
+        neighbor_ranks_o[3] = []
+        neighbor_ranks_o[4] = np.array([3])
+        neighbor_ranks_o[5] = []
+    if d_idx == 1:
+        neighbor_ranks_o[0] = []
+        neighbor_ranks_o[1] = np.array([0])
+        neighbor_ranks_o[2] = []
+        neighbor_ranks_o[3] = []
+        neighbor_ranks_o[4] = np.array([2])
+        neighbor_ranks_o[5] = []
+    if d_idx == 3:
+        neighbor_ranks_o[0] = np.array([2])
+        neighbor_ranks_o[1] =[]
+        neighbor_ranks_o[2] = []
+        neighbor_ranks_o[3] = []
+        neighbor_ranks_o[4] = []
+        neighbor_ranks_o[5] = np.array([0])
+    if d_idx == 2:
+        neighbor_ranks_o[0] = []
+        neighbor_ranks_o[1] = np.array([3])
+        neighbor_ranks_o[2] = []
+        neighbor_ranks_o[3] = []
+        neighbor_ranks_o[4] = []
+        neighbor_ranks_o[5] = np.array([1])
+    '''
     print(
         "domain:",
         d_idx,
@@ -166,6 +196,7 @@ def dd_prepare():
         "ordered:",
         neighbor_ranks_o,
     )
+    
 
     input_deck.technique["d_idx"] = d_idx
     input_deck.technique["xp_neigh"] = neighbor_ranks_o[0]
