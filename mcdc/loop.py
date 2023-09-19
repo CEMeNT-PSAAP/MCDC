@@ -209,8 +209,6 @@ def loop_source_dd(seed, mcdc):
     sourced_num = 0
 
     kernel.dd_particle_receive(mcdc)
-    completed = 0
-    result_0 = MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
     work_start = mcdc["mpi_work_start"]
     work_end = work_start + mcdc["mpi_work_size"]
     for work_idx in range(work_start, work_end):
@@ -286,21 +284,15 @@ def loop_source_dd(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-    completed =0
+
     kernel.dd_particle_send(mcdc)
   
     terminated = False
-
-    rank = MPI.COMM_WORLD.Get_rank()
     kernel.dd_particle_receive(mcdc)
     while not terminated:
-        completed =0
         if mcdc["bank_active"]["size"] > 0:
-            print("running recieved particles")
             # Loop until active bank is exhausted
             while mcdc["bank_active"]["size"] > 0:
-                completed = 0
-                kernel.dd_particle_receive(mcdc)
                 P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
                 if mcdc["technique"]["domain_decomp"]:
@@ -319,42 +311,19 @@ def loop_source_dd(seed, mcdc):
 
                 # Particle loop
                 loop_particle(P, mcdc)  
+
                 # Tally history closeout for one-batch fixed-source simulation
                 if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
                     kernel.tally_closeout_history(mcdc)
             kernel.dd_particle_send(mcdc)  
 
-#       time.sleep(0.005)  
         kernel.dd_particle_receive(mcdc)
-        if mcdc["bank_active"]["size"]==0:
-            completed = 1
-            result_0 = MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
-        else:
-            completed = 0
-            result_0 =MPI.COMM_WORLD.allreduce(completed, op=MPI.SUM)
         run_particles =MPI.COMM_WORLD.allreduce(mcdc["p_comp"], op=MPI.SUM)
-        print(run_particles,"done, need",mcdc["mpi_work_size_total"])
+        #print(run_particles,"done, need",mcdc["mpi_work_size_total"])
         terminated =run_particles>=mcdc["mpi_work_size_total"]-1
-        
-       #terminated = result_0 > MPI.COMM_WORLD.Get_size() - 1
-        
-        # print("pre_in",terminated,"sum",result_0)
-        
-        # print("term",terminated,"sum",result_0)
-        # print("checking termination, domain",mcdc["d_idx"])
-    #   kernel.send_terminate(mcdc,True)
-    print(mcdc["p_comp"])
-    print("terminated",completed)
 
-    # =====================================================================
-    # Closeout
-    # =====================================================================
 
-    # Tally history closeout for fixed-source simulation
-    if not mcdc["setting"]["mode_eigenvalue"]:
-        kernel.tally_closeout_history(mcdc)
-    # Re-sync RNG
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
+
 
 
 # =========================================================================
