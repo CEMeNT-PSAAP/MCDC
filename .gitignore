@@ -20,6 +20,7 @@ output*.h5
 *.png
 *.mp4
 *.gif
+*.csv
 
 # Cluster job
 *.out
@@ -37,3 +38,6 @@ tmp_*
 # test cache
 .pytest_cache
 pytestdebug.log
+
+# profiler
+*.prof
