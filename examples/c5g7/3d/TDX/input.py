@@ -298,7 +298,7 @@ t_grid = np.linspace(0.0, 20.0, 201)
 mcdc.tally(scores=["fission"], t=t_grid)
 
 # Setting
-mcdc.setting(N_particle=1e4, active_bank_buff=1000)
+mcdc.setting(N_particle=1e2, active_bank_buff=1000)
 
 # Run
 mcdc.run()
