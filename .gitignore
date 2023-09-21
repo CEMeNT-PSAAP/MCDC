@@ -37,3 +37,6 @@ tmp_*
 # test cache
 .pytest_cache
 pytestdebug.log
+
+# profiler
+*.prof
