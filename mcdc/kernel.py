@@ -77,23 +77,22 @@ def dd_particle_send(mcdc):
         ):
             if mcdc["technique"]["xp_neigh"].size > i:
                 size = mcdc["bank_domain_xp"]["size"]
-                ratio = int(size/len(mcdc["technique"]["xp_neigh"]))
-                start = ratio*i
-                end =start+ratio
-                if i == len(mcdc["technique"]["xp_neigh"])-1:
+                ratio = int(size / len(mcdc["technique"]["xp_neigh"]))
+                start = ratio * i
+                end = start + ratio
+                if i == len(mcdc["technique"]["xp_neigh"]) - 1:
                     end = size
                 bank = np.array(mcdc["bank_domain_xp"]["particles"][start:end])
                 request1 = MPI.COMM_WORLD.send(
                     bank, dest=mcdc["technique"]["xp_neigh"][i], tag=1
                 )
-    
 
             if mcdc["technique"]["xn_neigh"].size > i:
                 size = mcdc["bank_domain_xn"]["size"]
-                ratio = int(size/len(mcdc["technique"]["xn_neigh"]))
-                start = ratio*i
-                end =start+ratio
-                if i == len(mcdc["technique"]["xn_neigh"])-1:
+                ratio = int(size / len(mcdc["technique"]["xn_neigh"]))
+                start = ratio * i
+                end = start + ratio
+                if i == len(mcdc["technique"]["xn_neigh"]) - 1:
                     end = size
                 bank = np.array(mcdc["bank_domain_xn"]["particles"][start:end])
                 request2 = MPI.COMM_WORLD.send(
@@ -102,10 +101,10 @@ def dd_particle_send(mcdc):
 
             if mcdc["technique"]["yp_neigh"].size > i:
                 size = mcdc["bank_domain_yp"]["size"]
-                ratio = int(size/len(mcdc["technique"]["yp_neigh"]))
-                start = ratio*i
-                end =start+ratio
-                if i == len(mcdc["technique"]["yp_neigh"])-1:
+                ratio = int(size / len(mcdc["technique"]["yp_neigh"]))
+                start = ratio * i
+                end = start + ratio
+                if i == len(mcdc["technique"]["yp_neigh"]) - 1:
                     end = size
                 bank = np.array(mcdc["bank_domain_yp"]["particles"][start:end])
                 request3 = MPI.COMM_WORLD.send(
@@ -114,10 +113,10 @@ def dd_particle_send(mcdc):
 
             if mcdc["technique"]["yn_neigh"].size > i:
                 size = mcdc["bank_domain_yn"]["size"]
-                ratio = int(size/len(mcdc["technique"]["yn_neigh"]))
-                start = ratio*i
-                end =start+ratio
-                if i == len(mcdc["technique"]["yn_neigh"])-1:
+                ratio = int(size / len(mcdc["technique"]["yn_neigh"]))
+                start = ratio * i
+                end = start + ratio
+                if i == len(mcdc["technique"]["yn_neigh"]) - 1:
                     end = size
                 bank = np.array(mcdc["bank_domain_yn"]["particles"][start:end])
                 request4 = MPI.COMM_WORLD.send(
@@ -126,10 +125,10 @@ def dd_particle_send(mcdc):
 
             if mcdc["technique"]["zp_neigh"].size > i:
                 size = mcdc["bank_domain_zp"]["size"]
-                ratio = int(size/len(mcdc["technique"]["zp_neigh"]))
-                start = ratio*i
-                end =start+ratio
-                if i == len(mcdc["technique"]["zp_neigh"])-1:
+                ratio = int(size / len(mcdc["technique"]["zp_neigh"]))
+                start = ratio * i
+                end = start + ratio
+                if i == len(mcdc["technique"]["zp_neigh"]) - 1:
                     end = size
                 bank = np.array(mcdc["bank_domain_zp"]["particles"][start:end])
                 request5 = MPI.COMM_WORLD.send(
@@ -138,10 +137,10 @@ def dd_particle_send(mcdc):
 
             if mcdc["technique"]["zn_neigh"].size > i:
                 size = mcdc["bank_domain_zn"]["size"]
-                ratio = int(size/len(mcdc["technique"]["zn_neigh"]))
-                start = ratio*i
-                end =start+ratio
-                if i == len(mcdc["technique"]["zn_neigh"])-1:
+                ratio = int(size / len(mcdc["technique"]["zn_neigh"]))
+                start = ratio * i
+                end = start + ratio
+                if i == len(mcdc["technique"]["zn_neigh"]) - 1:
                     end = size
                 bank = np.array(mcdc["bank_domain_zn"]["particles"][start:end])
                 request6 = MPI.COMM_WORLD.send(
@@ -234,7 +233,7 @@ def dd_particle_receive(mcdc):
         for i in range(size):
             buff[i] = bankr[i]
         # if (size-size_old)>0:
-        #print("recieved",size-size_old,"particles, in domain",mcdc["d_idx"])
+        # print("recieved",size-size_old,"particles, in domain",mcdc["d_idx"])
     # Set source bank from buffer
     for i in range(size):
         add_particle(buff[i], mcdc["bank_active"])
@@ -252,9 +251,9 @@ def particle_in_domain(P, mcdc):
     d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
     d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
 
-    d_iz=int(d_idx/(d_Nx*d_Ny))
-    d_iy=int((d_idx-d_Nx*d_Ny*d_iz)/d_Nx)
-    d_ix=int(d_idx-d_Nx*d_Ny*d_iz-d_Nx*d_iy)
+    d_iz = int(d_idx / (d_Nx * d_Ny))
+    d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+    d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     x_cell = binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
     y_cell = binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
@@ -279,9 +278,9 @@ def source_in_domain(source, domain_mesh, d_idx):
     d_Ny = domain_mesh["y"].size - 1
     d_Nz = domain_mesh["z"].size - 1
 
-    d_iz=int(d_idx/(d_Nx*d_Ny))
-    d_iy=int((d_idx-d_Nx*d_Ny*d_iz)/d_Nx)
-    d_ix=int(d_idx-d_Nx*d_Ny*d_iz-d_Nx*d_iy)
+    d_iz = int(d_idx / (d_Nx * d_Ny))
+    d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+    d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     d_x = [domain_mesh["x"][d_ix], domain_mesh["x"][d_ix + 1]]
     d_y = [domain_mesh["y"][d_iy], domain_mesh["y"][d_iy + 1]]
@@ -326,9 +325,9 @@ def domain_work(mcdc, domain, N):
     d_Nz = domain_mesh["z"].size - 1
     work_start = 0
     for d_idx in range(domain):
-        d_iz=int(d_idx/(d_Nx*d_Ny))
-        d_iy=int((d_idx-d_Nx*d_Ny*d_iz)/d_Nx)
-        d_ix=int(d_idx-d_Nx*d_Ny*d_iz-d_Nx*d_iy)
+        d_iz = int(d_idx / (d_Nx * d_Ny))
+        d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+        d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
         d_x = [domain_mesh["x"][d_ix], domain_mesh["x"][d_ix + 1]]
         d_y = [domain_mesh["y"][d_iy], domain_mesh["y"][d_iy + 1]]
@@ -376,9 +375,9 @@ def domain_work(mcdc, domain, N):
             Nm += Ni[source] * Vim[source] / Vi[source]
         work_start += Nm
     d_idx = domain
-    d_iz=int(mcdc["d_idx"]/(d_Nx*d_Ny))
-    d_iy=int((mcdc["d_idx"]-d_Nx*d_Ny*d_iz)/d_Nx)
-    d_ix=int(mcdc["d_idx"]-d_Nx*d_Ny*d_iz-d_Nx*d_iy)
+    d_iz = int(mcdc["d_idx"] / (d_Nx * d_Ny))
+    d_iy = int((mcdc["d_idx"] - d_Nx * d_Ny * d_iz) / d_Nx)
+    d_ix = int(mcdc["d_idx"] - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     d_x = [domain_mesh["x"][d_ix], domain_mesh["x"][d_ix + 1]]
     d_y = [domain_mesh["y"][d_iy], domain_mesh["y"][d_iy + 1]]
@@ -421,14 +420,14 @@ def domain_work(mcdc, domain, N):
     if mcdc["technique"]["work_ratio"][domain] > 1:
         work_start += Nm * (rank - np.sum(mcdc["technique"]["work_ratio"][0:d_idx]))
     print("domain:", d_idx, ", Nm:", int(Nm), ", work_start:", int(work_start))
-    total_v=0
+    total_v = 0
     for source in range(len(mcdc["sources"])):
-        total_v+=Vim[source]
+        total_v += Vim[source]
     i = 0
     for source in mcdc["sources"]:
-        source["prob"]*=2*Vim[i]/total_v
-        print("domain:", d_idx,Vim[i]/total_v,"source",source["prob"],i)
-        i+=1
+        source["prob"] *= 2 * Vim[i] / total_v
+        print("domain:", d_idx, Vim[i] / total_v, "source", source["prob"], i)
+        i += 1
     return (int(Nm), int(work_start))
 
 
@@ -446,10 +445,9 @@ def source_particle_dd(seed, mcdc):
     d_Ny = domain_mesh["y"].size - 1
     d_Nz = domain_mesh["z"].size - 1
 
-    d_iz=int(mcdc["d_idx"]/(d_Nx*d_Ny))
-    d_iy=int((mcdc["d_idx"]-d_Nx*d_Ny*d_iz)/d_Nx)
-    d_ix=int(mcdc["d_idx"]-d_Nx*d_Ny*d_iz-d_Nx*d_iy)
-
+    d_iz = int(mcdc["d_idx"] / (d_Nx * d_Ny))
+    d_iy = int((mcdc["d_idx"] - d_Nx * d_Ny * d_iz) / d_Nx)
+    d_ix = int(mcdc["d_idx"] - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     d_x = [domain_mesh["x"][d_ix], domain_mesh["x"][d_ix + 1]]
     d_y = [domain_mesh["y"][d_iy], domain_mesh["y"][d_iy + 1]]
@@ -478,7 +476,6 @@ def source_particle_dd(seed, mcdc):
         z = sample_uniform(
             max(source["box_z"][0], d_z[0]), min(source["box_z"][1], d_z[1]), P
         )
-        
 
     else:
         x = source["x"]
@@ -551,8 +548,6 @@ def distribute_work_dd(N, mcdc, precursor=False):
     if rank < size - 1:
         send = MPI.COMM_WORLD.send(work_finish, dest=rank + 1, tag=0)
     work_size, work_start = domain_work(mcdc, mcdc["d_idx"], N)
-
-            
 
     if not precursor:
         mcdc["mpi_work_start"] = work_start
@@ -1516,7 +1511,6 @@ def surface_evaluate(P, surface, trans):
 @njit
 def surface_bc(P, surface, trans):
     if surface["vacuum"]:
-        
         P["alive"] = False
     elif surface["reflective"]:
         surface_reflect(P, surface, trans)
@@ -2412,7 +2406,7 @@ def surface_crossing(P, mcdc):
     surface = mcdc["surfaces"][P["surface_ID"]]
     surface_bc(P, surface, trans)
     if surface["vacuum"]:
-        mcdc["p_comp"]+=1
+        mcdc["p_comp"] += 1
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
 
@@ -2476,7 +2470,7 @@ def collision(P, mcdc):
     # =========================================================================
 
     if event & EVENT_CAPTURE:
-        mcdc["p_comp"]+=1
+        mcdc["p_comp"] += 1
         P["alive"] = False
 
 
