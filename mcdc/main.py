@@ -89,81 +89,89 @@ def run():
 # =============================================================================
 # prepare domain decomposition
 # =============================================================================
-def get_d_idx(i,j,k,ni,nj):
-    N = i+j*ni+k*ni*nj
+def get_d_idx(i, j, k, ni, nj):
+    N = i + j * ni + k * ni * nj
     return N
 
-def get_indexes(N,nx,ny):
-    k=int(N/(nx*ny))
-    j=int((N-nx*ny*k)/nx)
-    i=int(N-nx*ny*k-nx*j)
-    return i,j,k
 
-def get_neighbors(N,w,nx,ny,nz):
-    i,j,k= get_indexes(N,nx,ny)
-    print("Domain",N,i,j,k)
-    if i>0:
-        xn=get_d_idx(i-1,j,k,nx,ny)
+def get_indexes(N, nx, ny):
+    k = int(N / (nx * ny))
+    j = int((N - nx * ny * k) / nx)
+    i = int(N - nx * ny * k - nx * j)
+    return i, j, k
+
+
+def get_neighbors(N, w, nx, ny, nz):
+    i, j, k = get_indexes(N, nx, ny)
+    print("Domain", N, i, j, k)
+    if i > 0:
+        xn = get_d_idx(i - 1, j, k, nx, ny)
     else:
-        xn=None
-    if i<(nx-1):
-        xp=get_d_idx(i+1,j,k,nx,ny)
+        xn = None
+    if i < (nx - 1):
+        xp = get_d_idx(i + 1, j, k, nx, ny)
     else:
-        xp=None
-    if j>0:
-        yn=get_d_idx(i,j-1,k,nx,ny)
+        xp = None
+    if j > 0:
+        yn = get_d_idx(i, j - 1, k, nx, ny)
     else:
-        yn=None
-    if j<(ny-1):
-        yp=get_d_idx(i,j+1,k,nx,ny)
+        yn = None
+    if j < (ny - 1):
+        yp = get_d_idx(i, j + 1, k, nx, ny)
     else:
-        yp=None
-    if k>0:
-        zn=get_d_idx(i,j,k-1,nx,ny)
+        yp = None
+    if k > 0:
+        zn = get_d_idx(i, j, k - 1, nx, ny)
     else:
-        zn=None
-    if k<(nz-1):
-        zp=get_d_idx(i,j,k+1,nx,ny)
+        zn = None
+    if k < (nz - 1):
+        zp = get_d_idx(i, j, k + 1, nx, ny)
     else:
-        zp=None
-    print("domain neighbors:",xn,xp,yn,yp,zn,zp)
-    return xn,xp,yn,yp,zn,zp
+        zp = None
+    print("domain neighbors:", xn, xp, yn, yp, zn, zp)
+    return xn, xp, yn, yp, zn, zp
+
 
 def dd_prepare():
     work_ratio = input_deck.technique["work_ratio"]
 
-    d_Nx = input_deck.technique["domain_mesh"]["x"].size -1
-    d_Ny = input_deck.technique["domain_mesh"]["y"].size -1
-    d_Nz = input_deck.technique["domain_mesh"]["z"].size -1
-    
-    input_deck.setting["bank_active_buff"]=1000000
-    if input_deck.technique["exchange_rate"]==None:
-        input_deck.technique["exchange_rate"]=100
+    d_Nx = input_deck.technique["domain_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["domain_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["domain_mesh"]["z"].size - 1
+
+    input_deck.setting["bank_active_buff"] = 1000000
+    if input_deck.technique["exchange_rate"] == None:
+        input_deck.technique["exchange_rate"] = 100
 
     if work_ratio is None:
-        work_ratio=np.ones(d_Nx*d_Ny*d_Nz)
-        input_deck.technique["work_ratio"]=work_ratio
+        work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
+        input_deck.technique["work_ratio"] = work_ratio
 
-    if np.sum(work_ratio)!=MPI.COMM_WORLD.Get_size():
-        print("ERROR Domain work ratio not equal to number of processors,",np.sum(work_ratio),"!=",MPI.COMM_WORLD.Get_size())
+    if np.sum(work_ratio) != MPI.COMM_WORLD.Get_size():
+        print(
+            "ERROR Domain work ratio not equal to number of processors,",
+            np.sum(work_ratio),
+            "!=",
+            MPI.COMM_WORLD.Get_size(),
+        )
         exit()
-    
+
     # Assigning domain index
-    i=0
-    rank_info =[]
+    i = 0
+    rank_info = []
     print(work_ratio)
-    print(d_Nx*d_Ny*d_Nz)
-    for n in range(d_Nx*d_Ny*d_Nz):
+    print(d_Nx * d_Ny * d_Nz)
+    for n in range(d_Nx * d_Ny * d_Nz):
         ranks = []
         for r in range(int(work_ratio[n])):
             ranks.append(i)
-            if MPI.COMM_WORLD.Get_rank() ==i:
-                d_idx=n
-            i+=1
+            if MPI.COMM_WORLD.Get_rank() == i:
+                d_idx = n
+            i += 1
         rank_info.append(ranks)
 
-    xn,xp,yn,yp,zn,zp= get_neighbors(d_idx,0,d_Nx,d_Ny,d_Nz)
-    print(d_idx,"domain neighbors:",xn,xp,yn,yp,zn,zp)
+    xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
+    print(d_idx, "domain neighbors:", xn, xp, yn, yp, zn, zp)
 
     input_deck.technique["d_idx"] = d_idx
     if xp is not None:

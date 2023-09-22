@@ -121,4 +121,3 @@ plt.grid()
 plt.legend()
 plt.title(r"$\bar{\phi}_i$")
 plt.show()
-

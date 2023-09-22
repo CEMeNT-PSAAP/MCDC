@@ -198,9 +198,8 @@ def loop_source(seed, mcdc):
 # =============================================================================
 
 
-
 def loop_source_dd(seed, mcdc):
-    j=0
+    j = 0
     # Progress bar indicator
     N_prog = 0
     if mcdc["technique"]["iQMC"]:
@@ -224,13 +223,10 @@ def loop_source_dd(seed, mcdc):
         # Nonblocking recieve if domain decomp
         # kernel.dd_particle_receive(mcdc)
 
-
-        
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            P= kernel.source_particle_dd(seed_work, mcdc)
-
+            P = kernel.source_particle_dd(seed_work, mcdc)
 
         # Get from source bank
         else:
@@ -256,8 +252,15 @@ def loop_source_dd(seed, mcdc):
 
             if mcdc["technique"]["domain_decomp"]:
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print("particle not in domain active, z, domain idx:",P["x"],',',P["z"],',',mcdc["d_idx"])
-                    
+                    print(
+                        "particle not in domain active, z, domain idx:",
+                        P["x"],
+                        ",",
+                        P["z"],
+                        ",",
+                        mcdc["d_idx"],
+                    )
+
                     P["alive"] = False
 
             # Apply weight window
@@ -270,7 +273,7 @@ def loop_source_dd(seed, mcdc):
 
             # Particle loop
             loop_particle(P, mcdc)
-        
+
         # Tally history closeout for one-batch fixed-source simulation
         if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
             kernel.tally_closeout_history(mcdc)
@@ -294,8 +297,13 @@ def loop_source_dd(seed, mcdc):
 
                 if mcdc["technique"]["domain_decomp"]:
                     if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                        print("particle not in domain tre, z, domain idx:",P["z"],',',mcdc["d_idx"])
-                        mcdc["p_comp"]+=1
+                        print(
+                            "particle not in domain tre, z, domain idx:",
+                            P["z"],
+                            ",",
+                            mcdc["d_idx"],
+                        )
+                        mcdc["p_comp"] += 1
                         P["alive"] = False
 
                 # Apply weight window
@@ -307,24 +315,24 @@ def loop_source_dd(seed, mcdc):
                     mcdc["particle_track_particle_ID"] += 1
 
                 # Particle loop
-                loop_particle(P, mcdc)  
+                loop_particle(P, mcdc)
 
                 # Tally history closeout for one-batch fixed-source simulation
-                if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
+                if (
+                    not mcdc["setting"]["mode_eigenvalue"]
+                    and mcdc["setting"]["N_batch"] == 1
+                ):
                     kernel.tally_closeout_history(mcdc)
-            kernel.dd_particle_send(mcdc)  
+            kernel.dd_particle_send(mcdc)
 
         kernel.dd_particle_receive(mcdc)
-        run_particles =MPI.COMM_WORLD.allreduce(mcdc["p_comp"], op=MPI.SUM)
-        percent = run_particles/mcdc["mpi_work_size_total"]
+        run_particles = MPI.COMM_WORLD.allreduce(mcdc["p_comp"], op=MPI.SUM)
+        percent = run_particles / mcdc["mpi_work_size_total"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-        terminated =run_particles>=mcdc["mpi_work_size_total"]-3
-
-
-
+        terminated = run_particles >= mcdc["mpi_work_size_total"] - 3
 
 
 # =========================================================================

@@ -690,7 +690,7 @@ def make_type_global(card):
             ("bank_domain_zn", bank_domain_zn),
             ("bank_precursor", bank_precursor),
             ("d_idx", int64),
-            ("p_comp",int64),
+            ("p_comp", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),

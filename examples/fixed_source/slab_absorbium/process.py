@@ -57,7 +57,6 @@ plt.title(r"$\bar{\phi}_i$")
 plt.show()
 
 
-
 # Current - spatial average
 plt.plot(z_mid, J, "-b", label="MC")
 plt.fill_between(z_mid, J - J_sd, J + J_sd, alpha=0.2, color="b")
@@ -69,5 +68,3 @@ plt.grid()
 plt.legend()
 plt.title(r"$\bar{J}_i$")
 plt.show()
-
-
