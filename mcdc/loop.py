@@ -198,8 +198,9 @@ def loop_source(seed, mcdc):
 # =============================================================================
 
 
-@njit
+
 def loop_source_dd(seed, mcdc):
+    j=0
     # Progress bar indicator
     N_prog = 0
     if mcdc["technique"]["iQMC"]:
@@ -208,7 +209,6 @@ def loop_source_dd(seed, mcdc):
     # Loop over particle sources
     sourced_num = 0
 
-    kernel.dd_particle_receive(mcdc)
     work_start = mcdc["mpi_work_start"]
     work_end = work_start + mcdc["mpi_work_size"]
     for work_idx in range(work_start, work_end):
@@ -225,14 +225,12 @@ def loop_source_dd(seed, mcdc):
         # kernel.dd_particle_receive(mcdc)
 
 
-
+        
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
+            P= kernel.source_particle_dd(seed_work, mcdc)
 
-            # if kernel.source_in_domain(S,mcdc["technique"]["domain_mesh"],mcdc["d_idx"]):
-            P = kernel.source_particle_dd(seed_work, mcdc)
-            # print(S["box_z"],mcdc["d_idx"])
 
         # Get from source bank
         else:
@@ -253,14 +251,13 @@ def loop_source_dd(seed, mcdc):
 
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
-            completed=0
             # Get particle from active bank
             P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
             if mcdc["technique"]["domain_decomp"]:
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    #print("particle not in domain active, x, domain idx:",P["x"],',',mcdc["d_idx"])
-                    mcdc["p_comp"]+=1
+                    print("particle not in domain active, z, domain idx:",P["x"],',',P["z"],',',mcdc["d_idx"])
+                    
                     P["alive"] = False
 
             # Apply weight window
@@ -286,7 +283,7 @@ def loop_source_dd(seed, mcdc):
                 print_progress(percent, mcdc)
 
     kernel.dd_particle_send(mcdc)
-  
+    print("Done sourcing particles, running remaining particles")
     terminated = False
     kernel.dd_particle_receive(mcdc)
     while not terminated:
@@ -297,7 +294,7 @@ def loop_source_dd(seed, mcdc):
 
                 if mcdc["technique"]["domain_decomp"]:
                     if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                        #print("particle not in domain tre, x, domain idx:",P["x"],',',mcdc["d_idx"])
+                        print("particle not in domain tre, z, domain idx:",P["z"],',',mcdc["d_idx"])
                         mcdc["p_comp"]+=1
                         P["alive"] = False
 
@@ -319,8 +316,17 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
         run_particles =MPI.COMM_WORLD.allreduce(mcdc["p_comp"], op=MPI.SUM)
+<<<<<<< Updated upstream
         #print(run_particles,"done, need",mcdc["mpi_work_size_total"])
         terminated =run_particles>=mcdc["mpi_work_size_total"]-1
+=======
+        percent = run_particles/mcdc["mpi_work_size_total"]
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
+        terminated =run_particles>=mcdc["mpi_work_size_total"]-3
+>>>>>>> Stashed changes
 
 
 

@@ -98,11 +98,36 @@ def dd_prepare():
     d_Ny = input_deck.technique["domain_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["domain_mesh"]["z"].size - 1
 
+<<<<<<< Updated upstream
     # Assigning domain index
     if input_deck.technique["work_ratio"] is not None:
         domain = 0
         count = 0
         neighbors = []
+=======
+    d_Nx = input_deck.technique["domain_mesh"]["x"].size -1
+    d_Ny = input_deck.technique["domain_mesh"]["y"].size -1
+    d_Nz = input_deck.technique["domain_mesh"]["z"].size -1
+
+    input_deck.setting["bank_active_buff"]=1000000
+    if input_deck.technique["exchange_rate"]==None:
+        input_deck.technique["exchange_rate"]=100
+
+    if work_ratio is None:
+        work_ratio=np.ones(d_Nx*d_Ny*d_Nz)
+        input_deck.technique["work_ratio"]=work_ratio
+
+    if np.sum(work_ratio)!=MPI.COMM_WORLD.Get_size():
+        print("ERROR Domain work ratio not equal to number of processors,",np.sum(work_ratio),"!=",MPI.COMM_WORLD.Get_size())
+        exit()
+    
+    # Assigning domain index
+    i=0
+    rank_info =[]
+    print(work_ratio)
+    print(d_Nx*d_Ny*d_Nz)
+    for n in range(d_Nx*d_Ny*d_Nz):
+>>>>>>> Stashed changes
         ranks = []
         while domain < (len(work_ratio)):
             temp = []
@@ -205,7 +230,6 @@ def dd_prepare():
     input_deck.technique["yn_neigh"] = neighbor_ranks_o[3]
     input_deck.technique["zp_neigh"] = neighbor_ranks_o[4]
     input_deck.technique["zn_neigh"] = neighbor_ranks_o[5]
-
 
 def prepare():
     """

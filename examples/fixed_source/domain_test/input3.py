@@ -42,7 +42,7 @@ mcdc.tally(
 
 # Setting
 mcdc.setting(N_particle=1e4,active_bank_buff=1000000,save_input_deck=True)
-#mcdc.domain_decomp(x=np.linspace(0.0,6.0,4), exchange_rate=10,work_ratio=([1,1,1]))
+mcdc.domain_decomp(x=np.linspace(0.0,6.0,7),work_ratio=([3,1,1,1,3,1]))
 
 # Run
 mcdc.run()
