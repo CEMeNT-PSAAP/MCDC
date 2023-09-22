@@ -77,19 +77,12 @@ def dd_particle_send(mcdc):
         ):
             if mcdc["technique"]["xp_neigh"].size > i:
                 size = mcdc["bank_domain_xp"]["size"]
-<<<<<<< Updated upstream
-                bank = np.array(mcdc["bank_domain_xp"]["particles"][:size])
-                for particle in bank:
-                    particle["w"] /= int(len(mcdc["technique"]["xp_neigh"]))
-                size_s=bank.size
-=======
                 ratio = int(size/len(mcdc["technique"]["xp_neigh"]))
                 start = ratio*i
                 end =start+ratio
                 if i == len(mcdc["technique"]["xp_neigh"])-1:
                     end = size
                 bank = np.array(mcdc["bank_domain_xp"]["particles"][start:end])
->>>>>>> Stashed changes
                 request1 = MPI.COMM_WORLD.send(
                     bank, dest=mcdc["technique"]["xp_neigh"][i], tag=1
                 )
@@ -133,36 +126,24 @@ def dd_particle_send(mcdc):
 
             if mcdc["technique"]["zp_neigh"].size > i:
                 size = mcdc["bank_domain_zp"]["size"]
-<<<<<<< Updated upstream
-                bank = np.array(mcdc["bank_domain_zp"]["particles"][:size])
-                for particle in bank:
-                    particle["w"] /= int(len(mcdc["technique"]["zp_neigh"]))
-=======
                 ratio = int(size/len(mcdc["technique"]["zp_neigh"]))
                 start = ratio*i
                 end =start+ratio
                 if i == len(mcdc["technique"]["zp_neigh"])-1:
                     end = size
                 bank = np.array(mcdc["bank_domain_zp"]["particles"][start:end])
->>>>>>> Stashed changes
                 request5 = MPI.COMM_WORLD.send(
                     bank, dest=mcdc["technique"]["zp_neigh"][i], tag=5
                 )
 
             if mcdc["technique"]["zn_neigh"].size > i:
                 size = mcdc["bank_domain_zn"]["size"]
-<<<<<<< Updated upstream
-                bank = np.array(mcdc["bank_domain_zn"]["particles"][:size])
-                for particle in bank:
-                    particle["w"] /= int(len(mcdc["technique"]["zn_neigh"]))
-=======
                 ratio = int(size/len(mcdc["technique"]["zn_neigh"]))
                 start = ratio*i
                 end =start+ratio
                 if i == len(mcdc["technique"]["zn_neigh"])-1:
                     end = size
                 bank = np.array(mcdc["bank_domain_zn"]["particles"][start:end])
->>>>>>> Stashed changes
                 request6 = MPI.COMM_WORLD.send(
                     bank, dest=mcdc["technique"]["zn_neigh"][i], tag=6
                 )

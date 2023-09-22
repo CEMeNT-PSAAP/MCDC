@@ -316,17 +316,12 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
         run_particles =MPI.COMM_WORLD.allreduce(mcdc["p_comp"], op=MPI.SUM)
-<<<<<<< Updated upstream
-        #print(run_particles,"done, need",mcdc["mpi_work_size_total"])
-        terminated =run_particles>=mcdc["mpi_work_size_total"]-1
-=======
         percent = run_particles/mcdc["mpi_work_size_total"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
         terminated =run_particles>=mcdc["mpi_work_size_total"]-3
->>>>>>> Stashed changes
 
 
 
