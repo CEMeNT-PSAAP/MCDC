@@ -141,6 +141,7 @@ def loop_source(seed, mcdc):
             # Sample source
             P = kernel.source_particle(seed_work, mcdc)
 
+
         # Get from source bank
         else:
             P = mcdc["bank_source"]["particles"][idx_work]
@@ -196,8 +197,7 @@ def loop_source(seed, mcdc):
 # =============================================================================
 # DD Source loop
 # =============================================================================
-
-
+@njit
 def loop_source_dd(seed, mcdc):
     j = 0
     # Progress bar indicator
@@ -226,7 +226,12 @@ def loop_source_dd(seed, mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            P = kernel.source_particle_dd(seed_work, mcdc)
+            if mcdc["technique"]["repro"]:
+                P = kernel.source_particle(seed_work,mcdc)
+
+            else:
+                P = kernel.source_particle_dd(seed_work, mcdc)
+
 
         # Get from source bank
         else:
@@ -236,10 +241,12 @@ def loop_source_dd(seed, mcdc):
         idx_census = mcdc["idx_census"]
         if P["t"] > mcdc["setting"]["census_time"][idx_census]:
             P["t"] += SHIFT
-            kernel.add_particle(P, mcdc["bank_census"])
+            if kernel.particle_in_domain(P, mcdc):
+                kernel.add_particle(P, mcdc["bank_census"])
         else:
             # Add the source particle into the active bank
-            kernel.add_particle(P, mcdc["bank_active"])
+            if kernel.particle_in_domain(P, mcdc):
+                kernel.add_particle(P, mcdc["bank_active"])
 
         # =====================================================================
         # Run the source particle and its secondaries
@@ -252,16 +259,9 @@ def loop_source_dd(seed, mcdc):
 
             if mcdc["technique"]["domain_decomp"]:
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print(
-                        "particle not in domain active, z, domain idx:",
-                        P["x"],
-                        ",",
-                        P["z"],
-                        ",",
-                        mcdc["d_idx"],
-                    )
+                    print("particle not in domain active", "domain idx:",P["uz"], ",", P["z"], ",",mcdc["d_idx"])
 
-                    P["alive"] = False
+                    #P["alive"] = False
 
             # Apply weight window
             if mcdc["technique"]["weight_window"]:
@@ -300,11 +300,11 @@ def loop_source_dd(seed, mcdc):
                         print(
                             "particle not in domain tre, z, domain idx:",
                             P["z"],
-                            ",",
+                            ",",P["uz"],
                             mcdc["d_idx"],
                         )
-                        mcdc["p_comp"] += 1
-                        P["alive"] = False
+                        #mcdc["p_comp"] += 1
+                        #P["alive"] = False
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
@@ -332,7 +332,13 @@ def loop_source_dd(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-        terminated = run_particles >= mcdc["mpi_work_size_total"] - 3
+        if mcdc["technique"]["repro"]:
+            roundoff=0
+        else:
+            roundoff=3
+        terminated = run_particles >= mcdc["mpi_work_size_total"] - roundoff
+
+    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
 
 # =========================================================================
@@ -414,7 +420,12 @@ def loop_particle(P, mcdc):
             P["alive"] = False
         # Domain boundary
         if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
+            if event & EVENT_SURFACE:
+                if not mcdc["surfaces"][P["surface_ID"]]["reflective"]:
+                    kernel.domain_crossing(P, mcdc)
+            else:
+                kernel.domain_crossing(P, mcdc)
+
         # Apply weight window
         if P["alive"] and mcdc["technique"]["weight_window"]:
             kernel.weight_window(P, mcdc)

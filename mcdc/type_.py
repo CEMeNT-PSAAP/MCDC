@@ -462,6 +462,7 @@ def make_type_technique(N_particle, G, card):
         struct += [("d_idx", int64)]
         struct += [("work_ratio", int64, (len(card["work_ratio"]),))]
         struct += [("exchange_rate", int64)]
+        struct += [("repro", bool_)]
         struct += [("xp_neigh", int64, (len(card["xp_neigh"]),))]
         struct += [("xn_neigh", int64, (len(card["xn_neigh"]),))]
         struct += [("yp_neigh", int64, (len(card["yp_neigh"]),))]
