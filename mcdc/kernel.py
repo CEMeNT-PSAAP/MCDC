@@ -16,7 +16,6 @@ from mcdc.loop import loop_source
 # Domain Decomposition
 # =============================================================================
 
-
 # =============================================================================
 # Domain crossing event
 # =============================================================================
@@ -26,7 +25,7 @@ from mcdc.loop import loop_source
 def domain_crossing(P, mcdc):
     # Domain mesh crossing
     max_size = mcdc["technique"]["exchange_rate"]  # /1e4)*mcdc["mpi_work_size"])
-    if mcdc["technique"]["domain_decomp"] and P["alive"] == True:
+    if mcdc["technique"]["domain_decomp"]:
         mesh = mcdc["technique"]["domain_mesh"]
         # Determine which dimension is crossed
         x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
@@ -62,7 +61,7 @@ def domain_crossing(P, mcdc):
 # Send full domain bank
 # =============================================================================
 
-
+@njit
 def dd_particle_send(mcdc):
     with objmode(size="int64"):
         for i in range(
@@ -159,7 +158,7 @@ def dd_particle_send(mcdc):
 # Recieve particles and clear banks
 # =============================================================================
 
-
+@njit
 def dd_particle_receive(mcdc):
     buff = np.zeros(
         mcdc["bank_domain_xp"]["particles"].shape[0], dtype=type_.particle_record
@@ -245,6 +244,7 @@ def dd_particle_receive(mcdc):
 
 
 # Check if particle is in domain
+@njit
 def particle_in_domain(P, mcdc):
     d_idx = mcdc["d_idx"]
     d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
@@ -273,6 +273,7 @@ def particle_in_domain(P, mcdc):
 
 
 # Check for source in domain
+@njit
 def source_in_domain(source, domain_mesh, d_idx):
     d_Nx = domain_mesh["x"].size - 1
     d_Ny = domain_mesh["y"].size - 1
@@ -316,7 +317,7 @@ def source_in_domain(source, domain_mesh, d_idx):
 # Compute domain load
 # =============================================================================
 
-
+@njit
 def domain_work(mcdc, domain, N):
     domain_mesh = mcdc["technique"]["domain_mesh"]
 
@@ -436,7 +437,7 @@ def domain_work(mcdc, domain, N):
 # =============================================================================
 
 
-@njit
+@njit()
 def source_particle_dd(seed, mcdc):
     domain_mesh = mcdc["technique"]["domain_mesh"]
     d_idx = mcdc["d_idx"]
@@ -516,38 +517,14 @@ def source_particle_dd(seed, mcdc):
 
 @njit
 def distribute_work_dd(N, mcdc, precursor=False):
-    size = mcdc["mpi_size"]
-    rank = mcdc["mpi_rank"]
-
-    source_alloc = int(
-        N * len(mcdc["sources"]) / (len(mcdc["technique"]["work_ratio"]))
-    )
-    print("source-alloc", source_alloc)
     # Total # of work
     work_size_total = N
-    if rank == 0:
-        # Evenly distribute work
-        work_size = 0
-        for source in mcdc["sources"]:
-            if source_in_domain(
-                source, mcdc["technique"]["domain_mesh"], mcdc["d_idx"]
-            ):
-                work_size += source_alloc
-        work_start = 0
+  
+    if not mcdc["technique"]["repro"]:
+        work_size, work_start = domain_work(mcdc, mcdc["d_idx"], N)
     else:
-        work_start = MPI.COMM_WORLD.recv(source=rank - 1, tag=0)
-        print("WORK_START", work_start)
-        work_size = 0
-        for source in mcdc["sources"]:
-            if source_in_domain(
-                source, mcdc["technique"]["domain_mesh"], mcdc["d_idx"]
-            ):
-                work_size += int(source_alloc * source["prob"])
-
-    work_finish = work_size + work_start
-    if rank < size - 1:
-        send = MPI.COMM_WORLD.send(work_finish, dest=rank + 1, tag=0)
-    work_size, work_start = domain_work(mcdc, mcdc["d_idx"], N)
+        work_start = 0
+        work_size = work_size_total
 
     if not precursor:
         mcdc["mpi_work_start"] = work_start
@@ -560,7 +537,6 @@ def distribute_work_dd(N, mcdc, precursor=False):
 
     print(
         "Rank",
-        rank,
         "work_size:",
         work_size,
         "work_start:",
@@ -728,7 +704,6 @@ def source_particle(seed, mcdc):
         tot += source["prob"]
         if tot >= xi:
             break
-
     # Position
     if source["box"]:
         x = sample_uniform(source["box_x"][0], source["box_x"][1], P)
@@ -2404,9 +2379,10 @@ def surface_crossing(P, mcdc):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
+    
     surface_bc(P, surface, trans)
     if surface["vacuum"]:
-        mcdc["p_comp"] += 1
+        mcdc["p_comp"]+=1
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
 

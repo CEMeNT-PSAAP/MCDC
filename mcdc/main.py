@@ -472,6 +472,7 @@ def prepare():
         mcdc["technique"][name]["azi"] = input_deck.technique[name]["azi"]
         # Set exchange rate
         mcdc["technique"]["exchange_rate"] = input_deck.technique["exchange_rate"]
+        mcdc["technique"]["repro"] =input_deck.technique["repro"]
         # Set domain index
         mcdc["d_idx"] = input_deck.technique["d_idx"]
         mcdc["technique"]["xp_neigh"] = input_deck.technique["xp_neigh"]
