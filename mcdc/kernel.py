@@ -28,7 +28,16 @@ def domain_crossing(P, mcdc):
     if mcdc["technique"]["domain_decomp"]:
         mesh = mcdc["technique"]["domain_mesh"]
         # Determine which dimension is crossed
-        x, y, z, t, flag = mesh_crossing_evaluate(P, mesh)
+        x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
+        flag = directions[0]
+        if len(directions)>1:
+            for direction in directions[1:]:
+                if direction== MESH_X:
+                    P["x"]-=2*SHIFT
+                if direction== MESH_Y:
+                    P["y"]-=2*SHIFT
+                if direction== MESH_Z:
+                    P["z"]-=2*SHIFT
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -1775,14 +1784,14 @@ def mesh_crossing_evaluate(P, mesh):
     shift_particle(P, -2 * SHIFT)
 
     # Determine dimension crossed
+    directions=[]
     if x1 != x2:
-        return x1, y1, z1, t1, MESH_X
-    elif y1 != y2:
-        return x1, y1, z1, t1, MESH_Y
-    elif z1 != z2:
-        return x1, y1, z1, t1, MESH_Z
-    elif t1 != t2:
-        return x1, y1, z1, t1, MESH_T
+        directions.append(MESH_X)
+    if y1 != y2:
+        directions.append(MESH_Y)
+    if z1 != z2:
+        directions.append(MESH_Z)
+    return x1, y1, z1, t1, directions
 
 
 # =============================================================================
