@@ -58,8 +58,6 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
-    if input_deck.technique["domain_decomp"]:
-        dd_prepare()
     mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
@@ -176,6 +174,16 @@ def dd_prepare():
     xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
     print(d_idx, "domain neighbors:", xn, xp, yn, yp, zn, zp)
 
+    if not input_deck.technique["domain_decomp"]:
+        input_deck.technique["d_idx"] = 0
+        input_deck.technique["xp_neigh"] = []
+        input_deck.technique["xn_neigh"] = []
+        input_deck.technique["yp_neigh"] = []
+        input_deck.technique["yn_neigh"] = []
+        input_deck.technique["zp_neigh"] = []
+        input_deck.technique["zn_neigh"] = []
+        return
+
     input_deck.technique["d_idx"] = d_idx
     if xp is not None:
         input_deck.technique["xp_neigh"] = rank_info[xp]
@@ -212,6 +220,8 @@ def prepare():
       (2) Make types
       (3) Set up and return the global variable container `mcdc`
     """
+
+    dd_prepare()
 
     # =========================================================================
     # Sizes
