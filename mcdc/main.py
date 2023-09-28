@@ -30,7 +30,13 @@ import mcdc.type_ as type_
 
 from mcdc.constant import *
 from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc
-from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
+from mcdc.print_ import (
+    print_banner,
+    print_msg,
+    print_runtime,
+    print_header_eigenvalue,
+    print_error,
+)
 
 # Get input_deck
 import mcdc.global_ as mcdc_
@@ -148,13 +154,10 @@ def dd_prepare():
         input_deck.technique["work_ratio"] = work_ratio
 
     if np.sum(work_ratio) != MPI.COMM_WORLD.Get_size():
-        print(
-            "ERROR Domain work ratio not equal to number of processors,",
-            np.sum(work_ratio),
-            "!=",
-            MPI.COMM_WORLD.Get_size(),
+        print_error(
+            "Domain work ratio not equal to number of processors, %i != %i "
+            % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
         )
-        exit()
 
     # Assigning domain index
     i = 0
@@ -472,7 +475,7 @@ def prepare():
         mcdc["technique"][name]["azi"] = input_deck.technique[name]["azi"]
         # Set exchange rate
         mcdc["technique"]["exchange_rate"] = input_deck.technique["exchange_rate"]
-        mcdc["technique"]["repro"] =input_deck.technique["repro"]
+        mcdc["technique"]["repro"] = input_deck.technique["repro"]
         # Set domain index
         mcdc["d_idx"] = input_deck.technique["d_idx"]
         mcdc["technique"]["xp_neigh"] = input_deck.technique["xp_neigh"]

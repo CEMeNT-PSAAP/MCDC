@@ -30,14 +30,14 @@ def domain_crossing(P, mcdc):
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
         flag = directions[0]
-        if len(directions)>1:
+        if len(directions) > 1:
             for direction in directions[1:]:
-                if direction== MESH_X:
-                    P["x"]-=2*SHIFT
-                if direction== MESH_Y:
-                    P["y"]-=2*SHIFT
-                if direction== MESH_Z:
-                    P["z"]-=2*SHIFT
+                if direction == MESH_X:
+                    P["x"] -= 2 * SHIFT
+                if direction == MESH_Y:
+                    P["y"] -= 2 * SHIFT
+                if direction == MESH_Z:
+                    P["z"] -= 2 * SHIFT
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -69,6 +69,7 @@ def domain_crossing(P, mcdc):
 # =============================================================================
 # Send full domain bank
 # =============================================================================
+
 
 @njit
 def dd_particle_send(mcdc):
@@ -166,6 +167,7 @@ def dd_particle_send(mcdc):
 # =============================================================================
 # Recieve particles and clear banks
 # =============================================================================
+
 
 @njit
 def dd_particle_receive(mcdc):
@@ -325,6 +327,7 @@ def source_in_domain(source, domain_mesh, d_idx):
 # =============================================================================
 # Compute domain load
 # =============================================================================
+
 
 @njit
 def domain_work(mcdc, domain, N):
@@ -528,7 +531,7 @@ def source_particle_dd(seed, mcdc):
 def distribute_work_dd(N, mcdc, precursor=False):
     # Total # of work
     work_size_total = N
-  
+
     if not mcdc["technique"]["repro"]:
         work_size, work_start = domain_work(mcdc, mcdc["d_idx"], N)
     else:
@@ -1784,7 +1787,7 @@ def mesh_crossing_evaluate(P, mesh):
     shift_particle(P, -2 * SHIFT)
 
     # Determine dimension crossed
-    directions=[]
+    directions = []
     if x1 != x2:
         directions.append(MESH_X)
     if y1 != y2:
@@ -2388,10 +2391,10 @@ def surface_crossing(P, mcdc):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    
+
     surface_bc(P, surface, trans)
     if surface["vacuum"]:
-        mcdc["p_comp"]+=1
+        mcdc["p_comp"] += 1
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
 

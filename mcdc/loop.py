@@ -141,7 +141,6 @@ def loop_source(seed, mcdc):
             # Sample source
             P = kernel.source_particle(seed_work, mcdc)
 
-
         # Get from source bank
         else:
             P = mcdc["bank_source"]["particles"][idx_work]
@@ -227,11 +226,10 @@ def loop_source_dd(seed, mcdc):
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
             if mcdc["technique"]["repro"]:
-                P = kernel.source_particle(seed_work,mcdc)
+                P = kernel.source_particle(seed_work, mcdc)
 
             else:
                 P = kernel.source_particle_dd(seed_work, mcdc)
-
 
         # Get from source bank
         else:
@@ -259,9 +257,16 @@ def loop_source_dd(seed, mcdc):
 
             if mcdc["technique"]["domain_decomp"]:
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print("sourced particle not in domain:",P["uz"], ",", P["z"], ",",mcdc["d_idx"])
+                    print(
+                        "sourced particle not in domain:",
+                        P["uz"],
+                        ",",
+                        P["z"],
+                        ",",
+                        mcdc["d_idx"],
+                    )
 
-                    #P["alive"] = False
+                    # P["alive"] = False
 
             # Apply weight window
             if mcdc["technique"]["weight_window"]:
@@ -295,9 +300,16 @@ def loop_source_dd(seed, mcdc):
             while mcdc["bank_active"]["size"] > 0:
                 P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
-                
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print("recieved particle not in domain:",P["x"],P["z"],",",P["ux"],P["uz"],mcdc["d_idx"])
+                    print(
+                        "recieved particle not in domain:",
+                        P["x"],
+                        P["z"],
+                        ",",
+                        P["ux"],
+                        P["uz"],
+                        mcdc["d_idx"],
+                    )
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
@@ -326,9 +338,9 @@ def loop_source_dd(seed, mcdc):
             with objmode():
                 print_progress(percent, mcdc)
         if mcdc["technique"]["repro"]:
-            roundoff=0
+            roundoff = 0
         else:
-            roundoff=3
+            roundoff = 3
         terminated = run_particles >= mcdc["mpi_work_size_total"] - roundoff
 
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
