@@ -73,7 +73,7 @@ def domain_crossing(P, mcdc):
 
 @njit
 def dd_particle_send(mcdc):
-    with objmode(size="int64"):
+    with objmode():
         for i in range(
             max(
                 len(mcdc["technique"]["xp_neigh"]),
@@ -156,12 +156,12 @@ def dd_particle_send(mcdc):
                     bank, dest=mcdc["technique"]["zn_neigh"][i], tag=6
                 )
 
-        mcdc["bank_domain_xp"]["size"] = 0
-        mcdc["bank_domain_xn"]["size"] = 0
-        mcdc["bank_domain_yp"]["size"] = 0
-        mcdc["bank_domain_yn"]["size"] = 0
-        mcdc["bank_domain_zp"]["size"] = 0
-        mcdc["bank_domain_zn"]["size"] = 0
+    mcdc["bank_domain_xp"]["size"] = 0
+    mcdc["bank_domain_xn"]["size"] = 0
+    mcdc["bank_domain_yp"]["size"] = 0
+    mcdc["bank_domain_yn"]["size"] = 0
+    mcdc["bank_domain_zp"]["size"] = 0
+    mcdc["bank_domain_zn"]["size"] = 0
 
 
 # =============================================================================

@@ -455,20 +455,19 @@ def make_type_technique(N_particle, G, card):
     # =========================================================================
     # domain decomp
     # =========================================================================
-    if card["domain_decomp"]:
-        # Mesh
-        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["domain_mesh"])
-        struct += [("domain_mesh", mesh)]
-        struct += [("d_idx", int64)]
-        struct += [("work_ratio", int64, (len(card["work_ratio"]),))]
-        struct += [("exchange_rate", int64)]
-        struct += [("repro", bool_)]
-        struct += [("xp_neigh", int64, (len(card["xp_neigh"]),))]
-        struct += [("xn_neigh", int64, (len(card["xn_neigh"]),))]
-        struct += [("yp_neigh", int64, (len(card["yp_neigh"]),))]
-        struct += [("yn_neigh", int64, (len(card["yn_neigh"]),))]
-        struct += [("zp_neigh", int64, (len(card["zp_neigh"]),))]
-        struct += [("zn_neigh", int64, (len(card["zn_neigh"]),))]
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["domain_mesh"])
+    struct += [("domain_mesh", mesh)]
+    struct += [("d_idx", int64)]
+    struct += [("work_ratio", int64, (len(card["work_ratio"]),))]
+    struct += [("exchange_rate", int64)]
+    struct += [("repro", bool_)]
+    struct += [("xp_neigh", int64, (len(card["xp_neigh"]),))]
+    struct += [("xn_neigh", int64, (len(card["xn_neigh"]),))]
+    struct += [("yp_neigh", int64, (len(card["yp_neigh"]),))]
+    struct += [("yn_neigh", int64, (len(card["yn_neigh"]),))]
+    struct += [("zp_neigh", int64, (len(card["zp_neigh"]),))]
+    struct += [("zn_neigh", int64, (len(card["zn_neigh"]),))]
 
     # =========================================================================
     # Weight window
