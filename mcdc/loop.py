@@ -121,9 +121,10 @@ def loop_source(seed, mcdc):
 
     # Loop over particle sources
     work_start = mcdc["mpi_work_start"]
-    work_end = work_start + mcdc["mpi_work_size"]
-    for idx_work in range(work_start, work_end):
-        seed_work = kernel.split_seed(idx_work, seed)
+    work_size = mcdc["mpi_work_size"]
+    work_end = work_start + work_size
+    for idx_work in range(work_size):
+        seed_work = kernel.split_seed(work_start + idx_work, seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
