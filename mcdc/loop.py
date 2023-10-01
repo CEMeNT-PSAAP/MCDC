@@ -291,7 +291,7 @@ def loop_source_dd(seed, mcdc):
                 print_progress(percent, mcdc)
 
     kernel.dd_particle_send(mcdc)
-    print("Done sourcing particles, running remaining particles")
+    #print("Done sourcing particles, running remaining particles")
     terminated = False
     kernel.dd_particle_receive(mcdc)
     while not terminated:
@@ -332,16 +332,17 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
         run_particles = MPI.COMM_WORLD.allreduce(mcdc["p_comp"], op=MPI.SUM)
+        work_remaining = MPI.COMM_WORLD.allreduce(mcdc["bank_active"]["size"], op=MPI.SUM)
         percent = run_particles / mcdc["mpi_work_size_total"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
         if mcdc["technique"]["repro"]:
-            roundoff = 0
+            terminated = work_remaining == 0
         else:
-            roundoff = 3
-        terminated = run_particles >= mcdc["mpi_work_size_total"] - roundoff
+            terminated = run_particles >= mcdc["mpi_work_size_total"] - 3
+        
 
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
