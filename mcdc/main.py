@@ -107,7 +107,6 @@ def get_indexes(N, nx, ny):
 
 def get_neighbors(N, w, nx, ny, nz):
     i, j, k = get_indexes(N, nx, ny)
-    print("Domain", N, i, j, k)
     if i > 0:
         xn = get_d_idx(i - 1, j, k, nx, ny)
     else:
@@ -132,7 +131,6 @@ def get_neighbors(N, w, nx, ny, nz):
         zp = get_d_idx(i, j, k + 1, nx, ny)
     else:
         zp = None
-    print("domain neighbors:", xn, xp, yn, yp, zn, zp)
     return xn, xp, yn, yp, zn, zp
 
 
@@ -160,8 +158,6 @@ def dd_prepare():
     # Assigning domain index
     i = 0
     rank_info = []
-    print(work_ratio)
-    print(d_Nx * d_Ny * d_Nz)
     for n in range(d_Nx * d_Ny * d_Nz):
         ranks = []
         for r in range(int(work_ratio[n])):
@@ -172,7 +168,6 @@ def dd_prepare():
         rank_info.append(ranks)
 
     xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
-    print(d_idx, "domain neighbors:", xn, xp, yn, yp, zn, zp)
 
     if not input_deck.technique["domain_decomp"]:
         input_deck.technique["d_idx"] = 0
@@ -576,7 +571,6 @@ def prepare():
         kernel.distribute_work_dd(mcdc["setting"]["N_particle"], mcdc)
     else:
         kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
-    print("RANK", mcdc["mpi_rank"], "work size", mcdc["mpi_work_size"])
 
     # =========================================================================
     # Particle banks

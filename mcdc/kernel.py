@@ -432,14 +432,13 @@ def domain_work(mcdc, domain, N):
     rank = MPI.COMM_WORLD.Get_rank()
     if mcdc["technique"]["work_ratio"][domain] > 1:
         work_start += Nm * (rank - np.sum(mcdc["technique"]["work_ratio"][0:d_idx]))
-    print("domain:", d_idx, ", Nm:", int(Nm), ", work_start:", int(work_start))
     total_v = 0
     for source in range(len(mcdc["sources"])):
         total_v += Vim[source]
     i = 0
     for source in mcdc["sources"]:
-        source["prob"] *= 2 * Vim[i] / total_v
-        print("domain:", d_idx, Vim[i] / total_v, "source", source["prob"], i)
+        if total_v!=0:
+            source["prob"] *= 2 * Vim[i] / total_v
         i += 1
     return (int(Nm), int(work_start))
 
@@ -546,16 +545,6 @@ def distribute_work_dd(N, mcdc, precursor=False):
         mcdc["mpi_work_start_precursor"] = work_start
         mcdc["mpi_work_size_precursor"] = work_size
         mcdc["mpi_work_size_total_precursor"] = work_size_total
-
-    print(
-        "Rank",
-        "work_size:",
-        work_size,
-        "work_start:",
-        work_start,
-        "work_size_total:",
-        work_size_total,
-    )
 
 
 # =============================================================================
