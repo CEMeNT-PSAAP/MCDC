@@ -274,8 +274,7 @@ def particle_in_domain(P, mcdc):
         if d_iy == y_cell:
             if d_iz == z_cell:
                 return True
-    else:
-        return False
+    return False
 
 
 # =============================================================================
@@ -429,7 +428,7 @@ def domain_work(mcdc, domain, N):
     for source in range(num_source):
         Nm += Ni[source] * Vim[source] / Vi[source]
     Nm /= mcdc["technique"]["work_ratio"][domain]
-    rank = MPI.COMM_WORLD.Get_rank()
+    rank = mcdc["mpi_rank"]
     if mcdc["technique"]["work_ratio"][domain] > 1:
         work_start += Nm * (rank - np.sum(mcdc["technique"]["work_ratio"][0:d_idx]))
     total_v = 0
@@ -437,7 +436,7 @@ def domain_work(mcdc, domain, N):
         total_v += Vim[source]
     i = 0
     for source in mcdc["sources"]:
-        if total_v!=0:
+        if total_v != 0:
             source["prob"] *= 2 * Vim[i] / total_v
         i += 1
     return (int(Nm), int(work_start))
@@ -990,6 +989,14 @@ def total_weight(bank):
     with objmode():
         MPI.COMM_WORLD.Allreduce(W_local, buff, MPI.SUM)
     return buff[0]
+
+
+@njit
+def allreduce(value):
+    total = np.zeros(1, np.float64)
+    with objmode():
+        MPI.COMM_WORLD.Allreduce(np.array([value], np.float64), total, MPI.SUM)
+    return total[0]
 
 
 @njit
