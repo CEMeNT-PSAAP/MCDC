@@ -149,7 +149,10 @@ def dd_prepare():
         work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
         input_deck.technique["work_ratio"] = work_ratio
 
-    if np.sum(work_ratio) != MPI.COMM_WORLD.Get_size():
+    if (
+        input_deck.technique["domain_decomp"]
+        and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
+    ):
         print_error(
             "Domain work ratio not equal to number of processors, %i != %i "
             % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
