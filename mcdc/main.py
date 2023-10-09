@@ -141,7 +141,7 @@ def dd_prepare():
     d_Ny = input_deck.technique["domain_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["domain_mesh"]["z"].size - 1
 
-    input_deck.setting["bank_active_buff"] = 1000000
+    input_deck.setting["bank_active_buff"] = 1000
     if input_deck.technique["exchange_rate"] == None:
         input_deck.technique["exchange_rate"] = 100
 
@@ -153,26 +153,28 @@ def dd_prepare():
         input_deck.technique["domain_decomp"]
         and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
     ):
+        
         print_error(
             "Domain work ratio not equal to number of processors, %i != %i "
             % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
         )
 
-    # Assigning domain index
-    i = 0
-    rank_info = []
-    for n in range(d_Nx * d_Ny * d_Nz):
-        ranks = []
-        for r in range(int(work_ratio[n])):
-            ranks.append(i)
-            if MPI.COMM_WORLD.Get_rank() == i:
-                d_idx = n
-            i += 1
-        rank_info.append(ranks)
-
-    xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
-
-    if not input_deck.technique["domain_decomp"]:
+ 
+    if  input_deck.technique["domain_decomp"]:
+        # Assigning domain index
+        i = 0
+        rank_info = []
+        for n in range(d_Nx * d_Ny * d_Nz):
+            ranks = []
+            for r in range(int(work_ratio[n])):
+                ranks.append(i)
+                if MPI.COMM_WORLD.Get_rank() == i:
+                    d_idx = n
+                i += 1
+            rank_info.append(ranks)
+        input_deck.technique["d_idx"] = d_idx
+        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
+    else:
         input_deck.technique["d_idx"] = 0
         input_deck.technique["xp_neigh"] = []
         input_deck.technique["xn_neigh"] = []
@@ -182,7 +184,7 @@ def dd_prepare():
         input_deck.technique["zn_neigh"] = []
         return
 
-    input_deck.technique["d_idx"] = d_idx
+
     if xp is not None:
         input_deck.technique["xp_neigh"] = rank_info[xp]
     else:

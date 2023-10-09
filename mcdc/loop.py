@@ -294,6 +294,7 @@ def loop_source_dd(seed, mcdc):
     # print("Done sourcing particles, running remaining particles")
     terminated = False
     kernel.dd_particle_receive(mcdc)
+    wr_new = 0
     while not terminated:
         if mcdc["bank_active"]["size"] > 0:
             # Loop until active bank is exhausted
@@ -332,12 +333,13 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
 
-        run_particles = kernel.allreduce(mcdc["p_comp"])
-        work_remaining = kernel.allreduce(mcdc["bank_active"]["size"])
-        if mcdc["technique"]["repro"]:
-            terminated = work_remaining == 0
-        else:
-            terminated = run_particles >= mcdc["mpi_work_size_total"] - 3
+        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
+
+        if work_remaining == 0:
+                wr_new +=1        
+        if wr_new >5:
+            terminated = True
+
 
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
