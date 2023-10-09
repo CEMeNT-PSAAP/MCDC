@@ -337,7 +337,7 @@ def loop_source_dd(seed, mcdc):
 
         if work_remaining == 0:
                 wr_new +=1        
-        if wr_new >5:
+        if wr_new >2:
             terminated = True
 
 

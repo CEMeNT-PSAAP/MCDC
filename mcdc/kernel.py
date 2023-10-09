@@ -196,6 +196,7 @@ def dd_particle_receive(mcdc):
                     bankr = np.append(bankr, received1.wait())
                 else:
                     MPI.Request.cancel(received1)
+                    
             if mcdc["technique"]["xn_neigh"].size > i:
                 received2 = MPI.COMM_WORLD.irecv(
                     source=mcdc["technique"]["xn_neigh"][i], tag=1
@@ -204,6 +205,7 @@ def dd_particle_receive(mcdc):
                     bankr = np.append(bankr, received2.wait())
                 else:
                     MPI.Request.cancel(received2)
+
             if mcdc["technique"]["yp_neigh"].size > i:
                 received3 = MPI.COMM_WORLD.irecv(
                     source=mcdc["technique"]["yp_neigh"][i], tag=4
@@ -212,6 +214,7 @@ def dd_particle_receive(mcdc):
                     bankr = np.append(bankr, received3.wait())
                 else:
                     MPI.Request.cancel(received3)
+
             if mcdc["technique"]["yn_neigh"].size > i:
                 received4 = MPI.COMM_WORLD.irecv(
                     source=mcdc["technique"]["yn_neigh"][i], tag=3
@@ -220,6 +223,7 @@ def dd_particle_receive(mcdc):
                     bankr = np.append(bankr, received4.wait())
                 else:
                     MPI.Request.cancel(received4)
+
             if mcdc["technique"]["zp_neigh"].size > i:
                 received5 = MPI.COMM_WORLD.irecv(
                     source=mcdc["technique"]["zp_neigh"][i], tag=6
