@@ -14,7 +14,9 @@ __pycache__
 *.swp
 
 # Output
+*output.h5
 output*.h5
+*output.h5
 *.png
 *.mp4
 *.gif
@@ -35,3 +37,6 @@ tmp_*
 # test cache
 .pytest_cache
 pytestdebug.log
+
+# profiler
+*.prof

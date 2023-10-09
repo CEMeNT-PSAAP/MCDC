@@ -9,6 +9,9 @@ if len(sys.argv) > 1:
 else:
     N_proc = 1
 
+
+waitlist = []
+
 # Fixed source
 N_min = 3
 N_max = 7
@@ -18,10 +21,14 @@ for task in os.scandir("./fixed_source"):
         if not os.path.isfile("output_" + str(int(N_hist)) + ".h5"):
             print(task, int(N_hist))
             if N_proc == 1:
-                os.system("python input.py --mode=numba %i" % (N_hist))
+                os.system(
+                    "python input.py --mode=numba --N_particle=%i --output=output_%i"
+                    % (N_hist, N_hist)
+                )
             else:
                 os.system(
-                    "srun -n %i python input.py --mode=numba %i" % (N_proc, N_hist)
+                    "srun -n %i python input.py --mode=numba --N_particle=%i --output=output_%i"
+                    % (N_proc, N_hist, N_hist)
                 )
     os.chdir(r"../..")
 

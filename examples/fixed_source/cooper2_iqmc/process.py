@@ -38,7 +38,7 @@ ax.plot_surface(Y, X, Z, edgecolor="b", color="white", linewidth=0.5)
 
 ax.set_xlabel("x")
 ax.set_ylabel("y")
-ax.set_zlabel(r"log($\phi$)")
+ax.set_zlabel(r"log($\phi$)", rotation=180)
 
 ax.view_init(elev=15, azim=20)
 

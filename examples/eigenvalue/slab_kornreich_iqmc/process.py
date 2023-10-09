@@ -60,78 +60,83 @@ phi_exact = np.array(
     ]
 )
 tmp = 0.5 * (phi_exact[1:] + phi_exact[:-1])
-phi_exact /= np.sum(tmp * dx)
+norm = np.sum(tmp * dx)
+phi_exact /= norm
 
 # =============================================================================
-# Plot results
+# Begin Plot
+# =============================================================================
+plt.figure(dpi=300, figsize=(8, 5))
+plt.plot(x_exact, phi_exact, label="sol")
+
+# =============================================================================
+# MCDC results
+# =============================================================================
+# Results
+with h5py.File("mc_output.h5", "r") as f:
+    x = f["tally/grid/x"][:]
+    dx = x[1:] - x[:-1]
+    phi_avg = f["tally/flux-x/mean"][:]
+    phi_sd = f["tally/flux-x/sdev"][:]
+    k = f["k_cycle"][:]
+    k_avg = f["k_mean"][()]
+    k_sd = f["k_sdev"][()]
+    rg = f["gyration_radius"][:]
+    f.close()
+# Note the spatial (dx) and source strength (100+1) normalization
+tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
+norm = np.sum(tmp * dx)
+phi_avg /= norm
+
+print("MC Keff = ", k_avg)
+plt.plot(x, phi_avg, label="MC")
+
+
+# =============================================================================
+# Power Iteration Results
 # =============================================================================
 
-# Load output
-with h5py.File("output.h5", "r") as f:
+with h5py.File("PI_output.h5", "r") as f:
     # Note the spatial (dx) and source strength (100+1) normalization
+    keff = f["k_eff"][()]
     phi_avg = f["tally/iqmc_flux"][:]
-
     x = f["iqmc/grid/x"][:]
     dx = x[1] - x[0]
     x_mid = 0.5 * (x[:-1] + x[1:])
+    f.close()
 
-phi_avg /= np.sum(tmp * dx)
-# Flux - spatial average
-plt.figure(dpi=300, figsize=(8, 5))
-plt.plot(x_exact, phi_exact, label="Sol")
-plt.plot(x_mid, phi_avg, label="iQMC")
+tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
+norm = np.sum(tmp * dx)
+phi_avg /= norm
+print("PI Keff = ", keff)
+plt.plot(x_mid, phi_avg, label="PI")
+
+# =============================================================================
+# Davidson Results
+# =============================================================================
+
+with h5py.File("davidson_output.h5", "r") as f:
+    # Note the spatial (dx) and source strength (100+1) normalization
+    keff = f["k_eff"][()]
+    phi_avg = f["tally/iqmc_flux"][:]
+    x = f["iqmc/grid/x"][:]
+    dx = x[1] - x[0]
+    x_mid = 0.5 * (x[:-1] + x[1:])
+    f.close()
+
+tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
+norm = np.sum(tmp * dx)
+phi_avg /= norm
+
+print("davidson Keff = ", keff)
+plt.plot(x_mid, phi_avg, label="davidson")
+
+
+# =============================================================================
+# Finish Plot
+# =============================================================================
+plt.title("Kornreich et al. Slab")
 plt.ylabel(r"$\phi(x)$")
 plt.xlabel(r"$x$")
 plt.grid()
 plt.legend()
-
-# Results
-# with h5py.File("output.h5", "r") as f:
-#     x = f["tally/grid/x"][:]
-#     dx = x[1:] - x[:-1]
-#     phi_avg = f["tally/flux-x/mean"][:]
-#     phi_sd = f["tally/flux-x/sdev"][:]
-#     k = f["k_cycle"][:]
-#     k_avg = f["k_mean"][()]
-#     k_sd = f["k_sdev"][()]
-#     rg = f["gyration_radius"][:]
-
-# tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
-# norm = np.sum(tmp * dx)
-# phi_avg /= norm
-# phi_sd /= norm
-
-# # Plot
-# N_iter = len(k)
-# (p1,) = plt.plot(np.arange(1, N_iter + 1), k, "-b", label="MC")
-# (p2,) = plt.plot(
-#     np.arange(2, N_iter + 1), np.ones(N_iter - 1) * k_exact, "--r", label="analytical"
-# )
-# (p3,) = plt.plot(
-#     np.arange(1, N_iter + 1), np.ones(N_iter) * k_avg, ":g", label="MC-avg"
-# )
-# plt.fill_between(
-#     np.arange(1, N_iter + 1),
-#     np.ones(N_iter) * (k_avg - k_sd),
-#     np.ones(N_iter) * (k_avg + k_sd),
-#     alpha=0.2,
-#     color="g",
-# )
-# plt.xlabel("Iteration #")
-# plt.ylabel(r"$k$")
-# plt.grid()
-# ax2 = plt.gca().twinx()
-# (p4,) = ax2.plot(np.arange(1, N_iter + 1), rg, "-.m", label="GyRad")
-# plt.ylabel(r"Gyration radius [cm]")
-# lines = [p1, p2, p3, p4]
-# plt.legend(lines, [l.get_label() for l in lines])
-# plt.show()
-
-# plt.plot(x, phi_avg, "-ob", fillstyle="none", label="MC")
-# plt.fill_between(x, phi_avg - phi_sd, phi_avg + phi_sd, alpha=0.2, color="b")
-# plt.plot(x, phi_exact, "--xr", label="analytical")
-# plt.xlabel(r"$x$")
-# plt.ylabel(r"$\phi(x)$")
-# plt.grid()
-# plt.legend()
-# plt.show()

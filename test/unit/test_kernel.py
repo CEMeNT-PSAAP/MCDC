@@ -1,10 +1,72 @@
 import numpy as np
+import mcdc as MCDC
 from mcdc import type_
-from mcdc.kernel import rng, rng_skip_ahead_
+from mcdc.main import closeout
+from mcdc.kernel import rng, AxV, FxV, HxV, preconditioner
 import mcdc.global_ as mcdc_
 
-input_card = mcdc_.input_card
-mcdc = mcdc_.global_
+input_deck = mcdc_.input_deck
+
+
+def iqmc_dummy_mcdc_variable():
+    """
+    This function returns the global "mcdc" container. Inputs are
+    taken from the kornreich eigenvalue problem.
+
+    """
+    # Set materials
+    m1 = MCDC.material(
+        capture=np.array([0.0]),
+        scatter=np.array([[0.9]]),
+        fission=np.array([0.1]),
+        nu_p=np.array([6.0]),
+    )
+    m2 = MCDC.material(
+        capture=np.array([0.68]),
+        scatter=np.array([[0.2]]),
+        fission=np.array([0.12]),
+        nu_p=np.array([2.5]),
+    )
+
+    # Set surfaces
+    s1 = MCDC.surface("plane-x", x=0.0, bc="vacuum")
+    s2 = MCDC.surface("plane-x", x=1.5)
+    s3 = MCDC.surface("plane-x", x=2.5, bc="vacuum")
+
+    # Set cells
+    MCDC.cell([+s1, -s2], m1)
+    MCDC.cell([+s2, -s3], m2)
+
+    # =============================================================================
+    # iQMC Parameters
+    # =============================================================================
+    N = 100
+    maxit = 10
+    tol = 1e-3
+    x = np.arange(0.0, 2.6, 0.1)
+    Nx = len(x) - 1
+    generator = "halton"
+    solver = "davidson"
+    fixed_source = np.zeros(Nx)
+    phi0 = np.ones((Nx))
+
+    # =============================================================================
+    # Set tally, setting, and run mcdc
+    # =============================================================================
+
+    MCDC.iQMC(
+        x=x,
+        fixed_source=fixed_source,
+        phi0=phi0,
+        maxitt=maxit,
+        tol=tol,
+        generator=generator,
+        eigenmode_solver=solver,
+    )
+    # Setting
+    MCDC.setting(N_particle=N)
+    MCDC.eigenmode()
+    return MCDC.prepare()
 
 
 def test_rn_basic():
@@ -19,65 +81,142 @@ def test_rn_basic():
         Trans. Am. Nucl. Soc, 71, 202 (1994)
 
     """
+    MCDC.reset_cards()
+
     ref_data = np.array(
         (
-            3512401965023503517,
-            5461769869401032777,
-            1468184805722937541,
-            5160872062372652241,
-            6637647758174943277,
-            794206257475890433,
-            4662153896835267997,
-            6075201270501039433,
-            889694366662031813,
-            7299299962545529297,
+            1,
+            2806196910506780710,
+            6924308458965941631,
+            7093833571386932060,
+            4133560638274335821,
         )
     )
 
-    # PRNG parameters from [1]
-    g = 3512401965023503517
-    c = 0
-    seed0 = 1
-    mod = 2**63
-
-    # Arbitrary constants for dummy mcdc container
-    G = 1
-    J = 1
-    Nmax_slice = 1
-    Nmax_surface = 1
-    Nmax_cell = 1
-    # need a psuedo material for mcdc container
-    input_card.materials.append({"G": 1, "J": 1})
-
-    # Make types for dummy mcdc container
-    type_.make_type_material(G, J, 1)
-    type_.make_type_surface(Nmax_slice)
-    type_.make_type_cell(Nmax_surface)
-    type_.make_type_universe(Nmax_cell)
-    type_.make_type_lattice(input_card.lattices)
-    type_.make_type_source(G)
-    type_.make_type_tally(input_card)
-    type_.make_type_technique(input_card)
-    type_.make_type_global(input_card)
-
-    # The dummy container
-    mcdc = np.zeros(1, dtype=type_.global_)[0]
-
-    # Change mcdc PRNG parameters
-    mcdc["setting"]["rng_g"] = g
-    mcdc["setting"]["rng_c"] = c
-    mcdc["setting"]["rng_mod"] = mod
-    mcdc["rng_seed_base"] = seed0
-    mcdc["rng_seed"] = seed0
+    mcdc = iqmc_dummy_mcdc_variable()
 
     # run through the first five seeds (1-5)
     for i in range(5):
-        seed = rng(mcdc) * mod
-        assert seed == ref_data[i]
+        assert mcdc["setting"]["rng_seed"] == ref_data[i]
+        rng(mcdc["setting"])
 
-    # skip to 123456-123460
-    rng_skip_ahead_(123456, mcdc)
-    seed = mcdc["rng_seed"]
-    for i in range(5, 10):
-        assert seed == ref_data[i]
-        seed = rng(mcdc) * mod
+
+def test_AxV_linearity():
+    """
+    AxV is the linear operator used for GMRES in iQMC.
+
+    Linear operators must satisfy conditions of additivity and multiplicity
+    defined as:
+            - Additivity: f(x+y) = f(x) + f(y)
+            - Multiplicity: f(cx) = cf(x)
+
+    We can test both properties with:
+            - f(a*x + b*y) = a*f(x) + b*f(y)
+    """
+    MCDC.reset_cards()
+
+    mcdc = iqmc_dummy_mcdc_variable()
+
+    size = mcdc["technique"]["iqmc_flux"].size
+    np.random.seed(123456)
+    a = np.random.random()
+    b = np.random.random()
+    x = np.random.random((size,))
+    y = np.random.random((size,))
+    rhs = np.zeros((size,))
+
+    F1 = AxV((a * x + b * y), rhs, mcdc)
+    F2 = a * AxV(x, rhs, mcdc) + b * AxV(y, rhs, mcdc)
+    assert np.allclose(F1, F2, rtol=1e-10)
+
+
+def test_FxV_linearity():
+    """
+    FxV is a linear operator used for Davidson in iQMC.
+
+    Linear operators must satisfy conditions of additivity and multiplicity
+    defined as:
+            - Additivity: f(x+y) = f(x) + f(y)
+            - Multiplicity: f(cx) = cf(x)
+
+    We can test both properties with:
+            - f(a*x + b*y) = a*f(x) + b*f(y)
+    """
+    MCDC.reset_cards()
+
+    mcdc = iqmc_dummy_mcdc_variable()
+
+    size = mcdc["technique"]["iqmc_flux"].size
+    np.random.seed(123456)
+    a = np.random.random()
+    b = np.random.random()
+    x = np.random.random((size, 1))
+    y = np.random.random((size, 1))
+
+    F1 = FxV((a * x + b * y), mcdc)
+    F2 = a * FxV(x, mcdc) + b * FxV(y, mcdc)
+    assert np.allclose(F1, F2, rtol=1e-10)
+
+
+def test_HxV_linearity():
+    """
+    HxV is a linear operator used for Davidson in iQMC.
+
+    Linear operators must satisfy conditions of additivity and multiplicity
+    defined as:
+            - Additivity: f(x+y) = f(x) + f(y)
+            - Multiplicity: f(cx) = cf(x)
+
+    We can test both properties with:
+            - f(a*x + b*y) = a*f(x) + b*f(y)
+    """
+    MCDC.reset_cards()
+
+    mcdc = iqmc_dummy_mcdc_variable()
+
+    size = mcdc["technique"]["iqmc_flux"].size
+    np.random.seed(123456)
+    a = np.random.random()
+    b = np.random.random()
+    x = np.random.random((size, 1))
+    y = np.random.random((size, 1))
+
+    F1 = HxV((a * x + b * y), mcdc)
+    F2 = a * HxV(x, mcdc) + b * HxV(y, mcdc)
+    assert np.allclose(F1, F2, rtol=1e-10)
+
+
+def test_preconditioner_linearity():
+    """
+    perconditioner is a linear operator used for Davidson in iQMC.
+
+    Linear operators must satisfy conditions of additivity and multiplicity
+    defined as:
+            - Additivity: f(x+y) = f(x) + f(y)
+            - Multiplicity: f(cx) = cf(x)
+
+    We can test both properties with:
+            - f(a*x + b*y) = a*f(x) + b*f(y)
+    """
+    MCDC.reset_cards()
+
+    mcdc = iqmc_dummy_mcdc_variable()
+
+    size = mcdc["technique"]["iqmc_flux"].size
+    np.random.seed(123456)
+    a = np.random.random()
+    b = np.random.random()
+    x = np.random.random((size, 1))
+    y = np.random.random((size, 1))
+
+    F1 = preconditioner((a * x + b * y), mcdc)
+    F2 = a * preconditioner(x, mcdc) + b * preconditioner(y, mcdc)
+    assert np.allclose(F1, F2, rtol=1e-10)
+
+
+# if __name__ == "__main__":
+# test_rn_basic()
+# test_AxV_linearity()
+#     test_FxV_linearity()
+#     test_HxV_linearity()
+#     test_preconditioner_linearity()
