@@ -302,15 +302,22 @@ def loop_source_dd(seed, mcdc):
                 P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print(
-                        "recieved particle not in domain:",
-                        P["x"],
-                        P["z"],
-                        ",",
-                        P["ux"],
-                        P["uz"],
-                        mcdc["d_idx"],
-                    )
+                    kernel.shift_particle(P, SHIFT)
+                    if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                        print(
+                            "recieved particle not in domain: x,y,z: ",
+                            P["x"],
+                            P["y"],
+                            P["z"],
+                            ", ux,uy,uz: ",
+                            P["ux"],
+                            P["uy"],
+                            P["uz"],
+                            " domain: ",
+                            mcdc["d_idx"],
+                            "mesh",
+                            #mcdc["technique"]["domain_mesh"]
+                        )
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:

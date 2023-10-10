@@ -30,14 +30,16 @@ def domain_crossing(P, mcdc):
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
         flag = directions[0]
+        
         if len(directions) > 1:
             for direction in directions[1:]:
                 if direction == MESH_X:
-                    P["x"] -= 2 * SHIFT
+                    P["x"] -= SHIFT * P["ux"]/np.abs(P["ux"])
                 if direction == MESH_Y:
-                    P["y"] -= 2 * SHIFT
+                    P["y"] -= SHIFT * P["uy"]/np.abs(P["uy"])
                 if direction == MESH_Z:
-                    P["z"] -= 2 * SHIFT
+                    P["z"] -=  SHIFT *  P["uz"]/np.abs(P["uz"])
+        
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -273,11 +275,12 @@ def particle_in_domain(P, mcdc):
     x_cell = binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
     y_cell = binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
     z_cell = binary_search(P["z"], mcdc["technique"]["domain_mesh"]["z"])
-    # print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
+    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
     if d_ix == x_cell:
         if d_iy == y_cell:
             if d_iz == z_cell:
                 return True
+    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
     return False
 
 
