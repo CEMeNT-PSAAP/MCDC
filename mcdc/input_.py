@@ -1236,7 +1236,6 @@ def IC_generator(
     card["IC_generator"] = True
     card["IC_N_neutron"] = N_neutron
     card["IC_N_precursor"] = N_precursor
-    card["IC_cycle_stretch"] = cycle_stretch
 
     # Setting parameters
     card_setting = mcdc.input_deck.setting
