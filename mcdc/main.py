@@ -318,6 +318,20 @@ def prepare():
     mcdc["technique"]["pc_factor"] = input_deck.technique["pc_factor"]
 
     # =========================================================================
+    # IC generator
+    # =========================================================================
+
+    for name in [
+        "IC_N_neutron",
+        'IC_N_precursor',
+        'IC_neutron_density',
+        'IC_neutron_density_max',
+        'IC_precursor_density',
+        'IC_precursor_density_max'
+    ]:
+        mcdc["technique"][name] = input_deck.technique[name]
+
+    # =========================================================================
     # Weight window (WW)
     # =========================================================================
 
@@ -659,7 +673,7 @@ def generate_hdf5(mcdc):
             neutrons = np.concatenate(neutrons[:])
 
             # Create dataset
-            with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+            with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:
                 f.create_dataset("particles", data=neutrons[:])
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 

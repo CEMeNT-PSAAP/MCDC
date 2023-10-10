@@ -552,7 +552,6 @@ def make_type_technique(N_particle, G, card):
         ("IC_neutron_density_max", float64),
         ("IC_precursor_density", float64),
         ("IC_precursor_density_max", float64),
-        ("IC_cycle_stretch", float64),
         ("IC_bank_neutron_local", bank_neutron_local),
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
@@ -601,6 +600,7 @@ def make_type_global(card):
     # Particle bank types
     bank_active = particle_bank(1 + bank_active_buff)
     if card.setting["mode_eigenvalue"] or card.setting["N_census"] > 1:
+        print(int((1 + bank_census_buff) * N_work))
         bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
         bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
     else:
