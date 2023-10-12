@@ -36,6 +36,8 @@ class InputDeck:
 
         self.setting = {
             "tag": "Setting",
+            "mode_MG": True,
+            "mode_CE": False,
             "N_particle": 0,
             "N_batch": 1,
             "rng_seed": 1,
@@ -284,3 +286,21 @@ def make_card_mesh():
         "azi": np.array([-PI, PI]),
         "g": np.array([-INF, INF]),
     }
+
+
+def make_card_nuclide_CE():
+    card = {}
+    card["tag"] = "Nuclide-CE"
+    card["name"] = ''
+    card["ID"] = -1
+    return card
+
+
+def make_card_material_CE(N_nuclide):
+    card = {}
+    card["tag"] = "Material-CE"
+    card["ID"] = -1
+    card["N_nuclide"] = N_nuclide
+    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
+    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
+    return card

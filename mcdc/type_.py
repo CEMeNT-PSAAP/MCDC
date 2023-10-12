@@ -33,8 +33,9 @@ global_ = None
 
 
 # Particle (in-flight)
-def make_type_particle(iQMC, G):
+def make_type_particle(input_deck):
     global particle
+
     struct = [
         ("x", float64),
         ("y", float64),
@@ -44,6 +45,7 @@ def make_type_particle(iQMC, G):
         ("uy", float64),
         ("uz", float64),
         ("g", uint64),
+        ("E", float64),
         ("w", float64),
         ("alive", bool_),
         ("material_ID", int64),
@@ -54,17 +56,27 @@ def make_type_particle(iQMC, G):
         ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
-    # iqmc vector of weights
-    Ng = 1
-    if iQMC:
-        Ng = G
-    struct += [("iqmc_w", float64, (Ng,))]
+
+    # Get modes
+    mode_MG = input_deck.setting['mode_MG']
+    iQMC = input_deck.technique["iQMC"]
+
+    # Default number of groups for iQMC
+    G = 1
+
+    # iQMC vector of weights
+    if iQMC and mode_MG:
+        G = input_deck.materials[0]["G"]
+    struct += [("iqmc_w", float64, (G,))]
+
+    # Save type
     particle = np.dtype(struct)
 
 
 # Particle record (in-bank)
-def make_type_particle_record(iQMC, G):
+def make_type_particle_record(input_deck):
     global particle_record
+
     struct = [
         ("x", float64),
         ("y", float64),
@@ -74,15 +86,25 @@ def make_type_particle_record(iQMC, G):
         ("uy", float64),
         ("uz", float64),
         ("g", uint64),
+        ("E", float64),
         ("w", float64),
         ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
-    # iqmc vector of weights
-    Ng = 1
-    if iQMC:
-        Ng = G
-    struct += [("iqmc_w", float64, (Ng,))]
+
+    # Get modes
+    mode_MG = input_deck.setting['mode_MG']
+    iQMC = input_deck.technique["iQMC"]
+
+    # Default number of groups for iQMC
+    G = 1
+
+    # iQMC vector of weights
+    if iQMC and mode_MG:
+        G = input_deck.materials[0]["G"]
+    struct += [("iqmc_w", float64, (G,))]
+
+    # Save type
     particle_record = np.dtype(struct)
 
 
@@ -120,7 +142,7 @@ def precursor_bank(max_size):
 # ==============================================================================
 
 
-def make_type_nuclide(G, J):
+def make_type_nuclide(input_deck):
     global nuclide
     nuclide = np.dtype(
         [

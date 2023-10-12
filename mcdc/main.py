@@ -97,11 +97,6 @@ def prepare():
     #   We need this to determine the maximum size of model objects
     # =========================================================================
 
-    # Neutron and delayed neutron precursor group sizes
-    #   We assume that all materials have the same group structures
-    G = input_deck.materials[0]["G"]
-    J = input_deck.materials[0]["J"]
-
     # Number of model objects
     N_nuclide = len(input_deck.nuclides)
     N_material = len(input_deck.materials)
@@ -132,9 +127,6 @@ def prepare():
     # Other parameters needed to set up MC/DC object types
     # =========================================================================
 
-    # Flags
-    iQMC = input_deck.technique["iQMC"]
-
     # Numbers
     N_sensitivity = input_deck.setting["N_sensitivity"]
     N_tally_scores = 1 + N_sensitivity
@@ -158,9 +150,9 @@ def prepare():
     # Make types
     # =========================================================================
 
-    type_.make_type_particle(iQMC, G)
-    type_.make_type_particle_record(iQMC, G)
-    type_.make_type_nuclide(G, J)
+    type_.make_type_particle(input_deck)
+    type_.make_type_particle_record(input_deck)
+    type_.make_type_nuclide(input_deck)
     type_.make_type_material(G, J, Nmax_nuclide)
     type_.make_type_surface(Nmax_slice)
     type_.make_type_cell(Nmax_surface)

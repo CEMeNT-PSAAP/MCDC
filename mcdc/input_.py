@@ -11,7 +11,9 @@ import mcdc.type_ as type_
 from mcdc.card import (
     SurfaceHandle,
     make_card_nuclide,
+    make_card_nuclide_CE,
     make_card_material,
+    make_card_material_CE,
     make_card_surface,
     make_card_cell,
     make_card_universe,
@@ -296,8 +298,38 @@ def material(
         )
         nuclides = [[card_nuclide, 1.0]]
 
-    # Nuclide and group sizes
+    # Number of nuclides
     N_nuclide = len(nuclides)
+
+    # Continuous energy mode?
+    if isinstance(nuclides[0][0], str):
+        mcdc.input_deck.setting["mode_CE"] = True
+        mcdc.input_deck.setting["mode_MG"] = False
+
+        # Make material card
+        card = make_card_material_CE(N_nuclide)
+        card["ID"] = len(mcdc.input_deck.materials)
+
+        # Set the nuclides
+        for i in range(N_nuclide):
+            nuc_name = nuclides[i][0]
+            density = nuclides[i][1]
+            if not nuclide_registered(nuc_name):
+                nuc_ID = len(mcdc.input_deck.nuclides)
+                nuc_card = make_card_nuclide_CE()
+                nuc_card['name'] = nuc_name
+                nuc_card['ID'] = nuc_ID
+                mcdc.input_deck.nuclides.append(nuc_card)
+            else:
+                nuc_card = get_nuclide(nuc_name)
+            card["nuclide_IDs"][i] = nuc_card['ID']
+            card["nuclide_densities"][i] = density
+
+        # Add to deck
+        mcdc.input_deck.materials.append(card)
+        return card
+
+    # Nuclide and group sizes
     G = nuclides[0][0]["G"]
     J = nuclides[0][0]["J"]
 
@@ -720,7 +752,8 @@ def source(**kw):
         at which isotropic surface source is emitted. Note that it is similar to the
         mechanics of the typical white boundary condition in reactor physics.
     energy : array_like
-        Probability mass function of the energy group for multigroup source.
+        [MG] Probability mass function of the energy group for multigroup source.
+        [CE] 2D array of piecewise linear pdf [eV, value].
     time : array_like
         [t_min and t_max] in/at which source is emitted.
     prob : float
@@ -832,6 +865,7 @@ def tally(
     mu=np.array([-1.0, 1.0]),
     azi=np.array([-PI, PI]),
     g=np.array([-INF, INF]),
+    E=np.array([0.0, INF]),
 ):
     # Get tally card
     card = mcdc.input_deck.tally
@@ -850,6 +884,8 @@ def tally(
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
+    if mcdc.input_deck.setting['mode_CE']:
+        card["mesh"]["g"] = E
 
     # Set score flags
     for s in scores:
@@ -1281,6 +1317,19 @@ def dsm(order=1):
 # ==============================================================================
 # Util
 # ==============================================================================
+
+
+def nuclide_registered(name):
+    for card in mcdc.input_deck.nuclides:
+        if name == card['name']:
+            return True
+    return False
+
+
+def get_nuclide(name):
+    for card in mcdc.input_deck.nuclides:
+        if name == card['name']:
+            return card
 
 
 def print_card(card):
