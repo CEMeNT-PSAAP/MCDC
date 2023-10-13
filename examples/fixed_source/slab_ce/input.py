@@ -19,9 +19,9 @@ A_b4c = 55.255
 
 N_avo = 6.023e23
 
-N_uo2 = rho_uo2 * N_avo / A_uo2 * 1E-24
-N_h2o = rho_h2o * N_avo / A_h2o * 1E-24
-N_b4c = rho_b4c * N_avo / A_b4c * 1E-24
+N_uo2 = rho_uo2 * N_avo / A_uo2 * 1e-24
+N_h2o = rho_h2o * N_avo / A_h2o * 1e-24
+N_b4c = rho_b4c * N_avo / A_b4c * 1e-24
 
 N_u235 = a_u235 * N_uo2
 N_u238 = a_u238 * N_uo2
@@ -69,14 +69,14 @@ mcdc.cell([+s3, -s4], b4c)
 # Set source
 # =============================================================================
 
-mcdc.source(x=[0.95, 1.05], energy=np.array([[14E6, 14E6], [1.0, 1.0]]), isotropic=True)
+mcdc.source(
+    x=[0.95, 1.05], energy=np.array([[14e6 - 1, 14e6 + 1], [1.0, 1.0]]), isotropic=True
+)
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(
-    scores=["flux"], x=np.linspace(0.0, 2.0, 201), E=np.array([0.0, 1.0, 20e6])
-)
+mcdc.tally(scores=["flux"], x=np.linspace(0.0, 2.0, 201), E=np.array([0.0, 1.0, 20e6]))
 mcdc.setting(N_particle=1e3)
 mcdc.run()

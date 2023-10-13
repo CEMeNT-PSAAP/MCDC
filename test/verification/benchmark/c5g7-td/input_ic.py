@@ -5,12 +5,12 @@ import mcdc
 
 
 # Get IC generator parameters
-with h5py.File('output_k.h5', 'r') as f:
+with h5py.File("output_k.h5", "r") as f:
     neutron_density = f["global_tally/neutron/mean"][()]
     max_neutron_density = f["global_tally/neutron/max"][()]
     precursor_density = f["global_tally/precursor/mean"][()]
     max_precursor_density = f["global_tally/precursor/max"][()]
-    keff = f['k_mean'][()]
+    keff = f["k_mean"][()]
 
 # =============================================================================
 # Materials
@@ -26,8 +26,8 @@ def set_mat(mat):
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],
-        nu_p=mat["nu_p"][:]/keff,
-        nu_d=mat["nu_d"][:]/keff,
+        nu_p=mat["nu_p"][:] / keff,
+        nu_d=mat["nu_d"][:] / keff,
         chi_p=mat["chi_p"][:],
         chi_d=mat["chi_d"][:],
         speed=mat["speed"],
@@ -282,10 +282,10 @@ mcdc.universe(
 # =============================================================================
 
 # Setting
-mcdc.setting(source_file='output_k.h5', output_name='output_ic')
+mcdc.setting(source_file="output_k.h5", output_name="output_ic")
 mcdc.IC_generator(
-    N_neutron=1E6,
-    N_precursor=1E6,
+    N_neutron=1e6,
+    N_precursor=1e6,
     neutron_density=neutron_density,
     max_neutron_density=max_neutron_density,
     precursor_density=precursor_density,

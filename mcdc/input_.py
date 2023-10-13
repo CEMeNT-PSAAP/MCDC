@@ -3,7 +3,7 @@ This module contains functions for setting MC/DC input deck.
 The input deck class is defined in `card.py` and instantiated in `global_.py`.
 """
 
-import h5py, math, mpi4py
+import h5py, math, mpi4py, os
 import numpy as np
 
 import mcdc.type_ as type_
@@ -11,9 +11,7 @@ import mcdc.type_ as type_
 from mcdc.card import (
     SurfaceHandle,
     make_card_nuclide,
-    make_card_nuclide_CE,
     make_card_material,
-    make_card_material_CE,
     make_card_surface,
     make_card_cell,
     make_card_universe,
@@ -138,6 +136,7 @@ def nuclide(
         card["scatter"][:] = np.sum(scatter, 0)[:]
     if fission is not None:
         card["fission"][:] = fission[:]
+        card["fissionable"] = True
     card["total"][:] = card["capture"] + card["scatter"] + card["fission"]
 
     # Scattering multiplication (vector of size G)
@@ -307,7 +306,7 @@ def material(
         mcdc.input_deck.setting["mode_MG"] = False
 
         # Make material card
-        card = make_card_material_CE(N_nuclide)
+        card = make_card_material(N_nuclide)
         card["ID"] = len(mcdc.input_deck.materials)
 
         # Set the nuclides
@@ -316,13 +315,19 @@ def material(
             density = nuclides[i][1]
             if not nuclide_registered(nuc_name):
                 nuc_ID = len(mcdc.input_deck.nuclides)
-                nuc_card = make_card_nuclide_CE()
-                nuc_card['name'] = nuc_name
-                nuc_card['ID'] = nuc_ID
+                nuc_card = make_card_nuclide()
+                nuc_card["name"] = nuc_name
+                nuc_card["ID"] = nuc_ID
+
+                dir_name = os.getenv("MCDC_XSLIB")
+                with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
+                    if max(f["fission"][:]) > 0.0:
+                        nuc_card["fissionable"] = True
+
                 mcdc.input_deck.nuclides.append(nuc_card)
             else:
                 nuc_card = get_nuclide(nuc_name)
-            card["nuclide_IDs"][i] = nuc_card['ID']
+            card["nuclide_IDs"][i] = nuc_card["ID"]
             card["nuclide_densities"][i] = density
 
         # Add to deck
@@ -839,9 +844,18 @@ def source(**kw):
 
     # Set energy
     if energy is not None:
-        group = np.array(energy)
-        # Normalize
-        card["group"] = group / np.sum(group)
+        if mcdc.input_deck.setting["mode_MG"]:
+            group = np.array(energy)
+            # Normalize
+            card["group"] = group / np.sum(group)
+        if mcdc.input_deck.setting["mode_CE"]:
+            energy = np.array(energy)
+            # Resize
+            card["energy"] = np.zeros(energy.shape)
+            # Set energy
+            card["energy"][0, :] = energy[0, :]
+            # Normalize pdf
+            card["energy"][1, :] = energy[1, :] / np.trapz(energy[1, :], x=energy[0, :])
 
     # Set time
     if time is not None:
@@ -884,7 +898,7 @@ def tally(
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
-    if mcdc.input_deck.setting['mode_CE']:
+    if mcdc.input_deck.setting["mode_CE"]:
         card["mesh"]["g"] = E
 
     # Set score flags
@@ -1321,14 +1335,14 @@ def dsm(order=1):
 
 def nuclide_registered(name):
     for card in mcdc.input_deck.nuclides:
-        if name == card['name']:
+        if name == card["name"]:
             return True
     return False
 
 
 def get_nuclide(name):
     for card in mcdc.input_deck.nuclides:
-        if name == card['name']:
+        if name == card["name"]:
             return card
 
 
