@@ -285,7 +285,7 @@ source = mcdc.source(
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=2e7, output_name='output_k')
+mcdc.setting(N_particle=2e7, output_name="output_k")
 mcdc.eigenmode(N_inactive=50, N_active=150, gyration_radius="all", save_particle=True)
 mcdc.population_control()
 

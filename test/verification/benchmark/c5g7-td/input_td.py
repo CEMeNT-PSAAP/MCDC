@@ -61,7 +61,7 @@ cr2_t = np.array([0.0])
 cr3 = np.array([0.0, 0.0, 2.0 / 6.0, 0.0])
 cr3_t = np.array([0.0, 4.0, 6.0, 8.0])
 
-cr4 = np.array([0.0, 2.0/6.0, 2.0/6.0, 0.0])
+cr4 = np.array([0.0, 2.0 / 6.0, 2.0 / 6.0, 0.0])
 cr4_t = np.array([0.0, 2.0, 4.0, 6.0])
 
 # Control rod banks interfaces

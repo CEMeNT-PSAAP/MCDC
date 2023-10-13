@@ -132,10 +132,12 @@ class SurfaceHandle:
         return [self.card, False]
 
 
-def make_card_nuclide(G, J):
+def make_card_nuclide(G=1, J=0):
     card = {}
     card["tag"] = "Nuclide"
+    card["name"] = ""
     card["ID"] = -1
+    card["fissionable"] = False
     card["G"] = G
     card["J"] = J
     card["speed"] = np.ones(G)
@@ -157,7 +159,7 @@ def make_card_nuclide(G, J):
     return card
 
 
-def make_card_material(N_nuclide, G, J):
+def make_card_material(N_nuclide, G=1, J=0):
     card = {}
     card["tag"] = "Material"
     card["ID"] = -1
@@ -271,6 +273,7 @@ def make_card_source():
     card["white_y"] = 0.0
     card["white_z"] = 0.0
     card["group"] = np.array([1.0])
+    card["energy"] = np.array([[14e6, 14e6], [1.0, 1.0]])
     card["time"] = np.array([0.0, 0.0])
     card["prob"] = 1.0
     return card
@@ -286,21 +289,3 @@ def make_card_mesh():
         "azi": np.array([-PI, PI]),
         "g": np.array([-INF, INF]),
     }
-
-
-def make_card_nuclide_CE():
-    card = {}
-    card["tag"] = "Nuclide-CE"
-    card["name"] = ''
-    card["ID"] = -1
-    return card
-
-
-def make_card_material_CE(N_nuclide):
-    card = {}
-    card["tag"] = "Material-CE"
-    card["ID"] = -1
-    card["N_nuclide"] = N_nuclide
-    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
-    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
-    return card
