@@ -5,6 +5,7 @@ The input deck class is defined in `card.py` and instantiated in `global_.py`.
 
 import h5py, math, mpi4py, os
 import numpy as np
+import scipy as sp
 
 import mcdc.type_ as type_
 
@@ -856,6 +857,10 @@ def source(**kw):
             card["energy"][0, :] = energy[0, :]
             # Normalize pdf
             card["energy"][1, :] = energy[1, :] / np.trapz(energy[1, :], x=energy[0, :])
+            # Make cdf
+            card["energy"][1, :] = sp.integrate.cumulative_trapezoid(
+                card["energy"][1], x=card["energy"][0], initial=0.0
+            )
 
     # Set time
     if time is not None:

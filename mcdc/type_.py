@@ -170,15 +170,15 @@ def make_type_nuclide(input_deck):
         for nuc in input_deck.nuclides:
             with h5py.File(dir_name + "/" + nuc["name"] + ".h5", "r") as f:
                 NE_xs = max(NE_xs, len(f["E_xs"][:]))
-                NE_nu_p = max(NE_xs, len(f["E_nu_p"][:]))
-                NE_nu_d = max(NE_xs, len(f["E_nu_d"][:]))
-                NE_chi_p = max(NE_xs, len(f["E_chi_p"][:]))
-                NE_chi_d1 = max(NE_xs, len(f["E_chi_d1"][:]))
-                NE_chi_d2 = max(NE_xs, len(f["E_chi_d2"][:]))
-                NE_chi_d3 = max(NE_xs, len(f["E_chi_d3"][:]))
-                NE_chi_d4 = max(NE_xs, len(f["E_chi_d4"][:]))
-                NE_chi_d5 = max(NE_xs, len(f["E_chi_d5"][:]))
-                NE_chi_d6 = max(NE_xs, len(f["E_chi_d6"][:]))
+                NE_nu_p = max(NE_nu_p, len(f["E_nu_p"][:]))
+                NE_nu_d = max(NE_nu_d, len(f["E_nu_d"][:]))
+                NE_chi_p = max(NE_chi_p, len(f["E_chi_p"][:]))
+                NE_chi_d1 = max(NE_chi_d1, len(f["E_chi_d1"][:]))
+                NE_chi_d2 = max(NE_chi_d2, len(f["E_chi_d2"][:]))
+                NE_chi_d3 = max(NE_chi_d3, len(f["E_chi_d3"][:]))
+                NE_chi_d4 = max(NE_chi_d4, len(f["E_chi_d4"][:]))
+                NE_chi_d5 = max(NE_chi_d5, len(f["E_chi_d5"][:]))
+                NE_chi_d6 = max(NE_chi_d6, len(f["E_chi_d6"][:]))
 
     # Get MG sizes
     if mode_MG:
@@ -227,6 +227,7 @@ def make_type_nuclide(input_deck):
 
     # CE data
     struct += [
+        ("A", float64),
         ("NE_xs", int64),
         ("NE_nu_p", int64),
         ("NE_nu_d", int64),
@@ -598,6 +599,9 @@ def make_type_setting(deck):
         ("N_batch", uint64),
         ("rng_seed", uint64),
         ("time_boundary", float64),
+        # Physics flags
+        ("mode_MG", bool_),
+        ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
         ("output_name", "U30"),

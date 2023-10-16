@@ -56,8 +56,8 @@ b4c = mcdc.material(
 
 # Set surfaces
 s1 = mcdc.surface("plane-x", x=0.0, bc="reflective")
-s2 = mcdc.surface("plane-x", x=0.5, sensitivity=True)
-s3 = mcdc.surface("plane-x", x=1.5, sensitivity=True)
+s2 = mcdc.surface("plane-x", x=0.5)
+s3 = mcdc.surface("plane-x", x=1.5)
 s4 = mcdc.surface("plane-x", x=2.0, bc="reflective")
 
 # Set cells
@@ -77,6 +77,6 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=["flux"], x=np.linspace(0.0, 2.0, 201), E=np.array([0.0, 1.0, 20e6]))
+mcdc.tally(scores=["flux"], x=np.linspace(0.0, 2.0, 21), E=np.array([0.0, 1.0, 20e6]))
 mcdc.setting(N_particle=1e3)
 mcdc.run()
