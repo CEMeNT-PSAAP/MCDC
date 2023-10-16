@@ -756,7 +756,7 @@ def loop_source_precursor(seed, mcdc):
                 spectrum = nuclide["chi_d"][j]
                 decay = nuclide["decay"][j]
             else:
-                SigmaF = material["fission"][g]
+                SigmaF = material["fission"][g] # MG only
                 nu_d = material["nu_d"][g]
                 xi = kernel.rng(P_new) * nu_d[j] * SigmaF
                 tot = 0.0
