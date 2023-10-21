@@ -1216,6 +1216,7 @@ def mesh_get_index(P, mesh):
         or P["z"] > mesh["z"][-1]
     ):
         outside = True
+        return 0, 0, 0, 0,outside
 
     t = binary_search(P["t"], mesh["t"])
     x = binary_search(P["x"], mesh["x"])
@@ -1242,10 +1243,17 @@ def mesh_get_angular_index(P, mesh):
 
 @njit
 def mesh_get_energy_index(P, mesh, mcdc):
+    # Check if outside grid
+    outside = False
+
     if mcdc["setting"]["mode_MG"]:
-        return binary_search(P["g"], mesh["g"])
+        return binary_search(P["g"], mesh["g"]), outside
     else:
-        return binary_search(P["E"], mesh["g"])
+        E = P['E']
+        if E < mesh['g'][0] or E > mesh['g'][-1]:
+            outside = True
+            return 0, outside
+        return binary_search(P["E"], mesh["g"]), outside
 
 
 @njit
@@ -1273,10 +1281,10 @@ def score_tracklength(P, distance, mcdc):
     s = P["sensitivity_ID"]
     t, x, y, z, outside = mesh_get_index(P, tally["mesh"])
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"], mcdc)
+    g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
 
     # Outside grid?
-    if outside:
+    if outside or outside_energy:
         return
 
     # Score
@@ -3667,6 +3675,10 @@ def get_MacroXS(type_, material, P, mcdc):
         ID_nuclide = material["nuclide_IDs"][i]
         nuclide = mcdc["nuclides"][ID_nuclide]
 
+        # Skip if not compatible
+        if type_==XS_FISSION and not nuclide['fissionable']:
+            continue
+
         # Get nuclide density
         N = material["nuclide_densities"][i]
 
@@ -3709,6 +3721,7 @@ def get_XS(data, E, E_grid, NE):
     E2 = E_grid[idx + 1]
     XS1 = data[idx]
     XS2 = data[idx + 1]
+
     return XS1 + (E - E1) * (XS2 - XS1) / (E2 - E1)
 
 
@@ -3746,10 +3759,16 @@ def sample_nuclide(material, P, type_, mcdc):
     for i in range(material["N_nuclide"]):
         ID_nuclide = material["nuclide_IDs"][i]
         nuclide = mcdc["nuclides"][ID_nuclide]
+
+        # Skip if not compatible
+        if type_==XS_FISSION and not nuclide['fissionable']:
+            continue
+
         N = material["nuclide_densities"][i]
         tot += N * get_microXS(type_, nuclide, P["E"])
         if tot > xi:
             break
+
     return nuclide
 
 
@@ -3776,7 +3795,7 @@ def sample_Eout(P_new, E_grid, NE, chi):
 @njit
 def binary_search(val, grid, length=0):
     """
-    Binary search that returns the bin index of a value val given grid grid
+    Binary search that returns the bin index of the value `val` given grid `grid`.
 
     Some special cases:
         val < min(grid)  --> -1
@@ -3789,7 +3808,7 @@ def binary_search(val, grid, length=0):
     if length == 0:
         right = len(grid) - 1
     else:
-        right = length
+        right = length - 1
     mid = -1
     while left <= right:
         mid = int((left + right) / 2)
