@@ -187,9 +187,6 @@ def loop_source(seed, mcdc):
             with objmode():
                 print_progress(percent, mcdc)
 
-    # Re-sync RNG
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-
 
 # =========================================================================
 # Particle loop
@@ -834,6 +831,3 @@ def loop_source_precursor(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-
-    # Re-sync RNG
-    skip = N_global - idx_start

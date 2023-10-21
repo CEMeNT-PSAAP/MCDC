@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<materials>
+  <material depletable="true" id="1" name="UO2 fuel at 2.4% wt enrichment">
+    <density units="g/cm3" value="10.29769"/>
+    <nuclide ao="0.00021719193857965748" name="U234"/>
+    <nuclide ao="0.024299453780301263" name="U235"/>
+    <nuclide ao="0.9753720511113888" name="U238"/>
+    <nuclide ao="0.00011130316973028953" name="U236"/>
+    <nuclide ao="1.9952412" name="O16"/>
+    <nuclide ao="0.000758" name="O17"/>
+    <nuclide ao="0.0040008" name="O18"/>
+  </material>
+  <material id="2" name="Borated water">
+    <density units="g/cm3" value="1.0"/>
+    <nuclide ao="9.91e-05" name="B10"/>
+    <nuclide ao="0.0004009" name="B11"/>
+    <nuclide ao="0.04999221300000001" name="H1"/>
+    <nuclide ao="7.787e-06" name="H2"/>
+    <nuclide ao="0.0239428944" name="O16"/>
+    <nuclide ao="9.096e-06" name="O17"/>
+    <nuclide ao="4.8009599999999995e-05" name="O18"/>
+  </material>
+  <material id="3" name="Water">
+    <density units="g/cm3" value="1.0"/>
+    <nuclide ao="1.99968852" name="H1"/>
+    <nuclide ao="0.00031148" name="H2"/>
+    <nuclide ao="0.9976206" name="O16"/>
+    <nuclide ao="0.000379" name="O17"/>
+    <nuclide ao="0.0020004" name="O18"/>
+    <sab name="c_H_in_H2O"/>
+  </material>
+</materials>
