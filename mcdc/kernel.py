@@ -2048,49 +2048,21 @@ def scattering_CE(P, material, P_new, mcdc):
         if tot > xi:
             break
 
-    # =========================================================================
-    # Sampling nuclide velocity
-    # =========================================================================
-
+    # Sample nucleus thermal speed
     A = nuclide["A"]
-
-    # Maxwellian parameter
-    beta = math.sqrt(2.0659834e-11 * A)
-    # The constant above is
-    #   (1.674927471e-27 kg) / (1.38064852e-19 cm^2 kg s^-2 K^-1) / (293.6 K)/2
-
-    # Particle speed
-    P_speed = get_particle_speed(P, mcdc)
-
-    # Sample nuclide speed candidate V_tilda and
-    #   nuclide-neutron polar cosine candidate mu_tilda via
-    #   rejection sampling
-    y = beta * P_speed
-    while True:
-        if rng(P) < 2.0 / (2.0 + PI_SQRT * y):
-            x = math.sqrt(-math.log(rng(P) * rng(P)))
-        else:
-            cos_val = math.cos(PI_HALF * rng(P))
-            x = math.sqrt(-math.log(rng(P)) - math.log(rng(P)) * cos_val * cos_val)
-        V_tilda = x / beta
-        mu_tilda = 2.0 * rng(P) - 1.0
-
-        # Accept candidate V_tilda and mu_tilda?
-        if rng(P) > math.sqrt(
-            P_speed * P_speed + V_tilda * V_tilda - 2.0 * P_speed * V_tilda * mu_tilda
-        ) / (P_speed + V_tilda):
-            break
-
-    # Set nuclide velocity - LAB
-    azi = 2.0 * PI * rng(P)
-    ux, uy, uz = scatter_direction(P["ux"], P["uy"], P["uz"], mu_tilda, azi)
-    Vx = ux * V_tilda
-    Vy = uy * V_tilda
-    Vz = uz * V_tilda
+    if P['E'] > E_THERMAL_THRESHOLD:
+        Vx = 0.0
+        Vy = 0.0
+        Vz = 0.0
+    else:
+        Vx, Vy, Vz = sample_nucleus_speed(A, P, mcdc)
 
     # =========================================================================
     # COM kinematics
     # =========================================================================
+
+    # Particle speed
+    P_speed = get_particle_speed(P, mcdc)
 
     # Neutron velocity - LAB
     vx = P_speed * P["ux"]
@@ -2143,6 +2115,45 @@ def scattering_CE(P, material, P_new, mcdc):
     P_new["ux"] = vx / P_speed
     P_new["uy"] = vy / P_speed
     P_new["uz"] = vz / P_speed
+
+
+@njit
+def sample_nucleus_speed(A, P, mcdc):
+    # Particle speed
+    P_speed = get_particle_speed(P, mcdc)
+
+    # Maxwellian parameter
+    beta = math.sqrt(2.0659834e-11 * A)
+    # The constant above is
+    #   (1.674927471e-27 kg) / (1.38064852e-19 cm^2 kg s^-2 K^-1) / (293.6 K)/2
+
+    # Sample nuclide speed candidate V_tilda and
+    #   nuclide-neutron polar cosine candidate mu_tilda via
+    #   rejection sampling
+    y = beta * P_speed
+    while True:
+        if rng(P) < 2.0 / (2.0 + PI_SQRT * y):
+            x = math.sqrt(-math.log(rng(P) * rng(P)))
+        else:
+            cos_val = math.cos(PI_HALF * rng(P))
+            x = math.sqrt(-math.log(rng(P)) - math.log(rng(P)) * cos_val * cos_val)
+        V_tilda = x / beta
+        mu_tilda = 2.0 * rng(P) - 1.0
+
+        # Accept candidate V_tilda and mu_tilda?
+        if rng(P) > math.sqrt(
+            P_speed * P_speed + V_tilda * V_tilda - 2.0 * P_speed * V_tilda * mu_tilda
+        ) / (P_speed + V_tilda):
+            break
+
+    # Set nuclide velocity - LAB
+    azi = 2.0 * PI * rng(P)
+    ux, uy, uz = scatter_direction(P["ux"], P["uy"], P["uz"], mu_tilda, azi)
+    Vx = ux * V_tilda
+    Vy = uy * V_tilda
+    Vz = uz * V_tilda
+
+    return Vx, Vy, Vz
 
 
 @njit

@@ -31,7 +31,7 @@ water = mcdc.material(
         ["O18",6.574084932573092e-5 ],
     ]
 )
-'''
+
 water = mcdc.material(
     [
         ["H1", 0.06684555421640852],
@@ -41,7 +41,6 @@ water = mcdc.material(
         ["O18",6.686933755788307e-5],
     ]
 )
-'''
 
 # Set surfaces
 cy = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=0.45720)
@@ -52,7 +51,7 @@ y1 = mcdc.surface("plane-y", y=-pitch/2, bc="reflective")
 y2 = mcdc.surface("plane-y", y=pitch/2, bc="reflective")
 
 # Set cells
-mcdc.cell([-cy, +x1, -x2, +y1, -y2], fuel)
+mcdc.cell([-cy], water)
 mcdc.cell([+cy, +x1, -x2, +y1, -y2], water)
 
 # =============================================================================
@@ -74,5 +73,5 @@ with np.load("SHEM-361.npz") as data:
     E = data["E"]
 
 mcdc.tally(scores=["flux"], E=E, t=np.insert(np.logspace(-8, 2, 50), 0, 0.0))
-mcdc.setting(N_particle=1e7, active_bank_buff=1000)
+mcdc.setting(N_particle=1e7, active_bank_buff=1000, output_name='output_water_1MeV')
 mcdc.run()
