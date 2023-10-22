@@ -24,7 +24,7 @@ with openmc.StatePoint('statepoint.100.h5') as sp:
     phi_sd_openmc = (tally.get_values(scores=['flux'],value='std_dev')).reshape(K,G)
 
 # MCDC
-with h5py.File('output.h5', "r") as f:
+with h5py.File('output_water_1MeV.h5', "r") as f:
     phi_mcdc = f["tally/flux/mean"][:]
     phi_sd_mcdc = f["tally/flux/sdev"][:]
 
@@ -120,5 +120,5 @@ def animate(k):
 
 simulation = animation.FuncAnimation(fig, animate, frames=K)
 #writervideo = animation.FFMpegWriter(fps=10)
-simulation.save('pin_1MeV.gif',fps=10,writer='imagemagick',  savefig_kwargs={'bbox_inches':'tight', 'pad_inches':0}, dpi=600)
+simulation.save('water_1MeV.gif',fps=5,writer='imagemagick',  savefig_kwargs={'bbox_inches':'tight', 'pad_inches':0})
 plt.show()

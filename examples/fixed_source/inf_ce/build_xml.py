@@ -16,6 +16,7 @@ borated_water.set_density('g/cm3', 1.0)
 borated_water.add_element('B', 5e-4)
 borated_water.add_element('H', 5.0e-2)
 borated_water.add_element('O', 2.4e-2)
+borated_water.add_s_alpha_beta('c_H_in_H2O')
 
 water = openmc.Material(name='Water')
 water.set_density('g/cm3', 1.0)
@@ -42,8 +43,8 @@ pitch = 1.25984
 box = openmc.rectangular_prism(pitch, pitch, boundary_type='reflective')
 
 # Create cells, mapping materials to regions
-fuel = openmc.Cell(fill=uo2, region=-clad_or)
-water = openmc.Cell(fill=borated_water, region=+clad_or & box)
+fuel = openmc.Cell(fill=water, region=-clad_or)
+water = openmc.Cell(fill=water, region=+clad_or & box)
 
 # Create a geometry and export to XML
 geometry = openmc.Geometry([fuel, water])
