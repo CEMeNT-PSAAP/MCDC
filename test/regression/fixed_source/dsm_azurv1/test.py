@@ -26,7 +26,7 @@ def test():
 
     mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
 
-    scores = ["flux-t"]
+    scores = ["flux"]
     mcdc.tally(
         scores=scores,
         x=np.linspace(-20.0, 20.0, 202),

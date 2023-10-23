@@ -69,26 +69,10 @@ def f_phi(x1, x2):
     return quad(phi5, x1, x2)[0] / dx
 
 
-def f_phi_x(x):
-    if x <= 2.0:
-        return phi1(x)
-    if x <= 3.0:
-        return phi2(x)
-    if x <= 5.0:
-        return phi3(x)
-    if x <= 6.0:
-        return phi4(x)
-    return phi5(x)
-
-
 def reference(x):
     phi = np.zeros(len(x) - 1)
-    phi_x = np.zeros_like(x)
-
-    for i in range(len(x)):
-        phi_x[i] = f_phi_x(x[i])
 
     for i in range(len(phi)):
         phi[i] = f_phi(x[i], x[i + 1])
 
-    return phi, phi_x
+    return phi
