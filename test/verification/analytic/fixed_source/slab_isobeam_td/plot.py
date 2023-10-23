@@ -12,7 +12,7 @@ output = sys.argv[1]
 with h5py.File(output, "r") as f:
     x = f["tally/grid/x"][:]
     t = f["tally/grid/t"][:]
-phi_t_ref = reference(x, t)
+phi_ref = reference(x, t)
 
 # Get results
 with h5py.File(output, "r") as f:
@@ -24,13 +24,16 @@ with h5py.File(output, "r") as f:
     K = len(dt)
     J = len(x_mid)
 
-    phi_t = f["tally/flux-t/mean"][1:]
-    phi_t_sd = f["tally/flux-t/sdev"][1:]
+    phi = f["tally/flux/mean"][:]
+    phi_sd = f["tally/flux/sdev"][:]
 
 # Normalize
 for k in range(K):
-    phi_t[k] *= 0.5 / dx
-    phi_t_sd[k] *= 0.5 / dx
+    phi[k] *= 0.5 / dx
+    phi_sd[k] *= 0.5 / dx
+for j in range(J):
+    phi[:, j] /= dt
+    phi_sd[:, j] /= dt
 
 # Flux - t
 fig = plt.figure()
@@ -50,16 +53,16 @@ ax.legend()
 def animate(k):
     global fb
     fb.remove()
-    line1.set_data(x_mid, phi_t[k, :])
+    line1.set_data(x_mid, phi[k, :])
     fb = ax.fill_between(
         x_mid,
-        phi_t[k, :] - phi_t_sd[k, :],
-        phi_t[k, :] + phi_t_sd[k, :],
+        phi[k, :] - phi_sd[k, :],
+        phi[k, :] + phi_sd[k, :],
         alpha=0.2,
         color="b",
     )
-    line2.set_data(x_mid, phi_t_ref[k - 1, :])
-    text.set_text(r"$t = %.1f$ s" % (t[k]))
+    line2.set_data(x_mid, phi_ref[k, :])
+    text.set_text(r"$t \in [%.1f, %.1f]$ s" % (t[k], t[k + 1]))
     return line1, line2, text
 
 

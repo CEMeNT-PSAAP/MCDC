@@ -3,7 +3,6 @@ import sys
 
 import mcdc
 
-N_particle = int(sys.argv[2])
 
 # =============================================================================
 # Set model
@@ -45,12 +44,10 @@ mcdc.source(x=[5.0, 6.0], isotropic=True, prob=1.0)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=["flux", "flux-x"], x=np.linspace(0.0, 8.0, 41))
+mcdc.tally(scores=["flux"], x=np.linspace(0.0, 8.0, 41))
 
 # Setting
-mcdc.setting(
-    N_particle=N_particle, output_name="output_" + str(N_particle), progress_bar=False
-)
+mcdc.setting(N_particle=1000)
 
 # Run
 mcdc.run()

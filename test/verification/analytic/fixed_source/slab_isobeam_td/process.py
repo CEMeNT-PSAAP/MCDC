@@ -13,22 +13,15 @@ N_max = int(sys.argv[2])
 N_particle_list = np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1)
 
 
-def handle_run(file):
-    phi_t = file["tally/flux-t/mean"][1:]
-    for k in range(K):
-        phi_t[k] *= 0.5 / dx
-    error_t.append(np.linalg.norm(phi_t - phi_t_ref))
-
-
 # Reference solution
 with h5py.File("output_%i.h5" % int(N_particle_list[0]), "r") as f:
     x = f["tally/grid/x"][:]
     t = f["tally/grid/t"][:]
-phi_t_ref = reference(x, t)
+phi_ref = reference(x, t)
 
 # Error containers
-error_t = np.zeros(len(N_particle_list))
-error_max_t = np.zeros(len(N_particle_list))
+error = np.zeros(len(N_particle_list))
+error_max = np.zeros(len(N_particle_list))
 
 # Calculate error
 for i, N_particle in enumerate(N_particle_list):
@@ -37,17 +30,21 @@ for i, N_particle in enumerate(N_particle_list):
         x = f["tally/grid/x"][:]
         t = f["tally/grid/t"][:]
         K = len(t) - 1
+        J = len(x) - 1
         dx = x[1:] - x[:-1]
+        dt = t[1:] - t[:-1]
 
-        phi_t = f["tally/flux-t/mean"][1:]
+        phi = f["tally/flux/mean"][:]
 
     # Normalize
     for k in range(K):
-        phi_t[k] *= 0.5 / dx
+        phi[k] *= 0.5 / dx
+    for j in range(J):
+        phi[:, j] /= dt
 
     # Get error
-    error_t[i] = tool.error(phi_t, phi_t_ref)
-    error_max_t[i] = tool.error_max(phi_t, phi_t_ref)
+    error[i] = tool.error(phi, phi_ref)
+    error_max[i] = tool.error_max(phi, phi_ref)
 
 # Plot
-tool.plot_convergence("slab_isoBeam_td_flux_t", N_particle_list, error_t, error_max_t)
+tool.plot_convergence("slab_isoBeam_td_flux_t", N_particle_list, error, error_max)

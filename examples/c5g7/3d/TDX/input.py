@@ -283,7 +283,7 @@ mcdc.universe(
 # At highest energy
 
 energy = np.zeros(7)
-energy[-1] = 1.0
+energy[0] = 1.0
 
 source = mcdc.source(
     point=[pitch * 17 / 2, -pitch * 17 / 2, 0.0], time=[0.0, 15.0], energy=energy
@@ -295,10 +295,10 @@ source = mcdc.source(
 
 # Tally
 t_grid = np.linspace(0.0, 20.0, 201)
-mcdc.tally(scores=["fission"], t=t_grid, g=g_grid)
+mcdc.tally(scores=["fission"], t=t_grid)
 
 # Setting
-mcdc.setting(N_particle=1e5, active_bank_buff=10000)
+mcdc.setting(N_particle=1e2, active_bank_buff=1000)
 
 # Run
 mcdc.run()

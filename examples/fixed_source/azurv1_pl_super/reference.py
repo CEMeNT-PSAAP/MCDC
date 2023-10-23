@@ -50,8 +50,6 @@ def phiX(x, t0, t1):
 
 
 phi_avg = np.zeros([K, J])
-phi_edge = np.zeros([K, J])
-phi_face = np.zeros([K, J + 1])
 
 for k in range(K):
     for j in range(J):
@@ -61,7 +59,6 @@ for k in range(K):
         t0 = t[k]
         t1 = t[k + 1]
         dt = t1 - t0
-        phi_edge[k, j] = quad(phi, x0, x1, args=(t1))[0] / dx
         phi_avg[k, j] = quad(phiX, x0, x1, args=(t0, t1))[0] / dx / dt
 
 for j in range(J + 1):
@@ -69,11 +66,7 @@ for j in range(J + 1):
         t0 = t[k]
         t1 = t[k + 1]
         dt = t1 - t0
-        phi_face[k, j] = quad(phi_t, t0, t1, args=(x[j]))[0] / dt
 
-
-phi_edge = np.nan_to_num(phi_edge)
-phi_face = np.nan_to_num(phi_face)
 phi_avg = np.nan_to_num(phi_avg)
 
-np.savez("reference.npz", x=x, t=t, phi=phi_avg, phi_x=phi_face, phi_t=phi_edge)
+np.savez("reference.npz", x=x, t=t, phi=phi_avg)

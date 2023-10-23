@@ -121,9 +121,10 @@ def loop_source(seed, mcdc):
 
     # Loop over particle sources
     work_start = mcdc["mpi_work_start"]
-    work_end = work_start + mcdc["mpi_work_size"]
-    for idx_work in range(work_start, work_end):
-        seed_work = kernel.split_seed(idx_work, seed)
+    work_size = mcdc["mpi_work_size"]
+    work_end = work_start + work_size
+    for idx_work in range(work_size):
+        seed_work = kernel.split_seed(work_start + idx_work, seed)
 
         # Particle tracker
         if mcdc["setting"]["track_particle"]:
@@ -214,7 +215,7 @@ def loop_particle(P, mcdc):
         # The & operator here is a bitwise and.
         # It is used to determine if an event type is part of the particle event.
 
-        # Collision
+        # Collision events
         if event & EVENT_COLLISION:
             # Generate IC?
             if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
@@ -229,10 +230,9 @@ def loop_particle(P, mcdc):
                 # Get collision type
                 kernel.collision(P, mcdc)
                 event = P["event"]
+
                 # Perform collision
-                if event & EVENT_CAPTURE:
-                    kernel.capture(P, mcdc)
-                elif event == EVENT_SCATTERING:
+                if event == EVENT_SCATTERING:
                     kernel.scattering(P, mcdc)
                 elif event == EVENT_FISSION:
                     kernel.fission(P, mcdc)
@@ -246,40 +246,35 @@ def loop_particle(P, mcdc):
                 ):
                     kernel.sensitivity_material(P, mcdc)
 
-        # Mesh tally
-        if event & EVENT_MESH:
-            kernel.mesh_crossing(P, mcdc)
-
-        # Different Methods for shifting the particle
         # Surface crossing
         if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
 
-        # Surface move
-        elif event & EVENT_SURFACE_MOVE:
+        # Lattice or mesh crossing (skipped if surface crossing)
+        elif event & EVENT_LATTICE or event & EVENT_MESH:
+            kernel.shift_particle(P, SHIFT)
+
+        # Moving surface transition
+        if event & EVENT_SURFACE_MOVE:
             P["t"] += SHIFT
             P["cell_ID"] = -1
 
-        # Time census
-        elif event & EVENT_CENSUS:
+        # Census time crossing
+        if event & EVENT_CENSUS:
             P["t"] += SHIFT
             kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
             P["alive"] = False
 
-        # Shift particle
-        elif event & EVENT_LATTICE + EVENT_MESH:
-            kernel.shift_particle(P, SHIFT)
-
-        # Time boundary
+        # Time boundary crossing
         if event & EVENT_TIME_BOUNDARY:
-            kernel.time_boundary(P, mcdc)
+            P["alive"] = False
 
         # Apply weight window
-        elif mcdc["technique"]["weight_window"]:
+        if P["alive"] and mcdc["technique"]["weight_window"]:
             kernel.weight_window(P, mcdc)
 
         # Apply weight roulette
-        if mcdc["technique"]["weight_roulette"]:
+        if P["alive"] and mcdc["technique"]["weight_roulette"]:
             # check if weight has fallen below threshold
             if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
                 kernel.weight_roulette(P, mcdc)
