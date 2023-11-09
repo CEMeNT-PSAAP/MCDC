@@ -34,7 +34,7 @@ mcdc.source(z=[0.0, 6.0], isotropic=True)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-# Tally: cell-average and cell-edge angular fluxes and currents
+# Tally: cell-average fluxes and currents
 mcdc.tally(
     scores=["flux", "current"],
     z=np.linspace(0.0, 6.0, 61),
@@ -42,8 +42,7 @@ mcdc.tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1e4,active_bank_buff=1000000)
-mcdc.domain_decomp(z=np.linspace(0.0,6.0,7), exchange_rate=100,work_ratio=([1,1,1,1,1,1]))
+mcdc.setting(N_particle=1e3)
 
 # Run
 mcdc.run()
