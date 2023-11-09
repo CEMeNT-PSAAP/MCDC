@@ -17,10 +17,8 @@ with h5py.File("output.h5", "r") as f:
 
     psi = f["tally/flux/mean"][:]
     psi_sd = f["tally/flux/sdev"][:]
-
     J = f["tally/current/mean"][:, 2]
     J_sd = f["tally/current/sdev"][:, 2]
-
 
 I = len(z) - 1
 N = len(mu) - 1
@@ -42,7 +40,7 @@ for n in range(N):
     psi_sd[:, n] = psi_sd[:, n] / dz / dmu[n]
 
 # Reference solution
-phi_ref, phi_z_ref, J_ref, J_z_ref, psi_ref, psi_z_ref = reference(z, mu)
+phi_ref, J_ref, psi_ref = reference(z, mu)
 
 # Flux - spatial average
 plt.plot(z_mid, phi, "-b", label="MC")
@@ -56,8 +54,6 @@ plt.legend()
 plt.title(r"$\bar{\phi}_i$")
 plt.show()
 
-
-
 # Current - spatial average
 plt.plot(z_mid, J, "-b", label="MC")
 plt.fill_between(z_mid, J - J_sd, J + J_sd, alpha=0.2, color="b")
@@ -70,4 +66,22 @@ plt.legend()
 plt.title(r"$\bar{J}_i$")
 plt.show()
 
-
+# Angular flux - spatial average
+vmin = min(np.min(psi_ref), np.min(psi))
+vmax = max(np.max(psi_ref), np.max(psi))
+fig, ax = plt.subplots(1, 2, sharey=True)
+Z, MU = np.meshgrid(z_mid, mu_mid)
+im = ax[0].pcolormesh(MU.T, Z.T, psi_ref, vmin=vmin, vmax=vmax)
+ax[0].set_xlabel(r"Polar cosine, $\mu$")
+ax[0].set_ylabel(r"$z$")
+ax[0].set_title(r"\psi")
+ax[0].set_title(r"$\bar{\psi}_i(\mu)$ [Ref.]")
+ax[1].pcolormesh(MU.T, Z.T, psi, vmin=vmin, vmax=vmax)
+ax[1].set_xlabel(r"Polar cosine, $\mu$")
+ax[1].set_ylabel(r"$z$")
+ax[1].set_title(r"$\bar{\psi}_i(\mu)$ [MC]")
+fig.subplots_adjust(right=0.8)
+cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+cbar = fig.colorbar(im, cax=cbar_ax)
+cbar.set_label("Angular flux")
+plt.show()

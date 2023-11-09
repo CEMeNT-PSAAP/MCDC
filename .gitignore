@@ -33,7 +33,16 @@ tmp_*
 *.core
 .DS_Store # for mac users
 **/.DS_Store
+**/.idea
 
 # test cache
 .pytest_cache
 pytestdebug.log
+
+# profiler
+*.prof
+
+# Documentation builds
+docs/build
+docs/source/pythonapi/generated/
+
