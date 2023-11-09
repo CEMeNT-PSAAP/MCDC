@@ -42,16 +42,16 @@ def domain_crossing(P, mcdc):
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
         flag = directions[0]
-        
+
         if len(directions) > 1:
             for direction in directions[1:]:
                 if direction == MESH_X:
-                    P["x"] -= SHIFT * P["ux"]/np.abs(P["ux"])
+                    P["x"] -= SHIFT * P["ux"] / np.abs(P["ux"])
                 if direction == MESH_Y:
-                    P["y"] -= SHIFT * P["uy"]/np.abs(P["uy"])
+                    P["y"] -= SHIFT * P["uy"] / np.abs(P["uy"])
                 if direction == MESH_Z:
-                    P["z"] -=  SHIFT *  P["uz"]/np.abs(P["uz"])
-        
+                    P["z"] -= SHIFT * P["uz"] / np.abs(P["uz"])
+
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -210,7 +210,7 @@ def dd_particle_receive(mcdc):
                     bankr = np.append(bankr, received1.wait())
                 else:
                     MPI.Request.cancel(received1)
-                    
+
             if mcdc["technique"]["xn_neigh"].size > i:
                 received2 = MPI.COMM_WORLD.irecv(
                     source=mcdc["technique"]["xn_neigh"][i], tag=1
@@ -287,12 +287,12 @@ def particle_in_domain(P, mcdc):
     x_cell = binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
     y_cell = binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
     z_cell = binary_search(P["z"], mcdc["technique"]["domain_mesh"]["z"])
-    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
+    # print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
     if d_ix == x_cell:
         if d_iy == y_cell:
             if d_iz == z_cell:
                 return True
-    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
+    # print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
     return False
 
 
@@ -1791,7 +1791,6 @@ def mesh_uniform_get_index(P, mesh, trans):
 
 @njit
 def mesh_crossing_evaluate(P, mesh):
-
     # Shift backward
     shift_particle(P, -2 * SHIFT)
     t1, x1, y1, z1, outside1 = mesh_get_index(P, mesh)
@@ -1805,14 +1804,14 @@ def mesh_crossing_evaluate(P, mesh):
 
     # Determine dimension crossed
     directions = []
-    
+
     if x1 != x2:
         directions.append(MESH_X)
     if y1 != y2:
         directions.append(MESH_Y)
     if z1 != z2:
         directions.append(MESH_Z)
-    
+
     return x1, y1, z1, t1, directions
 
 
