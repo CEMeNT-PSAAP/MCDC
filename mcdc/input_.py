@@ -1110,12 +1110,20 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
 
 
 def domain_decomp(
-    x=None, y=None, z=None, t=None, exchange_rate=100, bank_size=1e5, work_ratio=None
+    x=None,
+    y=None,
+    z=None,
+    t=None,
+    exchange_rate=100,
+    bank_size=1e5,
+    work_ratio=None,
+    repro=True,
 ):
     card = mcdc.input_deck.technique
     card["domain_decomp"] = True
     card["domain_bank_size"] = int(1e5)
     card["exchange_rate"] = int(exchange_rate)
+    card["repro"] = repro
     dom_num = 1
     # Set mesh
     if x is not None:

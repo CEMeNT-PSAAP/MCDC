@@ -81,6 +81,7 @@ class InputDeck:
             "d_idx": 0,
             "domain_mesh": make_card_mesh(),
             "exchange_rate": 0,
+            "repro": False,
             "work_ratio": np.array([1]),
             "weight_roulette": False,
             "wr_threshold": 0.0,
