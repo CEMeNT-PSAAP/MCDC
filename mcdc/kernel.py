@@ -41,76 +41,43 @@ def domain_crossing(P, mcdc):
 
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
-        shift_particle(P,SHIFT)
-        if len(directions)>0:
-            flag = directions[0]
-            if len(directions) > 1:
-                for direction in directions[1:]:
-                    if direction == MESH_X:
-                        P["x"] -= 2 * SHIFT
-                    if direction == MESH_Y:
-                        P["y"] -= 2 * SHIFT
-                    if direction == MESH_Z:
-                        P["z"] -= 2 * SHIFT
-            # Score on tally
-            if flag == MESH_X:
-                if P["ux"] > 0:
-                    if x2 > d_ix:
-                        add_particle(copy_particle(P), mcdc["bank_domain_xp"])
-                        P["alive"] = False
-                elif P["ux"] < 0:
-                    if x2 < d_ix:
-                        add_particle(copy_particle(P), mcdc["bank_domain_xn"])
-                        P["alive"] = False
-                if mcdc["bank_domain_xn"]["size"] == max_size or mcdc["bank_domain_xp"]["size"] == max_size:
-                    dd_particle_send(mcdc)
-
-            elif flag == MESH_Y:
-                if P["uy"] > 0:
-                    if y2 > d_iy:
-                        add_particle(copy_particle(P), mcdc["bank_domain_yp"])
-                        P["alive"] = False
-                elif P["uy"] < 0:
-                    if y2 < d_iy:
-                        add_particle(copy_particle(P), mcdc["bank_domain_yn"])
-                        P["alive"] = False
-                if mcdc["bank_domain_yn"]["size"] == max_size or mcdc["bank_domain_yp"]["size"] == max_size:
-                    dd_particle_send(mcdc)
-            
-            elif flag == MESH_Z:
-                if P["uz"] > 0:
-                    if z2 > d_iz:
-                        add_particle(copy_particle(P), mcdc["bank_domain_zp"])
-                        P["alive"] = False
-                elif P["uz"] < 0:
-                    if z2 < d_iz:
-                        add_particle(copy_particle(P), mcdc["bank_domain_zn"])
-                        P["alive"] = False
-                if mcdc["bank_domain_zn"]["size"] == max_size or mcdc["bank_domain_zp"]["size"] == max_size:
-                    dd_particle_send(mcdc)
+        flag = directions[0]
         
-                '''
-                if flag == MESH_Y and P["uy"] > 0:
-                    add_particle(copy_particle(P), mcdc["bank_domain_yp"])
-                    if mcdc["bank_domain_yp"]["size"] == max_size:
-                        dd_particle_send(mcdc)
-                if flag == MESH_Y and P["uy"] < 0:
-                    add_particle(copy_particle(P), mcdc["bank_domain_yn"])
-                    if mcdc["bank_domain_yn"]["size"] == max_size:
-                        dd_particle_send(mcdc)
-                if flag == MESH_Z and P["uz"] > 0:
-                    add_particle(copy_particle(P), mcdc["bank_domain_zp"])
-                    if mcdc["bank_domain_zp"]["size"] == max_size:
-                        dd_particle_send(mcdc)
-                if flag == MESH_Z and P["uz"] < 0:
-                    add_particle(copy_particle(P), mcdc["bank_domain_zn"])
-                    if mcdc["bank_domain_zn"]["size"] == max_size:
-                        dd_particle_send(mcdc)
-                '''
-           
-        else:
-            print("failed crossing")
+        if len(directions) > 1:
+            for direction in directions[1:]:
+                if direction == MESH_X:
+                    P["x"] -= SHIFT * P["ux"]/np.abs(P["ux"])
+                if direction == MESH_Y:
+                    P["y"] -= SHIFT * P["uy"]/np.abs(P["uy"])
+                if direction == MESH_Z:
+                    P["z"] -=  SHIFT *  P["uz"]/np.abs(P["uz"])
         
+        # Score on tally
+        if flag == MESH_X and P["ux"] > 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_xp"])
+            if mcdc["bank_domain_xp"]["size"] == max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_X and P["ux"] < 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_xn"])
+            if mcdc["bank_domain_xn"]["size"] == max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Y and P["uy"] > 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_yp"])
+            if mcdc["bank_domain_yp"]["size"] == max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Y and P["uy"] < 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_yn"])
+            if mcdc["bank_domain_yn"]["size"] == max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Z and P["uz"] > 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_zp"])
+            if mcdc["bank_domain_zp"]["size"] == max_size:
+                dd_particle_send(mcdc)
+        if flag == MESH_Z and P["uz"] < 0:
+            add_particle(copy_particle(P), mcdc["bank_domain_zn"])
+            if mcdc["bank_domain_zn"]["size"] == max_size:
+                dd_particle_send(mcdc)
+        P["alive"] = False
 
 
 # =============================================================================
@@ -320,11 +287,12 @@ def particle_in_domain(P, mcdc):
     x_cell = binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
     y_cell = binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
     z_cell = binary_search(P["z"], mcdc["technique"]["domain_mesh"]["z"])
-    # print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
+    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
     if d_ix == x_cell:
         if d_iy == y_cell:
             if d_iz == z_cell:
                 return True
+    #print("xc",x_cell,"yc",y_cell,"zc",z_cell,"x",P["x"],"y",P["y"],"z",P["z"],"d_x",d_ix,"d_y",d_iy,"d_z",d_iz,"d_idx",d_idx)
     return False
 
 
