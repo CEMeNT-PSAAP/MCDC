@@ -43,7 +43,10 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            loop_source(seed_source, mcdc)
+            if mcdc["technique"]["domain_decomp"]:
+                loop_source_dd(seed_source, mcdc)
+            else:
+                loop_source(seed_source, mcdc)
 
             # Loop over source precursors
             if mcdc["bank_precursor"]["size"] > 0:
@@ -228,7 +231,7 @@ def loop_source_dd(seed, mcdc):
 
             else:
                 P = kernel.source_particle(seed_work, mcdc)
-
+            P["w"]/=mcdc["technique"]["work_ratio"][mcdc["d_idx"]]
         # Get from source bank
         else:
             P = mcdc["bank_source"]["particles"][work_idx]
