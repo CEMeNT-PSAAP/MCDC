@@ -191,6 +191,172 @@ def loop_source(seed, mcdc):
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
 
+# =============================================================================
+# DD Source loop
+# =============================================================================
+@njit
+def loop_source_dd(seed, mcdc):
+    j = 0
+    # Progress bar indicator
+    N_prog = 0
+    if mcdc["technique"]["iQMC"]:
+        mcdc["technique"]["iqmc_sweep_counter"] += 1
+
+    # Loop over particle sources
+    sourced_num = 0
+
+    work_start = mcdc["mpi_work_start"]
+    work_end = work_start + mcdc["mpi_work_size"]
+    for work_idx in range(work_start, work_end):
+        seed_work = kernel.split_seed(work_idx, seed)
+        # Particle tracker
+        if mcdc["setting"]["track_particle"]:
+            mcdc["particle_track_history_ID"] += 1
+
+        # =====================================================================
+        # Get a source particle and put into active bank
+        # =====================================================================
+
+        # Nonblocking recieve if domain decomp
+        # kernel.dd_particle_receive(mcdc)
+
+        # Get from fixed-source?
+        if mcdc["bank_source"]["size"] == 0:
+            # Sample source
+            if mcdc["technique"]["repro"]:
+                P = kernel.source_particle(seed_work, mcdc)
+
+            else:
+                P = kernel.source_particle(seed_work, mcdc)
+
+        # Get from source bank
+        else:
+            P = mcdc["bank_source"]["particles"][work_idx]
+
+        # Check if it is beyond current census index
+        idx_census = mcdc["idx_census"]
+        if P["t"] > mcdc["setting"]["census_time"][idx_census]:
+            P["t"] += SHIFT
+            if kernel.particle_in_domain(P, mcdc):
+                kernel.add_particle(P, mcdc["bank_census"])
+        else:
+            # Add the source particle into the active bank
+            if kernel.particle_in_domain(P, mcdc):
+                kernel.add_particle(P, mcdc["bank_active"])
+
+        # =====================================================================
+        # Run the source particle and its secondaries
+        # =====================================================================
+
+        # Loop until active bank is exhausted
+        while mcdc["bank_active"]["size"] > 0:
+            # Get particle from active bank
+            P = kernel.get_particle(mcdc["bank_active"], mcdc)
+
+            # Apply weight window
+            if mcdc["technique"]["weight_window"]:
+                kernel.weight_window(P, mcdc)
+
+            # Particle tracker
+            if mcdc["setting"]["track_particle"]:
+                mcdc["particle_track_particle_ID"] += 1
+
+            # Particle loop
+            loop_particle(P, mcdc)
+
+        # Tally history closeout for one-batch fixed-source simulation
+        if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
+            kernel.tally_closeout_history(mcdc)
+
+        # Progress printout
+        percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
+    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
+    
+    kernel.dd_particle_send(mcdc)
+    # print("Done sourcing particles, running remaining particles")
+    terminated = False
+    kernel.dd_particle_receive(mcdc)
+    wr_new = 0
+    while not terminated:
+        if mcdc["bank_active"]["size"] > 0:
+            #wr_new = 0
+            # Loop until active bank is exhausted
+            while mcdc["bank_active"]["size"] > 0:
+                P = kernel.get_particle(mcdc["bank_active"], mcdc)
+
+                if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                    d_idx = mcdc["d_idx"]
+                    d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
+                    d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
+                    d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
+
+                    d_iz = int(d_idx / (d_Nx * d_Ny))
+                    d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+                    d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
+
+                    x_cell = kernel.binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
+                    y_cell = kernel.binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
+                    z_cell = kernel.binary_search(P["z"], mcdc["technique"]["domain_mesh"]["z"])
+                    print(
+                        "recieved particle not in domain, position:",
+                        P["x"],
+                        P["y"],
+                        P["z"],
+                        ", speed: ",
+                        P["ux"],
+                        P["uy"],
+                        P["uz"],
+                        ", cell:",
+                        x_cell,
+                        y_cell,
+                        z_cell,
+                        ", domain: ",
+                        mcdc["d_idx"],
+                        ", mesh",
+                        mcdc["technique"]["domain_mesh"]["x"][d_ix],
+                        mcdc["technique"]["domain_mesh"]["y"][d_iy],
+                        mcdc["technique"]["domain_mesh"]["z"][d_iz],
+                    )
+                kernel.shift_particle(P,-SHIFT)
+
+                # Apply weight window
+                if mcdc["technique"]["weight_window"]:
+                    kernel.weight_window(P, mcdc)
+
+                # Particle tracker
+                if mcdc["setting"]["track_particle"]:
+                    mcdc["particle_track_particle_ID"] += 1
+
+                # Particle loop
+                loop_particle(P, mcdc)
+
+                # Tally history closeout for one-batch fixed-source simulation
+                if (
+                    not mcdc["setting"]["mode_eigenvalue"]
+                    and mcdc["setting"]["N_batch"] == 1
+                ):
+                    kernel.tally_closeout_history(mcdc)
+            kernel.dd_particle_send(mcdc)
+
+        kernel.dd_particle_receive(mcdc)
+
+        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"])) 
+
+        if work_remaining == 0:
+            wr_new +=1
+        else:
+            wr_new = 0        
+        if wr_new >4:
+            terminated = True
+
+
+
+
+
 # =========================================================================
 # Particle loop
 # =========================================================================
@@ -268,6 +434,13 @@ def loop_particle(P, mcdc):
         # Time boundary crossing
         if event & EVENT_TIME_BOUNDARY:
             P["alive"] = False
+        # Domain boundary
+        if event & EVENT_DOMAIN:
+            if event & EVENT_SURFACE:
+                if not mcdc["surfaces"][P["surface_ID"]]["reflective"]:
+                    kernel.domain_crossing(P, mcdc)
+            else:
+                kernel.domain_crossing(P, mcdc)
 
         # Apply weight window
         if P["alive"] and mcdc["technique"]["weight_window"]:
