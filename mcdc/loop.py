@@ -231,7 +231,7 @@ def loop_source_dd(seed, mcdc):
 
             else:
                 P = kernel.source_particle(seed_work, mcdc)
-            P["w"]/=mcdc["technique"]["work_ratio"][mcdc["d_idx"]]
+            P["w"] /= mcdc["technique"]["work_ratio"][mcdc["d_idx"]]
         # Get from source bank
         else:
             P = mcdc["bank_source"]["particles"][work_idx]
@@ -278,7 +278,7 @@ def loop_source_dd(seed, mcdc):
             with objmode():
                 print_progress(percent, mcdc)
     skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-    
+
     kernel.dd_particle_send(mcdc)
     # print("Done sourcing particles, running remaining particles")
     terminated = False
@@ -286,7 +286,7 @@ def loop_source_dd(seed, mcdc):
     wr_new = 0
     while not terminated:
         if mcdc["bank_active"]["size"] > 0:
-            #wr_new = 0
+            # wr_new = 0
             # Loop until active bank is exhausted
             while mcdc["bank_active"]["size"] > 0:
                 P = kernel.get_particle(mcdc["bank_active"], mcdc)
@@ -301,9 +301,15 @@ def loop_source_dd(seed, mcdc):
                     d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
                     d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
-                    x_cell = kernel.binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
-                    y_cell = kernel.binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
-                    z_cell = kernel.binary_search(P["z"], mcdc["technique"]["domain_mesh"]["z"])
+                    x_cell = kernel.binary_search(
+                        P["x"], mcdc["technique"]["domain_mesh"]["x"]
+                    )
+                    y_cell = kernel.binary_search(
+                        P["y"], mcdc["technique"]["domain_mesh"]["y"]
+                    )
+                    z_cell = kernel.binary_search(
+                        P["z"], mcdc["technique"]["domain_mesh"]["z"]
+                    )
                     print(
                         "recieved particle not in domain, position:",
                         P["x"],
@@ -324,7 +330,7 @@ def loop_source_dd(seed, mcdc):
                         mcdc["technique"]["domain_mesh"]["y"][d_iy],
                         mcdc["technique"]["domain_mesh"]["z"][d_iz],
                     )
-                kernel.shift_particle(P,-SHIFT)
+                kernel.shift_particle(P, -SHIFT)
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
@@ -347,17 +353,14 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
 
-        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"])) 
+        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
 
         if work_remaining == 0:
-            wr_new +=1
+            wr_new += 1
         else:
-            wr_new = 0        
-        if wr_new >4:
+            wr_new = 0
+        if wr_new > 4:
             terminated = True
-
-
-
 
 
 # =========================================================================

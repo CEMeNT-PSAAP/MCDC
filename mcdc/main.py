@@ -153,14 +153,12 @@ def dd_prepare():
         input_deck.technique["domain_decomp"]
         and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
     ):
-        
         print_error(
             "Domain work ratio not equal to number of processors, %i != %i "
             % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
         )
 
- 
-    if  input_deck.technique["domain_decomp"]:
+    if input_deck.technique["domain_decomp"]:
         # Assigning domain index
         i = 0
         rank_info = []
@@ -183,7 +181,6 @@ def dd_prepare():
         input_deck.technique["zp_neigh"] = []
         input_deck.technique["zn_neigh"] = []
         return
-
 
     if xp is not None:
         input_deck.technique["xp_neigh"] = rank_info[xp]
