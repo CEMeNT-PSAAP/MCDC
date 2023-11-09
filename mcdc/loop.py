@@ -229,7 +229,7 @@ def loop_source_dd(seed, mcdc):
                 P = kernel.source_particle(seed_work, mcdc)
 
             else:
-                P = kernel.source_particle_dd(seed_work, mcdc)
+                P = kernel.source_particle(seed_work, mcdc)
 
         # Get from source bank
         else:
@@ -255,19 +255,6 @@ def loop_source_dd(seed, mcdc):
             # Get particle from active bank
             P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
-            if mcdc["technique"]["domain_decomp"]:
-                if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print(
-                        "sourced particle not in domain:",
-                        P["uz"],
-                        ",",
-                        P["z"],
-                        ",",
-                        mcdc["d_idx"],
-                    )
-
-                    # P["alive"] = False
-
             # Apply weight window
             if mcdc["technique"]["weight_window"]:
                 kernel.weight_window(P, mcdc)
@@ -289,7 +276,8 @@ def loop_source_dd(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-
+    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
+    
     kernel.dd_particle_send(mcdc)
     # print("Done sourcing particles, running remaining particles")
     terminated = False
@@ -297,20 +285,45 @@ def loop_source_dd(seed, mcdc):
     wr_new = 0
     while not terminated:
         if mcdc["bank_active"]["size"] > 0:
+            #wr_new = 0
             # Loop until active bank is exhausted
             while mcdc["bank_active"]["size"] > 0:
                 P = kernel.get_particle(mcdc["bank_active"], mcdc)
 
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                    d_idx = mcdc["d_idx"]
+                    d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
+                    d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
+                    d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
+
+                    d_iz = int(d_idx / (d_Nx * d_Ny))
+                    d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+                    d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
+
+                    x_cell = kernel.binary_search(P["x"], mcdc["technique"]["domain_mesh"]["x"])
+                    y_cell = kernel.binary_search(P["y"], mcdc["technique"]["domain_mesh"]["y"])
+                    z_cell = kernel.binary_search(P["z"], mcdc["technique"]["domain_mesh"]["z"])
                     print(
-                        "recieved particle not in domain:",
+                        "recieved particle not in domain, position:",
                         P["x"],
+                        P["y"],
                         P["z"],
-                        ",",
+                        ", speed: ",
                         P["ux"],
+                        P["uy"],
                         P["uz"],
+                        ", cell:",
+                        x_cell,
+                        y_cell,
+                        z_cell,
+                        ", domain: ",
                         mcdc["d_idx"],
+                        ", mesh",
+                        mcdc["technique"]["domain_mesh"]["x"][d_ix],
+                        mcdc["technique"]["domain_mesh"]["y"][d_iy],
+                        mcdc["technique"]["domain_mesh"]["z"][d_iz],
                     )
+                kernel.shift_particle(P,-SHIFT)
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
@@ -333,15 +346,17 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
 
-        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
+        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"])) 
 
         if work_remaining == 0:
-                wr_new +=1        
-        if wr_new >2:
+            wr_new +=1
+        else:
+            wr_new = 0        
+        if wr_new >4:
             terminated = True
 
 
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
+
 
 
 # =========================================================================
