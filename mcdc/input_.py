@@ -17,6 +17,7 @@ from mcdc.card import (
     make_card_universe,
     make_card_lattice,
     make_card_source,
+    make_card_uq,
 )
 from mcdc.constant import (
     GYRATION_RADIUS_ALL,
@@ -1277,6 +1278,83 @@ def dsm(order=1):
     if order > 2:
         print_error("DSM currently only supports up to second-order sensitivities")
     card["dsm_order"] = order
+
+
+def uq(**kw):
+    def append_card(delta_card, global_tag):
+        delta_card["distribution"] = dist
+        delta_card["flags"] = []
+        for key in kw.keys():
+            check_support(parameter["tag"] + " parameter", key, parameter_list, False)
+            delta_card["flags"].append(key)
+            delta_card[key] = kw[key]
+        mcdc.input_deck.uq_deltas[global_tag].append(delta_card)
+
+    mcdc.input_deck.technique["uq"] = True
+    # Make sure N_batch > 1
+    if mcdc.input_deck.setting["N_batch"] <= 1:
+        print_error("Must set N_batch>1 with mcdc.setting() prior to mcdc.uq() call.")
+
+    # Check uq parameter
+    parameter_ = check_support(
+        "uq parameter",
+        list(kw)[0],
+        ["nuclide", "material", "surface", "source"],
+        False,
+    )
+    parameter = kw[parameter_]
+    del kw[parameter_]
+    parameter["uq"] = True
+
+    # Confirm supplied distribution
+    check_requirement("uq", kw, ["distribution"])
+    dist = check_support("distribution", kw["distribution"], ["uniform"], False)
+    del kw["distribution"]
+
+    # Only remaining keywords should be the parameter delta(s)
+
+    if parameter["tag"] == "Material":
+        parameter_list = [
+            "capture",
+            "scatter",
+            "fission",
+            "nu_s",
+            "nu_p",
+            "nu_d",
+            "chi_p",
+            "chi_d",
+            "speed",
+            "decay",
+        ]
+        global_tag = "materials"
+        if parameter["N_nuclide"] == 1:
+            nuc_card = make_card_nuclide(parameter["G"], parameter["J"])
+            nuc_card["ID"] = parameter["nuclide_IDs"][0]
+            append_card(nuc_card, "nuclides")
+        delta_card = make_card_material(
+            parameter["N_nuclide"], parameter["G"], parameter["J"]
+        )
+        for name in ["ID", "nuclide_IDs", "nuclide_densities"]:
+            delta_card[name] = parameter[name]
+    elif parameter["tag"] == "Nuclide":
+        parameter_list = [
+            "capture",
+            "scatter",
+            "fission",
+            "nu_s",
+            "nu_p",
+            "nu_d",
+            "chi_p",
+            "chi_d",
+            "speed",
+            "decay",
+        ]
+        global_tag = "nuclides"
+        delta_card = make_card_nuclide(parameter["G"], parameter["J"])
+        delta_card["ID"] = parameter["ID"]
+    append_card(delta_card, global_tag)
+    # elif parameter['tag'] is 'Surface':
+    # elif parameter['tag'] is 'Source':
 
 
 # ==============================================================================
