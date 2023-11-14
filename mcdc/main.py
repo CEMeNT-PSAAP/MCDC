@@ -168,6 +168,8 @@ def prepare():
     type_.make_type_lattice(input_deck.lattices)
     type_.make_type_source(G)
     type_.make_type_tally(N_tally_scores, input_deck.tally)
+    type_.make_type_uq_tally(N_tally_scores, input_deck.tally)
+    type_.make_type_uq(input_deck.uq_deltas, G, J)
     type_.make_type_setting(input_deck)
     type_.make_type_technique(N_particle, G, input_deck.technique)
     type_.make_type_global(input_deck)
@@ -306,6 +308,7 @@ def prepare():
         "iQMC",
         "IC_generator",
         "branchless_collision",
+        "uq",
     ]:
         mcdc["technique"][name] = input_deck.technique[name]
 
@@ -404,6 +407,61 @@ def prepare():
 
     # Threshold
     mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
+
+    # =========================================================================
+    # Variance Deconvolution - UQ
+    # =========================================================================
+    if mcdc["technique"]["uq"]:
+        # Assumes that all tallies will also be uq tallies
+        for name in type_.uq_tally.names:
+            if name != "score":
+                mcdc["technique"]["uq_tally"][name] = input_deck.tally[name]
+
+        M = len(input_deck.uq_deltas["materials"])
+        for i in range(M):
+            idm = input_deck.uq_deltas["materials"][i]["ID"]
+            mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"] = idm
+            mcdc["technique"]["uq_"]["materials"][i]["info"][
+                "distribution"
+            ] = input_deck.uq_deltas["materials"][i]["distribution"]
+            for name in input_deck.uq_deltas["materials"][i]["flags"]:
+                mcdc["technique"]["uq_"]["materials"][i]["flags"][name] = True
+                mcdc["technique"]["uq_"]["materials"][i]["delta"][
+                    name
+                ] = input_deck.uq_deltas["materials"][i][name]
+            flags = mcdc["technique"]["uq_"]["materials"][i]["flags"]
+            if flags["capture"] or flags["scatter"] or flags["fission"]:
+                flags["total"] = True
+                flags["speed"] = True
+            if flags["nu_p"] or flags["nu_d"]:
+                flags["nu_f"] = True
+            if mcdc["materials"][idm]["N_nuclide"] > 1:
+                for name in type_.uq_mat.names:
+                    mcdc["technique"]["uq_"]["materials"][i]["mean"][
+                        name
+                    ] = input_deck.materials[idm][name]
+
+        N = len(input_deck.uq_deltas["nuclides"])
+        for i in range(N):
+            mcdc["technique"]["uq_"]["nuclides"][i]["info"][
+                "distribution"
+            ] = input_deck.uq_deltas["nuclides"][i]["distribution"]
+            idn = input_deck.uq_deltas["nuclides"][i]["ID"]
+            mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
+            for name in type_.uq_nuc.names:
+                mcdc["technique"]["uq_"]["nuclides"][i]["mean"][
+                    name
+                ] = input_deck.nuclides[idn][name]
+            for name in input_deck.uq_deltas["nuclides"][i]["flags"]:
+                mcdc["technique"]["uq_"]["nuclides"][i]["flags"][name] = True
+                mcdc["technique"]["uq_"]["nuclides"][i]["delta"][
+                    name
+                ] = input_deck.uq_deltas["nuclides"][i][name]
+            flags = mcdc["technique"]["uq_"]["nuclides"][i]["flags"]
+            if flags["capture"] or flags["scatter"] or flags["fission"]:
+                flags["total"] = True
+            if flags["nu_p"] or flags["nu_d"]:
+                flags["nu_f"] = True
 
     # =========================================================================
     # MPI
@@ -578,6 +636,17 @@ def generate_hdf5(mcdc):
                         "tally/" + name_h5 + "/sdev",
                         data=np.squeeze(T["score"][name]["sdev"]),
                     )
+                    if mcdc["technique"]["uq_tally"][name]:
+                        mc_var = mcdc["technique"]["uq_tally"]["score"][name][
+                            "batch_var"
+                        ]
+                        tot_var = mcdc["technique"]["uq_tally"]["score"][name][
+                            "batch_bin"
+                        ]
+                        f.create_dataset(
+                            "tally/" + name_h5 + "/uq_var",
+                            data=np.squeeze(tot_var - mc_var),
+                        )
 
             # Eigenvalues
             if mcdc["setting"]["mode_eigenvalue"]:
