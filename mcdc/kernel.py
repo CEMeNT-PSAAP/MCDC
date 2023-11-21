@@ -153,6 +153,16 @@ def rng_from_seed(seed):
     return rng_(seed) / RNG_MOD
 
 
+@njit
+def rng_array(seed, shape, size):
+    xi = np.zeros(size)
+    for i in range(size):
+        xi_seed = split_seed(i, seed)
+        xi[i] = rng_from_seed(xi_seed)
+    xi = xi.reshape(shape)
+    return xi
+
+
 # =============================================================================
 # Particle source operations
 # =============================================================================
@@ -959,6 +969,14 @@ def surface_bc(P, surface, trans):
 
 
 @njit
+def surface_exit_evaluate(P):
+    if P["surface_ID"] == 0:
+        return 0
+    else:
+        return 1
+
+
+@njit
 def surface_reflect(P, surface, trans):
     ux = P["ux"]
     uy = P["uy"]
@@ -1265,6 +1283,19 @@ def score_tracklength(P, distance, mcdc):
         score_current(s, g, t, x, y, z, flux, P, tally["score"]["current"])
     if tally["eddington"]:
         score_eddington(s, g, t, x, y, z, flux, P, tally["score"]["eddington"])
+
+
+@njit
+def score_exit(P, x, mcdc):
+    tally = mcdc["tally"]
+    material = mcdc["materials"][P["material_ID"]]
+
+    s = P["sensitivity_ID"]
+    mu, azi = mesh_get_angular_index(P, tally["mesh"])
+    g = mesh_get_energy_index(P, tally["mesh"])
+
+    flux = P["w"] / abs(P["ux"])
+    score_flux(s, g, 0, x, 0, 0, mu, azi, flux, tally["score"]["exit"])
 
 
 @njit
@@ -1821,6 +1852,13 @@ def surface_crossing(P, mcdc):
 
     # Record old material for sensitivity quantification
     material_ID_old = P["material_ID"]
+
+    # Tally particle exit
+    if mcdc["tally"]["exit"] and not P["alive"]:
+        # Reflectance if P["surface_ID"] == 0, else transmittance
+        exit_idx = surface_exit_evaluate(P)
+        # Score on tally
+        score_exit(P, exit_idx, mcdc)
 
     # Check new cell?
     if P["alive"] and not surface["reflective"]:
@@ -3407,3 +3445,253 @@ def binary_search(val, grid):
         else:
             right = mid - 1
     return int(right)
+
+
+# =============================================================================
+# Variance Deconvolution
+# =============================================================================
+
+
+@njit
+def uq_resample(mean, delta, info):
+    # Currently only uniform distribution
+    shape = mean.shape
+    size = mean.size
+    xi = rng_array(info["rng_seed"], shape, size)
+
+    return mean + (2 * xi - 1) * delta
+
+
+@njit
+def reset_material(mcdc, idm, material_uq):
+    # Assumes all nuclides have already been re-sampled
+    # Basic XS
+    material = mcdc["materials"][idm]
+    for tag in literal_unroll(("capture", "scatter", "fission", "total")):
+        if material_uq["flags"][tag]:
+            material[tag][:] = 0.0
+            for n in range(material["N_nuclide"]):
+                nuc1 = mcdc["nuclides"][material["nuclide_IDs"][n]]
+                density = material["nuclide_densities"][n]
+                material[tag] += nuc1[tag] * density
+
+    # Effective speed
+    if material_uq["flags"]["speed"]:
+        material["speed"][:] = 0.0
+        for n in range(material["N_nuclide"]):
+            nuc2 = mcdc["nuclides"][material["nuclide_IDs"][n]]
+            density = material["nuclide_densities"][n]
+            material["speed"] += nuc2["speed"] * nuc2["total"] * density
+        if max(material["total"]) == 0.0:
+            material["speed"][:] = nuc2["speed"][:]
+        else:
+            material["speed"] /= material["total"]
+
+    # Calculate effective spectra and multiplicities of scattering and prompt fission
+    G = material["G"]
+    if max(material["scatter"]) > 0.0:
+        shape = material["chi_s"].shape
+        nuSigmaS = np.zeros(shape)
+        for i in range(material["N_nuclide"]):
+            nuc3 = mcdc["nuclides"][material["nuclide_IDs"][i]]
+            density = material["nuclide_densities"][i]
+            SigmaS = np.diag(nuc3["scatter"]) * density
+            nu_s = np.diag(nuc3["nu_s"])
+            chi_s = np.ascontiguousarray(nuc3["chi_s"].transpose())
+            nuSigmaS += chi_s.dot(nu_s.dot(SigmaS))
+        chi_nu_s = nuSigmaS.dot(np.diag(1.0 / material["scatter"]))
+        material["nu_s"] = np.sum(chi_nu_s, axis=0)
+        material["chi_s"] = np.ascontiguousarray(
+            chi_nu_s.dot(np.diag(1.0 / material["nu_s"])).transpose()
+        )
+    if max(material["fission"]) > 0.0:
+        nuSigmaF = np.zeros((G, G), dtype=float)
+        for n in range(material["N_nuclide"]):
+            nuc4 = mcdc["nuclides"][material["nuclide_IDs"][n]]
+            density = material["nuclide_densities"][n]
+            SigmaF = np.diag(nuc4["fission"]) * density
+            nu_p = np.diag(nuc4["nu_p"])
+            chi_p = np.ascontiguousarray(np.transpose(nuc4["chi_p"]))
+            nuSigmaF += chi_p.dot(nu_p.dot(SigmaF))
+        chi_nu_p = nuSigmaF.dot(np.diag(1.0 / material["fission"]))
+        material["nu_p"] = np.sum(chi_nu_p, axis=0)
+        # Required because the below function otherwise returns an F-contiguous array
+        material["chi_p"] = np.ascontiguousarray(
+            np.transpose(chi_nu_p.dot(np.diag(1.0 / material["nu_p"])))
+        )
+
+    # Calculate delayed and total fission multiplicities
+    if max(material["fission"]) > 0.0:
+        material["nu_f"][:] = material["nu_p"][:]
+        for j in range(material["J"]):
+            total = np.zeros(material["G"])
+            for n in range(material["N_nuclide"]):
+                nuc5 = mcdc["nuclides"][material["nuclide_IDs"][n]]
+                density = material["nuclide_densities"][n]
+                total += nuc5["nu_d"][:, j] * nuc5["fission"] * density
+            material["nu_d"][:, j] = total / material["fission"]
+            material["nu_f"] += material["nu_d"][:, j]
+
+
+@njit
+def reset_nuclide(nuclide, nuclide_uq):
+    for name in literal_unroll(
+        ("speed", "decay", "capture", "fission", "nu_s", "nu_p")
+    ):
+        if nuclide_uq["flags"][name]:
+            nuclide[name] = uq_resample(
+                nuclide_uq["mean"][name], nuclide_uq["delta"][name], nuclide_uq["info"]
+            )
+
+    if nuclide_uq["flags"]["scatter"]:
+        scatter = uq_resample(
+            nuclide_uq["mean"]["scatter"],
+            nuclide_uq["delta"]["scatter"],
+            nuclide_uq["info"],
+        )
+        nuclide["scatter"] = np.sum(scatter, 0)
+        nuclide["chi_s"][:, :] = np.swapaxes(scatter, 0, 1)[:, :]
+        for g in range(nuclide["G"]):
+            if nuclide["scatter"][g] > 0.0:
+                nuclide["chi_s"][g, :] /= nuclide["scatter"][g]
+
+    if nuclide_uq["flags"]["total"]:
+        nuclide["total"][:] = (
+            nuclide["capture"] + nuclide["scatter"] + nuclide["fission"]
+        )
+
+    if nuclide_uq["flags"]["nu_d"]:
+        nu_d = uq_resample(
+            nuclide_uq["mean"]["nu_d"], nuclide_uq["delta"]["nu_d"], nuclide_uq["info"]
+        )
+        nuclide["nu_d"][:, :] = np.swapaxes(nu_d, 0, 1)[:, :]
+
+    if nuclide_uq["flags"]["nu_f"]:  # True if either nu_p or nu_d is true
+        nuclide["nu_f"] = nuclide["nu_p"]
+        for j in range(nuclide["J"]):
+            nuclide["nu_f"] += nuclide["nu_d"][:, j]
+
+    # Prompt fission spectrum (If G == 1, all ones)
+    if nuclide_uq["flags"]["chi_p"]:
+        chi_p = uq_resample(
+            nuclide_uq["mean"]["chi_p"],
+            nuclide_uq["delta"]["chi_p"],
+            nuclide_uq["info"],
+        )
+        nuclide["chi_p"][:, :] = np.swapaxes(chi_p, 0, 1)[:, :]
+        # Normalize
+        for g in range(nuclide["G"]):
+            if np.sum(nuclide["chi_p"][g, :]) > 0.0:
+                nuclide["chi_p"][g, :] /= np.sum(nuclide["chi_p"][g, :])
+
+    # Delayed fission spectrum (matrix of size JxG)
+    if nuclide_uq["flags"]["chi_d"]:
+        chi_d = uq_resample(
+            nuclide_uq["mean"]["chi_d"],
+            nuclide_uq["delta"]["chi_d"],
+            nuclide_uq["info"],
+        )
+        # Transpose: [gout, dg] -> [dg, gout]
+        nuclide["chi_d"][:, :] = np.swapaxes(chi_d, 0, 1)[:, :]
+        # Normalize
+        for dg in range(nuclide["J"]):
+            if np.sum(nuclide["chi_d"][dg, :]) > 0.0:
+                nuclide["chi_d"][dg, :] /= np.sum(nuclide["chi_d"][dg, :])
+
+
+@njit
+def uq_reset(mcdc, seed):
+    # Types of uq parameters: materials, nuclides
+    N = len(mcdc["technique"]["uq_"]["nuclides"])
+    for i in range(N):
+        mcdc["technique"]["uq_"]["nuclides"][i]["info"]["rng_seed"] = split_seed(
+            i, seed
+        )
+        idn = mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"]
+        reset_nuclide(mcdc["nuclides"][idn], mcdc["technique"]["uq_"]["nuclides"][i])
+
+    M = len(mcdc["technique"]["uq_"]["materials"])
+    for i in range(M):
+        mcdc["technique"]["uq_"]["materials"][i]["info"]["rng_seed"] = split_seed(
+            i, seed
+        )
+        idm = mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"]
+        reset_material(mcdc, idm, mcdc["technique"]["uq_"]["materials"][i])
+
+
+@njit
+def uq_tally_closeout_history(mcdc):
+    tally = mcdc["tally"]
+    uq_tally = mcdc["technique"]["uq_tally"]
+
+    for name in literal_unroll(score_list):
+        if uq_tally[name]:
+            uq_score_closeout_history(tally["score"][name], uq_tally["score"][name])
+
+
+@njit
+def uq_score_closeout_history(score, uq_score):
+    # Assumes N_batch > 1
+    # Accumulate square of history score, but continue to accumulate bin
+    history_bin = score["bin"] - uq_score["batch_bin"]
+    uq_score["batch_var"][:] += history_bin**2
+    uq_score["batch_bin"] = score["bin"]
+
+
+@njit
+def uq_tally_closeout_batch(mcdc):
+    uq_tally = mcdc["technique"]["uq_tally"]
+
+    for name in literal_unroll(score_list):
+        if uq_tally[name]:
+            # Reset bin
+            uq_tally["score"][name]["batch_bin"].fill(0.0)
+            uq_reduce_bin(uq_tally["score"][name])
+
+
+@njit
+def uq_reduce_bin(score):
+    # MPI Reduce
+    buff = np.zeros_like(score["batch_var"])
+    with objmode():
+        MPI.COMM_WORLD.Reduce(np.array(score["batch_var"]), buff, MPI.SUM, 0)
+    score["batch_var"][:] = buff
+
+
+@njit
+def uq_tally_closeout(mcdc):
+    tally = mcdc["tally"]
+    uq_tally = mcdc["technique"]["uq_tally"]
+
+    for name in literal_unroll(score_list):
+        # Uq_tally implies tally, but tally does not imply uq_tally
+        if uq_tally[name]:
+            uq_score_closeout(name, mcdc)
+        elif tally[name]:
+            score_closeout(tally["score"][name], mcdc)
+
+
+@njit
+def uq_score_closeout(name, mcdc):
+    score = mcdc["tally"]["score"][name]
+    uq_score = mcdc["technique"]["uq_tally"]["score"][name]
+
+    N_history = mcdc["setting"]["N_particle"]
+
+    # At this point, score["sdev"] is still just the sum of the squared mean from every batch
+    uq_score["batch_var"] = (uq_score["batch_var"] / N_history - score["sdev"]) / (
+        N_history - 1
+    )
+
+    # If we're here, N_batch > 1
+    N_history = mcdc["setting"]["N_batch"]
+
+    # Store results
+    score["mean"][:] = score["mean"] / N_history
+    uq_score["batch_var"] /= N_history
+    uq_score["batch_bin"] = (score["sdev"] - N_history * np.square(score["mean"])) / (
+        N_history - 1
+    )
+    score["sdev"][:] = np.sqrt(
+        (score["sdev"] / N_history - np.square(score["mean"])) / (N_history - 1)
+    )
