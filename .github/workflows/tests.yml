@@ -34,9 +34,11 @@ jobs:
 #        cd ..
     - name: Run Unit Tests
       run: |
-        pytest
-      
-      
+        cd test/regression
+        python run.py
+        python run.py --mode=numba
+        # python run.py --srun=5
+        # python run.py --srun=5 --mode=numba
 
 #jobs:
 #  lint:
