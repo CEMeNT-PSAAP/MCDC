@@ -40,7 +40,7 @@ for i, name in enumerate(names):
     if name == "__pycache__":
         continue
 
-    print("\n[%i/%i] "%(i+1,len(names)) + name)
+    print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
     runtimes.append(-1)
@@ -123,7 +123,7 @@ for i, name in enumerate(names):
                 )
 
     # Other quantities
-    for result_name in ['k_mean', 'k_sdev', 'k_cycle', 'k_eff']:
+    for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:
         if result_name not in output.keys():
             continue
 
@@ -132,45 +132,25 @@ for i, name in enumerate(names):
 
         # Passed?
         if np.isclose(a, b).all():
-            print(
-                Fore.GREEN
-                + "  {}: Passed".format(result_name)
-                + Style.RESET_ALL
-            )
+            print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
         else:
             all_pass = False
-            error_msgs[-1].append(
-                "Differences in {}\n{}".format(result_name, a - b)
-            )
-            print(
-                Fore.RED
-                + "  {}: Failed".format(result_name)
-                + Style.RESET_ALL
-            )
+            error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
+            print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
 
     # iQMC flux
-    if 'iqmc' in output.keys():
-        result_name = 'iqmc/flux'
+    if "iqmc" in output.keys():
+        result_name = "iqmc/flux"
         a = output[result_name][:]
         b = answer[result_name][:]
 
         # Passed?
         if np.isclose(a, b).all():
-            print(
-                Fore.GREEN
-                + "  {}: Passed".format(result_name)
-                + Style.RESET_ALL
-            )
+            print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
         else:
             all_pass = False
-            error_msgs[-1].append(
-                "Differences in {}\n{}".format(result_name, a - b)
-            )
-            print(
-                Fore.RED
-                + "  {}: Failed".format(result_name)
-                + Style.RESET_ALL
-            )
+            error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
+            print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
 
     # Close files
     output.close()
@@ -185,9 +165,14 @@ for i in range(len(names)):
     if crashes[i] or len(error_msgs[i]) > 0:
         N_fails += 1
 
-print("\nTests passed: "+Fore.GREEN+"%i/%i"%(len(names)-N_fails, len(names))+Style.RESET_ALL)
-print("Tests failed: "+Fore.RED+"%i/%i"%(N_fails, len(names))+Style.RESET_ALL)
-print("  (%.2f seconds)\n"%np.sum(np.array(runtimes)))
+print(
+    "\nTests passed: "
+    + Fore.GREEN
+    + "%i/%i" % (len(names) - N_fails, len(names))
+    + Style.RESET_ALL
+)
+print("Tests failed: " + Fore.RED + "%i/%i" % (N_fails, len(names)) + Style.RESET_ALL)
+print("  (%.2f seconds)\n" % np.sum(np.array(runtimes)))
 for i in range(len(names)):
     if crashes[i]:
         print("\n" + "=" * 80)

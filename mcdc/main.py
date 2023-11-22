@@ -9,8 +9,8 @@ parser.add_argument(
 )
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
-parser.add_argument('--progress_bar', default=False, action='store_true')
-parser.add_argument('--no-progress_bar', dest='progress_bar', action='store_false')
+parser.add_argument("--progress_bar", default=False, action="store_true")
+parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
 args, unargs = parser.parse_known_args()
 
 # Set mode
@@ -47,7 +47,7 @@ def run():
     if args.output is not None:
         input_deck.setting["output_name"] = args.output
     if args.progress_bar is not None:
-        input_deck.setting['progress_bar'] = args.progress_bar
+        input_deck.setting["progress_bar"] = args.progress_bar
 
     # Start timer
     total_start = MPI.Wtime()
