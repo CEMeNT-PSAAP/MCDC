@@ -10,6 +10,7 @@ import mcdc
 
 lib = h5py.File("c5g7.h5", "r")
 
+
 def set_mat(mat):
     return mcdc.material(
         capture=mat["capture"][:],
@@ -23,6 +24,7 @@ def set_mat(mat):
         decay=mat["decay"],
         sensitivity=True,
     )
+
 
 mat_uo2 = set_mat(lib["uo2"])  # Fuel: UO2
 mat_mod = set_mat(lib["mod"])  # Moderator
