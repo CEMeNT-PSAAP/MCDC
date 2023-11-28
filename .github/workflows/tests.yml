@@ -17,17 +17,18 @@ jobs:
         ls
     - name: Install dependencies
       run: |
-        pip install numpy
-        pip install numba
-        pip install h5py
-        pip install matplotlib
-        pip install scipy
-        pip install pytest
-        pip install colorama
-        sudo apt-get install libopenmpi-dev
-        pip install mpi4py
-        pip list
-        pip install -e .
+        source install.sh
+        #pip install numpy
+        #pip install numba
+        #pip install h5py
+        #pip install matplotlib
+        #pip install scipy
+        #pip install pytest
+        #pip install colorama
+        #sudo apt-get install libopenmpi-dev
+        #pip install mpi4py
+        #pip list
+        #pip install -e .
 #        wget https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz
 #        tar -zxf mpi4py-3.1.4.tar.gz
 #        cd mpi4py-3.1.4
