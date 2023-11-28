@@ -17,7 +17,7 @@ jobs:
         ls
     - name: Install dependencies
       run: |
-        source install.sh
+        ./install.sh
         #pip install numpy
         #pip install numba
         #pip install h5py
