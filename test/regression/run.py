@@ -185,3 +185,5 @@ for i in range(len(names)):
         print("\n===\n")
         for msg in error_msgs[i]:
             print("\n# " + msg + "\n")
+
+assert all_pass
