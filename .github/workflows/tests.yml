@@ -17,7 +17,13 @@ jobs:
         ls
     - name: Install dependencies
       run: |
-        ./install.sh
+        sudo apt-get install libopenmpi-dev
+        pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py
+        pip list 
+        pip install -e .
+    - name: Patch numba
+      run : |
+        bash .github/workflows/patch.sh
     - name: Run Unit Tests
       run: |
         pytest
