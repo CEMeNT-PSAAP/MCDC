@@ -34,12 +34,15 @@ jobs:
         python run.py
     - name: Regression Test - MPI
       run: |
+        cd test/regression
         python run.py --mpiexec=4 --skip=iqmc*
     - name: Regression Test - Numba
       run: |
+        cd test/regression
         python run.py --mode=numba
     - name: Regression Test - Numba and MPI
       run: |
+        cd test/regression
         python run.py --mode=numba --mpiexec=4 --skip=iqmc*
     # TODO: Performance test
     # TODO: GPU test
