@@ -8,6 +8,7 @@ parser.add_argument("--mode", type=str, choices=["python", "numba"], default="py
 parser.add_argument("--mpiexec", type=int, default=0)
 parser.add_argument("--srun", type=int, default=0)
 parser.add_argument("--name", type=str, default="ALL")
+parser.add_argument("--skip", type=str, default="NONE")
 args, unargs = parser.parse_known_args()
 
 # Parse
@@ -15,6 +16,7 @@ mode = args.mode
 mpiexec = args.mpiexec
 srun = args.srun
 name = args.name
+skip = args.skip
 
 # Get test names
 if name == "ALL":
@@ -25,6 +27,12 @@ if name == "ALL":
 else:
     names = [item for item in os.listdir() if fnmatch.fnmatch(item, name)]
 names.sort()
+
+# Remove skipped if specified
+if skip != "NONE":
+    skips = [item for item in os.listdir() if fnmatch.fnmatch(item, skip)]
+    for name in skips:
+        names.remove(name)
 
 # Data for each test
 printouts = []
