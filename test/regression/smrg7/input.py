@@ -382,7 +382,7 @@ z_grid = np.linspace(-130, 130, 14)
 mcdc.tally(scores=["flux", "fission"], x=x_grid, y=y_grid, z=z_grid, g="all")
 
 # Setting
-mcdc.setting(N_particle=30)
+mcdc.setting(N_particle=30, census_bank_buff=2)
 mcdc.eigenmode(N_inactive=1, N_active=2, gyration_radius="all")
 mcdc.population_control()
 
