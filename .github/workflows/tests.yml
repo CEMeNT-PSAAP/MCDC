@@ -22,16 +22,24 @@ jobs:
         pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py
         pip list 
         pip install -e .
-    - name: Patch numba
+    - name: Patch Numba
       run : |
         bash .github/workflows/patch.sh
-    - name: Run Unit Tests
+    - name: Unit Test
       run: |
         pytest
+    - name: Regression Test - Python
+      run: |
         cd test/regression
         python run.py
+    - name: Regression Test - MPI
+      run: |
         python run.py --mpiexec=4 --skip=iqmc*
-        python run.py --mode=numba --skip=iqmc*
-        python run.py --mpiexec=4 --mode=numba --skip=iqmc*
-        # TODO: Run performance test
-        # TODO: Run GPU test
+    - name: Regression Test - Numba
+      run: |
+        python run.py --mode=numba
+    - name: Regression Test - Numba and MPI
+      run: |
+        python run.py --mode=numba --mpiexec=4 --skip=iqmc*
+    # TODO: Performance test
+    # TODO: GPU test
