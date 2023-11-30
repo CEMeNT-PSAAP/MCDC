@@ -141,30 +141,31 @@ def print_iqmc_eigenvalue_progress(mcdc):
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
             k_eff = mcdc["k_eff"]
-            itt = mcdc["technique"]["iqmc"]["itt_outter"]
-            res = mcdc["technique"]["iqmc"]["res_outter"]
+            itt = mcdc["technique"]["iqmc_itt_outter"]
+            res = mcdc["technique"]["iqmc_res_outter"]
             print("\n %2d   %2.5f  %10.3E" % (itt, k_eff, res))
             sys.stdout.flush()
 
 
 def print_iqmc_eigenvalue_exit_code(mcdc):
     if master:
-        sys.stdout.write("\r")
-        maxit = mcdc["technique"]["iqmc"]["maxitt"]
-        itt = mcdc["technique"]["iqmc"]["itt_outter"]
-        if itt >= maxit:
-            print("\n")
-            print("================================")
-            print("\n")
-            print(
-                " Convergence to tolerance not achieved: Maximum number of iterations."
-            )
-        else:
-            print("\n")
-            print("================================")
-            print(" Successful convergence.")
-            print("\n")
-        sys.stdout.flush()
+        if mcdc["setting"]["progress_bar"]:
+            sys.stdout.write("\r")
+            maxit = mcdc["technique"]["iqmc_maxitt"]
+            itt = mcdc["technique"]["iqmc_itt_outter"]
+            if itt >= maxit:
+                print("\n")
+                print("================================")
+                print("\n")
+                print(
+                    " Convergence to tolerance not achieved: Maximum number of iterations."
+                )
+            else:
+                print("\n")
+                print("================================")
+                print(" Successful convergence.")
+                print("\n")
+            sys.stdout.flush()
 
 
 def print_runtime(mcdc):
@@ -212,8 +213,8 @@ def print_progress_iqmc(mcdc):
     if master:
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
-            itt = mcdc["technique"]["iqmc"]["itt"]
-            res = mcdc["technique"]["iqmc"]["res"]
+            itt = mcdc["technique"]["iqmc_itt"]
+            res = mcdc["technique"]["iqmc_res"]
             print("\n*******************************")
             print("Iteration  %2d" % (itt))
             print("Residual %10.3E" % (res))

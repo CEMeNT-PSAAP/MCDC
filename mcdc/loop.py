@@ -478,32 +478,32 @@ def gmres(mcdc):
             if inner < max_inner - 1:
                 normr = abs(g[inner + 1])
                 rel_resid = normr / res_0
-
-                if rel_resid < tol:
-                    break
+                mcdc["technique"]["iqmc_res"] = rel_resid
 
             mcdc["technique"]["iqmc_itt"] += 1
-            mcdc["technique"]["iqmc_res"] = rel_resid
             if not mcdc["setting"]["mode_eigenvalue"]:
                 with objmode():
                     print_progress_iqmc(mcdc)
-        # end inner loop, back to outer loop
 
+            if rel_resid < tol:
+                break
+            if mcdc["technique"]["iqmc_itt"] >= max_iter:
+                break
+
+        # end inner loop, back to outer loop
         # Find best update to X in Krylov Space V.  Solve inner X inner system.
         y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
         update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
         X = X + update
         aux = kernel.AxV(X, b, mcdc)
         r = b - aux
-
         normr = np.linalg.norm(r)
         rel_resid = normr / res_0
-
-        mcdc["technique"]["iqmc_itt"] += 1
         mcdc["technique"]["iqmc_res"] = rel_resid
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            with objmode():
-                print_progress_iqmc(mcdc)
+        if rel_resid < tol:
+            break
+        if mcdc["technique"]["iqmc_itt"]  >= max_iter:
+            return
 
     # end outer loop
 
@@ -543,18 +543,16 @@ def power_iteration(mcdc):
         mcdc["technique"]["iqmc_flux_outter"] = mcdc["technique"]["iqmc_flux"].copy()
         mcdc["technique"]["iqmc_itt_outter"] += 1
 
-        if mcdc["setting"]["progress_bar"]:
-            with objmode():
-                print_iqmc_eigenvalue_progress(mcdc)
+        with objmode():
+            print_iqmc_eigenvalue_progress(mcdc)
 
         # iQMC convergence criteria
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
             mcdc["technique"]["iqmc_res_outter"] <= tol
         ):
             simulation_end = True
-    if mcdc["setting"]["progress_bar"]:
-        with objmode():
-            print_iqmc_eigenvalue_exit_code(mcdc)
+            with objmode():
+                print_iqmc_eigenvalue_exit_code(mcdc)
 
 
 @njit
@@ -655,7 +653,9 @@ def davidson(mcdc):
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
             mcdc["technique"]["iqmc_res_outter"] <= tol
         ):
-            simulation_end = True
+            simulation_end = True            
+            with objmode():
+                print_iqmc_eigenvalue_exit_code(mcdc)
             break
         else:
             # Precondition for next iteration
@@ -669,9 +669,6 @@ def davidson(mcdc):
                 # "restarts" by appending to a new array
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-
-    with objmode():
-        print_iqmc_eigenvalue_exit_code(mcdc)
 
     # normalize and save final scalar flux
     flux = np.reshape(
