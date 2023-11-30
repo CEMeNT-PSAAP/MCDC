@@ -138,28 +138,33 @@ def print_progress_eigenvalue(mcdc):
 
 def print_iqmc_eigenvalue_progress(mcdc):
     if master:
-        k_eff = mcdc["k_eff"]
-        itt = mcdc["technique"]["iqmc_itt_outter"]
-        res = mcdc["technique"]["iqmc_res_outter"]
-        print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
+        if mcdc["setting"]["progress_bar"]:
+            sys.stdout.write("\r")
+            k_eff = mcdc["k_eff"]
+            itt = mcdc["technique"]["iqmc"]["itt_outter"]
+            res = mcdc["technique"]["iqmc"]["res_outter"]
+            print("\n %2d   %2.5f  %10.3E" % (itt, k_eff, res))
+            sys.stdout.flush()
 
 
 def print_iqmc_eigenvalue_exit_code(mcdc):
     if master:
-        maxit = mcdc["technique"]["iqmc_maxitt"]
-        itt = mcdc["technique"]["iqmc_itt_outter"]
-        tol = mcdc["technique"]["iqmc_tol"]
-        res = mcdc["technique"]["iqmc_res_outter"]
-        solver = mcdc["technique"]["iqmc_eigenmode_solver"]
+        sys.stdout.write("\r")
+        maxit = mcdc["technique"]["iqmc"]["maxitt"]
+        itt = mcdc["technique"]["iqmc"]["itt_outter"]
         if itt >= maxit:
-            print("\n ================================\n ")
+            print("\n")
+            print("================================")
+            print("\n")
             print(
-                solver
-                + " convergence to tolerance not achieved: Maximum number of iterations."
+                " Convergence to tolerance not achieved: Maximum number of iterations."
             )
-        elif res <= tol:
-            print("\n ================================\n ")
-            print("Successful " + solver + " convergence.")
+        else:
+            print("\n")
+            print("================================")
+            print(" Successful convergence.")
+            print("\n")
+        sys.stdout.flush()
 
 
 def print_runtime(mcdc):
@@ -204,13 +209,13 @@ def print_bank(bank, show_content=False):
 
 
 def print_progress_iqmc(mcdc):
-    # TODO: function was not working with numba when structured like the
-    # other print_progress functions
     if master:
         if mcdc["setting"]["progress_bar"]:
-            itt = mcdc["technique"]["iqmc_itt"]
-            res = mcdc["technique"]["iqmc_res"]
+            sys.stdout.write("\r")
+            itt = mcdc["technique"]["iqmc"]["itt"]
+            res = mcdc["technique"]["iqmc"]["res"]
             print("\n*******************************")
-            print("Iteration ", itt)
-            print("Residual ", res)
+            print("Iteration  %2d" % (itt))
+            print("Residual %10.3E" % (res))
             print("*******************************\n")
+            sys.stdout.flush()
