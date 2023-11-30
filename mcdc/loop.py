@@ -502,7 +502,7 @@ def gmres(mcdc):
         mcdc["technique"]["iqmc_res"] = rel_resid
         if rel_resid < tol:
             break
-        if mcdc["technique"]["iqmc_itt"]  >= max_iter:
+        if mcdc["technique"]["iqmc_itt"] >= max_iter:
             return
 
     # end outer loop
@@ -653,7 +653,7 @@ def davidson(mcdc):
         if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
             mcdc["technique"]["iqmc_res_outter"] <= tol
         ):
-            simulation_end = True            
+            simulation_end = True
             with objmode():
                 print_iqmc_eigenvalue_exit_code(mcdc)
             break
