@@ -6,7 +6,7 @@ pip install -e .
 
 
 # Install MC/DC dependencies, reply "y" to conda prompt
-conda install numpy numba matplotlib scipy h5py pytest <<< "y"
+conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
 
 
 # Patch numba
@@ -40,11 +40,11 @@ while [ $# -gt 0 ]; do
       # Rename legacy compiler option in conda
       s=$(which python)
       s=${s//bin\/python/compiler_compat}
-      
+
       if [ ! -f $s/ld.bak ] && [ -f $s/ld ]; then
         mv $s/ld $s/ld.bak
       fi
-      
+
       mkdir installs; cd installs
       wget https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz -q
       tar -zxf mpi4py-3.1.4.tar.gz
