@@ -148,17 +148,19 @@ for i, name in enumerate(names):
 
     # iQMC flux
     if "iqmc" in output.keys():
-        result_name = "iqmc/flux"
-        a = output[result_name][:]
-        b = answer[result_name][:]
-
-        # Passed?
-        if np.isclose(a, b).all():
-            print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
-        else:
-            all_pass = False
-            error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
-            print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
+        for score in [key for key in output["iqmc/tally/"].keys()]:
+            result_name = "iqmc/tally/" + score
+            a = output[result_name][:]
+            b = answer[result_name][:]
+            if a.size == 0:
+                continue
+            # Passed?
+            if np.isclose(a, b).all():
+                print(Fore.GREEN + "  {}: Passed".format(score) + Style.RESET_ALL)
+            else:
+                all_pass = False
+                error_msgs[-1].append("Differences in {}\n{}".format(score, a - b))
+                print(Fore.RED + "  {}: Failed".format(score) + Style.RESET_ALL)
 
     # Close files
     output.close()
