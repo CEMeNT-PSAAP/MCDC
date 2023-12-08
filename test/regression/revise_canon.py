@@ -1,10 +1,9 @@
 import os
 
 
-test_dirs = ["fixed_source", "eigenvalue"]
-
-for dir in test_dirs:
-    for task in os.scandir("./" + dir):
-        os.chdir(task)
+for item in os.listdir():
+    if os.path.isdir(item):
+        print(item)
+        os.chdir(item)
         os.system("mv output.h5 answer.h5")
-        os.chdir(r"../..")
+        os.chdir(r"..")
