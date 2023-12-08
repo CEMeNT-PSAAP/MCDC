@@ -31,6 +31,7 @@ class InputDeck:
             "total": False,
             "current": False,
             "eddington": False,
+            "exit": False,
             "mesh": make_card_mesh(),
         }
 
@@ -116,6 +117,14 @@ class InputDeck:
             "IC_cycle_stretch": 1.0,
             "branchless_collision": False,
             "dsm_order": 1,
+            "uq": False,
+        }
+
+        self.uq_deltas = {
+            "tag": "Uq",
+            "nuclides": [],
+            "materials": [],
+            "surfaces": [],
         }
 
 
@@ -152,6 +161,7 @@ def make_card_nuclide(G, J):
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
     card["dsm_Np"] = 1.0
+    card["uq"] = False
     return card
 
 
@@ -176,6 +186,7 @@ def make_card_material(N_nuclide, G, J):
     card["chi_s"] = np.zeros([G, G])
     card["chi_p"] = np.zeros([G, G])
     card["sensitivity"] = False
+    card["uq"] = False
     return card
 
 
@@ -283,4 +294,18 @@ def make_card_mesh():
         "mu": np.array([-1.0, 1.0]),
         "azi": np.array([-PI, PI]),
         "g": np.array([-INF, INF]),
+    }
+
+
+def make_card_uq():
+    return {
+        "tag": "t",
+        "ID": -1,
+        "key": "k",
+        "mean": 0.0,
+        "delta": 0.0,
+        "distribution": "d",
+        "rng_seed": 0,
+        "group": False,
+        "group_group": False,
     }
