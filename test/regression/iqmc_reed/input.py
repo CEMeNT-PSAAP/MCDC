@@ -37,12 +37,13 @@ mcdc.cell([+s7, -s8], m4)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 1e2
+N = 20
 Nx = 16
 maxit = 10
 tol = 1e-3
 x = np.linspace(-8, 8, num=Nx + 1)
-generator = "halton"
+generator = "sobol"
+solver = "gmres"
 
 fixed_source = np.zeros(Nx)
 fixed_source[int(0.375 * Nx) : int(0.625 * Nx)] = 50.0
@@ -58,6 +59,8 @@ mcdc.iQMC(
     maxitt=maxit,
     tol=tol,
     generator=generator,
+    fixed_source_solver=solver,
+    score=["tilt-x"],
 )
 
 # =============================================================================
@@ -65,7 +68,7 @@ mcdc.iQMC(
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=N, progress_bar=True)
+mcdc.setting(N_particle=N)
 
 # Run
 mcdc.run()

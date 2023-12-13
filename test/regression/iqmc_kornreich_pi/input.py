@@ -35,7 +35,7 @@ mcdc.cell([+s2, -s3], m2)
 # =========================================================================
 # iQMC Parameters
 # =========================================================================
-N = 10
+N = 50
 maxit = 5
 tol = 1e-3
 x = np.arange(0.0, 2.6, 0.1)
@@ -57,9 +57,10 @@ mcdc.iQMC(
     tol=tol,
     generator=generator,
     eigenmode_solver=solver,
+    score=["tilt-x"],
 )
 # Setting
-mcdc.setting(N_particle=N, output_name="pi_output")
+mcdc.setting(N_particle=N)
 mcdc.eigenmode()
 
 # Run

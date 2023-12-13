@@ -7,6 +7,7 @@ from mpi4py import MPI
 # Basic types
 float64 = np.float64
 int64 = np.int64
+int32 = np.int32
 uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"
@@ -58,7 +59,8 @@ def make_type_particle(iQMC, G):
     Ng = 1
     if iQMC:
         Ng = G
-    struct += [("iqmc_w", float64, (Ng,))]
+    iqmc_struct = [("w", float64, (Ng,))]
+    struct += [("iqmc", iqmc_struct)]
     particle = np.dtype(struct)
 
 
@@ -82,7 +84,8 @@ def make_type_particle_record(iQMC, G):
     Ng = 1
     if iQMC:
         Ng = G
-    struct += [("iqmc_w", float64, (Ng,))]
+    iqmc_struct = [("w", float64, (Ng,))]
+    struct += [("iqmc", iqmc_struct)]
     particle_record = np.dtype(struct)
 
 
@@ -433,8 +436,24 @@ def make_type_setting(deck):
 # Technique
 # ==============================================================================
 
+iqmc_score_list = (
+    "flux",
+    "effective-scattering",
+    "effective-fission",
+    "tilt-x",
+    "tilt-y",
+    "tilt-z",
+    "tilt-xy",
+    "tilt-xz",
+    "tilt-yz",
+    "fission-power",
+    "fission-source",
+)
+
 
 def make_type_technique(N_particle, G, card):
+    setting = card.setting
+    card = card.technique
     global technique
 
     # Technique flags
@@ -478,53 +497,93 @@ def make_type_technique(N_particle, G, card):
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
+    iqmc_list = []
 
     # Mesh (for qmc source tallies)
     if card["iQMC"]:
-        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["iqmc_mesh"])
+        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["iqmc"]["mesh"])
         Ng = G
         N_dim = 6  # group, x, y, z, mu, phi
     else:
         Nx = Ny = Nz = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
 
-    struct += [("iqmc_mesh", mesh)]
+    iqmc_list += [("mesh", mesh)]
+
     # Low-discprenecy sequence
-    # TODO: make N_dim an input setting
     N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
-    struct += [("iqmc_lds", float64, (N_work, N_dim))]
+    iqmc_list += [("lds", float64, (N_work, N_dim))]
+    iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
+    # TODO: make matidx int32
+    iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
+    # this is the original source matrix size + all tilted sources
+    iqmc_list += [("source", float64, (Ng, Nt, Nx, Ny, Nz))]
+    total_size = (Ng * Nt * Nx * Ny * Nz) * card["iqmc"]["krylov_vector_size"]
+    iqmc_list += [(("total_source"), float64, (total_size,))]
 
-    # Source
-    struct += [("iqmc_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_material_idx", int64, (Nt, Nx, Ny, Nz))]
+    # Scores and shapes
+    # TODO: add fission power tally
+    scores_shapes = [
+        ["flux", (Ng, Nt, Nx, Ny, Nz)],
+        ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],
+        ["effective-fission", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-x", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-y", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-z", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-xy", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-xz", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-yz", (Ng, Nt, Nx, Ny, Nz)],
+        ["fission-power", (Ng, Nt, Nx, Ny, Nz)],  # SigmaF*phi
+        ["fission-source", (1,)],  # nu*SigmaF*phi
+    ]
 
-    # flux tallies
-    struct += [("iqmc_flux", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_flux_old", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # if card.setting["mode_eigenvalue"]:
-    #     struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # else:
-    #     struct += [("iqmc_flux_outter", float64, (0, 0, 0, 0, 0))]
+    if card["iQMC"]:
+        if setting["mode_eigenvalue"]:
+            if card["iqmc"]["eigenmode_solver"] == "power_iteration":
+                card["iqmc"]["score_list"]["fission-source"] = True
+
+    # Add score flags to structure
+    score_list = []
+    for i in range(len(scores_shapes)):
+        name = scores_shapes[i][0]
+        score_list += [(name, bool_)]
+    score_list = np.dtype(score_list)
+    iqmc_list += [("score_list", score_list)]
+
+    # Add scores to structure
+    scores_struct = []
+    for i in range(len(scores_shapes)):
+        name = scores_shapes[i][0]
+        shape = scores_shapes[i][1]
+        if not card["iqmc"]["score_list"][name]:
+            shape = (0,) * len(shape)
+        scores_struct += [(name, float64, shape)]
+    # TODO: make outter effective fission size zero if not eigenmode
+    # (causes problems with numba)
+    scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
+    scores = np.dtype(scores_struct)
+    iqmc_list += [("score", scores)]
 
     # Constants
-    struct += [
-        ("iqmc_maxitt", int64),
-        ("iqmc_tol", float64),
-        ("iqmc_itt", int64),
-        ("iqmc_itt_outter", int64),
-        ("iqmc_res", float64),
-        ("iqmc_res_outter", float64),
-        ("iqmc_N_dim", int64),
-        ("iqmc_scramble", bool_),
-        ("iqmc_seed", int64),
-        ("iqmc_generator", str_),
-        ("iqmc_fixed_source_solver", str_),
-        ("iqmc_eigenmode_solver", str_),
-        ("iqmc_krylov_restart", int64),
-        ("iqmc_preconditioner_sweeps", int64),
-        ("iqmc_sweep_counter", int64),
+    iqmc_list += [
+        ("maxitt", int64),
+        ("tol", float64),
+        ("itt", int64),
+        ("itt_outter", int64),
+        ("res", float64),
+        ("res_outter", float64),
+        ("N_dim", int64),
+        ("scramble", bool_),
+        ("seed", int64),
+        ("generator", str_),
+        ("fixed_source_solver", str_),
+        ("eigenmode_solver", str_),
+        ("krylov_restart", int64),
+        ("preconditioner_sweeps", int64),
+        ("sweep_counter", int64),
+        ("w_min", float64),
     ]
+
+    struct += [("iqmc", iqmc_list)]
 
     # =========================================================================
     # IC generator

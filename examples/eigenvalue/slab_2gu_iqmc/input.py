@@ -48,9 +48,7 @@ x = np.linspace(0.0, 6.01275, num=Nx + 1)
 generator = "halton"
 solver = "davidson"
 fixed_source = np.zeros((2, Nx))
-np.random.seed(123456)
-phi0 = np.random.random((2, Nx))
-# phi0 = np.ones((2, Nx))
+phi0 = np.ones((2, Nx))
 
 # =============================================================================
 # Set tally, setting, and run mcdc
