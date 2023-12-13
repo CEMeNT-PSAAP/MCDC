@@ -9,18 +9,6 @@ import mcdc
 # Based on Sood, PNE, Volume 42, Issue 1, 2003, Pages 55-106 2003,
 # "Analytical Benchmark Test Set For Criticality Code Verification"
 
-# Set materials
-
-# 1G-PU Slab data
-# m1 = mcdc.material(
-#         capture=np.array([0.019584]),
-#         scatter=np.array([[0.225216]]),
-#         fission=np.array([0.081600]),
-#         nu_p=np.array([2.84]),
-#         chi_p=np.array([1.0]),
-#     )
-# R = [0.0, 4.513502]
-
 # 2G-U Slab data
 m1 = mcdc.material(
     capture=np.array([0.01344, 0.00384]),
@@ -64,7 +52,7 @@ mcdc.iQMC(
     eigenmode_solver=solver,
 )
 # Setting
-mcdc.setting(N_particle=N, output_name="pi_output")
+mcdc.setting(N_particle=N)
 mcdc.eigenmode()
 
 # Run
