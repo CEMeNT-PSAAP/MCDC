@@ -659,7 +659,7 @@ def davidson(mcdc):
                 # "restarts" by appending to a new array
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-    # TODO: normalize and save final scalar flux
+        # TODO: normalize and save final scalar flux
         iqmc["score"]["flux"] /= iqmc["score"]["flux"].sum()
 
 
