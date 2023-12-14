@@ -9,17 +9,6 @@ import mcdc
 # "Analytical Benchmark Test Set For Criticality Code Verification"
 
 # Set materials
-
-# 1G-PU Slab data
-# m1 = mcdc.material(
-#         capture=np.array([0.019584]),
-#         scatter=np.array([[0.225216]]),
-#         fission=np.array([0.081600]),
-#         nu_p=np.array([2.84]),
-#         chi_p=np.array([1.0]),
-#     )
-# R = [0.0, 4.513502]
-
 # 2G-U Slab data
 m1 = mcdc.material(
     capture=np.array([0.01344, 0.00384]),

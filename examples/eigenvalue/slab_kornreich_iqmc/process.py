@@ -4,6 +4,26 @@ import h5py
 import sys
 
 # =============================================================================
+# Import data
+# =============================================================================
+
+with h5py.File("output.h5", "r") as f:
+    # Note the spatial (dx) and source strength (100+1) normalization
+    keff = f["k_eff"][()]
+    phi_avg = f["iqmc/tally/flux"][:]
+    sweeps = f["iqmc/sweep_count"][()]
+    x = f["iqmc/grid/x"][:]
+    dx = x[1] - x[0]
+    x_mid = 0.5 * (x[:-1] + x[1:])
+    f.close()
+
+tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
+norm = np.sum(tmp * dx)
+phi_avg /= norm
+print("Keff = ", keff)
+print("Number of QMC Transport Sweeps = ", sweeps)
+
+# =============================================================================
 # Reference solution
 # =============================================================================
 
@@ -69,27 +89,7 @@ phi_exact /= norm
 plt.figure(dpi=300, figsize=(8, 5))
 plt.plot(x_exact, phi_exact, label="sol")
 
-with h5py.File("output.h5", "r") as f:
-    # Note the spatial (dx) and source strength (100+1) normalization
-    keff = f["k_eff"][()]
-    phi_avg = f["iqmc/flux"][:]
-    sweeps = f["iqmc/sweep_count"][()]
-    x = f["iqmc/grid/x"][:]
-    dx = x[1] - x[0]
-    x_mid = 0.5 * (x[:-1] + x[1:])
-    f.close()
-
-tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
-norm = np.sum(tmp * dx)
-phi_avg /= norm
-print("Keff = ", keff)
-print(sweeps)
-plt.plot(x_mid, phi_avg, label="PI")
-
-
-# =============================================================================
-# Finish Plot
-# =============================================================================
+plt.plot(x_mid, phi_avg)
 plt.title("Kornreich et al. Slab")
 plt.ylabel(r"$\phi(x)$")
 plt.xlabel(r"$x$")

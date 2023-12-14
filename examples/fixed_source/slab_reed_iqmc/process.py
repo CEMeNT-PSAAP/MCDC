@@ -4,14 +4,26 @@ import h5py
 from scipy.integrate import quad
 
 # =============================================================================
+# Import data
+# =============================================================================
+
+with h5py.File("output.h5", "r") as f:
+    phi = f["iqmc/tally/flux"][:]
+    x = f["iqmc/grid/x"][:]
+    mesh = f["iqmc/grid/x"][:]
+    dx = x[1] - x[0]
+    x_mid = 0.5 * (x[:-1] + x[1:])
+    f.close()
+
+# =============================================================================
 # Reference solution (not accurate enough for N_hist > 1E7)
 # =============================================================================
 
 
 def reeds_sol(Nx=80, LB=-8.0, RB=8.0):
-    # =============================================================================
+    # =========================================================================
     # Reference solution
-    # =============================================================================
+    # =========================================================================
     def phi1(x):
         return (
             1.0
@@ -105,20 +117,6 @@ def reeds_sol(Nx=80, LB=-8.0, RB=8.0):
     return phi_ref
 
 
-with h5py.File("output.h5", "r") as f:
-    phi = f["iqmc/tally/flux"][:]
-    # q = f["iqmc/tally/source/constant"][:][0, 0, :, 0, 0]
-    # qdot = f["iqmc/tally/source_x"][:][0, 0, :, 0, 0]
-    x = f["iqmc/grid/x"][:]
-    mesh = f["iqmc/grid/x"][:]
-    dx = x[1] - x[0]
-    x_mid = 0.5 * (x[:-1] + x[1:])
-    lowX = x[:-1]
-    highX = x[1:]
-    Nx = x_mid.size
-    f.close()
-
-Nx = 27
 phi_ref = reeds_sol(Nx=x_mid.size, LB=-8.0, RB=8.0)
 
 
@@ -128,33 +126,9 @@ phi_ref = reeds_sol(Nx=x_mid.size, LB=-8.0, RB=8.0)
 
 # Flux - spatial average
 plt.figure(dpi=300, figsize=(8, 5))
-# plt.plot(x_mid,phi_ref,label='Sol')
+plt.plot(x_mid, phi_ref, label="Sol")
 plt.plot(x_mid, phi, label="iQMC")
 plt.ylabel(r"$\phi(x)$")
 plt.xlabel(r"$x$")
 plt.grid()
-
-# =============================================================================
-# Plot piecewise source
-# =============================================================================
-source_tilt = False
-
-# plt.figure(figsize=(6, 4), dpi=300)
-# plt.title("MCDC")
-# x = np.linspace(4, 8, num=1000)
-# n = len(x)
-# conditions = [(mesh[i] <= x) & (x <= mesh[i + 1]) for i in range(48, Nx)]
-# y1 = np.piecewise(x, conditions, q[48:Nx])
-# plt.plot(x, y1, label=r"$a_j$")
-# if source_tilt:
-#     y2 = np.zeros_like(x)
-#     for i in range(n):
-#         zone = np.argmax((x[i] > lowX) * (x[i] <= highX))
-#         mid = x_mid[zone]
-#         y2[i] = q[zone] + qdot[zone] * (x[i] - mid)
-#     plt.plot(x, y2, label=r"$a_j + b_j(x)$")
-# for i in range(48, Nx):
-#     plt.axvline(mesh[i], linestyle="--", color="black")
-# plt.legend()
-# plt.tight_layout()
-# plt.ylim((-0.1, 3.0))
+plt.legend()
