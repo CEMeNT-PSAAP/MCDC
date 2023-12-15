@@ -37,6 +37,12 @@ SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
 
+# Domain Decomp mesh crossing flags
+MESH_X = 0
+MESH_Y = 1
+MESH_Z = 2
+MESH_T = 3
+
 # RNG LCG parameters
 RNG_G = nb.uint64(2806196910506780709)
 RNG_C = nb.uint64(1)
