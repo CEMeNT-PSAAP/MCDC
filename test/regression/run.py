@@ -47,6 +47,9 @@ for i, name in enumerate(names):
     # Skip cache if any
     if name == "__pycache__":
         continue
+    # only run domain decomp tests if there are 2 MPI processes
+    if name[:3] == "dd_" and mpiexec != 4:
+        continue
 
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
@@ -119,6 +122,8 @@ for i, name in enumerate(names):
                     + Style.RESET_ALL
                 )
             else:
+                print("Answer = ", b)
+                print("Output = ", a)
                 all_pass = False
                 error_msgs[-1].append(
                     "Differences in %s"
