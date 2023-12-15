@@ -202,8 +202,6 @@ def loop_source_dd(seed, mcdc):
     j = 0
     # Progress bar indicator
     N_prog = 0
-    if mcdc["technique"]["iQMC"]:
-        mcdc["technique"]["iqmc_sweep_counter"] += 1
 
     # Loop over particle sources
     sourced_num = 0
