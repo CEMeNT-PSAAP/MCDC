@@ -31,6 +31,7 @@ class InputDeck:
             "total": False,
             "current": False,
             "eddington": False,
+            "exit": False,
             "mesh": make_card_mesh(),
         }
 
@@ -87,30 +88,57 @@ class InputDeck:
             "wr_threshold": 0.0,
             "wr_chance": 1.0,
             "iQMC": False,
-            "iqmc_generator": "sobol",
-            "iqmc_fixed_source_solver": "source_iteration",
-            "iqmc_eigenmode_solver": "power_iteration",
-            "iqmc_preconditioner_sweeps": 5,
-            "iqmc_krylov_restart": 5,
-            "iqmc_tol": 1e-6,
-            "iqmc_res": 1.0,
-            "iqmc_res_outter": 1.0,
-            "iqmc_itt": 0,
-            "iqmc_itt_outter": 0,
-            "iqmc_maxitt": 5,
-            "iqmc_N_dim": 6,
-            "iqmc_seed": 12345,
-            "iqmc_scramble": False,
-            "iqmc_fixed_source": np.ones([1, 1, 1, 1]),
-            "iqmc_material_idx": np.ones([1, 1, 1, 1]),
-            "iqmc_flux": np.ones([1, 1, 1, 1]),
-            "iqmc_mesh": {
-                "x": np.array([-INF, INF]),
-                "y": np.array([-INF, INF]),
-                "z": np.array([-INF, INF]),
-                "t": np.array([-INF, INF]),
-                "mu": np.array([-1.0, 1.0]),
-                "azi": np.array([-PI, PI]),
+            "iqmc": {
+                "generator": "sobol",
+                "fixed_source_solver": "source_iteration",
+                "eigenmode_solver": "power_iteration",
+                "preconditioner_sweeps": 5,
+                "krylov_restart": 5,
+                "krylov_vector_size": 1,
+                "tol": 1e-6,
+                "res": 1.0,
+                "res_outter": 1.0,
+                "itt": 0,
+                "itt_outter": 0,
+                "maxitt": 5,
+                "N_dim": 6,
+                "seed": 12345,
+                "scramble": False,
+                "fixed_source": np.ones([1, 1, 1, 1]),
+                "material_idx": np.ones([1, 1, 1, 1]),
+                "source": np.ones([1, 1, 1, 1]),
+                "score": {
+                    "flux": np.ones([1, 1, 1, 1]),
+                    "tilt-x": np.zeros([1, 1, 1, 1]),
+                    "tilt-y": np.zeros([1, 1, 1, 1]),
+                    "tilt-z": np.zeros([1, 1, 1, 1]),
+                    "tilt-xy": np.zeros([1, 1, 1, 1]),
+                    "tilt-xz": np.zeros([1, 1, 1, 1]),
+                    "tilt-yz": np.zeros([1, 1, 1, 1]),
+                    "fission-source": np.zeros([1, 1, 1, 1]),
+                },
+                "score_list": {
+                    "flux": True,
+                    "effective-scattering": True,
+                    "effective-fission": True,
+                    "tilt-x": False,
+                    "tilt-y": False,
+                    "tilt-z": False,
+                    "tilt-xy": False,
+                    "tilt-xz": False,
+                    "tilt-yz": False,
+                    "fission-power": False,
+                    "fission-source": False,
+                },
+                "mesh": {
+                    "g": np.array([-INF, INF]),
+                    "t": np.array([-INF, INF]),
+                    "x": np.array([-INF, INF]),
+                    "y": np.array([-INF, INF]),
+                    "z": np.array([-INF, INF]),
+                    "mu": np.array([-1.0, 1.0]),
+                    "azi": np.array([-PI, PI]),
+                },
             },
             "IC_generator": False,
             "IC_N_neutron": 0,
@@ -122,6 +150,14 @@ class InputDeck:
             "IC_cycle_stretch": 1.0,
             "branchless_collision": False,
             "dsm_order": 1,
+            "uq": False,
+        }
+
+        self.uq_deltas = {
+            "tag": "Uq",
+            "nuclides": [],
+            "materials": [],
+            "surfaces": [],
         }
 
 
@@ -158,6 +194,7 @@ def make_card_nuclide(G, J):
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
     card["dsm_Np"] = 1.0
+    card["uq"] = False
     return card
 
 
@@ -182,6 +219,7 @@ def make_card_material(N_nuclide, G, J):
     card["chi_s"] = np.zeros([G, G])
     card["chi_p"] = np.zeros([G, G])
     card["sensitivity"] = False
+    card["uq"] = False
     return card
 
 
@@ -289,4 +327,18 @@ def make_card_mesh():
         "mu": np.array([-1.0, 1.0]),
         "azi": np.array([-PI, PI]),
         "g": np.array([-INF, INF]),
+    }
+
+
+def make_card_uq():
+    return {
+        "tag": "t",
+        "ID": -1,
+        "key": "k",
+        "mean": 0.0,
+        "delta": 0.0,
+        "distribution": "d",
+        "rng_seed": 0,
+        "group": False,
+        "group_group": False,
     }
