@@ -117,7 +117,7 @@ def test_AxV_linearity():
 
     mcdc = iqmc_dummy_mcdc_variable()
 
-    size = mcdc["technique"]["iqmc_flux"].size
+    size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
@@ -146,7 +146,7 @@ def test_FxV_linearity():
 
     mcdc = iqmc_dummy_mcdc_variable()
 
-    size = mcdc["technique"]["iqmc_flux"].size
+    size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
@@ -174,7 +174,7 @@ def test_HxV_linearity():
 
     mcdc = iqmc_dummy_mcdc_variable()
 
-    size = mcdc["technique"]["iqmc_flux"].size
+    size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
@@ -202,12 +202,12 @@ def test_preconditioner_linearity():
 
     mcdc = iqmc_dummy_mcdc_variable()
 
-    size = mcdc["technique"]["iqmc_flux"].size
+    size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)
     a = np.random.random()
     b = np.random.random()
-    x = np.random.random((size, 1))
-    y = np.random.random((size, 1))
+    x = np.random.random((size,))
+    y = np.random.random((size,))
 
     F1 = preconditioner((a * x + b * y), mcdc)
     F2 = a * preconditioner(x, mcdc) + b * preconditioner(y, mcdc)
