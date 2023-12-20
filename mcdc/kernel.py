@@ -368,8 +368,7 @@ def domain_work(mcdc, domain, N):
             Ni[i] = N * source["prob"] / Psum
             Vi[i] = 1
             Vim[i] = 1
-            if source['box'] == True:
-
+            if source["box"] == True:
                 xV = source["box_x"][1] - source["box_x"][0]
                 if xV != 0:
                     Vi[i] *= xV
@@ -418,7 +417,7 @@ def domain_work(mcdc, domain, N):
         Vi[i] = 1
         Vim[i] = 1
 
-        if source['box'] == True:
+        if source["box"] == True:
             xV = source["box_x"][1] - source["box_x"][0]
             if xV != 0:
                 Vi[i] *= xV
