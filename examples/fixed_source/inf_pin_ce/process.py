@@ -5,14 +5,13 @@ import sys
 import matplotlib.animation as animation
 
 # Load results
-output = sys.argv[1]
 with np.load("SHEM-361.npz") as data:
     E = data["E"]
     G = data["G"]
     speed = data["v"]
     E_mid = 0.5 * (E[1:] + E[:-1])
     dE = E[1:] - E[:-1]
-with h5py.File(output, "r") as f:
+with h5py.File("output.h5", "r") as f:
     t = f["tally/grid/t"][:]
     dt = t[1:] - t[:-1]
     t_mid = 0.5 * (t[1:] + t[:-1])

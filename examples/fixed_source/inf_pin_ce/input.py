@@ -61,5 +61,5 @@ with np.load("SHEM-361.npz") as data:
     E = data["E"]
 
 mcdc.tally(scores=["flux"], E=E, t=np.insert(np.logspace(-8, 2, 50), 0, 0.0))
-mcdc.setting(N_particle=1e7, active_bank_buff=1000)
+mcdc.setting(N_particle=1e6, active_bank_buff=1000)
 mcdc.run()
