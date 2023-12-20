@@ -18,13 +18,13 @@ t_mid = 0.5 * (t[1:] + t[:-1])
 K = len(t) - 1
 
 # OpenMC results
-with openmc.StatePoint('statepoint.100.h5') as sp:
+with openmc.StatePoint("statepoint.100.h5") as sp:
     tally = sp.get_tally(name="TD spectrum")
-    phi_openmc = (tally.get_values(scores=['flux'])).reshape(K,G)
-    phi_sd_openmc = (tally.get_values(scores=['flux'],value='std_dev')).reshape(K,G)
+    phi_openmc = (tally.get_values(scores=["flux"])).reshape(K, G)
+    phi_sd_openmc = (tally.get_values(scores=["flux"], value="std_dev")).reshape(K, G)
 
 # MCDC
-with h5py.File('output_water_1MeV.h5', "r") as f:
+with h5py.File("output_water_1MeV.h5", "r") as f:
     phi_mcdc = f["tally/flux/mean"][:]
     phi_sd_mcdc = f["tally/flux/sdev"][:]
 
@@ -42,7 +42,7 @@ for k in range(K):
 # Normalize
 for k in range(K):
     phi_openmc[k, :] *= E_mid / dE / dt[k]
-    phi_sd_openmc[k,:] *= E_mid / dE / dt[k]
+    phi_sd_openmc[k, :] *= E_mid / dE / dt[k]
     phi_mcdc[:, k] *= E_mid / dE / dt[k]
     phi_sd_mcdc[:, k] *= E_mid / dE / dt[k]
 
@@ -75,7 +75,7 @@ ax2.set_xlabel("Energy [eV]")
 ax2.set_ylabel(r"Spectrum, $E\phi(E)$")
 ax2.set_title(r"Flux energy spectrum")
 ax2.set_xscale("log")
-ax2.set_xlim((E_mid[0],E_mid[-1]))
+ax2.set_xlim((E_mid[0], E_mid[-1]))
 (line_openmc,) = ax2.plot([], [], "-b", label="OpenMC")
 (line_mcdc,) = ax2.plot([], [], "--r", label="MC/DC")
 fb_openmc = ax2.fill_between([], [], [], [], alpha=0.2, color="b")
@@ -93,32 +93,42 @@ def animate(k):
     no_mcdc[k] = n_mcdc[k]
     dot_openmc.set_data(t[1:], no_openmc)
     dot_mcdc.set_data(t[1:], no_mcdc)
-    line_openmc.set_data(E_mid, phi_openmc[k,:])
-    line_mcdc.set_data(E_mid, phi_mcdc[:,k])
-    y = phi_openmc[k,:]
-    y_sd = phi_sd_openmc[k,:]
+    line_openmc.set_data(E_mid, phi_openmc[k, :])
+    line_mcdc.set_data(E_mid, phi_mcdc[:, k])
+    y = phi_openmc[k, :]
+    y_sd = phi_sd_openmc[k, :]
     fb_openmc = ax2.fill_between(
         E_mid,
-        y-y_sd,
-        y+y_sd,
+        y - y_sd,
+        y + y_sd,
         alpha=0.2,
         color="b",
     )
-    y = phi_mcdc[:,k]
-    y_sd = phi_sd_mcdc[:,k]
+    y = phi_mcdc[:, k]
+    y_sd = phi_sd_mcdc[:, k]
     fb_mcdc = ax2.fill_between(
         E_mid,
-        y-y_sd,
-        y+y_sd,
+        y - y_sd,
+        y + y_sd,
         alpha=0.2,
         color="r",
     )
     ax2.legend()
-    ax2.set_ylim([min((phi_openmc[k,:]).min(), (phi_mcdc[:,k]).min()), max((phi_openmc[k,:]).max(), (phi_mcdc[:,k]).max())])
+    ax2.set_ylim(
+        [
+            min((phi_openmc[k, :]).min(), (phi_mcdc[:, k]).min()),
+            max((phi_openmc[k, :]).max(), (phi_mcdc[:, k]).max()),
+        ]
+    )
     return line_openmc, line_mcdc
 
 
 simulation = animation.FuncAnimation(fig, animate, frames=K)
-#writervideo = animation.FFMpegWriter(fps=10)
-simulation.save('water_1MeV.gif',fps=5,writer='imagemagick',  savefig_kwargs={'bbox_inches':'tight', 'pad_inches':0})
+# writervideo = animation.FFMpegWriter(fps=10)
+simulation.save(
+    "water_1MeV.gif",
+    fps=5,
+    writer="imagemagick",
+    savefig_kwargs={"bbox_inches": "tight", "pad_inches": 0},
+)
 plt.show()

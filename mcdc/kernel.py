@@ -1234,7 +1234,7 @@ def mesh_get_index(P, mesh):
         or P["z"] > mesh["z"][-1]
     ):
         outside = True
-        return 0, 0, 0, 0,outside
+        return 0, 0, 0, 0, outside
 
     t = binary_search(P["t"], mesh["t"])
     x = binary_search(P["x"], mesh["x"])
@@ -1267,8 +1267,8 @@ def mesh_get_energy_index(P, mesh, mcdc):
     if mcdc["setting"]["mode_MG"]:
         return binary_search(P["g"], mesh["g"]), outside
     else:
-        E = P['E']
-        if E < mesh['g'][0] or E > mesh['g'][-1]:
+        E = P["E"]
+        if E < mesh["g"][0] or E > mesh["g"][-1]:
             outside = True
             return 0, outside
         return binary_search(P["E"], mesh["g"]), outside
@@ -2091,7 +2091,7 @@ def scattering_CE(P, material, P_new, mcdc):
 
     # Sample nucleus thermal speed
     A = nuclide["A"]
-    if P['E'] > E_THERMAL_THRESHOLD:
+    if P["E"] > E_THERMAL_THRESHOLD:
         Vx = 0.0
         Vy = 0.0
         Vz = 0.0
@@ -2243,7 +2243,7 @@ def fission(P, mcdc):
 
     # Sample nuclide if CE
     material = mcdc["materials"][P["material_ID"]]
-    nuclide = mcdc['nuclides'][0] # Default nuclide, will be resampled for CE
+    nuclide = mcdc["nuclides"][0]  # Default nuclide, will be resampled for CE
 
     # Get number of secondaries
     if mcdc["setting"]["mode_MG"]:
@@ -3769,7 +3769,9 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                             tot += nusigmaS
                             if tot > xi:
                                 # Scattering source
-                                sample_phasespace_scattering_nuclide(P, nuclide, P_new, mcdc)
+                                sample_phasespace_scattering_nuclide(
+                                    P, nuclide, P_new, mcdc
+                                )
                                 P_new["sensitivity_ID"] = ID_source
                                 add_particle(P_new, mcdc["bank_active"])
                                 source_obtained = True
@@ -3954,7 +3956,7 @@ def get_MacroXS(type_, material, P, mcdc):
         nuclide = mcdc["nuclides"][ID_nuclide]
 
         # Skip if not compatible
-        if type_==XS_FISSION and not nuclide['fissionable']:
+        if type_ == XS_FISSION and not nuclide["fissionable"]:
             continue
 
         # Get nuclide density
@@ -4039,7 +4041,7 @@ def sample_nuclide(material, P, type_, mcdc):
         nuclide = mcdc["nuclides"][ID_nuclide]
 
         # Skip if not compatible
-        if type_==XS_FISSION and not nuclide['fissionable']:
+        if type_ == XS_FISSION and not nuclide["fissionable"]:
             continue
 
         N = material["nuclide_densities"][i]
