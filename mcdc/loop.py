@@ -341,7 +341,6 @@ def loop_source_dd(seed, mcdc):
                         mcdc["technique"]["domain_mesh"]["y"][d_iy],
                         mcdc["technique"]["domain_mesh"]["z"][d_iz],
                     )
-                kernel.shift_particle(P, -SHIFT)
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
