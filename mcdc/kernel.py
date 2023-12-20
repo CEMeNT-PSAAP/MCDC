@@ -30,7 +30,7 @@ def domain_crossing(P, mcdc):
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
         flag = directions[0]
-         
+
         if len(directions) > 1:
             for direction in directions[1:]:
                 if direction == MESH_X:
@@ -39,7 +39,7 @@ def domain_crossing(P, mcdc):
                     P["y"] -= SHIFT * P["uy"] / np.abs(P["uy"])
                 if direction == MESH_Z:
                     P["z"] -= SHIFT * P["uz"] / np.abs(P["uz"])
-        
+
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -66,7 +66,6 @@ def domain_crossing(P, mcdc):
             if mcdc["bank_domain_zn"]["size"] == max_size:
                 dd_particle_send(mcdc)
         P["alive"] = False
-
 
 
 # =============================================================================
@@ -255,9 +254,6 @@ def dd_particle_receive(mcdc):
     for i in range(size):
         add_particle(buff[i], mcdc["bank_active"])
 
-
-
-        
 
 # =============================================================================
 # Particle in domain
@@ -1820,9 +1816,10 @@ def mesh_crossing_evaluate(P, mesh):
     if y1 != y2:
         directions.append(MESH_Y)
     if z1 != z2:
-        directions.append(MESH_Z) 
+        directions.append(MESH_Z)
 
-    return x1,y1,z1,t1,directions
+    return x1, y1, z1, t1, directions
+
 
 # =============================================================================
 # Tally operations
@@ -1919,10 +1916,10 @@ def score_closeout_history(score):
     score["mean"][:] += score["bin"]
     proc = MPI.COMM_WORLD.Get_rank()
     score["sdev"][:] += np.square(score["bin"])
-    #f = open('ref_tally'+str(proc)+'.csv','a')
-    #if score["bin"][0][0][0][0][0][4][0]>0:
+    # f = open('ref_tally'+str(proc)+'.csv','a')
+    # if score["bin"][0][0][0][0][0][4][0]>0:
     #    f.write(str(score["bin"][0][0][0][0][0][4][0][0])+',\n')
-        #f.write(str(score["mean"][0][0][0][0][0][4][0][0])+',\n')
+    # f.write(str(score["mean"][0][0][0][0][0][4][0][0])+',\n')
     # Reset bin
     score["bin"].fill(0.0)
 
@@ -2233,7 +2230,9 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision,d_domain)
+    distance = min(
+        d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision, d_domain
+    )
     # Remove the boundary event if it is not the nearest
     if d_boundary > distance * PREC:
         event = 0
@@ -2274,7 +2273,6 @@ def move_to_event(P, mcdc):
 
     # Move particle
     move_particle(P, distance, mcdc)
-        
 
 
 @njit
