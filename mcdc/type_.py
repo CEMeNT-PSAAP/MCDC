@@ -6,6 +6,7 @@ from mpi4py import MPI
 # Basic types
 float64 = np.float64
 int64 = np.int64
+int32 = np.int32
 uint64 = np.uint64
 bool_ = np.bool_
 str_ = "U30"
@@ -57,16 +58,20 @@ def make_type_particle(input_deck):
     ]
 
     # Get modes
-    mode_MG = input_deck.setting["mode_MG"]
     iQMC = input_deck.technique["iQMC"]
+
+    # =========================================================================
+    # iQMC
+    # =========================================================================
 
     # Default number of groups for iQMC
     G = 1
 
     # iQMC vector of weights
-    if iQMC and mode_MG:
+    if iQMC:
         G = input_deck.materials[0]["G"]
-    struct += [("iqmc_w", float64, (G,))]
+    iqmc_struct = [("w", float64, (G,))]
+    struct += [("iqmc", iqmc_struct)]
 
     # Save type
     particle = np.dtype(struct)
@@ -92,16 +97,20 @@ def make_type_particle_record(input_deck):
     ]
 
     # Get modes
-    mode_MG = input_deck.setting["mode_MG"]
     iQMC = input_deck.technique["iQMC"]
+
+    # =========================================================================
+    # iQMC
+    # =========================================================================
 
     # Default number of groups for iQMC
     G = 1
 
     # iQMC vector of weights
-    if iQMC and mode_MG:
+    if iQMC:
         G = input_deck.materials[0]["G"]
-    struct += [("iqmc_w", float64, (G,))]
+    iqmc_struct = [("w", float64, (G,))]
+    struct += [("iqmc", iqmc_struct)]
 
     # Save type
     particle_record = np.dtype(struct)
@@ -204,6 +213,7 @@ def make_type_nuclide(input_deck):
         ("sensitivity", bool_),
         ("sensitivity_ID", int64),
         ("dsm_Np", float64),
+        ("uq", bool_),
     ]
 
     # MG data
@@ -301,6 +311,7 @@ def make_type_material(input_deck):
         ("sensitivity", bool_),
         ("nuclide_IDs", int64, (Nmax_nuclide,)),
         ("nuclide_densities", float64, (Nmax_nuclide,)),
+        ("uq", bool_),
     ]
 
     # MG data
@@ -521,6 +532,7 @@ score_list = (
     "total",
     "current",
     "eddington",
+    "exit",
 )
 
 
@@ -562,6 +574,7 @@ def make_type_tally(input_deck):
         ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
         ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
         ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
+        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
     ]
 
     # Add score flags to structure
@@ -638,6 +651,20 @@ def make_type_setting(deck):
 # Technique
 # ==============================================================================
 
+iqmc_score_list = (
+    "flux",
+    "effective-scattering",
+    "effective-fission",
+    "tilt-x",
+    "tilt-y",
+    "tilt-z",
+    "tilt-xy",
+    "tilt-xz",
+    "tilt-yz",
+    "fission-power",
+    "fission-source",
+)
+
 
 def make_type_technique(input_deck):
     global technique
@@ -667,6 +694,7 @@ def make_type_technique(input_deck):
         ("iQMC", bool_),
         ("IC_generator", bool_),
         ("branchless_collision", bool_),
+        ("uq", bool_),
     ]
 
     # =========================================================================
@@ -697,53 +725,93 @@ def make_type_technique(input_deck):
     # =========================================================================
     # Quasi Monte Carlo
     # =========================================================================
+    iqmc_list = []
 
     # Mesh (for qmc source tallies)
     if card["iQMC"]:
-        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["iqmc_mesh"])
+        mesh, Nx, Ny, Nz, Nt, Nmu, N_azi = make_type_mesh_(card["iqmc"]["mesh"])
         Ng = G
         N_dim = 6  # group, x, y, z, mu, phi
     else:
         Nx = Ny = Nz = Nt = Nmu = N_azi = N_particle = Ng = N_dim = 0
 
-    struct += [("iqmc_mesh", mesh)]
+    iqmc_list += [("mesh", mesh)]
+
     # Low-discprenecy sequence
-    # TODO: make N_dim an input setting
     N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
-    struct += [("iqmc_lds", float64, (N_work, N_dim))]
+    iqmc_list += [("lds", float64, (N_work, N_dim))]
+    iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
+    # TODO: make matidx int32
+    iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
+    # this is the original source matrix size + all tilted sources
+    iqmc_list += [("source", float64, (Ng, Nt, Nx, Ny, Nz))]
+    total_size = (Ng * Nt * Nx * Ny * Nz) * card["iqmc"]["krylov_vector_size"]
+    iqmc_list += [(("total_source"), float64, (total_size,))]
 
-    # Source
-    struct += [("iqmc_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_material_idx", int64, (Nt, Nx, Ny, Nz))]
+    # Scores and shapes
+    # TODO: add fission power tally
+    scores_shapes = [
+        ["flux", (Ng, Nt, Nx, Ny, Nz)],
+        ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],
+        ["effective-fission", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-x", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-y", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-z", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-xy", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-xz", (Ng, Nt, Nx, Ny, Nz)],
+        ["tilt-yz", (Ng, Nt, Nx, Ny, Nz)],
+        ["fission-power", (Ng, Nt, Nx, Ny, Nz)],  # SigmaF*phi
+        ["fission-source", (1,)],  # nu*SigmaF*phi
+    ]
 
-    # flux tallies
-    struct += [("iqmc_flux", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_flux_old", float64, (Ng, Nt, Nx, Ny, Nz))]
-    struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # if card.setting["mode_eigenvalue"]:
-    #     struct += [("iqmc_flux_outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # else:
-    #     struct += [("iqmc_flux_outter", float64, (0, 0, 0, 0, 0))]
+    if card["iQMC"]:
+        if setting["mode_eigenvalue"]:
+            if card["iqmc"]["eigenmode_solver"] == "power_iteration":
+                card["iqmc"]["score_list"]["fission-source"] = True
+
+    # Add score flags to structure
+    score_list = []
+    for i in range(len(scores_shapes)):
+        name = scores_shapes[i][0]
+        score_list += [(name, bool_)]
+    score_list = np.dtype(score_list)
+    iqmc_list += [("score_list", score_list)]
+
+    # Add scores to structure
+    scores_struct = []
+    for i in range(len(scores_shapes)):
+        name = scores_shapes[i][0]
+        shape = scores_shapes[i][1]
+        if not card["iqmc"]["score_list"][name]:
+            shape = (0,) * len(shape)
+        scores_struct += [(name, float64, shape)]
+    # TODO: make outter effective fission size zero if not eigenmode
+    # (causes problems with numba)
+    scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
+    scores = np.dtype(scores_struct)
+    iqmc_list += [("score", scores)]
 
     # Constants
-    struct += [
-        ("iqmc_maxitt", int64),
-        ("iqmc_tol", float64),
-        ("iqmc_itt", int64),
-        ("iqmc_itt_outter", int64),
-        ("iqmc_res", float64),
-        ("iqmc_res_outter", float64),
-        ("iqmc_N_dim", int64),
-        ("iqmc_scramble", bool_),
-        ("iqmc_seed", int64),
-        ("iqmc_generator", str_),
-        ("iqmc_fixed_source_solver", str_),
-        ("iqmc_eigenmode_solver", str_),
-        ("iqmc_krylov_restart", int64),
-        ("iqmc_preconditioner_sweeps", int64),
-        ("iqmc_sweep_counter", int64),
+    iqmc_list += [
+        ("maxitt", int64),
+        ("tol", float64),
+        ("itt", int64),
+        ("itt_outter", int64),
+        ("res", float64),
+        ("res_outter", float64),
+        ("N_dim", int64),
+        ("scramble", bool_),
+        ("seed", int64),
+        ("generator", str_),
+        ("fixed_source_solver", str_),
+        ("eigenmode_solver", str_),
+        ("krylov_restart", int64),
+        ("preconditioner_sweeps", int64),
+        ("sweep_counter", int64),
+        ("w_min", float64),
     ]
+
+    struct += [("iqmc", iqmc_list)]
 
     # =========================================================================
     # IC generator
@@ -792,8 +860,142 @@ def make_type_technique(input_deck):
         ("dsm_order", int64),
     ]
 
+    # =========================================================================
+    # Variance Deconvolution
+    # =========================================================================
+    struct += [("uq_tally", uq_tally), ("uq_", uq)]
+
     # Finalize technique type
     technique = np.dtype(struct)
+
+
+# UQ
+def make_type_uq_tally(input_deck):
+    global uq_tally
+
+    def make_type_uq_score(shape):
+        return np.dtype(
+            [
+                ("batch_bin", float64, shape),
+                ("batch_var", float64, shape),
+            ]
+        )
+
+    # Tally estimator flags
+    struct = []
+
+    # Number of tally scores
+    Ns = 1 + input_deck.setting["N_sensitivity"]
+
+    # Tally card
+    tally_card = input_deck.tally
+
+    # Mesh, but doesn't need to be added
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
+
+    # Scores and shapes
+    scores_shapes = [
+        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
+        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
+        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+    ]
+
+    # Add score flags to structure
+    for i in range(len(scores_shapes)):
+        name = scores_shapes[i][0]
+        struct += [(name, bool_)]
+
+    # Add scores to structure
+    scores_struct = []
+    for i in range(len(scores_shapes)):
+        name = scores_shapes[i][0]
+        shape = scores_shapes[i][1]
+        if not tally_card[name]:
+            shape = (0,) * len(shape)
+        scores_struct += [(name, make_type_uq_score(shape))]
+    scores = np.dtype(scores_struct)
+    struct += [("score", scores)]
+
+    # Make tally structure
+    uq_tally = np.dtype(struct)
+
+
+def make_type_uq(input_deck):
+    global uq, uq_nuc, uq_mat
+
+    #    def make_type_parameter(shape):
+    #        return np.dtype(
+    #            [
+    #                ("tag", str_),             # nuclides, materials, surfaces, sources
+    #                ("ID", int64),
+    #                ("key", str_),
+    #                ("mean", float64, shape),
+    #                ("delta", float64, shape),
+    #                ("distribution", str_),
+    #                ("rng_seed", uint64),
+    #            ]
+    #        )
+
+    def make_type_parameter(G, J, decay=False):
+        # Fields are things that can have deltas
+        struct = [
+            ("speed", float64, (G,)),
+            ("capture", float64, (G,)),
+            ("scatter", float64, (G, G)),
+            ("fission", float64, (G,)),
+            ("nu_s", float64, (G,)),
+            ("nu_p", float64, (G,)),
+            ("nu_d", float64, (G, J)),
+            ("chi_p", float64, (G, G)),
+        ]
+        struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
+        return np.dtype(struct)
+
+    # Size numbers
+    G = input_deck.materials[0]["G"]
+    J = input_deck.materials[0]["J"]
+
+    # UQ deck
+    uq_deck = input_deck.uq_deltas
+
+    uq_nuc = make_type_parameter(G, J, True)
+    uq_mat = make_type_parameter(G, J)
+
+    flags = np.dtype(
+        [
+            ("speed", bool_),
+            ("decay", bool_),
+            ("total", bool_),
+            ("capture", bool_),
+            ("scatter", bool_),
+            ("fission", bool_),
+            ("nu_s", bool_),
+            ("nu_f", bool_),
+            ("nu_p", bool_),
+            ("nu_d", bool_),
+            ("chi_s", bool_),
+            ("chi_p", bool_),
+            ("chi_d", bool_),
+        ]
+    )
+    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+
+    container = np.dtype(
+        [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
+    )
+
+    N_nuclide = len(uq_deck["nuclides"])
+    N_material = len(uq_deck["materials"])
+    uq = np.dtype(
+        [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
+    )
+
+
+param_names = ["tag", "ID", "key", "mean", "delta", "distribution", "rng_seed"]
 
 
 # ==============================================================================
