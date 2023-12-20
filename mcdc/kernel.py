@@ -27,22 +27,10 @@ def domain_crossing(P, mcdc):
     max_size = mcdc["technique"]["exchange_rate"]  # /1e4)*mcdc["mpi_work_size"])
     if mcdc["technique"]["domain_decomp"]:
         mesh = mcdc["technique"]["domain_mesh"]
-        d_idx = mcdc["d_idx"]
-        d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
-        d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
-        d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
-
-        d_iz = int(d_idx / (d_Nx * d_Ny))
-        d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
-        d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
-        shift_particle(P, 2 * SHIFT)
-        t2, x2, y2, z2, outside2 = mesh_get_index(P, mesh)
-        shift_particle(P, -2 * SHIFT)
-
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
         flag = directions[0]
-
+         
         if len(directions) > 1:
             for direction in directions[1:]:
                 if direction == MESH_X:
@@ -51,7 +39,7 @@ def domain_crossing(P, mcdc):
                     P["y"] -= SHIFT * P["uy"] / np.abs(P["uy"])
                 if direction == MESH_Z:
                     P["z"] -= SHIFT * P["uz"] / np.abs(P["uz"])
-
+        
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -78,6 +66,7 @@ def domain_crossing(P, mcdc):
             if mcdc["bank_domain_zn"]["size"] == max_size:
                 dd_particle_send(mcdc)
         P["alive"] = False
+
 
 
 # =============================================================================
@@ -266,6 +255,9 @@ def dd_particle_receive(mcdc):
     for i in range(size):
         add_particle(buff[i], mcdc["bank_active"])
 
+
+
+        
 
 # =============================================================================
 # Particle in domain
@@ -1828,10 +1820,9 @@ def mesh_crossing_evaluate(P, mesh):
     if y1 != y2:
         directions.append(MESH_Y)
     if z1 != z2:
-        directions.append(MESH_Z)
+        directions.append(MESH_Z) 
 
-    return x1, y1, z1, t1, directions
-
+    return x1,y1,z1,t1,directions
 
 # =============================================================================
 # Tally operations
@@ -1926,8 +1917,12 @@ def score_reduce_bin(score, mcdc):
 def score_closeout_history(score):
     # Accumulate score and square of score into mean and sdev
     score["mean"][:] += score["bin"]
+    proc = MPI.COMM_WORLD.Get_rank()
     score["sdev"][:] += np.square(score["bin"])
-
+    #f = open('ref_tally'+str(proc)+'.csv','a')
+    #if score["bin"][0][0][0][0][0][4][0]>0:
+    #    f.write(str(score["bin"][0][0][0][0][0][4][0][0])+',\n')
+        #f.write(str(score["mean"][0][0][0][0][0][4][0][0])+',\n')
     # Reset bin
     score["bin"].fill(0.0)
 
@@ -2208,6 +2203,10 @@ def move_to_event(P, mcdc):
     if mcdc["cycle_active"]:
         d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
 
+    d_domain = INF
+    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomp"]:
+        d_domain = distance_to_mesh(P, mcdc["technique"]["domain_mesh"], mcdc)
+
     if mcdc["technique"]["iQMC"]:
         d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc"]["mesh"], mcdc)
         if d_iqmc_mesh < d_mesh:
@@ -2234,7 +2233,7 @@ def move_to_event(P, mcdc):
     # =========================================================================
 
     # Find the minimum
-    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision)
+    distance = min(d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision,d_domain)
     # Remove the boundary event if it is not the nearest
     if d_boundary > distance * PREC:
         event = 0
@@ -2246,6 +2245,8 @@ def move_to_event(P, mcdc):
         event += EVENT_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
+    if d_domain <= distance * PREC:
+        event += EVENT_DOMAIN
     if d_collision == distance:
         event = EVENT_COLLISION
 
@@ -2273,6 +2274,7 @@ def move_to_event(P, mcdc):
 
     # Move particle
     move_particle(P, distance, mcdc)
+        
 
 
 @njit
