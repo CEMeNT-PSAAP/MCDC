@@ -1636,6 +1636,10 @@ def surface_distance(P, surface, trans, mcdc):
         t_max = surface["t"][idx + 1]
         d_max = (t_max - P["t"]) * v
 
+        if (
+            G * ux + H * uy + I_ * uz + J1 / v
+        ) == 0:
+            J1=1e-25
         distance = -surface_evaluate(P, surface, trans) / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
@@ -1775,7 +1779,10 @@ def mesh_get_angular_index(P, mesh):
     uz = P["uz"]
 
     P_mu = uz
-    P_azi = math.acos(ux / math.sqrt(ux * ux + uy * uy))
+    if ux + uy != 0:
+        P_azi = math.acos(ux / math.sqrt(ux * ux + uy * uy))
+    else:
+        P_azi = 0
     if uy < 0.0:
         P_azi *= -1
 
