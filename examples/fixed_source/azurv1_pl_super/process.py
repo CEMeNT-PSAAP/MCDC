@@ -54,5 +54,10 @@ def animate(k):
 
 
 simulation = animation.FuncAnimation(fig, animate, frames=K)
-simulation.save('azurv1.gif',fps=4,writer='imagemagick',  savefig_kwargs={'bbox_inches':'tight', 'pad_inches':0})
+simulation.save(
+    "azurv1.gif",
+    fps=4,
+    writer="imagemagick",
+    savefig_kwargs={"bbox_inches": "tight", "pad_inches": 0},
+)
 plt.show()
