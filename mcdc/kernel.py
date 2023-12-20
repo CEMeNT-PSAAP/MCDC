@@ -368,25 +368,26 @@ def domain_work(mcdc, domain, N):
             Ni[i] = N * source["prob"] / Psum
             Vi[i] = 1
             Vim[i] = 1
+            if source['box'] == True:
 
-            xV = source["box_x"][1] - source["box_x"][0]
-            if xV != 0:
-                Vi[i] *= xV
-                Vim[i] *= min(source["box_x"][1], d_x[1]) - max(
-                    source["box_x"][0], d_x[0]
-                )
-            yV = source["box_y"][1] - source["box_y"][0]
-            if yV != 0:
-                Vi[i] *= yV
-                Vim[i] *= min(source["box_y"][1], d_y[1]) - max(
-                    source["box_y"][0], d_y[0]
-                )
-            zV = source["box_z"][1] - source["box_z"][0]
-            if zV != 0:
-                Vi[i] *= zV
-                Vim[i] *= min(source["box_z"][1], d_z[1]) - max(
-                    source["box_z"][0], d_z[0]
-                )
+                xV = source["box_x"][1] - source["box_x"][0]
+                if xV != 0:
+                    Vi[i] *= xV
+                    Vim[i] *= min(source["box_x"][1], d_x[1]) - max(
+                        source["box_x"][0], d_x[0]
+                    )
+                yV = source["box_y"][1] - source["box_y"][0]
+                if yV != 0:
+                    Vi[i] *= yV
+                    Vim[i] *= min(source["box_y"][1], d_y[1]) - max(
+                        source["box_y"][0], d_y[0]
+                    )
+                zV = source["box_z"][1] - source["box_z"][0]
+                if zV != 0:
+                    Vi[i] *= zV
+                    Vim[i] *= min(source["box_z"][1], d_z[1]) - max(
+                        source["box_z"][0], d_z[0]
+                    )
             if not source_in_domain(source, domain_mesh, d_idx):
                 Vim[i] = 0
             i += 1
@@ -417,20 +418,25 @@ def domain_work(mcdc, domain, N):
         Vi[i] = 1
         Vim[i] = 1
 
-        xV = source["box_x"][1] - source["box_x"][0]
-        if xV != 0:
-            Vi[i] *= xV
-            Vim[i] *= min(source["box_x"][1], d_x[1]) - max(source["box_x"][0], d_x[0])
-        yV = source["box_y"][1] - source["box_y"][0]
-        if yV != 0:
-            Vi[i] *= yV
-            Vim[i] *= min(source["box_y"][1], d_y[1]) - max(source["box_y"][0], d_y[0])
-        zV = source["box_z"][1] - source["box_z"][0]
-        if zV != 0:
-            Vi[i] *= zV
-            Vim[i] *= min(source["box_z"][1], d_z[1]) - max(source["box_z"][0], d_z[0])
-        if not source_in_domain(source, domain_mesh, d_idx):
-            Vim[i] = 0
+        if source['box'] == True:
+            xV = source["box_x"][1] - source["box_x"][0]
+            if xV != 0:
+                Vi[i] *= xV
+                Vim[i] *= min(source["box_x"][1], d_x[1]) - max(
+                    source["box_x"][0], d_x[0]
+                )
+            yV = source["box_y"][1] - source["box_y"][0]
+            if yV != 0:
+                Vi[i] *= yV
+                Vim[i] *= min(source["box_y"][1], d_y[1]) - max(
+                    source["box_y"][0], d_y[0]
+                )
+            zV = source["box_z"][1] - source["box_z"][0]
+            if zV != 0:
+                Vi[i] *= zV
+                Vim[i] *= min(source["box_z"][1], d_z[1]) - max(
+                    source["box_z"][0], d_z[0]
+                )
         i += 1
     for source in range(num_source):
         Nm += Ni[source] * Vim[source] / Vi[source]
