@@ -19,7 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         #sudo apt-get install libopenmpi-dev
-        pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py
+        pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py ngsolve distinctipy
         pip list 
         pip install -e .
     - name: Patch Numba
