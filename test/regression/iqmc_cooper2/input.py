@@ -33,9 +33,9 @@ mcdc.cell([+sx2, -sx3, +sy1, -sy2], m_barrier)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 1e2
+N = 20
 Nx = Ny = 40
-maxit = 1
+maxit = 2
 tol = 1e-3
 x = np.linspace(0, 4, num=Nx + 1)
 y = np.linspace(0, 4, num=Ny + 1)
@@ -55,6 +55,7 @@ mcdc.iQMC(
     maxitt=maxit,
     tol=tol,
     generator=generator,
+    score=["tilt-x", "tilt-y", "tilt-xy"],
 )
 
 # =============================================================================

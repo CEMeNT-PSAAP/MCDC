@@ -8,7 +8,7 @@ import mcdc
 # =============================================================================
 
 # Load material data
-lib = h5py.File("c5g7.h5", "r")
+lib = h5py.File("2d_c5g7_xs.h5", "r")
 
 
 # Materials
@@ -17,22 +17,17 @@ def set_mat(mat):
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],
-        nu_p=mat["nu_p"][:],
-        nu_d=mat["nu_d"][:],
-        chi_p=mat["chi_p"][:],
-        chi_d=mat["chi_d"][:],
-        speed=mat["speed"],
-        decay=mat["decay"],
+        nu_p=mat["nu"][:],
+        chi_p=mat["chi"][:],
     )
 
 
 mat_uo2 = set_mat(lib["uo2"])
 mat_mox43 = set_mat(lib["mox43"])
-mat_mox7 = set_mat(lib["mox7"])
+mat_mox7 = set_mat(lib["mox70"])
 mat_mox87 = set_mat(lib["mox87"])
 mat_gt = set_mat(lib["gt"])
 mat_fc = set_mat(lib["fc"])
-mat_cr = set_mat(lib["cr"])
 mat_mod = set_mat(lib["mod"])
 
 # =============================================================================
@@ -52,7 +47,6 @@ mox7 = mcdc.cell([-cy], mat_mox7)
 mox8 = mcdc.cell([-cy], mat_mox87)
 gt = mcdc.cell([-cy], mat_gt)
 fc = mcdc.cell([-cy], mat_fc)
-cr = mcdc.cell([-cy], mat_cr)
 mod = mcdc.cell([+cy], mat_mod)
 modi = mcdc.cell([-cy], mat_mod)  # For all-water lattice
 
@@ -63,7 +57,6 @@ m = mcdc.universe([mox7, mod])["ID"]
 n = mcdc.universe([mox8, mod])["ID"]
 g = mcdc.universe([gt, mod])["ID"]
 f = mcdc.universe([fc, mod])["ID"]
-c = mcdc.universe([cr, mod])["ID"]
 w = mcdc.universe([modi, mod])["ID"]
 
 # =============================================================================
@@ -171,29 +164,28 @@ mcdc.universe([core], root=True)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 1e5
+N = 1e4
 maxit = 10
 tol = 1e-3
-pre_sweeps = 9
-x_grid = np.linspace(0.0, pitch * 17 * 3, 17 * 3 * 2 + 1)
-y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 * 2 + 1)
+Nx = 17 * 3 * 2
+Ny = 17 * 3 * 2
+G = 7
+x_grid = np.linspace(0.0, pitch * 17 * 3, Nx + 1)
+y_grid = np.linspace(-pitch * 17 * 3, 0.0, Ny + 1)
 
 generator = "halton"
-solver = "davidson"
+solver = "power_iteration"
 
-phi0 = np.zeros((x_grid.size - 1, y_grid.size - 1))
-np.random.seed(123456)
-phi0[: int(pitch * 17 * 2), int(-pitch * 17 * 2) :] = np.random.random((42, 42))
-
+phi0 = np.ones((G, Nx, Ny))
 fixed_source = np.zeros_like(phi0)
 
 mcdc.iQMC(
     x=x_grid,
     y=y_grid,
+    g=np.ones(G),
     phi0=phi0,
     fixed_source=fixed_source,
     eigenmode_solver=solver,
-    preconditioner_sweeps=pre_sweeps,
     maxitt=maxit,
     tol=tol,
     generator=generator,
@@ -203,9 +195,8 @@ mcdc.iQMC(
 # run mcdc
 # =============================================================================
 
-
 # Setting
-mcdc.setting(N_particle=N, output_name="davidson_output")
+mcdc.setting(N_particle=N)
 mcdc.eigenmode()
 
 # Run
