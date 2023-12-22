@@ -36,6 +36,7 @@ jobs:
       run: |
         cd test/regression
         python run.py --mpiexec=4 --skip=iqmc*
+        python run.py --mpiexec=2 --name=iqmc*
     - name: Regression Test - Numba
       run: |
         cd test/regression
@@ -44,5 +45,6 @@ jobs:
       run: |
         cd test/regression
         python run.py --mode=numba --mpiexec=4 --skip=iqmc*
+        python run.py --mode=numba --mpiexec=2 --name=iqmc*
     # TODO: Performance test
     # TODO: GPU test
