@@ -375,64 +375,51 @@ def prepare():
 
     if input_deck.technique["iQMC"]:
         # pass in mesh
-        mcdc["technique"]["iqmc"]["mesh"]["x"] = input_deck.technique["iqmc"]["mesh"][
-            "x"
-        ]
-        mcdc["technique"]["iqmc"]["mesh"]["y"] = input_deck.technique["iqmc"]["mesh"][
-            "y"
-        ]
-        mcdc["technique"]["iqmc"]["mesh"]["z"] = input_deck.technique["iqmc"]["mesh"][
-            "z"
-        ]
-        mcdc["technique"]["iqmc"]["mesh"]["t"] = input_deck.technique["iqmc"]["mesh"][
-            "t"
-        ]
+        iqmc = mcdc["technique"]["iqmc"]
+        iqmc["mesh"]["x"] = input_deck.technique["iqmc"]["mesh"]["x"]
+        iqmc["mesh"]["y"] = input_deck.technique["iqmc"]["mesh"]["y"]
+        iqmc["mesh"]["z"] = input_deck.technique["iqmc"]["mesh"]["z"]
+        iqmc["mesh"]["t"] = input_deck.technique["iqmc"]["mesh"]["t"]
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
-            mcdc["technique"]["iqmc"]["score_list"][name] = value
+            iqmc["score_list"][name] = value
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
             mcdc["technique"]["iqmc"]["score"][name] = value
         # LDS generator
-        mcdc["technique"]["iqmc"]["generator"] = input_deck.technique["iqmc"][
-            "generator"
-        ]
+        iqmc["generator"] = input_deck.technique["iqmc"]["generator"]
         # minimum particle weight
-        mcdc["technique"]["iqmc"]["w_min"] = 1e-16  # / mcdc["setting"]["N_particle"]
+        iqmc["w_min"] = 1e-13
         # variables to generate samples
-        scramble = mcdc["technique"]["iqmc"]["scramble"]
-        N_dim = mcdc["technique"]["iqmc"]["N_dim"]
-        seed = mcdc["technique"]["iqmc"]["seed"]
-        N = mcdc["setting"]["N_particle"]
-        size = MPI.COMM_WORLD.Get_size()
-        rank = MPI.COMM_WORLD.Get_rank()
-        N_work = math.ceil(N_particle / size)
-        # how many samples this processor will skip in the LDS
-        fast_forward = int((rank / size) * N)
+        scramble = iqmc["scramble"]
+        N_dim = iqmc["N_dim"]
+        seed = iqmc["seed"]
+
+        mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
+        mcdc["mpi_rank"] = MPI.COMM_WORLD.Get_rank()
+        kernel.distribute_work(N_particle, mcdc)
+        N_work = int(mcdc["mpi_work_size"])
+        N_start = int(mcdc["mpi_work_start"])
+
         # generate LDS
         if input_deck.technique["iqmc"]["generator"] == "sobol":
             sampler = qmc.Sobol(d=N_dim, scramble=scramble)
             # skip the first entry in Sobol sequence because its 0.0
             # skip the second because it maps to ux = 0.0
             sampler.fast_forward(2)
-            sampler.fast_forward(fast_forward)
-            mcdc["technique"]["iqmc"]["lds"] = sampler.random(N_work)
+            sampler.fast_forward(N_start)
+            iqmc["lds"] = sampler.random(N_work)
         if input_deck.technique["iqmc"]["generator"] == "halton":
             sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
             # skip the first entry in Halton sequence because its 0.0
             sampler.fast_forward(1)
-            sampler.fast_forward(fast_forward)
-            mcdc["technique"]["iqmc"]["lds"] = sampler.random(N_work)
+            sampler.fast_forward(N_start)
+            iqmc["lds"] = sampler.random(N_work)
         if input_deck.technique["iqmc"]["generator"] == "random":
-            # this chunk of code uses the iqmc_seed to generate a number of
-            # seeds to be used  on each processor
-            # this way, each processor gets different samples, but if iQMC is run
-            # several times it will generate the same samples across runs
-            # 1e6 represents the maximum integer size generated
             np.random.seed(seed)
-            seeds = np.random.randint(1e6, size=size)
-            np.random.seed(seeds[rank])
-            mcdc["technique"]["iqmc"]["lds"] = np.random.random((N_work, N_dim))
+            seeds = np.random.randint(1e6, size=mcdc["mpi_size"])
+            np.random.seed(seeds[mcdc["mpi_rank"]])
+            iqmc["lds"] = np.random.random((N_work, N_dim))
 
     # =========================================================================
     # Derivative Source Method
