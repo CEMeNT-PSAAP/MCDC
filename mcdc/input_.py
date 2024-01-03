@@ -229,6 +229,7 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
+    name="P",
     sensitivity=False,
     dsm_Np=1.0,
 ):
@@ -305,6 +306,11 @@ def material(
     # Make material card
     card = make_card_material(N_nuclide, G, J)
     card["ID"] = len(mcdc.input_deck.materials)
+
+    if name is not None:
+        card["name"] = name
+    else:
+        card["name"] = card["ID"]
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
@@ -476,6 +482,8 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
 
+    card["type"] = type_
+
     # Set up surface attributes
     if type_ == "plane-x":
         check_requirement("surface plane-x", kw, ["x"])
@@ -628,6 +636,7 @@ def cell(surfaces_flags, fill, lattice_center=None):
     # Material cell
     else:
         card["material_ID"] = fill["ID"]
+        card["material_name"] = fill["name"]
 
     # Push card
     mcdc.input_deck.cells.append(card)
