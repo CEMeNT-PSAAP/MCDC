@@ -438,6 +438,7 @@ def prepare():
         scramble = iqmc["scramble"]
         N_dim = iqmc["N_dim"]
         seed = iqmc["seed"]
+        N_particle = mcdc["setting"]["N_particle"]
 
         mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
         mcdc["mpi_rank"] = MPI.COMM_WORLD.Get_rank()
