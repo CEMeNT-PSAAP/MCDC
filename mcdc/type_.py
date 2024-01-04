@@ -738,8 +738,17 @@ def make_type_technique(input_deck):
     iqmc_list += [("mesh", mesh)]
 
     # Low-discprenecy sequence
-    N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
-    iqmc_list += [("lds", float64, (N_work, N_dim))]
+    size = MPI.COMM_WORLD.Get_size()
+    rank = MPI.COMM_WORLD.Get_rank()
+    # Evenly distribute work
+    work_size = math.floor(N_particle / size)
+    # Count reminder
+    rem = N_particle % size
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size += 1
+
+    iqmc_list += [("lds", float64, (work_size, N_dim))]
     iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
     # TODO: make matidx int32
     iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
@@ -749,7 +758,6 @@ def make_type_technique(input_deck):
     iqmc_list += [(("total_source"), float64, (total_size,))]
 
     # Scores and shapes
-    # TODO: add fission power tally
     scores_shapes = [
         ["flux", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],

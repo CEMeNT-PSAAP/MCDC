@@ -6,7 +6,7 @@ pip install -e .
 
 
 # Install MC/DC dependencies, reply "y" to conda prompt
-conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
+conda install numpy numba matplotlib scipy h5py pytest colorama ngsolve distinctipy <<< "y"
 
 
 # Patch numba
