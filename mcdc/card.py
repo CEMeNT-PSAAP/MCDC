@@ -216,6 +216,7 @@ def make_card_material(N_nuclide, G=1, J=0):
     card["nu_f"] = np.zeros(G)
     card["chi_s"] = np.zeros([G, G])
     card["chi_p"] = np.zeros([G, G])
+    card["name"] = None
     card["sensitivity"] = False
     card["uq"] = False
     return card
@@ -245,6 +246,7 @@ def make_card_surface():
     card["nz"] = 0.0
     card["sensitivity"] = False
     card["sensitivity_ID"] = 0
+    card["type"] = " "
     card["dsm_Np"] = 1.0
     return card
 
@@ -257,6 +259,7 @@ def make_card_cell(N_surface):
     card["surface_IDs"] = np.zeros(N_surface, dtype=int)
     card["positive_flags"] = np.zeros(N_surface, dtype=bool)
     card["material_ID"] = 0
+    card["material_name"] = None
     card["lattice"] = False
     card["lattice_ID"] = 0
     card["lattice_center"] = np.array([0.0, 0.0, 0.0])
