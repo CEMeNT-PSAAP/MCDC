@@ -200,9 +200,6 @@ def loop_source(seed, mcdc):
             with objmode():
                 print_progress(percent, mcdc)
 
-    # Re-sync RNG
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-
 
 # =========================================================================
 # Particle loop
@@ -737,7 +734,7 @@ def loop_source_precursor(seed, mcdc):
                 spectrum = nuclide["chi_d"][j]
                 decay = nuclide["decay"][j]
             else:
-                SigmaF = material["fission"][g]
+                SigmaF = material["fission"][g]  # MG only
                 nu_d = material["nu_d"][g]
                 xi = kernel.rng(P_new) * nu_d[j] * SigmaF
                 tot = 0.0
@@ -815,6 +812,3 @@ def loop_source_precursor(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-
-    # Re-sync RNG
-    skip = N_global - idx_start

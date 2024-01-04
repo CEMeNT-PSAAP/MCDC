@@ -1,4 +1,4 @@
-import argparse
+import argparse, os
 import numba as nb
 
 # Parse command-line arguments
@@ -91,121 +91,147 @@ def run():
 def prepare():
     """
     Preparing the MC transport simulation:
-      (1) Process input deck
+      (1) Adapt kernels
       (2) Make types
-      (3) Set up and return the global variable container `mcdc`
+      (3) Create and set up global variable container `mcdc`
     """
 
     # =========================================================================
-    # Sizes
-    #   We need this to determine the maximum size of model objects
+    # Adapt kernels
     # =========================================================================
 
-    # Neutron and delayed neutron precursor group sizes
-    #   We assume that all materials have the same group structures
-    G = input_deck.materials[0]["G"]
-    J = input_deck.materials[0]["J"]
-
-    # Number of model objects
-    N_nuclide = len(input_deck.nuclides)
-    N_material = len(input_deck.materials)
-    N_surface = len(input_deck.surfaces)
-    N_cell = len(input_deck.cells)
-    N_universe = len(input_deck.universes)
-    N_lattice = len(input_deck.lattices)
-    N_source = len(input_deck.sources)
-
-    # Simulation parameters
-    N_particle = input_deck.setting["N_particle"]
-    N_cycle = input_deck.setting["N_cycle"]
-
-    # Maximum object references
-    # Maximum nuclides per material
-    Nmax_nuclide = max([material["N_nuclide"] for material in input_deck.materials])
-    # Maximum surfaces per cell
-    Nmax_surface = max([cell["N_surface"] for cell in input_deck.cells])
-    # Maximum cells per universe
-    Nmax_cell = max([universe["N_cell"] for universe in input_deck.universes])
-
-    # Maximum time-dependent surface slices
-    Nmax_slice = 0
-    for surface in input_deck.surfaces:
-        Nmax_slice = max(Nmax_slice, surface["N_slice"])
-
-    # =========================================================================
-    # Other parameters needed to set up MC/DC object types
-    # =========================================================================
-
-    # Flags
-    iQMC = input_deck.technique["iQMC"]
-
-    # Numbers
-    N_sensitivity = input_deck.setting["N_sensitivity"]
-    N_tally_scores = 1 + N_sensitivity
-    if input_deck.technique["dsm_order"] == 2:
-        N_tally_scores = (
-            1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-        )
-
-    # =========================================================================
-    # Default cards, if not given
-    # =========================================================================
-
-    # Default root universe
-    if N_universe == 1:
-        Nmax_cell = N_cell
-        card = input_deck.universes[0]
-        card["N_cell"] = N_cell
-        card["cell_IDs"] = np.arange(N_cell)
+    kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     # =========================================================================
     # Make types
     # =========================================================================
 
-    type_.make_type_particle(iQMC, G)
-    type_.make_type_particle_record(iQMC, G)
-    type_.make_type_nuclide(G, J)
-    type_.make_type_material(G, J, Nmax_nuclide)
-    type_.make_type_surface(Nmax_slice)
-    type_.make_type_cell(Nmax_surface)
-    type_.make_type_universe(Nmax_cell)
-    type_.make_type_lattice(input_deck.lattices)
-    type_.make_type_source(G)
-    type_.make_type_tally(N_tally_scores, input_deck.tally)
-    type_.make_type_uq_tally(N_tally_scores, input_deck.tally)
-    type_.make_type_uq(input_deck.uq_deltas, G, J)
+    type_.make_type_particle(input_deck)
+    type_.make_type_particle_record(input_deck)
+    type_.make_type_nuclide(input_deck)
+    type_.make_type_material(input_deck)
+    type_.make_type_surface(input_deck)
+    type_.make_type_cell(input_deck)
+    type_.make_type_universe(input_deck)
+    type_.make_type_lattice(input_deck)
+    type_.make_type_source(input_deck)
+    type_.make_type_tally(input_deck)
     type_.make_type_setting(input_deck)
-    type_.make_type_technique(N_particle, G, input_deck)
+    type_.make_type_uq_tally(input_deck)
+    type_.make_type_uq(input_deck)
+    type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
-    kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     # =========================================================================
-    # Make the global variable container
+    # Create the global variable container
     #   TODO: Better alternative?
     # =========================================================================
 
     mcdc = np.zeros(1, dtype=type_.global_)[0]
 
+    # Now, set up the global variable container
+
+    # Get modes
+    mode_CE = input_deck.setting["mode_CE"]
+    mode_MG = input_deck.setting["mode_MG"]
+
     # =========================================================================
     # Nuclides
     # =========================================================================
 
+    N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
-        for name in type_.nuclide.names:
+        # General data
+        for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
             mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
+
+        # MG data
+        if mode_MG:
+            for name in [
+                "G",
+                "J",
+                "speed",
+                "decay",
+                "total",
+                "capture",
+                "scatter",
+                "fission",
+                "nu_s",
+                "nu_f",
+                "nu_p",
+                "nu_d",
+                "chi_s",
+                "chi_p",
+                "chi_d",
+            ]:
+                mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
+
+        # CE data (load data from XS library)
+        dir_name = os.getenv("MCDC_XSLIB")
+        if mode_CE:
+            nuc_name = input_deck.nuclides[i]["name"]
+            with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
+                # Atomic weight ratio
+                mcdc["nuclides"][i]["A"] = f["A"][()]
+                # Energy grids
+                for name in [
+                    "E_xs",
+                    "E_nu_p",
+                    "E_nu_d",
+                    "E_chi_p",
+                    "E_chi_d1",
+                    "E_chi_d2",
+                    "E_chi_d3",
+                    "E_chi_d4",
+                    "E_chi_d5",
+                    "E_chi_d6",
+                ]:
+                    mcdc["nuclides"][i]["N" + name] = len(f[name][:])
+                    mcdc["nuclides"][i][name][: len(f[name][:])] = f[name][:]
+
+                # XS
+                for name in ["capture", "scatter", "fission"]:
+                    mcdc["nuclides"][i]["ce_" + name][: len(f[name][:])] = f[name][:]
+                    mcdc["nuclides"][i]["ce_total"][: len(f[name][:])] += f[name][:]
+
+                # Fission production
+                mcdc["nuclides"][i]["ce_nu_p"][: len(f["nu_p"][:])] = f["nu_p"][:]
+                for j in range(6):
+                    mcdc["nuclides"][i]["ce_nu_d"][j][: len(f["nu_d"][j, :])] = f[
+                        "nu_d"
+                    ][j, :]
+
+                # Fission spectrum
+                mcdc["nuclides"][i]["ce_chi_p"][: len(f["chi_p"][:])] = f["chi_p"][:]
+                for j in range(6):
+                    mcdc["nuclides"][i]["ce_chi_d%i" % (j + 1)][
+                        : len(f["chi_d%i" % (j + 1)][:])
+                    ] = f["chi_d%i" % (j + 1)][:]
+
+                # Decay
+                mcdc["nuclides"][i]["ce_decay"][: len(f["decay_rate"][:])] = f[
+                    "decay_rate"
+                ][:]
 
     # =========================================================================
     # Materials
     # =========================================================================
 
+    N_material = len(input_deck.materials)
     for i in range(N_material):
         for name in type_.material.names:
-            mcdc["materials"][i][name] = input_deck.materials[i][name]
+            if name in ["nuclide_IDs", "nuclide_densities"]:
+                mcdc["materials"][i][name][
+                    : mcdc["materials"][i]["N_nuclide"]
+                ] = input_deck.materials[i][name]
+            else:
+                mcdc["materials"][i][name] = input_deck.materials[i][name]
 
     # =========================================================================
     # Surfaces
     # =========================================================================
 
+    N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
         for name in type_.surface.names:
             if name not in ["J", "t"]:
@@ -220,6 +246,7 @@ def prepare():
     # Cells
     # =========================================================================
 
+    N_cell = len(input_deck.cells)
     for i in range(N_cell):
         for name in type_.cell.names:
             if name not in ["surface_IDs", "positive_flags"]:
@@ -234,6 +261,7 @@ def prepare():
     # Universes
     # =========================================================================
 
+    N_universe = len(input_deck.universes)
     for i in range(N_universe):
         for name in type_.universe.names:
             if name not in ["cell_IDs"]:
@@ -248,6 +276,7 @@ def prepare():
     # Lattices
     # =========================================================================
 
+    N_lattice = len(input_deck.lattices)
     for i in range(N_lattice):
         # Mesh
         for name in type_.mesh_uniform.names:
@@ -265,6 +294,7 @@ def prepare():
     # Source
     # =========================================================================
 
+    N_source = len(input_deck.sources)
     for i in range(N_source):
         for name in type_.source.names:
             mcdc["sources"][i][name] = input_deck.sources[i][name]
@@ -334,6 +364,20 @@ def prepare():
     mcdc["technique"]["pc_factor"] = input_deck.technique["pc_factor"]
 
     # =========================================================================
+    # IC generator
+    # =========================================================================
+
+    for name in [
+        "IC_N_neutron",
+        "IC_N_precursor",
+        "IC_neutron_density",
+        "IC_neutron_density_max",
+        "IC_precursor_density",
+        "IC_precursor_density_max",
+    ]:
+        mcdc["technique"][name] = input_deck.technique[name]
+
+    # =========================================================================
     # Weight window (WW)
     # =========================================================================
 
@@ -394,6 +438,7 @@ def prepare():
         scramble = iqmc["scramble"]
         N_dim = iqmc["N_dim"]
         seed = iqmc["seed"]
+        N_particle = mcdc["setting"]["N_particle"]
 
         mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
         mcdc["mpi_rank"] = MPI.COMM_WORLD.Get_rank()
@@ -777,7 +822,7 @@ def generate_hdf5(mcdc):
             neutrons = np.concatenate(neutrons[:])
 
             # Create dataset
-            with h5py.File(mcdc["setting"]["output"] + ".h5", "a") as f:
+            with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:
                 f.create_dataset("particles", data=neutrons[:])
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 
