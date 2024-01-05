@@ -21,7 +21,7 @@ xsec_dir=$(pwd)
 # exporting the needed enviroment variable for current enviroment
 export MCDC_XSLIB="${xsec_dir}"
 
-# sotring that enviroment variable in bashrc for future runs
+# adding that enviroment variable to bashrc for future runs
 export MCDC_XSLIB="${xsec_dir}">> ~/.bashrc 
 
 # printing a complete message
