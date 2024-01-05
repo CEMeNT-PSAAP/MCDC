@@ -27,6 +27,7 @@ by the `Center for Exascale Monte Carlo Neutron Transport <https://cement-psaap.
    :maxdepth: 1
 
    install
+   contributions
    pythonapi/index
 
 
