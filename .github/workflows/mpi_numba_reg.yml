@@ -1,10 +1,14 @@
-name: test
+name: Regression Test - Numba and MPI
 
 on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+        fail-fast: false
+        matrix:
+            os: ["ubuntu-latest", "macos-latest"]
     steps:
     - uses: actions/checkout@v3
     - name: Set up python 3.11
@@ -25,26 +29,8 @@ jobs:
     - name: Patch Numba
       run : |
         bash .github/workflows/patch.sh
-    - name: Unit Test
-      run: |
-        pytest
-    - name: Regression Test - Python
-      run: |
-        cd test/regression
-        python run.py
-    - name: Regression Test - MPI
-      run: |
-        cd test/regression
-        python run.py --mpiexec=4
-        python run.py --mpiexec=2
-    - name: Regression Test - Numba
-      run: |
-        cd test/regression
-        python run.py --mode=numba
     - name: Regression Test - Numba and MPI
       run: |
-        cd test/regression
-        python run.py --mode=numba --mpiexec=4
-        python run.py --mode=numba --mpiexec=2
-    # TODO: Performance test
-    # TODO: GPU test
+          cd test/regression
+          python run.py --mode=numba --mpiexec=4
+          python run.py --mode=numba --mpiexec=2
