@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "WARNING: Seemless continous energy functionality"
+echo "WARNING: Seamless continous energy functionality"
 echo "is only avlible to CEMeNT members."
 echo " "
 
