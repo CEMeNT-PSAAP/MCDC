@@ -52,6 +52,10 @@ while [ $# -gt 0 ]; do
       python setup.py install
       cd ../../
       rm -rf installs/
+      ;;
+
+    --config_cont_lib)
+      bash config_cont_energy.sh
   ;;
   esac
   shift
