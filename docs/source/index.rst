@@ -16,6 +16,15 @@ by the `Center for Exascale Monte Carlo Neutron Transport <https://cement-psaap.
    The project is in the early stages of *very* active development,
    not even an alpha release! 
 
+MC/DC is machine portable and is validated to run on:
+* linux-64 (x86)
+* osx-64 (x86, intel based macs)
+* osx-arm64 (apple silicon based macs)
+* linux-ppc64 (IBM POWER9)
+* linux-nvidia-cuda
+* linux-amd-gcn
+* win-64 (runs but not recommend!)
+
 
 .. only:: html
 
