@@ -7,6 +7,8 @@ pip install -e .
 
 # Install MC/DC dependencies, reply "y" to conda prompt
 conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
+
+# Installing visualization dependencies (required from pip for osx-arm54)
 pip install ngsolve distinctipy
 
 # Patch numba
