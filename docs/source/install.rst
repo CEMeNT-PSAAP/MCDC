@@ -86,4 +86,25 @@ On local machines, mpi4py will be installed using conda,
 
 To confirm that everything is properly installed, execute ``pytest`` from the MCDC directory. 
 
+------------------------------------
+Configuring Continous Energy Library
+------------------------------------
 
+MC/DC has continous energy transport capibilities.
+We provide the library and easy install to members of CEMeNT and other close devlopers.
+Due to export contorls we cannot build a library and transport functinoality in a single source.
+If you are a member of CEMeNT you should have access to `this internal repo <https://github.com/CEMeNT-PSAAP/MCDC-Xsec>`_.
+You an then either set a flag in the install script like,
+
+.. code-block:: sh
+
+    bash install.sh --config_cont_lib
+
+or run the script after instilation as a stand alone operation with
+
+.. code-block:: sh
+
+    bash config_cont_energy.sh
+
+Both these operations will clone the internal directory to your MCDC directory, untar the compressed folder, then set an enviroment variable in your bash script.
+NOTE: this does assume you are using bash shell.
