@@ -6,8 +6,10 @@ pip install -e .
 
 
 # Install MC/DC dependencies, reply "y" to conda prompt
-conda install numpy numba matplotlib scipy h5py pytest colorama ngsolve distinctipy <<< "y"
+conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
 
+# Installing visualization dependencies (required via pip for osx-arm64)
+pip install ngsolve distinctipy
 
 # Patch numba
 s=$(python -c 'import numba; print(numba.__path__[0])')
@@ -52,9 +54,12 @@ while [ $# -gt 0 ]; do
       python setup.py install
       cd ../../
       rm -rf installs/
+      ;;
+
+    --config_cont_lib)
+      bash config_cont_energy.sh
   ;;
   esac
   shift
 done
-
 
