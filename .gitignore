@@ -3,6 +3,10 @@ build
 .eggs
 mcdc.egg-info
 
+# Material Data
+mcdc_xs
+MCDC-Xsec
+
 # Python cache
 __pycache__
 *.pyc

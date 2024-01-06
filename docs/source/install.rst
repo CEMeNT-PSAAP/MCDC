@@ -13,7 +13,7 @@ Creating an MC/DC Conda environment
 
 `Conda <https://conda.io/en/latest/>`_ is an open source package and environment management system 
 that runs on Windows, macOS, and Linux. It allows for easy installing and switching between multiple
-versions of software packages and their dependendencies. 
+versions of software packages and their dependencies. 
 We can't force you to use it, but we do *highly* recommend it, particularly
 if you plan on running MC/DC in `numba mode <https://numba.pydata.org/>`_.
 **The included installation script will fail if executed outside of a conda environment.**
@@ -86,4 +86,25 @@ On local machines, mpi4py will be installed using conda,
 
 To confirm that everything is properly installed, execute ``pytest`` from the MCDC directory. 
 
+------------------------------------
+Configuring Continuous Energy Library
+------------------------------------
 
+MC/DC has continuous energy transport capabilities.
+We provide the library and easy install to members of CEMeNT and other close developers.
+Due to export controls we cannot build a library and transport functionality in a single source.
+If you are a member of CEMeNT you should have access to `this internal repo <https://github.com/CEMeNT-PSAAP/MCDC-Xsec>`_.
+You an then either set a flag in the install script like,
+
+.. code-block:: sh
+
+    bash install.sh --config_cont_lib
+
+or run the script after instillation as a stand alone operation with
+
+.. code-block:: sh
+
+    bash config_cont_energy.sh
+
+Both these operations will clone the internal directory to your MCDC directory, untar the compressed folder, then set an environment variable in your bash script.
+NOTE: this does assume you are using bash shell.
