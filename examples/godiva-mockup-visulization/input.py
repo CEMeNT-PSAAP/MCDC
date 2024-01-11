@@ -73,7 +73,7 @@ mcdc.cell(
 
 mcdc.source(x=[-22.0, 22.0], time=[0.0, 5.0], isotropic=True)
 
-mcdc.visualize(start_time=0, end_time=5)
+mcdc.visualize(start_time=0, end_time=1, tick_interval= 0.1)
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
