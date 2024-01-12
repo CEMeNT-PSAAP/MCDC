@@ -1,7 +1,7 @@
 from netgen.meshing import *
 from netgen.csg import *
 from ngsolve import Draw, Redraw  # just for visualization
-import tkinter as tk # Tkinter is used to create the window for the time slider and color key
+import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
 import distinctipy  # creates unlimited visually distinct colors for visualization
 import math
 
@@ -19,7 +19,7 @@ def get_plane_current_position(surface, current_time, start_time, end_time):
     if len(surface["t"]) > 2:  # check if shape moves
         # establish reference points
         start_time = start_time  # default start time is zero
-        end_time = end_time #default end time is zero
+        end_time = end_time  # default end time is zero
         start_position = -surface["J"][0][0]
         end_position = -surface["J"][1][0]
 
@@ -50,7 +50,7 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
                         surface_list[surface_ID],
                         current_time,
                         start_time=start_time,
-                        end_time=end_time
+                        end_time=end_time,
                     )
                 ),
                 0,
@@ -267,31 +267,33 @@ def draw_Geometry(current_time, start_time, end_time, material_colors):
     # list of materials that need colors to be generated (ie not water or the source)
     material_colors_to_generate = []
 
-
     # if the color of water and source are not set make them blue and green respectivly
-    # add manually specified colors to input colors. 
+    # add manually specified colors to input colors.
     for cell in cell_list:
         cell_material_name = cell["material_name"]
-        if (cell_material_name not in list(material_colors.keys())):
+        if cell_material_name not in list(material_colors.keys()):
             if cell_material_name == "water":
-                material_colors["water"] = [0,0,1]
-                input_colors.append((0,0,1))
+                material_colors["water"] = [0, 0, 1]
+                input_colors.append((0, 0, 1))
             elif cell_material_name == "source":
-                material_colors["source"] = [0,1,0]
-                input_colors.append((0,1,0))
+                material_colors["source"] = [0, 1, 0]
+                input_colors.append((0, 1, 0))
             else:
                 material_colors[cell_material_name] = None
                 material_colors_to_generate.append(cell_material_name)
-  
-    # create n number of distinct colors where n 
-    #is the number of materials in material_colors_to_generate
+
+    # create n number of distinct colors where n
+    # is the number of materials in material_colors_to_generate
     distinct_colors = distinctipy.get_colors(
         len(material_colors_to_generate), input_colors
     )
-    for i in range(0,len(material_colors_to_generate)):
-        material_colors[material_colors_to_generate[i]] = [distinct_colors[i][0],distinct_colors[i][1], distinct_colors[i][2]]
+    for i in range(0, len(material_colors_to_generate)):
+        material_colors[material_colors_to_generate[i]] = [
+            distinct_colors[i][0],
+            distinct_colors[i][1],
+            distinct_colors[i][2],
+        ]
 
-  
     # cycle through the cells in the model
     for cell_index in range(0, len(cell_list)):
         cell = cell_list[cell_index]
@@ -305,7 +307,9 @@ def draw_Geometry(current_time, start_time, end_time, material_colors):
             end_time=end_time,
         )
         # add the cell geometry to the visualization
-        geo.Add(cell_geometry.col(material_colors[cell["material_name"]]), transparent=True)
+        geo.Add(
+            cell_geometry.col(material_colors[cell["material_name"]]), transparent=True
+        )
 
     # draw the visualization
     geo.Draw()
@@ -321,11 +325,11 @@ def create_color_key(root, color_key_dict):
 
     # for each material in the color_key_dict display
     # the material name and corresponding color to the user
-    for material_index in range(0,len(color_key_dict)):
-        
-
+    for material_index in range(0, len(color_key_dict)):
         # create label for the material name
-        tk.Label(root, text=str(list(color_key_dict)[material_index]) + ":").grid(row=3 + material_index, sticky=tk.W)
+        tk.Label(root, text=str(list(color_key_dict)[material_index]) + ":").grid(
+            row=3 + material_index, sticky=tk.W
+        )
 
         # canvas where color will be displayed
         canvas = tk.Canvas(root, width=200, height=len(color_key_dict) * 50)
@@ -345,11 +349,12 @@ def create_color_key(root, color_key_dict):
 # triggered when time slider or time spinbox changed
 # it redraws the model at the new time
 def time_slider_changed(current_time, start_time, end_time, material_colors):
-    
-    draw_Geometry(current_time=float(current_time), start_time=start_time, end_time=end_time, material_colors=material_colors)
-    
-    
-    
+    draw_Geometry(
+        current_time=float(current_time),
+        start_time=start_time,
+        end_time=end_time,
+        material_colors=material_colors,
+    )
 
 
 # creates the time slider
@@ -360,8 +365,8 @@ def create_time_slider(root, start_time, end_time, tick_interval, material_color
     time_label = tk.Label(root, text="Time")
     time_label.grid(row=0, column=0, columnspan=2)
 
-    time_var = tk.StringVar(root,"0")
-    
+    time_var = tk.StringVar(root, "0")
+
     time_scale = tk.Scale(
         root,
         from_=start_time,
@@ -369,22 +374,37 @@ def create_time_slider(root, start_time, end_time, tick_interval, material_color
         orient=tk.HORIZONTAL,
         resolution=tick_interval,
         variable=time_var,
-        command=lambda event:time_slider_changed(event,start_time, end_time, material_colors=material_colors),
-        length= 400
+        command=lambda event: time_slider_changed(
+            event, start_time, end_time, material_colors=material_colors
+        ),
+        length=400,
     )
     time_scale.grid(row=1, column=1, columnspan=4)
 
-    time_spinbox = tk.Spinbox(root, from_=start_time, to=end_time, textvariable=time_var,increment= tick_interval, command=lambda:time_slider_changed(time_var.get(),start_time, end_time, material_colors=material_colors))
-    time_spinbox.grid(row=0,column=3)
+    time_spinbox = tk.Spinbox(
+        root,
+        from_=start_time,
+        to=end_time,
+        textvariable=time_var,
+        increment=tick_interval,
+        command=lambda: time_slider_changed(
+            time_var.get(), start_time, end_time, material_colors=material_colors
+        ),
+    )
+    time_spinbox.grid(row=0, column=3)
+
 
 # runs the visualization for a model
 # start and end times are default zero
 # called in input file
-def visualize(start_time=0, end_time=0, tick_interval = 1, material_colors={}):
+def visualize(start_time=0, end_time=0, tick_interval=1, material_colors={}):
     import netgen.gui  # launches visualiztation window
 
     color_key_dic = draw_Geometry(
-        current_time=0, start_time=start_time, end_time=end_time, material_colors=material_colors
+        current_time=0,
+        start_time=start_time,
+        end_time=end_time,
+        material_colors=material_colors,
     )
 
     # Set up tkinter window
