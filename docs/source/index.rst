@@ -13,10 +13,14 @@ Monte Carlo neutron transport software in active development
 by the `Center for Exascale Monte Carlo Neutron Transport <https://cement-psaap.github.io/>`_ (CEMeNT).
 
 .. note::
+
+
    The project is in the early stages of *very* active development,
    not even an alpha release! 
 
+
 MC/DC is machine portable and is validated to run on:
+
 * linux-64 (x86)
 * osx-64 (x86, intel based macs)
 * osx-arm64 (apple silicon based macs)
@@ -24,6 +28,7 @@ MC/DC is machine portable and is validated to run on:
 * linux-nvidia-cuda
 * linux-amd-gcn
 * win-64 (runs but not recommend!)
+
 
 
 .. only:: html
@@ -36,7 +41,7 @@ MC/DC is machine portable and is validated to run on:
    :maxdepth: 1
 
    install
-   contributions
+   contribution
    pythonapi/index
 
 
@@ -46,3 +51,11 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+To build the docs
+=================
+
+#. Install dependencies (we recommend: ``conda install sphinx`` and ``pip install furo``). Note that these dependencies are not installed as a part of base MC/DC
+#. Run ``make html`` to compile
+#. Then launch ``build/html/index.html`` with your browser of choice
