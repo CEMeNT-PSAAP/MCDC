@@ -86,9 +86,9 @@ On local machines, mpi4py will be installed using conda,
 
 To confirm that everything is properly installed, execute ``pytest`` from the MCDC directory. 
 
-------------------------------------
+-------------------------------------
 Configuring Continuous Energy Library
-------------------------------------
+-------------------------------------
 
 MC/DC has continuous energy transport capabilities.
 We provide the library and easy install to members of CEMeNT and other close developers.
