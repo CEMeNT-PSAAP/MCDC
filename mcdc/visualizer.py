@@ -1,7 +1,7 @@
 from netgen.meshing import *
 from netgen.csg import *
 from ngsolve import Draw, Redraw  # just for visualization
-from tkinter import *  # Tkinter is used to create the window for the time slider and color key
+import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
 import distinctipy  # creates unlimited visually distinct colors for visualization
 import math
 
@@ -19,7 +19,7 @@ def get_plane_current_position(surface, current_time, start_time, end_time):
     if len(surface["t"]) > 2:  # check if shape moves
         # establish reference points
         start_time = start_time  # default start time is zero
-        end_time = end_time
+        end_time = end_time  # default end time is zero
         start_position = -surface["J"][0][0]
         end_position = -surface["J"][1][0]
 
@@ -251,48 +251,48 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
 
 # visualizes the model at a specified time (current_time, type float)
 # called by visualize()
-def draw_Geometry(current_time, start_time, end_time):
+def draw_Geometry(current_time, start_time, end_time, material_colors):
     # create lists that contain all cells and surfaces
     surface_list = input_card.surfaces
     cell_list = input_card.cells
-    # surface_list = input_card.surfaces
-
-    # make water blue and the source green
-    water_rgb = [0, 0, 1]
-    source_rgb = [0, 1, 0]
 
     geo = CSGeometry()  # create the ngsolve geometry object
 
-    # list of materials that need colors to be generated (ie not water or the source)
-    material_colors_to_generate = []
-
-    # find the materials that need colors generated and add them to material_colors_to_generate
-    for cell in cell_list:
-        cell_material_name = cell["material_name"]
-        if (
-            (cell_material_name not in material_colors_to_generate)
-            and (cell_material_name != "water")
-            and (cell_material_name != "source")
-        ):
-            material_colors_to_generate.append(cell_material_name)
-
-    # colors that should not be generated (ie, taken by preset materials or which are visually unappealing)
+    # colors that should not be generated  by distinctipy(starts with visually unappleaning colors, manually set colors added later)
     # These colors are rgb values, more can be added by extending the list
     input_colors = [
-        (water_rgb[0], water_rgb[1], water_rgb[2]),  # water - blue
-        (source_rgb[0], source_rgb[1], source_rgb[2]),  # source - green
         (1, 1, 1),  # white
         (0, 0, 0),  # black
     ]
-    # create n number of distinct colors where n is the number of materials in material_colors_to_generate
+    # list of materials that need colors to be generated (ie not water or the source)
+    material_colors_to_generate = []
+
+    # if the color of water and source are not set make them blue and green respectivly
+    # add manually specified colors to input colors.
+    for cell in cell_list:
+        cell_material_name = cell["material_name"]
+        if cell_material_name not in list(material_colors.keys()):
+            if cell_material_name == "water":
+                material_colors["water"] = [0, 0, 1]
+                input_colors.append((0, 0, 1))
+            elif cell_material_name == "source":
+                material_colors["source"] = [0, 1, 0]
+                input_colors.append((0, 1, 0))
+            else:
+                material_colors[cell_material_name] = None
+                material_colors_to_generate.append(cell_material_name)
+
+    # create n number of distinct colors where n
+    # is the number of materials in material_colors_to_generate
     distinct_colors = distinctipy.get_colors(
         len(material_colors_to_generate), input_colors
     )
-
-    # This list will later be passed to create_color_key
-    # contains lists of format [rgb value, material name]
-    color_key_list = []
-    materials_added_to_color_key = []
+    for i in range(0, len(material_colors_to_generate)):
+        material_colors[material_colors_to_generate[i]] = [
+            distinct_colors[i][0],
+            distinct_colors[i][1],
+            distinct_colors[i][2],
+        ]
 
     # cycle through the cells in the model
     for cell_index in range(0, len(cell_list)):
@@ -306,98 +306,110 @@ def draw_Geometry(current_time, start_time, end_time):
             start_time=start_time,
             end_time=end_time,
         )
-
-        # assign the material an rgb value
-        cell_material_name = cell["material_name"]
-        if cell_material_name == "water":
-            rgb = water_rgb
-        elif cell_material_name == "source":
-            rgb = source_rgb
-        else:
-            rgb = distinct_colors[material_colors_to_generate.index(cell_material_name)]
-            rgb = [int(rgb[0]), int(rgb[1]), int(rgb[2])]  # ngsolve takes rgb as a list
-
-        # if material is missing from the color key, add it
-        if cell_material_name not in materials_added_to_color_key:
-            materials_added_to_color_key.append(cell_material_name)
-            color_key_list.append([rgb, cell_material_name])
-
         # add the cell geometry to the visualization
-        geo.Add(cell_geometry.col(rgb), transparent=True)
+        geo.Add(
+            cell_geometry.col(material_colors[cell["material_name"]]), transparent=True
+        )
 
     # draw the visualization
     geo.Draw()
     Redraw()
 
-    return color_key_list
+    return material_colors
 
 
 # displays the color key to the user
 # called by visualize()
-def create_color_key(root, color_key_list):
-    Label(root, text="color key").grid(row=2, column=0)
+def create_color_key(root, color_key_dict):
+    tk.Label(root, text="color key").grid(row=2, column=0)
 
-    # for each material in the color_key_list display
+    # for each material in the color_key_dict display
     # the material name and corresponding color to the user
-    for material_index in range(0, len(color_key_list)):
-        material = color_key_list[material_index]
-
+    for material_index in range(0, len(color_key_dict)):
         # create label for the material name
-        Label(root, text=str(material[1]) + ":").grid(row=3 + material_index, sticky=W)
+        tk.Label(root, text=str(list(color_key_dict)[material_index]) + ":").grid(
+            row=3 + material_index, sticky=tk.W
+        )
 
         # canvas where color will be displayed
-        canvas = Canvas(root, width=200, height=len(color_key_list) * 50)
+        canvas = tk.Canvas(root, width=200, height=len(color_key_dict) * 50)
 
         # switch from rgb to hex for tkinter
-        rgb = material[0]
-        rgb = [255 * rgb[0], 255 * rgb[1], 255 * rgb[2]]
+        rgb = list(color_key_dict.values())[material_index]
+        rgb = [int(255 * rgb[0]), int(255 * rgb[1]), int(255 * rgb[2])]
         colorval = "#{0:02x}{1:02x}{2:02x}".format(rgb[0], rgb[1], rgb[2])
 
         # add rectangle to canvas with material color
         canvas.create_rectangle(10, 10, 70, 60, fill=colorval)
 
         # add canvas to the window
-        canvas.grid(row=3 + material_index, column=1, sticky=E)
+        canvas.grid(row=3 + material_index, column=1, sticky=tk.E)
 
 
-# triggered when time slider changed
+# triggered when time slider or time spinbox changed
 # it redraws the model at the new time
-def time_slider_changed(event, start_time, end_time):
-    draw_Geometry(current_time=float(event), start_time=start_time, end_time=end_time)
+def time_slider_changed(current_time, start_time, end_time, material_colors):
+    draw_Geometry(
+        current_time=float(current_time),
+        start_time=start_time,
+        end_time=end_time,
+        material_colors=material_colors,
+    )
 
 
 # creates the time slider
 # called by visualize()
-def create_time_slider(root, start_time, end_time):
+def create_time_slider(root, start_time, end_time, tick_interval, material_colors):
     root.title("Time Slider")
 
-    time_label = Label(root, text="Time")
+    time_label = tk.Label(root, text="Time")
     time_label.grid(row=0, column=0, columnspan=2)
 
-    time_scale = Scale(
+    time_var = tk.StringVar(root, "0")
+
+    time_scale = tk.Scale(
         root,
         from_=start_time,
         to=end_time,
-        orient=HORIZONTAL,
-        tickinterval=1,
-        command=lambda event: time_slider_changed(event, start_time, end_time),
+        orient=tk.HORIZONTAL,
+        resolution=tick_interval,
+        variable=time_var,
+        command=lambda event: time_slider_changed(
+            event, start_time, end_time, material_colors=material_colors
+        ),
+        length=400,
     )
-    time_scale.grid(row=1, column=1)
+    time_scale.grid(row=1, column=1, columnspan=4)
+
+    time_spinbox = tk.Spinbox(
+        root,
+        from_=start_time,
+        to=end_time,
+        textvariable=time_var,
+        increment=tick_interval,
+        command=lambda: time_slider_changed(
+            time_var.get(), start_time, end_time, material_colors=material_colors
+        ),
+    )
+    time_spinbox.grid(row=0, column=3)
 
 
 # runs the visualization for a model
 # start and end times are default zero
 # called in input file
-def visualize(start_time=0, end_time=0):
+def visualize(start_time=0, end_time=0, tick_interval=1, material_colors={}):
     import netgen.gui  # launches visualiztation window
 
-    color_key_list = draw_Geometry(
-        current_time=0, start_time=start_time, end_time=end_time
+    color_key_dic = draw_Geometry(
+        current_time=0,
+        start_time=start_time,
+        end_time=end_time,
+        material_colors=material_colors,
     )
 
     # Set up tkinter window
-    root = Tk()
+    root = tk.Tk()
     if start_time != end_time:
-        create_time_slider(root, start_time, end_time)
-    create_color_key(root, color_key_list)
+        create_time_slider(root, start_time, end_time, tick_interval, color_key_dic)
+    create_color_key(root, color_key_dic)
     root.mainloop()  # mainloop for tkinter window
