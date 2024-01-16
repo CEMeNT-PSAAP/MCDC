@@ -12,43 +12,33 @@ tags:
 authors:
   - name: Joanna Piper Morgan
     orcid: 0000-0003-1379-5431
-    equal-contrib: true
     affiliation: "1, 2" # (Multiple affiliations must be quoted)
     corresponding: true
-  - name: Ilham Variansyah 
+  - name: Ilham Variansyah
     orcid: 0000-0003-3426-7160
-    equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
     affiliation: "1, 2"
     corresponding: true
   - name: Samuel Pasmann
     orcid: 0000-0003-1391-1471
-    equal-contrib: true
     affiliation: "1, 3"
   - name: Kayla Beth Clements
     orcid: 0000-0003-3358-5618
-    equal-contrib: true
     affiliation: "1, 2"
   - name: Braxton Cuneo
     orcid: 0000-0002-6493-0990
-    equal-contrib: true
     affiliation: "1, 5"
   - name: Alexander Mote 
     orcid: 0000-0001-5099-0223
-    equal-contrib: true
     affiliation: "1, 2"
   - name: Charles Goodman
-    orcid: 
-    equal-contrib: true
     affiliation: "1, 4"
   - name: Caleb Shaw 
-    orcid: 
-    equal-contrib: true
     affiliation: "1, 4"
   - name: Jordan Northrop 
     orcid: 0000-0003-0420-9699
     affiliation: "1, 2"
   - name: Rohan Pankaj
-    orcid: 
+    orcid:  0009-0005-0445-9323
     affiliation: "1, 6"
   - name: Ethan Lame
     orcid: 0000-0001-7686-9755
@@ -126,12 +116,12 @@ Many of the traditionally developed neutron transport codes are export controlle
 
 # Future Work
 
-The main `MC/DC` branch currently only supports CPU architectures enabled by Numba (x86-64, arm64, and ppc64) but we are rapidly extending support to GPUs.
+The main `MC/DC` branch currently only supports CPU architectures enabled by Numba (`x86-64`, `arm64`, and `ppc64`) but we are rapidly extending support to GPUs.
 We currently have operability on Nvidia GPUs (supported via Numba) and work is ongoing to enable compilation to AMD GPUs.
 On GPUs `MC/DC` will use the `harmonize` asynchronous GPU scheduler to increase performance [@brax2023].
 `harmonize` works by batching jobs during execution such that similar operations get executed at the same time, reducing the difference between parallel threads running on the GPU at the same time.
 
-We will continue to explore novel methods for dynamic neutron transport and will keep pushing to make `MC/DC` not only a proven platform for rapid neutron transport methods exploration, but also a full fledged simulation code for academic and industrial use alike.
+We will continue to explore novel methods for dynamic neutron transport and will keep pushing to make `MC/DC` not only a proven platform for rapid neutron transport methods exploration, but also a full-fledged simulation code for academic and industrial use alike.
 
 # Acknowledgements
 
