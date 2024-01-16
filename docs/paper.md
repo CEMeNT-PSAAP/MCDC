@@ -4,6 +4,7 @@ tags:
   - Python
   - Monte Carlo
   - nuclear engineering
+  - neutron transport
   - reactor anylisys
   - numba
   - HPC
@@ -100,76 +101,37 @@ bibliography: paper.bib
 # Summary
 
 When, where, and how neutrons move within a nuclear reactor governs when, where, and how heat is released.
-Knowing this is required for both the design and safety anylisys of these nuclear systems.
-The movement of these neutrons through phase space (3 position, 2 direction of travel, 1 particle speed, and 1 time) can be modeled with a Monte Carlo simulation.
-Previous Monte Carlo neutron transport applications have been built using compiled languages and predominantly conduct steady state anylisys.
+Knowing this is required for both the design and safety analysis of these nuclear systems.
+The movement of neutrons through phase space (3 position, 2 direction of travel, 1 particle speed, and 1 time) can be modeled with a Monte Carlo simulation.
+Previous Monte Carlo neutron transport applications have been built using compiled languages and predominantly conduct steady state analysis.
 When moving to dynamic simulations novel numerical methods are required to compute a solution performantly.
-We designed Monte Carlo / Dynamic Code (MC/DC) to explore these novel numerical methods on modern high performance compute systems.
+We designed Monte Carlo / Dynamic Code (`MC/DC`) to explore these novel numerical methods on modern high performance compute systems.
 We avoid the need of a compiled or domain specific language by use of the Numba compiler for Python to accelerate and abstract our compute kernels to near compiled code speeds.
-Using this scheme we have implemented many novel algorithms and in some verification tests we approach the performance of nominally developed industry standard codes.
+Using this scheme we have implemented many novel algorithms and in some verification tests we approach the performance of nominally developed industry standard codes at the tens of thousands of processors scale.
 
 
 # Statement of need
 
-`Gala` is an Astropy-affiliated Python package for galactic dynamics. Python
-enables wrapping low-level languages (e.g., C) for speed without losing
-flexibility or ease-of-use in the user-interface. The API for `Gala` was
-designed to provide a class-based and user-friendly interface to fast (C or
-Cython-optimized) implementations of common operations such as gravitational
-potential and force evaluation, orbit integration, dynamical transformations,
-and chaos indicators for nonlinear dynamics. `Gala` also relies heavily on and
-interfaces well with the implementations of physical units and astronomical
-coordinate systems in the `Astropy` package [@astropy] (`astropy.units` and
-`astropy.coordinates`).
+`MC/DC` is a performant rapid methods development platform for novel dynamic neutron transport algorithms on modern high performance compute systems.
+It uses the Numba compiler for Python to compile compute kernels to a desired hardware target, including support for graphics processing units (GPUs) [@lam_numba_2015].
+`MC/DC` uses `mpi4py` to gain distributed memory parallelism [@mpi4py_2021] and has run at the tens of thousands of processors scale [@variansyah_mc23_mcdc].
+These acceleration and abstraction techniques allow for `MC/DC` developers to remain in a pure Python development environment without need to support compiled or domain specific languages. 
+This has allowed `MC/DC` to grow form nothing to supporting full performant neutron transport and investigating novel transport algorithms in under two years with development mostly from relative novices.
 
-`Gala` was designed to be used by both astronomical researchers and by
-students in courses on gravitational dynamics or astronomy. It has already been
-used in a number of scientific publications [@Pearson:2017] and has also been
-used in graduate courses on Galactic dynamics to, e.g., provide interactive
-visualizations of textbook material [@Binney:2008]. The combination of speed,
-design, and support for Astropy functionality in `Gala` will enable exciting
-scientific explorations of forthcoming data releases from the *Gaia* mission
-[@gaia] by students and experts alike.
+Many of the traditionally developed neutron transport codes are export controlled (not open source and difficult to get) and notoriously difficult install, use, and develope in. `MC/DC` being an open source easily installable Python package means that it is ideal for an academic environment for both research and education by undergraduates on up. This is only further assisted by the full test suite we have developed to do unit, regression, verification and performance tests, most of which run on a CI basis.
+
+`MC/DC` has support for continuous energy and multi-group transport. It can solve more traditional k-eigenvalue problems (used to determine neutron population growth rates in reactors) as well as fully dynamic simulations. It has a novel continuous geometry movement function (other codes use step functions) that allows for better modeling of things like control rods. It also supports some simple Domain decomposition, with more complex algorithms currently being implemented.
+
+`MC/DC` enabled explorations into dynamic neutron transport algorithms have been successful, including, quasi-Monte Carlo techniques [@mcdc:variansyah_physor22_pct], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmc; @mcdc:qmcabs], transient population control techniques [@mcdc:variansyah_nse22_pct], hash based random number generation, global uncertainty quantification [@mcdc:clements_mc23], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling among others.
 
 # Future Work
 
-Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
+The main `MC/DC` branch currently only supports CPU architectures enabled by Numba (x86-64, arm64, and ppc64) but we are rapidly extending support to GPUs.
+We currently have operability on Nvidia GPUs (supported via Numba) and work is ongoing to enable compilation to AMD GPUs.
+On GPUs `MC/DC` will use the `harmonize` asynchronous GPU scheduler to increase performance [@brax2023].
+`harmonize` works by batching jobs during execution such that similar operations get executed at the same time, reducing the difference between parallel threads running on the GPU at the same time.
 
-Double dollars make self-standing equations:
-
-$$\Theta(x) = \left\{\begin{array}{l}
-0\textrm{ if } x < 0\cr
-1\textrm{ else}
-\end{array}\right.$$
-
-You can also use plain \LaTeX for equations
-\begin{equation}\label{eq:fourier}
-\hat f(\omega) = \int_{-\infty}^{\infty} f(x) e^{i\omega x} dx
-\end{equation}
-and refer to \autoref{eq:fourier} from text.
-
-# Citations
-
-Citations to entries in paper.bib should be in
-[rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
-format.
-
-If you want to cite a software repository URL (e.g. something on GitHub without a preferred
-citation) then you can do it with the example BibTeX entry below for @fidgit.
-
-For a quick reference, the following citation commands can be used:
-- `@author:2001`  ->  "Author et al. (2001)"
-- `[@author:2001]` -> "(Author et al., 2001)"
-- `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
-
-# Figures
-
-Figures can be included like this:
-![Caption for example figure.\label{fig:example}](figure.png)
-and referenced from text using \autoref{fig:example}.
-
-Figure sizes can be customized by adding an optional second parameter:
-![Caption for example figure.](figure.png){ width=20% }
+We will continue to explore novel methods for dynamic neutron transport and will keep pushing to make `MC/DC` not only a proven platform for rapid neutron transport methods exploration, but also a full fledged simulation code for academic and industrial use alike.
 
 # Acknowledgements
 
