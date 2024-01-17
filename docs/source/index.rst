@@ -78,13 +78,19 @@ A full exhaustive list of publications can be found on the `CEMeNT site <https:/
    --------
 
 .. toctree::
-   :maxdepth: 1
+    :maxdepth: 1
 
-   install
-   user
-   contribution
-   pythonapi/index
+    install
+    user
+    contribution
+    pythonapi/index
 
+.. sidebar-links::
+    :caption: Links
+    :github: 
+    :pypi: mcdc
+    CEMeNT <https://cement-psaap.github.io>
+    license <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/LICENSE>
 
 Indices and tables
 ==================
