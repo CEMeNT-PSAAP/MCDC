@@ -29,7 +29,7 @@ copyright = "2023, Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 author = "Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1"
+release = " "
 
 
 # -- General configuration ---------------------------------------------------
@@ -59,6 +59,9 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = "furo"
+html_logo = 'images/home/mcdc.svg'
+
+# html_permalinks = ['https://cement-psaap.github.io/', 'https://github.com/CEMeNT-PSAAP/MCDC']
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
