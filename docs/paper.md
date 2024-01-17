@@ -5,10 +5,11 @@ tags:
   - Monte Carlo
   - nuclear engineering
   - neutron transport
-  - reactor anylisys
+  - reactor analysis
   - numba
   - HPC
   - mpi4py
+  - GPU
 authors:
   - name: Joanna Piper Morgan
     orcid: 0000-0003-1379-5431
@@ -50,6 +51,7 @@ authors:
     orcid: 0000-0002-8342-6132
     affiliation: "1, 3"
   - name: Todd Palmer
+    orcid: 0000-0003-3310-5258
     affiliation: "1, 2"
   - name: Lizhong Chen 
     orcid: 0000-0001-5890-7121
