@@ -40,9 +40,16 @@ release = " "
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    'sphinx_toolbox.github',
+    'sphinx_toolbox.sidebar_links',
 ]
 autosummary_generate = True
 
+
+
+github_username = 'CEMeNT-PSAAP'
+github_repository = 'MCDC'
+github_url = "https://github.com/{github_username}/{github_repository}"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
