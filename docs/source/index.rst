@@ -12,11 +12,6 @@ MC/DC is a performant, scalable, and machine-portable Python-based
 Monte Carlo neutron transport software in active development 
 by the `Center for Exascale Monte Carlo Neutron Transport <https://cement-psaap.github.io/>`_ (CEMeNT).
 
-.. note::
-
-
-   The project is in the early stages of *very* active development,
-   not even an alpha release! 
 
 
 MC/DC is machine portable and is validated to run on:
@@ -26,7 +21,6 @@ MC/DC is machine portable and is validated to run on:
 * osx-arm64 (apple silicon based macs)
 * linux-ppc64 (IBM POWER9)
 * linux-nvidia-cuda
-* linux-amd-gcn
 * win-64 (runs but not recommend!)
 
 
@@ -41,6 +35,7 @@ MC/DC is machine portable and is validated to run on:
    :maxdepth: 1
 
    install
+   user
    contribution
    pythonapi/index
 
