@@ -30,6 +30,7 @@ dependencies = [
     "mpi4py>=3.1.5",
     "pytest",
     "h5py",
+    "colorama",
 ]
 [project.optional-dependencies]
     vis = ["ngsolve", "distinctipy"]
