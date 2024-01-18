@@ -31,9 +31,10 @@ dependencies = [
     "pytest",
     "h5py",
     "colorama",
+    "ngsolve",
+    "distinctipy",
 ]
 [project.optional-dependencies]
-    vis = ["ngsolve", "distinctipy"]
     docs = ["sphinx==7.2.6", "furo", "sphinx_toolbox"]
 
 
