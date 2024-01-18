@@ -10,91 +10,39 @@ MC/DC is a performant, scalable, and machine-portable Python-based Monte Carlo
 neutron transport software currently developed in the Center for Exascale Monte 
 Carlo Neutron Transport ([CEMeNT](https://cement-psaap.github.io/)).
 
-*Please Note that this project is in the early stages of devlopment.* We welcome any and all collaborators, feel free to reach out via comments or submit a PR! Enjoy!
-
 ## Installation
 
-In the root directory:
+For most users working on a single machine that they are administrators of MC/DC can be installed with
 
 ```bash
-pip install -e .
+pip install mcdc
 ```
 
-## Usage
+However when developing in MC/DC or when running on a high performance compute cluster we recommend you follow our [install guide](https://cement-psaapgithubio.readthedocs.io/en/latest/install.html).
+MC/DC is MPI enabled and can use lots of different compilers which can get tricky to manage on an HPC.
+MPI specifically can specific versions for specific machines the user should build `mpi4py` off of.
+Our install scripts take care of this for you
 
-As an example, let us consider a simple time-dependent transport problem based 
-on the [AZURV1 benchmark](https://inis.iaea.org/search/search.aspx?orig_q=RN:41070601):
+## Documentation
 
-```python
-import numpy as np
+We have documentation available at [https://cement-psaapgithubio.readthedocs.io/en/latest/](https://cement-psaapgithubio.readthedocs.io/en/latest/)
+but you can build the docs yourself by following the [`README.md`]() in the /docs folder.
 
-import mcdc
+## Running
 
-# =============================================================================
-# Set model
-# =============================================================================
+MC/DC has many different modes you can run in. 
+A generous flexible pure python environment or a `jit` compiled fast, but restrictive, mode.
+Depending on your use case you will most likely favor one over the other.
 
-# Set materials
-m = mcdc.material(capture = np.array([1.0/3.0]),
-                  scatter = np.array([[1.0/3.0]]),
-                  fission = np.array([1.0/3.0]),
-                  nu_p    = np.array([2.3]),
-                  speed   = np.array([1.0]))
+### Pure Python
 
-# Set surfaces
-s1 = mcdc.surface('plane-x', x=-1E10, bc="reflective")
-s2 = mcdc.surface('plane-x', x=1E10,  bc="reflective")
-
-# Set cells
-mcdc.cell([+s1, -s2], m)
-
-# =============================================================================
-# Set source
-# =============================================================================
-
-mcdc.source(point=[0.0,0.0,0.0], isotropic=True)
-
-# =============================================================================
-# Set tally, setting, and run mcdc
-# =============================================================================
-
-# Tally
-mcdc.tally(scores=['flux'],
-           x=np.linspace(-20.5, 20.5, 202),
-           t=np.linspace(0.0, 20.0, 21))
-
-# Setting
-mcdc.setting(N_particle=1E3)
-
-# Run
-mcdc.run()
-```
-
-If we save the input script above as `input.py`, we can run it as follows:
+To run a hypothetical input deck (for example this [slab wall problem]()) in pure python mode run:
 
 ```bash
 python input.py
 ```
 
-A more advanced input example that includes setting up multigroup (in energy and 
-delayed precursor) materials, lattice geometry, and continuous movements of 
-control rods is provided in `MCDC/example/c5g7/3d/TDX`.
-
-### Output
-
-MC/DC simulation results are stored in 
-[HDF5 format](https://www.hdfgroup.org/solutions/hdf5/), which can be processed 
-using [H5Py](https://www.h5py.org/) (default file name: `output.h5`) as follows:
-
-```python
-import h5py
-
-with h5py.File('output.h5', 'r') as f:
-    x      = f['tally/grid/x'][:]
-    t      = f['tally/grid/t'][:]
-    phi    = f['tally/flux/mean'][:]
-    phi_sd = f['tally/flux/sdev'][:]
-```
+Simulation outputs will be placed in the same directory the `input.py` file is located in.
 
 ### Numba mode
 
@@ -102,7 +50,7 @@ MC/DC supports transport kernel acceleration via
 [Numba](https://numba.readthedocs.io/en/stable/index.html)'s Just-in-Time 
 compilation (currently only the CPU implementation). Running in Numba mode takes 
 an *overhead* of about 15 to 80 seconds depending on the physics/features 
-simulated; however, once compiled, the simulation runs MUCH faster than the 
+simulated; however, once compiled, the simulation runs **MUCH** faster than the 
 Python mode.
 
 To run in the Numba mode:
@@ -120,3 +68,28 @@ processes in Numba mode with [SLURM](https://slurm.schedmd.com/documentation.htm
 ```bash
 srun -n 36 python input.py --mode=numba
 ```
+
+For system that do no use SLURM (i.e. a local system) try `mpiexec` or `mpirun` in its stead.
+
+## Contributions
+
+We welcome any contributions to this code base. Please keep in mind our [code of conduct]() that we do take seriously.
+We work off a forking development structure where you fork this repo, make contributions then open a pull request. That code will then be reviewed by the primary developers. For more information on how to do this see our [Contribution guide]()
+
+## Bugs and Issues
+
+Our documentation is in the early stages of development so bare with us while we bring that upto snuff.
+If you do feel that you have found a novel bug or we should be aware of feel free to [open an issue](https://github.com/CEMeNT-PSAAP/MCDC/issues)
+**We are not your HPC's admins. We can only do so much*
+
+## Testing
+
+MC/DC uses CI to run it's unit and regression test suite. 
+MC/DC also includes a verification and performance test that get ran on nightly builds on internal systems.
+For specifics on how to run these tests locally [go here](https://github.com/CEMeNT-PSAAP/MCDC/tree/main/test/regression).
+
+## Cite
+
+## License
+
+MC/DC is licensed under a BSD-3 clause license. We believe in open source software
