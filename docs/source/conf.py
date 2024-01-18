@@ -40,15 +40,14 @@ release = " "
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    'sphinx_toolbox.github',
-    'sphinx_toolbox.sidebar_links',
+    "sphinx_toolbox.github",
+    "sphinx_toolbox.sidebar_links",
 ]
 autosummary_generate = True
 
 
-
-github_username = 'CEMeNT-PSAAP'
-github_repository = 'MCDC'
+github_username = "CEMeNT-PSAAP"
+github_repository = "MCDC"
 github_url = "https://github.com/{github_username}/{github_repository}"
 
 # Add any paths that contain templates here, relative to this directory.
@@ -66,7 +65,7 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = "furo"
-html_logo = 'images/home/mcdc.svg'
+html_logo = "images/home/mcdc.svg"
 
 # html_permalinks = ['https://cement-psaap.github.io/', 'https://github.com/CEMeNT-PSAAP/MCDC']
 

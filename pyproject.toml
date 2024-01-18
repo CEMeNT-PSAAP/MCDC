@@ -32,13 +32,13 @@ dependencies = [
     "h5py",
 ]
 [project.optional-dependencies]
-    vis = ["ngsolve", "distinctipy"],
-    docs = ["sphinx==7.2.6", "furo", "sphinx_toolbox"],
-]
+    vis = ["ngsolve", "distinctipy"]
+    docs = ["sphinx==7.2.6", "furo", "sphinx_toolbox"]
+
 
 
 [project.urls]
 Repository = "https://github.com/CEMeNT-PSAAP/MCDC"
-Homepage = https://cement-psaap.github.io/
+Homepage = "https://cement-psaap.github.io/"
 Documentation = "https://cement-psaapgithubio.readthedocs.io/en/latest/"
 Issues = "https://github.com/CEMeNT-PSAAP/MCDC/issues"
