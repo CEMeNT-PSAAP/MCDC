@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Monte Carlo / Dynamic Code, a pure python high preofmrance Monte Carlo neutronics package"
 readme = "README.md"
-requires-python = ">=3.9, <3.12"
+requires-python = ">=3.9, <=3.11.7"
 license = {file = "LICENSE"}
 keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
 classifiers = [
