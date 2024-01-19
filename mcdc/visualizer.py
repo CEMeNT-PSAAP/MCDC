@@ -1,8 +1,26 @@
-from netgen.meshing import *
-from netgen.csg import *
-from ngsolve import Draw, Redraw  # just for visualization
+try:
+    # launches visualization window
+    # must be inside this loop so it doesn't launch when the visualizer is imported
+    from netgen.meshing import *
+    from netgen.csg import *
+    from ngsolve import Draw, Redraw  # just for visualization
+    import distinctipy  # creates unlimited visually distinct colors for visualization
+
+except ImportError as e:
+    print("")
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    print("MC/DC visualization error:")
+    print("     Dependencies for visualization not installed")
+    print("     To install optional dependencies needed for visualization:")
+    print("         <pip install mcdc[viz]> ")
+    print("")
+    print("raw import error stored in viz.error in run dir")
+    print(e, file='viz.error')
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    print("")
+
+
 import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
-import distinctipy  # creates unlimited visually distinct colors for visualization
 import math
 
 # Get input_card and set global variables as "mcdc_"
@@ -398,7 +416,25 @@ def create_time_slider(root, start_time, end_time, tick_interval, material_color
 # start and end times are default zero
 # called in input file
 def visualize(start_time=0, end_time=0, tick_interval=1, material_colors={}):
-    import netgen.gui  # launches visualiztation window
+    # The dependence for the visualizer are quite large and include
+    # netgen (75MB), intel mkl (200MB), among others
+    # These are configurable as optional dependencies
+    try:
+        # launches visualization window
+        # must be inside this loop so it doesn't launch when the visualizer is imported
+        import netgen.gui
+    except ImportError as e:
+        print("")
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        print("MC/DC visualization error:")
+        print("     Dependencies for visualization not installed")
+        print("     To install optional dependencies needed for visualization:")
+        print("         <pip install mcdc[viz]> ")
+        print("")
+        print("raw import error stored in viz.error in run dir")
+        print(e, file='viz.error')
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        print("")
 
     color_key_dic = draw_Geometry(
         current_time=0,
