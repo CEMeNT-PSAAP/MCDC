@@ -28,7 +28,9 @@ jobs:
         python-version: '3.11.7'
     - name: Install dependencies
       run: |
+        python --version
         python -m pip install --upgrade pip
+        sudo apt install openmpi
         #pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py ngsolve distinctipy
         pip install .
         pip install build
