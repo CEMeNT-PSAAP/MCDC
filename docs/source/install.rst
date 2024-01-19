@@ -4,8 +4,20 @@
 Installation Guide
 ===================
 
-This outlines the basic steps to install MC/DC on a local
-machine or on HPC machine.
+Most users should be able to install MC/DC using,
+.. code-block:: sh
+
+    pip install mcdc
+
+provided they have,
+
+#. a working version of openMPI (from sources like conda, brew, or apt)
+#. have administrator privileges or are using environment managers like conda
+#. are using a `unix` based (`macOS`, `linux`, etc.)
+#. are not trying to develope
+
+The rest of this guide outlines the basic steps to install MC/DC for development, on a local
+machine, or on HPC machine. The is the most resilient way to get the dependencies configured properly.
 
 -----------------------------------
 Creating an MC/DC Conda environment

@@ -12,7 +12,7 @@ description = "Monte Carlo / Dynamic Code, a pure python high preofmrance Monte 
 readme = "README.md"
 requires-python = ">=3.9, <=3.11.7"
 license = {file = "LICENSE"}
-keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
+keywords = ["Monte Carlo", "Nuclear", "GPU", "numba", "mpi4py", "neutron transport", "neutronics", "HPC"]
 classifiers = [
     "Programming Language :: Python :: 3",
     'License :: OSI Approved :: BSD License',
