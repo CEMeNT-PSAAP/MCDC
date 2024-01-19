@@ -87,10 +87,12 @@ A full exhaustive list of publications can be found on the `CEMeNT site <https:/
 
 .. sidebar-links::
     :caption: Links
-    :github: 
     :pypi: mcdc
+    :github:
+    
     CEMeNT <https://cement-psaap.github.io>
     license <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/LICENSE>
+
 
 Indices and tables
 ==================
