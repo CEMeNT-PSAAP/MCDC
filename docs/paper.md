@@ -10,8 +10,8 @@ tags:
   - HPC
   - mpi4py
   - GPU
-authors:
-  - name: Joanna Piper Morgan
+authors: # x=reviewed
+  - name: Joanna Piper Morgan #x
     orcid: 0000-0003-1379-5431
     affiliation: "1, 2" # (Multiple affiliations must be quoted)
     corresponding: true
@@ -115,6 +115,11 @@ Many of the traditionally developed neutron transport codes are export controlle
 `MC/DC` has support for continuous energy and multi-group transport. It can solve more traditional k-eigenvalue problems (used to determine neutron population growth rates in reactors) as well as fully dynamic simulations. It has a novel continuous geometry movement function (other codes use step functions) that allows for better modeling of things like control rods. It also supports some simple Domain decomposition, with more complex algorithms currently being implemented.
 
 `MC/DC` enabled explorations into dynamic neutron transport algorithms have been successful, including, quasi-Monte Carlo techniques [@mcdc:variansyah_physor22_pct], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmc; @mcdc:qmcabs], transient population control techniques [@mcdc:variansyah_nse22_pct], hash based random number generation, global uncertainty quantification [@mcdc:clements_mc23], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling among others.
+
+While many features, development schemes, and numerical methods in `MC/DC` are novel, it still uses a direct simulation Monte Carlo algorithm [@lewis_computational_1984].
+Particles with an associated statistical importance are spawned and transported to produce a particle history.
+The specific set of events that occur within their history as well as their path are governed by pseudo-random numbers, known probabilities (from things like material data), and known geometries to move particles through space, angle of travel, time, and energy.
+Information about how particles move and/or interact with the system are tallied to construct a histogram solution of parameters of interest with an associated statistical error from the Monte Carlo process. 
 
 # Future Work
 

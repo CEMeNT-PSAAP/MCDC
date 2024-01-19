@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 
+
 MC/DC is a performant, scalable, and machine-portable Python-based Monte Carlo 
 neutron transport software currently developed in the Center for Exascale Monte 
 Carlo Neutron Transport ([CEMeNT](https://cement-psaap.github.io/)).
@@ -29,7 +30,7 @@ The `pip mpi4py` distribution commonly has errors when building due to incompati
 * **Linux users:** we recommend `openmpi` is installed via a root package manager if possible (e.g. `sudo apt install openmpi`) or a conda distribution (e.g. `conda install openmpi`)
 * **HPC users and developers on any system:** we recommend you *do not use the pip distribution* and instead install MC/DC and its dependencies via [install scripts](https://cement-psaapgithubio.readthedocs.io/en/latest/install.html) we've included that will build `mpi4py` from source and use conda to manage your environment. *This is the most reliable way MC/DC can be installed and configured*. It also takes care of the [Numba patch](), and can configure the [continuous energy data library]() if you have access.
 
-### Numba Configuration
+### Numba Config
 
 MC/DC requires Numba to be patched to be able to run performantly in `numba mode`. There is a very simple patch file that will make it automatically. To patch numba
 1. Download the `patch.sh` file [here]() (If you cloned the git packa)
@@ -89,20 +90,20 @@ For system that do no use SLURM (i.e. a local system) try `mpiexec` or `mpirun` 
 
 ## Contributions
 
-We welcome any contributions to this code base. Please keep in mind our [code of conduct](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md) that we do take seriously.
+We welcome any contributions to this code base.
+Please keep in mind our [code of conduct](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md) that we do take seriously.
 We work off a forking development structure where you fork this repo, make contributions then open a pull request. That code will then be reviewed by the primary developers. For more information on how to do this see our [Contribution guide]()
 
 ## Bugs and Issues
 
 Our documentation is in the early stages of development so bare with us while we bring that upto snuff.
-If you do feel that you have found a novel bug or we should be aware of feel free to [open an issue](https://github.com/CEMeNT-PSAAP/MCDC/issues)
-**We are not your HPC's admins. We can only do so much*
+If you do feel that you have found a novel bug or we should be aware of feel free to [open an issue](https://github.com/CEMeNT-PSAAP/MCDC/issues).
 
 ## Testing
 
 MC/DC uses CI to run it's unit and regression test suite. 
 MC/DC also includes a verification and performance test that get ran on nightly builds on internal systems.
-For specifics on how to run these tests locally [go here](https://github.com/CEMeNT-PSAAP/MCDC/tree/main/test/regression).
+See specifics on how to run these tests locally [here](https://github.com/CEMeNT-PSAAP/MCDC/tree/main/test/regression).
 
 ## Cite
 
@@ -120,7 +121,6 @@ To provide proper attribution to MC/DC please cite,
 which should render something like this
 
 Variansyah, Ilham, J. P. Morgan, K. E. Niemeyer, and R. G. McClarren. 2023. “Development of MC/DC: a performant, scalable, and portable Python-based Monte Carlo neutron transport code.” In *International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering*, Niagara Falls, Ontario, Canada. DOI. [10.48550/arXiv.2305.07636](https://doi.org/10.48550/arXiv.2305.07636)
-
 
 ## License
 
