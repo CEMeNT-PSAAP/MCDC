@@ -6,7 +6,15 @@ build-backend = "hatchling.build"
 name = "mcdc"
 version = "0.9.0"
 authors = [
+  { name="Ilham Variansyah", email="variansi@oregonstate.edu" },
+  { name="Sam Pasmann", email="spasmann@nd.edu" },
   { name="Joanna Morgan", email="morgajoa@oregonstate.edu" },
+  { name="Kayla Clements", email="clemekay@oregonstate.edu" },
+  { name="Braxton Cuneo", email="bcuneo@seattleu.edu" },
+  { name="Charles Goodman"},
+  { name="Caleb Shaw"},
+  { name="Rohan Pankaj"},
+  { name="Jordan Northrop"},
 ]
 description = "Monte Carlo / Dynamic Code, a pure python high preofmrance Monte Carlo neutronics package"
 readme = "README.md"
