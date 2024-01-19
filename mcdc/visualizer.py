@@ -15,7 +15,8 @@ except ImportError as e:
     print("         <pip install mcdc[viz]> ")
     print("")
     print("raw import error stored in viz.error in run dir")
-    print(e, file='viz.error')
+    with open("viz.error", "w") as text_file:
+        text_file.write(e)
     print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     print("")
 
@@ -432,7 +433,8 @@ def visualize(start_time=0, end_time=0, tick_interval=1, material_colors={}):
         print("         <pip install mcdc[viz]> ")
         print("")
         print("raw import error stored in viz.error in run dir")
-        print(e, file='viz.error')
+        with open("viz.error", "w") as text_file:
+            text_file.write(e)
         print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         print("")
 
