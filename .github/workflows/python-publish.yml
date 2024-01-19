@@ -8,9 +8,9 @@
 
 name: Upload Python Package
 
-on: push
-  #release:
-  #  types: [push] # published
+on:
+    release:
+      types: [published]
 
 permissions:
   contents: read
@@ -31,7 +31,6 @@ jobs:
       run: |
         python --version
         python -m pip install --upgrade pip
-        #pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py ngsolve distinctipy
         pip install .
         pip install build
     - name: Patch Numba
