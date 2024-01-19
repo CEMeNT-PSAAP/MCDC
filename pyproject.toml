@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Monte Carlo / Dynamic Code, a pure python high preofmrance Monte Carlo neutronics package"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9, <3.12"
 license = {file = "LICENSE"}
 keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
 classifiers = [
@@ -23,7 +23,7 @@ classifiers = [
     'Operating System :: MacOS',
 ]
 dependencies = [
-    "numba>=0.58.1",
+    "numba>=0.58.0",
     "numpy",
     "scipy",
     "matplotlib",
