@@ -1,4 +1,4 @@
-name: Regression Test - Numba and MPI (2 threads)
+name: Regression Test - Numba and MPI (4 threads)
 
 on: [push, pull_request]
 
