@@ -720,7 +720,7 @@ def make_type_technique(input_deck):
     # =========================================================================
 
     # Constants
-    struct += [("wr_threshold", float64), ("wr_chance", float64)]
+    struct += [("wr_threshold", float64), ("wr_survive", float64)]
 
     # =========================================================================
     # Quasi Monte Carlo

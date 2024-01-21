@@ -397,7 +397,7 @@ def prepare():
     mcdc["technique"]["wr_threshold"] = input_deck.technique["wr_threshold"]
 
     # Survival probability
-    mcdc["technique"]["wr_chance"] = input_deck.technique["wr_chance"]
+    mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
 
     # =========================================================================
     # Quasi Monte Carlo
