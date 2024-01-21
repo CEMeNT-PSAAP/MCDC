@@ -2486,7 +2486,6 @@ def branchless_collision(P, mcdc):
     # Data
     # TODO: Consider multi-nuclide material
     material = mcdc["nuclides"][P["material_ID"]]
-    w = P["w"]
     g = P["g"]
     SigmaT = material["total"][g]
     SigmaS = material["scatter"][g]
@@ -2498,7 +2497,7 @@ def branchless_collision(P, mcdc):
     G = material["G"]
 
     # Total nu fission
-    nu = material["nu_f"][g]
+    nu = material["nu_f"][g] / mcdc["k_eff"]
 
     # Set weight
     n_scatter = nu_s * SigmaS
