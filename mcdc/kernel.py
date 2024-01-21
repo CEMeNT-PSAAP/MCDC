@@ -3533,26 +3533,12 @@ def preconditioner(V, mcdc, num_sweeps=3):
 
 @njit
 def weight_roulette(P, mcdc):
-    """
-    If neutron weight below wr_threshold, then enter weight rouelette
-    technique. Neutron has 'chance' probability of having its weight increased
-    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
-
-    Parameters
-    ----------
-    P :
-    mcdc :
-
-    Returns
-    -------
-    None.
-
-    """
-    chance = mcdc["technique"]["wr_chance"]
-    x = rng(P)
-    if x <= chance:
-        P["iqmc"]["w"] /= chance
-        P["w"] /= chance
+    w_survive = mcdc['technique']['wr_survive']
+    prob_survive = P['w']/w_survive
+    if rng(P) <= prob_survive:
+        P["w"] = w_survive
+        if mcdc['technique']['iQMC']:
+            P["iqmc"]["w"][:] = w_survive
     else:
         P["alive"] = False
 
