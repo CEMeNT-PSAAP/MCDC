@@ -1477,19 +1477,19 @@ def eigenvalue_tally(P, distance, mcdc):
         if mcdc["setting"]["mode_MG"]:
             g = P["g"]
             for i in range(material["N_nuclide"]):
+                ID_nuclide = material["nuclide_IDs"][i]
+                nuclide = mcdc["nuclides"][ID_nuclide]
                 for j in range(J):
-                    ID_nuclide = material["nuclide_IDs"][i]
-                    nuclide = mcdc["nuclides"][ID_nuclide]
                     nu_d = nuclide["nu_d"][g, j]
                     decay = nuclide["decay"][j]
                     total += nu_d / decay
         else:
             E = P["E"]
             for i in range(material["N_nuclide"]):
+                ID_nuclide = material["nuclide_IDs"][i]
+                nuclide = mcdc["nuclides"][ID_nuclide]
                 for j in range(J):
-                    ID_nuclide = material["nuclide_IDs"][i]
-                    nuclide = mcdc["nuclides"][ID_nuclide]
-                    nu_d = get_nu(NU_DELAYED, nuclide, E, j)
+                    nu_d = get_nu(NU_FISSION_DELAYED, nuclide, E, j)
                     decay = nuclide["ce_decay"][j]
                     total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
@@ -2262,7 +2262,7 @@ def fission(P, mcdc):
     else:
         nuclide = sample_nuclide(material, P, XS_FISSION, mcdc)
         E = P["E"]
-        nu = get_nu(NU_TOTAL, nuclide, E)
+        nu = get_nu(NU_FISSION, nuclide, E)
     N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P)))
 
     for n in range(N):
@@ -2425,11 +2425,11 @@ def fission_CE(P, nuclide, P_new):
     # Get constants
     E = P["E"]
     J = 6
-    nu = get_nu(NU_TOTAL, nuclide, E)
-    nu_p = get_nu(NU_PROMPT, nuclide, E)
+    nu = get_nu(NU_FISSION, nuclide, E)
+    nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
     nu_d = np.zeros(J)
     for j in range(J):
-        nu_d[j] = get_nu(NU_DELAYED, nuclide, E, j)
+        nu_d[j] = get_nu(NU_FISSION_DELAYED, nuclide, E, j)
 
     # Delayed?
     prompt = True
@@ -3971,10 +3971,6 @@ def get_MacroXS(type_, material, P, mcdc):
         ID_nuclide = material["nuclide_IDs"][i]
         nuclide = mcdc["nuclides"][ID_nuclide]
 
-        # Skip if not compatible
-        if type_ == XS_FISSION and not nuclide["fissionable"]:
-            continue
-
         # Get nuclide density
         N = material["nuclide_densities"][i]
 
@@ -4000,6 +3996,8 @@ def get_microXS(type_, nuclide, E):
         data = nuclide["ce_capture"]
         return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
     elif type_ == XS_FISSION:
+        if not nuclide["fissionable"]:
+            return 0.0
         data = nuclide["ce_fission"]
         return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
 
@@ -4010,16 +4008,22 @@ def get_microXS(type_, nuclide, E):
         nu = 1.0
         return nu * xs
     elif type_ == XS_NU_FISSION:
+        if not nuclide["fissionable"]:
+            return 0.0
         data = nuclide["ce_fission"]
         xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
         nu = get_nu(NU_FISSION, nuclide, E)
         return nu * xs
     elif type_ == XS_NU_FISSION_PROMPT:
+        if not nuclide["fissionable"]:
+            return 0.0
         data = nuclide["ce_fission"]
         xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
         nu = get_nu(NU_FISSION_PROMPT, nuclide, E)
         return nu * xs
     elif type_ == XS_NU_FISSION_DELAYED:
+        if not nuclide["fissionable"]:
+            return 0.0
         data = nuclide["ce_fission"]
         xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
         nu = get_nu(NU_FISSION_DELAYED, nuclide, E)
@@ -4048,7 +4052,7 @@ def get_XS(data, E, E_grid, NE):
 
 @njit
 def get_nu(type_, nuclide, E, group=-1):
-    if type_ == NU_TOTAL:
+    if type_ == NU_FISSION:
         nu = get_XS(nuclide["ce_nu_p"], E, nuclide["E_nu_p"], nuclide["NE_nu_p"])
         for i in range(6):
             nu += get_XS(
@@ -4056,10 +4060,10 @@ def get_nu(type_, nuclide, E, group=-1):
             )
         return nu
 
-    if type_ == NU_PROMPT:
+    if type_ == NU_FISSION_PROMPT:
         return get_XS(nuclide["ce_nu_p"], E, nuclide["E_nu_p"], nuclide["NE_nu_p"])
 
-    if type_ == NU_DELAYED and group == -1:
+    if type_ == NU_FISSION_DELAYED and group == -1:
         tot = 0.0
         for i in range(6):
             tot += get_XS(
@@ -4067,7 +4071,7 @@ def get_nu(type_, nuclide, E, group=-1):
             )
         return tot
 
-    if type_ == NU_DELAYED and group != -1:
+    if type_ == NU_FISSION_DELAYED and group != -1:
         return get_XS(
             nuclide["ce_nu_d"][group], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
         )
@@ -4080,10 +4084,6 @@ def sample_nuclide(material, P, type_, mcdc):
     for i in range(material["N_nuclide"]):
         ID_nuclide = material["nuclide_IDs"][i]
         nuclide = mcdc["nuclides"][ID_nuclide]
-
-        # Skip if not compatible
-        if type_ == XS_FISSION and not nuclide["fissionable"]:
-            continue
 
         N = material["nuclide_densities"][i]
         tot += N * get_microXS(type_, nuclide, P["E"])
