@@ -1452,7 +1452,7 @@ def tally_closeout(mcdc):
 def eigenvalue_tally(P, distance, mcdc):
     tally = mcdc["tally"]
     material = mcdc["materials"][P["material_ID"]]
-    flux = distance * P['w']
+    flux = distance * P["w"]
 
     # Get nu-fission
     nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P, mcdc)
@@ -1470,21 +1470,21 @@ def eigenvalue_tally(P, distance, mcdc):
             mcdc["n_max"] = n_density
 
         # Precursor density
-        J = material['J']
+        J = material["J"]
         SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
         # Get the decay-wighted multiplicity
         total = 0.0
-        if mcdc['setting']['mode_MG']:
-            g = P['g']
+        if mcdc["setting"]["mode_MG"]:
+            g = P["g"]
             for i in range(material["N_nuclide"]):
                 for j in range(J):
                     ID_nuclide = material["nuclide_IDs"][i]
                     nuclide = mcdc["nuclides"][ID_nuclide]
-                    nu_d = nuclide["nu_d"][g,j]
+                    nu_d = nuclide["nu_d"][g, j]
                     decay = nuclide["decay"][j]
                     total += nu_d / decay
         else:
-            E = P['E']
+            E = P["E"]
             for i in range(material["N_nuclide"]):
                 for j in range(J):
                     ID_nuclide = material["nuclide_IDs"][i]
