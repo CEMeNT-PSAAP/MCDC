@@ -4,8 +4,6 @@ from mpi4py import MPI
 from numba import njit, objmode, literal_unroll
 import numba
 
-from mcdc.mcdcjit import mcdc_jit
-
 import mcdc.type_ as type_
 
 from mcdc.constant import *
