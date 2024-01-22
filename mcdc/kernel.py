@@ -30,8 +30,9 @@ def domain_crossing(P, mcdc):
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
         flag = directions[0]
-
-        if len(directions) > 1:
+        if len(directions) == 0:
+            return
+        elif len(directions) > 1:
             for direction in directions[1:]:
                 if direction == MESH_X:
                     P["x"] -= SHIFT * P["ux"] / np.abs(P["ux"])
