@@ -1451,17 +1451,11 @@ def tally_closeout(mcdc):
 @njit
 def eigenvalue_tally(P, distance, mcdc):
     tally = mcdc["tally"]
+    material = mcdc["materials"][P["material_ID"]]
+    flux = distance * P['w']
 
-    # TODO: Consider multi-nuclide material
-    material = mcdc["nuclides"][P["material_ID"]]
-
-    # Parameters
-    flux = distance * P["w"]
-    g = P["g"]
-    nu = material["nu_f"][g]
-    SigmaT = material["total"][g]
-    SigmaF = material["fission"][g]
-    nuSigmaF = nu * SigmaF
+    # Get nu-fission
+    nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P, mcdc)
 
     # Fission production (needed even during inactive cycle)
     mcdc["eigenvalue_tally_nuSigmaF"] += flux * nuSigmaF
@@ -1476,12 +1470,28 @@ def eigenvalue_tally(P, distance, mcdc):
             mcdc["n_max"] = n_density
 
         # Precursor density
-        J = material["J"]
-        nu_d = material["nu_d"][g]
-        decay = material["decay"]
+        J = material['J']
+        SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+        # Get the decay-wighted multiplicity
         total = 0.0
-        for j in range(J):
-            total += nu_d[j] / decay[j]
+        if mcdc['setting']['mode_MG']:
+            g = P['g']
+            for i in range(material["N_nuclide"]):
+                for j in range(J):
+                    ID_nuclide = material["nuclide_IDs"][i]
+                    nuclide = mcdc["nuclides"][ID_nuclide]
+                    nu_d = nuclide["nu_d"][g,j]
+                    decay = nuclide["decay"][j]
+                    total += nu_d / decay
+        else:
+            E = P['E']
+            for i in range(material["N_nuclide"]):
+                for j in range(J):
+                    ID_nuclide = material["nuclide_IDs"][i]
+                    nuclide = mcdc["nuclides"][ID_nuclide]
+                    nu_d = get_nu(NU_DELAYED, nuclide, E, j)
+                    decay = nuclide["ce_decay"][j]
+                    total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
         mcdc["eigenvalue_tally_C"] += C_density
         # Maximum precursor density
@@ -3533,11 +3543,11 @@ def preconditioner(V, mcdc, num_sweeps=3):
 
 @njit
 def weight_roulette(P, mcdc):
-    w_survive = mcdc['technique']['wr_survive']
-    prob_survive = P['w']/w_survive
+    w_survive = mcdc["technique"]["wr_survive"]
+    prob_survive = P["w"] / w_survive
     if rng(P) <= prob_survive:
         P["w"] = w_survive
-        if mcdc['technique']['iQMC']:
+        if mcdc["technique"]["iQMC"]:
             P["iqmc"]["w"][:] = w_survive
     else:
         P["alive"] = False
@@ -3922,6 +3932,7 @@ def get_MacroXS(type_, material, P, mcdc):
     # Multigroup XS
     g = P["g"]
     if mcdc["setting"]["mode_MG"]:
+        # Cross sections
         if type_ == XS_TOTAL:
             return material["total"][g]
         elif type_ == XS_SCATTER:
@@ -3930,6 +3941,26 @@ def get_MacroXS(type_, material, P, mcdc):
             return material["capture"][g]
         elif type_ == XS_FISSION:
             return material["fission"][g]
+
+        # Productions
+        elif type_ == XS_NU_SCATTER:
+            nu = material["nu_s"][g]
+            scatter = material["scatter"][g]
+            return nu * scatter
+        elif type_ == XS_NU_FISSION:
+            nu = material["nu_f"][g]
+            fission = material["fission"][g]
+            return nu * fission
+        elif type_ == XS_NU_FISSION_PROMPT:
+            nu_p = material["nu_p"][g]
+            fission = material["fission"][g]
+            return nu_p * fission
+        elif type_ == XS_NU_FISSION_DELAYED:
+            nu_d = 0.0
+            for j in range(material["J"]):
+                nu_d += material["nu_d"][g, j]
+            fission = material["fission"][g]
+            return nu_d * fission
 
     # Continuous-energy XS
     MacroXS = 0.0
@@ -3958,16 +3989,41 @@ def get_MacroXS(type_, material, P, mcdc):
 
 @njit
 def get_microXS(type_, nuclide, E):
-    # Get type_ XS vector data
+    # Cross sections
     if type_ == XS_TOTAL:
         data = nuclide["ce_total"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
     elif type_ == XS_SCATTER:
         data = nuclide["ce_scatter"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
     elif type_ == XS_CAPTURE:
         data = nuclide["ce_capture"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
     elif type_ == XS_FISSION:
         data = nuclide["ce_fission"]
-    return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+
+    # Binary Multiplicities
+    elif type_ == XS_NU_SCATTER:
+        data = nuclide["ce_scatter"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = 1.0
+        return nu * xs
+    elif type_ == XS_NU_FISSION:
+        data = nuclide["ce_fission"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = get_nu(NU_FISSION, nuclide, E)
+        return nu * xs
+    elif type_ == XS_NU_FISSION_PROMPT:
+        data = nuclide["ce_fission"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = get_nu(NU_FISSION_PROMPT, nuclide, E)
+        return nu * xs
+    elif type_ == XS_NU_FISSION_DELAYED:
+        data = nuclide["ce_fission"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = get_nu(NU_FISSION_DELAYED, nuclide, E)
+        return nu * xs
 
 
 @njit
