@@ -155,7 +155,6 @@ def loop_source(seed, mcdc):
         # Check if it is beyond current census index
         idx_census = mcdc["idx_census"]
         if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-            P["t"] += SHIFT
             kernel.add_particle(P, mcdc["bank_census"])
         else:
             # Add the source particle into the active bank

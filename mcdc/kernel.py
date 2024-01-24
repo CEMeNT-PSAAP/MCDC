@@ -1310,13 +1310,13 @@ def score_tracklength(P, distance, mcdc):
     if tally["flux"]:
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux"])
     if tally["density"]:
-        flux /= material["speed"][g]
+        flux /= get_particle_speed(P, mcdc)
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density"])
     if tally["fission"]:
-        flux *= material["fission"][g]
+        flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission"])
     if tally["total"]:
-        flux *= material["total"][g]
+        flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total"])
     if tally["current"]:
         score_current(s, g, t, x, y, z, flux, P, tally["score"]["current"])
@@ -2283,7 +2283,10 @@ def fission(P, mcdc):
             continue
 
         # Bank
-        if mcdc["setting"]["mode_eigenvalue"]:
+        idx_census = mcdc["idx_census"]
+        if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
+            add_particle(P_new, mcdc["bank_census"])
+        elif mcdc["setting"]["mode_eigenvalue"]:
             add_particle(P_new, mcdc["bank_census"])
         else:
             add_particle(P_new, mcdc["bank_active"])
@@ -2493,69 +2496,32 @@ def fission_CE(P, nuclide, P_new):
 
 @njit
 def branchless_collision(P, mcdc):
-    # Data
-    # TODO: Consider multi-nuclide material
-    material = mcdc["nuclides"][P["material_ID"]]
-    g = P["g"]
-    SigmaT = material["total"][g]
-    SigmaS = material["scatter"][g]
-    SigmaF = material["fission"][g]
-    nu_s = material["nu_s"][g]
-    nu_p = material["nu_p"][g] / mcdc["k_eff"]
-    nu_d = material["nu_d"][g] / mcdc["k_eff"]
-    J = material["J"]
-    G = material["G"]
+    material = mcdc["materials"][P["material_ID"]]
 
-    # Total nu fission
-    nu = material["nu_f"][g] / mcdc["k_eff"]
-
-    # Set weight
-    n_scatter = nu_s * SigmaS
-    n_fission = nu * SigmaF
+    # Adjust weight
+    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+    n_scatter = get_MacroXS(XS_NU_SCATTER, material, P, mcdc)
+    n_fission = get_MacroXS(XS_NU_FISSION, material, P, mcdc) / mcdc['k_eff']
     n_total = n_fission + n_scatter
     P["w"] *= n_total / SigmaT
 
     # Set spectrum and decay rate
-    fission = True
-    prompt = True
     if rng(P) < n_scatter / n_total:
-        fission = False
-        spectrum = material["chi_s"][g]
+        sample_phasespace_scattering(P, material, P, mcdc)
     else:
-        xi = rng(P) * nu
-        tot = nu_p
-        if xi < tot:
-            spectrum = material["chi_p"][g]
+        if mcdc["setting"]["mode_MG"]:
+            sample_phasespace_fission(P, material, P, mcdc)
         else:
-            prompt = False
-            for j in range(J):
-                tot += nu_d[j]
-                if xi < tot:
-                    spectrum = material["chi_d"][j]
-                    decay = material["decay"][j]
-                    break
+            nuclide = sample_nuclide(material, P, XS_NU_FISSION, mcdc)
+            sample_phasespace_fission_nuclide(P, nuclide, P, mcdc)
 
-    # Set time
-    if not prompt:
-        xi = rng(P)
-        P["t"] -= math.log(xi) / decay
-
-        # Kill if it's beyond time boundary
-        if P["t"] > mcdc["setting"]["time_boundary"]:
-            P["alive"] = False
-            return
-
-    # Set energy
-    xi = rng(P)
-    tot = 0.0
-    for g_out in range(G):
-        tot += spectrum[g_out]
-        if tot > xi:
-            P["g"] = g_out
-            break
-
-    # Set direction (TODO: anisotropic scattering)
-    P["ux"], P["uy"], P["uz"] = sample_isotropic_direction(P)
+            # Beyond time census or time boundary?
+            idx_census = mcdc["idx_census"]
+            if P["t"] > mcdc["setting"]["census_time"][idx_census]:
+                P['alive'] = False
+                add_particle(split_particle(P), mcdc["bank_census"])
+            elif P["t"] > mcdc["setting"]["time_boundary"]:
+                P['alive'] = False
 
 
 # =============================================================================
