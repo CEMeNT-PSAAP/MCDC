@@ -2501,7 +2501,7 @@ def branchless_collision(P, mcdc):
     # Adjust weight
     SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
     n_scatter = get_MacroXS(XS_NU_SCATTER, material, P, mcdc)
-    n_fission = get_MacroXS(XS_NU_FISSION, material, P, mcdc) / mcdc['k_eff']
+    n_fission = get_MacroXS(XS_NU_FISSION, material, P, mcdc) / mcdc["k_eff"]
     n_total = n_fission + n_scatter
     P["w"] *= n_total / SigmaT
 
@@ -2518,10 +2518,10 @@ def branchless_collision(P, mcdc):
             # Beyond time census or time boundary?
             idx_census = mcdc["idx_census"]
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-                P['alive'] = False
+                P["alive"] = False
                 add_particle(split_particle(P), mcdc["bank_census"])
             elif P["t"] > mcdc["setting"]["time_boundary"]:
-                P['alive'] = False
+                P["alive"] = False
 
 
 # =============================================================================
