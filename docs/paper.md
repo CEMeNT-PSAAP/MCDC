@@ -92,33 +92,33 @@ bibliography: paper.bib
 
 # Summary
 
-How neutrons move through space, direction of travel, energy, and time is important in modeling inertial confinement fusion systems, pulsed neutron sources, and nuclear criticality safety experiments, etc.
+How neutrons move through space, angle, energy, and time is important in modeling inertial confinement fusion systems, pulsed neutron sources, and nuclear criticality safety experiments, etc.
 This can be modeled with a Monte Carlo simulation, wherein particles with an associated statistical importance are spawned and transported to produce a particle history [@lewis_computational_1984].
-The specific set of events that occur within their history as well as their path are governed by pseudo-random numbers, known probabilities (from things like material data), and known geometries.
+A particle's path and the specific set of events that occur within its history are governed by pseudo-random numbers, known probabilities (*e.g.*, from material data), and known geometries.
 Information about how particles move and/or interact with the system are tallied to construct a histogram solution of parameters of interest with an associated statistical error from the Monte Carlo process. 
-When moving to dynamic simulations novel numerical methods are required to compute a solution performantly.
+When simulating dynamic systems, novel numerical methods are required to performantly compute a solution.
 We designed Monte Carlo / Dynamic Code (`MC/DC`) to explore these novel numerical methods on modern high performance compute systems.
-We avoid the need of a compiled or domain specific language by use of the Numba compiler for Python to accelerate and abstract our compute kernels to near compiled code speeds.
-Using this scheme we have implemented many novel algorithms, and in some verification tests we approach the performance of industry standard codes at the tens of thousands of processors scale.
+We avoid the need of a compiled or domain specific language by using the Numba compiler for Python to accelerate and abstract our compute kernels to near compiled code speeds.
+We have implemented many novel algorithms using this scheme, and in some verification tests have approached the performance of industry-standard codes at the scale of tens of thousands of processors.
 
 # Statement of need
 
 `MC/DC` is a performant rapid methods development platform for novel dynamic neutron transport algorithms on modern high performance compute systems.
 It uses the Numba compiler for Python to compile compute kernels to a desired hardware target, including support for graphics processing units (GPUs) [@lam_numba_2015].
-`MC/DC` uses `mpi4py` to gain distributed memory parallelism [@mpi4py_2021] and has run at the tens of thousands of processors scale [@variansyah_mc23_mcdc].
-These acceleration and abstraction techniques allow for `MC/DC` developers to remain in a pure Python development environment without need to support compiled or domain specific languages. 
-This has allowed `MC/DC` to grow from nothing to supporting full performant neutron transport and investigating novel transport algorithms in under two years with development mostly from relative novices.
+`MC/DC` uses `mpi4py` to gain distributed memory parallelism [@mpi4py_2021] and has run at the scale of tens of thousands of processors [@variansyah_mc23_mcdc].
+These acceleration and abstraction techniques allow `MC/DC` developers to remain in a pure Python development environment without needing to support compiled or domain specific languages.
+This has allowed `MC\DC` to grow from its instantiation less than two years ago into a codebase that supports full performant neutron transport and investigation of novel transport algorithms, with development mostly from relative novices.
 
-Many of the traditionally developed neutron transport codes are export controlled (not open source and difficult to get) and notoriously difficult to install, use, and develope.
-`MC/DC` being an open source easily installable Python package (with a `pip` distribution) means that it is ideal in an academic environment for both research and education.
-This is only further assisted by a test suite we have developed to do unit, regression, verification and performance tests, most of which run on a continuous integration basis.
+Many of the traditionally developed neutron transport codes are export controlled (*i.e.*, are not open source and are difficult to get) and notoriously difficult to install, use, and develop in.
+Because `MC/DC` is an open source and easily-installable Python package (with a `pip` distribution), it is ideal in an academic environment for both research and education.
+This is further assisted by a test suite we have developed for unit, regression, verification and performance tests, most of which run on a continuous integration basis.
 
 `MC/DC` has support for continuous energy and multi-group treatments of the neutron distribution in energy.
 It can solve k-eigenvalue problems (used to determine neutron population growth rates in reactors) as well as fully dynamic simulations.
-It has a novel continuous geometry movement function (other codes use step functions) that allows for better modeling of things like reactor control rods or pulsed neutron experiments.
+It has a novel continuous geometry movement function that models transient elements (*e.g.*, control rods or pulsed neutron experiments) more accurately than the step functions used by other codes.
 It also supports some simple domain decomposition, with more complex algorithms currently being implemented.
 
-`MC/DC` enabled explorations into dynamic neutron transport algorithms have been successful, including, quasi-Monte Carlo techniques [@mcdc:variansyah_physor22_pct], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmc; @mcdc:qmcabs], transient population control techniques [@mcdc:variansyah_nse22_pct], hash based random number generation, global uncertainty quantification [@mcdc:clements_mc23], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling, among others.
+`MC/DC`-enabled explorations into dynamic neutron transport algorithms have been successful, including quasi-Monte Carlo techniques [@mcdc:variansyah_physor22_pct], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmc; @mcdc:qmcabs], transient population control techniques [@mcdc:variansyah_nse22_pct], hash-based random number generation, uncertainty and global sensitivity analysis [@mcdc:clements_mc23], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling, among others.
 
 # Future Work
 

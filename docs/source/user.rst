@@ -6,12 +6,12 @@ User's Guide
 
 This guide presupposes you are familiar with modeling nuclear systems using a Monte Carlo method.
 If you are completely new, we suggest checking out `OpenMC's theory guide <https://docs.openmc.org/en/stable/methods/introduction.htmll>`_ as most the basic underlying algorithms and core concepts are the same.
-Our input decks and keyword phrases are designed so that if you are familiar with tools like OpenMC or MCNP you should be able to get up and running quick.
+Our input decks and keyword phrases are designed so that if you are familiar with tools like OpenMC or MCNP, you should be able to get up and running quickly.
 
-While this guide is a great place to start, the  next best place to look when getting started is our ``MCDC/examples`` or ``MCDC/testing`` directories.
-Run a few problems there, change a few inputs around see if it works and keep looking around till you get the general hang of what we are doing.
+While this guide is a great place to start, the  next best place to look when getting started are our ``MCDC/examples`` or ``MCDC/testing`` directories.
+Run a few problems there, change a few inputs around, and keep looking around until you get the general hang of what we are doing.
 Believe it or not, there is a method to all this madness.
-If you find your self with errors you really don't know what to do with take look at our `GitHub issues page <https://github.com/CEMeNT-PSAAP/MCDC/issues>`_.
+If you find yourself with errors you really don't know what to do with, take look at our `GitHub issues page <https://github.com/CEMeNT-PSAAP/MCDC/issues>`_.
 If it looks like you are the first to have a given problem feel free to submit a new ticket!
 
 A note on testing:
@@ -19,27 +19,25 @@ Just because something seems right doesn't mean it is.
 Care must be taken to ensure that you are running the problem you think you are.
 The software only knows what you tell it.
 
-------------------
-Workflows in MC/DC
-------------------
+MC/DC Workflow
+--------------
 
-MC/DC uses an ``input`` -> ``run`` -> ``post-process`` work flow where users,
+MC/DC uses an ``input`` -> ``run`` -> ``post-process`` workflow, where users
 
-#. build input decks using scripts that import ``mcdc`` as a package and call functions to build geometries, tally meshes, and set other simulation parameters
-#. define a runtime sequence in the terminal executing ``input`` script (terminal operations are required for MPI calls)
-#. exporting the results from ``.h5`` files and either using the visualizer or tools like ``matplotlib`` to view results.
+#. build input decks using scripts that import ``mcdc`` as a package and call functions to build geometries, tally meshes, and set other simulation parameters,
+#. define a runtime sequence in the terminal to execute the ``input`` script (terminal operations are required for MPI calls),
+#. export the results from ``.h5`` files and use the MC/DC visualizer or tools like ``matplotlib`` to view results.
 
+Building an Input Script
+------------------------
 
-Building an input deck
-----------------------
+Building an input deck can be a complicated and nuanced process. Depending on the type of simulation you need to build, you could end up touching most of the functions in MC/DC, or very few.
+Again, the best way to start building input decks is to look at what we have already done in the ``MCDC/examples`` or ``MCDC/testing`` directories.
+To see more on the available input functions, look through the :doc:`pythonapi/index` section.
 
-Building an input deck can be a complicated and nuanced process. Depending on the type of simulation you need to build you might touch most of the functions in MC/DC, or very few.
-Again the best way to start building input decks is to look at what we have already done in the ``MCDC/examples`` or ``MCDC/testing`` directories.
+As an example, we walk through building the input for the ``MCDC/examples/fixed_source/slab_absorbium`` problem, which simulates a three-region, purely absorbing, mono-energetic transient slab wall.
 
-To see more on input functions look through pythonapi/index.
-As an example we are going to be building the ``MCDC/examples/fixed_source/slab_absorbium`` problem in which a three region purely absorbing mono-energetic transient slab wall problem is modeled.
-
-First we start with our inputs,
+We start with our imports:
 
 .. code-block:: python3
 
@@ -47,8 +45,8 @@ First we start with our inputs,
 
     import mcdc
 
-You may require more packages depending on the methods you are constructing but most of what you need will be in these two.
-Now we define the materials that are going into this problem
+You may require more packages depending on the methods you are constructing, but most of what you need will be in these two.
+Now, we define the materials for the problem:
 
 .. code-block:: python3
 
@@ -57,15 +55,15 @@ Now we define the materials that are going into this problem
     m2 = mcdc.material(capture=np.array([1.5]))
     m3 = mcdc.material(capture=np.array([2.0]))
 
-In this problem we only have mono-energetic capture but MC/DC has support for multi-group (capture, scatter, fission) and contentious energy (capture, scatter, fission).
-When in multi-group simulation modes, a Numpy array has the different .
-These functions can get quite complicated.
+In this problem we only have mono-energetic capture, but MC/DC has support for multi-group (capture, scatter, fission) and continuous energy (capture, scatter, fission).
+Multi-group data is written in a single numpy array; for example, a 3-group capture cross section would be ``capture=np.array([1.0, 1.1, 0.8])``.
 
-For continues energy transport if you are a member of CEMeNT we have internal repos which can be auto-configured with the required data.
+If you are a member of CEMeNT, we have internal repositories containing the data required for continuous-energy simulation.
 Unfortunately due to export controls we can not publicly distribute this data.
-If you are looking for cross-section data to plug into MC/DC we recommend you look at OpenMC or `NJOY <http://www.njoy21.io/>`_.
+If you are looking for cross-section data to plug into MC/DC, we recommend you look at OpenMC or `NJOY <http://www.njoy21.io/>`_.
 
-After setting material data we set surfaces to define the problem space. 
+After setting material data, we define the problem space by setting up surfaces with their boundary conditions (bc).
+If no boundary condition is defined, the surface is assumed to be internal.
 
 .. code-block:: python3
 
@@ -75,14 +73,16 @@ After setting material data we set surfaces to define the problem space.
     s3 = mcdc.surface("plane-z", z=4.0)
     s4 = mcdc.surface("plane-z", z=6.0, bc="vacuum")
 
-note that these surface also contain information about boundary conditions.
-Remember that we are solving a 7 independent partial-intrgro differential equation so we need both initial and boundary conditions.
-While we have tried to include warnings and errors if a ill-posed problem is detected we cannot forecast all the ways in which things might go hay-wire.
-Ideally MC/DC will fail before it even runs but possibly you could get in an infinite tracking problem or your data will look very odd when you go to visualize it.
+Remember that the radiation transport equation is a 7-dimensional integro-differential equation,
+so it's possible your problem will need both initial and boundary conditions.
+While we have tried to include warnings and errors if an ill-posed problem is detected,
+we cannot forecast all the ways in which things might go haywire.
+For transient simulations, initial conditions are assumed to be 0 everywhere.
 
-If this is a transient simulation initial conditions are assumed as 0 everywhere.
-Once we set surfaces we can define the cells that exist between surfaces and the material that fills them. 
-Here we use the materials we defined earlier distributing them between our four surface planes.
+We create problem geometry using cells, which are defined by the surfaces that constrain them and the material that fills them.
+The ``+/-`` convention is used to indicate whether the cell volume is outside (+) or inside (-) a given surface.
+For example, below, the first cell is filled with material m2 and is positive with respect to s1, negative with respect to s2.
+This corresponds to being bound on the left by s1 and on the right by s2.
 
 .. code-block:: python3
 
@@ -90,13 +90,16 @@ Here we use the materials we defined earlier distributing them between our four 
     mcdc.cell([+s2, -s3], m3)
     mcdc.cell([+s3, -s4], m1)
 
-Uniform isotropic source throughout the domain
+We define a uniform isotropic source throughout the domain:
 
 .. code-block:: python3
 
     mcdc.source(z=[0.0, 6.0], isotropic=True)
 
-Next we set tallies and specify the specific parameters of interest. Here its the time and space averaged flux and the time and space averaged current across the whole problem and direction space,
+Next we set tallies and specify the specific parameters of interest. Here, we're interested in the time- and space-averaged flux
+and current. We set up two meshes on which to tally, using Numpy arrays: along the z-axis from 0.0 to 6.0, and along the mu axis between -1 and 1.
+Regardless of problem specifics, particles are simulated through all space, direction, and time;
+the tally definitions are used to indicate in which dimensions a record of particle behavior should be kept.
 
 .. code-block:: python3
 
@@ -107,26 +110,21 @@ Next we set tallies and specify the specific parameters of interest. Here its th
         mu=np.linspace(-1.0, 1.0, 32 + 1),
     )
 
-Here you can see again that we are using Numpy arrays to construct our tally mesh. Monte Carlo results are really just a histogram over relevant tallies.
-In fact regardless of the specific problem particles are always flying through space direction and time, we just disable most of the tallying in those dimensions for a problem this simple.
-
-Next we set simulation settings, primarily the number of particles.
-If you where running a k-eigenvalue type problem there would be a number of different setting to put in here as well.
-You can also control weather the MC/DC title mast displays, something you might want to disable if MC/DC transport is part of an inner loop.
+Next we set simulation settings. The only required setting is the number of particles.
+Additional settings include, for example, the cycles to use for a k-eigenvalue problem
+or whether the MC/DC title should be disabled.
 
 .. code-block:: python3
 
     mcdc.setting(N_particle=1e3)
 
-Finally execute the problem.
+Finally, execute the problem.
 
 .. code-block:: python3
 
     mcdc.run()
 
-When you string this all together it should look something like this,
-
-``#input.py``
+Put together, our example ``input.py`` file:
 
 .. code-block:: python3
 
@@ -178,63 +176,59 @@ When you string this all together it should look something like this,
     # Run
     mcdc.run()
 
-Now that we have a script to run how do we actually run it?
+Now that we have a script to run, how do we actually run it?
 
+Running a Simulation
+--------------------
 
-Running a Script
-----------------
+Executing MC/DC in something like a jupyter note book is possible but not recommended,
+especially when using MPI and/or Numba.
+The instructions below assume you have an existing MC/DC installation.
+MPI can be quite tricky to configure if on an HPC; if you're having trouble,
+consult our :ref:`install`, your HPC admin, or our `GitHub issues page <https://github.com/CEMeNT-PSAAP/MCDC/issues>`_.
 
-While running MC/DC in something like a jupyter note book is possible it is not recommended,
-epically when doing MPI and/or Numba type runs.
-This assumes you have a correctly configured MC/DC instillation.
-MPI can be quite tricky to get configured if your on an HPC and if you are having trouble consult our :ref:`install`, your HPC admin, or our `GitHub issues page <https://github.com/CEMeNT-PSAAP/MCDC/issues>`_.
-
-----------------
 Pure Python Mode
-----------------
+^^^^^^^^^^^^^^^^
 
-To run in pure Python mode (slow with no acceleration) 
+To run in pure Python mode (slower, no acceleration)
 
 .. code-block:: python3
 
     python input.py
 
-----------
 Numba Mode
-----------
+^^^^^^^^^^
 
 .. code-block:: python3
 
     python input.py --mode=numba
 
---------
-MPI Mode
---------
+Using MPI
+^^^^^^^^^
+
+MC/DC can be executed using MPI with or without Numba acceleration.
+If ``numba-mode`` is enabled the ``jit`` compilation, which is executed on all threads, can take between 30s-2min.
+For smaller problems, Numba compilation time could exceed runtime, and pure python mode could be preferable.
+Below, ``--mode`` can equal python or numba.
 
 .. code-block:: python3
 
-    srun python input.py --mode=<PYTHON/NUMBA>
-
-MPI mode can be run with or without Numba acceleration.
-If ``numba-mode`` is enabled the ``jit`` compilation (which can take between 30s-2min) will be executed on all threads.
-This is why we allow users to use Python mode to avoid this for intermediate sized problems.
+    srun python input.py --mode=<python/numba>
 
 
-
-
-
-Postprocessing Outputs
+Postprocessing Results
 ----------------------
 
-While the whole workflow of MC/DC can be done in one script---for anything but very simple inputs
-(or if you know what your doing)---it is recommended to keep the simulation and post-processing/visualization scripts separate.
+While the entire workflow of running and post-processing MC/DC could be done in one script,
+unless the problem is very small (or you're an expert),
+we recommend using separate simulation and post-processing/visualization scripts.
 
 When a problem is executed tallied results are compiled, compressed, and saved in ``.h5`` files.
 The size of these files can vary widely depending on your tally settings, 
-the geometric size of the problem (e.g. number of surfaces, and the number of particles tracked.
+the geometric size of the problem (e.g. number of surfaces), and the number of particles tracked.
 Expect sizes as small as ``kB`` or as large as ``TB``.
 
-These result files can be exported manipulated and visualized.
+These result files can be exported, manipulated, and visualized.
 Data can be pulled from an ``.h5`` file using something like,
 
 .. code-block:: python3
@@ -256,27 +250,40 @@ Data can be pulled from an ``.h5`` file using something like,
         J = f["tally/current/mean"][:, 2]
         J_sd = f["tally/current/sdev"][:, 2]  
 
-While there can be some nuance to the dimensions of these data arrays the folder structures should be pretty evident from your tally settings.
-If needed to look in and browse around a ``.h5`` file you can use something like `h5Viewer <https://www.hdfgroup.org/downloads/>`_ (which on linux can be installed with ``sudo apt-get install hdfview``).
-Otherwise these arrays can then be manipulated and modified like any other.
-They are just arrays of numbers so tools like SciPy, NumPy, Pandas, .etc are all on the table for use to further compute information from these simulations.
+While there can be some nuance to the dimensions of these data arrays, the folder structures should be evident from your tally settings.
+You can see the structure of the file layer-by-layer using the ``keys`` attribute of an h5 group.
+For example, ``f.keys()`` will return
 
-When plotting results if the problem is small enough a tool like ``matplotlib`` will work great.
-For more complex simulations open source professional visualization softwares like
+.. code-block:: bash
+
+    <KeysViewHDF5 ['input_deck', 'runtime', 'tally']>
+
+and ``f['tally'].keys()`` will return
+
+.. code-block:: bash
+
+    <KeysViewHDF5 ['current', 'flux', 'grid']>
+
+If needed, you can look around a ``.h5`` file using something like `h5Viewer <https://www.hdfgroup.org/downloads/>`_ (which on linux can be installed with ``sudo apt-get install hdfview``).
+Otherwise these arrays can then be manipulated and modified like any other.
+Results are stored as NumPy arrays, so any tool that works with NumPy arrays (*e.g.*, SciPy and Pandas)
+can be used to analyze the data from your simulations.
+
+A tool like ``matplotlib`` will work great for plotting results.
+For more complex simulations, open source professional visualization software like
 `Paraview <https://www.paraview.org/>`_  or `Visit <https://sd.llnl.gov/simulation/computer-codes/visit>`_ are available.
 
-As the problem we ran above is pretty simple and has no scattering or fission we actually have an analytic solution we can import
+As the problem we ran above is pretty simple and has no scattering or fission, we have an analytic solution we can import:
 
 .. code-block:: python3
 
     from reference import reference
 
-From here we can go about plotting our problem like any other in ``matplotlib``. 
-In this script we plot the spatial averaged flux and current as separate figures 
-(including the statistical noise from the Monte Carlo solution).
-Remember that a Monte Carlo solution must always include a report a statical error!
-We then use those terms to compute a new term, spatial averaged angular flux, and plot
-that over it's dimensions (angle and distance) in a heat map.
+In the script below, we plot the space-averaged flux and space-averaged current, including their statistical noise.
+We also use the space-averaged flux and current to compute a new quantity, the space-averaged angular flux, and
+plot it over space and angle in a heat map.
+Remember that when reporting results from a Monte Carlo solver, you should **always include the statical error!**
+
 
 .. code-block:: python3
 
@@ -349,7 +356,7 @@ that over it's dimensions (angle and distance) in a heat map.
     cbar.set_label("Angular flux")
     plt.show()
 
-While this script does look rather long, most of these commands are controlling things like axis labels and what not.
+While this script does look rather long, most of these commands are controlling things like axis labels and whatnot.
 But at the end we have something like this.
 
 .. image:: images/user/sf_slab_1.png
@@ -362,9 +369,9 @@ But at the end we have something like this.
    :width: 266
    :alt: Reference v computed angular flux, 1e3 particles
 
-Notice how crappy these solutions are? We only ran 1e3 particles.
-We need more particles to get a less statistically noise, more converged solution.
-Here is the same simulation with 1e6 particles.
+Notice how noisy these solutions are? We only ran 1e3 particles.
+We need more particles to get a less statistically noisy, more converged solution.
+Here's results from the same simulation run with 1e6 particles:
 
 .. image:: images/user/sf_slab_2.png
    :width: 266
@@ -376,7 +383,7 @@ Here is the same simulation with 1e6 particles.
    :width: 266
    :alt: Reference v computed angular flux, 1e6 particles
 
-Its matching much closer with the analytic solution.
+This is much better converged around the analytic solution.
 As with everything else, the best way to see what you can do is sniff around the examples.
 We have examples with animated solutions, subplots, moving regions and more!
 
