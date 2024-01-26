@@ -16,7 +16,7 @@ a rapid methods development platform for for modern HPCs and is targeting CPUs a
 
 MC/DC has support for continuous energy and multi-group transport.
 It can solve more traditional k-eigenvalue problems (used to determine neutron population growth rates in reactors) as well as fully dynamic simulations.
-It has a novel continuous geometry movement function (other codes use step functions) that allows for better modeling of things like control rods.
+It has a novel continuous geometry movement function that models transient elements (*e.g.*, control rods or pulsed neutron experiments) more accurately than the step functions used by other codes.
 It also supports some simple Domain decomposition, with more complex algorithms currently being implemented.
 
 MC/DC is machine portable and is validated to run on:
@@ -105,9 +105,9 @@ Indices and tables
 To build the docs
 =================
 
-#. Install dependencies (we recommend: ``conda install sphinx`` and ``pip install furo``). Note that these dependencies are not installed as a part of base MC/DC
-#. Run ``make html`` to compile
-#. Then launch ``build/html/index.html`` with your browser of choice
+#. Install dependencies (we recommend: ``conda install sphinx`` and ``pip install furo sphinx_toolbox``). Note that these dependencies are not installed as part of base MC/DC.
+#. From the `MCDC/docs/` directory, run ``make html`` to compile.
+#. Launch ``build/html/index.html`` with your browser of choice.
 
 To Cite MC/DC
 =============
