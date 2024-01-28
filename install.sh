@@ -15,7 +15,7 @@ bash patch_numba.sh
 
 # Install or build mpi4py
 if [ $# -eq 0 ]; then
-  conda install mpi4py <<< "y"
+  conda mpi4py <<< "y"
 fi
 while [ $# -gt 0 ]; do
   case $1 in

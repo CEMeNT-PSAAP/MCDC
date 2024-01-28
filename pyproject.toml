@@ -16,7 +16,7 @@ authors = [
   { name="Rohan Pankaj"},
   { name="Jordan Northrop"},
 ]
-description = "Monte Carlo / Dynamic Code, a pure python high preofmrance Monte Carlo neutronics package"
+description = "Monte Carlo / Dynamic Code, a pure python high performance Monte Carlo neutronics package"
 readme = "README.md"
 requires-python = ">=3.9, <=3.11.7"
 license = {file = "LICENSE"}
@@ -39,6 +39,7 @@ dependencies = [
     "pytest",
     "h5py",
     "colorama",
+    "black",
 ]
 [project.optional-dependencies]
     docs = ["sphinx==7.2.6", "furo", "sphinx_toolbox"]
