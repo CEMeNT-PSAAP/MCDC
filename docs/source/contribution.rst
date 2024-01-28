@@ -1,4 +1,4 @@
-.. _contributions:
+.. _contribution:
 
 ==================
 Contribution Guide
@@ -108,6 +108,7 @@ MC/DC works off of a fork workflow in which contributors fork our repo, make alt
 You should only submit a pull request once your code passes all tests, is properly linted, you have edited documentation (if necessary), and added any new tests (if needed).
 
 Within your pull request documentation please list:
+
 #. Type of PR (e.g. enhancement, bugfix, etc);
 #. Link to any theory to understand what you are doing;
 #. Link to any open/closed issues if applicable;
