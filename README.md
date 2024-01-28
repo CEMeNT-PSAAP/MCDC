@@ -91,7 +91,7 @@ For systems that do not use SLURM (*i.e.*, a local system) try `mpiexec` or `mpi
 
 We welcome any contributions to this code base.
 Please keep in mind that we do take our [code of conduct](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md) seriously.
-Our development structure is fork-based: a developer makes a personal fork of this repo, commits contributions to their personal fork, then opens a pull request when they're ready to merge their changes into the main code base. Their contributions will then be reviewed by the primary developers. For more information on how to do this, see our [contribution guide]().
+Our development structure is fork-based: a developer makes a personal fork of this repo, commits contributions to their personal fork, then opens a pull request when they're ready to merge their changes into the main code base. Their contributions will then be reviewed by the primary developers. For more information on how to do this, see our [contribution guide](https://cement-psaapgithubio.readthedocs.io/en/latest/contribution.html).
 
 ## Bugs and Issues
 
