@@ -422,8 +422,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
 
     Parameters
     ----------
-    type_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y',
-             'cylinder-z', 'sphere', 'quadric'}
+    type\_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y', 'cylinder-z', 'sphere', 'quadric'}
         Surface type.
     bc : {'interface', 'vacuum', 'reflective'}
         Surface boundary condition.
@@ -1305,15 +1304,17 @@ def iQMC(
 
 def weight_roulette(chance, wr_threshold):
     """
-    If neutron weight is below wr_threshold, then enter weight rouelette
-    technique. Neutron has 'chance' probability of having its weight increased
+    Use weight roulette technique if neutron weight is below wr_threshold.
+
+    Neutron has 'chance' probability of having its weight increased
     by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
 
     Parameters
     ----------
-    chance : probability of survival
-    wr_threshold : weight_roulette() is called on a particle
-                    if P['w'] <= wr_threshold
+    chance :
+        probability of survival
+    wr_threshold :
+        weight_roulette() is called on a particle if P['w'] <= wr_threshold
 
     Returns
     -------
