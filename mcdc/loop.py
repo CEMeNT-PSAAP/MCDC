@@ -66,9 +66,9 @@ def loop_fixed_source(mcdc):
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
             # Reset banks
-            mcdc['bank_source']['size'] = 0
-            mcdc['bank_census']['size'] = 0
-            mcdc['bank_active']['size'] = 0
+            mcdc["bank_source"]["size"] = 0
+            mcdc["bank_census"]["size"] = 0
+            mcdc["bank_active"]["size"] = 0
 
             # Tally history closeout
             kernel.tally_reduce_bin(mcdc)
