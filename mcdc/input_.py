@@ -422,8 +422,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
 
     Parameters
     ----------
-    type_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y',
-             'cylinder-z', 'sphere', 'quadric'}
+    type\_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y', 'cylinder-z', 'sphere', 'quadric'}
         Surface type.
     bc : {'interface', 'vacuum', 'reflective'}
         Surface boundary condition.
@@ -1312,7 +1311,7 @@ def weight_roulette(w_threshold=0.2, w_survive=1.0):
     ----------
     w_threshold : weight_roulette() is called on a particle if
                   P['w'] <= wr_threshold
-    w_survive : weight survival
+    w_survive : survival weight
 
     Returns
     -------

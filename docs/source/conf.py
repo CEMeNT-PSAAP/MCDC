@@ -29,7 +29,7 @@ copyright = "2023, Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 author = "Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1"
+release = " "
 
 
 # -- General configuration ---------------------------------------------------
@@ -40,9 +40,15 @@ release = "0.1"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx_toolbox.github",
+    "sphinx_toolbox.sidebar_links",
 ]
 autosummary_generate = True
 
+
+github_username = "CEMeNT-PSAAP"
+github_repository = "MCDC"
+github_url = "https://github.com/{github_username}/{github_repository}"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -59,6 +65,9 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = "furo"
+html_logo = "images/home/mcdc.svg"
+
+# html_permalinks = ['https://cement-psaap.github.io/', 'https://github.com/CEMeNT-PSAAP/MCDC']
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
