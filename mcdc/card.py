@@ -82,7 +82,7 @@ class InputDeck:
             "ww_mesh": make_card_mesh(),
             "weight_roulette": False,
             "wr_threshold": 0.0,
-            "wr_chance": 1.0,
+            "wr_survive": 1.0,
             "iQMC": False,
             "iqmc": {
                 "generator": "sobol",

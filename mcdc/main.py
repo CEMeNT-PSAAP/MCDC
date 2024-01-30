@@ -9,7 +9,7 @@ parser.add_argument(
 )
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
-parser.add_argument("--progress_bar", default=False, action="store_true")
+parser.add_argument("--progress_bar", default=True, action="store_true")
 parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
 args, unargs = parser.parse_known_args()
 
@@ -397,7 +397,7 @@ def prepare():
     mcdc["technique"]["wr_threshold"] = input_deck.technique["wr_threshold"]
 
     # Survival probability
-    mcdc["technique"]["wr_chance"] = input_deck.technique["wr_chance"]
+    mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
 
     # =========================================================================
     # Quasi Monte Carlo

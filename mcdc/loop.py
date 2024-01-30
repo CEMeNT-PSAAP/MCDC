@@ -65,6 +65,11 @@ def loop_fixed_source(mcdc):
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
+            # Reset banks
+            mcdc["bank_source"]["size"] = 0
+            mcdc["bank_census"]["size"] = 0
+            mcdc["bank_active"]["size"] = 0
+
             # Tally history closeout
             kernel.tally_reduce_bin(mcdc)
             kernel.tally_closeout_history(mcdc)
@@ -155,7 +160,6 @@ def loop_source(seed, mcdc):
         # Check if it is beyond current census index
         idx_census = mcdc["idx_census"]
         if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-            P["t"] += SHIFT
             kernel.add_particle(P, mcdc["bank_census"])
         else:
             # Add the source particle into the active bank

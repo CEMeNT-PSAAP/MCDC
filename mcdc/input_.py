@@ -1302,19 +1302,16 @@ def iQMC(
     card["iqmc"]["krylov_restart"] = krylov_restart
 
 
-def weight_roulette(chance, wr_threshold):
+def weight_roulette(w_threshold=0.2, w_survive=1.0):
     """
-    Use weight roulette technique if neutron weight is below wr_threshold.
-
-    Neutron has 'chance' probability of having its weight increased
-    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
+    If neutron weight is below `w_threshold`, then enter weight rouelette
+    technique with survival weight `w_survive`.
 
     Parameters
     ----------
-    chance :
-        probability of survival
-    wr_threshold :
-        weight_roulette() is called on a particle if P['w'] <= wr_threshold
+    w_threshold : weight_roulette() is called on a particle if
+                  P['w'] <= wr_threshold
+    w_survive : survival weight
 
     Returns
     -------
@@ -1323,8 +1320,8 @@ def weight_roulette(chance, wr_threshold):
     """
     card = mcdc.input_deck.technique
     card["weight_roulette"] = True
-    card["wr_chance"] = chance
-    card["wr_threshold"] = wr_threshold
+    card["wr_threshold"] = w_threshold
+    card["wr_survive"] = w_survive
 
 
 def IC_generator(
