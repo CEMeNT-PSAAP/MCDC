@@ -720,7 +720,7 @@ def make_type_technique(input_deck):
     # =========================================================================
 
     # Constants
-    struct += [("wr_threshold", float64), ("wr_chance", float64)]
+    struct += [("wr_threshold", float64), ("wr_survive", float64)]
 
     # =========================================================================
     # Quasi Monte Carlo
@@ -1049,7 +1049,6 @@ def make_type_global(input_deck):
     # Particle bank types
     bank_active = particle_bank(1 + bank_active_buff)
     if input_deck.setting["mode_eigenvalue"] or input_deck.setting["N_census"] > 1:
-        print(int((1 + bank_census_buff) * N_work))
         bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
         bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
     else:
