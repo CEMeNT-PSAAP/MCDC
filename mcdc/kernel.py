@@ -624,6 +624,21 @@ def sample_discrete(group, P):
             return i
 
 
+@njit
+def sample_piecewise_linear(cdf, P):
+    xi = rng(P)
+
+    # Get bin
+    idx = binary_search(xi, cdf[1])
+
+    # Linear interpolation
+    x1 = cdf[1, idx]
+    x2 = cdf[1, idx + 1]
+    y1 = cdf[0, idx]
+    y2 = cdf[0, idx + 1]
+    return y1 + (xi - x1) * (y2 - y1) / (x2 - x1)
+
+
 # =============================================================================
 # Random number generator
 #   LCG with hash seed-split
@@ -750,7 +765,14 @@ def source_particle(seed, mcdc):
         uz = source["uz"]
 
     # Energy and time
-    g = sample_discrete(source["group"], P)
+    if mcdc["setting"]["mode_MG"]:
+        g = sample_discrete(source["group"], P)
+        E = 0.0
+    else:
+        g = 0
+        E = sample_piecewise_linear(source["energy"], P)
+
+    # Time
     t = sample_uniform(source["time"][0], source["time"][1], P)
 
     # Make and return particle
@@ -762,6 +784,7 @@ def source_particle(seed, mcdc):
     P["uy"] = uy
     P["uz"] = uz
     P["g"] = g
+    P["E"] = E
     P["w"] = 1.0
 
     P["sensitivity_ID"] = 0
@@ -811,6 +834,7 @@ def get_particle(bank, mcdc):
     P["uy"] = P_rec["uy"]
     P["uz"] = P_rec["uz"]
     P["g"] = P_rec["g"]
+    P["E"] = P_rec["E"]
     P["w"] = P_rec["w"]
     P["rng_seed"] = P_rec["rng_seed"]
 
@@ -1423,7 +1447,10 @@ def get_particle_material(P, mcdc):
 
 @njit
 def get_particle_speed(P, mcdc):
-    return mcdc["materials"][P["material_ID"]]["speed"][P["g"]]
+    if mcdc["setting"]["mode_MG"]:
+        return mcdc["materials"][P["material_ID"]]["speed"][P["g"]]
+    else:
+        return math.sqrt(P["E"]) * SQRT_E_TO_SPEED
 
 
 @njit
@@ -1437,6 +1464,7 @@ def copy_particle(P):
     P_new["uy"] = P["uy"]
     P_new["uz"] = P["uz"]
     P_new["g"] = P["g"]
+    P_new["E"] = P["E"]
     P_new["w"] = P["w"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
@@ -1765,6 +1793,7 @@ def mesh_get_index(P, mesh):
         or P["z"] > mesh["z"][-1]
     ):
         outside = True
+        return 0, 0, 0, 0, outside
 
     t = binary_search(P["t"], mesh["t"])
     x = binary_search(P["x"], mesh["x"])
@@ -1793,8 +1822,18 @@ def mesh_get_angular_index(P, mesh):
 
 
 @njit
-def mesh_get_energy_index(P, mesh):
-    return binary_search(P["g"], mesh["g"])
+def mesh_get_energy_index(P, mesh, mcdc):
+    # Check if outside grid
+    outside = False
+
+    if mcdc["setting"]["mode_MG"]:
+        return binary_search(P["g"], mesh["g"]), outside
+    else:
+        E = P["E"]
+        if E < mesh["g"][0] or E > mesh["g"][-1]:
+            outside = True
+            return 0, outside
+        return binary_search(P["E"], mesh["g"]), outside
 
 
 @njit
@@ -1848,10 +1887,10 @@ def score_tracklength(P, distance, mcdc):
     s = P["sensitivity_ID"]
     t, x, y, z, outside = mesh_get_index(P, tally["mesh"])
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
+    g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
 
     # Outside grid?
-    if outside:
+    if outside or outside_energy:
         return
 
     # Score
@@ -1859,13 +1898,13 @@ def score_tracklength(P, distance, mcdc):
     if tally["flux"]:
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["flux"])
     if tally["density"]:
-        flux /= material["speed"][g]
+        flux /= get_particle_speed(P, mcdc)
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["density"])
     if tally["fission"]:
-        flux *= material["fission"][g]
+        flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["fission"])
     if tally["total"]:
-        flux *= material["total"][g]
+        flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
         score_flux(s, g, t, x, y, z, mu, azi, flux, tally["score"]["total"])
     if tally["current"]:
         score_current(s, g, t, x, y, z, flux, P, tally["score"]["current"])
@@ -1880,8 +1919,13 @@ def score_exit(P, x, mcdc):
 
     s = P["sensitivity_ID"]
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g = mesh_get_energy_index(P, tally["mesh"])
+    g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
 
+    # Outside grid?
+    if outside_energy:
+        return
+
+    # Score
     flux = P["w"] / abs(P["ux"])
     score_flux(s, g, 0, x, 0, 0, mu, azi, flux, tally["score"]["exit"])
 
@@ -1999,17 +2043,11 @@ def tally_closeout(mcdc):
 @njit
 def eigenvalue_tally(P, distance, mcdc):
     tally = mcdc["tally"]
-
-    # TODO: Consider multi-nuclide material
-    material = mcdc["nuclides"][P["material_ID"]]
-
-    # Parameters
+    material = mcdc["materials"][P["material_ID"]]
     flux = distance * P["w"]
-    g = P["g"]
-    nu = material["nu_f"][g]
-    SigmaT = material["total"][g]
-    SigmaF = material["fission"][g]
-    nuSigmaF = nu * SigmaF
+
+    # Get nu-fission
+    nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P, mcdc)
 
     # Fission production (needed even during inactive cycle)
     mcdc["eigenvalue_tally_nuSigmaF"] += flux * nuSigmaF
@@ -2025,11 +2063,27 @@ def eigenvalue_tally(P, distance, mcdc):
 
         # Precursor density
         J = material["J"]
-        nu_d = material["nu_d"][g]
-        decay = material["decay"]
+        SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+        # Get the decay-wighted multiplicity
         total = 0.0
-        for j in range(J):
-            total += nu_d[j] / decay[j]
+        if mcdc["setting"]["mode_MG"]:
+            g = P["g"]
+            for i in range(material["N_nuclide"]):
+                ID_nuclide = material["nuclide_IDs"][i]
+                nuclide = mcdc["nuclides"][ID_nuclide]
+                for j in range(J):
+                    nu_d = nuclide["nu_d"][g, j]
+                    decay = nuclide["decay"][j]
+                    total += nu_d / decay
+        else:
+            E = P["E"]
+            for i in range(material["N_nuclide"]):
+                ID_nuclide = material["nuclide_IDs"][i]
+                nuclide = mcdc["nuclides"][ID_nuclide]
+                for j in range(J):
+                    nu_d = get_nu(NU_FISSION_DELAYED, nuclide, E, j)
+                    decay = nuclide["ce_decay"][j]
+                    total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
         mcdc["eigenvalue_tally_C"] += C_density
         # Maximum precursor density
@@ -2292,7 +2346,7 @@ def move_to_event(P, mcdc):
 def distance_to_collision(P, mcdc):
     # Get total cross-section
     material = mcdc["materials"][P["material_ID"]]
-    SigmaT = material["total"][P["g"]]
+    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
 
     # Vacuum material?
     if SigmaT == 0.0:
@@ -2487,10 +2541,10 @@ def collision(P, mcdc):
     # Get the reaction cross-sections
     material = mcdc["materials"][P["material_ID"]]
     g = P["g"]
-    SigmaT = material["total"][g]
-    SigmaC = material["capture"][g]
-    SigmaS = material["scatter"][g]
-    SigmaF = material["fission"][g]
+    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+    SigmaS = get_MacroXS(XS_SCATTER, material, P, mcdc)
+    SigmaC = get_MacroXS(XS_CAPTURE, material, P, mcdc)
+    SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
 
     # Implicit capture
     if mcdc["technique"]["implicit_capture"]:
@@ -2547,13 +2601,14 @@ def scattering(P, mcdc):
         weight_eff = 1.0
         weight_new = P["w"]
 
-    # Get production factor
+    # Get number of secondaries
     material = mcdc["materials"][P["material_ID"]]
     g = P["g"]
-    nu_s = material["nu_s"][g]
-
-    # Get number of secondaries
-    N = int(math.floor(weight_eff * nu_s + rng(P)))
+    if mcdc["setting"]["mode_MG"]:
+        nu_s = material["nu_s"][g]
+        N = int(math.floor(weight_eff * nu_s + rng(P)))
+    else:
+        N = 1
 
     for n in range(N):
         # Create new particle
@@ -2563,25 +2618,54 @@ def scattering(P, mcdc):
         P_new["w"] = weight_new
 
         # Sample scattering phase space
-        sample_phasespace_scattering(P, material, P_new)
+        sample_phasespace_scattering(P, material, P_new, mcdc)
 
         # Bank
         add_particle(P_new, mcdc["bank_active"])
 
 
 @njit
-def sample_phasespace_scattering(P, material, P_new):
-    # Get outgoing spectrum
-    g = P["g"]
-    G = material["G"]
-    chi_s = material["chi_s"][g]
-
+def sample_phasespace_scattering(P, material, P_new, mcdc):
     # Copy relevant attributes
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
     P_new["t"] = P["t"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
+
+    if mcdc["setting"]["mode_MG"]:
+        scattering_MG(P, material, P_new)
+    else:
+        scattering_CE(P, material, P_new, mcdc)
+
+
+@njit
+def sample_phasespace_scattering_nuclide(P, nuclide, P_new, mcdc):
+    # Copy relevant attributes
+    P_new["x"] = P["x"]
+    P_new["y"] = P["y"]
+    P_new["z"] = P["z"]
+    P_new["t"] = P["t"]
+    P_new["sensitivity_ID"] = P["sensitivity_ID"]
+
+    scattering_MG(P, nuclide, P_new)
+
+
+@njit
+def scattering_MG(P, material, P_new):
+    # Sample scattering angle
+    mu0 = 2.0 * rng(P_new) - 1.0
+
+    # Scatter direction
+    azi = 2.0 * PI * rng(P_new)
+    P_new["ux"], P_new["uy"], P_new["uz"] = scatter_direction(
+        P["ux"], P["uy"], P["uz"], mu0, azi
+    )
+
+    # Get outgoing spectrum
+    g = P["g"]
+    G = material["G"]
+    chi_s = material["chi_s"][g]
 
     # Sample outgoing energy
     xi = rng(P_new)
@@ -2592,35 +2676,161 @@ def sample_phasespace_scattering(P, material, P_new):
             break
     P_new["g"] = g_out
 
-    # Sample scattering angle
-    mu = 2.0 * rng(P_new) - 1.0
 
-    # Sample azimuthal direction
-    azi = 2.0 * PI * rng(P_new)
+@njit
+def scattering_CE(P, material, P_new, mcdc):
+    """
+    Scatter with sampled scattering angle mu0, with nucleus mass A
+    Scattering is treated in Center of mass (COM) frame
+    Current model:
+      - Free gas scattering
+      - Constant thermal cross section
+      - Isotropic in COM
+    """
+    # Sample nuclide
+    nuclide = sample_nuclide(material, P, XS_SCATTER, mcdc)
+    xi = rng(P) * get_MacroXS(XS_SCATTER, material, P, mcdc)
+    tot = 0.0
+    for i in range(material["N_nuclide"]):
+        ID_nuclide = material["nuclide_IDs"][i]
+        nuclide = mcdc["nuclides"][ID_nuclide]
+        N = material["nuclide_densities"][i]
+        tot += N * get_microXS(XS_SCATTER, nuclide, P["E"])
+        if tot > xi:
+            break
+
+    # Sample nucleus thermal speed
+    A = nuclide["A"]
+    if P["E"] > E_THERMAL_THRESHOLD:
+        Vx = 0.0
+        Vy = 0.0
+        Vz = 0.0
+    else:
+        Vx, Vy, Vz = sample_nucleus_speed(A, P, mcdc)
+
+    # =========================================================================
+    # COM kinematics
+    # =========================================================================
+
+    # Particle speed
+    P_speed = get_particle_speed(P, mcdc)
+
+    # Neutron velocity - LAB
+    vx = P_speed * P["ux"]
+    vy = P_speed * P["uy"]
+    vz = P_speed * P["uz"]
+
+    # COM velocity
+    COM_x = (vx + A * Vx) / (1.0 + A)
+    COM_y = (vy + A * Vy) / (1.0 + A)
+    COM_z = (vz + A * Vz) / (1.0 + A)
+
+    # Neutron velocity - COM
+    vx = vx - COM_x
+    vy = vy - COM_y
+    vz = vz - COM_z
+
+    # Neutron speed - COM
+    P_speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+
+    # Neutron initial direction - COM
+    ux = vx / P_speed
+    uy = vy / P_speed
+    uz = vz / P_speed
+
+    # Scatter the direction in COM
+    mu0 = 2.0 * rng(P) - 1.0
+    azi = 2.0 * PI * rng(P)
+    ux_new, uy_new, uz_new = scatter_direction(ux, uy, uz, mu0, azi)
+
+    # Neutron final velocity - COM
+    vx = P_speed * ux_new
+    vy = P_speed * uy_new
+    vz = P_speed * uz_new
+
+    # =========================================================================
+    # COM to LAB
+    # =========================================================================
+
+    # Final velocity - LAB
+    vx = vx + COM_x
+    vy = vy + COM_y
+    vz = vz + COM_z
+
+    # Final energy - LAB
+    P_speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+    P_new["E"] = 5.2270376e-13 * P_speed * P_speed
+    # constant: 0.5 / (1.60217662e-19 J/eV) * (1.674927471e-27 kg) / (10000 cm^2/m^2)
+
+    # Final direction - LAB
+    P_new["ux"] = vx / P_speed
+    P_new["uy"] = vy / P_speed
+    P_new["uz"] = vz / P_speed
+
+
+@njit
+def sample_nucleus_speed(A, P, mcdc):
+    # Particle speed
+    P_speed = get_particle_speed(P, mcdc)
+
+    # Maxwellian parameter
+    beta = math.sqrt(2.0659834e-11 * A)
+    # The constant above is
+    #   (1.674927471e-27 kg) / (1.38064852e-19 cm^2 kg s^-2 K^-1) / (293.6 K)/2
+
+    # Sample nuclide speed candidate V_tilda and
+    #   nuclide-neutron polar cosine candidate mu_tilda via
+    #   rejection sampling
+    y = beta * P_speed
+    while True:
+        if rng(P) < 2.0 / (2.0 + PI_SQRT * y):
+            x = math.sqrt(-math.log(rng(P) * rng(P)))
+        else:
+            cos_val = math.cos(PI_HALF * rng(P))
+            x = math.sqrt(-math.log(rng(P)) - math.log(rng(P)) * cos_val * cos_val)
+        V_tilda = x / beta
+        mu_tilda = 2.0 * rng(P) - 1.0
+
+        # Accept candidate V_tilda and mu_tilda?
+        if rng(P) > math.sqrt(
+            P_speed * P_speed + V_tilda * V_tilda - 2.0 * P_speed * V_tilda * mu_tilda
+        ) / (P_speed + V_tilda):
+            break
+
+    # Set nuclide velocity - LAB
+    azi = 2.0 * PI * rng(P)
+    ux, uy, uz = scatter_direction(P["ux"], P["uy"], P["uz"], mu_tilda, azi)
+    Vx = ux * V_tilda
+    Vy = uy * V_tilda
+    Vz = uz * V_tilda
+
+    return Vx, Vy, Vz
+
+
+@njit
+def scatter_direction(ux, uy, uz, mu0, azi):
     cos_azi = math.cos(azi)
     sin_azi = math.sin(azi)
-    Ac = (1.0 - mu**2) ** 0.5
-
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
+    Ac = (1.0 - mu0**2) ** 0.5
 
     if uz != 1.0:
-        B = (1.0 - P["uz"] ** 2) ** 0.5
+        B = (1.0 - uz**2) ** 0.5
         C = Ac / B
 
-        P_new["ux"] = ux * mu + (ux * uz * cos_azi - uy * sin_azi) * C
-        P_new["uy"] = uy * mu + (uy * uz * cos_azi + ux * sin_azi) * C
-        P_new["uz"] = uz * mu - cos_azi * Ac * B
+        ux_new = ux * mu0 + (ux * uz * cos_azi - uy * sin_azi) * C
+        uy_new = uy * mu0 + (uy * uz * cos_azi + ux * sin_azi) * C
+        uz_new = uz * mu0 - cos_azi * Ac * B
 
     # If dir = 0i + 0j + k, interchange z and y in the scattering formula
     else:
         B = (1.0 - uy**2) ** 0.5
         C = Ac / B
 
-        P_new["ux"] = ux * mu + (ux * uy * cos_azi - uz * sin_azi) * C
-        P_new["uz"] = uz * mu + (uz * uy * cos_azi + ux * sin_azi) * C
-        P_new["uy"] = uy * mu - cos_azi * Ac * B
+        ux_new = ux * mu0 + (ux * uy * cos_azi - uz * sin_azi) * C
+        uz_new = uz * mu0 + (uz * uy * cos_azi + ux * sin_azi) * C
+        uy_new = uy * mu0 - cos_azi * Ac * B
+
+    return ux_new, uy_new, uz_new
 
 
 # =============================================================================
@@ -2633,11 +2843,6 @@ def fission(P, mcdc):
     # Kill the current particle
     P["alive"] = False
 
-    # Get production factor
-    material = mcdc["materials"][P["material_ID"]]
-    g = P["g"]
-    nu = material["nu_f"][g]
-
     # Get effective and new weight
     if mcdc["technique"]["weighted_emission"]:
         weight_eff = P["w"]
@@ -2646,7 +2851,18 @@ def fission(P, mcdc):
         weight_eff = 1.0
         weight_new = P["w"]
 
+    # Sample nuclide if CE
+    material = mcdc["materials"][P["material_ID"]]
+    nuclide = mcdc["nuclides"][0]  # Default nuclide, will be resampled for CE
+
     # Get number of secondaries
+    if mcdc["setting"]["mode_MG"]:
+        g = P["g"]
+        nu = material["nu_f"][g]
+    else:
+        nuclide = sample_nuclide(material, P, XS_FISSION, mcdc)
+        E = P["E"]
+        nu = get_nu(NU_FISSION, nuclide, E)
     N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P)))
 
     for n in range(N):
@@ -2656,15 +2872,21 @@ def fission(P, mcdc):
         # Set weight
         P_new["w"] = weight_new
 
-        # Sample scattering phase space
-        sample_phasespace_fission(P, material, P_new, mcdc)
+        # Sample fission neutron phase space
+        if mcdc["setting"]["mode_MG"]:
+            sample_phasespace_fission(P, material, P_new, mcdc)
+        else:
+            sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc)
 
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
             continue
 
         # Bank
-        if mcdc["setting"]["mode_eigenvalue"]:
+        idx_census = mcdc["idx_census"]
+        if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
+            add_particle(P_new, mcdc["bank_census"])
+        elif mcdc["setting"]["mode_eigenvalue"]:
             add_particle(P_new, mcdc["bank_census"])
         else:
             add_particle(P_new, mcdc["bank_active"])
@@ -2711,7 +2933,7 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
                     spectrum = nuclide["chi_d"][j]
                     decay = nuclide["decay"][j]
                     break
-                SigmaF = material["fission"][g]
+                SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
                 xi = rng(P_new) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
@@ -2742,15 +2964,6 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
 
 @njit
 def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
-    # Get constants
-    G = nuclide["G"]
-    J = nuclide["J"]
-    g = P["g"]
-    nu = nuclide["nu_f"][g]
-    nu_p = nuclide["nu_p"][g]
-    if J > 0:
-        nu_d = nuclide["nu_d"][g]
-
     # Copy relevant attributes
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -2760,6 +2973,23 @@ def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
 
     # Sample isotropic direction
     P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(P_new)
+
+    if mcdc["setting"]["mode_MG"]:
+        fission_MG(P, nuclide, P_new)
+    else:
+        fission_CE(P, nuclide, P_new)
+
+
+@njit
+def fission_MG(P, nuclide, P_new):
+    # Get constants
+    G = nuclide["G"]
+    J = nuclide["J"]
+    g = P["g"]
+    nu = nuclide["nu_f"][g]
+    nu_p = nuclide["nu_p"][g]
+    if J > 0:
+        nu_d = nuclide["nu_d"][g]
 
     # Prompt or delayed?
     xi = rng(P_new) * nu
@@ -2793,6 +3023,72 @@ def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
         P_new["t"] -= math.log(xi) / decay
 
 
+@njit
+def fission_CE(P, nuclide, P_new):
+    # Get constants
+    E = P["E"]
+    J = 6
+    nu = get_nu(NU_FISSION, nuclide, E)
+    nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
+    nu_d = np.zeros(J)
+    for j in range(J):
+        nu_d[j] = get_nu(NU_FISSION_DELAYED, nuclide, E, j)
+
+    # Delayed?
+    prompt = True
+    delayed_group = -1
+    xi = rng(P_new) * nu
+    tot = nu_p
+    if xi > tot:
+        prompt = False
+
+        # Determine delayed group
+        for j in range(J):
+            tot += nu_d[j]
+            if xi < tot:
+                delayed_group = j
+                break
+
+    # Sample outgoing energy
+    if prompt:
+        E_chi = nuclide["E_chi_p"]
+        NE_chi = nuclide["NE_chi_p"]
+        chi = nuclide["ce_chi_p"]
+        P_new["E"] = sample_Eout(
+            P_new, nuclide["E_chi_p"], nuclide["NE_chi_p"], nuclide["ce_chi_p"]
+        )
+    else:
+        if delayed_group == 0:
+            P_new["E"] = sample_Eout(
+                P_new, nuclide["E_chi_d1"], nuclide["NE_chi_d1"], nuclide["ce_chi_d1"]
+            )
+        elif delayed_group == 1:
+            P_new["E"] = sample_Eout(
+                P_new, nuclide["E_chi_d2"], nuclide["NE_chi_d2"], nuclide["ce_chi_d2"]
+            )
+        elif delayed_group == 2:
+            P_new["E"] = sample_Eout(
+                P_new, nuclide["E_chi_d3"], nuclide["NE_chi_d3"], nuclide["ce_chi_d3"]
+            )
+        elif delayed_group == 3:
+            P_new["E"] = sample_Eout(
+                P_new, nuclide["E_chi_d4"], nuclide["NE_chi_d4"], nuclide["ce_chi_d4"]
+            )
+        elif delayed_group == 4:
+            P_new["E"] = sample_Eout(
+                P_new, nuclide["E_chi_d5"], nuclide["NE_chi_d5"], nuclide["ce_chi_d5"]
+            )
+        else:
+            P_new["E"] = sample_Eout(
+                P_new, nuclide["E_chi_d6"], nuclide["NE_chi_d6"], nuclide["ce_chi_d6"]
+            )
+
+    # Sample emission time
+    if not prompt:
+        xi = rng(P_new)
+        P_new["t"] -= math.log(xi) / nuclide["ce_decay"][delayed_group]
+
+
 # =============================================================================
 # Branchless collision
 # =============================================================================
@@ -2800,70 +3096,32 @@ def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
 
 @njit
 def branchless_collision(P, mcdc):
-    # Data
-    # TODO: Consider multi-nuclide material
-    material = mcdc["nuclides"][P["material_ID"]]
-    w = P["w"]
-    g = P["g"]
-    SigmaT = material["total"][g]
-    SigmaF = material["fission"][g]
-    SigmaS = material["scatter"][g]
-    nu_s = material["nu_s"][g]
-    nu_p = material["nu_p"][g] / mcdc["k_eff"]
-    nu_d = material["nu_d"][g] / mcdc["k_eff"]
-    J = material["J"]
-    G = material["G"]
+    material = mcdc["materials"][P["material_ID"]]
 
-    # Total nu fission
-    nu = material["nu_f"][g]
-
-    # Set weight
-    n_scatter = nu_s * SigmaS
-    n_fission = nu * SigmaF
+    # Adjust weight
+    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+    n_scatter = get_MacroXS(XS_NU_SCATTER, material, P, mcdc)
+    n_fission = get_MacroXS(XS_NU_FISSION, material, P, mcdc) / mcdc["k_eff"]
     n_total = n_fission + n_scatter
     P["w"] *= n_total / SigmaT
 
     # Set spectrum and decay rate
-    fission = True
-    prompt = True
     if rng(P) < n_scatter / n_total:
-        fission = False
-        spectrum = material["chi_s"][g]
+        sample_phasespace_scattering(P, material, P, mcdc)
     else:
-        xi = rng(P) * nu
-        tot = nu_p
-        if xi < tot:
-            spectrum = material["chi_p"][g]
+        if mcdc["setting"]["mode_MG"]:
+            sample_phasespace_fission(P, material, P, mcdc)
         else:
-            prompt = False
-            for j in range(J):
-                tot += nu_d[j]
-                if xi < tot:
-                    spectrum = material["chi_d"][j]
-                    decay = material["decay"][j]
-                    break
+            nuclide = sample_nuclide(material, P, XS_NU_FISSION, mcdc)
+            sample_phasespace_fission_nuclide(P, nuclide, P, mcdc)
 
-    # Set time
-    if not prompt:
-        xi = rng(P)
-        P["t"] -= math.log(xi) / decay
-
-        # Kill if it's beyond time boundary
-        if P["t"] > mcdc["setting"]["time_boundary"]:
-            P["alive"] = False
-            return
-
-    # Set energy
-    xi = rng(P)
-    tot = 0.0
-    for g_out in range(G):
-        tot += spectrum[g_out]
-        if tot > xi:
-            P["g"] = g_out
-            break
-
-    # Set direction (TODO: anisotropic scattering)
-    P["ux"], P["uy"], P["uz"] = sample_isotropic_direction(P)
+            # Beyond time census or time boundary?
+            idx_census = mcdc["idx_census"]
+            if P["t"] > mcdc["setting"]["census_time"][idx_census]:
+                P["alive"] = False
+                add_particle(split_particle(P), mcdc["bank_census"])
+            elif P["t"] > mcdc["setting"]["time_boundary"]:
+                P["alive"] = False
 
 
 # =============================================================================
@@ -3851,26 +4109,12 @@ def preconditioner(V, mcdc, num_sweeps=3):
 
 @njit
 def weight_roulette(P, mcdc):
-    """
-    If neutron weight below wr_threshold, then enter weight rouelette
-    technique. Neutron has 'chance' probability of having its weight increased
-    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
-
-    Parameters
-    ----------
-    P :
-    mcdc :
-
-    Returns
-    -------
-    None.
-
-    """
-    chance = mcdc["technique"]["wr_chance"]
-    x = rng(P)
-    if x <= chance:
-        P["iqmc"]["w"] /= chance
-        P["w"] /= chance
+    w_survive = mcdc["technique"]["wr_survive"]
+    prob_survive = P["w"] / w_survive
+    if rng(P) <= prob_survive:
+        P["w"] = w_survive
+        if mcdc["technique"]["iQMC"]:
+            P["iqmc"]["w"][:] = w_survive
     else:
         P["alive"] = False
 
@@ -3974,10 +4218,10 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
 
                 # Sample if it is from + or - component
                 if nuSigmaS_old > rng(P) * total_scatter:
-                    sample_phasespace_scattering(P, material_old, P_new)
+                    sample_phasespace_scattering(P, material_old, P_new, mcdc)
                     P_new["w"] = w_s * sign_old
                 else:
-                    sample_phasespace_scattering(P, material_new, P_new)
+                    sample_phasespace_scattering(P, material_new, P_new, mcdc)
                     P_new["w"] = w_s * sign_new
             else:
                 # Fission source
@@ -4086,7 +4330,9 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc):
                             tot += nusigmaS
                             if tot > xi:
                                 # Scattering source
-                                sample_phasespace_scattering(P, nuclide, P_new)
+                                sample_phasespace_scattering_nuclide(
+                                    P, nuclide, P_new, mcdc
+                                )
                                 P_new["sensitivity_ID"] = ID_source
                                 add_particle(P_new, mcdc["bank_active"])
                                 source_obtained = True
@@ -4188,7 +4434,7 @@ def sensitivity_material(P, mcdc):
             tot += nusigmaS
             if tot > xi:
                 # Scattering source
-                sample_phasespace_scattering(P, nuclide, P_new)
+                sample_phasespace_scattering_nuclide(P, nuclide, P_new, mcdc)
             else:
                 # Fission source
                 sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc)
@@ -4243,14 +4489,200 @@ def get_DSM_ID(ID1, ID2, Np):
 
 
 # =============================================================================
+# Continuous Energy Physics
+# =============================================================================
+
+
+@njit
+def get_MacroXS(type_, material, P, mcdc):
+    # Multigroup XS
+    g = P["g"]
+    if mcdc["setting"]["mode_MG"]:
+        # Cross sections
+        if type_ == XS_TOTAL:
+            return material["total"][g]
+        elif type_ == XS_SCATTER:
+            return material["scatter"][g]
+        elif type_ == XS_CAPTURE:
+            return material["capture"][g]
+        elif type_ == XS_FISSION:
+            return material["fission"][g]
+
+        # Productions
+        elif type_ == XS_NU_SCATTER:
+            nu = material["nu_s"][g]
+            scatter = material["scatter"][g]
+            return nu * scatter
+        elif type_ == XS_NU_FISSION:
+            nu = material["nu_f"][g]
+            fission = material["fission"][g]
+            return nu * fission
+        elif type_ == XS_NU_FISSION_PROMPT:
+            nu_p = material["nu_p"][g]
+            fission = material["fission"][g]
+            return nu_p * fission
+        elif type_ == XS_NU_FISSION_DELAYED:
+            nu_d = 0.0
+            for j in range(material["J"]):
+                nu_d += material["nu_d"][g, j]
+            fission = material["fission"][g]
+            return nu_d * fission
+
+    # Continuous-energy XS
+    MacroXS = 0.0
+    E = P["E"]
+
+    # Sum over all nuclides
+    for i in range(material["N_nuclide"]):
+        ID_nuclide = material["nuclide_IDs"][i]
+        nuclide = mcdc["nuclides"][ID_nuclide]
+
+        # Get nuclide density
+        N = material["nuclide_densities"][i]
+
+        # Get microscopic cross-section
+        microXS = get_microXS(type_, nuclide, E)
+
+        # Accumulate
+        MacroXS += N * microXS
+
+    return MacroXS
+
+
+@njit
+def get_microXS(type_, nuclide, E):
+    # Cross sections
+    if type_ == XS_TOTAL:
+        data = nuclide["ce_total"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+    elif type_ == XS_SCATTER:
+        data = nuclide["ce_scatter"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+    elif type_ == XS_CAPTURE:
+        data = nuclide["ce_capture"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+    elif type_ == XS_FISSION:
+        if not nuclide["fissionable"]:
+            return 0.0
+        data = nuclide["ce_fission"]
+        return get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+
+    # Binary Multiplicities
+    elif type_ == XS_NU_SCATTER:
+        data = nuclide["ce_scatter"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = 1.0
+        return nu * xs
+    elif type_ == XS_NU_FISSION:
+        if not nuclide["fissionable"]:
+            return 0.0
+        data = nuclide["ce_fission"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = get_nu(NU_FISSION, nuclide, E)
+        return nu * xs
+    elif type_ == XS_NU_FISSION_PROMPT:
+        if not nuclide["fissionable"]:
+            return 0.0
+        data = nuclide["ce_fission"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = get_nu(NU_FISSION_PROMPT, nuclide, E)
+        return nu * xs
+    elif type_ == XS_NU_FISSION_DELAYED:
+        if not nuclide["fissionable"]:
+            return 0.0
+        data = nuclide["ce_fission"]
+        xs = get_XS(data, E, nuclide["E_xs"], nuclide["NE_xs"])
+        nu = get_nu(NU_FISSION_DELAYED, nuclide, E)
+        return nu * xs
+
+
+@njit
+def get_XS(data, E, E_grid, NE):
+    # Search XS energy bin index
+    idx = binary_search(E, E_grid, NE)
+
+    # Extrapolate if E is outside the given data
+    if idx == -1:
+        idx = 0
+    elif idx + 1 == NE:
+        idx -= 1
+
+    # Linear interpolation
+    E1 = E_grid[idx]
+    E2 = E_grid[idx + 1]
+    XS1 = data[idx]
+    XS2 = data[idx + 1]
+
+    return XS1 + (E - E1) * (XS2 - XS1) / (E2 - E1)
+
+
+@njit
+def get_nu(type_, nuclide, E, group=-1):
+    if type_ == NU_FISSION:
+        nu = get_XS(nuclide["ce_nu_p"], E, nuclide["E_nu_p"], nuclide["NE_nu_p"])
+        for i in range(6):
+            nu += get_XS(
+                nuclide["ce_nu_d"][i], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
+            )
+        return nu
+
+    if type_ == NU_FISSION_PROMPT:
+        return get_XS(nuclide["ce_nu_p"], E, nuclide["E_nu_p"], nuclide["NE_nu_p"])
+
+    if type_ == NU_FISSION_DELAYED and group == -1:
+        tot = 0.0
+        for i in range(6):
+            tot += get_XS(
+                nuclide["ce_nu_d"][i], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
+            )
+        return tot
+
+    if type_ == NU_FISSION_DELAYED and group != -1:
+        return get_XS(
+            nuclide["ce_nu_d"][group], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
+        )
+
+
+@njit
+def sample_nuclide(material, P, type_, mcdc):
+    xi = rng(P) * get_MacroXS(type_, material, P, mcdc)
+    tot = 0.0
+    for i in range(material["N_nuclide"]):
+        ID_nuclide = material["nuclide_IDs"][i]
+        nuclide = mcdc["nuclides"][ID_nuclide]
+
+        N = material["nuclide_densities"][i]
+        tot += N * get_microXS(type_, nuclide, P["E"])
+        if tot > xi:
+            break
+
+    return nuclide
+
+
+@njit
+def sample_Eout(P_new, E_grid, NE, chi):
+    xi = rng(P_new)
+
+    # Determine bin index
+    idx = binary_search(xi, chi, NE)
+
+    # Linear interpolation
+    E1 = E_grid[idx]
+    E2 = E_grid[idx + 1]
+    chi1 = chi[idx]
+    chi2 = chi[idx + 1]
+    return E1 + (xi - chi1) * (E2 - E1) / (chi2 - chi1)
+
+
+# =============================================================================
 # Miscellany
 # =============================================================================
 
 
 @njit
-def binary_search(val, grid):
+def binary_search(val, grid, length=0):
     """
-    Binary search that returns the bin index of a value val given grid grid
+    Binary search that returns the bin index of the value `val` given grid `grid`.
 
     Some special cases:
         val < min(grid)  --> -1
@@ -4260,7 +4692,10 @@ def binary_search(val, grid):
     """
 
     left = 0
-    right = len(grid) - 1
+    if length == 0:
+        right = len(grid) - 1
+    else:
+        right = length - 1
     mid = -1
     while left <= right:
         mid = int((left + right) / 2)
