@@ -7,7 +7,7 @@ import numba
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.print_ import print_error
+from mcdc.print_ import print_error, print_msg
 from mcdc.type_ import score_list, iqmc_score_list
 from mcdc.loop import loop_source
 

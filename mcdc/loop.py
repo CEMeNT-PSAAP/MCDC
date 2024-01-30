@@ -16,6 +16,7 @@ from mcdc.print_ import (
     print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
+    print_msg,
 )
 
 
@@ -280,8 +281,7 @@ def loop_source_dd(seed, mcdc):
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        if mcdc["mpi_work_size"] > 0:
-            percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
+        percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
@@ -324,15 +324,16 @@ def loop_source_dd(seed, mcdc):
             kernel.dd_particle_send(mcdc)
 
         kernel.dd_particle_receive(mcdc)
-
         work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-
+        print_msg("\rWork remaining:" + str(work_remaining))
         if work_remaining == 0:
             wr_new += 1
         else:
             wr_new = 0
         if wr_new > 4:
             terminated = True
+
+        # Progress printout
 
 
 # =========================================================================
@@ -393,13 +394,17 @@ def loop_particle(P, mcdc):
         # Surface crossing
         if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
+            if event & EVENT_DOMAIN:
+                if not (
+                    mcdc["surfaces"][P["surface_ID"]]["reflective"]
+                    or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
+                ):
+                    kernel.domain_crossing(P, mcdc)
 
         # Lattice or mesh crossing (skipped if surface crossing)
         elif event & EVENT_LATTICE or event & EVENT_MESH:
             kernel.shift_particle(P, SHIFT)
-
-        if event & EVENT_DOMAIN:
-            if not (event & EVENT_SURFACE):
+            if event & EVENT_DOMAIN:
                 kernel.domain_crossing(P, mcdc)
 
         # Moving surface transition
