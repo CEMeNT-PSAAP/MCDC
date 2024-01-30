@@ -2,7 +2,7 @@ import numpy as np
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode, jit
 from scipy.linalg import eig
-from mpi4py import MPI
+
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
@@ -213,13 +213,10 @@ def loop_source(seed, mcdc):
 # =============================================================================
 @njit
 def loop_source_dd(seed, mcdc):
-    j = 0
     # Progress bar indicator
     N_prog = 0
-
+    
     # Loop over particle sources
-    sourced_num = 0
-
     work_start = mcdc["mpi_work_start"]
     work_end = work_start + mcdc["mpi_work_size"]
     for work_idx in range(work_start, work_end):
@@ -232,9 +229,6 @@ def loop_source_dd(seed, mcdc):
         # Get a source particle and put into active bank
         # =====================================================================
 
-        # Nonblocking recieve if domain decomp
-        # kernel.dd_particle_receive(mcdc)
-
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
@@ -243,15 +237,15 @@ def loop_source_dd(seed, mcdc):
 
             else:
                 P = kernel.source_particle(seed_work, mcdc)
-            P["w"] /= mcdc["technique"]["work_ratio"][mcdc["d_idx"]]
+            if mcdc["technique"]["work_ratio"][mcdc["d_idx"]]>0:
+                P["w"] /= mcdc["technique"]["work_ratio"][mcdc["d_idx"]]
         # Get from source bank
         else:
             P = mcdc["bank_source"]["particles"][work_idx]
-
+    
         # Check if it is beyond current census index
         idx_census = mcdc["idx_census"]
         if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-            P["t"] += SHIFT
             if kernel.particle_in_domain(P, mcdc):
                 kernel.add_particle(P, mcdc["bank_census"])
         else:
@@ -261,43 +255,39 @@ def loop_source_dd(seed, mcdc):
 
         # =====================================================================
         # Run the source particle and its secondaries
-        # =====================================================================
-
+        # ========================================== ===========================
+    
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
             # Get particle from active bank
             P = kernel.get_particle(mcdc["bank_active"], mcdc)
             if not kernel.particle_in_domain(P, mcdc):
                 print("particle not in domain")
-                input()
+        
             # Apply weight window
             if mcdc["technique"]["weight_window"]:
                 kernel.weight_window(P, mcdc)
-
+        
             # Particle tracker
             if mcdc["setting"]["track_particle"]:
                 mcdc["particle_track_particle_ID"] += 1
 
             # Particle loop
             loop_particle(P, mcdc)
-
+    
         # Tally history closeout for one-batch fixed-source simulation
         if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
+        if mcdc["mpi_work_size"] > 0: 
+            percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
-    rank = MPI.COMM_WORLD.Get_rank()
+    
     kernel.dd_particle_send(mcdc)
-    proc = mcdc["mpi_rank"]
-    # f = open('dd_tally'+str(proc)+'.csv','a')
-    # f.write('recieving,\n')
-    # print("Done sourcing particles, running remaining particles")
     terminated = False
     kernel.dd_particle_receive(mcdc)
     wr_new = 0
@@ -310,44 +300,7 @@ def loop_source_dd(seed, mcdc):
                 # kernel.score_tracklength(P, SHIFT, mcdc)
                 # kernel.shift_particle(P,-SHIFT)
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    d_idx = mcdc["d_idx"]
-                    d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
-                    d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
-                    d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
-
-                    d_iz = int(d_idx / (d_Nx * d_Ny))
-                    d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
-                    d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
-
-                    x_cell = kernel.binary_search(
-                        P["x"], mcdc["technique"]["domain_mesh"]["x"]
-                    )
-                    y_cell = kernel.binary_search(
-                        P["y"], mcdc["technique"]["domain_mesh"]["y"]
-                    )
-                    z_cell = kernel.binary_search(
-                        P["z"], mcdc["technique"]["domain_mesh"]["z"]
-                    )
-                    print(
-                        "recieved particle not in domain, position:",
-                        P["x"],
-                        P["y"],
-                        P["z"],
-                        ", speed: ",
-                        P["ux"],
-                        P["uy"],
-                        P["uz"],
-                        ", cell:",
-                        x_cell,
-                        y_cell,
-                        z_cell,
-                        ", domain: ",
-                        mcdc["d_idx"],
-                        ", mesh",
-                        mcdc["technique"]["domain_mesh"]["x"][d_ix],
-                        mcdc["technique"]["domain_mesh"]["y"][d_iy],
-                        mcdc["technique"]["domain_mesh"]["z"][d_iz],
-                    )
+                    print("recieved particle not in domain, position:")
 
                 # kernel.shift_particle(P, -1*SHIFT)
 
@@ -380,7 +333,7 @@ def loop_source_dd(seed, mcdc):
             wr_new = 0
         if wr_new > 4:
             terminated = True
-
+    
 
 # =========================================================================
 # Particle loop
@@ -402,6 +355,7 @@ def loop_particle(P, mcdc):
         # Determine and move to event
         kernel.move_to_event(P, mcdc)
         event = P["event"]
+
         # The & operator here is a bitwise and.
         # It is used to determine if an event type is part of the particle event.
 
@@ -467,21 +421,7 @@ def loop_particle(P, mcdc):
             else:
                 if not (event & EVENT_LATTICE or event & EVENT_MESH):
                     kernel.shift_particle(P, SHIFT)
-                """
-                mesh = mcdc["technique"]["domain_mesh"]
-                d_idx = mcdc["d_idx"]
-                d_Nx = mcdc["technique"]["domain_mesh"]["x"].size - 1
-                d_Ny = mcdc["technique"]["domain_mesh"]["y"].size - 1
-                d_Nz = mcdc["technique"]["domain_mesh"]["z"].size - 1
 
-                d_iz = int(d_idx / (d_Nx * d_Ny))
-                d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
-                d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
-                kernel.shift_particle(P, 4 * SHIFT)
-                t2, x2, y2, z2, outside2 = kernel.mesh_get_index(P, mesh)
-                kernel.shift_particle(P, -4 * SHIFT)
-                if x2!=d_ix or y2!=d_iy or z2!=d_iz:
-                """
                 kernel.domain_crossing(P, mcdc)
 
         # Apply weight window

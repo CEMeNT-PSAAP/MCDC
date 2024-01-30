@@ -1075,13 +1075,13 @@ def make_type_global(input_deck):
     bank_precursor = precursor_bank(0)
 
     # Domain banks if needed
-    if card.technique["domain_decomp"]:
-        bank_domain_xp = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_xn = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_yp = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_yn = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_zp = particle_bank(card.technique["domain_bank_size"])
-        bank_domain_zn = particle_bank(card.technique["domain_bank_size"])
+    if input_deck.technique["domain_decomp"]:
+        bank_domain_xp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_xn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_yp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_yn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_zp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_zn = particle_bank(input_deck.technique["domain_bank_size"])
     else:
         bank_domain_xp = particle_bank(0)
         bank_domain_xn = particle_bank(0)
@@ -1138,7 +1138,6 @@ def make_type_global(input_deck):
             ("bank_domain_zn", bank_domain_zn),
             ("bank_precursor", bank_precursor),
             ("d_idx", int64),
-            ("p_comp", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
