@@ -26,3 +26,4 @@ from mcdc.input_ import (
     domain_decomp,
 )
 from mcdc.main import run, prepare
+from mcdc.visualizer import visualize

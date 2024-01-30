@@ -33,6 +33,8 @@ PCT_COMBING_WEIGHT = 10
 # Misc.
 INF = 1e10
 PI = math.acos(-1.0)
+PI_SQRT = math.sqrt(PI)
+PI_HALF = PI / 2.0
 SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
@@ -56,3 +58,25 @@ SEED_SPLIT_SOURCE_PRECURSOR = nb.uint64(0x546F6464)
 SEED_SPLIT_BANK = nb.uint64(0x5279616E)
 SEED_SPLIT_PARTICLE = nb.uint64(0)
 SEED_SPLIT_UQ = nb.uint64(0x5368656261)
+
+# Physics
+NEUTRON_MASS = 1.67492749804e-27  # kg
+EV_TO_J = 1.6022e-19
+SQRT_E_TO_SPEED = math.sqrt(2.0 * EV_TO_J / NEUTRON_MASS) * 100
+BOLTZMAN_K = 8.61733326e-5  # eV/K
+T_ROOM = 294  # K
+E_THERMAL_THRESHOLD = 400 * BOLTZMAN_K * T_ROOM
+
+# Cross Section Type
+XS_TOTAL = 0
+XS_SCATTER = 1
+XS_CAPTURE = 2
+XS_FISSION = 3
+XS_NU_FISSION = 4
+XS_NU_FISSION_PROMPT = 5
+XS_NU_FISSION_DELAYED = 6
+XS_NU_SCATTER = 7
+
+NU_FISSION = 0
+NU_FISSION_PROMPT = 1
+NU_FISSION_DELAYED = 2

@@ -3,8 +3,9 @@ This module contains functions for setting MC/DC input deck.
 The input deck class is defined in `card.py` and instantiated in `global_.py`.
 """
 
-import h5py, math, mpi4py
+import h5py, math, mpi4py, os
 import numpy as np
+import scipy as sp
 
 import mcdc.type_ as type_
 
@@ -137,6 +138,7 @@ def nuclide(
         card["scatter"][:] = np.sum(scatter, 0)[:]
     if fission is not None:
         card["fission"][:] = fission[:]
+        card["fissionable"] = True
     card["total"][:] = card["capture"] + card["scatter"] + card["fission"]
 
     # Scattering multiplication (vector of size G)
@@ -229,6 +231,7 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
+    name="P",
     sensitivity=False,
     dsm_Np=1.0,
 ):
@@ -297,14 +300,55 @@ def material(
         )
         nuclides = [[card_nuclide, 1.0]]
 
-    # Nuclide and group sizes
+    # Number of nuclides
     N_nuclide = len(nuclides)
+
+    # Continuous energy mode?
+    if isinstance(nuclides[0][0], str):
+        mcdc.input_deck.setting["mode_CE"] = True
+        mcdc.input_deck.setting["mode_MG"] = False
+
+        # Make material card
+        card = make_card_material(N_nuclide)
+        card["ID"] = len(mcdc.input_deck.materials)
+
+        # Set the nuclides
+        for i in range(N_nuclide):
+            nuc_name = nuclides[i][0]
+            density = nuclides[i][1]
+            if not nuclide_registered(nuc_name):
+                nuc_ID = len(mcdc.input_deck.nuclides)
+                nuc_card = make_card_nuclide()
+                nuc_card["name"] = nuc_name
+                nuc_card["ID"] = nuc_ID
+
+                dir_name = os.getenv("MCDC_XSLIB")
+                with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
+                    if max(f["fission"][:]) > 0.0:
+                        nuc_card["fissionable"] = True
+
+                mcdc.input_deck.nuclides.append(nuc_card)
+            else:
+                nuc_card = get_nuclide(nuc_name)
+            card["nuclide_IDs"][i] = nuc_card["ID"]
+            card["nuclide_densities"][i] = density
+
+        # Add to deck
+        mcdc.input_deck.materials.append(card)
+        return card
+
+    # Nuclide and group sizes
     G = nuclides[0][0]["G"]
     J = nuclides[0][0]["J"]
 
     # Make material card
     card = make_card_material(N_nuclide, G, J)
     card["ID"] = len(mcdc.input_deck.materials)
+
+    if name is not None:
+        card["name"] = name
+    else:
+        card["name"] = card["ID"]
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
@@ -378,8 +422,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
 
     Parameters
     ----------
-    type_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y',
-             'cylinder-z', 'sphere', 'quadric'}
+    type\_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y', 'cylinder-z', 'sphere', 'quadric'}
         Surface type.
     bc : {'interface', 'vacuum', 'reflective'}
         Surface boundary condition.
@@ -475,6 +518,8 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     # ==========================================================================
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
+
+    card["type"] = type_
 
     # Set up surface attributes
     if type_ == "plane-x":
@@ -628,6 +673,7 @@ def cell(surfaces_flags, fill, lattice_center=None):
     # Material cell
     else:
         card["material_ID"] = fill["ID"]
+        card["material_name"] = fill["name"]
 
     # Push card
     mcdc.input_deck.cells.append(card)
@@ -721,7 +767,8 @@ def source(**kw):
         at which isotropic surface source is emitted. Note that it is similar to the
         mechanics of the typical white boundary condition in reactor physics.
     energy : array_like
-        Probability mass function of the energy group for multigroup source.
+        [MG] Probability mass function of the energy group for multigroup source.
+        [CE] 2D array of piecewise linear pdf [eV, value].
     time : array_like
         [t_min and t_max] in/at which source is emitted.
     prob : float
@@ -807,9 +854,22 @@ def source(**kw):
 
     # Set energy
     if energy is not None:
-        group = np.array(energy)
-        # Normalize
-        card["group"] = group / np.sum(group)
+        if mcdc.input_deck.setting["mode_MG"]:
+            group = np.array(energy)
+            # Normalize
+            card["group"] = group / np.sum(group)
+        if mcdc.input_deck.setting["mode_CE"]:
+            energy = np.array(energy)
+            # Resize
+            card["energy"] = np.zeros(energy.shape)
+            # Set energy
+            card["energy"][0, :] = energy[0, :]
+            # Normalize pdf
+            card["energy"][1, :] = energy[1, :] / np.trapz(energy[1, :], x=energy[0, :])
+            # Make cdf
+            card["energy"][1, :] = sp.integrate.cumulative_trapezoid(
+                card["energy"][1], x=card["energy"][0], initial=0.0
+            )
 
     # Set time
     if time is not None:
@@ -833,6 +893,7 @@ def tally(
     mu=np.array([-1.0, 1.0]),
     azi=np.array([-PI, PI]),
     g=np.array([-INF, INF]),
+    E=np.array([0.0, INF]),
 ):
     # Get tally card
     card = mcdc.input_deck.tally
@@ -851,6 +912,8 @@ def tally(
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
+    if mcdc.input_deck.setting["mode_CE"]:
+        card["mesh"]["g"] = E
 
     # Set score flags
     for s in scores:
@@ -1283,17 +1346,16 @@ def iQMC(
     card["iqmc"]["krylov_restart"] = krylov_restart
 
 
-def weight_roulette(chance, wr_threshold):
+def weight_roulette(w_threshold=0.2, w_survive=1.0):
     """
-    If neutron weight is below wr_threshold, then enter weight rouelette
-    technique. Neutron has 'chance' probability of having its weight increased
-    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
+    If neutron weight is below `w_threshold`, then enter weight rouelette
+    technique with survival weight `w_survive`.
 
     Parameters
     ----------
-    chance : probability of survival
-    wr_threshold : weight_roulette() is called on a particle
-                    if P['w'] <= wr_threshold
+    w_threshold : weight_roulette() is called on a particle if
+                  P['w'] <= wr_threshold
+    w_survive : survival weight
 
     Returns
     -------
@@ -1302,8 +1364,8 @@ def weight_roulette(chance, wr_threshold):
     """
     card = mcdc.input_deck.technique
     card["weight_roulette"] = True
-    card["wr_chance"] = chance
-    card["wr_threshold"] = wr_threshold
+    card["wr_threshold"] = w_threshold
+    card["wr_survive"] = w_survive
 
 
 def IC_generator(
@@ -1344,7 +1406,6 @@ def IC_generator(
     card["IC_generator"] = True
     card["IC_N_neutron"] = N_neutron
     card["IC_N_precursor"] = N_precursor
-    card["IC_cycle_stretch"] = cycle_stretch
 
     # Setting parameters
     card_setting = mcdc.input_deck.setting
@@ -1467,6 +1528,19 @@ def uq(**kw):
 # ==============================================================================
 # Util
 # ==============================================================================
+
+
+def nuclide_registered(name):
+    for card in mcdc.input_deck.nuclides:
+        if name == card["name"]:
+            return True
+    return False
+
+
+def get_nuclide(name):
+    for card in mcdc.input_deck.nuclides:
+        if name == card["name"]:
+            return card
 
 
 def print_card(card):

@@ -4,8 +4,32 @@
 Installation Guide
 ===================
 
-This outlines the basic steps to install MC/DC on a local
-machine or on HPC machine.
+Developers in MC/DC (on any machine) or users on HPC machines should install using the installation script included with the source code; 
+start by :ref:`creating-a-conda-environment`. 
+Installing from source via the installation script is the most resilient way to get properly configured dependencies.
+Most other users can install using pip. 
+
+-------------------
+Installing with pip
+-------------------
+Users who:
+
+#. are unix based (macOS, linux, etc.),
+#. have a working version of openMPI (from conda, brew, or apt),
+#. are using an environment manager like conda or have administrator privileges, and
+#. plan to *use* MC/DC, not develop features for MC/DC
+
+can install using pip. 
+We recommend doing so within an active conda (or other environment manager) environment, 
+which avoids the need for any admin access and keeps dependencies clean. 
+
+.. code-block:: sh
+
+    pip install mcdc
+
+Now you're ready to run in pure Python mode!
+
+.. _creating-a-conda-environment:
 
 -----------------------------------
 Creating an MC/DC Conda environment
@@ -13,12 +37,12 @@ Creating an MC/DC Conda environment
 
 `Conda <https://conda.io/en/latest/>`_ is an open source package and environment management system 
 that runs on Windows, macOS, and Linux. It allows for easy installing and switching between multiple
-versions of software packages and their dependendencies. 
+versions of software packages and their dependencies. 
 We can't force you to use it, but we do *highly* recommend it, particularly
 if you plan on running MC/DC in `numba mode <https://numba.pydata.org/>`_.
 **The included installation script will fail if executed outside of a conda environment.**
 
-First, `conda` should be installed with `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_
+First, ``conda`` should be installed with `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_
 or `Anaconda <https://www.anaconda.com/>`_. HPC instructions: 
 
 `Quartz <https://hpc.llnl.gov/hardware/compute-platforms/quartz>`_ (LLNL, x86_64), 
@@ -37,7 +61,7 @@ or `Anaconda <https://www.anaconda.com/>`_. HPC instructions:
     bash Miniconda3-latest-Linux-ppc64le.sh
 
 
-Then create and activate a new conda environment called `mcdc-env` in
+Then create and activate a new conda environment called *mcdc-env* in
 which to install MC/DC. This creates an environment with python3.11 
 installed.
 
@@ -86,4 +110,25 @@ On local machines, mpi4py will be installed using conda,
 
 To confirm that everything is properly installed, execute ``pytest`` from the MCDC directory. 
 
+-------------------------------------
+Configuring Continuous Energy Library
+-------------------------------------
 
+MC/DC has continuous energy transport capabilities.
+We provide the library and easy install to members of CEMeNT and other close developers.
+Due to export controls we cannot build a library and transport functionality in a single source.
+If you are a member of CEMeNT you should have access to `this internal repo <https://github.com/CEMeNT-PSAAP/MCDC-Xsec>`_.
+You an then either set a flag in the install script like,
+
+.. code-block:: sh
+
+    bash install.sh --config_cont_lib
+
+or run the script after instillation as a stand alone operation with
+
+.. code-block:: sh
+
+    bash config_cont_energy.sh
+
+Both these operations will clone the internal directory to your MCDC directory, untar the compressed folder, then set an environment variable in your bash script.
+NOTE: this does assume you are using bash shell.
