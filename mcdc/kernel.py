@@ -29,7 +29,6 @@ def domain_crossing(P, mcdc):
         mesh = mcdc["technique"]["domain_mesh"]
         # Determine which dimension is crossed
         x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
-        flag = directions[0]
         if len(directions) == 0:
             return
         elif len(directions) > 1:
@@ -40,7 +39,7 @@ def domain_crossing(P, mcdc):
                     P["y"] -= SHIFT * P["uy"] / np.abs(P["uy"])
                 if direction == MESH_Z:
                     P["z"] -= SHIFT * P["uz"] / np.abs(P["uz"])
-
+        flag = directions[0]
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(copy_particle(P), mcdc["bank_domain_xp"])
@@ -742,6 +741,7 @@ def source_particle(seed, mcdc):
         tot += source["prob"]
         if tot >= xi:
             break
+
     # Position
     if source["box"]:
         x = sample_uniform(source["box_x"][0], source["box_x"][1], P)
@@ -1665,10 +1665,6 @@ def surface_distance(P, surface, trans, mcdc):
         t_max = surface["t"][idx + 1]
         d_max = (t_max - P["t"]) * v
 
-        if (
-            G * ux + H * uy + I_ * uz + J1 / v
-        ) == 0:
-            J1=1e-25
         distance = -surface_evaluate(P, surface, trans) / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
@@ -1809,10 +1805,7 @@ def mesh_get_angular_index(P, mesh):
     uz = P["uz"]
 
     P_mu = uz
-    if ux + uy != 0:
-        P_azi = math.acos(ux / math.sqrt(ux * ux + uy * uy))
-    else:
-        P_azi = 0
+    P_azi = math.acos(ux / math.sqrt(ux * ux + uy * uy))
     if uy < 0.0:
         P_azi *= -1
 
@@ -1971,12 +1964,8 @@ def score_reduce_bin(score, mcdc):
 def score_closeout_history(score):
     # Accumulate score and square of score into mean and sdev
     score["mean"][:] += score["bin"]
-    proc = MPI.COMM_WORLD.Get_rank()
     score["sdev"][:] += np.square(score["bin"])
-    # f = open('ref_tally'+str(proc)+'.csv','a')
-    # if score["bin"][0][0][0][0][0][4][0]>0:
-    #    f.write(str(score["bin"][0][0][0][0][0][4][0][0])+',\n')
-    # f.write(str(score["mean"][0][0][0][0][0][4][0][0])+',\n')
+
     # Reset bin
     score["bin"].fill(0.0)
 
@@ -2497,8 +2486,8 @@ def surface_crossing(P, mcdc):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-
     surface_bc(P, surface, trans)
+
     # Small shift to ensure crossing
     surface_shift(P, surface, trans, mcdc)
 
