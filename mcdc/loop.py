@@ -398,6 +398,10 @@ def loop_particle(P, mcdc):
         elif event & EVENT_LATTICE or event & EVENT_MESH:
             kernel.shift_particle(P, SHIFT)
 
+        if event & EVENT_DOMAIN:
+            if not (event & EVENT_SURFACE):
+                kernel.domain_crossing(P, mcdc)
+
         # Moving surface transition
         if event & EVENT_SURFACE_MOVE:
             P["t"] += SHIFT
@@ -412,17 +416,6 @@ def loop_particle(P, mcdc):
         # Time boundary crossing
         if event & EVENT_TIME_BOUNDARY:
             P["alive"] = False
-
-        # Domain boundary
-        if event & EVENT_DOMAIN:
-            if event & EVENT_SURFACE:
-                if not mcdc["surfaces"][P["surface_ID"]]["reflective"]:
-                    kernel.domain_crossing(P, mcdc)
-            else:
-                if not (event & EVENT_LATTICE or event & EVENT_MESH):
-                    kernel.shift_particle(P, SHIFT)
-
-                kernel.domain_crossing(P, mcdc)
 
         # Apply weight window
         if P["alive"] and mcdc["technique"]["weight_window"]:
