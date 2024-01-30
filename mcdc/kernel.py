@@ -24,7 +24,7 @@ from mcdc.loop import loop_source
 @njit
 def domain_crossing(P, mcdc):
     # Domain mesh crossing
-    max_size = mcdc["technique"]["exchange_rate"]  # /1e4)*mcdc["mpi_work_size"])
+    max_size = mcdc["technique"]["exchange_rate"]
     if mcdc["technique"]["domain_decomp"]:
         mesh = mcdc["technique"]["domain_mesh"]
         # Determine which dimension is crossed
