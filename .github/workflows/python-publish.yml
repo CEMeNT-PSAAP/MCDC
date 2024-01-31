@@ -8,18 +8,18 @@
 
 name: Upload Python Package
 
-on:
-    release:
-      types: [published]
+on: push
+    #release:
+    #  types: [published]
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
-
+    permissions:
+        id-token: write
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.11
@@ -38,8 +38,9 @@ jobs:
         bash .github/workflows/patch.sh
     - name: Build package
       run: python -m build
-    - name: Publish package
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
       #with:
       #  user: __token__
       #  password: ${{ secrets.PYPI_API_TOKEN }}
