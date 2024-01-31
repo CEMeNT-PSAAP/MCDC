@@ -6,6 +6,8 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
+# assumming this is being done in a repo with trusted publishing permissions in pypi
+
 name: Upload Python Package
 
 on: push
@@ -20,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
         id-token: write
-    steps:
+    steps: 
     - uses: actions/checkout@v3
     - name: Set up Python 3.11
       uses: actions/setup-python@v3
@@ -40,7 +42,7 @@ jobs:
       run: python -m build
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-
+        
       #with:
       #  user: __token__
       #  password: ${{ secrets.PYPI_API_TOKEN }}
