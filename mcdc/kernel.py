@@ -2021,14 +2021,14 @@ def scattering(P, mcdc):
         sample_phasespace_scattering(P, material, P_new, mcdc)
 
         # Bank, but keep it if it is the last particle
-        if n == N-1:
-            P['alive'] = True
-            P['ux'] = P_new['ux']
-            P['uy'] = P_new['uy']
-            P['uz'] = P_new['uz']
-            P['g'] = P_new['g']
-            P['E'] = P_new['E']
-            P['w'] = P_new['w']
+        if n == N - 1:
+            P["alive"] = True
+            P["ux"] = P_new["ux"]
+            P["uy"] = P_new["uy"]
+            P["uz"] = P_new["uz"]
+            P["g"] = P_new["g"]
+            P["E"] = P_new["E"]
+            P["w"] = P_new["w"]
         else:
             add_particle(P_new, mcdc["bank_active"])
 
@@ -2299,15 +2299,15 @@ def fission(P, mcdc):
             add_particle(P_new, mcdc["bank_census"])
         else:
             # Keep it if it is the last particle
-            if n == N-1:
-                P['alive'] = True
-                P['ux'] = P_new['ux']
-                P['uy'] = P_new['uy']
-                P['uz'] = P_new['uz']
-                P['t'] = P_new['t']
-                P['g'] = P_new['g']
-                P['E'] = P_new['E']
-                P['w'] = P_new['w']
+            if n == N - 1:
+                P["alive"] = True
+                P["ux"] = P_new["ux"]
+                P["uy"] = P_new["uy"]
+                P["uz"] = P_new["uz"]
+                P["t"] = P_new["t"]
+                P["g"] = P_new["g"]
+                P["E"] = P_new["E"]
+                P["w"] = P_new["w"]
             else:
                 add_particle(P_new, mcdc["bank_active"])
 

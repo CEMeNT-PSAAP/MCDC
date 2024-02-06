@@ -1,12 +1,14 @@
 import numpy as np
-import os, sys
+import os, sys, argparse
 from task import task
 
-
-if len(sys.argv) > 1:
-    N_rank = int(sys.argv[1])
-else:
-    N_rank = 1
+# Option parser
+parser = argparse.ArgumentParser(description="MC/DC verification test")
+parser.add_argument("--mpiexec", type=int, default=0)
+parser.add_argument("--srun", type=int, default=0)
+args, unargs = parser.parse_known_args()
+mpiexec = args.mpiexec
+srun = args.srun
 
 
 # =============================================================================
@@ -21,10 +23,21 @@ def run(N_hist, name):
     """
     output = "output_%i" % N_hist
 
-    os.system(
-        "srun -n %i python input.py --mode=numba --N_particle=%i --output=%s"
-        % (N_rank, N_hist, output)
-    )
+    if srun > 1:
+        os.system(
+            "srun -n %i python input.py --mode=numba --N_particle=%i --output=%s"
+            % (srun, N_hist, output)
+        )
+    elif mpiexec > 1:
+        os.system(
+            "mpiexec -n %i python input.py --mode=numba --N_particle=%i --output=%s"
+            % (mpiexec, N_hist, output)
+        )
+    else:
+        os.system(
+            "python input.py --mode=numba --N_particle=%i --output=%s"
+            % (N_hist, output)
+        )
 
 
 # =============================================================================
