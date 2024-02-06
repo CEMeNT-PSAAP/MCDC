@@ -33,4 +33,3 @@ jobs:
       run: |
         cd test/regression
         python run.py --mpiexec=4
-        python run.py --mpiexec=2
