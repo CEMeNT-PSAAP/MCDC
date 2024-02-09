@@ -14,6 +14,7 @@ from mcdc.print_ import (
     print_progress,
     print_progress_eigenvalue,
     print_progress_iqmc,
+    print_progress_dd,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
     print_msg,
@@ -281,16 +282,18 @@ def loop_source_dd(seed, mcdc):
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        percent = (work_idx + 1.0) / mcdc["mpi_work_size"]
+        percent = ((work_idx + 1.0) / mcdc["mpi_work_size"])*0.5
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
-                print_progress(percent, mcdc)
+                print_progress_dd(percent, mcdc,"sourcing")
 
     kernel.dd_particle_send(mcdc)
     terminated = False
     kernel.dd_particle_receive(mcdc)
     wr_new = 0
+    max_work = 1
+    #print_msg("Done sourcing, now running")
     while not terminated:
         if mcdc["bank_active"]["size"] > 0:
             # wr_new = 0
@@ -321,11 +324,21 @@ def loop_source_dd(seed, mcdc):
                     and mcdc["setting"]["N_batch"] == 1
                 ):
                     kernel.tally_closeout_history(mcdc)
+
             kernel.dd_particle_send(mcdc)
 
         kernel.dd_particle_receive(mcdc)
         work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-        print_msg("\rWork remaining:" + str(work_remaining))
+        if work_remaining > max_work:
+            max_work = work_remaining
+
+        # Progress printout
+        percent = (1-work_remaining/max_work)*0.5+0.5
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress_dd(percent, mcdc,"running")
+        #print_msg(str(percent)+"percent"+ str(work_remaining)+','+str(max_work))
         if work_remaining == 0:
             wr_new += 1
         else:
