@@ -4,6 +4,26 @@ import h5py
 import sys
 
 # =============================================================================
+# Import data
+# =============================================================================
+
+with h5py.File("output.h5", "r") as f:
+    # Note the spatial (dx) and source strength (100+1) normalization
+    keff = f["k_eff"][()]
+    phi_avg = f["iqmc/tally/flux"][:]
+    sweeps = f["iqmc/sweep_count"][()]
+    x = f["iqmc/grid/x"][:]
+    dx = x[1] - x[0]
+    x_mid = 0.5 * (x[:-1] + x[1:])
+    f.close()
+
+tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
+norm = np.sum(tmp * dx)
+phi_avg /= norm
+print("Keff = ", keff)
+print("Number of QMC Transport Sweeps = ", sweeps)
+
+# =============================================================================
 # Reference solution
 # =============================================================================
 
@@ -69,72 +89,7 @@ phi_exact /= norm
 plt.figure(dpi=300, figsize=(8, 5))
 plt.plot(x_exact, phi_exact, label="sol")
 
-# =============================================================================
-# MCDC results
-# =============================================================================
-# Results
-with h5py.File("mc_output.h5", "r") as f:
-    x = f["tally/grid/x"][:]
-    dx = x[1:] - x[:-1]
-    phi_avg = f["tally/flux-x/mean"][:]
-    phi_sd = f["tally/flux-x/sdev"][:]
-    k = f["k_cycle"][:]
-    k_avg = f["k_mean"][()]
-    k_sd = f["k_sdev"][()]
-    rg = f["gyration_radius"][:]
-    f.close()
-# Note the spatial (dx) and source strength (100+1) normalization
-tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
-norm = np.sum(tmp * dx)
-phi_avg /= norm
-
-print("MC Keff = ", k_avg)
-plt.plot(x, phi_avg, label="MC")
-
-
-# =============================================================================
-# Power Iteration Results
-# =============================================================================
-
-with h5py.File("PI_output.h5", "r") as f:
-    # Note the spatial (dx) and source strength (100+1) normalization
-    keff = f["k_eff"][()]
-    phi_avg = f["tally/iqmc_flux"][:]
-    x = f["iqmc/grid/x"][:]
-    dx = x[1] - x[0]
-    x_mid = 0.5 * (x[:-1] + x[1:])
-    f.close()
-
-tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
-norm = np.sum(tmp * dx)
-phi_avg /= norm
-print("PI Keff = ", keff)
-plt.plot(x_mid, phi_avg, label="PI")
-
-# =============================================================================
-# Davidson Results
-# =============================================================================
-
-with h5py.File("davidson_output.h5", "r") as f:
-    # Note the spatial (dx) and source strength (100+1) normalization
-    keff = f["k_eff"][()]
-    phi_avg = f["tally/iqmc_flux"][:]
-    x = f["iqmc/grid/x"][:]
-    dx = x[1] - x[0]
-    x_mid = 0.5 * (x[:-1] + x[1:])
-    f.close()
-
-tmp = 0.5 * (phi_avg[1:] + phi_avg[:-1])
-norm = np.sum(tmp * dx)
-phi_avg /= norm
-
-print("davidson Keff = ", keff)
-plt.plot(x_mid, phi_avg, label="davidson")
-
-
-# =============================================================================
-# Finish Plot
-# =============================================================================
+plt.plot(x_mid, phi_avg)
 plt.title("Kornreich et al. Slab")
 plt.ylabel(r"$\phi(x)$")
 plt.xlabel(r"$x$")

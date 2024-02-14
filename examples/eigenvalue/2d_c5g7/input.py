@@ -8,7 +8,7 @@ import mcdc
 # =============================================================================
 
 # Load material data
-lib = h5py.File("c5g7.h5", "r")
+lib = h5py.File("2d_c5g7_xs.h5", "r")
 
 
 # Materials
@@ -17,22 +17,17 @@ def set_mat(mat):
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],
-        nu_p=mat["nu_p"][:],
-        nu_d=mat["nu_d"][:],
-        chi_p=mat["chi_p"][:],
-        chi_d=mat["chi_d"][:],
-        speed=mat["speed"],
-        decay=mat["decay"],
+        nu_p=mat["nu"][:],
+        chi_p=mat["chi"][:],
     )
 
 
 mat_uo2 = set_mat(lib["uo2"])
 mat_mox43 = set_mat(lib["mox43"])
-mat_mox7 = set_mat(lib["mox7"])
+mat_mox7 = set_mat(lib["mox70"])
 mat_mox87 = set_mat(lib["mox87"])
 mat_gt = set_mat(lib["gt"])
 mat_fc = set_mat(lib["fc"])
-mat_cr = set_mat(lib["cr"])
 mat_mod = set_mat(lib["mod"])
 
 # =============================================================================
@@ -52,7 +47,6 @@ mox7 = mcdc.cell([-cy], mat_mox7)
 mox8 = mcdc.cell([-cy], mat_mox87)
 gt = mcdc.cell([-cy], mat_gt)
 fc = mcdc.cell([-cy], mat_fc)
-cr = mcdc.cell([-cy], mat_cr)
 mod = mcdc.cell([+cy], mat_mod)
 modi = mcdc.cell([-cy], mat_mod)  # For all-water lattice
 
@@ -63,7 +57,6 @@ m = mcdc.universe([mox7, mod])["ID"]
 n = mcdc.universe([mox8, mod])["ID"]
 g = mcdc.universe([gt, mod])["ID"]
 f = mcdc.universe([fc, mod])["ID"]
-c = mcdc.universe([cr, mod])["ID"]
 w = mcdc.universe([modi, mod])["ID"]
 
 # =============================================================================

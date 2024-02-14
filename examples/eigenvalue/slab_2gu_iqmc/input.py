@@ -9,17 +9,6 @@ import mcdc
 # "Analytical Benchmark Test Set For Criticality Code Verification"
 
 # Set materials
-
-# 1G-PU Slab data
-# m1 = mcdc.material(
-#         capture=np.array([0.019584]),
-#         scatter=np.array([[0.225216]]),
-#         fission=np.array([0.081600]),
-#         nu_p=np.array([2.84]),
-#         chi_p=np.array([1.0]),
-#     )
-# R = [0.0, 4.513502]
-
 # 2G-U Slab data
 m1 = mcdc.material(
     capture=np.array([0.01344, 0.00384]),
@@ -48,9 +37,7 @@ x = np.linspace(0.0, 6.01275, num=Nx + 1)
 generator = "halton"
 solver = "davidson"
 fixed_source = np.zeros((2, Nx))
-np.random.seed(123456)
-phi0 = np.random.random((2, Nx))
-# phi0 = np.ones((2, Nx))
+phi0 = np.ones((2, Nx))
 
 # =============================================================================
 # Set tally, setting, and run mcdc

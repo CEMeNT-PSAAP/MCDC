@@ -37,18 +37,45 @@ mcdc.cell([+s7, -s8], m4)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 1e2
-Nx = 16
-maxit = 10
-tol = 1e-3
+N = 10000
+Nx = 64
+maxit = 20
+tol = 1e-4
 x = np.linspace(-8, 8, num=Nx + 1)
 generator = "halton"
+solver = "gmres"
 
-fixed_source = np.zeros(Nx)
-fixed_source[int(0.375 * Nx) : int(0.625 * Nx)] = 50.0
-fixed_source[int(0.125 * Nx) : int(0.1875 * Nx)] = 1.0
-fixed_source[int(0.8125 * Nx) : int(0.875 * Nx)] = 1.0
 
+def reeds_source(Nx, LB=-8.0, RB=8.0):
+    source = np.empty(Nx)
+    dx = (RB - LB) / Nx
+    xspan = np.linspace(LB + dx / 2, RB - dx / 2, num=Nx)
+    count = 0
+    for x in xspan:
+        if x < -6:
+            source[count] = 0.0
+        elif (-6.0 < x) and (x < -5.0):
+            source[count] = 1.0
+        elif -5.0 < x < -3.0:  # vacuum region 1
+            source[count] = 0.0
+        elif -3.0 < x < -2.0:
+            source[count] = 0.0
+        elif -2.0 < x < 2.0:
+            source[count] = 50.0
+        elif 2.0 < x < 3.0:
+            source[count] = 0.0
+        elif 3.0 < x < 5.0:  # vacuum region 2
+            source[count] = 0.0
+        elif 5.0 < x < 6.0:
+            source[count] = 1.0
+        elif 6.0 < x:
+            source[count] = 0.0
+        count += 1
+
+    return source
+
+
+fixed_source = reeds_source(Nx)
 phi0 = np.ones((Nx))
 
 mcdc.iQMC(
@@ -58,6 +85,8 @@ mcdc.iQMC(
     maxitt=maxit,
     tol=tol,
     generator=generator,
+    fixed_source_solver=solver,
+    score=["tilt-x"],
 )
 
 # =============================================================================
@@ -65,7 +94,7 @@ mcdc.iQMC(
 # =============================================================================
 
 # Setting
-mcdc.setting(N_particle=N, progress_bar=True)
+mcdc.setting(N_particle=N)
 
 # Run
 mcdc.run()

@@ -8,10 +8,10 @@ import h5py
 # =============================================================================
 
 # Load iqmc result
-with h5py.File("PI_output.h5", "r") as f:
+with h5py.File("output.h5", "r") as f:
     x = f["iqmc/grid/x"][:]
     y = f["iqmc/grid/y"][:]
-    phi_avg = f["iqmc/flux"][:]
+    phi_avg = f["iqmc/tally/flux"][:]
     f.close()
 
 

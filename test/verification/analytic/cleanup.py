@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 
-os.system("rm *png")
+os.system("rm results/*png")
 
 # Fixed source
 for task in os.scandir("./fixed_source"):

@@ -25,6 +25,10 @@ def phi_(x, t):
         )
 
 
+def phi_X(t, x1, x2):
+    return quad(phi_, x1, x2, args=(t))[0] / (x2 - x1)
+
+
 def reference(x, t):
     dx = x[1] - x[0]
     x_mid = 0.5 * (x[:-1] + x[1:])
@@ -37,6 +41,9 @@ def reference(x, t):
         for j in range(J):
             x1 = x[j]
             x2 = x[j + 1]
-            phi[k, j] = quad(phi_, x1, x2, args=(t[k + 1]))[0] / (x2 - x1)
+            t1 = t[k]
+            t2 = t[k + 1]
+            phi[k, j] = quad(phi_X, t1, t2, args=(x1, x2))[0] / (t2 - t1)
+            # phi[k, j] = quad(phi_, x1, x2, args=(t[k + 1]))[0] / (x2 - x1)
 
     return phi
