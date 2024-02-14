@@ -25,8 +25,6 @@ def print_warning(msg):
         print(Style.RESET_ALL)
         sys.stdout.flush()
 
-        
-
 
 def print_banner(mcdc):
     size = MPI.COMM_WORLD.Get_size()
