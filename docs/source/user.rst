@@ -203,6 +203,23 @@ Numba Mode
 
     python input.py --mode=numba
 
+When running in Numba mode a significant amount of time is taken compiling Python functions to performant binaries.
+Only functions used in a specific simulation will be compiled.
+These binaries will be cached meaning that in subsequent runs of the same simulation the compilation step can be avoided.
+The cache can be used as an effective ahead of time compilation scheme where binaries can be compiled once and shared between machines.
+For more information on caching see :ref:`Caching` and `Numba Caching <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
+
+MC/DC also has the ability to run Numba in a debugging mode.
+This will result in less performant code and longer compile times but will allow for better error messages from Numba and other packages.
+
+.. code-block:: python3
+
+    python input.py --mode=numba_debug
+
+
+For more information on the exact behavior of this option see :ref:`Debugging`
+
+
 Using MPI
 ^^^^^^^^^
 
@@ -214,6 +231,7 @@ Below, ``--mode`` can equal python or numba.
 .. code-block:: python3
 
     srun python input.py --mode=<python/numba>
+
 
 
 Postprocessing Results
