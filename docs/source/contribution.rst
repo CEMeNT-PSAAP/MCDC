@@ -30,6 +30,64 @@ It's pretty easy to do this locally, just run,
 
 in the top level MC/DC directory and all necessary changes will be automatically made for you.
 
+---------
+Debugging
+---------
+
+MCDC includes options to debug the Numba JIT code.
+It does this by toggling Numba options using the numba.config submodule.
+This will result in less performant code and longer compile times but will allow for better error messages from Numba and other packages.
+`See Numba documentation of a list of all possible debug and compiler options. <https://numba.readthedocs.io/en/stable/reference/envvars.html#debugging>`_
+The most useful set of debug options for MC/DC can be enabled with
+
+.. code-block:: python3
+
+    python input.py --mode=numba_debug
+
+Which will toggle the following debug and compiler options in Numba:
+
+* ``DISABLE_JIT=False`` turns on the jitter
+* ``NUMBA_OPT=0`` Forces the compilers to form un-optimized code (other options for this are ``1``, ``2``, and ``3`` with ``3`` being the most optimized). This option might need to be changed if errors only result from more optimization.
+* ``DEBUG=False`` turns on all debugging options. This is still disabled in ``mcdc numba_debug`` as it will print ALOT of info on your terminal screen
+* ``NUMBA_FULL_TRACEBACKS=1`` allows errors from sub-packages to be printed (i.e. Numpy)
+* ``NUMBA_BOUNDSCHECK=1`` numba will check vectors for bounds errors. If this is disabled it bound errors will result in a ``seg_fault``. This in consort with the previous option allows for the exact location of a bound error to be printed from Numpy subroutines
+* ``NUMBA_DEBUG_NRT=1`` enables the `Numba run time (NRT) statistics counter <https://numba.readthedocs.io/en/stable/developer/numba-runtime.html>`_ This helps with debugging memory leaks.
+* ``NUMBA_DEBUG_TYPEINFER= 1`` print out debugging information about type inferences that numba might need to make if a function is ill-defined
+* ``NUMBA_ENABLE_PROFILING=1`` enables profiler use
+* ``NUMBA_DUMP_CFG=1`` prints out a control flow diagram
+
+If extra debug options or alteration to these options are required they can be toggled and passed under the ``mode==numba_debug`` option tree near the top of ``mcdc/main.py``.
+
+-------
+Caching
+-------
+
+MC/DC is a just-in-time (JIT) compiled code.
+This is sometimes disadvantageous, especially for users who might run many versions of the same simulation with slightly different parameters.
+As the JIT compilation scheme will only compile functions that are actually used in a given simulation, it is not a grantee that any one function will be compiled.
+
+Developers should be very cautious about using caching features.
+Numba has a few documented errors around caching.
+The most critical of which is that functions in other files that are called by cached functions will not force a recompile, even if there are changes in those sub-functions.
+In this case caching should be disabled.
+
+In MC/DC the outer most loop functions (in ``mcdc/loop.py``) are called to be cached.
+This is done with a option on the jit flag above the individual function declarations like
+
+.. code-block:: python3
+
+    nb.njit(cache=True)
+    def loop_fixed_source(mcdc):
+        # Loop over
+        ...
+
+To disable caching toggle these jit flags from ``True`` to ``False``.
+Alteratively a developer could delete the ``__pycache__`` directory or other cache directory which is system dependent (`see more about clearing the numba cache <https://numba.readthedocs.io/en/stable/developer/caching.html>`_)
+
+
+At some point MC/DC will enable `Numba's Ahead of Time compilation abilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_. But the core development team is holding off until scheduled `upgrades to AOT functionality in Numba are implemented <https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-numba-pycc>`_.
+However if absolutely required by users numba does allow for some `cache sharing <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
+
 -------
 Testing
 -------
