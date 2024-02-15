@@ -44,6 +44,6 @@ mcdc.source(point=[1.0, 0.0, 0.0], energy=[1, 0, 0, 0, 0, 0, 0], isotropic=True)
 scores = ["flux"]
 mcdc.tally(scores=scores, x=np.linspace(0.0, 2.0, 11), g="all")
 
-mcdc.setting(N_particle=3)
+mcdc.setting(N_particle=3, active_bank_buff=1000)
 
 mcdc.run()

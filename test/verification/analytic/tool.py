@@ -40,6 +40,6 @@ def plot_convergence(name, N_particle, error, error_max):
     plt.legend()
     plt.grid()
     plt.title(name)
-    plt.savefig("../../results/" + name + ".png")
+    plt.savefig("../results/" + name + ".png")
     # plt.show()
     plt.clf()
