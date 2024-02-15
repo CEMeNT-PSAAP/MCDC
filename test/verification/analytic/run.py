@@ -1,46 +1,56 @@
 import numpy as np
-import os
-import sys
+import os, sys, argparse
+from task import task
 
-if len(sys.argv) > 1:
-    N_proc = int(sys.argv[1])
-else:
-    N_proc = 1
+# Option parser
+parser = argparse.ArgumentParser(description="MC/DC verification test")
+parser.add_argument("--mpiexec", type=int, default=0)
+parser.add_argument("--srun", type=int, default=0)
+args, unargs = parser.parse_known_args()
+mpiexec = args.mpiexec
+srun = args.srun
 
 
-waitlist = []
+# =============================================================================
+# Functions
+# =============================================================================
 
-# Fixed source
-N_min = 3
-N_max = 7
-for task in os.scandir("./fixed_source"):
-    os.chdir(task)
-    for N_hist in np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1):
-        if not os.path.isfile("output_" + str(int(N_hist)) + ".h5"):
-            print(task, int(N_hist))
-            if N_proc == 1:
-                os.system(
-                    "python input.py --mode=numba --N_particle=%i --output=output_%i"
-                    % (N_hist, N_hist)
-                )
-            else:
-                os.system(
-                    "srun -n %i python input.py --mode=numba --N_particle=%i --output=output_%i"
-                    % (N_proc, N_hist, N_hist)
-                )
-    os.chdir(r"../..")
 
-# Eigenvalue
-"""
-N_min = 1
-N_max = 3
-for task in os.scandir('./eigenvalue'):
-    os.chdir(task)
-    for N_hist in np.logspace(N_min, N_max, (N_max-N_min)*4+1):
-        print(task, int(N_hist))
-        if N_proc == 1:
-            os.system("python input.py --mode=numba %i"%(N_hist))
-        else:
-            os.system("srun -n %i python input.py --mode=numba %i"%(N_proc,N_hist))
-    os.chdir(r"../..")
-"""
+def run(N_hist, name):
+    """
+    N_hist: number of histories
+    name: name for the job
+    """
+    output = "output_%i" % N_hist
+
+    if srun > 1:
+        os.system(
+            "srun -n %i python input.py --mode=numba --N_particle=%i --output=%s"
+            % (srun, N_hist, output)
+        )
+    elif mpiexec > 1:
+        os.system(
+            "mpiexec -n %i python input.py --mode=numba --N_particle=%i --output=%s"
+            % (mpiexec, N_hist, output)
+        )
+    else:
+        os.system(
+            "python input.py --mode=numba --N_particle=%i --output=%s"
+            % (N_hist, output)
+        )
+
+
+# =============================================================================
+# Select and run tests
+# =============================================================================
+
+for name in task.keys():
+    os.chdir(name)
+    N_min = task[name]["N_lim"][0]
+    N_max = task[name]["N_lim"][1]
+    N = task[name]["N"]
+    for N_hist in np.logspace(N_min, N_max, N):
+        N_hist = int(N_hist)
+        print(name, N_hist)
+        run(N_hist, name)
+    os.chdir(r"..")
