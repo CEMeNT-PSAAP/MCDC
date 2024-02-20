@@ -133,8 +133,8 @@ def prepare():
     if target == "gpu":
         adapt.gpu_forward_declare()
 
-    adapt.set_toggle("iQMC",iQMC)
-    adapt.set_toggle("particle_tracker",track_particle)
+    adapt.set_toggle("iQMC",input_deck.technique["iQMC"])
+    adapt.set_toggle("particle_tracker",input_deck.setting["track_particle"])
     adapt.eval_toggle()
     if target == "gpu":
         build_gpu_progs()
@@ -187,6 +187,7 @@ def prepare():
                 "chi_p",
                 "chi_d",
             ]:
+                print(name)
                 mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
 
         # CE data (load data from XS library)

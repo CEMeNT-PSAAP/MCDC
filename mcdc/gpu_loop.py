@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import ascontiguousarray as cga
-from numba import njit, objmode, jit
+from numba import njit, objmode, jit, cuda
 from scipy.linalg import eig
 
 import mcdc.kernel as kernel
@@ -10,7 +10,6 @@ import mcdc.print_ as print_module
 
 from mcdc.constant import *
 from mcdc.print_ import (
-    print_header_batch,
     print_progress,
     print_progress_eigenvalue,
     print_progress_iqmc,
@@ -18,112 +17,207 @@ from mcdc.print_ import (
     print_iqmc_eigenvalue_exit_code,
 )
 
-
-from mcdc.adapt import toggle, for_gpu, for_cpu, universal_arrays
 import mcdc.adapt as adapt
+from mcdc.adapt import toggle, for_gpu, for_cpu, universal_arrays
+
+import numba as nb
 
 # =========================================================================
-# Fixed-source loop
-# =========================================================================
-
-
-@njit
-def loop_fixed_source(mcdc):
-    # Loop over batches
-    for idx_batch in range(mcdc["setting"]["N_batch"]):
-        mcdc["idx_batch"] = idx_batch
-        seed_batch = kernel.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
-
-        # Print multi-batch header
-        if mcdc["setting"]["N_batch"] > 1:
-            with objmode():
-                print_header_batch(mcdc)
-            if mcdc["technique"]["uq"]:
-                seed_uq = kernel.split_seed(seed_batch, SEED_SPLIT_UQ)
-                kernel.uq_reset(mcdc, seed_uq)
-
-        # Loop over time censuses
-        for idx_census in range(mcdc["setting"]["N_census"]):
-            mcdc["idx_census"] = idx_census
-            seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
-
-            # Loop over source particles
-            seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            loop_source(seed_source, mcdc)
-
-            # Loop over source precursors
-            if mcdc["bank_precursor"]["size"] > 0:
-                seed_source_precursor = kernel.split_seed(
-                    seed_census, SEED_SPLIT_SOURCE_PRECURSOR
-                )
-                loop_source_precursor(seed_source_precursor, mcdc)
-
-            # Time census closeout
-            if idx_census < mcdc["setting"]["N_census"] - 1:
-                # TODO: Output tally (optional)
-
-                # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
-                kernel.manage_particle_banks(seed_bank, mcdc)
-
-        # Multi-batch closeout
-        if mcdc["setting"]["N_batch"] > 1:
-            # Reset banks
-            mcdc["bank_source"]["size"] = 0
-            mcdc["bank_census"]["size"] = 0
-            mcdc["bank_active"]["size"] = 0
-
-            # Tally history closeout
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
-            # Uq closeout
-            if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(mcdc)
-
-    # Tally closeout
-    if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(mcdc)
-    else:
-        kernel.tally_closeout(mcdc)
-
-
-# =========================================================================
-# Eigenvalue loop
+# Main loop
 # =========================================================================
 
 
 @njit
-def loop_eigenvalue(mcdc):
-    # Loop over power iteration cycles
-    for idx_cycle in range(mcdc["setting"]["N_cycle"]):
-        seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
+def loop_main(mcdc):
+    simulation_end = False
+
+    idx_cycle = 0
+    while not simulation_end:
+        seed_cycle = kernel.split_seed(idx_cycle, mcdc["rng_seed"])
 
         # Loop over source particles
-        seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
+        seed_source = kernel.split_seed(seed_cycle, 0x43616D696C6C65)
         loop_source(seed_source, mcdc)
 
-        # Tally "history" closeout
-        kernel.eigenvalue_tally_closeout_history(mcdc)
-        if mcdc["cycle_active"]:
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+        # Loop over source precursors
+        if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
+            seed_source_precursor = kernel.split_seed(seed_cycle, 0x546F6464)
+            loop_source_precursor(seed_source_precursor, mcdc)
 
-        # Print progress
-        with objmode():
-            print_progress_eigenvalue(mcdc)
+        # Eigenvalue cycle closeout
+        if mcdc["setting"]["mode_eigenvalue"]:
+            # Tally history closeout
+            kernel.eigenvalue_tally_closeout_history(mcdc)
+            if mcdc["cycle_active"]:
+                kernel.tally_reduce_bin(mcdc)
+                kernel.tally_closeout_history(mcdc)
 
-        # Manage particle banks
-        seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
-        kernel.manage_particle_banks(seed_bank, mcdc)
+            # Print progress
+            with objmode():
+                print_progress_eigenvalue(mcdc)
 
-        # Entering active cycle?
-        mcdc["idx_cycle"] += 1
-        if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
-            mcdc["cycle_active"] = True
+            # Manage particle banks
+            seed_bank = kernel.split_seed(seed_cycle, 0x5279616E)
+            kernel.manage_particle_banks(seed_bank, mcdc)
+
+            # Cycle management
+            mcdc["i_cycle"] += 1
+            if mcdc["i_cycle"] == mcdc["setting"]["N_cycle"]:
+                simulation_end = True
+            elif mcdc["i_cycle"] >= mcdc["setting"]["N_inactive"]:
+                mcdc["cycle_active"] = True
+
+        # Time census closeout
+        elif (
+            mcdc["technique"]["time_census"]
+            and mcdc["technique"]["census_idx"]
+            < len(mcdc["technique"]["census_time"]) - 1
+        ):
+            # Manage particle banks
+            seed_bank = kernel.split_seed(seed_cycle, 0x5279616E)
+            kernel.manage_particle_banks(seed_cycle, mcdc)
+
+            # Increment census index
+            mcdc["technique"]["census_idx"] += 1
+
+        # Fixed-source closeout
+        else:
+            simulation_end = True
+
+        idx_cycle += 1
 
     # Tally closeout
     kernel.tally_closeout(mcdc)
-    kernel.eigenvalue_tally_closeout(mcdc)
+    if mcdc["setting"]["mode_eigenvalue"]:
+        kernel.eigenvalue_tally_closeout(mcdc)
+
+
+
+
+
+# =========================================================================
+# Particle loop
+# =========================================================================
+
+
+
+@njit
+def find_particle_cell(P,prog):
+    mcdc = adapt.device(prog)
+
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
+    P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+
+
+@njit
+def evaluate_collision(P,prog):
+    mcdc = adapt.device(prog)
+
+    # Generate IC?
+    if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
+        kernel.bank_IC(P, prog)
+
+    # Branchless collision?
+    if mcdc["technique"]["branchless_collision"]:
+        kernel.branchless_collision(P, mcdc)
+
+    # Analog collision
+    else:
+        # Get collision type
+        kernel.collision(P, mcdc)
+        event = P["event"]
+        # Perform collision
+        if event & EVENT_CAPTURE:
+            kernel.capture(P, mcdc)
+        elif event == EVENT_SCATTERING:
+            kernel.scattering(P, prog)
+        elif event == EVENT_FISSION:
+            kernel.fission(P, prog)
+
+        # Sensitivity quantification for nuclide?
+        material = mcdc["materials"][P["material_ID"]]
+        if material["sensitivity"] and (
+            P["sensitivity_ID"] == 0
+            or mcdc["technique"]["dsm_order"] == 2
+            and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
+        ):
+            kernel.sensitivity_material(P, prog)
+
+
+
+@njit
+def step_particle(P, prog):
+
+    mcdc = adapt.device(prog)
+
+    # Find cell from root universe if unknown
+    if P["cell_ID"] == -1:
+        find_particle_cell(P,prog)
+
+
+    # Determine and move to event
+    kernel.move_to_event(P, mcdc)
+    event = P["event"]
+
+
+    # The & operator here is a bitwise and.
+    # It is used to determine if an event type is part of the particle event.
+
+    # Collision
+    if event & EVENT_COLLISION:
+        evaluate_collision(P,prog)
+
+
+    # Mesh tally
+    if event & EVENT_MESH:
+        kernel.mesh_crossing(P, mcdc)
+
+
+
+    # Different Methods for shifting the particle
+    # Surface crossing
+    if event & EVENT_SURFACE:
+        kernel.surface_crossing(P, prog)
+
+    # Surface move
+    elif event & EVENT_SURFACE_MOVE:
+        P["t"] += SHIFT
+        P["cell_ID"] = -1
+
+    # Time census
+    elif event & EVENT_CENSUS:
+        P["t"] += SHIFT
+        adapt.add_census(kernel.copy_record(P), prog)
+        P["alive"] = False
+
+    # Shift particle
+    elif event & EVENT_LATTICE + EVENT_MESH:
+        kernel.shift_particle(P, SHIFT)
+
+
+
+
+    # Time boundary
+    if event & EVENT_TIME_BOUNDARY:
+        kernel.time_boundary(P, mcdc)
+
+    # Apply weight window
+    elif mcdc["technique"]["weight_window"]:
+        kernel.weight_window(P, prog)
+
+
+    # Apply weight roulette
+    if mcdc["technique"]["weight_roulette"]:
+        # check if weight has fallen below threshold
+        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
+            kernel.weight_roulette(P, mcdc)
+
+    # Particle tracker
+    if mcdc["setting"]["track_particle"] and not P["alive"]:
+        kernel.track_particle(P, mcdc)
+
+
 
 
 # =============================================================================
@@ -131,86 +225,35 @@ def loop_eigenvalue(mcdc):
 # =============================================================================
 
 
+
+
+
 @njit
-def _loop_source(seed, mcdc):
-    ## Progress bar indicator
-    #N_prog = 0
-    #
-    # Loop over particle sources
-    #work_start = mcdc["mpi_work_start"]
-    #work_size = mcdc["mpi_work_size"]
-    #work_end = work_start + work_size
-    #for idx_work in range(work_size):
-    #    seed_work = kernel.split_seed(work_start + idx_work, seed)
+def prep_particle(P,prog):
 
-        ## Particle tracker
-        #if mcdc["setting"]["track_particle"]:
-        #    mcdc["particle_track_history_ID"] += 1
+    mcdc = adapt.device(prog)
 
-        ## =====================================================================
-        ## Get a source particle and put into active bank
-        ## =====================================================================
+    # Apply weight window
+    if mcdc["technique"]["weight_window"]:
+        kernel.weight_window(P, prog)
 
-        ## Get from fixed-source?
-        #if mcdc["bank_source"]["size"] == 0:
-        #    # Sample source
-        #    P = kernel.source_particle(seed_work, mcdc)
-
-        ## Get from source bank
-        #else:
-        #    P = mcdc["bank_source"]["particles"][idx_work]
-
-        ## Check if it is beyond current census index
-        #idx_census = mcdc["idx_census"]
-        #if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-        #    kernel.add_particle(P, mcdc["bank_census"])
-        #else:
-        #    # Add the source particle into the active bank
-        #    kernel.add_particle(P, mcdc["bank_active"])
-
-        # =====================================================================
-        # Run the source particle and its secondaries
-        # =====================================================================
-
-        # Loop until active bank is exhausted
-        #while mcdc["bank_active"]["size"] > 0:
-            # Get particle from active bank
-            #kernel.get_particle(P,mcdc["bank_active"], mcdc)
-
-            # Apply weight window
-            #if mcdc["technique"]["weight_window"]:
-            #    kernel.weight_window(P, mcdc)
-
-            ## Particle tracker
-            #if mcdc["setting"]["track_particle"]:
-            #    mcdc["particle_track_particle_ID"] += 1
-
-            # Particle loop
-            #loop_particle(P, mcdc)
-
-        ## =====================================================================
-        ## Closeout
-        ## =====================================================================
-
-        ## Tally history closeout for one-batch fixed-source simulation
-        #if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        #    kernel.tally_closeout_history(mcdc)
-
-        ## Tally history closeout for multi-batch uq simulation
-        #if mcdc["technique"]["uq"]:
-        #    kernel.uq_tally_closeout_history(mcdc)
-
-        ## Progress printout
-        #percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
-        #if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-        #    N_prog += 1
-        #    with objmode():
-        #        print_progress(percent, mcdc)
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.allocate_pid(P,mcdc)
+    
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
 
 
-#$$$$GOOD
+
+
+
+
 @njit
 def generate_source_particle(idx_work, seed, prog):
+
+    #$$$$vvvv
     mcdc = adapt.device(prog)
 
     seed_work = kernel.split_seed(idx_work, seed)
@@ -231,36 +274,19 @@ def generate_source_particle(idx_work, seed, prog):
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.allocate_hid(P,mcdc)
+    #$$$$^^^^
 
     # Check if it is beyond current census index
-    idx_census = mcdc["idx_census"]
-    if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-        kernel.add_particle(P, mcdc["bank_census"])
+    census_idx = mcdc["technique"]["census_idx"]
+    if P["t"] > mcdc["technique"]["census_time"][census_idx]:
+        P["t"] += SHIFT
+        adapt.add_census(P, prog)
     else:
         # Add the source particle into the active bank
-        kernel.add_particle(P, mcdc["bank_active"])
+        adapt.add_active(P, prog)
 
 
-#$$$$GOOD
-@njit
-def prep_particle(P,prog):
 
-    mcdc = adapt.device(prog)
-
-    # Apply weight window
-    if mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_pid(P,mcdc)
-    
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
-
-#$$$$PROBABLY GOOD?
 @njit
 def exhaust_active_bank(mcdc):
     # Loop until active bank is exhausted
@@ -269,24 +295,17 @@ def exhaust_active_bank(mcdc):
         prep_particle(P,mcdc)
         while P["alive"]:
             step_particle(P,mcdc)
-    #????
     kernel.set_bank_size(mcdc["bank_active"],0)
-    #????
 
-#$$$$GOOD
+
+
 @for_cpu()
 def process_sources(seed,mcdc):
-
     # Progress bar indicator
     N_prog = 0
 
     # Loop over particle sources
-    work_start = mcdc["mpi_work_start"]
-    work_size = mcdc["mpi_work_size"]
-    work_end = work_start + work_size
-    for idx_work in range(work_size):
-        seed_work = kernel.split_seed(work_start + idx_work, seed)
-
+    for idx_work in range(mcdc["mpi_work_size"]):
         generate_source_particle(idx_work,seed,mcdc)
 
         # Loop until active bank is exhausted
@@ -302,190 +321,88 @@ def process_sources(seed,mcdc):
 
 
 
-#$$$$PROBABLY GOOD?
+
+
+
 @njit
 def loop_source(seed, mcdc):
 
-    #~~~~
-    #if mcdc["technique"]["iQMC"]:
-    #    mcdc["technique"]["iqmc_sweep_counter"] += 1
-    #~~~~
+    if mcdc["technique"]["iQMC"]:
+        mcdc["technique"]["iqmc_sweep_counter"] += 1
 
-    #$$$$
     process_sources(seed,mcdc)
-    #$$$$
 
     # =====================================================================
     # Closeout
     # =====================================================================
 
-    # Tally history closeout for one-batch fixed-source simulation
-    if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
+    # Tally history closeout for fixed-source simulation
+    if not mcdc["setting"]["mode_eigenvalue"]:
         kernel.tally_closeout_history(mcdc)
 
-    # Tally history closeout for multi-batch uq simulation
-    if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout_history(mcdc)
 
-    #~~~~
-    # Progress printout
-    #percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
-    #if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-    #    N_prog += 1
-    #    with objmode():
-    #        print_progress(percent, mcdc)
-    #~~~~
+    # Re-sync RNG
+    skip = mcdc["mpi_work_size_total"] - mcdc["mpi_work_start"]
 
 
-
-# =========================================================================
-# Particle loop
-# =========================================================================
-
-#$$$$GOOD
-@njit
-def find_particle_cell(P,prog):
-    mcdc = adapt.device(prog)
-
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
-    P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
-
-
-#$$$$GOOD
-@njit
-def step_particle(P, prog):
-    mcdc = adapt.device(prog)
-
-    # Find cell from root universe if unknown
-    if P["cell_ID"] == -1:
-        find_particle_cell(P,prog)
-
-    # Determine and move to event
-    kernel.move_to_event(P, mcdc)
-    event = P["event"]
-
-    # The & operator here is a bitwise and.
-    # It is used to determine if an event type is part of the particle event.
-
-    # Collision events
-    if event & EVENT_COLLISION:
-        # Generate IC?
-        if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-            kernel.bank_IC(P, prog)
-
-        # Branchless collision?
-        if mcdc["technique"]["branchless_collision"]:
-            kernel.branchless_collision(P, mcdc)
-
-        # Analog collision
-        else:
-            # Get collision type
-            kernel.collision(P, mcdc)
-            event = P["event"]
-
-            # Perform collision
-            if event == EVENT_SCATTERING:
-                kernel.scattering(P, prog)
-            elif event == EVENT_FISSION:
-                kernel.fission(P, prog)
-
-            # Sensitivity quantification for nuclide?
-            material = mcdc["materials"][P["material_ID"]]
-            if material["sensitivity"] and (
-                P["sensitivity_ID"] == 0
-                or mcdc["technique"]["dsm_order"] == 2
-                and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
-            ):
-                kernel.sensitivity_material(P, prog)
-
-    # Surface crossing
-    if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, prog)
-
-    # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["t"] += SHIFT
-        P["cell_ID"] = -1
-
-    # Census time crossing
-    if event & EVENT_CENSUS:
-        P["t"] += SHIFT
-        adapt.add_census(kernel.copy_record(P),prog)
-        P["alive"] = False
-
-    # Time boundary crossing
-    if event & EVENT_TIME_BOUNDARY:
-        P["alive"] = False
-
-    # Apply weight window
-    if P["alive"] and mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, prog)
-
-    # Apply weight roulette
-    if P["alive"] and mcdc["technique"]["weight_roulette"]:
-        # check if weight has fallen below threshold
-        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
-            kernel.weight_roulette(P, mcdc)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
 
 
 # =============================================================================
 # iQMC Loops
 # =============================================================================
 
-
 @toggle("iQMC")
 def loop_iqmc(mcdc):
+    # generate material index
+    kernel.generate_iqmc_material_idx(mcdc)
     # function calls from specified solvers
-    iqmc = mcdc["technique"]["iqmc"]
-    kernel.iqmc_preprocess(mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
-        if iqmc["eigenmode_solver"] == "davidson":
+        if mcdc["technique"]["iqmc_eigenmode_solver"] == "davidson":
             davidson(mcdc)
-        if iqmc["eigenmode_solver"] == "power_iteration":
+        if mcdc["technique"]["iqmc_eigenmode_solver"] == "power_iteration":
             power_iteration(mcdc)
     else:
-        if iqmc["fixed_source_solver"] == "source_iteration":
+        if mcdc["technique"]["iqmc_fixed_source_solver"] == "source_iteration":
             source_iteration(mcdc)
-        if iqmc["fixed_source_solver"] == "gmres":
+        if mcdc["technique"]["iqmc_fixed_source_solver"] == "gmres":
             gmres(mcdc)
 
 
 @njit
 def source_iteration(mcdc):
     simulation_end = False
-    iqmc = mcdc["technique"]["iqmc"]
-    total_source_old = iqmc["total_source"].copy()
 
+    loop_index = 0
     while not simulation_end:
         # reset particle bank size
-        mcdc["bank_source"]["size"] = 0
-        # initialize particles with LDS
-        kernel.iqmc_prepare_particles(mcdc)
-        # reset tallies for next loop
-        kernel.iqmc_reset_tallies(iqmc)
-        # sweep particles
-        iqmc["sweep_counter"] += 1
-        loop_source(0, mcdc)
+        kernel.set_bank_size(mcdc["bank_source"],0)
+        mcdc["technique"]["iqmc_source"] = np.zeros_like(
+            mcdc["technique"]["iqmc_source"]
+        )
 
+        # set bank source
+        kernel.prepare_qmc_source(mcdc)
+        # initialize particles with LDS
+        kernel.prepare_qmc_particles(mcdc)
+
+        # prepare source for next iteration
+        mcdc["technique"]["iqmc_flux"] = np.zeros_like(mcdc["technique"]["iqmc_flux"])
+
+        # sweep particles
+        loop_source(0, mcdc)
         # sum resultant flux on all processors
-        kernel.iqmc_distribute_tallies(iqmc)
-        iqmc["itt"] += 1
-        kernel.iqmc_update_source(mcdc)
-        # combine source tallies into one vector
-        kernel.iqmc_consolidate_sources(mcdc)
-        # calculate norm of sources
-        iqmc["res"] = kernel.iqmc_res(iqmc["total_source"], total_source_old)
+        kernel.iqmc_distribute_flux(mcdc)
+        mcdc["technique"]["iqmc_itt"] += 1
+
+        # calculate norm of flux iterations
+        mcdc["technique"]["iqmc_res"] = kernel.qmc_res(
+            mcdc["technique"]["iqmc_flux"], mcdc["technique"]["iqmc_flux_old"]
+        )
+
         # iQMC convergence criteria
-        if (iqmc["itt"] == iqmc["maxitt"]) or (iqmc["res"] <= iqmc["tol"]):
+        if (mcdc["technique"]["iqmc_itt"] == mcdc["technique"]["iqmc_maxitt"]) or (
+            mcdc["technique"]["iqmc_res"] <= mcdc["technique"]["iqmc_tol"]
+        ):
             simulation_end = True
 
         # Print progress
@@ -493,41 +410,33 @@ def source_iteration(mcdc):
             with objmode():
                 print_progress_iqmc(mcdc)
 
-        # set  source_old = current source
-        total_source_old = iqmc["total_source"].copy()
+        # set flux_old = current flux
+        mcdc["technique"]["iqmc_flux_old"] = mcdc["technique"]["iqmc_flux"].copy()
+
+        loop_index += 1
 
 
 @toggle("iQMC")
 def gmres(mcdc):
     """
-    GMRES solver.
+    GMRES solver for iQMC fixed-source problems.
     ----------
-    Linear Krylov solver. Solves problem of the form Ax = b.
 
     References
     ----------
     .. [1] Yousef Saad, "Iterative Methods for Sparse Linear Systems,
-        Second Edition", SIAM, pp. 151-172, pp. 272-275, 2003
-        http://www-users.cs.umn.edu/~saad/books.html
+       Second Edition", SIAM, pp. 151-172, pp. 272-275, 2003
+       http://www-users.cs.umn.edu/~saad/books.html
     .. [2] C. T. Kelley, http://www4.ncsu.edu/~ctk/matlab_roots.html
 
     code adapted from: https://github.com/pygbe/pygbe/blob/master/pygbe/gmres.py
 
     """
-    iqmc = mcdc["technique"]["iqmc"]
-    max_iter = iqmc["maxitt"]
-    R = iqmc["krylov_restart"]
-    tol = iqmc["tol"]
-
-    fixed_source = iqmc["fixed_source"]
-    single_vector = iqmc["fixed_source"].size
-    b = np.zeros_like(iqmc["total_source"])
-    b[:single_vector] = np.reshape(fixed_source, fixed_source.size)
-    X = iqmc["total_source"].copy()
-    # initial residual
-    r = b - kernel.AxV(X, b, mcdc)
-    normr = np.linalg.norm(r)
-
+    max_iter = mcdc["technique"]["iqmc_maxitt"]
+    R = mcdc["technique"]["iqmc_krylov_restart"]
+    tol = mcdc["technique"]["iqmc_tol"]
+    vector_size = mcdc["technique"]["iqmc_flux"].size
+    X = np.reshape(mcdc["technique"]["iqmc_flux"].copy(), vector_size)
     # Defining dimension
     dimen = X.size
     # Set number of outer and inner iterations
@@ -542,6 +451,11 @@ def gmres(mcdc):
     # In the inner loop there is a if statement to break in case max_iter is
     # reached.
     max_outer = int(np.ceil(max_iter / max_inner))
+
+    # initial residual
+    b = kernel.RHS(mcdc)
+    r = b - kernel.AxV(X, b, mcdc)
+    normr = np.linalg.norm(r)
 
     # Check initial guess ( scaling by b, if b != 0, must account for
     # case when norm(b) is very small)
@@ -624,78 +538,83 @@ def gmres(mcdc):
             if inner < max_inner - 1:
                 normr = abs(g[inner + 1])
                 rel_resid = normr / res_0
-                iqmc["res"] = rel_resid
 
-            iqmc["itt"] += 1
+                if rel_resid < tol:
+                    break
+
+            mcdc["technique"]["iqmc_itt"] += 1
+            mcdc["technique"]["iqmc_res"] = rel_resid
             if not mcdc["setting"]["mode_eigenvalue"]:
                 with objmode():
                     print_progress_iqmc(mcdc)
-
-            if rel_resid < tol:
-                break
-            if iqmc["itt"] >= max_iter:
-                break
-
         # end inner loop, back to outer loop
+
         # Find best update to X in Krylov Space V.  Solve inner X inner system.
         y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
         update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
         X = X + update
         aux = kernel.AxV(X, b, mcdc)
         r = b - aux
+
         normr = np.linalg.norm(r)
         rel_resid = normr / res_0
-        iqmc["res"] = rel_resid
-        if rel_resid < tol:
-            break
-        if iqmc["itt"] >= max_iter:
-            return
+
+        mcdc["technique"]["iqmc_itt"] += 1
+        mcdc["technique"]["iqmc_res"] = rel_resid
+        if not mcdc["setting"]["mode_eigenvalue"]:
+            with objmode():
+                print_progress_iqmc(mcdc)
+
+    # end outer loop
 
 
 @toggle("iQMC")
 def power_iteration(mcdc):
     simulation_end = False
-    iqmc = mcdc["technique"]["iqmc"]
-    # iteration tolerance
-    tol = iqmc["tol"]
-    # maximum number of iterations
-    maxit = iqmc["maxitt"]
-    score_bin = iqmc["score"]
-    k_old = mcdc["k_eff"]
-    solver = iqmc["fixed_source_solver"]
 
-    fission_source_old = score_bin["fission-source"].copy()
+    # iteration tolerance
+    tol = mcdc["technique"]["iqmc_tol"]
+    # maximum number of iterations
+    maxit = mcdc["technique"]["iqmc_maxitt"]
+    mcdc["technique"]["iqmc_flux_outter"] = mcdc["technique"]["iqmc_flux"].copy()
+    k_old = mcdc["k_eff"]
+    solver = mcdc["technique"]["iqmc_fixed_source_solver"]
 
     while not simulation_end:
         # iterate over scattering source
         if solver == "source_iteration":
-            iqmc["maxitt"] = 1
             source_iteration(mcdc)
-            iqmc["maxitt"] = maxit
         if solver == "gmres":
             gmres(mcdc)
         # reset counter for inner iteration
-        iqmc["itt"] = 0
+        mcdc["technique"]["iqmc_itt"] = 0
 
         # update k_eff
-        mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
+        kernel.UpdateK(
+            mcdc["k_eff"],
+            mcdc["technique"]["iqmc_flux_outter"],
+            mcdc["technique"]["iqmc_flux"],
+            mcdc,
+        )
 
-        # calculate diff in keff
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
+        # calculate diff in flux
+        mcdc["technique"]["iqmc_res_outter"] = abs(mcdc["k_eff"] - k_old)
         k_old = mcdc["k_eff"]
-        # store outter iteration values
-        score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
-        fission_source_old = score_bin["fission-source"].copy()
-        iqmc["itt_outter"] += 1
+        mcdc["technique"]["iqmc_flux_outter"] = mcdc["technique"]["iqmc_flux"].copy()
+        mcdc["technique"]["iqmc_itt_outter"] += 1
 
-        with objmode():
-            print_iqmc_eigenvalue_progress(mcdc)
+        if mcdc["setting"]["progress_bar"]:
+            with objmode():
+                print_iqmc_eigenvalue_progress(mcdc)
 
         # iQMC convergence criteria
-        if (iqmc["itt_outter"] == maxit) or (iqmc["res_outter"] <= tol):
+        if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
+            mcdc["technique"]["iqmc_res_outter"] <= tol
+        ):
             simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
+    if mcdc["setting"]["progress_bar"]:
+        with objmode():
+            print_iqmc_eigenvalue_exit_code(mcdc)
 
 
 @toggle("iQMC")
@@ -711,31 +630,42 @@ def davidson(mcdc):
 
     """
     # TODO: handle imaginary eigenvalues
-    iqmc = mcdc["technique"]["iqmc"]
+
     # Davidson parameters
     simulation_end = False
-    maxit = iqmc["maxitt"]
-    tol = iqmc["tol"]
+    maxit = mcdc["technique"]["iqmc_maxitt"]
+    tol = mcdc["technique"]["iqmc_tol"]
     # num_sweeps: number of preconditioner sweeps
-    num_sweeps = iqmc["preconditioner_sweeps"]
+    num_sweeps = mcdc["technique"]["iqmc_preconditioner_sweeps"]
     # m : restart parameter
-    m = iqmc["krylov_restart"]
+    m = mcdc["technique"]["iqmc_krylov_restart"]
     k_old = mcdc["k_eff"]
     # initial size of Krylov subspace
     Vsize = 1
     # l : number of eigenvalues to solve for
     l = 1
-    # vector size
-    Nt = iqmc["total_source"].size
-    # allocate memory then use slice indexing in loop
-    V = np.zeros((Nt, m), dtype=np.float64)
-    HV = np.zeros((Nt, m), dtype=np.float64)
-    FV = np.zeros((Nt, m), dtype=np.float64)
 
-    V0 = iqmc["total_source"].copy()
-    V0 = kernel.preconditioner(V0, mcdc, num_sweeps=5)
+    # initial scalar flux guess comes from power iteration
+    mcdc["technique"]["iqmc_maxitt"] = 3
+    mcdc["setting"]["progress_bar"] = False
+    power_iteration(mcdc)
+    mcdc["setting"]["progress_bar"] = True
+    mcdc["technique"]["iqmc_maxitt"] = maxit
+    mcdc["technique"]["iqmc_itt_outter"] = 0
+
+    # resulting guess
+    phi0 = mcdc["technique"]["iqmc_flux"].copy()
+    Nt = phi0.size
+    phi0 = np.reshape(phi0, (Nt,))
+
+    # Krylov subspace matrices
+    # we allocate memory then use slice indexing in loop
+    V = np.zeros((Nt, maxit), dtype=np.float64)
+    HV = np.zeros((Nt, maxit), dtype=np.float64)
+    FV = np.zeros((Nt, maxit), dtype=np.float64)
+
     # orthonormalize initial guess
-    V0 = V0 / np.linalg.norm(V0)
+    V0 = phi0 / np.linalg.norm(phi0)
     V[:, 0] = V0
 
     if m is None:
@@ -745,10 +675,10 @@ def davidson(mcdc):
     # Davidson Routine
     while not simulation_end:
         # Calculate V*H*V (HxV is scattering linear operator function)
-        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)
+        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)[:, 0]
         VHV = np.dot(cga(V[:, :Vsize].T), cga(HV[:, :Vsize]))
         # Calculate V*F*V (FxV is fission linear operator function)
-        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)
+        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)[:, 0]
         VFV = np.dot(cga(V[:, :Vsize].T), cga(FV[:, :Vsize]))
         # solve for eigenvalues and vectors
         with objmode(Lambda="complex128[:]", w="complex128[:,:]"):
@@ -775,18 +705,18 @@ def davidson(mcdc):
         u = np.dot(cga(V[:, :Vsize]), cga(w))
         # residual
         res = kernel.FxV(u, mcdc) - Lambda * kernel.HxV(u, mcdc)
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
+        mcdc["technique"]["iqmc_res_outter"] = abs(mcdc["k_eff"] - k_old)
         k_old = mcdc["k_eff"]
-        iqmc["itt_outter"] += 1
+        mcdc["technique"]["iqmc_itt_outter"] += 1
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
 
         # check convergence criteria
-        if (iqmc["itt_outter"] >= maxit) or (iqmc["res_outter"] <= tol):
+        if (mcdc["technique"]["iqmc_itt_outter"] == maxit) or (
+            mcdc["technique"]["iqmc_res_outter"] <= tol
+        ):
             simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
-            # return
+            break
         else:
             # Precondition for next iteration
             t = kernel.preconditioner(res, mcdc, num_sweeps)
@@ -799,8 +729,17 @@ def davidson(mcdc):
                 # "restarts" by appending to a new array
                 Vsize = l + 1
                 V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-        # TODO: normalize and save final scalar flux
-        iqmc["score"]["flux"] /= iqmc["score"]["flux"].sum()
+
+    with objmode():
+        print_iqmc_eigenvalue_exit_code(mcdc)
+
+    # normalize and save final scalar flux
+    flux = np.reshape(
+        u / np.linalg.norm(u),
+        mcdc["technique"]["iqmc_flux"].shape,
+    )
+
+    mcdc["technique"]["iqmc_flux"] = flux
 
 
 # =============================================================================
@@ -809,32 +748,100 @@ def davidson(mcdc):
 
 
 @njit
-def loop_source_precursor(seed, mcdc):
-    # TODO: censussed neutrons seeding is still not reproducible
+def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
+
+    mcdc = adapt.device(prog)
+
+    # Set groups
+    j = DNP["g"]
+    g = DNP["n_g"]
+
+    # Create new particle
+    P_new = adapt.local_particle()
+    part_seed = kernel.split_seed(particle_idx, seed_work)
+    P_new["rng_seed"] = part_seed
+    P_new["alive"] = True
+    P_new["w"] = 1.0
+    P_new["sensitivity_ID"] = 0
+
+    # Set position
+    P_new["x"] = DNP["x"]
+    P_new["y"] = DNP["y"]
+    P_new["z"] = DNP["z"]
+
+    # Get material
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
+
+    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
+    material_ID = kernel.get_particle_material(P_new, mcdc)
+    material = mcdc["materials"][material_ID]
+    G = material["G"]
+
+    # Sample nuclide and get spectrum and decay constant
+    N_nuclide = material["N_nuclide"]
+    if N_nuclide == 1:
+        nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
+        spectrum = nuclide["chi_d"][j]
+        decay = nuclide["decay"][j]
+    else:
+        SigmaF = material["fission"][g]
+        nu_d = material["nu_d"][g]
+        xi = kernel.rng(P_new) * nu_d[j] * SigmaF
+        tot = 0.0
+        for i in range(N_nuclide):
+            nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+            density = material["nuclide_densities"][i]
+            tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
+            if xi < tot:
+                # Nuclide determined, now get the constant and spectruum
+                spectrum = nuclide["chi_d"][j]
+                decay = nuclide["decay"][j]
+                break
+
+    # Sample emission time
+    P_new["t"] = -math.log(kernel.rng(P_new)) / decay
+    census_idx = mcdc["technique"]["census_idx"]
+    if census_idx > 0:
+        P_new["t"] += mcdc["technique"]["census_time"][census_idx - 1]
+
+    # Accept if it is inside current census index
+    if P_new["t"] < mcdc["technique"]["census_time"][census_idx]:
+        # Reduce precursor weight
+        DNP["w"] -= 1.0
+
+        # Skip if it's beyond time boundary
+        if P_new["t"] <= mcdc["setting"]["time_boundary"]:
+            # Sample energy
+            xi = kernel.rng(P_new)
+            tot = 0.0
+            for g_out in range(G):
+                tot += spectrum[g_out]
+                if tot > xi:
+                    break
+            P_new["g"] = g_out
+
+            # Sample direction
+            (
+                P_new["ux"],
+                P_new["uy"],
+                P_new["uz"],
+            ) = kernel.sample_isotropic_direction(P_new)
+
+            # Push to active bank
+            adapt.add_active(kernel.copy_record(P_new), prog)
+
+
+@for_cpu()
+def process_source_precursors(seed,mcdc):
 
     # Progress bar indicator
     N_prog = 0
-
-    # =========================================================================
-    # Sync. RNG skip ahead for reproducibility
-    # =========================================================================
-
-    # Exscan upper estimate of number of particles generated locally
-    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
-        mcdc["bank_precursor"], mcdc
-    )
-
-    # =========================================================================
-    # Loop over precursor sources
-    # =========================================================================
 
     for idx_work in range(mcdc["mpi_work_size_precursor"]):
         # Get precursor
         DNP = mcdc["bank_precursor"]["precursors"][idx_work]
 
-        # Set groups
-        j = DNP["g"]
-        g = DNP["n_g"]
 
         # Determine number of particles to be generated
         w = DNP["w"]
@@ -850,105 +857,10 @@ def loop_source_precursor(seed, mcdc):
         # =====================================================================
 
         for particle_idx in range(N):
-            # Create new particle
-            P_new = np.zeros(1, dtype=type_.particle)[0]
-            part_seed = kernel.split_seed(particle_idx, seed_work)
-            P_new["rng_seed"] = part_seed
-            P_new["alive"] = True
-            P_new["w"] = 1.0
-            P_new["sensitivity_ID"] = 0
-
-            # Set position
-            P_new["x"] = DNP["x"]
-            P_new["y"] = DNP["y"]
-            P_new["z"] = DNP["z"]
-
-            # Get material
-            trans = np.zeros(3)
-            P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
-            material_ID = kernel.get_particle_material(P_new, mcdc)
-            material = mcdc["materials"][material_ID]
-            G = material["G"]
-
-            # Sample nuclide and get spectrum and decay constant
-            N_nuclide = material["N_nuclide"]
-            if N_nuclide == 1:
-                nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
-                spectrum = nuclide["chi_d"][j]
-                decay = nuclide["decay"][j]
-            else:
-                SigmaF = material["fission"][g]  # MG only
-                nu_d = material["nu_d"][g]
-                xi = kernel.rng(P_new) * nu_d[j] * SigmaF
-                tot = 0.0
-                for i in range(N_nuclide):
-                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
-                    density = material["nuclide_densities"][i]
-                    tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
-                    if xi < tot:
-                        # Nuclide determined, now get the constant and spectruum
-                        spectrum = nuclide["chi_d"][j]
-                        decay = nuclide["decay"][j]
-                        break
-
-            # Sample emission time
-            P_new["t"] = -math.log(kernel.rng(P_new)) / decay
-            idx_census = mcdc["idx_census"]
-            if idx_census > 0:
-                P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
-
-            # Accept if it is inside current census index
-            if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
-                # Reduce precursor weight
-                DNP["w"] -= 1.0
-
-                # Skip if it's beyond time boundary
-                if P_new["t"] > mcdc["setting"]["time_boundary"]:
-                    continue
-
-                # Sample energy
-                xi = kernel.rng(P_new)
-                tot = 0.0
-                for g_out in range(G):
-                    tot += spectrum[g_out]
-                    if tot > xi:
-                        break
-                P_new["g"] = g_out
-
-                # Sample direction
-                (
-                    P_new["ux"],
-                    P_new["uy"],
-                    P_new["uz"],
-                ) = kernel.sample_isotropic_direction(P_new)
-
-                # Push to active bank
-                kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
-
-                # Loop until active bank is exhausted
-                while mcdc["bank_active"]["size"] > 0:
-                    # Get particle from active bank
-                    P = kernel.get_particle(mcdc["bank_active"], mcdc)
-
-                    # Apply weight window
-                    if mcdc["technique"]["weight_window"]:
-                        kernel.weight_window(P, mcdc)
-
-                    # Particle tracker
-                    if mcdc["setting"]["track_particle"]:
-                        mcdc["particle_track_particle_ID"] += 1
-
-                    # Particle loop
-                    loop_particle(P, mcdc)
-
-        # =====================================================================
-        # Closeout
-        # =====================================================================
-
-        # Tally history closeout for fixed-source simulation
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            kernel.tally_closeout_history(mcdc)
-
+            generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
+            # Loop until active bank is exhausted
+            exhaust_active_bank(mcdc)
+    
         # Progress printout
         percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
@@ -957,12 +869,10 @@ def loop_source_precursor(seed, mcdc):
                 print_progress(percent, mcdc)
 
 
-
-
-
 @njit
 def loop_source_precursor(seed, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
+
 
     # =========================================================================
     # Sync. RNG skip ahead for reproducibility
@@ -990,8 +900,6 @@ def loop_source_precursor(seed, mcdc):
 
     # Re-sync RNG
     skip = N_global - idx_start
-
-
 
 
 
@@ -1303,6 +1211,5 @@ def build_gpu_progs():
     global process_sources, process_source_precursors
     process_sources = make_gpu_process_sources(False)
     process_source_precursors = make_gpu_process_sources(True)
-
 
 

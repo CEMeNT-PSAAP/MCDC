@@ -169,6 +169,10 @@ class SurfaceHandle:
 
 
 def make_card_nuclide(G=1, J=0):
+    # Dimensions cannot be zero when compiling
+    # for gpu for data layout reasons.
+    G=max(G,1)
+    J=max(J,1)
     card = {}
     card["tag"] = "Nuclide"
     card["name"] = ""

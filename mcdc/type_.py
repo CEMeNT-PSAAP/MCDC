@@ -175,7 +175,7 @@ def make_type_particle(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    if tracked:
+    if input_deck.setting["track_particle"]:
         struct += [("track_pid",int64),("track_hid",int64)]
     particle = into_dtype(struct)
 
@@ -197,6 +197,7 @@ def make_type_particle_record(input_deck):
         ("w", float64),
         ("sensitivity_ID", int64),
         ("rng_seed", uint64),
+        ("alive", bool_),
     ]
 
     # Get modes
@@ -213,7 +214,7 @@ def make_type_particle_record(input_deck):
     if iQMC:
         G = input_deck.materials[0]["G"]
     iqmc_struct = [("w", float64, (G,))]
-    if tracked:
+    if input_deck.setting["track_particle"]:
         struct += [("track_pid",int64),("track_hid",int64)]
     struct += [("iqmc", iqmc_struct)]
 
