@@ -976,9 +976,9 @@ def copy_recordlike(P_new, P):
     P_new["g"] = P["g"]
     P_new["E"] = P["E"]
     P_new["w"] = P["w"]
-    P_new["rng_seed"] = P["rng_seed"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
-    P_new["iqmc_w"] = P["iqmc_w"]
+    P_new["rng_seed"] = P["rng_seed"]
+    P_new["alive"] = P["alive"]
     copy_track_data(P_new,P)
 
 
@@ -1021,7 +1021,6 @@ def copy_particle(P):
     P_new["event"] = P["event"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
     P_new["rng_seed"] = P["rng_seed"]
-    P_new["iqmc_w"] = P["iqmc_w"]
     copy_track_data(P_new,P)
     return P_new
 

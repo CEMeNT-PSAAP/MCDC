@@ -112,6 +112,7 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_translate()
     type_.make_type_particle(input_deck)
     type_.make_type_particle_record(input_deck)
     type_.make_type_nuclide(input_deck)
@@ -187,7 +188,6 @@ def prepare():
                 "chi_p",
                 "chi_d",
             ]:
-                print(name)
                 mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
 
         # CE data (load data from XS library)
