@@ -107,7 +107,7 @@ We have implemented novel algorithms using this scheme and, in some verification
 It uses the Numba compiler for Python to compile compute kernels to a desired hardware target, including support for graphics processing units (GPUs) [@lam_numba_2015].
 `MC/DC` uses `mpi4py` for distributed-memory parallelism [@mpi4py_2021] and has run at the scale of tens of thousands of processors [@variansyah_mc23_mcdc].
 These acceleration and abstraction techniques allow `MC/DC` developers to remain in a pure Python development environment without needing to support compiled or domain-specific languages.
-This has allowed `MC/DC` to grow from its instantiation less than two years ago into a codebase that supports full performant neutron transport and investigation of novel transport algorithms, with development mostly from relative novices.
+This has allowed `MC/DC` to grow from its initialization less than two years ago into a codebase that supports full performant neutron transport and investigation of novel transport algorithms, with development mostly from relative novices.
 
 Many of the traditionally developed neutron-transport codes are export-controlled (i.e., are not open source and difficult to access) and notoriously difficult to install, use, and develop in.
 Because `MC/DC` is an open-source and easily installable Python package (with a `pip`-installable distribution), it is ideal for use in an academic environment for both research and education.

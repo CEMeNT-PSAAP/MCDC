@@ -1,17 +1,29 @@
-import argparse, os
+import argparse, os, sys
 import numba as nb
 
 # Parse command-line arguments
 #   TODO: Will be inside run() once Python/Numba adapter is integrated
 parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
 parser.add_argument(
-    "--mode", type=str, help="Run mode", choices=["python", "numba"], default="python"
+    "--mode",
+    type=str,
+    help="Run mode",
+    choices=["python", "numba", "numba_debug"],
+    default="python",
 )
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 parser.add_argument("--progress_bar", default=True, action="store_true")
 parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
 args, unargs = parser.parse_known_args()
+
+from mcdc.print_ import (
+    print_banner,
+    print_msg,
+    print_runtime,
+    print_header_eigenvalue,
+    print_warning,
+)
 
 # Set mode
 #   TODO: Will be inside run() once Python/Numba adapter is integrated
@@ -20,6 +32,43 @@ if mode == "python":
     nb.config.DISABLE_JIT = True
 elif mode == "numba":
     nb.config.DISABLE_JIT = False
+    nb.config.NUMBA_DEBUG_CACHE = 1
+elif mode == "numba_debug":
+    msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
+    print_warning(msg)
+
+    nb.config.DISABLE_JIT = False  # turns on the jitter
+    nb.config.DEBUG = False  # turns on debugging options
+    nb.config.NUMBA_FULL_TRACEBACKS = (
+        1  # enables errors from sub-packages to be printed
+    )
+    nb.config.NUMBA_BOUNDSCHECK = 1  # checks bounds errors of vectors
+    nb.config.NUMBA_COLOR_SCHEME = (
+        "dark_bg"  # prints error messages for dark background terminals
+    )
+    nb.config.NUMBA_DEBUG_NRT = 1  # Numba run time (NRT) statistics counter
+    nb.config.NUMBA_DEBUG_TYPEINFER = (
+        1  # print out debugging information about type inference.
+    )
+    nb.config.NUMBA_ENABLE_PROFILING = 1  # enables profiler use
+    nb.config.NUMBA_DUMP_CFG = 1  # prints out a control flow diagram
+    nb.config.NUMBA_OPT = 0  # forums un optimized code from compilers
+    nb.config.NUMBA_DEBUGINFO = 1  #
+    nb.config.NUMBA_EXTEND_VARIABLE_LIFETIMES = (
+        1  # allows for inspection of numba variables after end of compilation
+    )
+
+    # file="str.txt";file1="list.txt"
+    # out=sys.stdout
+    # sys.stdout=open('debug_numba_config.txt','w')
+    # help(nb.config)
+    # sys.stdout.close
+
+    # print_msg('>> Numba config exported to debug_numba_config.txt')
+
+# elif mode == "numba x86":
+#    nb.config.NUMBA_OPT = 3
+#    NUMBA_DISABLE_INTEL_SVML
 
 import h5py
 import numpy as np
