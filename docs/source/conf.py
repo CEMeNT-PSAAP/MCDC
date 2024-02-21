@@ -42,6 +42,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx_toolbox.github",
     "sphinx_toolbox.sidebar_links",
+    "sphinx.ext.autosectionlabel",
 ]
 autosummary_generate = True
 

@@ -1,19 +1,10 @@
 import numpy as np
 import os
-import sys
+from task import task
+
 
 os.system("rm results/*png")
-
-# Fixed source
-for task in os.scandir("./fixed_source"):
-    os.chdir(task)
+for name in task.keys():
+    os.chdir(name)
     os.system("rm output*")
-    os.chdir(r"../..")
-
-# Eigenvalue
-"""
-for task in os.scandir('./eigenvalue'):
-    os.chdir(task)
-    os.system("rm output*")
-    os.chdir(r"../..")
-"""
+    os.chdir(r"..")
