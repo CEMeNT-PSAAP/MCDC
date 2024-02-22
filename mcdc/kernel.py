@@ -1855,7 +1855,7 @@ def move_to_event(P, mcdc):
             track_particle(P, mcdc)
         iqmc_score_tallies(P, distance, mcdc)
         iqmc_continuous_weight_reduction(P, distance, mcdc)
-        if np.abs(P["w"]) <= mcdc["technique"]["iqmc"]["w_min"]:
+        if math.fabs(P["w"]) <= mcdc["technique"]["iqmc"]["w_min"]:
             P["alive"] = False
 
     # Score tracklength tallies
@@ -2063,7 +2063,7 @@ def surface_crossing(P, prog):
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
             # Sample derivative source particles
-            sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc)
+            sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog)
 
 
 # =============================================================================
@@ -2568,7 +2568,7 @@ def fission_CE(P, nuclide, P_new):
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d = np.zeros(J)
+    nu_d = adapt.local_j_array()["values"]#np.zeros(J)
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 
@@ -2717,7 +2717,7 @@ def weight_window(P, prog):
 # ==============================================================================
 
 
-@njit
+@toggle("iQMC")
 def iqmc_continuous_weight_reduction(P, distance, mcdc):
     """
     Continuous weight reduction technique based on particle track-length, for
@@ -2747,7 +2747,7 @@ def iqmc_continuous_weight_reduction(P, distance, mcdc):
     P["w"] = iqmc_w_sum
 
 
-@njit
+@toggle("iQMC")
 def iqmc_preprocess(mcdc):
     # set bank source
     iqmc = mcdc["technique"]["iqmc"]
@@ -2764,7 +2764,7 @@ def iqmc_preprocess(mcdc):
     iqmc_consolidate_sources(mcdc)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_prepare_nuSigmaF(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     mesh = iqmc["mesh"]
@@ -2786,7 +2786,7 @@ def iqmc_prepare_nuSigmaF(mcdc):
                     )
 
 
-@njit
+@toggle("iQMC")
 def iqmc_prepare_source(mcdc):
     """
     Iterates trhough all spatial cells to calculate the iQMC source. The source
@@ -2826,7 +2826,7 @@ def iqmc_prepare_source(mcdc):
     iqmc_update_source(mcdc)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_prepare_particles(mcdc):
     """
     Create N_particles assigning the position, direction, and group from the
@@ -2884,7 +2884,7 @@ def iqmc_prepare_particles(mcdc):
         adapt.add_source(P_new, mcdc)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_res(flux_new, flux_old):
     """
 
@@ -2909,7 +2909,7 @@ def iqmc_res(flux_new, flux_old):
     return (flux_new - flux_old) / flux_old
 
 
-@njit
+@toggle("iQMC")
 def iqmc_score_tallies(P, distance, mcdc):
     """
 
@@ -3039,7 +3039,7 @@ def iqmc_score_tallies(P, distance, mcdc):
         score_bin["tilt-yz"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_cell_volume(x, y, z, mesh):
     """
     Calculate the volume of the current spatial cell.
@@ -3072,12 +3072,12 @@ def iqmc_cell_volume(x, y, z, mesh):
     return dV
 
 
-@njit
+@toggle("iQMC")
 def iqmc_sample_position(a, b, sample):
     return a + (b - a) * sample
 
 
-@njit
+@toggle("iQMC")
 def iqmc_sample_isotropic_direction(sample1, sample2):
     """
 
@@ -3112,7 +3112,7 @@ def iqmc_sample_isotropic_direction(sample1, sample2):
     return ux, uy, uz
 
 
-@njit
+@toggle("iQMC")
 def iqmc_sample_group(sample, G):
     """
     Uniformly sample energy group using a random sample between [0,1].
@@ -3133,7 +3133,7 @@ def iqmc_sample_group(sample, G):
     return int(np.floor(sample * G))
 
 
-@njit
+@toggle("iQMC")
 def iqmc_generate_material_idx(mcdc):
     """
     This algorithm is meant to loop through every spatial cell of the
@@ -3191,7 +3191,7 @@ def iqmc_generate_material_idx(mcdc):
                     mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = material_ID
 
 
-@njit
+@toggle("iQMC")
 def iqmc_reset_tallies(iqmc):
     score_bin = iqmc["score"]
     score_list = iqmc["score_list"]
@@ -3202,7 +3202,7 @@ def iqmc_reset_tallies(iqmc):
             score_bin[name].fill(0.0)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_distribute_tallies(iqmc):
     score_bin = iqmc["score"]
     score_list = iqmc["score_list"]
@@ -3212,7 +3212,7 @@ def iqmc_distribute_tallies(iqmc):
             iqmc_score_reduce_bin(score_bin[name])
 
 
-@njit
+@toggle("iQMC")
 def iqmc_score_reduce_bin(score):
     # MPI Reduce
     buff = np.zeros_like(score)
@@ -3221,7 +3221,7 @@ def iqmc_score_reduce_bin(score):
     score[:] = buff
 
 
-@njit
+@toggle("iQMC")
 def iqmc_update_source(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     keff = mcdc["k_eff"]
@@ -3237,7 +3237,7 @@ def iqmc_update_source(mcdc):
     iqmc["source"] = scatter + (fission / keff) + fixed
 
 
-@njit
+@toggle("iQMC")
 def iqmc_tilt_source(t, x, y, z, P, Q, mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     score_list = iqmc["score_list"]
@@ -3269,7 +3269,7 @@ def iqmc_tilt_source(t, x, y, z, P, Q, mcdc):
         Q += score_bin["tilt-yz"][:, t, x, y, z] * (P["y"] - y_mid) * (P["z"] - z_mid)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_distribute_sources(mcdc):
     """
     This function is meant to distribute iqmc_total_source to the relevant
@@ -3328,7 +3328,7 @@ def iqmc_distribute_sources(mcdc):
             Vsize += size
 
 
-@njit
+@toggle("iQMC")
 def iqmc_consolidate_sources(mcdc):
     """
     This function is meant to collect the relevant invidual source
@@ -3392,7 +3392,7 @@ def iqmc_consolidate_sources(mcdc):
 # TODO: Not all ST tallies have been built for case where SigmaT = 0.0
 
 
-@njit
+@toggle("iQMC")
 def iqmc_flux(SigmaT, w, distance, dV):
     # Score Flux
     if SigmaT.all() > 0.0:
@@ -3401,20 +3401,20 @@ def iqmc_flux(SigmaT, w, distance, dV):
         return distance * w / dV
 
 
-@njit
+@toggle("iQMC")
 def iqmc_fission_source(phi, material):
     SigmaF = material["fission"]
     nu_f = material["nu_f"]
     return np.sum(nu_f * SigmaF * phi)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_fission_power(phi, material):
     SigmaF = material["fission"]
     return SigmaF * phi
 
 
-@njit
+@toggle("iQMC")
 def iqmc_effective_fission(phi, mat_id, mcdc):
     """
     Calculate the fission source for use with iQMC.
@@ -3449,7 +3449,7 @@ def iqmc_effective_fission(phi, mat_id, mcdc):
     return F
 
 
-@njit
+@toggle("iQMC")
 def iqmc_effective_scattering(phi, mat_id, mcdc):
     """
     Calculate the scattering source for use with iQMC.
@@ -3475,14 +3475,14 @@ def iqmc_effective_scattering(phi, mat_id, mcdc):
     return np.dot(chi_s.T, SigmaS * phi)
 
 
-@njit
+@toggle("iQMC")
 def iqmc_effective_source(phi, mat_id, mcdc):
     S = iqmc_effective_scattering(phi, mat_id, mcdc)
     F = iqmc_effective_fission(phi, mat_id, mcdc)
     return S + F
 
 
-@njit
+@toggle("iQMC")
 def iqmc_linear_tilt(mu, x, dx, x_mid, dy, dz, w, distance, SigmaT):
     if SigmaT.all() > 1e-12:
         a = mu * (
@@ -3495,7 +3495,7 @@ def iqmc_linear_tilt(mu, x, dx, x_mid, dy, dz, w, distance, SigmaT):
     return Q
 
 
-@njit
+@toggle("iQMC")
 def iqmc_bilinear_tilt(ux, x, dx, x_mid, uy, y, dy, y_mid, dt, dz, w, S, SigmaT):
     # TODO: integral incase of SigmaT = 0
     Q = (

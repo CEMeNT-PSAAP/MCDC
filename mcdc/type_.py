@@ -56,6 +56,8 @@ def align(field_list):
         if len(field) == 3:
             field = ( field[0], field[1], fixup_dims(field[2]) )
             for d in field[2]:
+                if d == 0:
+                    print("AAAAAAAAAAAAAAAAAA")
                 multiplier *= d
         kind = np.dtype(field[1])
         size = kind.itemsize
@@ -87,6 +89,7 @@ def align(field_list):
         result.append((f"padding_{pad_id}", uint8, (pad_size,)))
         pad_id += 1
 
+    print(result)
     return result
 
 
@@ -889,7 +892,7 @@ def make_type_technique(input_deck):
     for i in range(len(scores_shapes)):
         name = scores_shapes[i][0]
         score_list += [(name, bool_)]
-    score_list = np.dtype(score_list)
+    score_list = into_dtype(score_list)
     iqmc_list += [("score_list", score_list)]
 
     # Add scores to structure
@@ -903,7 +906,7 @@ def make_type_technique(input_deck):
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     iqmc_list += [("score", scores)]
 
     # Constants
@@ -926,7 +929,7 @@ def make_type_technique(input_deck):
         ("w_min", float64),
     ]
 
-    struct += [("iqmc", iqmc_list)]
+    struct += [("iqmc", into_dtype(iqmc_list))]
 
     # =========================================================================
     # IC generator
@@ -989,7 +992,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -1032,11 +1035,11 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
@@ -1068,7 +1071,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -1080,7 +1083,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -1097,15 +1100,15 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
     )
 
@@ -1118,7 +1121,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -1161,11 +1164,11 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
@@ -1197,7 +1200,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -1209,7 +1212,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -1226,15 +1229,15 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
     )
 

@@ -114,7 +114,7 @@ def prepare():
 
     type_.make_type_translate()
     type_.make_type_group_array(input_deck)
-    type_.make_type_group_array(input_deck)
+    type_.make_type_j_array(input_deck)
 
     type_.make_type_particle(input_deck)
     type_.make_type_particle_record(input_deck)
@@ -455,7 +455,7 @@ def prepare():
             "w_min",
             "score_list",
             "score",
-        ]:
+        ] and not name.startswith("padding"):
             mcdc["technique"]["iqmc"][name] = input_deck.technique["iqmc"][name]
 
     if input_deck.technique["iQMC"]:
