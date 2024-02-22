@@ -70,7 +70,7 @@ def align(field_list):
 
         if multiplier == 0:
             multiplier = 1
-        
+
         size *= multiplier
 
         if offset % alignment != 0:
@@ -81,7 +81,7 @@ def align(field_list):
 
         result.append(field)
         offset += size
-    
+
     if offset % 8 != 0:
         pad_size = 8 - (offset%8)
         result.append((f"padding_{pad_id}", uint8, (pad_size,)))
@@ -89,12 +89,12 @@ def align(field_list):
 
     return result
 
-        
+
 
 
 def into_dtype(field_list):
     return np.dtype(align(field_list),align)
-         
+
 
 
 # ==============================================================================
@@ -1375,6 +1375,8 @@ def make_type_global(input_deck):
             ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
+            ("source_seed", uint64),
+            ("source_precursor_seed", uint64)
         ]
     )
 
@@ -1390,13 +1392,15 @@ def make_type_translate():
 
 
 
-def make_type_group_array(G):
+def make_type_group_array(input_deck):
     global group_array
+    G = input_deck.materials[0]["G"]
     group_array = into_dtype([("values", float64, (G,))])
 
 
-def make_type_j_array(J):
+def make_type_j_array(input_deck):
     global j_array
+    J = input_deck.materials[0]["J"]
     j_array = into_dtype([("values", float64, (J,))])
 
 

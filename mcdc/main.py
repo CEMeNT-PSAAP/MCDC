@@ -113,6 +113,9 @@ def prepare():
     # =========================================================================
 
     type_.make_type_translate()
+    type_.make_type_group_array(input_deck)
+    type_.make_type_group_array(input_deck)
+
     type_.make_type_particle(input_deck)
     type_.make_type_particle_record(input_deck)
     type_.make_type_nuclide(input_deck)
@@ -130,7 +133,7 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    
+
     if target == "gpu":
         adapt.gpu_forward_declare()
 

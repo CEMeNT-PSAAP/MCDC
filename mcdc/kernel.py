@@ -130,8 +130,11 @@ def adapt_rng(object_mode=False):
         wrapping_mul = wrapping_mul_python
 
 
-@njit(numba.uint64(numba.uint64, numba.uint64))
+#@njit(numba.uint64(numba.uint64, numba.uint64))
+@njit
 def split_seed(key, seed):
+    key = numba.uint64(key)
+    seed = numba.uint64(seed)
     """murmur_hash64a"""
     multiplier = numba.uint64(0xC6A4A7935BD1E995)
     length = numba.uint64(8)
@@ -293,7 +296,7 @@ def add_particle(P, bank):
 
 @njit
 def get_particle(P, bank, mcdc):
-    
+
     idx = add_bank_size(bank,-1) - 1
 
     # Check if bank is empty
@@ -1028,7 +1031,7 @@ def copy_particle(P):
 @njit
 def split_particle(P):
     P_new = copy_record(P)
-    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE) 
+    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
     return P_new
 
@@ -1610,7 +1613,7 @@ def eigenvalue_tally(P, distance, mcdc):
                 ID_nuclide = material["nuclide_IDs"][i]
                 nuclide = mcdc["nuclides"][ID_nuclide]
                 for j in range(J):
-                    nu_d = get_nu(NU_FISSION_DELAYED, nuclide, E, j)
+                    nu_d = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
                     decay = nuclide["ce_decay"][j]
                     total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
@@ -2567,7 +2570,7 @@ def fission_CE(P, nuclide, P_new):
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
     nu_d = np.zeros(J)
     for j in range(J):
-        nu_d[j] = get_nu(NU_FISSION_DELAYED, nuclide, E, j)
+        nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 
     # Delayed?
     prompt = True
@@ -2955,9 +2958,7 @@ def iqmc_score_tallies(P, distance, mcdc):
     score_bin["flux"][:, t, x, y, z] += flux
 
     # Score effective source tallies
-    score_bin["effective-scattering"][:, t, x, y, z] += iqmc_effective_scattering(
-        flux, mat_id, mcdc
-    )
+    score_bin["effective-scattering"][:, t, x, y, z] += iqmc_effective_scattering(flux, mat_id, mcdc)
     score_bin["effective-fission"][:, t, x, y, z] += iqmc_effective_fission(
         flux, mat_id, mcdc
     )
@@ -3840,7 +3841,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
 
 
         for idx in range(2):
-        
+
             if idx == 0:
                 material_ID = material_ID_old
                 sign = sign_old
@@ -4169,7 +4170,7 @@ def get_microXS(type_, nuclide, E):
 @njit
 def get_XS(data, E, E_grid, NE):
     # Search XS energy bin index
-    idx = binary_search(E, E_grid, NE)
+    idx = binary_search_length(E, E_grid, NE)
 
     # Extrapolate if E is outside the given data
     if idx == -1:
@@ -4187,7 +4188,7 @@ def get_XS(data, E, E_grid, NE):
 
 
 @njit
-def get_nu(type_, nuclide, E, group=-1):
+def get_nu_group(type_, nuclide, E, group):
     if type_ == NU_FISSION:
         nu = get_XS(nuclide["ce_nu_p"], E, nuclide["E_nu_p"], nuclide["NE_nu_p"])
         for i in range(6):
@@ -4212,6 +4213,10 @@ def get_nu(type_, nuclide, E, group=-1):
             nuclide["ce_nu_d"][group], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
         )
 
+@njit
+def get_nu(type_, nuclide, E):
+    return get_nu_group(type_,nuclide,E,-1)
+
 
 @njit
 def sample_nuclide(material, P, type_, mcdc):
@@ -4234,7 +4239,7 @@ def sample_Eout(P_new, E_grid, NE, chi):
     xi = rng(P_new)
 
     # Determine bin index
-    idx = binary_search(xi, chi, NE)
+    idx = binary_search_length(xi, chi, NE)
 
     # Linear interpolation
     E1 = E_grid[idx]
@@ -4250,7 +4255,7 @@ def sample_Eout(P_new, E_grid, NE, chi):
 
 
 @njit
-def binary_search(val, grid, length=0):
+def binary_search_length(val, grid, length):
     """
     Binary search that returns the bin index of the value `val` given grid `grid`.
 
@@ -4275,6 +4280,9 @@ def binary_search(val, grid, length=0):
             right = mid - 1
     return int(right)
 
+@njit
+def binary_search(val, grid):
+    return binary_search_length(val,grid,0)
 
 @njit
 def lartg(f, g):

@@ -69,9 +69,12 @@ def loop_fixed_source(mcdc):
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
             # Reset banks
-            mcdc["bank_source"]["size"] = 0
-            mcdc["bank_census"]["size"] = 0
-            mcdc["bank_active"]["size"] = 0
+            kernel.set_bank_size(mcdc["bank_source"],0)
+            kernel.set_bank_size(mcdc["bank_census"],0)
+            kernel.set_bank_size(mcdc["bank_active"],0)
+            #mcdc["bank_source"]["size"] = 0
+            #mcdc["bank_census"]["size"] = 0
+            #mcdc["bank_active"]["size"] = 0
 
             # Tally history closeout
             kernel.tally_reduce_bin(mcdc)
@@ -136,7 +139,7 @@ def loop_eigenvalue(mcdc):
 def generate_source_particle(idx_work, seed, prog):
     mcdc = adapt.device(prog)
 
-    seed_work = kernel.split_seed(idx_work, seed)
+    seed_work = kernel.split_seed(idx_work,seed)
 
     # =====================================================================
     # Get a source particle and put into active bank
@@ -145,12 +148,12 @@ def generate_source_particle(idx_work, seed, prog):
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
         # Sample source
-        P : type_.particle_record = kernel.source_particle(seed_work, mcdc)
+        P : type_.particle_record = kernel.source_particle(seed_work,mcdc)
 
     # Get from source bank
     else:
         P : type_.particle_record = mcdc["bank_source"]["particles"][idx_work]
-    
+
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.allocate_hid(P,mcdc)
@@ -177,7 +180,7 @@ def prep_particle(P,prog):
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.allocate_pid(P,mcdc)
-    
+
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.track_particle(P, mcdc)
@@ -208,7 +211,7 @@ def process_sources(seed,mcdc):
     work_size = mcdc["mpi_work_size"]
     work_end = work_start + work_size
     for idx_work in range(work_size):
-        seed_work = kernel.split_seed(work_start + idx_work, seed)
+        #seed_work = kernel.split_seed(work_start + idx_work, seed)
 
         generate_source_particle(idx_work,seed,mcdc)
 
@@ -731,25 +734,245 @@ def davidson(mcdc):
 # =============================================================================
 
 
-@njit
-def loop_source_precursor(seed, mcdc):
+#@njit
+#def loop_source_precursor(seed, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
     # Progress bar indicator
-    N_prog = 0
+    #N_prog = 0
 
     # =========================================================================
     # Sync. RNG skip ahead for reproducibility
     # =========================================================================
 
     # Exscan upper estimate of number of particles generated locally
-    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
-        mcdc["bank_precursor"], mcdc
-    )
+    #idx_start, N_local, N_global = kernel.bank_scanning_DNP(
+    #    mcdc["bank_precursor"], mcdc
+    #)
 
     # =========================================================================
     # Loop over precursor sources
     # =========================================================================
+
+    #for idx_work in range(mcdc["mpi_work_size_precursor"]):
+        ## Get precursor
+        #DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+
+        ## Set groups
+        #j = DNP["g"]
+        #g = DNP["n_g"]
+
+        ## Determine number of particles to be generated
+        #w = DNP["w"]
+        #N = math.floor(w)
+        ## "Roulette" the last particle
+        #seed_work = kernel.split_seed(idx_work, seed)
+        #if kernel.rng_from_seed(seed_work) < w - N:
+        #    N += 1
+        #DNP["w"] = N
+
+        # =====================================================================
+        # Loop over source particles from the source precursor
+        # =====================================================================
+
+        #for particle_idx in range(N):
+        #    # Create new particle
+        #    P_new = np.zeros(1, dtype=type_.particle)[0]
+        #    part_seed = kernel.split_seed(particle_idx, seed_work)
+        #    P_new["rng_seed"] = part_seed
+        #    P_new["alive"] = True
+        #    P_new["w"] = 1.0
+        #    P_new["sensitivity_ID"] = 0
+
+        #    # Set position
+        #    P_new["x"] = DNP["x"]
+        #    P_new["y"] = DNP["y"]
+        #    P_new["z"] = DNP["z"]
+
+        #    # Get material
+        #    trans = np.zeros(3)
+        #    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
+        #    material_ID = kernel.get_particle_material(P_new, mcdc)
+        #    material = mcdc["materials"][material_ID]
+        #    G = material["G"]
+
+        #    # Sample nuclide and get spectrum and decay constant
+        #    N_nuclide = material["N_nuclide"]
+        #    if N_nuclide == 1:
+        #        nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
+        #        spectrum = nuclide["chi_d"][j]
+        #        decay = nuclide["decay"][j]
+        #    else:
+        #        SigmaF = material["fission"][g]  # MG only
+        #        nu_d = material["nu_d"][g]
+        #        xi = kernel.rng(P_new) * nu_d[j] * SigmaF
+        #        tot = 0.0
+        #        for i in range(N_nuclide):
+        #            nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+        #            density = material["nuclide_densities"][i]
+        #            tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
+        #            if xi < tot:
+        #                # Nuclide determined, now get the constant and spectruum
+        #                spectrum = nuclide["chi_d"][j]
+        #                decay = nuclide["decay"][j]
+        #                break
+
+        #    # Sample emission time
+        #    P_new["t"] = -math.log(kernel.rng(P_new)) / decay
+        #    idx_census = mcdc["idx_census"]
+        #    if idx_census > 0:
+        #        P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
+
+        #    # Accept if it is inside current census index
+        #    if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
+        #        # Reduce precursor weight
+        #        DNP["w"] -= 1.0
+
+        #        # Skip if it's beyond time boundary
+        #        if P_new["t"] > mcdc["setting"]["time_boundary"]:
+        #            continue
+
+        #        # Sample energy
+        #        xi = kernel.rng(P_new)
+        #        tot = 0.0
+        #        for g_out in range(G):
+        #            tot += spectrum[g_out]
+        #            if tot > xi:
+        #                break
+        #        P_new["g"] = g_out
+
+        #        # Sample direction
+        #        (
+        #            P_new["ux"],
+        #            P_new["uy"],
+        #            P_new["uz"],
+        #        ) = kernel.sample_isotropic_direction(P_new)
+
+        #        # Push to active bank
+        #        kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
+
+        #        # Loop until active bank is exhausted
+        #        while mcdc["bank_active"]["size"] > 0:
+        #            # Get particle from active bank
+        #            P = kernel.get_particle(mcdc["bank_active"], mcdc)
+
+        #            # Apply weight window
+        #            if mcdc["technique"]["weight_window"]:
+        #                kernel.weight_window(P, mcdc)
+
+        #            # Particle tracker
+        #            if mcdc["setting"]["track_particle"]:
+        #                mcdc["particle_track_particle_ID"] += 1
+
+        #            # Particle loop
+        #            loop_particle(P, mcdc)
+
+        # =====================================================================
+        # Closeout
+        # =====================================================================
+
+        ## Tally history closeout for fixed-source simulation
+        #if not mcdc["setting"]["mode_eigenvalue"]:
+        #    kernel.tally_closeout_history(mcdc)
+
+        # Progress printout
+        #percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
+        #if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+        #    N_prog += 1
+        #    with objmode():
+        #        print_progress(percent, mcdc)
+
+
+@njit
+def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
+
+    mcdc = adapt.device(prog)
+
+    # Set groups
+    j = DNP["g"]
+    g = DNP["n_g"]
+
+    # Create new particle
+    P_new = adapt.local_particle()
+    part_seed = kernel.split_seed(particle_idx, seed_work)
+    P_new["rng_seed"] = part_seed
+    P_new["alive"] = True
+    P_new["w"] = 1.0
+    P_new["sensitivity_ID"] = 0
+
+    # Set position
+    P_new["x"] = DNP["x"]
+    P_new["y"] = DNP["y"]
+    P_new["z"] = DNP["z"]
+
+    # Get material
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
+
+    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
+    material_ID = kernel.get_particle_material(P_new, mcdc)
+    material = mcdc["materials"][material_ID]
+    G = material["G"]
+
+    # Sample nuclide and get spectrum and decay constant
+    N_nuclide = material["N_nuclide"]
+    if N_nuclide == 1:
+        nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
+        spectrum = nuclide["chi_d"][j]
+        decay = nuclide["decay"][j]
+    else:
+        SigmaF = material["fission"][g]
+        nu_d = material["nu_d"][g] # MG only
+        xi = kernel.rng(P_new) * nu_d[j] * SigmaF
+        tot = 0.0
+        for i in range(N_nuclide):
+            nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
+            density = material["nuclide_densities"][i]
+            tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
+            if xi < tot:
+                # Nuclide determined, now get the constant and spectruum
+                spectrum = nuclide["chi_d"][j]
+                decay = nuclide["decay"][j]
+                break
+
+    # Sample emission time
+    P_new["t"] = -math.log(kernel.rng(P_new)) / decay
+    idx_census = mcdc["idx_census"]
+    if idx_census > 0:
+        P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
+
+    # Accept if it is inside current census index
+    if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
+        # Reduce precursor weight
+        DNP["w"] -= 1.0
+
+        # Skip if it's beyond time boundary
+        if P_new["t"] <= mcdc["setting"]["time_boundary"]:
+            # Sample energy
+            xi = kernel.rng(P_new)
+            tot = 0.0
+            for g_out in range(G):
+                tot += spectrum[g_out]
+                if tot > xi:
+                    return
+            P_new["g"] = g_out
+
+            # Sample direction
+            (
+                P_new["ux"],
+                P_new["uy"],
+                P_new["uz"],
+            ) = kernel.sample_isotropic_direction(P_new)
+
+            # Push to active bank
+            adapt.add_active(kernel.copy_record(P_new), prog)
+
+
+@for_cpu()
+def process_source_precursors(seed,mcdc):
+
+    # Progress bar indicator
+    N_prog = 0
 
     for idx_work in range(mcdc["mpi_work_size_precursor"]):
         # Get precursor
@@ -773,104 +996,11 @@ def loop_source_precursor(seed, mcdc):
         # =====================================================================
 
         for particle_idx in range(N):
-            # Create new particle
-            P_new = np.zeros(1, dtype=type_.particle)[0]
-            part_seed = kernel.split_seed(particle_idx, seed_work)
-            P_new["rng_seed"] = part_seed
-            P_new["alive"] = True
-            P_new["w"] = 1.0
-            P_new["sensitivity_ID"] = 0
-
-            # Set position
-            P_new["x"] = DNP["x"]
-            P_new["y"] = DNP["y"]
-            P_new["z"] = DNP["z"]
-
-            # Get material
-            trans = np.zeros(3)
-            P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
-            material_ID = kernel.get_particle_material(P_new, mcdc)
-            material = mcdc["materials"][material_ID]
-            G = material["G"]
-
-            # Sample nuclide and get spectrum and decay constant
-            N_nuclide = material["N_nuclide"]
-            if N_nuclide == 1:
-                nuclide = mcdc["nuclides"][material["nuclide_IDs"][0]]
-                spectrum = nuclide["chi_d"][j]
-                decay = nuclide["decay"][j]
-            else:
-                SigmaF = material["fission"][g]  # MG only
-                nu_d = material["nu_d"][g]
-                xi = kernel.rng(P_new) * nu_d[j] * SigmaF
-                tot = 0.0
-                for i in range(N_nuclide):
-                    nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
-                    density = material["nuclide_densities"][i]
-                    tot += density * nuclide["nu_d"][g, j] * nuclide["fission"][g]
-                    if xi < tot:
-                        # Nuclide determined, now get the constant and spectruum
-                        spectrum = nuclide["chi_d"][j]
-                        decay = nuclide["decay"][j]
-                        break
-
-            # Sample emission time
-            P_new["t"] = -math.log(kernel.rng(P_new)) / decay
-            idx_census = mcdc["idx_census"]
-            if idx_census > 0:
-                P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
-
-            # Accept if it is inside current census index
-            if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
-                # Reduce precursor weight
-                DNP["w"] -= 1.0
-
-                # Skip if it's beyond time boundary
-                if P_new["t"] > mcdc["setting"]["time_boundary"]:
-                    continue
-
-                # Sample energy
-                xi = kernel.rng(P_new)
-                tot = 0.0
-                for g_out in range(G):
-                    tot += spectrum[g_out]
-                    if tot > xi:
-                        break
-                P_new["g"] = g_out
-
-                # Sample direction
-                (
-                    P_new["ux"],
-                    P_new["uy"],
-                    P_new["uz"],
-                ) = kernel.sample_isotropic_direction(P_new)
-
-                # Push to active bank
-                kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
-
-                # Loop until active bank is exhausted
-                while mcdc["bank_active"]["size"] > 0:
-                    # Get particle from active bank
-                    P = kernel.get_particle(mcdc["bank_active"], mcdc)
-
-                    # Apply weight window
-                    if mcdc["technique"]["weight_window"]:
-                        kernel.weight_window(P, mcdc)
-
-                    # Particle tracker
-                    if mcdc["setting"]["track_particle"]:
-                        mcdc["particle_track_particle_ID"] += 1
-
-                    # Particle loop
-                    loop_particle(P, mcdc)
-
-        # =====================================================================
-        # Closeout
-        # =====================================================================
-
-        # Tally history closeout for fixed-source simulation
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            kernel.tally_closeout_history(mcdc)
+            #????vvvv
+            generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
+            #????^^^^
+            # Loop until active bank is exhausted
+            exhaust_active_bank(mcdc)
 
         # Progress printout
         percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
@@ -878,8 +1008,6 @@ def loop_source_precursor(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-
-
 
 
 
@@ -910,9 +1038,8 @@ def loop_source_precursor(seed, mcdc):
     if not mcdc["setting"]["mode_eigenvalue"]:
         kernel.tally_closeout_history(mcdc)
 
-
     # Re-sync RNG
-    skip = N_global - idx_start
+    #skip = N_global - idx_start
 
 
 
@@ -987,7 +1114,7 @@ def make_gpu_process_sources(precursor):
             if idx_work >= mcdc["mpi_work_size"]:
                 return False
 
-            generate_source_particle(nb.uint64(idx_work),mcdc["source_seed"],prog)
+            generate_source_particle(nb.uint64(idx_work),nb.uint64(mcdc["source_seed"]),prog)
             return True
         work_maker = make_work
 
@@ -997,7 +1124,7 @@ def make_gpu_process_sources(precursor):
         pass
 
     def finalize(prog: nb.uintp):
-        pass 
+        pass
 
     @njit
     def hit_surface(P):
@@ -1017,12 +1144,12 @@ def make_gpu_process_sources(precursor):
         find_particle_cell(P,prog)
 
         adapt.step_async(prog,P)
-        
+
     def step(prog: nb.uintp, P: adapt.particle_gpu):
         mcdc = adapt.device(prog)
         # Determine and move to event
         kernel.move_to_event(P, mcdc)
-        
+
         if P["event"] & EVENT_COLLISION:
             collision_async(prog,P)
         elif P["event"] & EVENT_MESH:
@@ -1046,7 +1173,7 @@ def make_gpu_process_sources(precursor):
         mcdc = adapt.device(prog)
 
         kernel.mesh_crossing(P, mcdc)
-        
+
         if hit_surface(P):
             surface_async(prog,P)
         else:
@@ -1054,7 +1181,7 @@ def make_gpu_process_sources(precursor):
 
     def surface(prog: nb.uintp, P: adapt.particle_gpu):
         mcdc = adapt.device(prog)
-        
+
         # Different Methods for shifting the particle
         # Surface crossing
         if P["event"] & EVENT_SURFACE:
@@ -1139,7 +1266,7 @@ def make_gpu_process_sources(precursor):
         spec = adapt.harm.RuntimeSpec(spec_name,adapt.state_spec,base_fns,async_fns)
 
 
-    
+
     global source_gpu_rt, precursor_gpu_rt
 
     if precursor:
@@ -1154,10 +1281,10 @@ def make_gpu_process_sources(precursor):
         def process_source_precursors(seed,mcdc):
             mcdc["mpi_work_iter"][0] = 0
             mcdc["source_precursor_seed"] = seed
-            
+
             with objmode(mcdc_new = adapt.mcdc_type):
                 mcdc_new = run_precursor_gpu_rt(mcdc)
-            
+
             mcdc["tally"] = mcdc_new["tally"]
             mcdc["setting"] = mcdc_new["setting"]
             mcdc["technique"] = mcdc_new["technique"]
@@ -1179,7 +1306,7 @@ def make_gpu_process_sources(precursor):
             mcdc["particle_track_N"] = mcdc_new["particle_track_N"]
             mcdc["particle_track_history_ID"] = mcdc_new["particle_track_history_ID"]
             mcdc["particle_track_particle_ID"] = mcdc_new["particle_track_particle_ID"]
-            
+
             kernel.set_bank_size(mcdc["bank_active"],0)
         return process_source_precursors
     else:
@@ -1187,7 +1314,7 @@ def make_gpu_process_sources(precursor):
         def process_sources(seed,mcdc):
             mcdc["mpi_work_iter"][0] = 0
             mcdc["source_seed"] = seed
-            
+
             with objmode(mcdc_new = adapt.mcdc_type):
                 mcdc_new = run_source_gpu_rt(mcdc)
 
