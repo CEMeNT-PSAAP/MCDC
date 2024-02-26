@@ -18,7 +18,7 @@ authors = [
 ]
 description = "Monte Carlo / Dynamic Code, a pure python high performance Monte Carlo neutronics package"
 readme = "README.md"
-requires-python = ">=3.9, <=3.11.7"
+requires-python = ">=3.9, <=3.11.8"
 license = {file = "LICENSE"}
 keywords = ["Monte Carlo", "Nuclear", "GPU", "numba", "mpi4py", "neutron transport", "neutronics", "HPC"]
 classifiers = [
