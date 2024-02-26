@@ -1055,7 +1055,7 @@ def run_source_gpu_rt(mcdc):
     while True:
         source_gpu_rt.init(4096)
         source_gpu_rt.exec(65536,288)
-        #print(f"({count})")
+        print(f"(source {count})")
         count += 1
         if source_gpu_rt.halted():
             break
@@ -1067,7 +1067,7 @@ def run_precursor_gpu_rt(mcdc):
     while True:
         precursor_gpu_rt.init(4096)
         precursor_gpu_rt.exec(65536,288)
-        #print(f"({count})")
+        print(f"(precursor {count})")
         count += 1
         if source_gpu_rt.halted():
             break
@@ -1283,7 +1283,7 @@ def make_gpu_process_sources(precursor):
             mcdc["source_precursor_seed"] = seed
 
             with objmode(mcdc_new = adapt.mcdc_type):
-                mcdc_new = run_precursor_gpu_rt(mcdc)
+                mcdc_new = run_precursor_gpu_rt(mcdc)[0]
 
             mcdc["tally"] = mcdc_new["tally"]
             mcdc["setting"] = mcdc_new["setting"]
@@ -1315,32 +1315,21 @@ def make_gpu_process_sources(precursor):
             mcdc["mpi_work_iter"][0] = 0
             mcdc["source_seed"] = seed
 
-            with objmode(mcdc_new = adapt.mcdc_type):
+            mcdc_new = np.zeros(1, dtype=type_.global_)
+            with objmode(mcdc_new = adapt.mcdc_array_type):
                 mcdc_new = run_source_gpu_rt(mcdc)
 
-            mcdc["tally"] = mcdc_new["tally"]
-            mcdc["setting"] = mcdc_new["setting"]
-            mcdc["technique"] = mcdc_new["technique"]
-            mcdc["bank_active"] = mcdc_new["bank_active"]
-            mcdc["bank_census"] = mcdc_new["bank_census"]
-            mcdc["bank_source"] = mcdc_new["bank_source"]
-            mcdc["bank_precursor"] = mcdc_new["bank_precursor"]
-            #mcdc["i_cycle"] = mcdc_new["i_cycle"]
-            mcdc["cycle_active"] = mcdc_new["cycle_active"]
-            mcdc["eigenvalue_tally_nuSigmaF"] = mcdc_new["eigenvalue_tally_nuSigmaF"]
-            mcdc["eigenvalue_tally_n"] = mcdc_new["eigenvalue_tally_n"]
-            mcdc["eigenvalue_tally_C"] = mcdc_new["eigenvalue_tally_C"]
-            mcdc["runtime_total"] = mcdc_new["runtime_total"]
-            mcdc["runtime_preparation"] = mcdc_new["runtime_preparation"]
-            mcdc["runtime_simulation"] = mcdc_new["runtime_simulation"]
-            mcdc["runtime_output"] = mcdc_new["runtime_output"]
-            mcdc["runtime_bank_management"] = mcdc_new["runtime_bank_management"]
-            mcdc["particle_track"] = mcdc_new["particle_track"]
-            mcdc["particle_track_N"] = mcdc_new["particle_track_N"]
-            mcdc["particle_track_history_ID"] = mcdc_new["particle_track_history_ID"]
-            mcdc["particle_track_particle_ID"] = mcdc_new["particle_track_particle_ID"]
 
+            print("A")
+            #mcdc["mpi_work_iter"]              = mcdc_new[0]["mpi_work_iter"]
+            type_.copy_global(mcdc,mcdc_new[0])
+            with objmode():
+                print(mcdc_new[0]["mpi_work_iter"])
+                print(mcdc["mpi_work_iter"])
+
+            print("Setting bank size")
             kernel.set_bank_size(mcdc["bank_active"],0)
+            print("Finished processing sources")
         return process_sources
 
 

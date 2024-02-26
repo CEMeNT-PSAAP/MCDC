@@ -56,8 +56,6 @@ def align(field_list):
         if len(field) == 3:
             field = ( field[0], field[1], fixup_dims(field[2]) )
             for d in field[2]:
-                if d == 0:
-                    print("AAAAAAAAAAAAAAAAAA")
                 multiplier *= d
         kind = np.dtype(field[1])
         size = kind.itemsize
@@ -89,7 +87,7 @@ def align(field_list):
         result.append((f"padding_{pad_id}", uint8, (pad_size,)))
         pad_id += 1
 
-    print(result)
+    #print(result)
     return result
 
 
@@ -199,8 +197,8 @@ def make_type_particle_record(input_deck):
         ("E", float64),
         ("w", float64),
         ("sensitivity_ID", int64),
+        ("alive", bool_), # Should not be last until padding before nested structs is figured out
         ("rng_seed", uint64),
-        ("alive", bool_),
     ]
 
     # Get modes
@@ -219,10 +217,12 @@ def make_type_particle_record(input_deck):
     iqmc_struct = [("w", float64, (G,))]
     if input_deck.setting["track_particle"]:
         struct += [("track_pid",int64),("track_hid",int64)]
-    struct += [("iqmc", iqmc_struct)]
+    struct += [("iqmc", into_dtype(iqmc_struct))]
+    print(np.dtype(struct))
 
     # Save type
     particle_record = into_dtype(struct)
+    print(particle_record)
 
 
 precursor = into_dtype(
@@ -244,13 +244,13 @@ precursor = into_dtype(
 
 def particle_bank(max_size):
     return into_dtype(
-        [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U16")]
+        [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U32")]
     )
 
 
 def precursor_bank(max_size):
     return into_dtype(
-        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U16")]
+        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U32")]
     )
 
 
@@ -727,7 +727,7 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
-        ("output_name", "U30"),
+        ("output_name", str_),
         ("save_input_deck", bool_),
         ("track_particle", bool_),
         # Eigenvalue mode
@@ -744,10 +744,10 @@ def make_type_setting(deck):
         ("census_time", float64, (card["N_census"],)),
         # Particle source file
         ("source_file", bool_),
-        ("source_file_name", "U30"),
+        ("source_file_name", str_),
         # Initial condition source file
         ("IC_file", bool_),
-        ("IC_file_name", "U30"),
+        ("IC_file_name", str_),
         ("N_precursor", uint64),
         # TODO: Move to technique
         ("N_sensitivity", uint64),
@@ -1249,8 +1249,9 @@ param_names = ["tag", "ID", "key", "mean", "delta", "distribution", "rng_seed"]
 # Global
 # ==============================================================================
 
-def copy_global(dst,src):
-    pass
+
+
+
 
 def make_type_global(input_deck):
     global global_
@@ -1324,6 +1325,7 @@ def make_type_global(input_deck):
     # GLobal type
     global_ = into_dtype(
         [
+            ("mpi_work_iter", int64, (1,)),
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
@@ -1352,7 +1354,6 @@ def make_type_global(input_deck):
             ("k_sdv_running", float64),
             ("gyration_radius", float64, (N_cycle,)),
             ("idx_cycle", int64),
-            ("cycle_active", bool_),
             ("eigenvalue_tally_nuSigmaF", float64, (1,)),
             ("eigenvalue_tally_n", float64, (1,)),
             ("eigenvalue_tally_C", float64, (1,)),
@@ -1360,7 +1361,6 @@ def make_type_global(input_deck):
             ("idx_batch", int64),
             ("mpi_size", int64),
             ("mpi_rank", int64),
-            ("mpi_master", bool_),
             ("mpi_work_start", int64),
             ("mpi_work_size", int64),
             ("mpi_work_size_total", int64),
@@ -1377,9 +1377,10 @@ def make_type_global(input_deck):
             ("particle_track_history_ID", int64, (1,)),
             ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
-            ("mpi_work_iter", int64, (1,)),
             ("source_seed", uint64),
-            ("source_precursor_seed", uint64)
+            ("source_precursor_seed", uint64),
+            ("mpi_master", bool_),
+            ("cycle_active", bool_),
         ]
     )
 
@@ -1465,3 +1466,55 @@ def make_type_mesh_(card):
 
 
 mesh_names = ["x", "y", "z", "t", "mu", "azi", "g"]
+
+
+
+
+
+
+@njit
+def copy_global(dst,src):
+    dst["mpi_work_iter"] = src["mpi_work_iter"]
+    #dst["tally"]                      = src["tally"]
+    #dst["bank_active"]                = src["bank_active"].deep_copy()
+    #dst["bank_census"]                = src["bank_census"]
+    #dst["bank_source"]                = src["bank_source"]
+    print("B")
+    #dst["setting"]                    = src["setting"]
+    print("C")
+    #dst["technique"]                  = src["technique"]
+    print("D")
+    #dst["bank_precursor"]             = src["bank_precursor"]
+    print("E")
+    ##dst["i_cycle"]                    = src["i_cycle"]
+    #dst["cycle_active"]               = src["cycle_active"]
+    print("F")
+    #dst["eigenvalue_tally_nuSigmaF"]  = src["eigenvalue_tally_nuSigmaF"]
+    print("G")
+    #dst["eigenvalue_tally_n"]         = src["eigenvalue_tally_n"]
+    print("H")
+    #dst["eigenvalue_tally_C"]         = src["eigenvalue_tally_C"]
+    print("I")
+    #dst["runtime_total"]              = src["runtime_total"]
+    print("J")
+    #dst["runtime_preparation"]        = src["runtime_preparation"]
+    print("K")
+    #dst["runtime_simulation"]         = src["runtime_simulation"]
+    print("L")
+    #dst["runtime_output"]             = src["runtime_output"]
+    print("M")
+    #dst["runtime_bank_management"]    = src["runtime_bank_management"]
+    print("N")
+    #dst["particle_track"]             = src["particle_track"]
+    print("O")
+    #dst["particle_track_N"]           = src["particle_track_N"]
+    print("P")
+    #dst["particle_track_history_ID"]  = src["particle_track_history_ID"]
+    print("Q")
+    #dst["particle_track_particle_ID"] = src["particle_track_particle_ID"]
+    print("R")
+    print("S")
+    print("T")
+    pass
+
+
