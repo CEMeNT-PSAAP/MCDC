@@ -10,18 +10,6 @@ if ! { python3 -c 'import sys; assert sys.version_info < (3,12)' > /dev/null 2>&
   exit 1
 fi 
 
-# Install MC/DC module
-pip install -e .
-
-
-# Install MC/DC dependencies, reply "y" to conda prompt
-conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
-
-# Installing visualization dependencies (required via pip for osx-arm64)
-pip install ngsolve distinctipy
-
-bash patch_numba.sh
-
 # Install or build mpi4py
 if [ $# -eq 0 ]; then
   conda install mpi4py <<< "y"
@@ -52,4 +40,16 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Install MC/DC module
+pip install -e .
+
+
+# Install MC/DC dependencies, reply "y" to conda prompt
+conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
+
+# Installing visualization dependencies (required via pip for osx-arm64)
+pip install ngsolve distinctipy
+
+bash patch_numba.sh
 
