@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# Check python version
+if ! { python3 -c 'import sys; assert sys.version_info < (3,12)' > /dev/null 2>&1 && python3 -c 'import sys; assert sys.version_info >= (3,9)' > /dev/null 2>&1; }; then
+  v=$(python3 --version)
+  p=$(which python)
+  echo "ERROR: Python version must be < 3.12 and >= 3.9."
+  echo "    Found $v at $p."
+  echo "ERROR: Installation failed."
+  exit 1
+fi 
 
 # Install MC/DC module
 pip install -e .
