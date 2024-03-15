@@ -287,13 +287,13 @@ def loop_source_dd(seed, mcdc):
             kernel.tally_closeout_history(mcdc)
 
         # Progress printout
-        '''
+        """
         percent = ((work_idx + 1.0) / mcdc["mpi_work_size"]) * 0.5
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress_dd(percent, mcdc, "sourcing")
-        '''
+        """
 
     kernel.dd_particle_send(mcdc)
     terminated = False
@@ -340,13 +340,13 @@ def loop_source_dd(seed, mcdc):
             max_work = work_remaining
 
         # Progress printout
-        '''        
+        """        
         percent = (1 - work_remaining / max_work) * 0.5 + 0.5
         if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
             N_prog += 1
             with objmode():
                 print_progress_dd(percent, mcdc, "running")
-        '''
+        """
 
         if work_remaining == 0:
             wr_new += 1
