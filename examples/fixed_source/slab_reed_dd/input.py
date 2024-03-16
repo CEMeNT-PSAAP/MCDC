@@ -46,5 +46,6 @@ mcdc.tally(scores=["flux"], z=np.linspace(0.0, 8.0, 81))
 
 # Setting
 mcdc.setting(N_particle=5000)
+mcdc.domain_decomp(z=np.linspace(0.0, 8.0, 5))
 # Run
 mcdc.run()

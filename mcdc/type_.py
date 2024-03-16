@@ -711,6 +711,7 @@ def make_type_technique(input_deck):
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["domain_mesh"])
     struct += [("domain_mesh", mesh)]
     struct += [("d_idx", int64)]
+    struct += [("sent", int64)]
     struct += [("work_ratio", int64, (len(card["work_ratio"]),))]
     struct += [("exchange_rate", int64)]
     struct += [("repro", bool_)]

@@ -158,6 +158,16 @@ def dd_particle_send(mcdc):
                     bank, dest=mcdc["technique"]["zn_neigh"][i], tag=6
                 )
 
+    sent_particles = (
+        mcdc["bank_domain_xp"]["size"]
+        + mcdc["bank_domain_xn"]["size"]
+        + mcdc["bank_domain_yp"]["size"]
+        + mcdc["bank_domain_yn"]["size"]
+        + mcdc["bank_domain_zp"]["size"]
+        + mcdc["bank_domain_zn"]["size"]
+    )
+    mcdc["technique"]["sent"] += sent_particles
+
     mcdc["bank_domain_xp"]["size"] = 0
     mcdc["bank_domain_xn"]["size"] = 0
     mcdc["bank_domain_yp"]["size"] = 0
@@ -253,6 +263,7 @@ def dd_particle_receive(mcdc):
     # Set source bank from buffer
     for i in range(size):
         add_particle(buff[i], mcdc["bank_active"])
+    mcdc["technique"]["sent"] -= size
 
 
 # =============================================================================
