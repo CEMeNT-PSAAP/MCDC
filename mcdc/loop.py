@@ -17,7 +17,6 @@ from mcdc.print_ import (
     print_progress_dd,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
-    print_msg,
 )
 
 
@@ -336,6 +335,7 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
         work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
+        total_sent = int(kernel.allreduce(mcdc["technique"]["sent"]))
         if work_remaining > max_work:
             max_work = work_remaining
 
@@ -347,12 +347,7 @@ def loop_source_dd(seed, mcdc):
             with objmode():
                 print_progress_dd(percent, mcdc, "running")
         """
-
-        if work_remaining == 0:
-            wr_new += 1
-        else:
-            wr_new = 0
-        if wr_new > 4:
+        if work_remaining + total_sent == 0:
             terminated = True
 
         # Progress printout
