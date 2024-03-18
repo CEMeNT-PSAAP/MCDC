@@ -1173,7 +1173,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     return card
 
 
-def domain_decomp(
+def domain_decomposition(
     x=None,
     y=None,
     z=None,
@@ -1184,36 +1184,36 @@ def domain_decomp(
     repro=True,
 ):
     card = mcdc.input_deck.technique
-    card["domain_decomp"] = True
+    card["domain_decomposition"] = True
     card["domain_bank_size"] = int(1e5)
-    card["exchange_rate"] = int(exchange_rate)
-    card["repro"] = repro
+    card["dd_exchange_rate"] = int(exchange_rate)
+    card["dd_repro"] = repro
     dom_num = 1
     # Set mesh
     if x is not None:
-        card["domain_mesh"]["x"] = x
+        card["dd_mesh"]["x"] = x
         dom_num *= len(x)
     if y is not None:
-        card["domain_mesh"]["y"] = y
+        card["dd_mesh"]["y"] = y
         dom_num *= len(y)
     if z is not None:
-        card["domain_mesh"]["z"] = z
+        card["dd_mesh"]["z"] = z
         dom_num += len(z)
     if t is not None:
-        card["domain_mesh"]["t"] = t
+        card["dd_mesh"]["t"] = t
         dom_num += len(t)
     # Set work ratio
     if work_ratio is None:
-        card["work_ratio"] = None
+        card["dd_work_ratio"] = None
     elif work_ratio is not None:
-        card["work_ratio"] = work_ratio
-    card["d_idx"] = 0
-    card["xp_neigh"] = []
-    card["xn_neigh"] = []
-    card["yp_neigh"] = []
-    card["yn_neigh"] = []
-    card["zp_neigh"] = []
-    card["zn_neigh"] = []
+        card["dd_work_ratio"] = work_ratio
+    card["dd_idx"] = 0
+    card["dd_xp_neigh"] = []
+    card["dd_xn_neigh"] = []
+    card["dd_yp_neigh"] = []
+    card["dd_yn_neigh"] = []
+    card["dd_zp_neigh"] = []
+    card["dd_zn_neigh"] = []
     return card
 
 

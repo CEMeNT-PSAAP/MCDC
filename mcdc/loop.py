@@ -52,7 +52,7 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            if mcdc["technique"]["domain_decomp"]:
+            if mcdc["technique"]["domain_decomposition"]:
                 loop_source_dd(seed_source, mcdc)
             else:
                 loop_source(seed_source, mcdc)
@@ -238,13 +238,13 @@ def loop_source_dd(seed, mcdc):
         # Get from fixed-source?
         if mcdc["bank_source"]["size"] == 0:
             # Sample source
-            if mcdc["technique"]["repro"]:
+            if mcdc["technique"]["dd_repro"]:
                 P = kernel.source_particle(seed_work, mcdc)
 
             else:
                 P = kernel.source_particle(seed_work, mcdc)
-            if mcdc["technique"]["work_ratio"][mcdc["d_idx"]] > 0:
-                P["w"] /= mcdc["technique"]["work_ratio"][mcdc["d_idx"]]
+            if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
+                P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
         # Get from source bank
         else:
             P = mcdc["bank_source"]["particles"][work_idx]
@@ -335,7 +335,7 @@ def loop_source_dd(seed, mcdc):
 
         kernel.dd_particle_receive(mcdc)
         work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-        total_sent = int(kernel.allreduce(mcdc["technique"]["sent"]))
+        total_sent = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
         if work_remaining > max_work:
             max_work = work_remaining
 
