@@ -23,7 +23,7 @@ from mcdc.input_ import (
     uq,
     print_card,
     reset_cards,
-    domain_decomp,
+    domain_decomposition,
 )
 from mcdc.main import run, prepare
 from mcdc.visualizer import visualize
