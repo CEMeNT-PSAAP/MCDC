@@ -264,13 +264,13 @@ def loop_source(seed, mcdc):
                 max_work = work_remaining
 
             # Progress printout
-            '''
+            """
             percent = 1 - work_remaining / max_work
             if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
                 N_prog += 1
                 with objmode():
                     print_progress(percent, mcdc)
-            '''
+            """
             if work_remaining + total_sent == 0:
                 terminated = True
 
