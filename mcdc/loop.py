@@ -51,10 +51,7 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            if mcdc["technique"]["domain_decomposition"]:
-                loop_source(seed_source, mcdc)
-            else:
-                loop_source(seed_source, mcdc)
+            loop_source(seed_source, mcdc)
 
             # Loop over source precursors
             if mcdc["bank_precursor"]["size"] > 0:
@@ -267,154 +264,15 @@ def loop_source(seed, mcdc):
                 max_work = work_remaining
 
             # Progress printout
-
+            '''
             percent = 1 - work_remaining / max_work
             if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
                 N_prog += 1
                 with objmode():
                     print_progress(percent, mcdc)
-
+            '''
             if work_remaining + total_sent == 0:
                 terminated = True
-
-
-# =============================================================================
-# DD Source loop
-# =============================================================================
-@njit
-def loop_source_dd(seed, mcdc):
-    # Progress bar indicator
-    N_prog = 0
-
-    # Loop over particle sources
-    work_start = mcdc["mpi_work_start"]
-    work_end = work_start + mcdc["mpi_work_size"]
-    for work_idx in range(work_start, work_end):
-        seed_work = kernel.split_seed(work_idx, seed)
-        # Particle tracker
-        if mcdc["setting"]["track_particle"]:
-            mcdc["particle_track_history_ID"] += 1
-
-        # =====================================================================
-        # Get a source particle and put into active bank
-        # =====================================================================
-
-        # Get from fixed-source?
-        if mcdc["bank_source"]["size"] == 0:
-            # Sample source
-            if mcdc["technique"]["dd_repro"]:
-                P = kernel.source_particle(seed_work, mcdc)
-
-            else:
-                P = kernel.source_particle(seed_work, mcdc)
-            if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
-                P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
-        # Get from source bank
-        else:
-            P = mcdc["bank_source"]["particles"][work_idx]
-
-        # Check if it is beyond current census index
-        idx_census = mcdc["idx_census"]
-        if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-            if kernel.particle_in_domain(P, mcdc):
-                kernel.add_particle(P, mcdc["bank_census"])
-        else:
-            # Add the source particle into the active bank
-            if kernel.particle_in_domain(P, mcdc):
-                kernel.add_particle(P, mcdc["bank_active"])
-
-        # =====================================================================
-        # Run the source particle and its secondaries
-        # ========================================== ===========================
-
-        # Loop until active bank is exhausted
-        while mcdc["bank_active"]["size"] > 0:
-            # Get particle from active bank
-            P = kernel.get_particle(mcdc["bank_active"], mcdc)
-            if not kernel.particle_in_domain(P, mcdc):
-                print("particle not in domain")
-
-            # Apply weight window
-            if mcdc["technique"]["weight_window"]:
-                kernel.weight_window(P, mcdc)
-
-            # Particle tracker
-            if mcdc["setting"]["track_particle"]:
-                mcdc["particle_track_particle_ID"] += 1
-
-            # Particle loop
-            loop_particle(P, mcdc)
-
-        # Tally history closeout for one-batch fixed-source simulation
-        if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-            kernel.tally_closeout_history(mcdc)
-
-        # Progress printout
-        """
-        percent = ((work_idx + 1.0) / mcdc["mpi_work_size"]) * 0.5
-        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-            N_prog += 1
-            with objmode():
-                print_progress_dd(percent, mcdc, "sourcing")
-        """
-
-    kernel.dd_particle_send(mcdc)
-    terminated = False
-    kernel.dd_particle_receive(mcdc)
-    wr_new = 0
-    max_work = 1
-    # print_msg("Done sourcing, now running")
-    while not terminated:
-        if mcdc["bank_active"]["size"] > 0:
-            # wr_new = 0
-            # Loop until active bank is exhausted
-            while mcdc["bank_active"]["size"] > 0:
-                P = kernel.get_particle(mcdc["bank_active"], mcdc)
-                # kernel.score_tracklength(P, SHIFT, mcdc)
-                # kernel.shift_particle(P,-SHIFT)
-                if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print("recieved particle not in domain, position:")
-
-                # kernel.shift_particle(P, -1*SHIFT)
-
-                # Apply weight window
-                if mcdc["technique"]["weight_window"]:
-                    kernel.weight_window(P, mcdc)
-
-                # Particle tracker
-                if mcdc["setting"]["track_particle"]:
-                    mcdc["particle_track_particle_ID"] += 1
-
-                # Particle loop
-                loop_particle(P, mcdc)
-
-                # Tally history closeout for one-batch fixed-source simulation
-                if (
-                    not mcdc["setting"]["mode_eigenvalue"]
-                    and mcdc["setting"]["N_batch"] == 1
-                ):
-                    kernel.tally_closeout_history(mcdc)
-
-            kernel.dd_particle_send(mcdc)
-
-        kernel.dd_particle_receive(mcdc)
-        work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-        total_sent = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
-        if work_remaining > max_work:
-            max_work = work_remaining
-
-        # Progress printout
-        """        
-        percent = (1 - work_remaining / max_work) * 0.5 + 0.5
-        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-            N_prog += 1
-            with objmode():
-                print_progress_dd(percent, mcdc, "running")
-        """
-        if work_remaining + total_sent == 0:
-            terminated = True
-
-        # Progress printout
 
 
 # =========================================================================
