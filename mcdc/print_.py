@@ -91,35 +91,6 @@ def print_progress(percent, mcdc):
         sys.stdout.flush()
 
 
-def print_progress_dd(percent, mcdc, stage):
-    if master:
-        sys.stdout.write("\r")
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            if mcdc["setting"]["N_census"] == 1:
-                sys.stdout.write(
-                    "DD:"
-                    + stage
-                    + " [%-28s] %d%%" % ("=" * int(percent * 28), percent * 100.0)
-                )
-            else:
-                idx = mcdc["idx_census"] + 1
-                N = len(mcdc["setting"]["census_time"])
-                sys.stdout.write(
-                    " Census %i/%i: [%-28s] %d%%"
-                    % (idx, N, "=" * int(percent * 28), percent * 100.0)
-                )
-        else:
-            if mcdc["setting"]["gyration_radius"]:
-                sys.stdout.write(
-                    " [%-40s] %d%%" % ("=" * int(percent * 40), percent * 100.0)
-                )
-            else:
-                sys.stdout.write(
-                    "[%-32s] %d%%" % ("=" * int(percent * 32), percent * 100.0)
-                )
-        sys.stdout.flush()
-
-
 def print_progress_iqmc(mcdc):
     # TODO: function was not working with numba when structured like the
     # other print_progress functions

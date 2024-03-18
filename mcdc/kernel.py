@@ -285,7 +285,7 @@ def particle_in_domain(P, mcdc):
     x_cell = binary_search(P["x"], mcdc["technique"]["dd_mesh"]["x"])
     y_cell = binary_search(P["y"], mcdc["technique"]["dd_mesh"]["y"])
     z_cell = binary_search(P["z"], mcdc["technique"]["dd_mesh"]["z"])
-    
+
     if d_ix == x_cell:
         if d_iy == y_cell:
             if d_iz == z_cell:
@@ -537,7 +537,7 @@ def source_particle_dd(seed, mcdc):
     P["uy"] = uy
     P["uz"] = uz
     P["g"] = g
-    P["w"] = 1  
+    P["w"] = 1
     P["sensitivity_ID"] = 0
     return P
 

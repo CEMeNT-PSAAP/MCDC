@@ -14,7 +14,6 @@ from mcdc.print_ import (
     print_progress,
     print_progress_eigenvalue,
     print_progress_iqmc,
-    print_progress_dd,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
 )
@@ -53,7 +52,7 @@ def loop_fixed_source(mcdc):
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
             if mcdc["technique"]["domain_decomposition"]:
-                loop_source_dd(seed_source, mcdc)
+                loop_source(seed_source, mcdc)
             else:
                 loop_source(seed_source, mcdc)
 
@@ -169,10 +168,22 @@ def loop_source(seed, mcdc):
         # Check if it is beyond current census index
         idx_census = mcdc["idx_census"]
         if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-            kernel.add_particle(P, mcdc["bank_census"])
+            if mcdc["technique"]["domain_decomposition"]:
+                if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
+                    P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
+                if kernel.particle_in_domain(P, mcdc):
+                    kernel.add_particle(P, mcdc["bank_census"])
+            else:
+                kernel.add_particle(P, mcdc["bank_census"])
         else:
             # Add the source particle into the active bank
-            kernel.add_particle(P, mcdc["bank_active"])
+            if mcdc["technique"]["domain_decomposition"]:
+                if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
+                    P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
+                if kernel.particle_in_domain(P, mcdc):
+                    kernel.add_particle(P, mcdc["bank_active"])
+            else:
+                kernel.add_particle(P, mcdc["bank_active"])
 
         # =====================================================================
         # Run the source particle and its secondaries
@@ -212,6 +223,59 @@ def loop_source(seed, mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
+
+    if mcdc["technique"]["domain_decomposition"]:
+        kernel.dd_particle_send(mcdc)
+        terminated = False
+        max_work = 1
+        kernel.dd_particle_receive(mcdc)
+        while not terminated:
+            if mcdc["bank_active"]["size"] > 0:
+                # Loop until active bank is exhausted
+                while mcdc["bank_active"]["size"] > 0:
+
+                    P = kernel.get_particle(mcdc["bank_active"], mcdc)
+                    if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                        print("recieved particle not in domain, position:")
+
+                    # Apply weight window
+                    if mcdc["technique"]["weight_window"]:
+                        kernel.weight_window(P, mcdc)
+
+                    # Particle tracker
+                    if mcdc["setting"]["track_particle"]:
+                        mcdc["particle_track_particle_ID"] += 1
+
+                    # Particle loop
+                    loop_particle(P, mcdc)
+
+                    # Tally history closeout for one-batch fixed-source simulation
+                    if (
+                        not mcdc["setting"]["mode_eigenvalue"]
+                        and mcdc["setting"]["N_batch"] == 1
+                    ):
+                        kernel.tally_closeout_history(mcdc)
+
+                # Send all domain particle banks
+                kernel.dd_particle_send(mcdc)
+
+            # Check for incoming particles
+            kernel.dd_particle_receive(mcdc)
+            work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
+            total_sent = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
+            if work_remaining > max_work:
+                max_work = work_remaining
+
+            # Progress printout
+
+            percent = 1 - work_remaining / max_work
+            if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+                N_prog += 1
+                with objmode():
+                    print_progress(percent, mcdc)
+
+            if work_remaining + total_sent == 0:
+                terminated = True
 
 
 # =============================================================================
