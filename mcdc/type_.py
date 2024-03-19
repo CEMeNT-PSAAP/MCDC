@@ -694,6 +694,7 @@ def make_type_technique(input_deck):
         ("iQMC", bool_),
         ("IC_generator", bool_),
         ("branchless_collision", bool_),
+        ("domain_decomposition", bool_),
         ("uq", bool_),
     ]
 
@@ -702,6 +703,24 @@ def make_type_technique(input_deck):
     # =========================================================================
 
     struct += [("pct", int64), ("pc_factor", float64)]
+
+    # =========================================================================
+    # domain decomp
+    # =========================================================================
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["dd_mesh"])
+    struct += [("dd_mesh", mesh)]
+    struct += [("dd_idx", int64)]
+    struct += [("dd_sent", int64)]
+    struct += [("dd_work_ratio", int64, (len(card["dd_work_ratio"]),))]
+    struct += [("dd_exchange_rate", int64)]
+    struct += [("dd_repro", bool_)]
+    struct += [("dd_xp_neigh", int64, (len(card["dd_xp_neigh"]),))]
+    struct += [("dd_xn_neigh", int64, (len(card["dd_xn_neigh"]),))]
+    struct += [("dd_yp_neigh", int64, (len(card["dd_yp_neigh"]),))]
+    struct += [("dd_yn_neigh", int64, (len(card["dd_yn_neigh"]),))]
+    struct += [("dd_zp_neigh", int64, (len(card["dd_zp_neigh"]),))]
+    struct += [("dd_zn_neigh", int64, (len(card["dd_zn_neigh"]),))]
 
     # =========================================================================
     # Weight window
@@ -1056,6 +1075,22 @@ def make_type_global(input_deck):
         bank_source = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
+    # Domain banks if needed
+    if input_deck.technique["domain_decomposition"]:
+        bank_domain_xp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_xn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_yp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_yn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_zp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_zn = particle_bank(input_deck.technique["domain_bank_size"])
+    else:
+        bank_domain_xp = particle_bank(0)
+        bank_domain_xn = particle_bank(0)
+        bank_domain_yp = particle_bank(0)
+        bank_domain_yn = particle_bank(0)
+        bank_domain_zp = particle_bank(0)
+        bank_domain_zn = particle_bank(0)
+        bank_lost = particle_bank(0)
     # Particle tracker
     N_track = 0
     if input_deck.setting["track_particle"]:
@@ -1096,7 +1131,14 @@ def make_type_global(input_deck):
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
+            ("bank_domain_xp", bank_domain_xp),
+            ("bank_domain_xn", bank_domain_xn),
+            ("bank_domain_yp", bank_domain_yp),
+            ("bank_domain_yn", bank_domain_yn),
+            ("bank_domain_zp", bank_domain_zp),
+            ("bank_domain_zn", bank_domain_zn),
             ("bank_precursor", bank_precursor),
+            ("dd_idx", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),

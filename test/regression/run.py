@@ -28,11 +28,21 @@ else:
     names = [item for item in os.listdir() if fnmatch.fnmatch(item, name)]
 names.sort()
 
+
 # Remove skipped if specified
 if skip != "NONE":
     skips = [item for item in os.listdir() if fnmatch.fnmatch(item, skip)]
     for name in skips:
         names.remove(name)
+# Skip cache if any
+if "__pycache__" in names:
+    names.remove("__pycache__")
+# Skip domain decomp tests unless there are 4 MPI processes
+temp = names.copy()
+for name in names:
+    if name[:3] == "dd_" and mpiexec != 4:
+        temp.remove(name)
+names = temp
 
 # Data for each test
 printouts = []
@@ -44,10 +54,6 @@ all_pass = True
 
 # Run all tests
 for i, name in enumerate(names):
-    # Skip cache if any
-    if name == "__pycache__":
-        continue
-
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
