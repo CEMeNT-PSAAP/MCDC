@@ -1,21 +1,18 @@
 #!/bin/bash
 
-
-# Install MC/DC module
-pip install -e .
-
-
-# Install MC/DC dependencies, reply "y" to conda prompt
-conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
-
-# Installing visualization dependencies (required via pip for osx-arm64)
-pip install ngsolve distinctipy
-
-bash patch_numba.sh
+# Check python version
+if ! { python3 -c 'import sys; assert sys.version_info < (3,12)' > /dev/null 2>&1 && python3 -c 'import sys; assert sys.version_info >= (3,9)' > /dev/null 2>&1; }; then
+  v=$(python3 --version)
+  p=$(which python)
+  echo "ERROR: Python version must be < 3.12 and >= 3.9."
+  echo "    Found $v at $p."
+  echo "ERROR: Installation failed."
+  exit 1
+fi 
 
 # Install or build mpi4py
 if [ $# -eq 0 ]; then
-  conda mpi4py <<< "y"
+  conda install mpi4py <<< "y"
 fi
 while [ $# -gt 0 ]; do
   case $1 in
@@ -43,4 +40,16 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Install MC/DC module
+pip install -e .
+
+
+# Install MC/DC dependencies, reply "y" to conda prompt
+conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
+
+# Installing visualization dependencies (required via pip for osx-arm64)
+pip install ngsolve distinctipy
+
+bash patch_numba.sh
 
