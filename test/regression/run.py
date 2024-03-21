@@ -34,6 +34,10 @@ if skip != "NONE":
     for name in skips:
         names.remove(name)
 
+# Skip cache if any
+if "__pycache__" in names:
+    names.remove("__pycache__")
+    
 # Data for each test
 printouts = []
 runtimes = []
@@ -44,10 +48,6 @@ all_pass = True
 
 # Run all tests
 for i, name in enumerate(names):
-    # Skip cache if any
-    if name == "__pycache__":
-        continue
-
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
