@@ -44,6 +44,10 @@ for name in names:
         temp.remove(name)
 names = temp
 
+# Skip cache if any
+if "__pycache__" in names:
+    names.remove("__pycache__")
+
 # Data for each test
 printouts = []
 runtimes = []
