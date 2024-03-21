@@ -37,7 +37,7 @@ if skip != "NONE":
 # Skip cache if any
 if "__pycache__" in names:
     names.remove("__pycache__")
-    
+
 # Data for each test
 printouts = []
 runtimes = []
