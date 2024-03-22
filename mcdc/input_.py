@@ -323,6 +323,8 @@ def material(
                 nuc_card["ID"] = nuc_ID
 
                 dir_name = os.getenv("MCDC_XSLIB")
+                if (dir_name == None):
+                    print_error("Continuous energy data directory not configured \n       see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n")
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card["fissionable"] = True
