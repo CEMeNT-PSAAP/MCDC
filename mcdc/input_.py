@@ -657,7 +657,8 @@ def _set_J(x, t, card):
 
 
 def cell(surfaces_flags, fill, lattice_center=None):
-    """_summary_
+    """
+    Defines a cell as a building block of geometry
 
     Parameters
     ----------
@@ -665,8 +666,8 @@ def cell(surfaces_flags, fill, lattice_center=None):
         list of surface cards
     fill : bool
         fill the cells
-    lattice_center : _type_, optional
-        _description_, by default None
+    lattice_center : array like[float], optional
+        defines the center of the lattice, by default None
 
     Returns
     -------
@@ -701,12 +702,13 @@ def cell(surfaces_flags, fill, lattice_center=None):
 
 
 def universe(cells, root=False):
-    """_summary_
+    """
+    Defines the region where particles will be tracked
 
     Parameters
     ----------
     cells : dictionary
-        cell card dexcriptions
+        cell card descriptions
     root : bool, optional
         by default False
 
@@ -799,7 +801,7 @@ def lattice(x=None, y=None, z=None, universes=None):
 
 def source(**kw):
     """
-    Create a source card.
+    Create a source card
 
     Other Parameters
     ----------------
@@ -948,33 +950,33 @@ def tally(
     g=np.array([-INF, INF]),
     E=np.array([0.0, INF]),
 ):
-    """_summary_
+    """
+    Creates a tally card to collect MC solutions
 
     Parameters
     ----------
-    scores : _type_
-        _description_
-    x : _type_, optional
-        _description_, by default np.array([-INF, INF])
-    y : _type_, optional
-        _description_, by default np.array([-INF, INF])
-    z : _type_, optional
-        _description_, by default np.array([-INF, INF])
-    t : _type_, optional
-        _description_, by default np.array([-INF, INF])
-    mu : _type_, optional
-        _description_, by default np.array([-1.0, 1.0])
-    azi : _type_, optional
-        _description_, by default np.array([-PI, PI])
-    g : _type_, optional
-        _description_, by default np.array([-INF, INF])
-    E : _type_, optional
+    scores : str
+        set tally type, default to tracklength
+    x : array like [float], optional
+        define x-spatial tally bins, by default np.array([-INF, INF])
+    y : array like [float], optional
+        define y-spatial tally bins, by default np.array([-INF, INF])
+    z : array like [float], optional
+        define z-spatial tally bins, by default np.array([-INF, INF])
+    t : array like [float], optional
+        define time tally bins, by default np.array([-INF, INF])
+    mu : array like [float], optional
+        define axial angular tally bins, by default np.array([-1.0, 1.0])
+    azi : array like [float], optional
+        define azimuthal angle tally bins, by default np.array([-PI, PI])
+    g : array like [float], optional
+        tally group, define an energy band to tally in, by default np.array([-INF, INF])
+    E : array like [float], optional
         _description_, by default np.array([0.0, INF])
 
     Returns
     -------
-    _type_
-        _description_
+    tally card : dictionary
     """
 
     # Get tally card
@@ -1234,7 +1236,9 @@ def eigenmode(
 
 
 def implicit_capture():
-    """sets implicit capture"""
+    """
+    Sets implicit capture
+    """
     card = mcdc.input_deck.technique
     card["implicit_capture"] = True
     card["weighted_emission"] = False
@@ -1242,7 +1246,7 @@ def implicit_capture():
 
 def weighted_emission(flag):
     """
-    sets weighted emission
+    Sets weighted emission variance reduction
 
     Parameters
     ----------
@@ -1255,7 +1259,8 @@ def weighted_emission(flag):
 
 
 def population_control(pct="combing"):
-    """sets population control techniques
+    """
+    Sets population control techniques
 
     Parameters
     ----------
@@ -1276,7 +1281,7 @@ def population_control(pct="combing"):
 
 def branchless_collision():
     """
-    sets branchless collision
+    Sets branchless collision variance reduction technique
     """
     card = mcdc.input_deck.technique
     card["branchless_collision"] = True
@@ -1314,7 +1319,8 @@ def time_census(t):
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
-    """adds weight windows for a combing function
+    """
+    Adds weight window variance reduction technique
 
     Parameters
     ----------
@@ -1400,14 +1406,15 @@ def iQMC(
     eigenmode_solver="power_iteration",
     score=[],
 ):
-    """Sets iqmc settings
+    """
+    Sets iQMC settings
 
     Parameters
     ----------
     g : _type_, optional
-        _description_, by default None
+        group, by default None
     t : _type_, optional
-        _description_, by default None
+        time, by default None
     x : _type_, optional
         _description_, by default None
     y : _type_, optional
@@ -1459,7 +1466,9 @@ def iQMC(
     score : list, optional
         _description_, by default []
 
-
+    Returns
+    -------
+    iqmc card : dictionary 
     """
 
     card = mcdc.input_deck.technique
@@ -1659,7 +1668,7 @@ def IC_generator(
 
 def dsm(order=1):
     """
-    direct sensitivity analysis
+    Direct sensitivity method
 
     Parameters
     ----------
@@ -1675,7 +1684,7 @@ def dsm(order=1):
 
 def uq(**kw):
     """
-    uncertainty quantification set
+    Set uncertainty quantification
 
     Other Parameters
     ----------------
