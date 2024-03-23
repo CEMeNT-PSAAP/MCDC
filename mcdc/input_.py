@@ -1,6 +1,7 @@
 """
 This module contains functions for setting MC/DC input deck.
 The input deck class is defined in `card.py` and instantiated in `global_.py`.
+Note docstring are numpy typed 
 """
 
 import h5py, math, mpi4py, os
@@ -656,6 +657,21 @@ def _set_J(x, t, card):
 
 
 def cell(surfaces_flags, fill, lattice_center=None):
+    """_summary_
+
+    Parameters
+    ----------
+    surfaces_flags : bool
+        list of surface cards
+    fill : bool
+        fill the cells
+    lattice_center : _type_, optional
+        _description_, by default None
+
+    Returns
+    -------
+    cell card : dictionary
+    """
     N_surface = len(surfaces_flags)
 
     # Make cell card
@@ -685,6 +701,20 @@ def cell(surfaces_flags, fill, lattice_center=None):
 
 
 def universe(cells, root=False):
+    """_summary_
+
+    Parameters
+    ----------
+    cells : dictionary
+        cell card dexcriptions
+    root : bool, optional
+        by default False
+
+    Returns
+    -------
+    dictionary
+        universe
+    """
     N_cell = len(cells)
 
     # Set default card values (c.f. type_.py)
@@ -708,6 +738,25 @@ def universe(cells, root=False):
 
 
 def lattice(x=None, y=None, z=None, universes=None):
+    """
+    Create a lattice card
+
+    Parameters
+    ----------
+    x : array like, optional
+        x[float], by default None
+    y : array like, optional
+        y[float], by default None
+    z : array like, optional
+        z[float], by default None
+    universes : dictionary, optional
+        d, by default None
+
+    Returns
+    -------
+    dictionary
+        lattice card
+    """
     # Make lattice card
     card = make_card_lattice()
     card["ID"] = len(mcdc.input_deck.lattices)
@@ -899,6 +948,35 @@ def tally(
     g=np.array([-INF, INF]),
     E=np.array([0.0, INF]),
 ):
+    """_summary_
+
+    Parameters
+    ----------
+    scores : _type_
+        _description_
+    x : _type_, optional
+        _description_, by default np.array([-INF, INF])
+    y : _type_, optional
+        _description_, by default np.array([-INF, INF])
+    z : _type_, optional
+        _description_, by default np.array([-INF, INF])
+    t : _type_, optional
+        _description_, by default np.array([-INF, INF])
+    mu : _type_, optional
+        _description_, by default np.array([-1.0, 1.0])
+    azi : _type_, optional
+        _description_, by default np.array([-PI, PI])
+    g : _type_, optional
+        _description_, by default np.array([-INF, INF])
+    E : _type_, optional
+        _description_, by default np.array([0.0, INF])
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
     # Get tally card
     card = mcdc.input_deck.tally
 
@@ -940,6 +1018,44 @@ def tally(
 
 
 def setting(**kw):
+    """
+    Create a setting card.
+
+    Other Parameters
+    ----------------
+    N_particle : int
+        Number of MC particle histories to run (for k-eigen and iQMC its /iteration)
+    N_batch : int
+        Number of batches to run
+    rng_seed : int
+        Random number seed
+    time_boundary : float
+        the time edge of the problem after which all particles will be killed
+    progress_bar : bool
+        display the progress bar (disable when running MC/DC in a loop)
+    output_name : str
+        Name of the output file MC/DC should save data in, default is output.h5
+    save_input_deck : bool
+        toggle to save the input deck
+    particle_tracker : bool
+        true will track the paths of all individual particle histories, memory issues abound
+    k_eff : str
+        toggle true to run a k-eigen problem
+    source_file : str
+        specify a source file path and name
+    IC_file : str
+        path to a file containing a description of an initial condition as a file
+    active_bank_buff : int
+        size of the activate particle bank buffer, for MPI runs
+    census_bank_buff : int
+        sets size of the census buffer particle bank
+
+    Returns
+    -------
+    dictionary
+        A setting card
+    """
+
     # Check the suplied keyword arguments
     for key in kw.keys():
         check_support(
@@ -1056,6 +1172,28 @@ def setting(**kw):
 def eigenmode(
     N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, save_particle=False
 ):
+    """
+    Creates an eigenmode card
+
+    Parameters
+    ----------
+    N_inactive : int
+        Number of inactive cycles to settle k
+    N_active : int
+        Number of active cycles to collect statistics and inform the value of k
+    k_init : float
+        an initial k value
+    gyration_radius : float
+        specify a gyration radius
+    save_particle : bool
+        toggle to save particle track outputs in a tally mesh
+
+    Returns
+    -------
+    dictionary
+        A eigen mode card
+    """
+
     # Update setting card
     card = mcdc.input_deck.setting
     card["N_inactive"] = N_inactive
@@ -1096,17 +1234,35 @@ def eigenmode(
 
 
 def implicit_capture():
+    """sets implicit capture"""
     card = mcdc.input_deck.technique
     card["implicit_capture"] = True
     card["weighted_emission"] = False
 
 
 def weighted_emission(flag):
+    """
+    sets weighted emission
+
+    Parameters
+    ----------
+    flag : bool
+        toggle weighted emission on or off
+    """
+
     card = mcdc.input_deck.technique
     card["weighted_emission"] = flag
 
 
 def population_control(pct="combing"):
+    """sets population control techniques
+
+    Parameters
+    ----------
+    pct : str, optional
+        population control method, by default "combing"
+    """
+
     card = mcdc.input_deck.technique
     card["population_control"] = True
     card["weighted_emission"] = False
@@ -1119,12 +1275,28 @@ def population_control(pct="combing"):
 
 
 def branchless_collision():
+    """
+    sets branchless collision
+    """
     card = mcdc.input_deck.technique
     card["branchless_collision"] = True
     card["weighted_emission"] = False
 
 
 def time_census(t):
+    """
+    Sets a time
+
+    Parameters
+    ----------
+    t : array like [float]
+        set the time census boundaries
+
+    Returns
+    -------
+    Card alterations.
+    """
+
     # Remove census beyond the final tally time grid point
     while True:
         if t[-1] >= mcdc.input_deck.tally["mesh"]["t"][-1]:
@@ -1142,6 +1314,28 @@ def time_census(t):
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
+    """adds weight windows for a combing function
+
+    Parameters
+    ----------
+    x : array like[float], optional
+        location of the weight window in x, by default None
+    y : array like[float], optional
+        location of the weight window in y, by default None
+    z : array like[float], optional
+        location of the weight window in z, by default None
+    t : array like[float], optional
+        location of the weight window in t, by default None
+    window : array like[float], optional
+        bound of the statistic weight of the window, by default None
+    width : array like[float], optional
+        statistical width the window will apply, by default None
+
+    Returns
+    -------
+    Card alterations.
+
+    """
     card = mcdc.input_deck.technique
     card["weight_window"] = True
 
@@ -1206,6 +1400,68 @@ def iQMC(
     eigenmode_solver="power_iteration",
     score=[],
 ):
+    """Sets iqmc settings
+
+    Parameters
+    ----------
+    g : _type_, optional
+        _description_, by default None
+    t : _type_, optional
+        _description_, by default None
+    x : _type_, optional
+        _description_, by default None
+    y : _type_, optional
+        _description_, by default None
+    z : _type_, optional
+        _description_, by default None
+    phi0 : _type_, optional
+        _description_, by default None
+    source0 : _type_, optional
+        _description_, by default None
+    source_x0 : _type_, optional
+        _description_, by default None
+    source_y0 : _type_, optional
+        _description_, by default None
+    source_z0 : _type_, optional
+        _description_, by default None
+    source_xy0 : _type_, optional
+        _description_, by default None
+    source_xz0 : _type_, optional
+        _description_, by default None
+    source_yz0 : _type_, optional
+        _description_, by default None
+    source_xyz0 : _type_, optional
+        _description_, by default None
+    fission_source0 : _type_, optional
+        _description_, by default None
+    krylov_restart : _type_, optional
+        _description_, by default None
+    fixed_source : _type_, optional
+        _description_, by default None
+    scramble : bool, optional
+        _description_, by default False
+    maxitt : int, optional
+        _description_, by default 25
+    tol : _type_, optional
+        _description_, by default 1e-6
+    N_dim : int, optional
+        _description_, by default 6
+    seed : int, optional
+        _description_, by default 12345
+    preconditioner_sweeps : int, optional
+        _description_, by default 5
+    generator : str, optional
+        _description_, by default "halton"
+    fixed_source_solver : str, optional
+        _description_, by default "source_iteration"
+    eigenmode_solver : str, optional
+        _description_, by default "power_iteration"
+    score : list, optional
+        _description_, by default []
+
+
+    """
+
     card = mcdc.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
@@ -1308,7 +1564,7 @@ def iQMC(
 
 def weight_roulette(w_threshold=0.2, w_survive=1.0):
     """
-    If neutron weight is below `w_threshold`, then enter weight rouelette
+    If neutron weight is below `w_threshold`, then enter weight roulette
     technique with survival weight `w_survive`.
 
     Parameters
@@ -1319,7 +1575,7 @@ def weight_roulette(w_threshold=0.2, w_survive=1.0):
 
     Returns
     -------
-    None.
+    Card alterations.
 
     """
     card = mcdc.input_deck.technique
@@ -1347,9 +1603,9 @@ def IC_generator(
     N_neutron : int
         Neutron target size
     N_precursor : int
-        Delayed neutron precursot target size
+        Delayed neutron precursor target size
     cycle_stretch : float
-        Factor to strethch number of cycles. Higher cycle stretch reduces inter-cycle
+        Factor to stretch number of cycles. Higher cycle stretch reduces inter-cycle
         correlation.
     neutron_density, max_neutron_density : float
         Total and maximum neutron density, required if `N_neutron` > 0.
@@ -1402,6 +1658,15 @@ def IC_generator(
 
 
 def dsm(order=1):
+    """
+    direct sensitivity analysis
+
+    Parameters
+    ----------
+    order : int, optional
+        order of the sensitivity to probe, by default 1
+    """
+
     card = mcdc.input_deck.technique
     if order > 2:
         print_error("DSM currently only supports up to second-order sensitivities")
@@ -1409,6 +1674,20 @@ def dsm(order=1):
 
 
 def uq(**kw):
+    """
+    uncertainty quantification set
+
+    Other Parameters
+    ----------------
+    w_threshold : weight_roulette() is called on a particle if
+                  P['w'] <= wr_threshold
+    w_survive : survival weight
+
+    Returns
+    -------
+    Card alterations.
+    """
+
     def append_card(delta_card, global_tag):
         delta_card["distribution"] = dist
         delta_card["flags"] = []
