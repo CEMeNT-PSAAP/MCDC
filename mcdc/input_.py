@@ -1468,7 +1468,7 @@ def iQMC(
 
     Returns
     -------
-    iqmc card : dictionary 
+    iqmc card : dictionary
     """
 
     card = mcdc.input_deck.technique
