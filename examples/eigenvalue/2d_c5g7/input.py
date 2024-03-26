@@ -181,6 +181,7 @@ mcdc.tally(scores=["flux"], x=x_grid, y=y_grid)
 
 # Setting
 mcdc.setting(N_particle=1e3)
+
 mcdc.eigenmode(N_inactive=10, N_active=30, gyration_radius="infinite-z")
 mcdc.population_control()
 

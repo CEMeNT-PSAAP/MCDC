@@ -299,6 +299,10 @@ mcdc.tally(scores=["fission"], t=t_grid)
 
 # Setting
 mcdc.setting(N_particle=1e2, active_bank_buff=1000)
+# small particle count, a more realistic number is 1e7 or higher which
+# will require some acceleration to run at those high particle counts
+# This is a very hard problem to solve and may also require multiple
+# nodes depending on your systems
 
 # Run
 mcdc.run()

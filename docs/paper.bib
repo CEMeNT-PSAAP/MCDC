@@ -82,6 +82,21 @@
     doi     = {10.1080/00295639.2022.2091906}
 }
 
+@article{mcdc:clements_variance_2024,
+	title = {A variance deconvolution estimator for efficient uncertainty quantification in {Monte} {Carlo} radiation transport applications},
+	volume = {319},
+	issn = {0022-4073},
+	url = {https://www.sciencedirect.com/science/article/pii/S0022407324000657},
+	doi = {https://doi.org/10.1016/j.jqsrt.2024.108958},
+	abstract = {Monte Carlo simulations are at the heart of many high-fidelity simulations and analyses for radiation transport systems. As is the case with any complex computational model, it is important to propagate sources of input uncertainty and characterize how they affect model output. Unfortunately, uncertainty quantification (UQ) is made difficult by the stochastic variability that Monte Carlo transport solvers introduce. The standard method to avoid corrupting the UQ statistics with the transport solver noise is to increase the number of particle histories, resulting in very high computational costs. In this contribution, we propose and analyze a sampling estimator based on the law of total variance to compute UQ variance even in the presence of residual noise from Monte Carlo transport calculations. We rigorously derive the statistical properties of the new variance estimator, compare its performance to that of the standard method, and demonstrate its use on neutral particle transport model problems involving both attenuation and scattering physics. We illustrate, both analytically and numerically, the estimator’s statistical performance as a function of available computational budget and the distribution of that budget between UQ samples and particle histories. We show analytically and corroborate numerically that the new estimator is unbiased, unlike the standard approach, and is more accurate and precise than the standard estimator for the same computational budget.},
+	journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+	author = {Clements, Kayla B. and Geraci, Gianluca and Olson, Aaron J. and Palmer, Todd S.},
+	year = {2024},
+	keywords = {Monte Carlo radiation transport, Stochastic solvers, Uncertainty quantification},
+	pages = {108958},
+}
+}
+
 @inproceedings{variansyah_mc23_mcdc,
     Booktitle = {International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering},
     title = {Development of {MC/DC}: a performant, scalable, and portable {P}ython-based {M}onte {C}arlo neutron transport code},
@@ -196,4 +211,15 @@
     doi = {10.1016/S0168-9002(03)01368-8},
     url = {https://www.sciencedirect.com/science/article/pii/S0168900203013688},
     author = {S. Agostinelli and J. Allison and K. Amako and J. Apostolakis and H. Araujo and P. Arce and M. Asai and D. Axen and S. Banerjee and G. Barrand and F. Behner and L. Bellagamba and J. Boudreau and L. Broglia and A. Brunengo and H. Burkhardt and S. Chauvie and J. Chuma and R. Chytracek and G. Cooperman and G. Cosmo and P. Degtyarenko and A. Dell'Acqua and G. Depaola and D. Dietrich and R. Enami and A. Feliciello and C. Ferguson and H. Fesefeldt and G. Folger and F. Foppiano and A. Forti and S. Garelli and S. Giani and R. Giannitrapani and D. Gibin and J.J. {Gómez Cadenas} and I. González and G. {Gracia Abril} and G. Greeniaus and W. Greiner and V. Grichine and A. Grossheim and S. Guatelli and P. Gumplinger and R. Hamatsu and K. Hashimoto and H. Hasui and A. Heikkinen and A. Howard and V. Ivanchenko and A. Johnson and F.W. Jones and J. Kallenbach and N. Kanaya and M. Kawabata and Y. Kawabata and M. Kawaguti and S. Kelner and P. Kent and A. Kimura and T. Kodama and R. Kokoulin and M. Kossov and H. Kurashige and E. Lamanna and T. Lampén and V. Lara and V. Lefebure and F. Lei and M. Liendl and W. Lockman and F. Longo and S. Magni and M. Maire and E. Medernach and K. Minamimoto and P. {Mora de Freitas} and Y. Morita and K. Murakami and M. Nagamatu and R. Nartallo and P. Nieminen and T. Nishimura and K. Ohtsubo and M. Okamura and S. O'Neale and Y. Oohata and K. Paech and J. Perl and A. Pfeiffer and M.G. Pia and F. Ranjard and A. Rybin and S. Sadilov and E. {Di Salvo} and G. Santin and T. Sasaki and N. Savvas and Y. Sawada and S. Scherer and S. Sei and V. Sirotenko and D. Smith and N. Starkov and H. Stoecker and J. Sulkimo and M. Takahata and S. Tanaka and E. Tcherniaev and E. {Safai Tehrani} and M. Tropeano and P. Truscott and H. Uno and L. Urban and P. Urban and M. Verderi and A. Walkden and W. Wander and H. Weber and J.P. Wellisch and T. Wenaus and D.C. Williams and D. Wright and T. Yamada and H. Yoshida and D. Zschiesche},
+}
+
+@confrence{mcdc:cuneo2024alternative,
+      title={An Alternative to Stride-Based RNG for Monte Carlo Transport}, 
+      author={Braxton S. Cuneo and Ilham Variansyah},
+      year={2024},
+      doi = {10.48550/arXiv.2403.06362},
+      journal = {Submitted to Transactions of the American Nuclear, Annual meeting 2024},
+      eprint={2403.06362},
+      archivePrefix={arXiv},
+      primaryClass={physics.comp-ph}
 }
