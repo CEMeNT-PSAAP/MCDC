@@ -120,7 +120,7 @@ It can solve k-eigenvalue problems (used to determine neutron population growth 
 It has a novel continuous geometry movement function that models transient elements (e.g., control rods or pulsed neutron experiments) more accurately than the step functions used by other codes.
 It also supports some simple domain decomposition, with more complex algorithms currently being implemented.
 
-`MC/DC`-enabled explorations into dynamic neutron transport algorithms have been successful, including quasi-Monte Carlo techniques [@mcdc:variansyah_physor22_pct], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmc; @mcdc:qmcabs], transient population control techniques [@mcdc:variansyah_nse22_pct], hash-based random number generation, uncertainty and global sensitivity analysis [@mcdc:clements_mc23; mcdc:clements_variance_2024], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling, among others.
+`MC/DC`-enabled explorations into dynamic neutron transport algorithms have been successful, including quasi-Monte Carlo techniques [@mcdc:variansyah_physor22_pct], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmc; @mcdc:qmcabs], transient population control techniques [@mcdc:variansyah_nse22_pct], hash-based random number generation [@mcdc:cuneo2024alternative], uncertainty and global sensitivity analysis [@mcdc:clements_mc23; mcdc:clements_variance_2024], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling, among others.
 
 # Future Work
 
