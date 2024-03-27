@@ -177,10 +177,11 @@ source = mcdc.source(
 # Tally
 x_grid = np.linspace(0.0, pitch * 17 * 3, 17 * 3 + 1)
 y_grid = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1)
-mcdc.tally(scores=["flux"], x=x_grid, y=y_grid)
+mcdc.tally(scores=["flux"], x=x_grid, y=y_grid, g="all")
 
 # Setting
 mcdc.setting(N_particle=1e3)
+
 mcdc.eigenmode(N_inactive=10, N_active=30, gyration_radius="infinite-z")
 mcdc.population_control()
 
