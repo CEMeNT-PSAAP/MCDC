@@ -109,15 +109,16 @@ It uses the Numba compiler for Python to compile compute kernels to a desired ha
 These acceleration and abstraction techniques allow `MC/DC` developers to remain in a pure Python development environment without needing to support compiled or domain-specific languages.
 This has allowed `MC/DC` to grow from its initialization less than two years ago into a codebase that supports full performant neutron transport and investigation of novel transport algorithms, with development mostly from relative novices.
 
-Many traditionally developed neutron-transport codes (e.g. `MCNP` [@mcnp], `Shift` [@shift], and `MCATK` [@mcatk]) are export-controlled and notoriously difficult to install, use, and develop in.
-`MC/DC` is comparable to other open source Monte Carlo neutron-transport apps (e.g. `OpenMC` [@openmc]), however `MC/DC` is an easily installable Python package (with a `pip` distribution) with it's own novel transport methods and features tailored to tackle dynamic transport.
+Many traditionally developed neutron-transport codes are export-controlled (e.g. `MCNP` [@mcnp], `Shift` [@shift], and `MCATK` [@mcatk]) and some are known to be difficult to install, use, and develop in.
+`MC/DC` is open-source, and thus, similar to other open-source Monte Carlo neutron-transport codes (e.g., `OpenMC` [@openmc]), it promotes knowledge sharing, collaboration, and inclusive, community-driven development.
+What makes `MC/DC` unique is that its code base is exclusively written in Python, making it a good method exploration tool and an excellent entry point for students.
+Furthermore, `MC/DC` is wrapped as a Python package that can be conveniently installed via the `pip` distribution, and its development is assisted by a suite of unit, regression, verification, and performance tests, which are mostly run using continuous integration via GitHub Actions.
 This all together makes `MC/DC` ideal for use in an academic environment for both research and education.
-This is further assisted by the test suite we have developed for unit, regression, verification, and performance tests, which are mostly run using continuous integration via GitHub Actions.
-In an initial code-to-code performance comparison, `MC/DC` was found to run about 2.5 times slower than the Shift Monte Carlo code for a simple problem and showed similar scaling on some systems [@mcdc:variansyah_mc23_mcdc].
 
-`MC/DC` has support for continuous energy and multi-group treatments of the neutron distribution in energy.
+`MC/DC` has support for continuous and multi-group energy neutron transport physics with constructive solid geometry modeling.
 It can solve k-eigenvalue problems (used to determine neutron population growth rates in reactors) as well as fully dynamic simulations.
 It also supports some simple domain decomposition, with more complex algorithms currently being implemented.
+In an initial code-to-code performance comparison, `MC/DC` was found to run about 2.5 times slower than the Shift Monte Carlo code for a simple problem and showed similar scaling on some systems [@mcdc:variansyah_mc23_mcdc].
 
 `MC/DC`-enabled explorations into dynamic neutron transport algorithms have been successful, including quasi-Monte Carlo techniques [@mcdc:qmc], hybrid iterative techniques for k-eigenvalue simulations [@mcdc:qmcabs], population control techniques [@mcdc:variansyah_nse22_pct; @mcdc:variansyah_physor22_pct], continuous geometry movement techniques that model transient elements [@mcdc:variansyah_mc23_moving_object] (e.g., control rods or pulsed neutron experiments) more accurately than step functions typically used by other codes, initial condition sampling technique for typical reactor transients [@mcdc:variansyah_mc23_ic], hash-based random number generation [@mcdc:cuneo2024alternative], uncertainty and global sensitivity analysis [@mcdc:clements_mc23; @mcdc:clements_variance_2024], residual Monte Carlo methods, and machine learning techniques for dynamic node scheduling, among others.
 
