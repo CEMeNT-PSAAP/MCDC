@@ -226,7 +226,7 @@ Using MPI
 MC/DC can be executed using MPI with or without Numba acceleration.
 If ``numba-mode`` is enabled the ``jit`` compilation, which is executed on all threads, can take between 30s-2min.
 For smaller problems, Numba compilation time could exceed runtime, and pure python mode could be preferable.
-Below, ``--mode`` can equal python or numba. MC/DC gets MPI functinoality via `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_. 
+Below, ``--mode`` can equal python or numba. MC/DC gets MPI functionality via `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_. 
 As an example, to run on 36 processes in Numba mode with `SLURM <https://slurm.schedmd.com/documentation.html>`_:
 
 .. code-block:: python3
