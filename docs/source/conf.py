@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 # On Read the Docs, need to mock any python packages that would require c
 from unittest.mock import MagicMock
 
-MOCK_MODULES = ["mpi4py"]
+MOCK_MODULES = ["mpi4py", "colorama"]
 sys.modules.update((mod_name, MagicMock()) for mod_name in MOCK_MODULES)
 
 
