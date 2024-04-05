@@ -19,10 +19,10 @@ authors: # x=reviewed
     orcid: 0000-0003-3426-7160
     affiliation: "1, 2"
     corresponding: true
-  - name: Samuel Pasmann
+  - name: Samuel L. Pasmann
     orcid: 0000-0003-1391-1471
     affiliation: "1, 3"
-  - name: Kayla Beth Clements
+  - name: Kayla B. Clements
     orcid: 0000-0003-3358-5618
     affiliation: "1, 2"
   - name: Braxton Cuneo
@@ -35,7 +35,7 @@ authors: # x=reviewed
     affiliation: "1, 4"
   - name: Caleb Shaw 
     affiliation: "1, 4"
-  - name: Jordan Northrop 
+  - name: Jordan Northrop
     orcid: 0000-0003-0420-9699
     affiliation: "1, 2"
   - name: Rohan Pankaj
@@ -47,20 +47,20 @@ authors: # x=reviewed
   - name:  Benjamin Whewell
     orcid: 0000-0001-7826-5525
     affiliation: "1, 3"
-  - name: Ryan McClarren #advisors in order of authors except Niemeyer
+  - name: Ryan G. McClarren #advisors in order of authors except Niemeyer
     orcid: 0000-0002-8342-6132
     affiliation: "1, 3"
-  - name: Todd Palmer
+  - name: Todd S. Palmer
     orcid: 0000-0003-3310-5258
     affiliation: "1, 2"
   - name: Lizhong Chen 
     orcid: 0000-0001-5890-7121
     affiliation: "1, 2"
-  - name: Dmitriy Anistratov
+  - name: Dmitriy Y. Anistratov
     affiliation: "1, 4"
   - name: C. T. Kelley
     affiliation: "1, 4"
-  - name: Camille Palmer
+  - name: Camille J. Palmer
     orcid: 0000-0002-7573-4215
     affiliation: "1, 2"
   - name: Kyle E. Niemeyer
