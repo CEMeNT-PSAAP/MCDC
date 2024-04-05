@@ -1088,6 +1088,7 @@ def setting(**kw):
                 "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
+                "caching",
             ],
             False,
         )
@@ -1106,6 +1107,7 @@ def setting(**kw):
     IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
+    caching = kw.get("caching")
 
     # Check if setting card has been initialized
     card = mcdc.input_deck.setting
@@ -1145,6 +1147,10 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
+
+    # caching is normally enabled
+    if caching in None:
+        card["caching"] = True
 
     # Particle tracker
     if particle_tracker is not None:
