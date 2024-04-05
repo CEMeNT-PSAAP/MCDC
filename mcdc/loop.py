@@ -18,6 +18,7 @@ from mcdc.print_ import (
     print_iqmc_eigenvalue_exit_code,
 )
 
+caching = True # mcdc["setting"]["caching"]
 
 # =========================================================================
 # Fixed-source loop
@@ -29,7 +30,7 @@ from mcdc.print_ import (
 #     see more about cacheing here https://numba.readthedocs.io/en/stable/developer/caching.html
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def loop_fixed_source(mcdc):
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
@@ -94,7 +95,7 @@ def loop_fixed_source(mcdc):
 # =========================================================================
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def loop_eigenvalue(mcdc):
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
@@ -133,7 +134,7 @@ def loop_eigenvalue(mcdc):
 # =============================================================================
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
@@ -280,7 +281,7 @@ def loop_source(seed, mcdc):
 # =========================================================================
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def loop_particle(P, mcdc):
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
@@ -381,7 +382,7 @@ def loop_particle(P, mcdc):
 # =============================================================================
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def loop_iqmc(mcdc):
     # function calls from specified solvers
     iqmc = mcdc["technique"]["iqmc"]
@@ -398,7 +399,7 @@ def loop_iqmc(mcdc):
             gmres(mcdc)
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def source_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
@@ -436,7 +437,7 @@ def source_iteration(mcdc):
         total_source_old = iqmc["total_source"].copy()
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def gmres(mcdc):
     """
     GMRES solver.
@@ -591,7 +592,7 @@ def gmres(mcdc):
             return
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def power_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
@@ -637,7 +638,7 @@ def power_iteration(mcdc):
                 print_iqmc_eigenvalue_exit_code(mcdc)
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def davidson(mcdc):
     """
     The generalized Davidson method is a Krylov subspace method for solving
@@ -747,7 +748,7 @@ def davidson(mcdc):
 # =============================================================================
 
 
-@njit(cache=True)
+@njit(cache=caching)
 def loop_source_precursor(seed, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
