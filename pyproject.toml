@@ -23,14 +23,14 @@ authors = [
   { name="Dmitriy Y. Anistratov"},
   { name="C. T. Kelley"},
   { name="Camille J. Palmer"},
-  { name="Kyle E. Niemeyer"}
+  { name="Kyle E. Niemeyer"},
 ]
 
 maintainers = [
-    "Ilham Variansyah <variansi@oregonstate.edu>",
-    "Kayla Clements <clemekay@oregonstate.edu>",
-    "Joanna Piper Morgan <morgajoa@oregonstate.edu>",
-    "Kyle E. Niemeyer <kyle.niemeyer@oregonstate.edu>",
+    { name="Ilham Variansyah", email = "variansi@oregonstate.edu"},
+    { name="Kayla Clements", email = "clemekay@oregonstate.edu"},
+    { name="Joanna Piper Morgan", email = "morgajoa@oregonstate.edu"},
+    { name="Kyle E. Niemeyer", email = "kyle.niemeyer@oregonstate.edu"},
 ]
 
 description = "Monte Carlo / Dynamic Code, a pure python high performance Monte Carlo neutronics package"
