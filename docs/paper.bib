@@ -50,6 +50,7 @@
     title = {Global Sensitivity Analysis in {M}onte {C}arlo Radiation Transport},
     Month = {8},
     year = {2023},
+    doi = {10.48550/arXiv.2403.06106},
     author = {Kayla Clements and Gianluca Geraci and Aaron J Olson and Todd Palmer},
     address = {Niagara Falls, Ontario, Canada},
 }
@@ -59,6 +60,7 @@
     booktitle = {International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering},
     title="{iQMC}: Iterative Quasi-{Monte Carlo} with {K}rylov Linear Solvers for k-Eigenvalue Neutron Transport Simulations",
     author="S. Pasmann and I. Variansyah and C. T. Kelley and R. McClarren",
+    doi = {10.48550/arXiv.2306.11600},
     year=2023,
     address = {Niagara Falls, Ontario, Canada},
 }
@@ -67,6 +69,7 @@
     Booktitle = {International Conference on Physics of Reactors},
     title = {Performance of Population Control Techniques in {M}onte {C}arlo Reactor Criticality Simulation},
     year = {2022},
+    doi = {10.13182/physor22-37871},
     author = {Ilham Variansyah and Ryan G. McClarren},
     address = {Pittsburgh, Pennsylvania, USA},
 }
@@ -104,7 +107,7 @@
 	volume = {319},
 	issn = {0022-4073},
 	url = {https://www.sciencedirect.com/science/article/pii/S0022407324000657},
-	doi = {https://doi.org/10.1016/j.jqsrt.2024.108958},
+	doi = {10.1016/j.jqsrt.2024.108958},
 	abstract = {Monte Carlo simulations are at the heart of many high-fidelity simulations and analyses for radiation transport systems. As is the case with any complex computational model, it is important to propagate sources of input uncertainty and characterize how they affect model output. Unfortunately, uncertainty quantification (UQ) is made difficult by the stochastic variability that Monte Carlo transport solvers introduce. The standard method to avoid corrupting the UQ statistics with the transport solver noise is to increase the number of particle histories, resulting in very high computational costs. In this contribution, we propose and analyze a sampling estimator based on the law of total variance to compute UQ variance even in the presence of residual noise from Monte Carlo transport calculations. We rigorously derive the statistical properties of the new variance estimator, compare its performance to that of the standard method, and demonstrate its use on neutral particle transport model problems involving both attenuation and scattering physics. We illustrate, both analytically and numerically, the estimator’s statistical performance as a function of available computational budget and the distribution of that budget between UQ samples and particle histories. We show analytically and corroborate numerically that the new estimator is unbiased, unlike the standard approach, and is more accurate and precise than the standard estimator for the same computational budget.},
 	journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
 	author = {Clements, Kayla B. and Geraci, Gianluca and Olson, Aaron J. and Palmer, Todd S.},
@@ -131,7 +134,6 @@
     issn = {1049-3301},
     url = {10.1145/3626957},
     doi = {10.1145/3626957},
-    note = {Just Accepted},
     journal = {ACM Trans. Model. Comput. Simul.},
     month = {oct},
     keywords = {asynchronous, divergence, scheduling, GPGPU, GPU}
@@ -143,6 +145,7 @@
 	title = {Computational methods of neutron transport},
 	publisher = {John Wiley and Sons, Inc.},
 	author = {Lewis, Elmer Eugene and Miller, Warren F},
+    url = {https://www.osti.gov/biblio/5538794},
 	year = {1984},
 }
 
@@ -172,7 +175,7 @@
 	volume = {82},
 	issn = {0306-4549},
 	url = {https://www.sciencedirect.com/science/article/pii/S0306454914004472},
-	doi = {https://doi.org/10.1016/j.anucene.2014.08.047},
+	doi = {10.1016/j.anucene.2014.08.047},
 	abstract = {The Monte Carlo Application ToolKit (MCATK) is a component-based software library designed to build specialized applications and to provide new functionality for existing general purpose Monte Carlo radiation transport codes. We will describe MCATK and its capabilities along with presenting some verification and validations results.},
 	journal = {Annals of Nuclear Energy},
 	author = {Adams, Terry and Nolen, Steve and Sweezy, Jeremy and Zukaitis, Anthony and Campbell, Joann and Goorley, Tim and Greene, Simon and Aulwes, Rob},
@@ -196,23 +199,24 @@
   year = {2023}
 }
 
-# openmc
+
+
 @article{openmc,
-    author = {Romano, Paul K. and Forget, Benoit},
-    address = {United States},
-    copyright = {2012 Elsevier Ltd},
-    issn = {0306-4549},
-    journal = {Annals of nuclear energy},
-    keywords = {Code (cryptography) ; Computational science ; Computer science ; Criticality ; High performance computing ; Monte Carlo ; Monte carlo code ; Monte Carlo method ; Neutron transport ; Nuclear Science \& Technology ; Open source ; Particle transport ; Software design ; Supercomputer ; Theoretical computer science},
-    language = {eng},
-    number = {C},
-    organization = {UT-Battelle LLC/ORNL, Oak Ridge, TN (Unted States)},
-    pages = {274-281},
-    publisher = {Elsevier Ltd},
-    title = {The {OpenMC} {M}onte {C}arlo particle transport code},
-    volume = {51},
-    year = {2013},
+	title = {{OpenMC}: {A} state-of-the-art {Monte} {Carlo} code for research and development},
+	volume = {82},
+	issn = {0306-4549},
+	url = {https://www.sciencedirect.com/science/article/pii/S030645491400379X},
+	doi = {10.1016/j.anucene.2014.07.048},
+	abstract = {This paper gives an overview of OpenMC, an open source Monte Carlo particle transport code recently developed at the Massachusetts Institute of Technology. OpenMC uses continuous-energy cross sections and a constructive solid geometry representation, enabling high-fidelity modeling of nuclear reactors and other systems. Modern, portable input/output file formats are used in OpenMC: XML for input, and HDF5 for output. High performance parallel algorithms in OpenMC have demonstrated near-linear scaling to over 100,000 processors on modern supercomputers. Other topics discussed in this paper include plotting, CMFD acceleration, variance reduction, eigenvalue calculations, and software development processes.},
+	journal = {Annals of Nuclear Energy},
+	author = {Romano, Paul K. and Horelik, Nicholas E. and Herman, Bryan R. and Nelson, Adam G. and Forget, Benoit and Smith, Kord},
+	year = {2015},
+	keywords = {HDF5, Monte Carlo, Neutron transport, OpenMC, Parallel, XML},
+	pages = {90--97},
+	annote = {Joint International Conference on Supercomputing in Nuclear Applications and Monte Carlo 2013, SNA + MC 2013. Pluri- and Trans-disciplinarity, Towards New Modeling and Numerical Simulation Paradigms},
 }
+
+
 
 
 # geant4
