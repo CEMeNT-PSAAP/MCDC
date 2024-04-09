@@ -8,7 +8,10 @@
 
 # assumming this is being done in a repo with trusted publishing permissions in pypi
 
-name: Manually upload Python Package (if auto upload fails)
+# There is an automated runner which should upload a new PyPi package but it often fails due to API BS.
+# This is here so one doesn't have to republish everything
+
+name: manually publish pypi package (for touble shooting)
 
 on: workflow_dispatch
 
