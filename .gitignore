@@ -3,6 +3,10 @@ build
 .eggs
 mcdc.egg-info
 
+# Material Data
+mcdc_xs
+MCDC-Xsec
+
 # Python cache
 __pycache__
 *.pyc
@@ -12,8 +16,10 @@ __pycache__
 # Editor
 .spyproject
 *.swp
+.vscode/
 
 # Output
+*output.h5
 output*.h5
 *output.h5
 *.png
@@ -32,7 +38,16 @@ tmp_*
 *.core
 .DS_Store # for mac users
 **/.DS_Store
+**/.idea
 
 # test cache
 .pytest_cache
 pytestdebug.log
+
+# profiler
+*.prof
+
+# Documentation builds
+docs/build
+docs/source/pythonapi/generated/
+
