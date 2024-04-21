@@ -1,4 +1,4 @@
-name: Regression Test - Numba and MPI (2 threads)
+name: Regression Test - Numba and MPI
 
 on: [push, pull_request]
 
@@ -32,4 +32,4 @@ jobs:
     - name: Regression Test - Numba and MPI
       run: |
           cd test/regression
-          python run.py --mode=numba --mpiexec=2
+          python run.py --mode=numba --mpiexec=4

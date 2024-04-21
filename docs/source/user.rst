@@ -203,18 +203,37 @@ Numba Mode
 
     python input.py --mode=numba
 
+When running in Numba mode a significant amount of time is taken compiling Python functions to performant binaries.
+Only functions used in a specific simulation will be compiled.
+These binaries will be cached meaning that in subsequent runs of the same simulation the compilation step can be avoided.
+The cache can be used as an effective ahead of time compilation scheme where binaries can be compiled once and shared between machines.
+For more information on caching see :ref:`Caching` and `Numba Caching <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
+
+MC/DC also has the ability to run Numba in a debugging mode.
+This will result in less performant code and longer compile times but will allow for better error messages from Numba and other packages.
+
+.. code-block:: python3
+
+    python input.py --mode=numba_debug
+
+
+For more information on the exact behavior of this option see :ref:`Debugging`
+
+
 Using MPI
 ^^^^^^^^^
 
 MC/DC can be executed using MPI with or without Numba acceleration.
 If ``numba-mode`` is enabled the ``jit`` compilation, which is executed on all threads, can take between 30s-2min.
 For smaller problems, Numba compilation time could exceed runtime, and pure python mode could be preferable.
-Below, ``--mode`` can equal python or numba.
+Below, ``--mode`` can equal python or numba. MC/DC gets MPI functionality via `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_. 
+As an example, to run on 36 processes in Numba mode with `SLURM <https://slurm.schedmd.com/documentation.html>`_:
 
 .. code-block:: python3
 
-    srun python input.py --mode=<python/numba>
+    srun -n 36 python input.py --mode=<python/numba>
 
+For systems that do not use SLURM (i.e., a local system) try ``mpiexec`` or ``mpirun`` in its stead.
 
 Postprocessing Results
 ----------------------
@@ -273,7 +292,7 @@ A tool like ``matplotlib`` will work great for plotting results.
 For more complex simulations, open source professional visualization software like
 `Paraview <https://www.paraview.org/>`_  or `Visit <https://sd.llnl.gov/simulation/computer-codes/visit>`_ are available.
 
-As the problem we ran above is pretty simple and has no scattering or fission, we have an analytic solution we can import:
+As the problem we ran above is pretty simple and has no scattering or fission, we have an `analytic solution we can import <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/examples/fixed_source/slab_absorbium/reference.py>`_:
 
 .. code-block:: python3
 
@@ -282,7 +301,7 @@ As the problem we ran above is pretty simple and has no scattering or fission, w
 In the script below, we plot the space-averaged flux and space-averaged current, including their statistical noise.
 We also use the space-averaged flux and current to compute a new quantity, the space-averaged angular flux, and
 plot it over space and angle in a heat map.
-Remember that when reporting results from a Monte Carlo solver, you should **always include the statical error!**
+Remember that when reporting results from a Monte Carlo solver, you should **always include the statistical error!**
 
 
 .. code-block:: python3
