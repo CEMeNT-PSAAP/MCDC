@@ -2,7 +2,7 @@ import numba as nb
 import numpy as np
 import sys
 from mpi4py import MPI
-
+from colorama import Fore, Back, Style
 
 master = MPI.COMM_WORLD.Get_rank() == 0
 
@@ -21,7 +21,8 @@ def print_error(msg):
 
 def print_warning(msg):
     if master:
-        print("Warning: %s\n" % msg)
+        print(Fore.RED + "Warning: %s\n" % msg)
+        print(Style.RESET_ALL)
         sys.stdout.flush()
 
 

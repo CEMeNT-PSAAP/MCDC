@@ -2139,8 +2139,17 @@ def scattering(P, prog):
         # Sample scattering phase space
         sample_phasespace_scattering(P, material, P_new, mcdc)
 
-        # Bank
-        adapt.add_active(P_new, prog)
+        # Bank, but keep it if it is the last particle
+        if n == N - 1:
+            P["alive"] = True
+            P["ux"] = P_new["ux"]
+            P["uy"] = P_new["uy"]
+            P["uz"] = P_new["uz"]
+            P["g"] = P_new["g"]
+            P["E"] = P_new["E"]
+            P["w"] = P_new["w"]
+        else:
+            adapt.add_active(P_new, prog)
 
 
 @njit
@@ -2410,7 +2419,18 @@ def fission(P, prog):
         elif mcdc["setting"]["mode_eigenvalue"]:
             adapt.add_census(P_new, prog)
         else:
-            adapt.add_active(P_new, prog)
+            # Keep it if it is the last particle
+            if n == N - 1:
+                P["alive"] = True
+                P["ux"] = P_new["ux"]
+                P["uy"] = P_new["uy"]
+                P["uz"] = P_new["uz"]
+                P["t"] = P_new["t"]
+                P["g"] = P_new["g"]
+                P["E"] = P_new["E"]
+                P["w"] = P_new["w"]
+            else:
+                adapt.add_active("bank_active")
 
 
 @njit
