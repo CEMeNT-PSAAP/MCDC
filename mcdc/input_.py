@@ -3,8 +3,9 @@ This module contains functions for setting MC/DC input deck.
 The input deck class is defined in `card.py` and instantiated in `global_.py`.
 """
 
-import h5py, math, mpi4py
+import h5py, math, mpi4py, os
 import numpy as np
+import scipy as sp
 
 import mcdc.type_ as type_
 
@@ -17,15 +18,16 @@ from mcdc.card import (
     make_card_universe,
     make_card_lattice,
     make_card_source,
+    make_card_uq,
 )
 from mcdc.constant import (
-    GR_ALL,
-    GR_INFINITE_X,
-    GR_INFINITE_Y,
-    GR_INFINITE_Z,
-    GR_ONLY_X,
-    GR_ONLY_Y,
-    GR_ONLY_Z,
+    GYRATION_RADIUS_ALL,
+    GYRATION_RADIUS_INFINITE_X,
+    GYRATION_RADIUS_INFINITE_Y,
+    GYRATION_RADIUS_INFINITE_Z,
+    GYRATION_RADIUS_ONLY_X,
+    GYRATION_RADIUS_ONLY_Y,
+    GYRATION_RADIUS_ONLY_Z,
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
@@ -136,6 +138,7 @@ def nuclide(
         card["scatter"][:] = np.sum(scatter, 0)[:]
     if fission is not None:
         card["fission"][:] = fission[:]
+        card["fissionable"] = True
     card["total"][:] = card["capture"] + card["scatter"] + card["fission"]
 
     # Scattering multiplication (vector of size G)
@@ -228,6 +231,7 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
+    name="P",
     sensitivity=False,
     dsm_Np=1.0,
 ):
@@ -296,14 +300,55 @@ def material(
         )
         nuclides = [[card_nuclide, 1.0]]
 
-    # Nuclide and group sizes
+    # Number of nuclides
     N_nuclide = len(nuclides)
+
+    # Continuous energy mode?
+    if isinstance(nuclides[0][0], str):
+        mcdc.input_deck.setting["mode_CE"] = True
+        mcdc.input_deck.setting["mode_MG"] = False
+
+        # Make material card
+        card = make_card_material(N_nuclide)
+        card["ID"] = len(mcdc.input_deck.materials)
+
+        # Set the nuclides
+        for i in range(N_nuclide):
+            nuc_name = nuclides[i][0]
+            density = nuclides[i][1]
+            if not nuclide_registered(nuc_name):
+                nuc_ID = len(mcdc.input_deck.nuclides)
+                nuc_card = make_card_nuclide()
+                nuc_card["name"] = nuc_name
+                nuc_card["ID"] = nuc_ID
+
+                dir_name = os.getenv("MCDC_XSLIB")
+                with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
+                    if max(f["fission"][:]) > 0.0:
+                        nuc_card["fissionable"] = True
+
+                mcdc.input_deck.nuclides.append(nuc_card)
+            else:
+                nuc_card = get_nuclide(nuc_name)
+            card["nuclide_IDs"][i] = nuc_card["ID"]
+            card["nuclide_densities"][i] = density
+
+        # Add to deck
+        mcdc.input_deck.materials.append(card)
+        return card
+
+    # Nuclide and group sizes
     G = nuclides[0][0]["G"]
     J = nuclides[0][0]["J"]
 
     # Make material card
     card = make_card_material(N_nuclide, G, J)
     card["ID"] = len(mcdc.input_deck.materials)
+
+    if name is not None:
+        card["name"] = name
+    else:
+        card["name"] = card["ID"]
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
@@ -377,8 +422,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
 
     Parameters
     ----------
-    type_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y',
-             'cylinder-z', 'sphere', 'quadric'}
+    type\_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y', 'cylinder-z', 'sphere', 'quadric'}
         Surface type.
     bc : {'interface', 'vacuum', 'reflective'}
         Surface boundary condition.
@@ -474,6 +518,8 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     # ==========================================================================
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
+
+    card["type"] = type_
 
     # Set up surface attributes
     if type_ == "plane-x":
@@ -627,6 +673,7 @@ def cell(surfaces_flags, fill, lattice_center=None):
     # Material cell
     else:
         card["material_ID"] = fill["ID"]
+        card["material_name"] = fill["name"]
 
     # Push card
     mcdc.input_deck.cells.append(card)
@@ -720,7 +767,8 @@ def source(**kw):
         at which isotropic surface source is emitted. Note that it is similar to the
         mechanics of the typical white boundary condition in reactor physics.
     energy : array_like
-        Probability mass function of the energy group for multigroup source.
+        [MG] Probability mass function of the energy group for multigroup source.
+        [CE] 2D array of piecewise linear pdf [eV, value].
     time : array_like
         [t_min and t_max] in/at which source is emitted.
     prob : float
@@ -806,9 +854,22 @@ def source(**kw):
 
     # Set energy
     if energy is not None:
-        group = np.array(energy)
-        # Normalize
-        card["group"] = group / np.sum(group)
+        if mcdc.input_deck.setting["mode_MG"]:
+            group = np.array(energy)
+            # Normalize
+            card["group"] = group / np.sum(group)
+        if mcdc.input_deck.setting["mode_CE"]:
+            energy = np.array(energy)
+            # Resize
+            card["energy"] = np.zeros(energy.shape)
+            # Set energy
+            card["energy"][0, :] = energy[0, :]
+            # Normalize pdf
+            card["energy"][1, :] = energy[1, :] / np.trapz(energy[1, :], x=energy[0, :])
+            # Make cdf
+            card["energy"][1, :] = sp.integrate.cumulative_trapezoid(
+                card["energy"][1], x=card["energy"][0], initial=0.0
+            )
 
     # Set time
     if time is not None:
@@ -832,6 +893,7 @@ def tally(
     mu=np.array([-1.0, 1.0]),
     azi=np.array([-PI, PI]),
     g=np.array([-INF, INF]),
+    E=np.array([0.0, INF]),
 ):
     # Get tally card
     card = mcdc.input_deck.tally
@@ -850,43 +912,20 @@ def tally(
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
+    if mcdc.input_deck.setting["mode_CE"]:
+        card["mesh"]["g"] = E
 
     # Set score flags
     for s in scores:
         found = False
         for score_name in type_.score_list:
             if s.replace("-", "_") == score_name:
+                card["tracklength"] = True
                 card[score_name] = True
                 found = True
                 break
         if not found:
             print_error("Unknown tally score %s" % s)
-
-    # Set estimator flags
-    for score_name in type_.score_tl_list:
-        if card[score_name]:
-            card["tracklength"] = True
-            break
-    for score_name in type_.score_x_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_x"] = True
-            break
-    for score_name in type_.score_y_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_y"] = True
-            break
-    for score_name in type_.score_z_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_z"] = True
-            break
-    for score_name in type_.score_t_list:
-        if card[score_name]:
-            card["crossing"] = True
-            card["crossing_t"] = True
-            break
 
     return card
 
@@ -900,40 +939,40 @@ def setting(**kw):
     # Check the suplied keyword arguments
     for key in kw.keys():
         check_support(
-            "source parameter",
+            "setting parameter",
             key,
             [
                 "N_particle",
-                "time_boundary",
+                "N_batch",
                 "rng_seed",
-                "rng_stride",
-                "output",
+                "time_boundary",
                 "progress_bar",
+                "output_name",
+                "save_input_deck",
+                "particle_tracker",
                 "k_eff",
+                "source_file",
+                "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
-                "source_file",
-                "particle_tracker",
-                "save_input_deck",
-                "IC_file",
             ],
             False,
         )
 
     # Get keyword arguments
     N_particle = kw.get("N_particle")
-    time_boundary = kw.get("time_boundary")
+    N_batch = kw.get("N_batch")
     rng_seed = kw.get("rng_seed")
-    rng_stride = kw.get("rng_stride")
-    output = kw.get("output")
+    time_boundary = kw.get("time_boundary")
     progress_bar = kw.get("progress_bar")
+    output = kw.get("output_name")
+    save_input_deck = kw.get("save_input_deck")
+    particle_tracker = kw.get("particle_tracker")
     k_eff = kw.get("k_eff")
+    source_file = kw.get("source_file")
+    IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
-    source_file = kw.get("source_file")
-    particle_tracker = kw.get("particle_tracker")
-    save_input_deck = kw.get("save_input_deck")
-    IC_file = kw.get("IC_file")
 
     # Check if setting card has been initialized
     card = mcdc.input_deck.setting
@@ -942,6 +981,10 @@ def setting(**kw):
     if N_particle is not None:
         card["N_particle"] = int(N_particle)
 
+    # Number of batches
+    if N_batch is not None:
+        card["N_batch"] = int(N_batch)
+
     # Time boundary
     if time_boundary is not None:
         card["time_boundary"] = time_boundary
@@ -949,12 +992,10 @@ def setting(**kw):
     # RNG seed and stride
     if rng_seed is not None:
         card["rng_seed"] = rng_seed
-    if rng_stride is not None:
-        card["rng_stride"] = rng_stride
 
     # Output .h5 file name
     if output is not None:
-        card["output"] = output
+        card["output_name"] = output
 
     # Progress bar
     if progress_bar is not None:
@@ -1024,19 +1065,19 @@ def eigenmode(
     if gyration_radius is not None:
         card["gyration_radius"] = True
         if gyration_radius == "all":
-            card["gyration_radius_type"] = GR_ALL
+            card["gyration_radius_type"] = GYRATION_RADIUS_ALL
         elif gyration_radius == "infinite-x":
-            card["gyration_radius_type"] = GR_INFINITE_X
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_X
         elif gyration_radius == "infinite-y":
-            card["gyration_radius_type"] = GR_INFINITE_Y
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_Y
         elif gyration_radius == "infinite-z":
-            card["gyration_radius_type"] = GR_INFINITE_Z
+            card["gyration_radius_type"] = GYRATION_RADIUS_INFINITE_Z
         elif gyration_radius == "only-x":
-            card["gyration_radius_type"] = GR_ONLY_X
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_X
         elif gyration_radius == "only-y":
-            card["gyration_radius_type"] = GR_ONLY_Y
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Y
         elif gyration_radius == "only-z":
-            card["gyration_radius_type"] = GR_ONLY_Z
+            card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Z
         else:
             print_error("Unknown gyration radius type")
 
@@ -1079,12 +1120,21 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def census(t, pct="none"):
-    card = mcdc.input_deck.technique
-    card["time_census"] = True
+def time_census(t):
+    # Remove census beyond the final tally time grid point
+    while True:
+        if t[-1] >= mcdc.input_deck.tally["mesh"]["t"][-1]:
+            t = t[:-1]
+        else:
+            break
+
+    # Add the default, final census-at-infinity
+    t = np.append(t, INF)
+
+    # Set the time census parameters
+    card = mcdc.input_deck.setting
     card["census_time"] = t
-    if pct != "none":
-        population_control(pct)
+    card["N_census"] = len(t)
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
@@ -1130,6 +1180,15 @@ def iQMC(
     y=None,
     z=None,
     phi0=None,
+    source0=None,
+    source_x0=None,
+    source_y0=None,
+    source_z0=None,
+    source_xy0=None,
+    source_xz0=None,
+    source_yz0=None,
+    source_xyz0=None,
+    fission_source0=None,
     krylov_restart=None,
     fixed_source=None,
     scramble=False,
@@ -1141,27 +1200,28 @@ def iQMC(
     generator="halton",
     fixed_source_solver="source_iteration",
     eigenmode_solver="power_iteration",
+    score=[],
 ):
     card = mcdc.input_deck.technique
     card["iQMC"] = True
-    card["iqmc_tol"] = tol
-    card["iqmc_maxitt"] = maxitt
-    card["iqmc_generator"] = generator
-    card["iqmc_N_dim"] = N_dim
-    card["iqmc_scramble"] = scramble
-    card["iqmc_seed"] = seed
+    card["iqmc"]["tol"] = tol
+    card["iqmc"]["maxitt"] = maxitt
+    card["iqmc"]["generator"] = generator
+    card["iqmc"]["N_dim"] = N_dim
+    card["iqmc"]["scramble"] = scramble
+    card["iqmc"]["seed"] = seed
 
     # Set mesh
     if g is not None:
-        card["iqmc_mesh"]["g"] = g
+        card["iqmc"]["mesh"]["g"] = g
     if t is not None:
-        card["iqmc_mesh"]["t"] = t
+        card["iqmc"]["mesh"]["t"] = t
     if x is not None:
-        card["iqmc_mesh"]["x"] = x
+        card["iqmc"]["mesh"]["x"] = x
     if y is not None:
-        card["iqmc_mesh"]["y"] = y
+        card["iqmc"]["mesh"]["y"] = y
     if z is not None:
-        card["iqmc_mesh"]["z"] = z
+        card["iqmc"]["mesh"]["z"] = z
 
     ax_expand = []
     if g is None:
@@ -1175,31 +1235,83 @@ def iQMC(
     if z is None:
         ax_expand.append(4)
     for ax in ax_expand:
-        fixed_source = np.expand_dims(fixed_source, axis=ax)
         phi0 = np.expand_dims(phi0, axis=ax)
+        if fixed_source is not None:
+            fixed_source = np.expand_dims(fixed_source, axis=ax)
+        else:
+            fixed_source = np.zeros_like(phi0)
 
     if krylov_restart is None:
         krylov_restart = maxitt
 
-    card["iqmc_flux"] = phi0
-    card["iqmc_fixed_source"] = fixed_source
-    card["iqmc_fixed_source_solver"] = fixed_source_solver
-    card["iqmc_eigenmode_solver"] = eigenmode_solver
-    card["iqmc_preconditioner_sweeps"] = preconditioner_sweeps
-    card["iqmc_krylov_restart"] = krylov_restart
+    if source0 is None:
+        source0 = np.zeros_like(phi0)
+
+    if eigenmode_solver == "davidson":
+        card["iqmc"]["krylov_vector_size"] += 1
+
+    score_list = card["iqmc"]["score_list"]
+    for name in score:
+        score_list[name] = True
+
+    if score_list["tilt-x"]:
+        card["iqmc"]["krylov_vector_size"] += 1
+        if source_x0 is None:
+            source_x0 = np.zeros_like(phi0)
+
+    if score_list["tilt-y"]:
+        card["iqmc"]["krylov_vector_size"] += 1
+        if source_y0 is None:
+            source_y0 = np.zeros_like(phi0)
+
+    if score_list["tilt-z"]:
+        card["iqmc"]["krylov_vector_size"] += 1
+        if source_z0 is None:
+            source_z0 = np.zeros_like(phi0)
+
+    if score_list["tilt-xy"]:
+        card["iqmc"]["krylov_vector_size"] += 1
+        if source_xy0 is None:
+            source_xy0 = np.zeros_like(phi0)
+
+    if score_list["tilt-xz"]:
+        card["iqmc"]["krylov_vector_size"] += 1
+        if source_xz0 is None:
+            source_xz0 = np.zeros_like(phi0)
+
+    if score_list["tilt-yz"]:
+        card["iqmc"]["krylov_vector_size"] += 1
+        if source_yz0 is None:
+            source_yz0 = np.zeros_like(phi0)
+
+    if fission_source0 is not None:
+        card["iqmc"]["score"]["fission-source"] = fission_source0
+
+    card["iqmc"]["score"]["flux"] = phi0
+    card["iqmc"]["score"]["tilt-x"] = source_x0
+    card["iqmc"]["score"]["tilt-y"] = source_y0
+    card["iqmc"]["score"]["tilt-z"] = source_z0
+    card["iqmc"]["score"]["tilt-xy"] = source_xy0
+    card["iqmc"]["score"]["tilt-xz"] = source_xz0
+    card["iqmc"]["score"]["tilt-yz"] = source_yz0
+    card["iqmc"]["source"] = source0
+    card["iqmc"]["fixed_source"] = fixed_source
+    card["iqmc"]["fixed_source_solver"] = fixed_source_solver
+    card["iqmc"]["eigenmode_solver"] = eigenmode_solver
+    card["iqmc"]["preconditioner_sweeps"] = preconditioner_sweeps
+    card["iqmc"]["krylov_restart"] = krylov_restart
 
 
-def weight_roulette(chance, wr_threshold):
+def weight_roulette(w_threshold=0.2, w_survive=1.0):
     """
-    If neutron weight is below wr_threshold, then enter weight rouelette
-    technique. Neutron has 'chance' probability of having its weight increased
-    by factor of 1/CHANCE, and 1-CHANCE probability of terminating.
+    If neutron weight is below `w_threshold`, then enter weight rouelette
+    technique with survival weight `w_survive`.
 
     Parameters
     ----------
-    chance : probability of survival
-    wr_threshold : weight_roulette() is called on a particle
-                    if P['w'] <= wr_threshold
+    w_threshold : weight_roulette() is called on a particle if
+                  P['w'] <= wr_threshold
+    w_survive : survival weight
 
     Returns
     -------
@@ -1208,8 +1320,8 @@ def weight_roulette(chance, wr_threshold):
     """
     card = mcdc.input_deck.technique
     card["weight_roulette"] = True
-    card["wr_chance"] = chance
-    card["wr_threshold"] = wr_threshold
+    card["wr_threshold"] = w_threshold
+    card["wr_survive"] = w_survive
 
 
 def IC_generator(
@@ -1250,7 +1362,6 @@ def IC_generator(
     card["IC_generator"] = True
     card["IC_N_neutron"] = N_neutron
     card["IC_N_precursor"] = N_precursor
-    card["IC_cycle_stretch"] = cycle_stretch
 
     # Setting parameters
     card_setting = mcdc.input_deck.setting
@@ -1293,9 +1404,99 @@ def dsm(order=1):
     card["dsm_order"] = order
 
 
+def uq(**kw):
+    def append_card(delta_card, global_tag):
+        delta_card["distribution"] = dist
+        delta_card["flags"] = []
+        for key in kw.keys():
+            check_support(parameter["tag"] + " parameter", key, parameter_list, False)
+            delta_card["flags"].append(key)
+            delta_card[key] = kw[key]
+        mcdc.input_deck.uq_deltas[global_tag].append(delta_card)
+
+    mcdc.input_deck.technique["uq"] = True
+    # Make sure N_batch > 1
+    if mcdc.input_deck.setting["N_batch"] <= 1:
+        print_error("Must set N_batch>1 with mcdc.setting() prior to mcdc.uq() call.")
+
+    # Check uq parameter
+    parameter_ = check_support(
+        "uq parameter",
+        list(kw)[0],
+        ["nuclide", "material", "surface", "source"],
+        False,
+    )
+    parameter = kw[parameter_]
+    del kw[parameter_]
+    parameter["uq"] = True
+
+    # Confirm supplied distribution
+    check_requirement("uq", kw, ["distribution"])
+    dist = check_support("distribution", kw["distribution"], ["uniform"], False)
+    del kw["distribution"]
+
+    # Only remaining keywords should be the parameter delta(s)
+
+    if parameter["tag"] == "Material":
+        parameter_list = [
+            "capture",
+            "scatter",
+            "fission",
+            "nu_s",
+            "nu_p",
+            "nu_d",
+            "chi_p",
+            "chi_d",
+            "speed",
+            "decay",
+        ]
+        global_tag = "materials"
+        if parameter["N_nuclide"] == 1:
+            nuc_card = make_card_nuclide(parameter["G"], parameter["J"])
+            nuc_card["ID"] = parameter["nuclide_IDs"][0]
+            append_card(nuc_card, "nuclides")
+        delta_card = make_card_material(
+            parameter["N_nuclide"], parameter["G"], parameter["J"]
+        )
+        for name in ["ID", "nuclide_IDs", "nuclide_densities"]:
+            delta_card[name] = parameter[name]
+    elif parameter["tag"] == "Nuclide":
+        parameter_list = [
+            "capture",
+            "scatter",
+            "fission",
+            "nu_s",
+            "nu_p",
+            "nu_d",
+            "chi_p",
+            "chi_d",
+            "speed",
+            "decay",
+        ]
+        global_tag = "nuclides"
+        delta_card = make_card_nuclide(parameter["G"], parameter["J"])
+        delta_card["ID"] = parameter["ID"]
+    append_card(delta_card, global_tag)
+    # elif parameter['tag'] is 'Surface':
+    # elif parameter['tag'] is 'Source':
+
+
 # ==============================================================================
 # Util
 # ==============================================================================
+
+
+def nuclide_registered(name):
+    for card in mcdc.input_deck.nuclides:
+        if name == card["name"]:
+            return True
+    return False
+
+
+def get_nuclide(name):
+    for card in mcdc.input_deck.nuclides:
+        if name == card["name"]:
+            return card
 
 
 def print_card(card):
