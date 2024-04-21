@@ -482,9 +482,6 @@ def prepare():
     # Tally
     # =========================================================================
 
-    for name in type_.tally.names:
-        if name not in ["score", "mesh"]:
-            mcdc["tally"][name] = input_deck.tally[name]
     # Set mesh
     for name in type_.mesh_names:
         mcdc["tally"]["mesh"][name] = input_deck.tally["mesh"][name]
@@ -893,28 +890,21 @@ def generate_hdf5(mcdc):
             f.create_dataset("tally/grid/g", data=T["mesh"]["g"])
 
             # Scores
-            for name in T["score"].dtype.names:
-                if mcdc["tally"][name]:
-                    name_h5 = name.replace("_", "-")
-                    f.create_dataset(
-                        "tally/" + name_h5 + "/mean",
-                        data=np.squeeze(T["score"][name]["mean"]),
-                    )
-                    f.create_dataset(
-                        "tally/" + name_h5 + "/sdev",
-                        data=np.squeeze(T["score"][name]["sdev"]),
-                    )
-                    if mcdc["technique"]["uq_tally"][name]:
-                        mc_var = mcdc["technique"]["uq_tally"]["score"][name][
-                            "batch_var"
-                        ]
-                        tot_var = mcdc["technique"]["uq_tally"]["score"][name][
-                            "batch_bin"
-                        ]
-                        f.create_dataset(
-                            "tally/" + name_h5 + "/uq_var",
-                            data=np.squeeze(tot_var - mc_var),
-                        )
+            f.create_dataset(
+                "tally/mean",
+                data=np.squeeze(T["sum"]),
+            )
+            f.create_dataset(
+                "tally/sdev",
+                data=np.squeeze(T["sum_sq"]),
+            )
+            if mcdc["technique"]["uq_tally"]:
+                mc_var = mcdc["technique"]["uq_tally"]["batch_var"]
+                tot_var = mcdc["technique"]["uq_tally"]["batch_bin"]
+                f.create_dataset(
+                    "tally/uq_var",
+                    data=np.squeeze(tot_var - mc_var),
+                )
 
             # Eigenvalues
             if mcdc["setting"]["mode_eigenvalue"]:

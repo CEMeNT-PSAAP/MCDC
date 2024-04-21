@@ -539,6 +539,10 @@ score_list = (
 def make_type_tally(input_deck):
     global tally
 
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(input_deck.tally["mesh"])
+    struct = [("mesh", mesh)]
+
     # Number of sensitivitys parameters
     N_sensitivity = input_deck.setting["N_sensitivity"]
 
@@ -547,51 +551,11 @@ def make_type_tally(input_deck):
     if input_deck.technique["dsm_order"] == 2:
         Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
 
-    # Get card
-    card = input_deck.tally
-
-    # Tally estimator flags
-    struct = [("tracklength", bool_)]
-
-    def make_type_score(shape):
-        return np.dtype(
-            [
-                ("bin", float64, shape),
-                ("mean", float64, shape),
-                ("sdev", float64, shape),
-            ]
-        )
-
-    # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
-    struct += [("mesh", mesh)]
-
-    # Scores and shapes
-    scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
-    ]
-
-    # Add score flags to structure
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        struct += [(name, bool_)]
-
-    # Add scores to structure
-    scores_struct = []
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        shape = scores_shapes[i][1]
-        if not card[name]:
-            shape = (0,) * len(shape)
-        scores_struct += [(name, make_type_score(shape))]
-    scores = np.dtype(scores_struct)
-    struct += [("score", scores)]
+    # Tally shape and bins
+    shape = (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)
+    struct += [("score", float64, shape)]
+    struct += [("sum", float64, shape)]
+    struct += [("sum_sq", float64, shape)]
 
     # Make tally structure
     tally = np.dtype(struct)

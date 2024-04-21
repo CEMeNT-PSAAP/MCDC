@@ -76,8 +76,8 @@ def loop_fixed_source(mcdc):
             mcdc["bank_active"]["size"] = 0
 
             # Tally history closeout
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_reduce(mcdc)
+            kernel.tally_accumulate(mcdc)
             # Uq closeout
             if mcdc["technique"]["uq"]:
                 kernel.uq_tally_closeout_batch(mcdc)
@@ -107,8 +107,8 @@ def loop_eigenvalue(mcdc):
         # Tally "history" closeout
         kernel.eigenvalue_tally_closeout_history(mcdc)
         if mcdc["cycle_active"]:
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_reduce(mcdc)
+            kernel.tally_accumulate(mcdc)
 
         # Print progress
         with objmode():
@@ -208,7 +208,7 @@ def loop_source(seed, mcdc):
 
         # Tally history closeout for one-batch fixed-source simulation
         if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_accumulate(mcdc)
 
         # Tally history closeout for multi-batch uq simulation
         if mcdc["technique"]["uq"]:
@@ -251,7 +251,7 @@ def loop_source(seed, mcdc):
                         not mcdc["setting"]["mode_eigenvalue"]
                         and mcdc["setting"]["N_batch"] == 1
                     ):
-                        kernel.tally_closeout_history(mcdc)
+                        kernel.tally_accumulate(mcdc)
 
                 # Send all domain particle banks
                 kernel.dd_particle_send(mcdc)
@@ -886,7 +886,7 @@ def loop_source_precursor(seed, mcdc):
 
         # Tally history closeout for fixed-source simulation
         if not mcdc["setting"]["mode_eigenvalue"]:
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_accumulate(mcdc)
 
         # Progress printout
         percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
