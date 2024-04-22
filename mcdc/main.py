@@ -105,7 +105,7 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
-    mcdc = prepare()
+    data, mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -121,12 +121,12 @@ def run():
     elif mcdc["setting"]["mode_eigenvalue"]:
         loop_eigenvalue(mcdc)
     else:
-        loop_fixed_source(mcdc)
+        loop_fixed_source(data, mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
-    generate_hdf5(mcdc)
+    generate_hdf5(data, mcdc)
     mcdc["runtime_output"] = MPI.Wtime() - output_start
 
     # Stop timer
@@ -486,6 +486,24 @@ def prepare():
     for name in type_.mesh_names:
         mcdc["tally"]["mesh"][name] = input_deck.tally["mesh"][name]
 
+    # Tally shape
+    N_sensitivity = input_deck.setting["N_sensitivity"]
+    Ns = 1 + N_sensitivity
+    if input_deck.technique["dsm_order"] == 2:
+        Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+    card = input_deck.tally["mesh"]
+    Nmu = len(card["mu"]) - 1
+    N_azi = len(card["azi"]) - 1
+    Ng = len(card["g"]) - 1
+    Nx = len(card["x"]) - 1
+    Ny = len(card["y"]) - 1
+    Nz = len(card["z"]) - 1
+    Nt = len(card["t"]) - 1
+    shape = (3, Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)
+
+    # Set tally data
+    tally = np.zeros(shape, dtype=type_.float64)
+
     # =========================================================================
     # Setting
     # =========================================================================
@@ -831,7 +849,13 @@ def prepare():
                     "w"
                 ]
 
-    return mcdc
+    # =========================================================================
+    # Finalize data: wrapping into a tuple
+    # =========================================================================
+
+    data = (tally,)
+
+    return data, mcdc
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
@@ -851,7 +875,7 @@ def dict_to_h5group(dict_, group):
             group[k] = v
 
 
-def generate_hdf5(mcdc):
+def generate_hdf5(data, mcdc):
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
             print_msg("")
@@ -875,23 +899,24 @@ def generate_hdf5(mcdc):
                 )
 
             # Tally
-            T = mcdc["tally"]
-            f.create_dataset("tally/grid/t", data=T["mesh"]["t"])
-            f.create_dataset("tally/grid/x", data=T["mesh"]["x"])
-            f.create_dataset("tally/grid/y", data=T["mesh"]["y"])
-            f.create_dataset("tally/grid/z", data=T["mesh"]["z"])
-            f.create_dataset("tally/grid/mu", data=T["mesh"]["mu"])
-            f.create_dataset("tally/grid/azi", data=T["mesh"]["azi"])
-            f.create_dataset("tally/grid/g", data=T["mesh"]["g"])
+            mesh = mcdc["tally"]["mesh"]
+            tally = data[TALLY]
+            f.create_dataset("tally/grid/t", data=mesh["t"])
+            f.create_dataset("tally/grid/x", data=mesh["x"])
+            f.create_dataset("tally/grid/y", data=mesh["y"])
+            f.create_dataset("tally/grid/z", data=mesh["z"])
+            f.create_dataset("tally/grid/mu", data=mesh["mu"])
+            f.create_dataset("tally/grid/azi", data=mesh["azi"])
+            f.create_dataset("tally/grid/g", data=mesh["g"])
 
             # Scores
             f.create_dataset(
                 "tally/flux/mean",
-                data=np.squeeze(T["sum"]),
+                data=np.squeeze(tally[TALLY_SUM]),
             )
             f.create_dataset(
                 "tally/flux/sdev",
-                data=np.squeeze(T["sum_sq"]),
+                data=np.squeeze(tally[TALLY_SUM_SQ]),
             )
             if mcdc["technique"]["uq_tally"]:
                 mc_var = mcdc["technique"]["uq_tally"]["batch_var"]

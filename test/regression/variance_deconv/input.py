@@ -23,7 +23,7 @@ mcdc.cell([+s3, -s4], m3)
 
 mcdc.source(point=[0.0, 0.0, 0.0], direction=[1.0, 0.0, 0.0])
 
-mcdc.tally(scores=['flux'], x=np.linspace(0.0, 6.0, 7))
+mcdc.tally(scores=["flux"], x=np.linspace(0.0, 6.0, 7))
 
 mcdc.setting(N_particle=1e1, N_batch=1e1, progress_bar=False)
 

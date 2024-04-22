@@ -30,7 +30,7 @@ from mcdc.print_ import (
 
 
 @njit(cache=True)
-def loop_fixed_source(mcdc):
+def loop_fixed_source(data, mcdc):
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
         mcdc["idx_batch"] = idx_batch
@@ -51,14 +51,14 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            loop_source(seed_source, mcdc)
+            loop_source(seed_source, data, mcdc)
 
             # Loop over source precursors
             if mcdc["bank_precursor"]["size"] > 0:
                 seed_source_precursor = kernel.split_seed(
                     seed_census, SEED_SPLIT_SOURCE_PRECURSOR
                 )
-                loop_source_precursor(seed_source_precursor, mcdc)
+                loop_source_precursor(seed_source_precursor, data, mcdc)
 
             # Time census closeout
             if idx_census < mcdc["setting"]["N_census"] - 1:
@@ -76,16 +76,16 @@ def loop_fixed_source(mcdc):
             mcdc["bank_active"]["size"] = 0
 
             # Tally history closeout
-            kernel.tally_reduce(mcdc)
-            kernel.tally_accumulate(mcdc)
+            kernel.tally_reduce(data[TALLY], mcdc)
+            kernel.tally_accumulate(data[TALLY])
             # Uq closeout
             if mcdc["technique"]["uq"]:
                 kernel.uq_tally_closeout_batch(mcdc)
 
     # Tally closeout
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(mcdc)
-    kernel.tally_closeout(mcdc)
+        kernel.uq_tally_closeout(data, mcdc)
+    kernel.tally_closeout(data[TALLY], mcdc)
 
 
 # =========================================================================
@@ -133,7 +133,7 @@ def loop_eigenvalue(mcdc):
 
 
 @njit(cache=True)
-def loop_source(seed, mcdc):
+def loop_source(seed, data, mcdc):
     # Progress bar indicator
     N_prog = 0
 
@@ -199,7 +199,7 @@ def loop_source(seed, mcdc):
                 mcdc["particle_track_particle_ID"] += 1
 
             # Particle loop
-            loop_particle(P, mcdc)
+            loop_particle(P, data, mcdc)
 
         # =====================================================================
         # Closeout
@@ -207,11 +207,11 @@ def loop_source(seed, mcdc):
 
         # Tally history closeout for one-batch fixed-source simulation
         if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-            kernel.tally_accumulate(mcdc)
+            kernel.tally_accumulate(data[TALLY])
 
         # Tally history closeout for multi-batch uq simulation
         if mcdc["technique"]["uq"]:
-            kernel.uq_tally_closeout_history(mcdc)
+            kernel.uq_tally_closeout_history(data, mcdc)
 
         # Progress printout
         percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
@@ -243,14 +243,14 @@ def loop_source(seed, mcdc):
                         mcdc["particle_track_particle_ID"] += 1
 
                     # Particle loop
-                    loop_particle(P, mcdc)
+                    loop_particle(P, data, mcdc)
 
                     # Tally history closeout for one-batch fixed-source simulation
                     if (
                         not mcdc["setting"]["mode_eigenvalue"]
                         and mcdc["setting"]["N_batch"] == 1
                     ):
-                        kernel.tally_accumulate(mcdc)
+                        kernel.tally_accumulate(data[TALLY])
 
                 # Send all domain particle banks
                 kernel.dd_particle_send(mcdc)
@@ -280,7 +280,7 @@ def loop_source(seed, mcdc):
 
 
 @njit(cache=True)
-def loop_particle(P, mcdc):
+def loop_particle(P, data, mcdc):
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
         kernel.track_particle(P, mcdc)
@@ -292,7 +292,7 @@ def loop_particle(P, mcdc):
             P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
         # Determine and move to event
-        kernel.move_to_event(P, mcdc)
+        kernel.move_to_event(P, data, mcdc)
         event = P["event"]
 
         # The & operator here is a bitwise and.
@@ -747,7 +747,7 @@ def davidson(mcdc):
 
 
 @njit(cache=True)
-def loop_source_precursor(seed, mcdc):
+def loop_source_precursor(seed, data, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
     # Progress bar indicator
@@ -877,7 +877,7 @@ def loop_source_precursor(seed, mcdc):
                         mcdc["particle_track_particle_ID"] += 1
 
                     # Particle loop
-                    loop_particle(P, mcdc)
+                    loop_particle(P, data, mcdc)
 
         # =====================================================================
         # Closeout
@@ -885,7 +885,7 @@ def loop_source_precursor(seed, mcdc):
 
         # Tally history closeout for fixed-source simulation
         if not mcdc["setting"]["mode_eigenvalue"]:
-            kernel.tally_accumulate(mcdc)
+            kernel.tally_accumulate(data[TALLY])
 
         # Progress printout
         percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]

@@ -126,22 +126,13 @@ for i, name in enumerate(names):
 
         # Passed?
         if np.isclose(a, b).all():
-            print(
-                Fore.GREEN
-                + "  {}: Passed".format(result)
-                + Style.RESET_ALL
-            )
+            print(Fore.GREEN + "  {}: Passed".format(result) + Style.RESET_ALL)
         else:
             all_pass = False
             error_msgs[-1].append(
-                "Differences in %s"
-                % (name + "/" + result + "\n" + "{}".format(a - b))
+                "Differences in %s" % (name + "/" + result + "\n" + "{}".format(a - b))
             )
-            print(
-                Fore.RED
-                + "  {}: Failed".format(result)
-                + Style.RESET_ALL
-            )
+            print(Fore.RED + "  {}: Failed".format(result) + Style.RESET_ALL)
 
     # Other quantities
     for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:

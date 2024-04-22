@@ -531,20 +531,6 @@ def make_type_tally(input_deck):
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(input_deck.tally["mesh"])
     struct = [("mesh", mesh)]
 
-    # Number of sensitivitys parameters
-    N_sensitivity = input_deck.setting["N_sensitivity"]
-
-    # Number of tally scores
-    Ns = 1 + N_sensitivity
-    if input_deck.technique["dsm_order"] == 2:
-        Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-
-    # Tally shape and bins
-    shape = (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)
-    struct += [("score", float64, shape)]
-    struct += [("sum", float64, shape)]
-    struct += [("sum_sq", float64, shape)]
-
     # Make tally structure
     tally = np.dtype(struct)
 

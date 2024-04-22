@@ -16,6 +16,14 @@ EVENT_LATTICE = 1 << 8
 EVENT_SURFACE_MOVE = 1 << 9
 EVENT_DOMAIN = 1 << 10
 
+# Data index
+TALLY = 0
+
+# Tally bins
+TALLY_SCORE = 0
+TALLY_SUM = 1
+TALLY_SUM_SQ = 2
+
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
 GYRATION_RADIUS_INFINITE_X = 1
