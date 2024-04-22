@@ -1913,7 +1913,7 @@ def tally_accumulate(mcdc):
     tally["sum_sq"] += score * score
 
     # Reset bin
-    tally["score"] = 0.0
+    tally["score"].fill(0.0)
 
 
 @njit
