@@ -1913,7 +1913,7 @@ def tally_reduce(data, mcdc):
     # MPI Reduce
     buff = np.zeros_like(tally[TALLY_SCORE])
     with objmode():
-        MPI.COMM_WORLD.Reduce(np.array(tally[TALLY_SCORE]), buff, MPI.SUM, 0)
+        MPI.COMM_WORLD.Reduce(tally[TALLY_SCORE], buff, MPI.SUM, 0)
     tally[TALLY_SCORE][:] = buff
 
 
