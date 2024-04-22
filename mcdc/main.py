@@ -672,11 +672,6 @@ def prepare():
     # Variance Deconvolution - UQ
     # =========================================================================
     if mcdc["technique"]["uq"]:
-        # Assumes that all tallies will also be uq tallies
-        for name in type_.uq_tally.names:
-            if name != "score":
-                mcdc["technique"]["uq_tally"][name] = input_deck.tally[name]
-
         M = len(input_deck.uq_deltas["materials"])
         for i in range(M):
             idm = input_deck.uq_deltas["materials"][i]["ID"]
@@ -891,18 +886,18 @@ def generate_hdf5(mcdc):
 
             # Scores
             f.create_dataset(
-                "tally/mean",
+                "tally/flux/mean",
                 data=np.squeeze(T["sum"]),
             )
             f.create_dataset(
-                "tally/sdev",
+                "tally/flux/sdev",
                 data=np.squeeze(T["sum_sq"]),
             )
             if mcdc["technique"]["uq_tally"]:
                 mc_var = mcdc["technique"]["uq_tally"]["batch_var"]
                 tot_var = mcdc["technique"]["uq_tally"]["batch_bin"]
                 f.create_dataset(
-                    "tally/uq_var",
+                    "tally/flux/uq_var",
                     data=np.squeeze(tot_var - mc_var),
                 )
 

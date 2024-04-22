@@ -8,7 +8,7 @@ import mcdc.type_ as type_
 
 from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
-from mcdc.type_ import score_list, iqmc_score_list
+from mcdc.type_ import iqmc_score_list
 from mcdc.loop import loop_source
 
 
@@ -1557,14 +1557,6 @@ def surface_bc(P, surface, trans):
 
 
 @njit
-def surface_exit_evaluate(P):
-    if P["surface_ID"] == 0:
-        return 0
-    else:
-        return 1
-
-
-@njit
 def surface_reflect(P, surface, trans):
     ux = P["ux"]
     uy = P["uy"]
@@ -1897,24 +1889,6 @@ def score_tracklength(P, distance, mcdc):
 
 
 @njit
-def score_exit(P, x, mcdc):
-    tally = mcdc["tally"]
-    material = mcdc["materials"][P["material_ID"]]
-
-    s = P["sensitivity_ID"]
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
-
-    # Outside grid?
-    if outside_energy:
-        return
-
-    # Score
-    flux = P["w"] / abs(P["ux"])
-    tally["score"][s, g, 0, x, 0, 0, mu, azi] += flux
-
-
-@njit
 def tally_reduce(mcdc):
     tally = mcdc["tally"]
 
@@ -1925,8 +1899,8 @@ def tally_reduce(mcdc):
     # MPI Reduce
     buff = np.zeros_like(tally["score"])
     with objmode():
-        MPI.COMM_WORLD.Reduce(tally["score"], buff, MPI.SUM, 0)
-    score["score"][:] = buff
+        MPI.COMM_WORLD.Reduce(np.array(tally["score"]), buff, MPI.SUM, 0)
+    tally["score"][:] = buff
 
 
 @njit
@@ -2442,13 +2416,6 @@ def surface_crossing(P, mcdc):
 
     # Record old material for sensitivity quantification
     material_ID_old = P["material_ID"]
-
-    # Tally particle exit
-    if mcdc["tally"]["exit"] and not P["alive"]:
-        # Reflectance if P["surface_ID"] == 0, else transmittance
-        exit_idx = surface_exit_evaluate(P)
-        # Score on tally
-        score_exit(P, exit_idx, mcdc)
 
     # Check new cell?
     if P["alive"] and not surface["reflective"]:
@@ -4885,62 +4852,34 @@ def uq_tally_closeout_history(mcdc):
     tally = mcdc["tally"]
     uq_tally = mcdc["technique"]["uq_tally"]
 
-    for name in literal_unroll(score_list):
-        if uq_tally[name]:
-            uq_score_closeout_history(tally["score"][name], uq_tally["score"][name])
-
-
-@njit
-def uq_score_closeout_history(score, uq_score):
     # Assumes N_batch > 1
     # Accumulate square of history score, but continue to accumulate bin
-    history_bin = score["bin"] - uq_score["batch_bin"]
-    uq_score["batch_var"][:] += history_bin**2
-    uq_score["batch_bin"] = score["bin"]
+    history_bin = tally["score"] - uq_tally["batch_bin"]
+    uq_tally["batch_var"][:] += history_bin**2
+    uq_tally["batch_bin"] = tally["score"]
 
 
 @njit
 def uq_tally_closeout_batch(mcdc):
     uq_tally = mcdc["technique"]["uq_tally"]
 
-    for name in literal_unroll(score_list):
-        if uq_tally[name]:
-            # Reset bin
-            uq_tally["score"][name]["batch_bin"].fill(0.0)
-            uq_reduce_bin(uq_tally["score"][name])
+    # Reset bin
+    uq_tally["batch_bin"].fill(0.0)
 
-
-@njit
-def uq_reduce_bin(score):
     # MPI Reduce
-    buff = np.zeros_like(score["batch_var"])
+    buff = np.zeros_like(uq_tally["batch_var"])
     with objmode():
-        MPI.COMM_WORLD.Reduce(np.array(score["batch_var"]), buff, MPI.SUM, 0)
-    score["batch_var"][:] = buff
+        MPI.COMM_WORLD.Reduce(np.array(uq_tally["batch_var"]), buff, MPI.SUM, 0)
+    uq_tally["batch_var"][:] = buff
 
 
 @njit
 def uq_tally_closeout(mcdc):
     tally = mcdc["tally"]
     uq_tally = mcdc["technique"]["uq_tally"]
-
-    for name in literal_unroll(score_list):
-        # Uq_tally implies tally, but tally does not imply uq_tally
-        if uq_tally[name]:
-            uq_score_closeout(name, mcdc)
-        elif tally[name]:
-            score_closeout(tally["score"][name], mcdc)
-
-
-@njit
-def uq_score_closeout(name, mcdc):
-    score = mcdc["tally"]["score"][name]
-    uq_score = mcdc["technique"]["uq_tally"]["score"][name]
-
     N_history = mcdc["setting"]["N_particle"]
 
-    # At this point, score["sdev"] is still just the sum of the squared mean from every batch
-    uq_score["batch_var"] = (uq_score["batch_var"] / N_history - score["sdev"]) / (
+    uq_tally["batch_var"] = (uq_tally["batch_var"] / N_history - tally["sum_sq"]) / (
         N_history - 1
     )
 
@@ -4948,11 +4887,8 @@ def uq_score_closeout(name, mcdc):
     N_history = mcdc["setting"]["N_batch"]
 
     # Store results
-    score["mean"][:] = score["mean"] / N_history
-    uq_score["batch_var"] /= N_history
-    uq_score["batch_bin"] = (score["sdev"] - N_history * np.square(score["mean"])) / (
+    mean = tally["sum"] / N_history
+    uq_tally["batch_var"] /= N_history
+    uq_tally["batch_bin"] = (tally["sum_sq"] - N_history * np.square(mean)) / (
         N_history - 1
-    )
-    score["sdev"][:] = np.sqrt(
-        (score["sdev"] / N_history - np.square(score["mean"])) / (N_history - 1)
     )

@@ -524,18 +524,6 @@ def make_type_source(input_deck):
 # ==============================================================================
 
 
-# Score lists
-score_list = (
-    "flux",
-    "density",
-    "fission",
-    "total",
-    "current",
-    "eddington",
-    "exit",
-)
-
-
 def make_type_tally(input_deck):
     global tally
 
@@ -864,14 +852,6 @@ def make_type_technique(input_deck):
 def make_type_uq_tally(input_deck):
     global uq_tally
 
-    def make_type_uq_score(shape):
-        return np.dtype(
-            [
-                ("batch_bin", float64, shape),
-                ("batch_var", float64, shape),
-            ]
-        )
-
     # Tally estimator flags
     struct = []
 
@@ -884,32 +864,10 @@ def make_type_uq_tally(input_deck):
     # Mesh, but doesn't need to be added
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
 
-    # Scores and shapes
-    scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
-    ]
-
-    # Add score flags to structure
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        struct += [(name, bool_)]
-
-    # Add scores to structure
-    scores_struct = []
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        shape = scores_shapes[i][1]
-        if not tally_card[name]:
-            shape = (0,) * len(shape)
-        scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
-    struct += [("score", scores)]
+    # Tally shape and bins
+    shape = (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)
+    struct += [("batch_bin", float64, shape)]
+    struct += [("batch_var", float64, shape)]
 
     # Make tally structure
     uq_tally = np.dtype(struct)

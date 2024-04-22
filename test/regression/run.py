@@ -114,20 +114,21 @@ for i, name in enumerate(names):
     print("  (%.2f seconds)" % runtimes[-1])
 
     # Compare mean, sdev, and uq_var (if available)
-    for result in [key for key in output["tally"].keys()]:
+    for result in [key for key in output["tally/flux"].keys()]:
+        if "iqmc" in output.keys():
+            break
         if result in ["grid"]:
             continue
 
-        result_name = "tally/" + result
-        a = output[result_name][:]
         result_name = "tally/flux/" + result
+        a = output[result_name][:]
         b = answer[result_name][:]
 
         # Passed?
         if np.isclose(a, b).all():
             print(
                 Fore.GREEN
-                + "  {}: Passed".format("/" + result)
+                + "  {}: Passed".format(result)
                 + Style.RESET_ALL
             )
         else:

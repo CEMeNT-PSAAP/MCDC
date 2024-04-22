@@ -85,8 +85,7 @@ def loop_fixed_source(mcdc):
     # Tally closeout
     if mcdc["technique"]["uq"]:
         kernel.uq_tally_closeout(mcdc)
-    else:
-        kernel.tally_closeout(mcdc)
+    kernel.tally_closeout(mcdc)
 
 
 # =========================================================================
