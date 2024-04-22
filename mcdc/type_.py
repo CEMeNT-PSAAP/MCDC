@@ -1,5 +1,6 @@
 import math, sys, os, h5py
 import numpy as np
+import numba as nb
 import sys
 from numba import njit
 from mcdc.print_ import print_error
@@ -12,6 +13,7 @@ int64 = np.int64
 int32 = np.int32
 uint64 = np.uint64
 uint8 = np.uint8
+uintp = np.uintp
 bool_ = np.bool_
 str_ = "U32"
 
@@ -196,6 +198,7 @@ def make_type_particle_record(input_deck):
         ("w", float64),
         ("sensitivity_ID", int64),
         ("rng_seed", uint64),
+        ("alive", bool_),
     ]
 
     # Get modes
@@ -723,7 +726,7 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
-        ("output_name", "U30"),
+        ("output_name", str_),
         ("save_input_deck", bool_),
         ("track_particle", bool_),
         # Eigenvalue mode
@@ -740,10 +743,10 @@ def make_type_setting(deck):
         ("census_time", float64, (card["N_census"],)),
         # Particle source file
         ("source_file", bool_),
-        ("source_file_name", "U30"),
+        ("source_file_name", str_),
         # Initial condition source file
         ("IC_file", bool_),
-        ("IC_file_name", "U30"),
+        ("IC_file_name", str_),
         ("N_precursor", uint64),
         # TODO: Move to technique
         ("N_sensitivity", uint64),
@@ -1374,6 +1377,9 @@ def make_type_global(input_deck):
             ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
+            ("gpu_state", uintp),
+            ("source_program", uintp),
+            ("precursor_program", uintp),
         ]
     )
 
@@ -1389,13 +1395,15 @@ def make_type_translate():
 
 
 
-def make_type_group_array(G):
+def make_type_group_array(input_deck):
     global group_array
+    G = input_deck.materials[0]["G"]
     group_array = into_dtype([("values", float64, (G,))])
 
 
-def make_type_j_array(J):
+def make_type_j_array(input_deck):
     global j_array
+    J = input_deck.materials[0]["J"]
     j_array = into_dtype([("values", float64, (J,))])
 
 
