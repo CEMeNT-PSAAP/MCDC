@@ -178,7 +178,7 @@ def make_type_particle(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    particle = np.dtype(struct)
+    particle = into_dtype(struct)
 
 
 # Particle record (in-bank)
@@ -218,7 +218,7 @@ def make_type_particle_record(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    particle_record = np.dtype(struct)
+    particle_record = into_dtype(struct)
 
 
 precursor = into_dtype(
@@ -380,7 +380,7 @@ def make_type_nuclide(input_deck):
     ]
 
     # Set the type
-    nuclide = np.dtype(struct)
+    nuclide = into_dtype(struct)
 
 
 # ==============================================================================
@@ -437,7 +437,7 @@ def make_type_material(input_deck):
     ]
 
     # Set the type
-    material = np.dtype(struct)
+    material = into_dtype(struct)
 
 
 # ==============================================================================
@@ -453,7 +453,7 @@ def make_type_surface(input_deck):
     for surface in input_deck.surfaces:
         Nmax_slice = max(Nmax_slice, surface["N_slice"])
 
-    surface = np.dtype(
+    surface = into_dtype(
         [
             ("ID", int64),
             ("N_slice", int64),
@@ -530,7 +530,7 @@ def make_type_universe(input_deck):
         card["N_cell"] = N_cell
         card["cell_IDs"] = np.arange(N_cell)
 
-    universe = np.dtype(
+    universe = into_dtype(
         [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
     )
 
@@ -625,7 +625,7 @@ def make_type_source(input_deck):
         ("energy", float64, (2, Nmax_E)),
     ]
 
-    source = np.dtype(struct)
+    source = into_dtype(struct)
 
 
 # ==============================================================================
@@ -753,7 +753,7 @@ def make_type_setting(deck):
     ]
 
     # Finalize setting type
-    setting = np.dtype(struct)
+    setting = into_dtype(struct)
 
 
 # ==============================================================================
@@ -891,7 +891,7 @@ def make_type_technique(input_deck):
     for i in range(len(scores_shapes)):
         name = scores_shapes[i][0]
         score_list += [(name, bool_)]
-    score_list = np.dtype(score_list)
+    score_list = into_dtype(score_list)
     iqmc_list += [("score_list", score_list)]
 
     # Add scores to structure
@@ -905,7 +905,7 @@ def make_type_technique(input_deck):
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     iqmc_list += [("score", scores)]
 
     # Constants
@@ -991,7 +991,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -1034,11 +1034,11 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
@@ -1070,7 +1070,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -1082,7 +1082,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -1099,15 +1099,15 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
     )
 
@@ -1120,7 +1120,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -1163,11 +1163,11 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
@@ -1199,7 +1199,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -1211,7 +1211,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -1228,15 +1228,15 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
     )
 
@@ -1380,6 +1380,7 @@ def make_type_global(input_deck):
             ("gpu_state", uintp),
             ("source_program", uintp),
             ("precursor_program", uintp),
+            ("source_seed", uint64),
         ]
     )
 

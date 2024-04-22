@@ -158,15 +158,16 @@ def teardown_gpu(mcdc):
 # Source loop
 # =============================================================================
 
-@njit(cache=True)
+@njit
 def generate_source_particle(work_start,idx_work,seed,prog):
     mcdc = adapt.device(prog)
 
-    seed_work = kernel.split_seed(work_start + idx_work, seed)
+    key : nb.uint64 = work_start + idx_work
+    seed_work = kernel.split_seed(key,seed)
 
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
-        mcdc["particle_track_history_ID"] += 1
+       adapt.global_add(mcdc["particle_track_history_ID"],0,1)
 
     # =====================================================================
     # Get a source particle and put into active bank
@@ -174,20 +175,20 @@ def generate_source_particle(work_start,idx_work,seed,prog):
 
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
-        # Sample source
-        P : type_.particle_record = kernel.source_particle(seed_work, mcdc)
+       # Sample source
+       P : type_.particle_record = kernel.source_particle(seed_work, mcdc)
 
     # Get from source bank
     else:
-        P : type_.particle_record = mcdc["bank_source"]["particles"][idx_work]
+       P : type_.particle_record = mcdc["bank_source"]["particles"][idx_work]
 
     # Check if it is beyond current census index
     idx_census = mcdc["idx_census"]
     if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-        adapt.add_census(P,prog)
+       adapt.add_census(P,prog)
     else:
-        # Add the source particle into the active bank
-        adapt.add_active(P,prog)
+       # Add the source particle into the active bank
+       adapt.add_active(P,prog)
 
 @njit(cache=True)
 def prep_particle(P,prog):
@@ -257,21 +258,55 @@ def loop_source(seed, mcdc):
 
 
 
+
+
+def gpu_sources_spec():
+
+    def make_work(prog: nb.uintp) -> nb.boolean:
+        mcdc = adapt.device(prog)
+
+        idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
+
+        if idx_work >= mcdc["mpi_work_size"]:
+            return False
+
+        generate_source_particle(mcdc["mpi_work_start"],nb.uint64(idx_work),mcdc["source_seed"],prog)
+        return True
+
+    def initialize(prog: nb.uintp):
+        pass
+
+    def finalize(prog: nb.uintp):
+        pass
+
+    base_fns = (initialize,finalize,make_work)
+
+    def step(prog: nb.uintp, P: adapt.particle_gpu):
+        mcdc = adapt.device(prog)
+        if P["fresh"]:
+            prep_particle(P,prog)
+        P["fresh"] = False
+        step_particle(P,prog)
+        if P["alive"]:
+            adapt.step_async(prog,P)
+
+    async_fns = [step]
+    return adapt.harm.RuntimeSpec("mcdc_source",adapt.state_spec,base_fns,async_fns)
+
+
+
+@njit
 def gpu_loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
 
-    # Loop over particle sources
-    mcdc["mpi_work_iter"][0] = 0
-    mcdc["source_precursor_seed"] = seed
+    # =====================================================================
+    # GPU Interop
+    # =====================================================================
 
     # Number of blocks to launch and number of iterations to run
     block_count  = 240
     iter_count = 65536
-
-    # =====================================================================
-    # GPU Interop
-    # =====================================================================
 
     mcdc["mpi_work_iter"][0] = 0
     mcdc["source_seed"] = seed
@@ -305,46 +340,10 @@ def gpu_loop_source(seed, mcdc):
     # Progress printout
     if mcdc["setting"]["progress_bar"] and int(100.0) > N_prog:
         N_prog += 1
-        with objmode():
-            print_progress(percent, mcdc)
 
 
 
 
-
-
-def gpu_sources_spec():
-
-    def make_work(prog: nb.uintp) -> nb.boolean:
-        mcdc = adapt.device(prog)
-
-        idx_work = adapt.global_add(mcdc["mpi_work_iter"],0,1)
-
-        if idx_work >= mcdc["mpi_work_size"]:
-            return False
-
-        generate_source_particle(nb.uint64(idx_work),mcdc["source_seed"],prog)
-        return True
-
-    def initialize(prog: nb.uintp):
-        pass
-
-    def finalize(prog: nb.uintp):
-        pass
-
-    base_fns = (initialize,finalize,work_make)
-
-    def step(prog: nb.uintp, P: adapt.particle_gpu):
-        mcdc = adapt.device(prog)
-        if P["fresh"]:
-            prep_particle(P,prog)
-        P["fresh"] = False
-        step_particle(P,prog)
-        if P["alive"]:
-            adapt.step_async(prog,P)
-
-    async_fns = [step]
-    return adapt.harm.RuntimeSpec("mcdc_source",adapt.state_spec,base_fns,async_fns)
 
 
 
@@ -366,7 +365,9 @@ def loop_particle(P, mcdc):
 
 
 @njit(cache=True)
-def step_particle(P, mcdc):
+def step_particle(P, prog):
+    mcdc = adapt.device(prog)
+
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
         trans = np.zeros(3)
@@ -387,7 +388,7 @@ def step_particle(P, mcdc):
 
         # Branchless collision?
         if mcdc["technique"]["branchless_collision"]:
-            kernel.branchless_collision(P, mcdc)
+            kernel.branchless_collision(P, prog)
 
         # Analog collision
         else:
@@ -426,7 +427,7 @@ def step_particle(P, mcdc):
     # Census time crossing
     if event & EVENT_CENSUS:
         P["t"] += SHIFT
-        kernel.add_particle(kernel.copy_particle(P), mcdc["bank_census"])
+        adapt.add_census(kernel.copy_particle(P), prog)
         P["alive"] = False
 
     # Time boundary crossing
@@ -895,7 +896,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
         ) = kernel.sample_isotropic_direction(P_new)
 
         # Push to active bank
-        kernel.add_particle(kernel.copy_particle(P_new), mcdc["bank_active"])
+        adapt.add_active(kernel.copy_particle(P_new), prog)
 
 
 
@@ -969,20 +970,26 @@ def gpu_precursor_spec():
         if idx_work >= mcdc["mpi_work_size_precursor"]:
             return False
 
-        # Get precursor
-        DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+        print(".")
 
-        # Determine number of particles to be generated
-        w = DNP["w"]
-        N = math.floor(w)
+        ## Get precursor
+        #DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+
+        ## Determine number of particles to be generated
+        #w = DNP["w"]
+        ##N = math.floor(w)
         # "Roulette" the last particle
-        seed_work = kernel.split_seed(nb.uint64(idx_work), mcdc["source_precursor_seed"])
-        if kernel.rng_from_seed(seed_work) < w - N:
-            N += 1
-        DNP["w"] = N
+        #seed_work = kernel.split_seed(idx_work, seed)
+        #if kernel.rng_from_seed(seed_work) < w - N:
+        #    N += 1
+        #DNP["w"] = N
 
-        for particle_idx in range(N):
-            generate_precursor_particle(DNP,particle_idx,seed_work,prog)
+        ## =====================================================================
+        ## Loop over source particles from the source precursor
+        ## =====================================================================
+
+        #for particle_idx in range(N):
+        #    generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
 
         return True
 
@@ -992,19 +999,83 @@ def gpu_precursor_spec():
     def finalize(prog: nb.uintp):
         pass
 
-    base_fns = (initialize,finalize,work_make)
+    base_fns = (initialize,finalize,make_work)
 
     def step(prog: nb.uintp, P: adapt.particle_gpu):
         mcdc = adapt.device(prog)
-        if P["fresh"]:
-            prep_particle(P,prog)
-        P["fresh"] = False
-        step_particle(P,prog)
-        if P["alive"]:
-            adapt.step_async(prog,P)
+        #if P["fresh"]:
+        #    prep_particle(P,prog)
+        #P["fresh"] = False
+        #step_particle(P,prog)
+        #if P["alive"]:
+        #    adapt.step_async(prog,P)
 
     async_fns = [step]
     return adapt.harm.RuntimeSpec("mcdc_precursor",adapt.state_spec,base_fns,async_fns)
+
+
+
+
+@njit
+def gpu_loop_source_precursor(seed, mcdc):
+    # TODO: censussed neutrons seeding is still not reproducible
+
+    # Progress bar indicator
+    N_prog = 0
+
+    # =========================================================================
+    # Sync. RNG skip ahead for reproducibility
+    # =========================================================================
+
+    # Exscan upper estimate of number of particles generated locally
+    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
+        mcdc["bank_precursor"], mcdc
+    )
+
+    # =====================================================================
+    # GPU Interop
+    # =====================================================================
+
+    # Number of blocks to launch and number of iterations to run
+    block_count  = 240
+    iter_count = 65536
+
+    mcdc["mpi_work_iter"][0] = 0
+    mcdc["source_seed"] = seed
+
+    # Store the global state to the GPU
+    pre_store_state(mcdc["gpu_state"],mcdc)
+
+    # Execute the program, and continue to do so until it is done
+    pre_exec_program(mcdc["source_program"],block_count,iter_count)
+    while (not pre_complete(mcdc["source_program"])):
+        pre_exec_program(mcdc["source_program"],block_count,iter_count)
+
+    # Recover the original program state
+    pre_load_state(mcdc,mcdc["gpu_state"])
+    pre_clear_flags(mcdc["source_program"])
+
+    kernel.set_bank_size(mcdc["bank_active"],0)
+
+    # =====================================================================
+    # Closeout (moved out of loop)
+    # =====================================================================
+
+    # Tally history closeout for fixed-source simulation
+    if not mcdc["setting"]["mode_eigenvalue"]:
+        kernel.tally_closeout_history(mcdc)
+
+    # Progress printout
+    if mcdc["setting"]["progress_bar"] and int(100.0) > N_prog:
+        N_prog += 1
+
+
+
+
+
+
+
+
 
 
 
@@ -1018,7 +1089,7 @@ def build_gpu_progs():
     src_spec = gpu_sources_spec()
     pre_spec = gpu_precursor_spec()
 
-    harm.bind_and_load()
+    adapt.harm.RuntimeSpec.bind_and_load()
 
     src_fns           = src_spec.async_functions()
     pre_fns           = pre_spec.async_functions()
@@ -1027,7 +1098,7 @@ def build_gpu_progs():
     alloc_state   = src_fns["alloc_state"]
     free_state    = src_fns["free_state"]
 
-    global src_alloc_program, src_free_program, src_load_state, src_free_state
+    global src_alloc_program, src_free_program, src_load_state, src_store_state
     global src_init_program, src_exec_program, src_complete, src_clear_flags
     src_alloc_program = src_fns["alloc_program"]
     src_free_program  = src_fns["free_program"]
@@ -1038,7 +1109,7 @@ def build_gpu_progs():
     src_complete      = src_fns["complete"]
     src_clear_flags   = src_fns["clear_flags"]
 
-    global pre_alloc_program, pre_free_program, pre_load_state, pre_free_state
+    global pre_alloc_program, pre_free_program, pre_load_state, pre_store_state
     global pre_init_program,  pre_exec_program, pre_complete,   pre_clear_flags
     pre_alloc_state   = pre_fns["alloc_state"]
     pre_free_state    = pre_fns["free_state"]
@@ -1053,30 +1124,31 @@ def build_gpu_progs():
 
 
     @njit
-    def real_setup_gpu(mdcdc):
+    def real_setup_gpu(mcdc):
+        print("Real setup")
         arena_size  = 0x10000
         block_count = 240
-        mcdc["gpu_state"]         = src_alloc_state()
-        mcdc["source_program"]    = src_alloc_program(mcdc["gpu_state"],arena_size)
+        mcdc["gpu_state"]         = adapt.cast_voidptr_to_uintp(alloc_state())
+        mcdc["source_program"]    = adapt.cast_voidptr_to_uintp(src_alloc_program(mcdc["gpu_state"],arena_size))
         src_init_program(mcdc["source_program"],4096)
-        mcdc["precursor_program"] = pre_alloc_program(mcdc["gpu_state"],arena_size)
+        mcdc["precursor_program"] = adapt.cast_voidptr_to_uintp(pre_alloc_program(mcdc["gpu_state"],arena_size))
         pre_init_program(mcdc["precursor_program"],4096)
 
 
     @njit
     def real_teardown_gpu(mcdc):
-        src_free_program(mcdc)
-        pre_free_program(mcdc)
-        src_free_state(mcdc)
+        print("Real teardown")
+        src_free_program(adapt.cast_uintp_to_voidptr(mcdc["source_program"]))
+        pre_free_program(adapt.cast_uintp_to_voidptr(mcdc["precursor_program"]))
+        free_state(adapt.cast_uintp_to_voidptr(mcdc["gpu_state"]))
 
     global setup_gpu, teardown_gpu
     setup_gpu    = real_setup_gpu
     teardown_gpu = real_teardown_gpu
 
-    global process_sources, process_source_precursors
-    process_sources           = njit(gpu_process_sources)
-    process_source_precursors = njit(gpu_process_source_precursors)
-
+    global loop_source, loop_source_precursor
+    loop_source           = gpu_loop_source
+    loop_source_precursor = gpu_loop_source_precursor
 
 
 

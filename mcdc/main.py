@@ -188,11 +188,10 @@ def prepare():
 
     adapt.set_toggle("iQMC",input_deck.technique["iQMC"])
     adapt.set_toggle("particle_tracker",input_deck.setting["track_particle"])
-    if target=="gpu":
-        generate_gpu_functionality()
-        adapt.set_toggle("gpu_transport",(target=="gpu"))
     adapt.eval_toggle()
     adapt.target_for(target)
+    if target=="gpu":
+        build_gpu_progs()
     adapt.nopython_mode(mode=="numba")
 
 
@@ -243,6 +242,8 @@ def prepare():
                 "chi_p",
                 "chi_d",
             ]:
+                if isinstance(input_deck.nuclides[i][name],np.ndarray) and input_deck.nuclides[i][name].shape != mcdc["nuclides"][i][name].shape:
+                    continue
                 mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
 
         # CE data (load data from XS library)
@@ -572,6 +573,8 @@ def prepare():
     if mcdc["technique"]["uq"]:
         # Assumes that all tallies will also be uq tallies
         for name in type_.uq_tally.names:
+            if "padding" in name:
+                continue
             if name != "score":
                 mcdc["technique"]["uq_tally"][name] = input_deck.tally[name]
 
