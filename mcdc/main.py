@@ -93,6 +93,7 @@ import mcdc.global_ as mcdc_
 input_deck = mcdc_.input_deck
 
 import mcdc.adapt as adapt
+import mcdc.loop as loop
 
 
 def run():
@@ -161,8 +162,8 @@ def prepare():
     # Make types
     # =========================================================================
 
-    type_.make_type_group_array(G)
-    type_.make_type_j_array(J)
+    type_.make_type_group_array(input_deck)
+    type_.make_type_j_array(input_deck)
     type_.make_type_translate()
     type_.make_type_particle(input_deck)
     type_.make_type_particle_record(input_deck)
@@ -185,13 +186,15 @@ def prepare():
     if target == "gpu":
         adapt.gpu_forward_declare()
 
-    adapt.set_toggle("iQMC",iQMC)
-    adapt.set_toggle("particle_tracker",track_particle)
+    adapt.set_toggle("iQMC",input_deck.technique["iQMC"])
+    adapt.set_toggle("particle_tracker",input_deck.setting["track_particle"])
+    if target=="gpu":
+        generate_gpu_functionality()
+        adapt.set_toggle("gpu_transport",(target=="gpu"))
     adapt.eval_toggle()
-    if target == "gpu":
-        build_gpu_progs()
     adapt.target_for(target)
     adapt.nopython_mode(mode=="numba")
+
 
     # =========================================================================
     # Create the global variable container
@@ -199,6 +202,7 @@ def prepare():
     # =========================================================================
 
     mcdc = np.zeros(1, dtype=type_.global_)[0]
+
 
     # Now, set up the global variable container
 
@@ -727,6 +731,8 @@ def prepare():
                     "w"
                 ]
 
+    loop.setup_gpu(mcdc)
+
     return mcdc
 
 
@@ -917,6 +923,9 @@ def generate_hdf5(mcdc):
 
 
 def closeout(mcdc):
+
+    loop.teardown_gpu(mcdc)
+
     # Runtime
     if mcdc["mpi_master"]:
         with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:

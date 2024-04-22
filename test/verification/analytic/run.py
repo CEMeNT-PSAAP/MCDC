@@ -15,28 +15,6 @@ srun = args.srun
 # Functions
 # =============================================================================
 
-<<<<<<< HEAD
-# Fixed source
-N_min = 3
-N_max = 5
-for task in os.scandir("./fixed_source"):
-    os.chdir(task)
-    for N_hist in np.logspace(N_min, N_max, (N_max - N_min) * 2 + 1):
-        if not os.path.isfile("output_" + str(int(N_hist)) + ".h5"):
-            print(task, int(N_hist))
-            if N_proc == 1:
-                os.system(
-                    "python input.py --mode=numba --N_particle=%i --output=output_%i"
-                    % (N_hist, N_hist)
-                )
-            else:
-                os.system(
-                    "srun -n %i python input.py --mode=numba --N_particle=%i --output=output_%i"
-                    % (N_proc, N_hist, N_hist)
-                )
-    os.chdir(r"../..")
-=======
->>>>>>> main
 
 def run(N_hist, name):
     """
