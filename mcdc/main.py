@@ -499,7 +499,7 @@ def prepare():
     Ny = len(card["y"]) - 1
     Nz = len(card["z"]) - 1
     Nt = len(card["t"]) - 1
-    shape = (3, Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)
+    shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz)
 
     # Set tally data
     tally = np.zeros(shape, dtype=type_.float64)

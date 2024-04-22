@@ -1885,7 +1885,7 @@ def score_tracklength(P, distance, tally, mcdc):
 
     # Score
     flux = distance * P["w"]
-    tally[TALLY_SCORE, s, g, t, x, y, z, mu, azi] += flux
+    tally[TALLY_SCORE, s, mu, azi, g, t, x, y, z] += flux
 
 
 @njit

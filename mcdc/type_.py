@@ -851,7 +851,7 @@ def make_type_uq_tally(input_deck):
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
 
     # Tally shape and bins
-    shape = (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)
+    shape = (Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz)
     struct += [("batch_bin", float64, shape)]
     struct += [("batch_var", float64, shape)]
 
