@@ -203,6 +203,17 @@ def prep_particle(P,prog):
         kernel.track_particle(P,mcdc)
 
 
+@njit(cache=True)
+def exhaust_active_bank(mcdc):
+    P = adapt.local_particle()
+    # Loop until active bank is exhausted
+    while kernel.get_particle(P, mcdc["bank_active"], mcdc):
+        # Handle weight windows and tracking
+        prep_particle(P,mcdc)
+        # Particle loop
+        loop_particle(P, mcdc)
+    kernel.set_bank_size(mcdc["bank_active"],0)
+
 
 
 @njit(cache=True)
@@ -215,8 +226,6 @@ def loop_source(seed, mcdc):
     work_size = mcdc["mpi_work_size"]
     work_end = work_start + work_size
 
-    P = adapt.local_particle()
-
     for idx_work in range(work_size):
 
         generate_source_particle(work_start, idx_work, seed, mcdc)
@@ -224,17 +233,7 @@ def loop_source(seed, mcdc):
         # =====================================================================
         # Run the source particle and its secondaries
         # =====================================================================
-
-        # Loop until active bank is exhausted
-        while mcdc["bank_active"]["size"] > 0:
-            # Get particle from active bank
-            kernel.get_particle(P, mcdc["bank_active"], mcdc)
-
-            # Handle weight windows and tracking
-            prep_particle(P,mcdc)
-
-            # Particle loop
-            loop_particle(P, mcdc)
+        exhaust_active_bank(mcdc)
 
         # =====================================================================
         # Closeout
@@ -356,9 +355,6 @@ def gpu_sources_spec():
 
 @njit(cache=True)
 def loop_particle(P, mcdc):
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
 
     while P["alive"]:
         step_particle(P,mcdc)
@@ -943,23 +939,7 @@ def loop_source_precursor(seed, mcdc):
 
         for particle_idx in range(N):
             generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
-
-            P = adapt.local_particle()
-            # Loop until active bank is exhausted
-            while mcdc["bank_active"]["size"] > 0:
-                # Get particle from active bank
-                kernel.get_particle(P, mcdc["bank_active"], mcdc)
-
-                # Apply weight window
-                if mcdc["technique"]["weight_window"]:
-                    kernel.weight_window(P, mcdc)
-
-                # Particle tracker
-                if mcdc["setting"]["track_particle"]:
-                    mcdc["particle_track_particle_ID"] += 1
-
-                # Particle loop
-                loop_particle(P, mcdc)
+            exhaust_active_bank(mcdc)
 
         # =====================================================================
         # Closeout
