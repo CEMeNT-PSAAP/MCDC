@@ -532,6 +532,22 @@ def make_type_tally(input_deck):
     struct = [("mesh", mesh)]
 
     # Make tally structure
+    # Tally strides
+    stride = [
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+        ("x", int64),
+        ("y", int64),
+        ("z", int64),
+    ]
+    struct += [("stride", stride)]
+
+    # Total number of bins
+    struct += [("N_bin", int64)]
+
     tally = np.dtype(struct)
 
 
@@ -851,7 +867,11 @@ def make_type_uq_tally(input_deck):
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
 
     # Tally shape and bins
-    shape = (Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz)
+    if input_deck.technique['uq']:
+        N_bin = Ns * Nmu * N_azi * Ng * Nt * Nx * Ny * Nz
+    else:
+        N_bin = 0
+    shape = (N_bin,)
     struct += [("batch_bin", float64, shape)]
     struct += [("batch_var", float64, shape)]
 

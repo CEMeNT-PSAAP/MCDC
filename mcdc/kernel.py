@@ -1869,13 +1869,15 @@ def mesh_crossing_evaluate(P, mesh):
 
 
 @njit
-def score_tracklength(P, distance, tally, mcdc):
+def score_tracklength(P, distance, data, mcdc):
+    tally = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
+    mesh = mcdc["tally"]["mesh"]
+    stride = mcdc["tally"]["stride"]
 
     # Get indices
     s = P["sensitivity_ID"]
-    mesh = mcdc["tally"]["mesh"]
-    t, x, y, z, outside = mesh_get_index(P, mesh)
+    it, ix, iy, iz, outside = mesh_get_index(P, mesh)
     mu, azi = mesh_get_angular_index(P, mesh)
     g, outside_energy = mesh_get_energy_index(P, mesh, mcdc["setting"]["mode_MG"])
 
@@ -1883,13 +1885,27 @@ def score_tracklength(P, distance, tally, mcdc):
     if outside or outside_energy:
         return
 
+    # The tally index
+    idx = (
+        s * stride["sensitivity"]
+        + mu * stride["mu"]
+        + azi * stride["azi"]
+        + g * stride["g"]
+        + it * stride["t"]
+        + ix * stride["x"]
+        + iy * stride["y"]
+        + iz * stride["z"]
+    )
+
     # Score
     flux = distance * P["w"]
-    tally[TALLY_SCORE, s, mu, azi, g, t, x, y, z] += flux
+    tally[TALLY_SCORE, idx] += flux
 
 
 @njit
-def tally_reduce(tally, mcdc):
+def tally_reduce(data, mcdc):
+    tally = data[TALLY]
+
     # Normalize
     N_particle = mcdc["setting"]["N_particle"]
     tally[TALLY_SCORE][:] /= N_particle
@@ -1902,18 +1918,23 @@ def tally_reduce(tally, mcdc):
 
 
 @njit
-def tally_accumulate(tally):
-    # Accumulate score and square of score into sum and sum_sq
-    score = tally[TALLY_SCORE]
-    tally[TALLY_SUM] += score
-    tally[TALLY_SUM_SQ] += score * score
+def tally_accumulate(data, mcdc):
+    tally = data[TALLY]
+    N_bin = mcdc['tally']['N_bin']
 
-    # Reset score bin
-    tally[TALLY_SCORE].fill(0.0)
+    for i in range(N_bin):
+        # Accumulate score and square of score into sum and sum_sq
+        score = tally[TALLY_SCORE, i]
+        tally[TALLY_SUM, i] += score
+        tally[TALLY_SUM_SQ, i] += score * score
+
+        # Reset score bin
+        tally[TALLY_SCORE, i] = 0.0
 
 
 @njit
-def tally_closeout(tally, mcdc):
+def tally_closeout(data, mcdc):
+    tally = data[TALLY]
     N_history = mcdc["setting"]["N_particle"]
 
     if mcdc["setting"]["N_batch"] > 1:
@@ -2241,7 +2262,7 @@ def move_to_event(P, data, mcdc):
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
-        score_tracklength(P, distance, data[TALLY], mcdc)
+        score_tracklength(P, distance, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P, distance, mcdc)
 

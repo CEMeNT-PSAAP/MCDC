@@ -486,7 +486,7 @@ def prepare():
     for name in type_.mesh_names:
         mcdc["tally"]["mesh"][name] = input_deck.tally["mesh"][name]
 
-    # Tally shape
+    # Tally strides
     N_sensitivity = input_deck.setting["N_sensitivity"]
     Ns = 1 + N_sensitivity
     if input_deck.technique["dsm_order"] == 2:
@@ -499,10 +499,35 @@ def prepare():
     Ny = len(card["y"]) - 1
     Nz = len(card["z"]) - 1
     Nt = len(card["t"]) - 1
-    shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz)
+    stride = 1
+    if Nz > 1:
+        mcdc["tally"]["stride"]["z"] = stride
+        stride *= Nz
+    if Ny > 1:
+        mcdc["tally"]["stride"]["y"] = stride
+        stride *= Ny
+    if Nx > 1:
+        mcdc["tally"]["stride"]["x"] = stride
+        stride *= Nx
+    if Nt > 1:
+        mcdc["tally"]["stride"]["t"] = stride
+        stride *= Nt
+    if Ng > 1:
+        mcdc["tally"]["stride"]["g"] = stride
+        stride *= Ng
+    if N_azi > 1:
+        mcdc["tally"]["stride"]["azi"] = stride
+        stride *= N_azi
+    if Nmu > 1:
+        mcdc["tally"]["stride"]["mu"] = stride
+        stride *= Nmu
+    if Ns > 1:
+        mcdc["tally"]["stride"]["sensitivity"] = stride
+    N_bin = Ns * Nmu * N_azi * Ng * Nt * Nx * Ny * Nz
+    mcdc['tally']['N_bin'] = N_bin
 
     # Set tally data
-    tally = np.zeros(shape, dtype=type_.float64)
+    tally = np.zeros((3, N_bin), dtype=type_.float64)
 
     # =========================================================================
     # Setting
@@ -909,21 +934,37 @@ def generate_hdf5(data, mcdc):
             f.create_dataset("tally/grid/azi", data=mesh["azi"])
             f.create_dataset("tally/grid/g", data=mesh["g"])
 
+            # Shape
+            N_sensitivity = input_deck.setting["N_sensitivity"]
+            Ns = 1 + N_sensitivity
+            if input_deck.technique["dsm_order"] == 2:
+                Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+            card = input_deck.tally['mesh']
+            Nmu = len(card["mu"]) - 1
+            N_azi = len(card["azi"]) - 1
+            Ng = len(card["g"]) - 1
+            Nx = len(card["x"]) - 1
+            Ny = len(card["y"]) - 1
+            Nz = len(card["z"]) - 1
+            Nt = len(card["t"]) - 1
+            shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz)
+
+            # Reshape tally
+            tally = data[TALLY]
+            tally = tally.reshape(shape)
+
+            mean = np.squeeze(tally[TALLY_SUM])
+            sdev = np.squeeze(tally[TALLY_SUM_SQ])
+
             # Scores
-            f.create_dataset(
-                "tally/flux/mean",
-                data=np.squeeze(tally[TALLY_SUM]),
-            )
-            f.create_dataset(
-                "tally/flux/sdev",
-                data=np.squeeze(tally[TALLY_SUM_SQ]),
-            )
+            f.create_dataset("tally/flux/mean", data=mean)
+            f.create_dataset("tally/flux/sdev", data=sdev)
             if mcdc["technique"]["uq_tally"]:
                 mc_var = mcdc["technique"]["uq_tally"]["batch_var"]
                 tot_var = mcdc["technique"]["uq_tally"]["batch_bin"]
                 f.create_dataset(
                     "tally/flux/uq_var",
-                    data=np.squeeze(tot_var - mc_var),
+                    data=np.squeeze((tot_var - mc_var).reshape(shape)),
                 )
 
             # Eigenvalues
