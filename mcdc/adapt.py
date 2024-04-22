@@ -1,5 +1,6 @@
 import numpy as np
-from numba import njit, jit, objmode, literal_unroll, cuda
+from numba import njit, jit, objmode, literal_unroll, cuda, types
+from numba.extending import intrinsic
 import numba
 import mcdc.type_  as type_
 import mcdc.kernel as kernel
@@ -23,6 +24,46 @@ import mcdc.adapt as adapt
 
 def unknown_target(target):
     print_error(f"ERROR: Unrecognized target '{target}'")
+
+
+
+# =============================================================================
+# uintp/voidptr casters
+# =============================================================================
+
+
+@intrinsic
+def cast_uintp_to_voidptr(typingctx, src):
+    # check for accepted types
+    if isinstance(src, types.Integer):
+        # create the expected type signature
+        result_type = types.voidptr
+        sig = result_type(types.uintp)
+        # defines the custom code generation
+        def codegen(context, builder, signature, args):
+            # llvm IRBuilder code here
+            [src] = args
+            rtype = signature.return_type
+            llrtype = context.get_value_type(rtype)
+            return builder.inttoptr(src, llrtype)
+        return sig, codegen
+
+
+@intrinsic
+def cast_voidptr_to_uintp(typingctx, src):
+    # check for accepted types
+    if isinstance(src, types.RawPointer):
+        # create the expected type signature
+        result_type = types.uintp
+        sig = result_type(types.voidptr)
+        # defines the custom code generation
+        def codegen(context, builder, signature, args):
+            # llvm IRBuilder code here
+            [src] = args
+            rtype = signature.return_type
+            llrtype = context.get_value_type(rtype)
+            return builder.ptrtoint(src, llrtype)
+        return sig, codegen
 
 
 # =============================================================================
@@ -89,7 +130,7 @@ def eval_toggle():
             else:
                 global do_nothing_id
                 name = func.__name__
-                #print(f"do_nothing_{do_nothing_id} for {name}")
+                print(f"do_nothing_{do_nothing_id} for {name}")
                 arg_count = len(inspect.signature(func).parameters)
                 overwrite_func(func,numba.njit(generate_do_nothing(arg_count)))
 
@@ -287,10 +328,7 @@ def add_active(particle,prog):
 @for_gpu()
 def add_active(particle,prog):
     P = kernel.recordlike_to_particle(particle)
-    if SIMPLE_ASYNC:
-        step_async(prog,P)
-    else:
-        find_cell_async(prog,P)
+    step_async(prog,P)
 
 
 @for_cpu()

@@ -13,6 +13,9 @@ __pycache__
 *.nbc
 *.nbi
 
+# PTX cache
+__ptxcache__
+
 # Editor
 .spyproject
 *.swp
