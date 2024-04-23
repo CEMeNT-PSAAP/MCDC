@@ -370,8 +370,8 @@ def step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans = np.zeros(3)
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+        trans = adapt.local_translate()
+        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans["values"], mcdc)
 
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
@@ -384,7 +384,7 @@ def step_particle(P, prog):
     if event & EVENT_COLLISION:
         # Generate IC?
         if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-            kernel.bank_IC(P, mcdc)
+            kernel.bank_IC(P, prog)
 
         # Branchless collision?
         if mcdc["technique"]["branchless_collision"]:
@@ -398,9 +398,9 @@ def step_particle(P, prog):
 
             # Perform collision
             if event == EVENT_SCATTERING:
-                kernel.scattering(P, mcdc)
+                kernel.scattering(P, prog)
             elif event == EVENT_FISSION:
-                kernel.fission(P, mcdc)
+                kernel.fission(P, prog)
 
             # Sensitivity quantification for nuclide?
             material = mcdc["materials"][P["material_ID"]]
@@ -409,11 +409,11 @@ def step_particle(P, prog):
                 or mcdc["technique"]["dsm_order"] == 2
                 and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
             ):
-                kernel.sensitivity_material(P, mcdc)
+                kernel.sensitivity_material(P, prog)
 
     # Surface crossing
     if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, mcdc)
+        kernel.surface_crossing(P, prog)
 
     # Lattice or mesh crossing (skipped if surface crossing)
     elif event & EVENT_LATTICE or event & EVENT_MESH:
@@ -436,7 +436,7 @@ def step_particle(P, prog):
 
     # Apply weight window
     if P["alive"] and mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, mcdc)
+        kernel.weight_window(P, prog)
 
     # Apply weight roulette
     if P["alive"] and mcdc["technique"]["weight_roulette"]:
@@ -824,7 +824,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     g = DNP["n_g"]
 
     # Create new particle
-    P_new = np.zeros(1, dtype=type_.particle)[0]
+    P_new = adapt.local_particle()
     part_seed = kernel.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
@@ -837,8 +837,8 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    trans = np.zeros(3)
-    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
+    trans = adapt.local_translate()
+    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans["values"], mcdc)
     material_ID = kernel.get_particle_material(P_new, mcdc)
     material = mcdc["materials"][material_ID]
     G = material["G"]
@@ -970,26 +970,26 @@ def gpu_precursor_spec():
         if idx_work >= mcdc["mpi_work_size_precursor"]:
             return False
 
-        print(".")
+        seed = mcdc["source_seed"]
 
-        ## Get precursor
-        #DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+        # Get precursor
+        DNP = mcdc["bank_precursor"]["precursors"][idx_work]
 
-        ## Determine number of particles to be generated
-        #w = DNP["w"]
-        ##N = math.floor(w)
+        # Determine number of particles to be generated
+        w = DNP["w"]
+        N = math.floor(w)
         # "Roulette" the last particle
-        #seed_work = kernel.split_seed(idx_work, seed)
-        #if kernel.rng_from_seed(seed_work) < w - N:
-        #    N += 1
-        #DNP["w"] = N
+        seed_work = kernel.split_seed(idx_work, seed)
+        if kernel.rng_from_seed(seed_work) < w - N:
+            N += 1
+        DNP["w"] = N
 
-        ## =====================================================================
-        ## Loop over source particles from the source precursor
-        ## =====================================================================
+        # =====================================================================
+        # Loop over source particles from the source precursor
+        # =====================================================================
 
-        #for particle_idx in range(N):
-        #    generate_precursor_particle(DNP,particle_idx,seed_work,mcdc)
+        for particle_idx in range(N):
+            generate_precursor_particle(DNP,particle_idx,seed_work,prog)
 
         return True
 
