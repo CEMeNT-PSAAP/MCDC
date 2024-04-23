@@ -1841,7 +1841,7 @@ def move_to_event(P, mcdc):
             track_particle(P, mcdc)
         iqmc_score_tallies(P, distance, mcdc)
         iqmc_continuous_weight_reduction(P, distance, mcdc)
-        if np.abs(P["w"]) <= mcdc["technique"]["iqmc"]["w_min"]:
+        if abs(P["w"]) <= mcdc["technique"]["iqmc"]["w_min"]:
             P["alive"] = False
 
     # Score tracklength tallies
@@ -2049,7 +2049,7 @@ def surface_crossing(P, prog):
         material_ID_new = get_particle_material(P, mcdc)
         if material_ID_old != material_ID_new:
             # Sample derivative source particles
-            sensitivity_surface(P, surface, material_ID_old, material_ID_new, mcdc)
+            sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog)
 
 
 # =============================================================================
@@ -2574,7 +2574,8 @@ def fission_CE(P, nuclide, P_new):
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d = np.zeros(J)
+    nu_d_array = adapt.local_j_array()
+    nu_d = nu_d_array["values"]
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 
