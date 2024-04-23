@@ -217,7 +217,7 @@ def exhaust_active_bank(mcdc):
 
 
 
-@njit(cache=True)
+@njit
 def loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
@@ -901,7 +901,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
 
 
-@njit(cache=True)
+@njit
 def loop_source_precursor(seed, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
@@ -1003,12 +1003,12 @@ def gpu_precursor_spec():
 
     def step(prog: nb.uintp, P: adapt.particle_gpu):
         mcdc = adapt.device(prog)
-        #if P["fresh"]:
-        #    prep_particle(P,prog)
-        #P["fresh"] = False
-        #step_particle(P,prog)
-        #if P["alive"]:
-        #    adapt.step_async(prog,P)
+        if P["fresh"]:
+            prep_particle(P,prog)
+        P["fresh"] = False
+        step_particle(P,prog)
+        if P["alive"]:
+            adapt.step_async(prog,P)
 
     async_fns = [step]
     return adapt.harm.RuntimeSpec("mcdc_precursor",adapt.state_spec,base_fns,async_fns)
@@ -1120,7 +1120,7 @@ def build_gpu_progs():
     pre_init_program  = pre_fns["init_program"]
     pre_exec_program  = pre_fns["exec_program"]
     pre_complete      = pre_fns["complete"]
-    pre_clear_flags   = src_fns["clear_flags"]
+    pre_clear_flags   = pre_fns["clear_flags"]
 
 
     @njit
@@ -1149,6 +1149,5 @@ def build_gpu_progs():
     global loop_source, loop_source_precursor
     loop_source           = gpu_loop_source
     loop_source_precursor = gpu_loop_source_precursor
-
 
 
