@@ -188,7 +188,6 @@ def dd_prepare():
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
-    input_deck.setting["bank_active_buff"] = 1000
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
 
