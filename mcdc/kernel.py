@@ -771,7 +771,8 @@ def source_particle(seed, mcdc):
 
     # Energy and time
     if mcdc["setting"]["mode_MG"]:
-        g = sample_discrete(source["group"], P)
+        xi = rng(P)
+        g = 1 + binary_search(xi, source['group'])
         E = 0.0
     else:
         g = 0
@@ -2599,12 +2600,7 @@ def scattering_MG(P, material, P_new):
 
     # Sample outgoing energy
     xi = rng(P_new)
-    tot = 0.0
-    for g_out in range(G):
-        tot += chi_s[g_out]
-        if tot > xi:
-            break
-    P_new["g"] = g_out
+    P_new["g"] = 1 + binary_search(xi, chi_s)
 
 
 @njit
@@ -2890,12 +2886,7 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
 
     # Sample outgoing energy
     xi = rng(P_new)
-    tot = 0.0
-    for g_out in range(G):
-        tot += spectrum[g_out]
-        if tot > xi:
-            break
-    P_new["g"] = g_out
+    P_new["g"] = 1 + binary_search(xi, spectrum)
 
     # Sample emission time
     if not prompt:
@@ -2951,12 +2942,7 @@ def fission_MG(P, nuclide, P_new):
 
     # Sample outgoing energy
     xi = rng(P_new)
-    tot = 0.0
-    for g_out in range(G):
-        tot += spectrum[g_out]
-        if tot > xi:
-            break
-    P_new["g"] = g_out
+    P_new["g"] = 1 + binary_search(xi, spectrum)
 
     # Sample emission time
     if not prompt:

@@ -170,6 +170,7 @@ def nuclide(
         card["chi_s"][:, :] = np.swapaxes(scatter, 0, 1)[:, :]
         for g in range(G):
             if card["scatter"][g] > 0.0:
+                # Normalize
                 card["chi_s"][g, :] /= card["scatter"][g]
 
     # Prompt fission spectrum (matrix of size GxG)
@@ -199,6 +200,7 @@ def nuclide(
         for dg in range(J):
             if np.sum(card["chi_d"][dg, :]) > 0.0:
                 card["chi_d"][dg, :] /= np.sum(card["chi_d"][dg, :])
+                card["chi_d"][dg, :] = np.cumsum(card["chi_d"][dg, :])
 
     # Sensitivity setup
     if sensitivity:
@@ -386,6 +388,9 @@ def material(
         chi_nu_s = nuSigmaS.dot(np.diag(1.0 / card["scatter"]))
         card["nu_s"] = np.sum(chi_nu_s, axis=0)
         card["chi_s"] = np.transpose(chi_nu_s.dot(np.diag(1.0 / card["nu_s"])))
+        # Make CDF
+        for g in range(G):
+            card["chi_s"][g, :] = np.cumsum(card["chi_s"][g, :])
     if max(card["fission"]) > 0.0:
         nuSigmaF = np.zeros((G, G), dtype=float)
         for i in range(N_nuclide):
@@ -398,6 +403,9 @@ def material(
         chi_nu_p = nuSigmaF.dot(np.diag(1.0 / card["fission"]))
         card["nu_p"] = np.sum(chi_nu_p, axis=0)
         card["chi_p"] = np.transpose(chi_nu_p.dot(np.diag(1.0 / card["nu_p"])))
+        # Make CDF
+        for g in range(G):
+            card["chi_p"][g, :] = np.cumsum(card["chi_p"][g, :])
 
     # Calculate delayed and total fission multiplicities
     if max(card["fission"]) > 0.0:
@@ -858,6 +866,8 @@ def source(**kw):
             group = np.array(energy)
             # Normalize
             card["group"] = group / np.sum(group)
+            # Make CDF
+            group = np.cumsum(group)
         if mcdc.input_deck.setting["mode_CE"]:
             energy = np.array(energy)
             # Resize
