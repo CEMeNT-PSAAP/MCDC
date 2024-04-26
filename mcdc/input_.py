@@ -1149,7 +1149,7 @@ def setting(**kw):
         card["bank_census_buff"] = int(bank_census_buff)
 
     # caching is normally enabled
-    if caching in None:
+    if caching is None:
         card["caching"] = True
 
     # Particle tracker
