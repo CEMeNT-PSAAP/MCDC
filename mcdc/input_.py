@@ -867,7 +867,7 @@ def source(**kw):
             # Normalize
             card["group"] = group / np.sum(group)
             # Make CDF
-            group = np.cumsum(group)
+            card["group"] = np.cumsum(card["group"])
         if mcdc.input_deck.setting["mode_CE"]:
             energy = np.array(energy)
             # Resize

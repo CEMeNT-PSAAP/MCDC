@@ -4010,7 +4010,7 @@ def iqmc_bilinear_tilt(ux, x, dx, x_mid, uy, y, dy, y_mid, dt, dz, w, S, SigmaT)
 
 
 @njit
-def AxV(V, b, mcdc):
+def AxV(V, b, data, mcdc):
     """
     Linear operator to be used with GMRES.
     Calculate action of A on input vector V, where A is a transport sweep
@@ -4026,7 +4026,7 @@ def AxV(V, b, mcdc):
     iqmc_prepare_particles(mcdc)
     iqmc_reset_tallies(iqmc)
     iqmc["sweep_counter"] += 1
-    loop_source(0, mcdc)
+    loop_source(0, data, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_tallies(iqmc)
     # update source adds effective scattering + fission + fixed-source
@@ -4040,7 +4040,7 @@ def AxV(V, b, mcdc):
 
 
 @njit
-def HxV(V, mcdc):
+def HxV(V, data, mcdc):
     """
     Linear operator for Davidson method,
     scattering + streaming terms -> (I-L^(-1)S)*phi
@@ -4059,7 +4059,7 @@ def HxV(V, mcdc):
     iqmc_prepare_particles(mcdc)
     iqmc_reset_tallies(iqmc)
     iqmc["sweep_counter"] += 1
-    loop_source(0, mcdc)
+    loop_source(0, data, mcdc)
     # sum resultant flux on all processors
     iqmc_distribute_tallies(iqmc)
     iqmc_consolidate_sources(mcdc)
@@ -4070,7 +4070,7 @@ def HxV(V, mcdc):
 
 
 @njit
-def FxV(V, mcdc):
+def FxV(V, data, mcdc):
     """
     Linear operator for Davidson method,
     fission term -> (L^(-1)F*phi)
@@ -4089,7 +4089,7 @@ def FxV(V, mcdc):
     iqmc_prepare_particles(mcdc)
     iqmc_reset_tallies(iqmc)
     iqmc["sweep_counter"] += 1
-    loop_source(0, mcdc)
+    loop_source(0, data, mcdc)
 
     # sum resultant flux on all processors
     iqmc_distribute_tallies(iqmc)
@@ -4100,7 +4100,7 @@ def FxV(V, mcdc):
 
 
 @njit
-def preconditioner(V, mcdc, num_sweeps=3):
+def preconditioner(V, data, mcdc, num_sweeps=3):
     """
     Linear operator approximation of (I-L^(-1)S)*phi
 
@@ -4120,7 +4120,7 @@ def preconditioner(V, mcdc, num_sweeps=3):
         iqmc_prepare_particles(mcdc)
         iqmc_reset_tallies(iqmc)
         iqmc["sweep_counter"] += 1
-        loop_source(0, mcdc)
+        loop_source(0, data, mcdc)
         # sum resultant flux on all processors
         iqmc_distribute_tallies(iqmc)
 

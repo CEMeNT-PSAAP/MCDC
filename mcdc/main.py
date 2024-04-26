@@ -117,9 +117,9 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        loop_iqmc(mcdc)
+        loop_iqmc(data, mcdc)
     elif mcdc["setting"]["mode_eigenvalue"]:
-        loop_eigenvalue(mcdc)
+        loop_eigenvalue(data, mcdc)
     else:
         loop_fixed_source(data, mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
@@ -963,7 +963,7 @@ def generate_hdf5(data, mcdc):
                 tot_var = mcdc["technique"]["uq_tally"]["batch_bin"]
                 f.create_dataset(
                     "tally/flux/uq_var",
-                    data=np.squeeze((tot_var - mc_var).reshape(shape)),
+                    data=np.squeeze((tot_var - mc_var).reshape(shape[1:])),
                 )
 
             # Eigenvalues

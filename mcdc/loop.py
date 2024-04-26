@@ -94,20 +94,20 @@ def loop_fixed_source(data, mcdc):
 
 
 @njit(cache=True)
-def loop_eigenvalue(mcdc):
+def loop_eigenvalue(data, mcdc):
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
         seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
 
         # Loop over source particles
         seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
-        loop_source(seed_source, mcdc)
+        loop_source(seed_source, data, mcdc)
 
         # Tally "history" closeout
         kernel.eigenvalue_tally_closeout_history(mcdc)
         if mcdc["cycle_active"]:
-            kernel.tally_reduce(mcdc)
-            kernel.tally_accumulate(mcdc)
+            kernel.tally_reduce(data, mcdc)
+            kernel.tally_accumulate(data, mcdc)
 
         # Print progress
         with objmode():
@@ -123,7 +123,7 @@ def loop_eigenvalue(mcdc):
             mcdc["cycle_active"] = True
 
     # Tally closeout
-    kernel.tally_closeout(mcdc)
+    kernel.tally_closeout(data, mcdc)
     kernel.eigenvalue_tally_closeout(mcdc)
 
 
@@ -383,24 +383,24 @@ def loop_particle(P, data, mcdc):
 
 
 @njit(cache=True)
-def loop_iqmc(mcdc):
+def loop_iqmc(data, mcdc):
     # function calls from specified solvers
     iqmc = mcdc["technique"]["iqmc"]
     kernel.iqmc_preprocess(mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         if iqmc["eigenmode_solver"] == "davidson":
-            davidson(mcdc)
+            davidson(data, mcdc)
         if iqmc["eigenmode_solver"] == "power_iteration":
-            power_iteration(mcdc)
+            power_iteration(data, mcdc)
     else:
         if iqmc["fixed_source_solver"] == "source_iteration":
-            source_iteration(mcdc)
+            source_iteration(data, mcdc)
         if iqmc["fixed_source_solver"] == "gmres":
-            gmres(mcdc)
+            gmres(data, mcdc)
 
 
 @njit(cache=True)
-def source_iteration(mcdc):
+def source_iteration(data, mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
     total_source_old = iqmc["total_source"].copy()
@@ -414,7 +414,7 @@ def source_iteration(mcdc):
         kernel.iqmc_reset_tallies(iqmc)
         # sweep particles
         iqmc["sweep_counter"] += 1
-        loop_source(0, mcdc)
+        loop_source(0, data, mcdc)
 
         # sum resultant flux on all processors
         kernel.iqmc_distribute_tallies(iqmc)
@@ -438,7 +438,7 @@ def source_iteration(mcdc):
 
 
 @njit(cache=True)
-def gmres(mcdc):
+def gmres(data, mcdc):
     """
     GMRES solver.
     ----------
@@ -465,7 +465,7 @@ def gmres(mcdc):
     b[:single_vector] = np.reshape(fixed_source, fixed_source.size)
     X = iqmc["total_source"].copy()
     # initial residual
-    r = b - kernel.AxV(X, b, mcdc)
+    r = b - kernel.AxV(X, b, data, mcdc)
     normr = np.linalg.norm(r)
 
     # Defining dimension
@@ -517,7 +517,7 @@ def gmres(mcdc):
         for inner in range(max_inner):
             # New search direction
             v = V[inner + 1, :]
-            v[:] = kernel.AxV(vs[-1], b, mcdc)
+            v[:] = kernel.AxV(vs[-1], b, data, mcdc)
             vs.append(v)
 
             # Modified Gram Schmidt
@@ -581,7 +581,7 @@ def gmres(mcdc):
         y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
         update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
         X = X + update
-        aux = kernel.AxV(X, b, mcdc)
+        aux = kernel.AxV(X, b, data, mcdc)
         r = b - aux
         normr = np.linalg.norm(r)
         rel_resid = normr / res_0
@@ -593,7 +593,7 @@ def gmres(mcdc):
 
 
 @njit(cache=True)
-def power_iteration(mcdc):
+def power_iteration(data, mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
     # iteration tolerance
@@ -610,10 +610,10 @@ def power_iteration(mcdc):
         # iterate over scattering source
         if solver == "source_iteration":
             iqmc["maxitt"] = 1
-            source_iteration(mcdc)
+            source_iteration(data, mcdc)
             iqmc["maxitt"] = maxit
         if solver == "gmres":
-            gmres(mcdc)
+            gmres(data, mcdc)
         # reset counter for inner iteration
         iqmc["itt"] = 0
 
@@ -639,7 +639,7 @@ def power_iteration(mcdc):
 
 
 @njit(cache=True)
-def davidson(mcdc):
+def davidson(data, mcdc):
     """
     The generalized Davidson method is a Krylov subspace method for solving
     the generalized eigenvalue problem. The algorithm here is based on the
@@ -673,7 +673,7 @@ def davidson(mcdc):
     FV = np.zeros((Nt, m), dtype=np.float64)
 
     V0 = iqmc["total_source"].copy()
-    V0 = kernel.preconditioner(V0, mcdc, num_sweeps=5)
+    V0 = kernel.preconditioner(V0, data, mcdc, num_sweeps=5)
     # orthonormalize initial guess
     V0 = V0 / np.linalg.norm(V0)
     V[:, 0] = V0
@@ -685,10 +685,10 @@ def davidson(mcdc):
     # Davidson Routine
     while not simulation_end:
         # Calculate V*H*V (HxV is scattering linear operator function)
-        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)
+        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], data, mcdc)
         VHV = np.dot(cga(V[:, :Vsize].T), cga(HV[:, :Vsize]))
         # Calculate V*F*V (FxV is fission linear operator function)
-        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)
+        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], data, mcdc)
         VFV = np.dot(cga(V[:, :Vsize].T), cga(FV[:, :Vsize]))
         # solve for eigenvalues and vectors
         with objmode(Lambda="complex128[:]", w="complex128[:,:]"):
@@ -714,7 +714,7 @@ def davidson(mcdc):
         # Ritz vector
         u = np.dot(cga(V[:, :Vsize]), cga(w))
         # residual
-        res = kernel.FxV(u, mcdc) - Lambda * kernel.HxV(u, mcdc)
+        res = kernel.FxV(u, data, mcdc) - Lambda * kernel.HxV(u, data, mcdc)
         iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
         iqmc["itt_outter"] += 1
@@ -729,7 +729,7 @@ def davidson(mcdc):
             # return
         else:
             # Precondition for next iteration
-            t = kernel.preconditioner(res, mcdc, num_sweeps)
+            t = kernel.preconditioner(res, data, mcdc, num_sweeps)
             # check restart condition
             if Vsize <= m - l:
                 # appends new orthogonalization to V
