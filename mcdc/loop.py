@@ -256,10 +256,10 @@ def loop_source(seed, mcdc):
                 # Send all domain particle banks
                 kernel.dd_particle_send(mcdc)
 
+            work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
+            total_sent     = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
             # Check for incoming particles
             kernel.dd_particle_receive(mcdc)
-            work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-            total_sent = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
             if work_remaining > max_work:
                 max_work = work_remaining
 
