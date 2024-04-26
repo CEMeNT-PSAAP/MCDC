@@ -18,7 +18,7 @@ from mcdc.print_ import (
     print_iqmc_eigenvalue_exit_code,
 )
 
-caching = True # mcdc["setting"]["caching"]
+caching = True  # mcdc["setting"]["caching"]
 
 # =========================================================================
 # Fixed-source loop
