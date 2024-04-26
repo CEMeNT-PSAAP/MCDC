@@ -115,12 +115,38 @@ To Cite MC/DC
 If you use or devlope in MC/DC and would like to publish your results
 please cite our article in the Journal of Open Source software
 
-.. code-block:: 
-
+.. code-block:: bibtex
+        
     @article{morgan2024mcdc,
-        booktitle = {}
-        title = {},
-        author = {},
-        date = {},
-        doi = {},
+        title = {Monte {Carlo} / {Dynamic} {Code} ({MC}/{DC}): {An} accelerated
+                 {Python} package for fully transient neutron transport and
+                 rapid methods development},
+        author = {Morgan, Joanna Piper and Variansyah, Ilham and Pasmann, Samuel L. and 
+                  Clements, Kayla B. and Cuneo, Braxton and Mote, Alexander and
+                  Goodman, Charles and Shaw, Caleb and Northrop, Jordan and Pankaj, Rohan and
+                  Lame, Ethan and Whewell, Benjamin and McClarren, Ryan G. and Palmer, Todd S. and
+                  Chen, Lizhong and Anistratov, Dmitriy Y. and Kelley, C. T. and
+                  Palmer, Camille J. and Niemeyer, Kyle E.},
+        journal = {Journal of Open Source Software},
+        volume = {9},
+        number = {96},
+        year = {2024},
+        pages = {6415},
+        url = {https://joss.theoj.org/papers/10.21105/joss.06415},
+        doi = {10.21105/joss.06415},
     }
+
+To cite specific numerical methods within MC/DC please use our ANS M&C publications
+
+.. code-block:: bibtex
+
+    @inproceedings{var_mc23_mcdc,
+        Booktitle = {International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering},
+        title = {Development of {MC/DC}: a performant, scalable, and portable Python-based {M}onte {C}arlo neutron transport code},
+        year = {2023},
+        author = {Ilham Variansyah and Joanna Piper Morgan and Kyle E. Niemeyer and Ryan G. McClarren},
+        address = {Niagara Falls, Ontario, Canada},
+        doi={10.48550/arXiv.2305.07636},
+    }
+
+or for an individual specifc methods please browse through our `center's publiications <https://cement-psaap.github.io/publications/>`_

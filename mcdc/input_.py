@@ -1,6 +1,7 @@
 """
 This module contains functions for setting MC/DC input deck.
 The input deck class is defined in `card.py` and instantiated in `global_.py`.
+Docstrings use NumPy formatting.
 """
 
 import h5py, math, mpi4py, os
@@ -61,7 +62,7 @@ def nuclide(
     Parameters
     ----------
     capture : numpy.ndarray (1D), optional
-        Capture microscopic cross-section [barn]
+        Capture microscopic cross-section [barn].
     scatter : numpy.ndarray (2D), optional
         Differential scattering microscopic cross-section [gout, gin] [barn].
     fission : numpy.ndarray (1D), optional
@@ -73,23 +74,23 @@ def nuclide(
     nu_d : numpy.ndarray (2D), optional
         Delayed neutron precursor yield [dg, gin].
     chi_p : numpy.ndarray (2D), optional
-        Prompt fission spectrum [gout, gin]
+        Prompt fission spectrum [gout, gin].
     chi_d : numpy.ndarray (2D), optional
-        Delayed neutron spectrum [gout, dg]
+        Delayed neutron spectrum [gout, dg].
     speed : numpy.ndarray (1D), optional
-        Energy group speed [cm/s]
+        Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
-        Precursor group decay constant [/s]
+        Precursor group decay constant [/s].
     sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the nuclide
+        Set to `True` to calculate sensitivities to the nuclide.
     dsm_Np : float
         Average number of derivative particles produced at each
-        sensitivity nuclide collision
+        sensitivity nuclide collision.
 
     Returns
     -------
     dictionary
-        A nuclide card
+        A nuclide card.
 
     Notes
     -----
@@ -244,9 +245,9 @@ def material(
     Parameters
     ----------
     nuclides : list of tuple of (dictionary, float), optional
-        List of pairs of nuclide card and its density [/barn-cm]
+        List of pairs of nuclide card and its density [/barn-cm].
     capture : numpy.ndarray (1D), optional
-        Capture macroscopic cross-section [/cm]
+        Capture macroscopic cross-section [/cm].
     scatter : numpy.ndarray (2D), optional
         Differential scattering macroscopic cross-section [gout, gin] [/cm].
     fission : numpy.ndarray (1D), optional
@@ -258,24 +259,24 @@ def material(
     nu_d : numpy.ndarray (2D), optional
         Delayed neutron precursor yield [dg, gin].
     chi_p : numpy.ndarray (2D), optional
-        Prompt fission spectrum [gout, gin]
+        Prompt fission spectrum [gout, gin].
     chi_d : numpy.ndarray (2D), optional
-        Delayed neutron spectrum [gout, dg]
+        Delayed neutron spectrum [gout, dg].
     speed : numpy.ndarray (1D), optional
-        Energy group speed [cm/s]
+        Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
-        Precursor group decay constant [/s]
+        Precursor group decay constant [/s].
     sensitivity : bool, optional
         Set to `True` to calculate sensitivities to the material
-        (only relevant for single-nuclide material)
+        (only relevant for single-nuclide material).
     dsm_Np : float
         Average number of derivative particles produced at each
-        sensitivity material collision (only relevant for single_nuclide material)
+        sensitivity material collision (only relevant for single_nuclide material).
 
     Returns
     -------
     dictionary
-        A material card
+        A material card.
 
     See also
     --------
@@ -323,6 +324,10 @@ def material(
                 nuc_card["ID"] = nuc_ID
 
                 dir_name = os.getenv("MCDC_XSLIB")
+                if dir_name == None:
+                    print_error(
+                        "Continuous energy data directory not configured \n       see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
+                    )
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card["fissionable"] = True
@@ -427,10 +432,10 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     bc : {'interface', 'vacuum', 'reflective'}
         Surface boundary condition.
     sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the nuclide
+        Set to `True` to calculate sensitivities to the nuclide.
     dsm_Np : int
         Average number of derivative particles produced at each
-        sensitivity surface crossing
+        sensitivity surface crossing.
 
     Other Parameters
     ----------------
@@ -460,7 +465,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
 
     See also
     --------
-    mcdc.cell : SurfaceHandle is used to define cell domain
+    mcdc.cell : SurfaceHandle is used to define cell domain.
     """
     # Make surface card
     card = make_card_surface()
@@ -652,6 +657,28 @@ def _set_J(x, t, card):
 
 
 def cell(surfaces_flags, fill, lattice_center=None):
+    """
+    Define a cell as a building block of geometry.
+
+    Parameters
+    ----------
+    surfaces_flags : list of SurfaceHandle
+        List of surfaces that contain the cell.
+    fill : dictionary
+        Material that fills the cell.
+    lattice_center : array_like[float], optional
+        Defines the center of the lattice (default None, implies no lattice).
+
+    Returns
+    -------
+    dictionary
+        A cell card.
+
+    See also
+    --------
+    mcdc.surface : Creates SurfaceHandle used to define cell domain.
+    mcdc.material : Defines material used to fill cell.
+    """
     N_surface = len(surfaces_flags)
 
     # Make cell card
@@ -681,6 +708,25 @@ def cell(surfaces_flags, fill, lattice_center=None):
 
 
 def universe(cells, root=False):
+    """
+    Define the region where particles will be tracked.
+
+    Parameters
+    ----------
+    cells : list of dictionary
+        List of cells that comprise the universe.
+    root : bool, optional
+        Defines whether the universe is the root universe (default False).
+
+    Returns
+    -------
+    dictionary
+        A universe card.
+
+    See also
+    --------
+    mcdc.cell : Creates cells used to define universe.
+    """
     N_cell = len(cells)
 
     # Set default card values (c.f. type_.py)
@@ -704,6 +750,25 @@ def universe(cells, root=False):
 
 
 def lattice(x=None, y=None, z=None, universes=None):
+    """
+    Create a lattice card.
+
+    Parameters
+    ----------
+    x : array_like[float], optional
+        x-coordinates that define the lattice mesh (default None).
+    y : array_like[float], optional
+        y-coordinates that define the lattice mesh (default None).
+    z : array_like[float], optional
+        z-coordinates that define the lattice mesh (default None).
+    universes : list of (list of dictionary), optional
+        List of lists of universe cards that fill the lattice (default None).
+
+    Returns
+    -------
+    dictionary
+        Lattice card.
+    """
     # Make lattice card
     card = make_card_lattice()
     card["ID"] = len(mcdc.input_deck.lattices)
@@ -759,7 +824,7 @@ def source(**kw):
     z : array_like
         [z_min and z_max] for uniform source.
     isotropic : bool
-        Flag for isotropic source
+        Flag for whether source is isotropic.
     direction : array_like
         [ux, uy, uz] unit vector for parallel beam source.
     white_direction : array_like
@@ -777,9 +842,9 @@ def source(**kw):
     Returns
     -------
     dictionary
-        A source card
+        A source card.
     """
-    # Check the suplied keyword arguments
+    # Check the supplied keyword arguments
     for key in kw.keys():
         check_support(
             "source parameter",
@@ -895,6 +960,36 @@ def tally(
     g=np.array([-INF, INF]),
     E=np.array([0.0, INF]),
 ):
+    """
+    Create a tally card to collect MC solutions.
+
+    Parameters
+    ----------
+    scores : list of str
+        List of tally types (default ["tracklength"]).
+    x : array_like[float], optional
+        x-coordinates that demarcate tally bins (default numpy.ndarray([-INF, INF])).
+    y : array_like[float], optional
+        y-coordinates that demarcate tally bins (default numpy.ndarray([-INF, INF])).
+    z : array_like[float], optional
+        z-coordinates that demarcate tally bins (default numpy.ndarray([-INF, INF])).
+    t : array_like[float], optional
+        Times that demarcate tally bins (default numpy.ndarray([-INF, INF])).
+    mu : array_like[float], optional
+        Angles that demarcate axial angular tally bins (default numpy.ndarray([-1.0, 1.0])).
+    azi : array_like[float], optional
+        Angles that demarcate azimuthal angular tally bins (default numpy.ndarray([-1.0, 1.0])).
+    g : array_like[float], optional
+        Energies that demarcate energy tally bins (default numpy.ndarray([-INF, INF])).
+    E : array_like[float], optional
+        Continuous energy functionality, (default numpy.ndarray([0.0, INF])).
+
+    Returns
+    -------
+    dictionary
+        A tally card.
+    """
+
     # Get tally card
     card = mcdc.input_deck.tally
 
@@ -936,7 +1031,45 @@ def tally(
 
 
 def setting(**kw):
-    # Check the suplied keyword arguments
+    """
+    Create a setting card.
+
+    Other Parameters
+    ----------------
+    N_particle : int
+        Number of MC particle histories to run (for k-eigen and iQMC its /iteration).
+    N_batch : int
+        Number of batches to run.
+    rng_seed : int
+        Random number seed.
+    time_boundary : float
+        The time edge of the problem, after which all particles will be killed.
+    progress_bar : bool
+        Whether to display the progress bar (default True; disable when running MC/DC in a loop).
+    output_name : str
+        Name of the output file MC/DC should save data in (default "output.h5").
+    save_input_deck : bool
+        Whether to save the input deck information to the output file (default False).
+    particle_tracker : bool
+        Whether to track paths of all individual particles histories, memory issues abound (default False).
+    k_eff : str
+        Whether to run a k-eigenvalue problem.
+    source_file : str
+        Source file path and name.
+    IC_file : str
+        Path to a file containing a description of an initial condition.
+    active_bank_buff : int
+        Size of the activate particle bank buffer, for MPI runs.
+    census_bank_buff : int
+        Sets size of the census buffer particle bank.
+
+    Returns
+    -------
+    dictionary
+        A setting card.
+    """
+
+    # Check the supplied keyword arguments
     for key in kw.keys():
         check_support(
             "setting parameter",
@@ -1052,6 +1185,28 @@ def setting(**kw):
 def eigenmode(
     N_inactive=0, N_active=0, k_init=1.0, gyration_radius=None, save_particle=False
 ):
+    """
+    Create an eigenmode card.
+
+    Parameters
+    ----------
+    N_inactive : int
+        Number of cycles not included when averaging the k-eigenvalue (default 0).
+    N_active : int
+        Number of cycles to include for statistics of the k-eigenvalue (default 0).
+    k_init : float
+        Initial k value to iterate on (default 1.0).
+    gyration_radius : float, optional
+        Specify a gyration radius (default None).
+    save_particle : bool
+        Whether particle track outputs in a tally mesh (default False).
+
+    Returns
+    -------
+    dictionary
+        A eigenmode card.
+    """
+
     # Update setting card
     card = mcdc.input_deck.setting
     card["N_inactive"] = N_inactive
@@ -1092,17 +1247,38 @@ def eigenmode(
 
 
 def implicit_capture():
+    """
+    Activate implicit capture (implies no weighted emission).
+    """
     card = mcdc.input_deck.technique
     card["implicit_capture"] = True
     card["weighted_emission"] = False
 
 
 def weighted_emission(flag):
+    """
+    Activate weighted emission variance reduction technique.
+
+    Parameters
+    ----------
+    flag : bool
+        True to activate weighted emission.
+    """
+
     card = mcdc.input_deck.technique
     card["weighted_emission"] = flag
 
 
 def population_control(pct="combing"):
+    """
+    Set population control techniques.
+
+    Parameters
+    ----------
+    pct : str, optional
+        Population control method (default "combing").
+    """
+
     card = mcdc.input_deck.technique
     card["population_control"] = True
     card["weighted_emission"] = False
@@ -1115,12 +1291,28 @@ def population_control(pct="combing"):
 
 
 def branchless_collision():
+    """
+    Activate branchless collision variance reduction technique (implies no weighted emission).
+    """
     card = mcdc.input_deck.technique
     card["branchless_collision"] = True
     card["weighted_emission"] = False
 
 
 def time_census(t):
+    """
+    Set time-census boundaries.
+
+    Parameters
+    ----------
+    t : array_like[float]
+        The time-census boundaries.
+
+    Returns
+    -------
+        None (in-place card alterations).
+    """
+
     # Remove census beyond the final tally time grid point
     while True:
         if t[-1] >= mcdc.input_deck.tally["mesh"]["t"][-1]:
@@ -1138,6 +1330,29 @@ def time_census(t):
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
+    """
+    Activate weight window variance reduction technique.
+
+    Parameters
+    ----------
+    x : array_like[float], optional
+        Location of the weight window in x (default None).
+    y : array_like[float], optional
+        Location of the weight window in y (default None).
+    z : array_like[float], optional
+        Location of the weight window in z (default None).
+    t : array_like[float], optional
+        Location of the weight window in t (default None).
+    window : array_like[float], optional
+        Bound of the statistic weight of the window (default None).
+    width : array_like[float], optional
+        Statistical width the window will apply (default None).
+
+    Returns
+    -------
+        A weight window card.
+
+    """
     card = mcdc.input_deck.technique
     card["weight_window"] = True
 
@@ -1246,6 +1461,71 @@ def iQMC(
     eigenmode_solver="power_iteration",
     score=[],
 ):
+    """
+    Set iQMC settings.
+
+    Parameters
+    ----------
+    g : array_like[float], optional
+        Energy values that define energy mesh (default None).
+    t : array_like[float], optional
+        Time values that define time mesh (default None).
+    x : array_like[float], optional
+        x-coordinates that define spacial mesh (default None).
+    y : array_like[float], optional
+        y-coordinates that define spacial mesh (default None).
+    z : array_like[float], optional
+        z-coordinates that define spacial mesh (default None).
+    phi0 : array_like[float], optional
+        Initial scalar flux (default None).
+    source0 : array_like[float], optional
+        Initial particle source (default None).
+    source_x0 : array_like[float], optional
+        Initial source for tilt-x (default None).
+    source_y0 : array_like[float], optional
+        Initial source for tilt-y (default None).
+    source_z0 : array_like[float], optional
+        Initial source for tilt-z (default None).
+    source_xy0 : array_like[float], optional
+        Initial source for tilt-xy (default None).
+    source_xz0 : array_like[float], optional
+        Initial source for tilt-xz (default None).
+    source_yz0 : array_like[float], optional
+        Initial source for tilt-yz (default None).
+    source_xyz0 : array_like[float], optional
+        Initial source for tilt-xyz (default None).
+    fission_source0 : array_like[float], optional
+        Initial fission source (default None).
+    krylov_restart : int, optional
+        Max number of iterations for Krylov iteration (default same as maxitt).
+    fixed_source : array_like[float], optional
+        Fixed source (default same as phi0).
+    scramble : bool, optional
+        Whether to scramble (default False, implies over-easy).
+    maxitt : int, optional
+        Maximum number of iterations allowed before termination (default 25).
+    tol : float, optional
+        Convergence tolerance (default 1e-6).
+    N_dim : int, optional
+        Problem dimensionality (default 6).
+    seed : int, optional
+        Random number seed (default 12345).
+    preconditioner_sweeps : int, optional
+        Number of preconditioner sweeps (default 5).
+    generator : str, optional
+        Low-discrepancy sequence generator (default "halton").
+    fixed_source_solver : str, optional
+        Deterministic solver for fixed-source problem (default "source_iteration").
+    eigenmode_solver : str, optional
+        Solver for k-eigenvalue problem (default "power_iteration").
+    score : list of str
+        List of tally types (default empty list).
+
+    Returns
+    -------
+        None (in-place card alterations).
+    """
+
     card = mcdc.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
@@ -1348,19 +1628,21 @@ def iQMC(
 
 def weight_roulette(w_threshold=0.2, w_survive=1.0):
     """
-    If neutron weight is below `w_threshold`, then enter weight rouelette
+    Activate weight roulette technique.
+
+    If neutron weight is below `w_threshold`, then enter weight roulette
     technique with survival weight `w_survive`.
 
     Parameters
     ----------
-    w_threshold : weight_roulette() is called on a particle if
-                  P['w'] <= wr_threshold
-    w_survive : survival weight
+    w_threshold : float
+        Weight_roulette() is called on a particle if P['w'] <= wr_threshold.
+    w_survive : float
+        Weight of surviving particle.
 
     Returns
     -------
-    None.
-
+        None (in-place card alterations).
     """
     card = mcdc.input_deck.technique
     card["weight_roulette"] = True
@@ -1378,23 +1660,28 @@ def IC_generator(
     max_precursor_density=None,
 ):
     """
-    Turn on initial condition generator, which samples initial neutrons and precursors
-    during an eigenvalue simulation.
+    Activate initial condition generator.
 
+    The initial condition generator samples initial neutrons and precursors
+    during an eigenvalue simulation.
 
     Parameters
     ----------
     N_neutron : int
-        Neutron target size
+        Neutron target size.
     N_precursor : int
-        Delayed neutron precursot target size
+        Delayed neutron precursor target size.
     cycle_stretch : float
-        Factor to strethch number of cycles. Higher cycle stretch reduces inter-cycle
+        Factor to stretch number of cycles. Higher cycle stretch reduces inter-cycle
         correlation.
     neutron_density, max_neutron_density : float
         Total and maximum neutron density, required if `N_neutron` > 0.
     precursor_density, max_precursor_density : float
         Total and maximum precursor density, required if `N_precursor` > 0.
+
+    Returns
+    -------
+        None (in-place card alterations).
     """
 
     # Turn on eigenmode and population control
@@ -1442,6 +1729,15 @@ def IC_generator(
 
 
 def dsm(order=1):
+    """
+    Direct sensitivity method
+
+    Parameters
+    ----------
+    order : int, optional
+        order of the sensitivity to probe, by default 1
+    """
+
     card = mcdc.input_deck.technique
     if order > 2:
         print_error("DSM currently only supports up to second-order sensitivities")
@@ -1449,6 +1745,23 @@ def dsm(order=1):
 
 
 def uq(**kw):
+    """
+    Activate uncertainty quantification.
+
+    Other Parameters
+    ----------------
+    material : dictionary, optional
+        Material card of material with uncertain parameters.
+    nuclide : dictionary, optional
+        Nuclear card of nuclide with uncertain parameters.
+    distribution : {"uniform"}
+        Probability distribution of uncertain parameters.
+
+    Returns
+    -------
+        None (in-place card alterations).
+    """
+
     def append_card(delta_card, global_tag):
         delta_card["distribution"] = dist
         delta_card["flags"] = []
