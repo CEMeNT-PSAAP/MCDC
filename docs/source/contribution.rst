@@ -10,6 +10,15 @@ Whether you are here to make a single PR and never return, or want to become a m
 We have regular developers meetings for any and all who are interested to discuss contributions to this code base.
 
 This describes the processes of contributing to MC/DC for both internal (CEMeNT) and external developers.
+We make contributions to the ``dev`` branch of MC/DC.
+To get started making alterations in a cloned repo
+
+#. fork ``CEMeNT-PSAAP/MCDC`` to your github account
+#. ``git clone git@github.com:<YOUR_GITHUB>/MCDC.git``
+#. ``git switch dev``
+#. run install script which will install MC/DC as an editedable package from this directory
+
+Push some particles around!!!!
 
 Please note our `code of conduct <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md>`_ which we take seriously
 
@@ -164,6 +173,8 @@ Pull Requests
 
 MC/DC works off of a fork workflow in which contributors fork our repo, make alterations, and submit a pull requests.
 You should only submit a pull request once your code passes all tests, is properly linted, you have edited documentation (if necessary), and added any new tests (if needed).
+Open a PR to the ``dev`` branch in Github.
+MC/DC's main branch is only updated for version releases at which time a PR from dev to main is opened, taged, archived, and published automatically.
 
 Within your pull request documentation please list:
 

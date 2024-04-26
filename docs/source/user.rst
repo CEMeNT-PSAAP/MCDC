@@ -226,13 +226,14 @@ Using MPI
 MC/DC can be executed using MPI with or without Numba acceleration.
 If ``numba-mode`` is enabled the ``jit`` compilation, which is executed on all threads, can take between 30s-2min.
 For smaller problems, Numba compilation time could exceed runtime, and pure python mode could be preferable.
-Below, ``--mode`` can equal python or numba.
+Below, ``--mode`` can equal python or numba. MC/DC gets MPI functionality via `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_. 
+As an example, to run on 36 processes in Numba mode with `SLURM <https://slurm.schedmd.com/documentation.html>`_:
 
 .. code-block:: python3
 
-    srun python input.py --mode=<python/numba>
+    srun -n 36 python input.py --mode=<python/numba>
 
-
+For systems that do not use SLURM (i.e., a local system) try ``mpiexec`` or ``mpirun`` in its stead.
 
 Postprocessing Results
 ----------------------
@@ -291,7 +292,7 @@ A tool like ``matplotlib`` will work great for plotting results.
 For more complex simulations, open source professional visualization software like
 `Paraview <https://www.paraview.org/>`_  or `Visit <https://sd.llnl.gov/simulation/computer-codes/visit>`_ are available.
 
-As the problem we ran above is pretty simple and has no scattering or fission, we have an analytic solution we can import:
+As the problem we ran above is pretty simple and has no scattering or fission, we have an `analytic solution we can import <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/examples/fixed_source/slab_absorbium/reference.py>`_:
 
 .. code-block:: python3
 
@@ -300,7 +301,7 @@ As the problem we ran above is pretty simple and has no scattering or fission, w
 In the script below, we plot the space-averaged flux and space-averaged current, including their statistical noise.
 We also use the space-averaged flux and current to compute a new quantity, the space-averaged angular flux, and
 plot it over space and angle in a heat map.
-Remember that when reporting results from a Monte Carlo solver, you should **always include the statical error!**
+Remember that when reporting results from a Monte Carlo solver, you should **always include the statistical error!**
 
 
 .. code-block:: python3
