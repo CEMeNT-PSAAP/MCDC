@@ -867,7 +867,7 @@ def make_type_uq_tally(input_deck):
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
 
     # Tally shape and bins
-    if input_deck.technique['uq']:
+    if input_deck.technique["uq"]:
         N_bin = Ns * Nmu * N_azi * Ng * Nt * Nx * Ny * Nz
     else:
         N_bin = 0

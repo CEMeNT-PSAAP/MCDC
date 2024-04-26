@@ -772,7 +772,7 @@ def source_particle(seed, mcdc):
     # Energy and time
     if mcdc["setting"]["mode_MG"]:
         xi = rng(P)
-        g = 1 + binary_search(xi, source['group'])
+        g = 1 + binary_search(xi, source["group"])
         E = 0.0
     else:
         g = 0
@@ -1895,7 +1895,7 @@ def score_tracklength(P, distance, data, mcdc):
     # Easily identified tally bin indices
     s = P["sensitivity_ID"]
     mu, azi = mesh_get_angular_index(P, mesh)
-    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc['setting']['mode_MG'])
+    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc["setting"]["mode_MG"])
 
     # Return if outside the domain of interest
     if (
@@ -1955,7 +1955,6 @@ def score_tracklength(P, distance, data, mcdc):
         # Score
         flux = distance_scored * P["w"]
         tally[TALLY_SCORE, idx] += flux
-
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -2025,7 +2024,7 @@ def tally_reduce(data, mcdc):
 @njit
 def tally_accumulate(data, mcdc):
     tally = data[TALLY]
-    N_bin = mcdc['tally']['N_bin']
+    N_bin = mcdc["tally"]["N_bin"]
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq
