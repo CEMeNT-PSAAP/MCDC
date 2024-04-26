@@ -332,17 +332,19 @@ def loop_particle(P, data, mcdc):
         # Surface crossing
         if event & EVENT_SURFACE:
             kernel.surface_crossing(P, mcdc)
-            if event & EVENT_DOMAIN:
-                if not (
-                    mcdc["surfaces"][P["surface_ID"]]["reflective"]
-                    or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
-                ):
-                    kernel.domain_crossing(P, mcdc)
 
         # Lattice or mesh crossing (skipped if surface crossing)
-        elif event & EVENT_LATTICE or event & EVENT_MESH:
+        elif event & EVENT_LATTICE or event & EVENT_IQMC_MESH:
             kernel.shift_particle(P, SHIFT)
-            if event & EVENT_DOMAIN:
+
+        # Domain crossing
+        if event & EVENT_DOMAIN:
+            if event & EVENT_SURFACE and (
+                mcdc["surfaces"][P["surface_ID"]]["reflective"]
+                or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
+            ):
+                pass
+            else:
                 kernel.domain_crossing(P, mcdc)
 
         # Moving surface transition

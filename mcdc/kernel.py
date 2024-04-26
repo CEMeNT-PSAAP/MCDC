@@ -1876,15 +1876,45 @@ def score_tracklength(P, distance, data, mcdc):
     mesh = mcdc["tally"]["mesh"]
     stride = mcdc["tally"]["stride"]
 
-    # Get indices
-    s = P["sensitivity_ID"]
-    it, ix, iy, iz, outside = mesh_get_index(P, mesh)
-    mu, azi = mesh_get_angular_index(P, mesh)
-    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc["setting"]["mode_MG"])
+    # Particle 4D velocity
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / get_particle_speed(P, mcdc)
 
-    # Outside grid?
-    if outside or outside_energy:
+    # Particle initial and final 4D positions
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    # Easily identified tally bin indices
+    s = P["sensitivity_ID"]
+    mu, azi = mesh_get_angular_index(P, mesh)
+    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc['setting']['mode_MG'])
+
+    # Return if outside the domain of interest
+    if (
+        outside_energy
+        or (ux < 0.0 and x < mesh["x"][0] or x_final > mesh["x"][-1])
+        or (ux > 0.0 and x > mesh["x"][-1] or x_final < mesh["x"][0])
+        or (uy < 0.0 and y < mesh["y"][0] or y_final > mesh["y"][-1])
+        or (uy > 0.0 and y > mesh["y"][-1] or y_final < mesh["y"][0])
+        or (uz < 0.0 and z < mesh["z"][0] or z_final > mesh["z"][-1])
+        or (uz > 0.0 and z > mesh["z"][-1] or z_final < mesh["z"][0])
+        or (t > mesh["t"][-1] or t_final < mesh["t"][0])
+    ):
         return
+
+    # Get the 4D indices
+    ix = binary_search(x, mesh["x"])
+    iy = binary_search(y, mesh["y"])
+    iz = binary_search(z, mesh["z"])
+    it = binary_search(t, mesh["t"])
 
     # The tally index
     idx = (
@@ -1898,9 +1928,83 @@ def score_tracklength(P, distance, data, mcdc):
         + iz * stride["z"]
     )
 
-    # Score
-    flux = distance * P["w"]
-    tally[TALLY_SCORE, idx] += flux
+    # Sweep through the distance
+    distance_swept = 0.0
+    while distance_swept < distance:
+        # Find distances to the mesh grids
+        if ux > 0.0:
+            x_next = min(mesh["x"][ix + 1], x_final)
+        else:
+            x_next = max(mesh["x"][ix], x_final)
+        dx = (x_next - x) / ux
+        if uy > 0.0:
+            y_next = min(mesh["y"][iy + 1], y_final)
+        else:
+            y_next = max(mesh["y"][iy], y_final)
+        dy = (y_next - y) / uy
+        if uz > 0.0:
+            z_next = min(mesh["z"][iz + 1], z_final)
+        else:
+            z_next = max(mesh["z"][iz], z_final)
+        dz = (z_next - z) / uz
+        dt = (min(mesh["t"][it + 1], t_final) - t) / ut
+
+        # Get the shortest
+        distance_scored = min(dx, dy, dz, dt)
+
+        # Score
+        flux = distance_scored * P["w"]
+        tally[TALLY_SCORE, idx] += flux
+
+
+        # Accumulate distance swept
+        distance_swept += distance_scored
+
+        # Move the 4D position
+        x += distance_scored * ux
+        y += distance_scored * uy
+        z += distance_scored * uz
+        t += distance_scored * ut
+
+        # Increment index and check if out of bound
+        if dx == distance_scored:
+            if ux > 0.0:
+                ix += 1
+                if ix == len(mesh["x"]) - 1:
+                    break
+                idx += stride["x"]
+            else:
+                ix -= 1
+                if ix == -1:
+                    break
+                idx -= stride["x"]
+        if dy == distance_scored:
+            if uy > 0.0:
+                iy += 1
+                if iy == len(mesh["y"]) - 1:
+                    break
+                idx += stride["y"]
+            else:
+                iy -= 1
+                if iy == -1:
+                    break
+                idx -= stride["y"]
+        if dz == distance_scored:
+            if uz > 0.0:
+                iz += 1
+                if iz == len(mesh["z"]) - 1:
+                    break
+                idx += stride["z"]
+            else:
+                iz -= 1
+                if iz == -1:
+                    break
+                idx -= stride["z"]
+        if dt == distance_scored:
+            it += 1
+            if it == len(mesh["t"]) - 1:
+                break
+            idx += stride["t"]
 
 
 @njit
@@ -2191,19 +2295,17 @@ def move_to_event(P, data, mcdc):
     # Also set particle material and speed
     d_boundary, event = distance_to_boundary(P, mcdc)
 
-    # Distance to tally mesh
-    d_mesh = INF
-    if mcdc["cycle_active"]:
-        d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
+    # Distance to iQMC mesh
+    d_iqmc_mesh = INF
+    if mcdc["technique"]["iQMC"]:
+        d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc"]["mesh"], mcdc)
+        if d_iqmc_mesh < d_iqmc_mesh:
+            d_iqmc_mesh = d_iqmc_mesh
 
+    # Distance to domain mesh
     d_domain = INF
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
         d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
-
-    if mcdc["technique"]["iQMC"]:
-        d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc"]["mesh"], mcdc)
-        if d_iqmc_mesh < d_mesh:
-            d_mesh = d_iqmc_mesh
 
     # Distance to time boundary
     speed = get_particle_speed(P, mcdc)
@@ -2227,7 +2329,7 @@ def move_to_event(P, data, mcdc):
 
     # Find the minimum
     distance = min(
-        d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision, d_domain
+        d_boundary, d_time_boundary, d_time_census, d_iqmc_mesh, d_collision, d_domain
     )
     # Remove the boundary event if it is not the nearest
     if d_boundary > distance * PREC:
@@ -2238,8 +2340,8 @@ def move_to_event(P, data, mcdc):
         event += EVENT_TIME_BOUNDARY
     if d_time_census <= distance * PREC:
         event += EVENT_CENSUS
-    if d_mesh <= distance * PREC:
-        event += EVENT_MESH
+    if d_iqmc_mesh <= distance * PREC:
+        event += EVENT_IQMC_MESH
     if d_domain <= distance * PREC:
         event += EVENT_DOMAIN
     if d_collision == distance:
