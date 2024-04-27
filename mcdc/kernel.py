@@ -146,6 +146,9 @@ def dd_signal_block(mcdc):
     if rank == 0:
         mcdc["domain_decomp"]["send_total"] += send_delta
         mcdc["domain_decomp"]["busy_total"] -= 1
+        send_total = mcdc["domain_decomp"]["send_total"]
+        busy_total = mcdc["domain_decomp"]["busy_total"]
+        print(f"BUSY {busy_total} SENT {send_total}",flush=True)
         if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
             dd_signal_halt(mcdc)
     else:
@@ -166,6 +169,9 @@ def dd_signal_unblock(mcdc):
     if rank == 0:
         mcdc["domain_decomp"]["send_total"] += send_delta
         mcdc["domain_decomp"]["busy_total"] += 1
+        send_total = mcdc["domain_decomp"]["send_total"]
+        busy_total = mcdc["domain_decomp"]["busy_total"]
+        print(f"BUSY {busy_total} SENT {send_total}",flush=True)
         if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
             dd_signal_halt(mcdc)
     else:
@@ -183,6 +189,9 @@ def dd_handle_event(event,mcdc):
     if event['type'] == 'turnstile':
         mcdc["domain_decomp"]["send_total"] += event['send_delta']
         mcdc["domain_decomp"]["busy_total"] += event['busy_delta']
+        send_total = mcdc["domain_decomp"]["send_total"]
+        busy_total = mcdc["domain_decomp"]["busy_total"]
+        print(f"BUSY {busy_total} SENT {send_total}",flush=True)
         if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
             dd_signal_halt(mcdc)
     elif event['type'] == 'halt':
@@ -322,6 +331,7 @@ def dd_particle_receive(mcdc):
         if mcdc["domain_decomp"]["rank_busy"]:
             dd_signal_block(mcdc)
             mcdc["domain_decomp"]["rank_busy"] = False
+            print(f"Rank {MPI.COMM_WORLD.Get_rank()} no longer busy")
 
 
         buf = MPI.COMM_WORLD.recv()
@@ -339,6 +349,7 @@ def dd_particle_receive(mcdc):
         if mcdc["domain_decomp"]["recv_count"] > 0 and not mcdc["domain_decomp"]["rank_busy"]:
             dd_signal_unblock(mcdc)
             mcdc["domain_decomp"]["rank_busy"] = True
+            print(f"Rank {MPI.COMM_WORLD.Get_rank()} busy")
 
         size = bankr.shape[0]
         # Set output buffer

@@ -237,6 +237,7 @@ def loop_source(seed, mcdc):
                 print_progress(percent, mcdc)
 
     if mcdc["technique"]["domain_decomposition"]:
+        print("TEST")
         kernel.dd_check_in(mcdc)
         kernel.dd_particle_send(mcdc)
         terminated = False
