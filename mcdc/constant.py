@@ -7,7 +7,7 @@ import numba as nb
 EVENT_COLLISION = 1 << 0
 EVENT_SURFACE = 1 << 1
 EVENT_CENSUS = 1 << 2
-EVENT_MESH = 1 << 3
+EVENT_IQMC_MESH = 1 << 3
 EVENT_SCATTERING = 1 << 4
 EVENT_FISSION = 1 << 5
 EVENT_CAPTURE = 1 << 6
@@ -15,6 +15,14 @@ EVENT_TIME_BOUNDARY = 1 << 7
 EVENT_LATTICE = 1 << 8
 EVENT_SURFACE_MOVE = 1 << 9
 EVENT_DOMAIN = 1 << 10
+
+# Data index
+TALLY = 0
+
+# Tally bins
+TALLY_SCORE = 0
+TALLY_SUM = 1
+TALLY_SUM_SQ = 2
 
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
