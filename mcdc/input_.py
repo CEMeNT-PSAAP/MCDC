@@ -1401,12 +1401,31 @@ def domain_decomposition(
     x=None,
     y=None,
     z=None,
-    t=None,
     exchange_rate=100,
-    bank_size=1e5,
     work_ratio=None,
     repro=True,
 ):
+    """
+    Activate domain decomposition.
+
+    Parameters
+    ----------
+    x : array_like[float], optional
+        Location of subdomain boundaries in x (default None).
+    y : array_like[float], optional
+        Location of subdomain boundaries in y (default None).
+    z : array_like[float], optional
+        Location of subdomain boundaries in z (default None).
+    exchange_rate : float, optional
+        number of particles to acumulate in the domain banks before sending.
+    work_ratio : array_like[integer], optional
+        Inte
+
+    Returns
+    -------
+        A domain decomposition card.
+
+    """
     card = mcdc.input_deck.technique
     card["domain_decomposition"] = True
     card["domain_bank_size"] = int(1e5)
@@ -1423,9 +1442,6 @@ def domain_decomposition(
     if z is not None:
         card["dd_mesh"]["z"] = z
         dom_num += len(z)
-    if t is not None:
-        card["dd_mesh"]["t"] = t
-        dom_num += len(t)
     # Set work ratio
     if work_ratio is None:
         card["dd_work_ratio"] = None
