@@ -1022,6 +1022,52 @@ def make_type_uq(input_deck):
     )
 
 
+
+def make_type_domain_decomp(input_deck):
+    global domain_decomp
+    # Domain banks if needed
+    if input_deck.technique["domain_decomposition"]:
+        bank_domain_xp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_xn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_yp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_yn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_zp = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_zn = particle_bank(input_deck.technique["domain_bank_size"])
+    else:
+        bank_domain_xp = particle_bank(0)
+        bank_domain_xn = particle_bank(0)
+        bank_domain_yp = particle_bank(0)
+        bank_domain_yn = particle_bank(0)
+        bank_domain_zp = particle_bank(0)
+        bank_domain_zn = particle_bank(0)
+
+
+    domain_decomp = np.dtype(
+        [
+            # Info tracked in all ranks
+            ("bank_xp",    bank_domain_xp),
+            ("bank_xn",    bank_domain_xn),
+            ("bank_yp",    bank_domain_yp),
+            ("bank_yn",    bank_domain_yn),
+            ("bank_zp",    bank_domain_zp),
+            ("bank_zn",    bank_domain_zn),
+
+            ("send_count", int64 ), # Number of particles sent
+            ("recv_count", int64 ), # Number of particles recv'd
+            ("rank_busy",  bool_ ), # True if the rank currently has particles to process
+            ("work_done",  int64 ), # Whether or not there is any outstanding work across any ranks
+
+            # Info tracked in "leader" rank zero
+            ("send_total", int64 ), # The total number of particles sent but not yet recv'd
+            ("busy_total", int64 ), # The total number of busy ranks
+        ]
+    )
+
+
+
+
+
+
 param_names = ["tag", "ID", "key", "mean", "delta", "distribution", "rng_seed"]
 
 
@@ -1075,22 +1121,6 @@ def make_type_global(input_deck):
         bank_source = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
-    # Domain banks if needed
-    if input_deck.technique["domain_decomposition"]:
-        bank_domain_xp = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_xn = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_yp = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_yn = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_zp = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_zn = particle_bank(input_deck.technique["domain_bank_size"])
-    else:
-        bank_domain_xp = particle_bank(0)
-        bank_domain_xn = particle_bank(0)
-        bank_domain_yp = particle_bank(0)
-        bank_domain_yn = particle_bank(0)
-        bank_domain_zp = particle_bank(0)
-        bank_domain_zn = particle_bank(0)
-        bank_lost = particle_bank(0)
     # Particle tracker
     N_track = 0
     if input_deck.setting["track_particle"]:
@@ -1128,15 +1158,10 @@ def make_type_global(input_deck):
             ("tally", tally),
             ("setting", setting),
             ("technique", technique),
+            ("domain_decomp", domain_decomp),
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
-            ("bank_domain_xp", bank_domain_xp),
-            ("bank_domain_xn", bank_domain_xn),
-            ("bank_domain_yp", bank_domain_yp),
-            ("bank_domain_yn", bank_domain_yn),
-            ("bank_domain_zp", bank_domain_zp),
-            ("bank_domain_zn", bank_domain_zn),
             ("bank_precursor", bank_precursor),
             ("dd_idx", int64),
             ("k_eff", float64),
