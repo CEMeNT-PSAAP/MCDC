@@ -296,6 +296,7 @@ def prepare():
     type_.make_type_setting(input_deck)
     type_.make_type_uq_tally(input_deck)
     type_.make_type_uq(input_deck)
+    type_.make_type_domain_decomp(input_deck)
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
 
