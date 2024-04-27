@@ -16,7 +16,7 @@ To get started making alterations in a cloned repo
 #. fork ``CEMeNT-PSAAP/MCDC`` to your github account
 #. ``git clone git@github.com:<YOUR_GITHUB>/MCDC.git``
 #. ``git switch dev``
-#. run install script which will install MC/DC as an editedable package from this directory
+#. run install script which will install MC/DC as an editable package from this directory
 
 Push some particles around!!!!
 
@@ -97,6 +97,17 @@ Alteratively a developer could delete the ``__pycache__`` directory or other cac
 At some point MC/DC will enable `Numba's Ahead of Time compilation abilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_. But the core development team is holding off until scheduled `upgrades to AOT functionality in Numba are implemented <https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-numba-pycc>`_.
 However if absolutely required by users numba does allow for some `cache sharing <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
 
+------------------
+Adding a New Input
+------------------
+
+To add a new keyword argument such that a user can interface with it in an input deck 
+there are a few different places a dev will need to make alterations
+
+#. ``card.py`` (where the input cards are actually defined)
+#. ``type.py`` (where the type information of the inputs are strictly added)
+#. ``input_.py`` (where user inputs are merged with the specifications in ``card.py`` and ``type.py``)
+
 -------
 Testing
 -------
@@ -112,7 +123,7 @@ Our github based CI runs for,
 * linux-64 (x86)
 * osx-64 (x86, intel based macs)
 
-while we do not have continuos integration we have validated MC/DC on other systems.
+while we do not have continuous integration we have validated MC/DC on other systems.
 
 To run the regression tests locally, navigate to ``\MCDC\tests\regression`` and run,
 
@@ -150,7 +161,7 @@ Adding Documentation
 
 
 It's not everything it needs to be but we are trying!
-If your contribution changes the behavior of the input deck, instillation process, or testing infrastructure your contribution must include alteration to this documentaiton.
+If your contribution changes the behavior of the input deck, instillation process, or testing infrastructure your contribution must include alteration to this documentation.
 That can be done by editing the RST files in ``/MCDC/docs/source/<FILENAME>.rst``.
 
 To add a new page to the documentation,
@@ -174,7 +185,7 @@ Pull Requests
 MC/DC works off of a fork workflow in which contributors fork our repo, make alterations, and submit a pull requests.
 You should only submit a pull request once your code passes all tests, is properly linted, you have edited documentation (if necessary), and added any new tests (if needed).
 Open a PR to the ``dev`` branch in Github.
-MC/DC's main branch is only updated for version releases at which time a PR from dev to main is opened, taged, archived, and published automatically.
+MC/DC's main branch is only updated for version releases at which time a PR from dev to main is opened, tagged, archived, and published automatically.
 
 Within your pull request documentation please list:
 

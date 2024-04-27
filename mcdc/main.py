@@ -80,7 +80,7 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc
+from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc, set_cache
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_deck
@@ -110,6 +110,11 @@ def run():
 
     # Print banner, hardware configuration, and header
     print_banner(mcdc)
+
+    print(mcdc["setting"]["caching"])
+
+    set_cache(mcdc["setting"]["caching"])
+
     print_msg(" Now running TNT...")
     if mcdc["setting"]["mode_eigenvalue"]:
         print_header_eigenvalue(mcdc)
