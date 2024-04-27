@@ -1,4 +1,4 @@
-name: Verification Tests (manual execition only)
+name: Verification Tests (manual execution only)
 
 on: workflow_dispatch
 

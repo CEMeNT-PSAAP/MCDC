@@ -114,7 +114,7 @@ To build the docs
 To Cite MC/DC
 =============
 
-If you use MC/DC and would like to provide proper atribution
+If you use MC/DC and would like to provide proper attribution
 please cite our article in the Journal of Open Source software
 
 .. code-block:: bibtex
@@ -139,7 +139,7 @@ please cite our article in the Journal of Open Source software
     }
 
 If you are developing or working with specific numerical methods please take greater care
-to cite the specifc publications where that work is presented.
-An exhsitve list can be found on our :ref:`pubs` page.
+to cite the specific publications where that work is presented.
+An exhaustive list can be found on our :ref:`pubs` page.
 Also check out and even longer list of associated publications on our
-`center's publiications page <https://cement-psaap.github.io/publications/>`_
+`center's publications page <https://cement-psaap.github.io/publications/>`_

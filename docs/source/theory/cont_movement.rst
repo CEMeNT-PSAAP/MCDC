@@ -1,7 +1,7 @@
 .. _cont_movement:
 
 ===================
-Continous Movement
+Continuous Movement
 ===================
 
 blah
