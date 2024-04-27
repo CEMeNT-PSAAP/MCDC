@@ -97,6 +97,17 @@ Alteratively a developer could delete the ``__pycache__`` directory or other cac
 At some point MC/DC will enable `Numba's Ahead of Time compilation abilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_. But the core development team is holding off until scheduled `upgrades to AOT functionality in Numba are implemented <https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-numba-pycc>`_.
 However if absolutely required by users numba does allow for some `cache sharing <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
 
+------------------
+Adding a New Input
+------------------
+
+To add a new keyword argument such that a user can interface with it in an input deck 
+there are a few diffrent places a dev will need to make alterations
+
+#. ``card.py`` (where the input cards are actually defined)
+#. ``type.py`` (where the type information of the inputs are stricly added)
+#. ``input_.py`` (where user inputs are merged with the spcifications in ``card.py`` and ``type.py``)
+
 -------
 Testing
 -------
