@@ -9,7 +9,7 @@ try:
     import distinctipy  # creates unlimited visually distinct colors for visualization
 
 except ImportError as e:
-    msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc[viz]> (add para for mac)"
+    msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc[viz]> (for mac: mcdc'[viz]')"
     print_warning(msg)
 
 import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
@@ -414,7 +414,7 @@ def visualize(start_time=0, end_time=0, tick_interval=1, material_colors={}):
         # must be inside this loop so it doesn't launch when the visualizer is imported
         import netgen.gui
     except ImportError as e:
-        msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc[viz]> (add para for mac)"
+        msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc[viz]> (for mac: mcdc'[viz]')"
         print_warning(msg)
 
     color_key_dic = draw_Geometry(

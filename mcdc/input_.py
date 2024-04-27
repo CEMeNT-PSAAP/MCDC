@@ -1046,6 +1046,9 @@ def setting(**kw):
         The time edge of the problem, after which all particles will be killed.
     progress_bar : bool
         Whether to display the progress bar (default True; disable when running MC/DC in a loop).
+    caching : bool
+        True will store a cache of compiled Numba kernels. False will not and will delete a __pycache__ folder if one exists.
+        see :ref:`Caching`.
     output_name : str
         Name of the output file MC/DC should save data in (default "output.h5").
     save_input_deck : bool
@@ -1149,8 +1152,8 @@ def setting(**kw):
         card["bank_census_buff"] = int(bank_census_buff)
 
     # caching is normally enabled
-    if caching is None:
-        card["caching"] = True
+    if caching is not None:
+        card["caching"] = caching
 
     # Particle tracker
     if particle_tracker is not None:

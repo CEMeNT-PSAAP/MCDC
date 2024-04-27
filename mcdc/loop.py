@@ -5,6 +5,7 @@ from scipy.linalg import eig
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
+import pathlib
 
 import mcdc.print_ as print_module
 
@@ -16,9 +17,20 @@ from mcdc.print_ import (
     print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
+    print_msg,
 )
 
-caching = True  # mcdc["setting"]["caching"]
+caching = True
+
+
+def set_cache(setting):
+    caching = setting
+
+    if setting == False:
+        print_msg(" Caching has been disabled")
+        # p.unlink() for p in pathlib.Path('.').rglob('*.py[co]')
+        # p.rmdir() for p in pathlib.Path('.').rglob('__pycache__')
+
 
 # =========================================================================
 # Fixed-source loop

@@ -617,6 +617,7 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
+        ("caching", bool_),
         ("output_name", "U30"),
         ("save_input_deck", bool_),
         ("track_particle", bool_),
