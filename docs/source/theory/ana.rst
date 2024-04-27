@@ -1,7 +1,7 @@
 .. _ana:
 
-===========================
-Accleration and Abstraction
-===========================
+============================
+Acceleration and Abstraction
+============================
 
 blah 

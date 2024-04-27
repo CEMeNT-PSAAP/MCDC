@@ -5,7 +5,7 @@ Publications
 =============
 
 This page contains various formal publications describing the features and algorithms of MC/DC.
-If you are writing a research paper please provide proper attribution to those whos work you are using in MC/DC.
+If you are writing a research paper please provide proper attribution to those whose work you are using in MC/DC.
 Generally, the citation on the home page is a good place to start.
 
 General MC/DC Papers
@@ -130,7 +130,7 @@ S. Pasmann, I. Variansyah, and R. G. McClarren.
 with Quasi-Monte Carlo.” In Transactions of the American Nuclear Society,
 volume 124, pp. 192–195. American Nuclear Society (2021).
 
-Validation and Verifiaction Publications
+Validation and Verification Publications
 ----------------------------------------
 
 C. J. Palmer, J. Northrop, T. S. Palmer, A. J. Reynolds.

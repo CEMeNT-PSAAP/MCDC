@@ -1,12 +1,12 @@
 .. _dd:
 
 ====================
-Domain Decompisition
+Domain Decomposition
 ====================
 
 blah 
 
-This is an equation as a seperate call out:
+This is an equation as a separate call out:
 
 .. math::
 

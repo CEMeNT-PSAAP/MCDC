@@ -1,7 +1,7 @@
 .. _uq:
 
-=========================
-Uncertatny Quntification
-=========================
+==========================
+Uncertainty Quantification
+==========================
 
 blah

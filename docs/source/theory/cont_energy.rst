@@ -1,7 +1,7 @@
 .. _cont_energy:
 
-================
-Continous Energy
-================
+=================
+Continuous Energy
+=================
 
 blah

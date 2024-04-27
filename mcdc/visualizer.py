@@ -9,7 +9,7 @@ try:
     import distinctipy  # creates unlimited visually distinct colors for visualization
 
 except ImportError as e:
-    msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc[viz]> (for mac: mcdc'[viz]')"
+    msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc['viz']> (for mac: 'mcdc[viz]')"
     print_warning(msg)
 
 import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
@@ -81,7 +81,7 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
                     surface_list[surface_ID]["I"],
                 )
 
-            # planes have to be intersected to achive the wanted visualization in ngsolve
+            # planes have to be intersected to achieve the wanted visualization in ngsolve
             cell_shape_list.append([Plane(Pnt(point), Vec(vector)), "intersect"])
 
         elif surface_list[surface_ID]["type"] == "plane-y":
@@ -113,7 +113,7 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
                     surface_list[surface_ID]["I"],
                 )
 
-            # planes have to be intersected to achive the wanted visualization in ngsolve
+            # planes have to be intersected to achieve the wanted visualization in ngsolve
             cell_shape_list.append(
                 [Plane(Pnt(point), Vec(vector)).col([1, 0, 0]), "intersect"]
             )
@@ -147,7 +147,7 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
                     surface_list[surface_ID]["I"],
                 )
 
-            # planes have to be intersected to achive the wanted visualization in ngsolve
+            # planes have to be intersected to achieve the wanted visualization in ngsolve
             cell_shape_list.append(
                 [Plane(Pnt(point), Vec(vector)).col([1, 0, 0]), "intersect"]
             )
@@ -266,7 +266,7 @@ def draw_Geometry(current_time, start_time, end_time, material_colors):
 
     geo = CSGeometry()  # create the ngsolve geometry object
 
-    # colors that should not be generated  by distinctipy(starts with visually unappleaning colors, manually set colors added later)
+    # colors that should not be generated  by distinctipy(starts with visually unappealing colors, manually set colors added later)
     # These colors are rgb values, more can be added by extending the list
     input_colors = [
         (1, 1, 1),  # white
@@ -275,7 +275,7 @@ def draw_Geometry(current_time, start_time, end_time, material_colors):
     # list of materials that need colors to be generated (ie not water or the source)
     material_colors_to_generate = []
 
-    # if the color of water and source are not set make them blue and green respectivly
+    # if the color of water and source are not set make them blue and green respectively
     # add manually specified colors to input colors.
     for cell in cell_list:
         cell_material_name = cell["material_name"]
@@ -414,7 +414,7 @@ def visualize(start_time=0, end_time=0, tick_interval=1, material_colors={}):
         # must be inside this loop so it doesn't launch when the visualizer is imported
         import netgen.gui
     except ImportError as e:
-        msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc[viz]> (for mac: mcdc'[viz]')"
+        msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc['viz']> (for mac: 'mcdc[viz]')"
         print_warning(msg)
 
     color_key_dic = draw_Geometry(

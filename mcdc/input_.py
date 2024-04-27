@@ -1047,7 +1047,7 @@ def setting(**kw):
     progress_bar : bool
         Whether to display the progress bar (default True; disable when running MC/DC in a loop).
     caching : bool
-        True will store a cache of compiled Numba kernels. False will not and will delete a __pycache__ folder if one exists.
+        Whether to store or delete compiled Numba kernels (default True will store; False will delete existing __pycache__ folder).
         see :ref:`Caching`.
     output_name : str
         Name of the output file MC/DC should save data in (default "output.h5").
