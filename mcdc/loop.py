@@ -138,6 +138,8 @@ def loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
 
+
+
     # Loop over particle sources
     work_start = mcdc["mpi_work_start"]
     work_size = mcdc["mpi_work_size"]
@@ -222,6 +224,7 @@ def loop_source(seed, mcdc):
                 print_progress(percent, mcdc)
 
     if mcdc["technique"]["domain_decomposition"]:
+        kernel.dd_check_in(mcdc)
         kernel.dd_particle_send(mcdc)
         terminated = False
         max_work = 1
@@ -253,15 +256,12 @@ def loop_source(seed, mcdc):
                     ):
                         kernel.tally_closeout_history(mcdc)
 
-                # Send all domain particle banks
-                kernel.dd_particle_send(mcdc)
+            # Send all domain particle banks
+            kernel.dd_particle_send(mcdc)
 
-            work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-            total_sent     = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
-            # Check for incoming particles
             kernel.dd_particle_receive(mcdc)
-            if work_remaining > max_work:
-                max_work = work_remaining
+
+            mcdc["technique"]["dd_sent"] = 0
 
             # Progress printout
             """
@@ -271,7 +271,8 @@ def loop_source(seed, mcdc):
                 with objmode():
                     print_progress(percent, mcdc)
             """
-            if work_remaining + total_sent == 0:
+            if kernel.dd_check_halt(mcdc):
+                kernel.dd_check_out(mcdc)
                 terminated = True
 
 
