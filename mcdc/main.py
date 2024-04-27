@@ -137,6 +137,127 @@ def run():
     closeout(mcdc)
 
 
+# =============================================================================
+# prepare domain decomposition
+# =============================================================================
+def get_d_idx(i, j, k, ni, nj):
+    N = i + j * ni + k * ni * nj
+    return N
+
+
+def get_indexes(N, nx, ny):
+    k = int(N / (nx * ny))
+    j = int((N - nx * ny * k) / nx)
+    i = int(N - nx * ny * k - nx * j)
+    return i, j, k
+
+
+def get_neighbors(N, w, nx, ny, nz):
+    i, j, k = get_indexes(N, nx, ny)
+    if i > 0:
+        xn = get_d_idx(i - 1, j, k, nx, ny)
+    else:
+        xn = None
+    if i < (nx - 1):
+        xp = get_d_idx(i + 1, j, k, nx, ny)
+    else:
+        xp = None
+    if j > 0:
+        yn = get_d_idx(i, j - 1, k, nx, ny)
+    else:
+        yn = None
+    if j < (ny - 1):
+        yp = get_d_idx(i, j + 1, k, nx, ny)
+    else:
+        yp = None
+    if k > 0:
+        zn = get_d_idx(i, j, k - 1, nx, ny)
+    else:
+        zn = None
+    if k < (nz - 1):
+        zp = get_d_idx(i, j, k + 1, nx, ny)
+    else:
+        zp = None
+    return xn, xp, yn, yp, zn, zp
+
+
+def dd_prepare():
+    work_ratio = input_deck.technique["dd_work_ratio"]
+
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+
+    input_deck.setting["bank_active_buff"] = 1000
+    if input_deck.technique["dd_exchange_rate"] == None:
+        input_deck.technique["dd_exchange_rate"] = 100
+
+    if work_ratio is None:
+        work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
+        input_deck.technique["dd_work_ratio"] = work_ratio
+
+    if (
+        input_deck.technique["domain_decomposition"]
+        and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
+    ):
+        print_msg(
+            "Domain work ratio not equal to number of processors, %i != %i "
+            % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
+        )
+        exit()
+
+    if input_deck.technique["domain_decomposition"]:
+        # Assigning domain index
+        i = 0
+        rank_info = []
+        for n in range(d_Nx * d_Ny * d_Nz):
+            ranks = []
+            for r in range(int(work_ratio[n])):
+                ranks.append(i)
+                if MPI.COMM_WORLD.Get_rank() == i:
+                    d_idx = n
+                i += 1
+            rank_info.append(ranks)
+        input_deck.technique["dd_idx"] = d_idx
+        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
+    else:
+        input_deck.technique["dd_idx"] = 0
+        input_deck.technique["dd_xp_neigh"] = []
+        input_deck.technique["dd_xn_neigh"] = []
+        input_deck.technique["dd_yp_neigh"] = []
+        input_deck.technique["dd_yn_neigh"] = []
+        input_deck.technique["dd_zp_neigh"] = []
+        input_deck.technique["dd_zn_neigh"] = []
+        return
+
+    if xp is not None:
+        input_deck.technique["dd_xp_neigh"] = rank_info[xp]
+    else:
+        input_deck.technique["dd_xp_neigh"] = []
+    if xn is not None:
+        input_deck.technique["dd_xn_neigh"] = rank_info[xn]
+    else:
+        input_deck.technique["dd_xn_neigh"] = []
+
+    if yp is not None:
+        input_deck.technique["dd_yp_neigh"] = rank_info[yp]
+    else:
+        input_deck.technique["dd_yp_neigh"] = []
+    if yn is not None:
+        input_deck.technique["dd_yn_neigh"] = rank_info[yn]
+    else:
+        input_deck.technique["dd_yn_neigh"] = []
+
+    if zp is not None:
+        input_deck.technique["dd_zp_neigh"] = rank_info[zp]
+    else:
+        input_deck.technique["dd_zp_neigh"] = []
+    if zn is not None:
+        input_deck.technique["dd_zn_neigh"] = rank_info[zn]
+    else:
+        input_deck.technique["dd_zn_neigh"] = []
+
+
 def prepare():
     """
     Preparing the MC transport simulation:
@@ -144,6 +265,8 @@ def prepare():
       (2) Make types
       (3) Create and set up global variable container `mcdc`
     """
+
+    dd_prepare()
 
     # =========================================================================
     # Adapt kernels
@@ -396,6 +519,7 @@ def prepare():
         "implicit_capture",
         "population_control",
         "weight_window",
+        "domain_decomposition",
         "weight_roulette",
         "iQMC",
         "IC_generator",
@@ -447,6 +571,31 @@ def prepare():
 
     # Survival probability
     mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
+    # =========================================================================
+    # Domain Decomposition
+    # =========================================================================
+
+    # Set domain mesh
+    if input_deck.technique["domain_decomposition"]:
+        name = "dd_mesh"
+        mcdc["technique"][name]["x"] = input_deck.technique[name]["x"]
+        mcdc["technique"][name]["y"] = input_deck.technique[name]["y"]
+        mcdc["technique"][name]["z"] = input_deck.technique[name]["z"]
+        mcdc["technique"][name]["t"] = input_deck.technique[name]["t"]
+        mcdc["technique"][name]["mu"] = input_deck.technique[name]["mu"]
+        mcdc["technique"][name]["azi"] = input_deck.technique[name]["azi"]
+        # Set exchange rate
+        mcdc["technique"]["dd_exchange_rate"] = input_deck.technique["dd_exchange_rate"]
+        mcdc["technique"]["dd_repro"] = input_deck.technique["dd_repro"]
+        # Set domain index
+        mcdc["dd_idx"] = input_deck.technique["dd_idx"]
+        mcdc["technique"]["dd_xp_neigh"] = input_deck.technique["dd_xp_neigh"]
+        mcdc["technique"]["dd_xn_neigh"] = input_deck.technique["dd_xn_neigh"]
+        mcdc["technique"]["dd_yp_neigh"] = input_deck.technique["dd_yp_neigh"]
+        mcdc["technique"]["dd_yn_neigh"] = input_deck.technique["dd_yn_neigh"]
+        mcdc["technique"]["dd_zp_neigh"] = input_deck.technique["dd_zp_neigh"]
+        mcdc["technique"]["dd_zn_neigh"] = input_deck.technique["dd_zn_neigh"]
+        mcdc["technique"]["dd_work_ratio"] = input_deck.technique["dd_work_ratio"]
 
     # =========================================================================
     # Quasi Monte Carlo
@@ -587,7 +736,10 @@ def prepare():
     mcdc["mpi_master"] = mcdc["mpi_rank"] == 0
 
     # Distribute work to MPI ranks
-    kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
+    if mcdc["technique"]["domain_decomposition"]:
+        kernel.distribute_work_dd(mcdc["setting"]["N_particle"], mcdc)
+    else:
+        kernel.distribute_work(mcdc["setting"]["N_particle"], mcdc)
 
     # =========================================================================
     # Particle banks

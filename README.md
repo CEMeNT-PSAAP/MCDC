@@ -4,6 +4,7 @@
 
 [![Build](https://github.com/CEMeNT-PSAAP/MCDC/actions/workflows/mpi_numba_reg.yml/badge.svg)](https://github.com/CEMeNT-PSAAP/MCDC/actions/workflows/mpi_numba_reg.yml)
 [![ReadTheDocs](https://readthedocs.org/projects/cement-psaapgithubio/badge/?version=latest&style=flat)](https://cement-psaapgithubio.readthedocs.org/en/latest/ )
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.06415/status.svg)](https://doi.org/10.21105/joss.06415)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 
@@ -108,18 +109,21 @@ You can find specifics on how to run these tests locally [here](https://github.c
 
 To provide proper attribution to MC/DC, please cite
 ```
-@inproceedings{var_mc23_mcdc,
-    Booktitle = {International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering},
-    title = {Development of {MC/DC}: a performant, scalable, and portable Python-based {M}onte {C}arlo neutron transport code},
-    year = {2023},
-    author = {Ilham Variansyah and Joanna Piper Morgan and Kyle E. Niemeyer and Ryan G. McClarren},
-    address = {Niagara Falls, Ontario, Canada},
-    doi={10.48550/arXiv.2305.07636},
-}
+    @article{morgan2024mcdc,
+        title = {Monte {Carlo} / {Dynamic} {Code} ({MC}/{DC}): {An} accelerated {Python} package for fully transient neutron transport and rapid methods development},
+        author = {Morgan, Joanna Piper and Variansyah, Ilham and Pasmann, Samuel L. and Clements, Kayla B. and Cuneo, Braxton and Mote, Alexander and Goodman, Charles and Shaw, Caleb and Northrop, Jordan and Pankaj, Rohan and Lame, Ethan and Whewell, Benjamin and McClarren, Ryan G. and Palmer, Todd S. and Chen, Lizhong and Anistratov, Dmitriy Y. and Kelley, C. T. and Palmer, Camille J. and Niemeyer, Kyle E.},
+        journal = {Journal of Open Source Software},
+        volume = {9},
+        number = {96},
+        year = {2024},
+        pages = {6415},
+        url = {https://joss.theoj.org/papers/10.21105/joss.06415},
+        doi = {10.21105/joss.06415},
+    }
 ```
 which should render something like this
 
-Variansyah, Ilham, J. P. Morgan, K. E. Niemeyer, and R. G. McClarren. 2023. “Development of MC/DC: a performant, scalable, and portable Python-based Monte Carlo neutron transport code.” In *International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering*, Niagara Falls, Ontario, Canada. DOI. [10.48550/arXiv.2305.07636](https://doi.org/10.48550/arXiv.2305.07636)
+Morgan et al. (2024). Monte Carlo / Dynamic Code (MC/DC): An accelerated Python package for fully transient neutron transport and rapid methods development. Journal of Open Source Software, 9(96), 6415. https://doi.org/10.21105/joss.06415.
 
 ## License
 

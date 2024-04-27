@@ -1388,6 +1388,50 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     return card
 
 
+def domain_decomposition(
+    x=None,
+    y=None,
+    z=None,
+    t=None,
+    exchange_rate=100,
+    bank_size=1e5,
+    work_ratio=None,
+    repro=True,
+):
+    card = mcdc.input_deck.technique
+    card["domain_decomposition"] = True
+    card["domain_bank_size"] = int(1e5)
+    card["dd_exchange_rate"] = int(exchange_rate)
+    card["dd_repro"] = repro
+    dom_num = 1
+    # Set mesh
+    if x is not None:
+        card["dd_mesh"]["x"] = x
+        dom_num *= len(x)
+    if y is not None:
+        card["dd_mesh"]["y"] = y
+        dom_num *= len(y)
+    if z is not None:
+        card["dd_mesh"]["z"] = z
+        dom_num += len(z)
+    if t is not None:
+        card["dd_mesh"]["t"] = t
+        dom_num += len(t)
+    # Set work ratio
+    if work_ratio is None:
+        card["dd_work_ratio"] = None
+    elif work_ratio is not None:
+        card["dd_work_ratio"] = work_ratio
+    card["dd_idx"] = 0
+    card["dd_xp_neigh"] = []
+    card["dd_xn_neigh"] = []
+    card["dd_yp_neigh"] = []
+    card["dd_yn_neigh"] = []
+    card["dd_zp_neigh"] = []
+    card["dd_zn_neigh"] = []
+    return card
+
+
 def iQMC(
     g=None,
     t=None,
