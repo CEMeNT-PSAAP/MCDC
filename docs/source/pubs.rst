@@ -4,9 +4,9 @@
 Publications
 =============
 
-This page contains the various formal publications describing the features and algrythims of MC/DC.
-If you are writing a research paper please provide proper attribution to thoes whoes work you are actually using in MC/DC.
-Tho generally the citation on the home page is a good place to start.
+This page contains various formal publications describing the features and algorithms of MC/DC.
+If you are writing a research paper please provide proper attribution to those whos work you are using in MC/DC.
+Generally, the citation on the home page is a good place to start.
 
 General MC/DC Papers
 ---------------------
