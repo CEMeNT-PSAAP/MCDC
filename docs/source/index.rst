@@ -83,7 +83,9 @@ A full exhaustive list of publications can be found on the `CEMeNT site <https:/
     install
     user
     contribution
+    theory/index
     pythonapi/index
+    pubs
 
 .. sidebar-links::
     :caption: Links
@@ -112,7 +114,7 @@ To build the docs
 To Cite MC/DC
 =============
 
-If you use or devlope in MC/DC and would like to publish your results
+If you use MC/DC and would like to provide proper atribution
 please cite our article in the Journal of Open Source software
 
 .. code-block:: bibtex
@@ -124,8 +126,8 @@ please cite our article in the Journal of Open Source software
         author = {Morgan, Joanna Piper and Variansyah, Ilham and Pasmann, Samuel L. and 
                   Clements, Kayla B. and Cuneo, Braxton and Mote, Alexander and
                   Goodman, Charles and Shaw, Caleb and Northrop, Jordan and Pankaj, Rohan and
-                  Lame, Ethan and Whewell, Benjamin and McClarren, Ryan G. and Palmer, Todd S. and
-                  Chen, Lizhong and Anistratov, Dmitriy Y. and Kelley, C. T. and
+                  Lame, Ethan and Whewell, Benjamin and McClarren, Ryan G. and Palmer, Todd S.
+                  and Chen, Lizhong and Anistratov, Dmitriy Y. and Kelley, C. T. and
                   Palmer, Camille J. and Niemeyer, Kyle E.},
         journal = {Journal of Open Source Software},
         volume = {9},
@@ -136,17 +138,8 @@ please cite our article in the Journal of Open Source software
         doi = {10.21105/joss.06415},
     }
 
-To cite specific numerical methods within MC/DC please use our ANS M&C publications
-
-.. code-block:: bibtex
-
-    @inproceedings{var_mc23_mcdc,
-        Booktitle = {International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering},
-        title = {Development of {MC/DC}: a performant, scalable, and portable Python-based {M}onte {C}arlo neutron transport code},
-        year = {2023},
-        author = {Ilham Variansyah and Joanna Piper Morgan and Kyle E. Niemeyer and Ryan G. McClarren},
-        address = {Niagara Falls, Ontario, Canada},
-        doi={10.48550/arXiv.2305.07636},
-    }
-
-or for an individual specifc methods please browse through our `center's publiications <https://cement-psaap.github.io/publications/>`_
+If you are developing or working with specific numerical methods please take greater care
+to cite the specifc publications where that work is presented.
+An exhsitve list can be found on our :ref:`pubs` page.
+Also check out and even longer list of associated publications on our
+`center's publiications page <https://cement-psaap.github.io/publications/>`_
