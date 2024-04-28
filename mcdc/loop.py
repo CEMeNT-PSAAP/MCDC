@@ -3,6 +3,8 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode, jit
 from scipy.linalg import eig
 
+from mpi4py import MPI
+
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
 import pathlib
@@ -21,6 +23,8 @@ from mcdc.print_ import (
 )
 
 caching = True
+
+
 
 
 def set_cache(setting):
@@ -78,7 +82,7 @@ def loop_fixed_source(mcdc):
                 # TODO: Output tally (optional)
 
                 # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+                seed_bank = kernel.split_seed(seed_census,SEED_SPLIT_BANK)
                 kernel.manage_particle_banks(seed_bank, mcdc)
 
         # Multi-batch closeout
@@ -100,6 +104,10 @@ def loop_fixed_source(mcdc):
         kernel.uq_tally_closeout(mcdc)
     else:
         kernel.tally_closeout(mcdc)
+
+
+
+
 
 
 # =========================================================================
@@ -146,11 +154,14 @@ def loop_eigenvalue(mcdc):
 # =============================================================================
 
 
+
 @njit(cache=caching)
 def loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
 
+    if mcdc["technique"]["domain_decomposition"]:
+        kernel.dd_check_in(mcdc)
 
 
     # Loop over particle sources
@@ -237,12 +248,15 @@ def loop_source(seed, mcdc):
                 print_progress(percent, mcdc)
 
     if mcdc["technique"]["domain_decomposition"]:
-        print("TEST")
-        kernel.dd_check_in(mcdc)
         kernel.dd_particle_send(mcdc)
         terminated = False
         max_work = 1
-        kernel.dd_particle_receive(mcdc)
+        kernel.dd_recv(mcdc)
+        if mcdc["domain_decomp"]["work_done"]:
+            terminated = True
+            with objmode():
+                print(f"rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
+
         while not terminated:
             if mcdc["bank_active"]["size"] > 0:
                 # Loop until active bank is exhausted
@@ -250,7 +264,7 @@ def loop_source(seed, mcdc):
 
                     P = kernel.get_particle(mcdc["bank_active"], mcdc)
                     if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                        print("recieved particle not in domain, position:")
+                        print(f"recieved particle not in domain, index")
 
                     # Apply weight window
                     if mcdc["technique"]["weight_window"]:
@@ -273,9 +287,12 @@ def loop_source(seed, mcdc):
             # Send all domain particle banks
             kernel.dd_particle_send(mcdc)
 
-            kernel.dd_particle_receive(mcdc)
+            kernel.dd_recv(mcdc)
 
-            mcdc["technique"]["dd_sent"] = 0
+            if mcdc["domain_decomp"]["work_done"]:
+                with objmode():
+                    print(f"rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
+
 
             # Progress printout
             """
@@ -288,6 +305,9 @@ def loop_source(seed, mcdc):
             if kernel.dd_check_halt(mcdc):
                 kernel.dd_check_out(mcdc)
                 terminated = True
+
+
+
 
 
 # =========================================================================
