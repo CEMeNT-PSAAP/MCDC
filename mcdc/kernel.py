@@ -74,15 +74,19 @@ def domain_crossing(P, mcdc):
 
 
 
+requests = []
 
-@njit
-def dd_begin_work(mcdc):
-    mcdc["domain_decomp"]["work_done"] = False
-    mcdc["domain_decomp"]["rank_busy"] = True
+def save_request(req):
+    global requests
+    requests.append(req)
+
 
 
 @njit
 def dd_check_halt(mcdc):
+    if mcdc["domain_decomp"]["work_done"]:
+        with objmode():
+            print(f"Terminating from rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
     return mcdc["domain_decomp"]["work_done"]
 
 @njit
@@ -92,11 +96,15 @@ def dd_check_in(mcdc):
     mcdc["domain_decomp"]["send_total"] = 0
     mcdc["domain_decomp"]["rank_busy"]  = True
 
-    with objmode():
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            mcdc["domain_decomp"]["busy_total"] = MPI.COMM_WORLD.Get_size()
-        else:
-            mcdc["domain_decomp"]["busy_total"] = 0
+    with objmode(rank="int64", total="int64"):
+        rank = MPI.COMM_WORLD.Get_rank()
+        total = MPI.COMM_WORLD.Get_size()
+
+    if rank == 0:
+        mcdc["domain_decomp"]["busy_total"] = total
+    else:
+        mcdc["domain_decomp"]["busy_total"] = 0
+
 
 
 
@@ -132,77 +140,79 @@ def dd_check_out(mcdc):
 
 @njit
 def dd_signal_halt(mcdc):
+
     with objmode():
         for rank in range(1,MPI.COMM_WORLD.Get_size()):
-            MPI.COMM_WORLD.isend({
-                'type':'halt',
-            }, dest=rank, tag=1)
-        mcdc["domain_decomp"]["work_done"] = True
+            dummy_buff = np.zeros((1,),dtype=np.int32)
+            MPI.COMM_WORLD.Send(dummy_buff, dest=rank, tag=3)
+            #print(f"Sent halt notice to rank {rank}",flush=True)
+        #print(f"Halting in rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
 
+    mcdc["domain_decomp"]["work_done"] = True
 
+@njit
 def dd_signal_block(mcdc):
-    rank = MPI.COMM_WORLD.Get_rank()
-    send_delta = mcdc["domain_decomp"]["send_count"]-mcdc["domain_decomp"]["recv_count"]
+
+    with objmode(rank="int64"):
+        rank = MPI.COMM_WORLD.Get_rank()
+
+    send_delta = mcdc["domain_decomp"]["send_count"] - mcdc["domain_decomp"]["recv_count"]
     if rank == 0:
         mcdc["domain_decomp"]["send_total"] += send_delta
         mcdc["domain_decomp"]["busy_total"] -= 1
-        send_total = mcdc["domain_decomp"]["send_total"]
-        busy_total = mcdc["domain_decomp"]["busy_total"]
-        print(f"BUSY {busy_total} SENT {send_total}",flush=True)
-        if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
-            dd_signal_halt(mcdc)
-    else:
-        MPI.COMM_WORLD.isend({
-            'type'        : 'turnstile',
-            'busy_delta'  : -1,
-            'send_delta'  : send_delta,
-        }, dest=0, tag=1)
+    else :
+        with objmode():
+            buff = np.zeros((1,),dtype=type_.dd_turnstile_event)
+            buff[0]["busy_delta"] = -1
+            buff[0]["send_delta"] = send_delta
+            req = MPI.COMM_WORLD.Isend([buff,type_.dd_turnstile_event_mpi], dest=0, tag=2)
+            save_request((req,buff))
+
     mcdc["domain_decomp"]["send_count"] = 0
     mcdc["domain_decomp"]["recv_count"] = 0
 
+    if (rank == 0) and (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
+        dd_signal_halt(mcdc)
 
 
+@njit
 def dd_signal_unblock(mcdc):
-    rank = MPI.COMM_WORLD.Get_rank()
 
-    send_delta = mcdc["domain_decomp"]["send_count"]-mcdc["domain_decomp"]["recv_count"]
+    with objmode(rank="int64"):
+        rank = MPI.COMM_WORLD.Get_rank()
+
+    send_delta = mcdc["domain_decomp"]["send_count"] - mcdc["domain_decomp"]["recv_count"]
+
     if rank == 0:
         mcdc["domain_decomp"]["send_total"] += send_delta
         mcdc["domain_decomp"]["busy_total"] += 1
-        send_total = mcdc["domain_decomp"]["send_total"]
-        busy_total = mcdc["domain_decomp"]["busy_total"]
-        print(f"BUSY {busy_total} SENT {send_total}",flush=True)
         if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
             dd_signal_halt(mcdc)
     else:
-        MPI.COMM_WORLD.isend({
-            'type'       : 'turnstile',
-            'busy_delta' : 1,
-            'send_delta' : send_delta
-        }, dest=0, tag=1)
+        with objmode():
+            buff = np.zeros((1,),dtype=type_.dd_turnstile_event)
+            buff[0]["busy_delta"] = 1
+            buff[0]["send_delta"] = send_delta
+            req = MPI.COMM_WORLD.Isend([buff,type_.dd_turnstile_event_mpi], dest=0, tag=2)
+            save_request((req,buff))
     mcdc["domain_decomp"]["send_count"] = 0
     mcdc["domain_decomp"]["recv_count"] = 0
 
 
 
-def dd_handle_event(event,mcdc):
-    if event['type'] == 'turnstile':
-        mcdc["domain_decomp"]["send_total"] += event['send_delta']
-        mcdc["domain_decomp"]["busy_total"] += event['busy_delta']
-        send_total = mcdc["domain_decomp"]["send_total"]
-        busy_total = mcdc["domain_decomp"]["busy_total"]
-        print(f"BUSY {busy_total} SENT {send_total}",flush=True)
-        if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
-            dd_signal_halt(mcdc)
-    elif event['type'] == 'halt':
-        mcdc["domain_decomp"]["work_done"] = True
+
+
 
 
 
 
 @njit
 def dd_particle_send(mcdc):
-    with objmode():
+
+    with objmode(send_delta="int64"):
+        rank = MPI.COMM_WORLD.Get_rank()
+
+        send_delta = 0
 
         for i in range(
             max(
@@ -225,7 +235,7 @@ def dd_particle_send(mcdc):
                 request1 = MPI.COMM_WORLD.isend(
                     bank, dest=mcdc["technique"]["dd_xp_neigh"][i], tag=1
                 )
-                mcdc["domain_decomp"]["send_count"] += end-start
+                send_delta += (end-start)
 
             if mcdc["technique"]["dd_xn_neigh"].size > i:
                 size = mcdc["domain_decomp"]["bank_xn"]["size"]
@@ -236,9 +246,9 @@ def dd_particle_send(mcdc):
                     end = size
                 bank = np.array(mcdc["domain_decomp"]["bank_xn"]["particles"][start:end])
                 request2 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_xn_neigh"][i], tag=2
+                    bank, dest=mcdc["technique"]["dd_xn_neigh"][i], tag=1
                 )
-                mcdc["domain_decomp"]["send_count"] += end-start
+                send_delta += (end-start)
 
             if mcdc["technique"]["dd_yp_neigh"].size > i:
                 size = mcdc["domain_decomp"]["bank_yp"]["size"]
@@ -249,9 +259,9 @@ def dd_particle_send(mcdc):
                     end = size
                 bank = np.array(mcdc["domain_decomp"]["bank_yp"]["particles"][start:end])
                 request3 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_yp_neigh"][i], tag=3
+                    bank, dest=mcdc["technique"]["dd_yp_neigh"][i], tag=1
                 )
-                mcdc["domain_decomp"]["send_count"] += end-start
+                send_delta += (end-start)
 
             if mcdc["technique"]["dd_yn_neigh"].size > i:
                 size = mcdc["domain_decomp"]["bank_yn"]["size"]
@@ -262,9 +272,9 @@ def dd_particle_send(mcdc):
                     end = size
                 bank = np.array(mcdc["domain_decomp"]["bank_yn"]["particles"][start:end])
                 request4 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_yn_neigh"][i], tag=4
+                    bank, dest=mcdc["technique"]["dd_yn_neigh"][i], tag=1
                 )
-                mcdc["domain_decomp"]["send_count"] += end-start
+                send_delta += (end-start)
 
             if mcdc["technique"]["dd_zp_neigh"].size > i:
                 size = mcdc["domain_decomp"]["bank_zp"]["size"]
@@ -276,10 +286,13 @@ def dd_particle_send(mcdc):
                 bank = np.array(mcdc["domain_decomp"]["bank_zp"]["particles"][start:end])
                 dest = mcdc["technique"]["dd_zp_neigh"][i]
                 if bank.shape[0] > 0:
-                    request5 = MPI.COMM_WORLD.isend(
-                        bank, dest=mcdc["technique"]["dd_zp_neigh"][i], tag=5
+                    dest = mcdc["technique"]["dd_zp_neigh"][i]
+                    #print(f"Sending {end-start}",flush=True)
+                    r5 = MPI.COMM_WORLD.Isend(
+                        [bank,type_.particle_record_mpi] , dest=dest, tag=1
                     )
-                mcdc["domain_decomp"]["send_count"] += end-start
+                    save_request((r5,bank))
+                    send_delta += (end-start)
 
             if mcdc["technique"]["dd_zn_neigh"].size > i:
                 size = mcdc["domain_decomp"]["bank_zn"]["size"]
@@ -291,20 +304,15 @@ def dd_particle_send(mcdc):
                 bank = np.array(mcdc["domain_decomp"]["bank_zn"]["particles"][start:end])
                 dest = mcdc["technique"]["dd_zn_neigh"][i]
                 if bank.shape[0] > 0:
-                    request6 = MPI.COMM_WORLD.isend(
-                        bank, dest=mcdc["technique"]["dd_zn_neigh"][i], tag=6
+                    dest = mcdc["technique"]["dd_zn_neigh"][i]
+                    #print(f"Sending {end-start}",flush=True)
+                    r6 = MPI.COMM_WORLD.Isend(
+                        [bank,type_.particle_record_mpi], dest=dest, tag=1
                     )
-                mcdc["domain_decomp"]["send_count"] += end-start
+                    save_request((r6,bank))
+                    send_delta += (end-start)
 
-    sent_particles = (
-        mcdc["domain_decomp"]["bank_xp"]["size"]
-        + mcdc["domain_decomp"]["bank_xn"]["size"]
-        + mcdc["domain_decomp"]["bank_yp"]["size"]
-        + mcdc["domain_decomp"]["bank_yn"]["size"]
-        + mcdc["domain_decomp"]["bank_zp"]["size"]
-        + mcdc["domain_decomp"]["bank_zn"]["size"]
-    )
-
+    mcdc["domain_decomp"]["send_count"] += send_delta
 
     mcdc["domain_decomp"]["bank_xp"]["size"] = 0
     mcdc["domain_decomp"]["bank_xn"]["size"] = 0
@@ -318,48 +326,99 @@ def dd_particle_send(mcdc):
 # Receive particles and clear banks
 # =============================================================================
 
+@njit
+def dd_get_recv_tag():
+
+    with objmode(tag="int64"):
+        status = MPI.Status()
+        MPI.COMM_WORLD.Probe(status=status)
+        tag = status.Get_tag()
+
+    return tag
+
+
 
 @njit
-def dd_particle_receive(mcdc):
+def dd_recv_particles(mcdc):
+
     buff = np.zeros(
-        mcdc["domain_decomp"]["bank_xp"]["particles"].shape[0], dtype=type_.particle_record
+        mcdc["domain_decomp"]["bank_zp"]["particles"].shape[0], dtype=type_.particle_record
     )
 
     with objmode(size="int64"):
+        status = MPI.Status()
+        MPI.COMM_WORLD.Recv([buff,type_.particle_record_mpi],status=status)
+        size = status.Get_count(type_.particle_record_mpi)
+        rank = MPI.COMM_WORLD.Get_rank()
+        #print(f"Particle {size} in {rank}",flush=True)
 
-        # Notify leader this rank will block on a recv
-        if mcdc["domain_decomp"]["rank_busy"]:
-            dd_signal_block(mcdc)
-            mcdc["domain_decomp"]["rank_busy"] = False
-            print(f"Rank {MPI.COMM_WORLD.Get_rank()} no longer busy")
-
-
-        buf = MPI.COMM_WORLD.recv()
-
-        bankr = mcdc["bank_active"]["particles"][:0]
-        size_old = bankr.shape[0]
-
-        if isinstance(buf,dict):
-            dd_handle_event(buf,mcdc)
-        else:
-            if buf.shape[0] != 0:
-                mcdc["domain_decomp"]["recv_count"] += buf.shape[0]
-                bankr = np.append(bankr,buf)
-
-        if mcdc["domain_decomp"]["recv_count"] > 0 and not mcdc["domain_decomp"]["rank_busy"]:
-            dd_signal_unblock(mcdc)
-            mcdc["domain_decomp"]["rank_busy"] = True
-            print(f"Rank {MPI.COMM_WORLD.Get_rank()} busy")
-
-        size = bankr.shape[0]
-        # Set output buffer
-        for i in range(size):
-            buff[i] = bankr[i]
+    mcdc["domain_decomp"]["recv_count"] += size
 
     # Set source bank from buffer
     for i in range(size):
         add_particle(buff[i], mcdc["bank_active"])
-    mcdc["technique"]["dd_sent"] -= size
+
+    if mcdc["domain_decomp"]["recv_count"] > 0 and not mcdc["domain_decomp"]["rank_busy"]:
+        dd_signal_unblock(mcdc)
+        mcdc["domain_decomp"]["rank_busy"] = True
+
+
+
+
+@njit
+def dd_recv_turnstile(mcdc):
+
+    with objmode(busy_delta="int64",send_delta="int64"):
+        event_buff = np.zeros((1,),dtype=type_.dd_turnstile_event)
+        MPI.COMM_WORLD.Recv([event_buff,type_.dd_turnstile_event_mpi])
+        busy_delta = event_buff[0]["busy_delta"]
+        send_delta = event_buff[0]["send_delta"]
+        rank = MPI.COMM_WORLD.Get_rank()
+        busy_total = mcdc["domain_decomp"]["busy_total"]
+        send_total = mcdc["domain_decomp"]["send_total"]
+        #print(f"Turnstile in {rank} busy_delta {busy_delta} send_delta {send_delta} (old) busy_total {busy_total} (old) send_total {send_total}",flush=True)
+
+    mcdc["domain_decomp"]["busy_total"] += busy_delta
+    mcdc["domain_decomp"]["send_total"] += send_delta
+
+    if (mcdc["domain_decomp"]["busy_total"] == 0) and (mcdc["domain_decomp"]["send_total"] == 0):
+        dd_signal_halt(mcdc)
+
+
+
+@njit
+def dd_recv_halt(mcdc):
+
+    with objmode():
+        dummy_buff = np.zeros((1,),dtype=np.int32)
+        MPI.COMM_WORLD.Recv(dummy_buff)
+        work_done = 1
+        rank = MPI.COMM_WORLD.Get_rank()
+        #print(f"Halting in {rank}",flush=True)
+
+    mcdc["domain_decomp"]["work_done"] = True
+
+
+
+
+
+@njit
+def dd_recv(mcdc):
+
+    if mcdc["domain_decomp"]["rank_busy"] :
+        dd_signal_block(mcdc)
+        mcdc["domain_decomp"]["rank_busy"] = False
+
+    if not mcdc["domain_decomp"]["work_done"] :
+        tag = dd_get_recv_tag()
+
+        if tag == 1:
+            dd_recv_particles(mcdc)
+        elif tag == 2:
+            dd_recv_turnstile(mcdc)
+        elif tag == 3:
+            dd_recv_halt(mcdc)
+
 
 
 # =============================================================================

@@ -1428,7 +1428,6 @@ def domain_decomposition(
     """
     card = mcdc.input_deck.technique
     card["domain_decomposition"] = True
-    card["domain_bank_size"] = int(1e5)
     card["dd_exchange_rate"] = int(exchange_rate)
     card["dd_repro"] = repro
     dom_num = 1

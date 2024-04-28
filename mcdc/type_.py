@@ -2,6 +2,7 @@ import math, sys, os, h5py
 import numpy as np
 
 from mpi4py import MPI
+from mpi4py.util.dtlib import from_numpy_dtype
 
 # Basic types
 float64 = np.float64
@@ -79,7 +80,7 @@ def make_type_particle(input_deck):
 
 # Particle record (in-bank)
 def make_type_particle_record(input_deck):
-    global particle_record
+    global particle_record, particle_record_mpi
 
     struct = [
         ("x", float64),
@@ -114,6 +115,9 @@ def make_type_particle_record(input_deck):
 
     # Save type
     particle_record = np.dtype(struct)
+
+    particle_record_mpi = from_numpy_dtype(particle_record)
+    particle_record_mpi.Commit()
 
 
 precursor = np.dtype(
@@ -1024,16 +1028,28 @@ def make_type_uq(input_deck):
 
 
 
+def make_type_dd_turnstile_event(input_deck):
+    global dd_turnstile_event, dd_turnstile_event_mpi
+    dd_turnstile_event = np.dtype([
+        ("busy_delta", int32),
+        ("send_delta", int32),
+    ])
+    dd_turnstile_event_mpi = from_numpy_dtype(dd_turnstile_event)
+    dd_turnstile_event_mpi.Commit()
+
+
+
+
 def make_type_domain_decomp(input_deck):
     global domain_decomp
     # Domain banks if needed
     if input_deck.technique["domain_decomposition"]:
-        bank_domain_xp = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_xn = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_yp = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_yn = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_zp = particle_bank(input_deck.technique["domain_bank_size"])
-        bank_domain_zn = particle_bank(input_deck.technique["domain_bank_size"])
+        bank_domain_xp = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_xn = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_yp = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_yn = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_zp = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_zn = particle_bank(input_deck.technique["dd_exchange_rate"])
     else:
         bank_domain_xp = particle_bank(0)
         bank_domain_xn = particle_bank(0)
