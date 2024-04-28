@@ -46,7 +46,7 @@ mcdc.tally(scores=["flux"], x=np.linspace(0.0, 4.0, 40), y=np.linspace(0.0, 4.0,
 
 # Setting
 mcdc.setting(N_particle=50)
-mcdc.implicit_capture()
+# mcdc.implicit_capture() # TODO: Commented, see GitHub Issue #190
 
 # Run
 mcdc.run()
