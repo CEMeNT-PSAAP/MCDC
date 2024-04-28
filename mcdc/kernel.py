@@ -1932,21 +1932,30 @@ def score_tracklength(P, distance, data, mcdc):
     distance_swept = 0.0
     while distance_swept < distance:
         # Find distances to the mesh grids
-        if ux > 0.0:
-            x_next = min(mesh["x"][ix + 1], x_final)
+        if ux == 0.0:
+            dx = INF
         else:
-            x_next = max(mesh["x"][ix], x_final)
-        dx = (x_next - x) / ux
-        if uy > 0.0:
-            y_next = min(mesh["y"][iy + 1], y_final)
+            if ux > 0.0:
+                x_next = min(mesh["x"][ix + 1], x_final)
+            else:
+                x_next = max(mesh["x"][ix], x_final)
+            dx = (x_next - x) / ux
+        if uy == 0.0:
+            dy = INF
         else:
-            y_next = max(mesh["y"][iy], y_final)
-        dy = (y_next - y) / uy
-        if uz > 0.0:
-            z_next = min(mesh["z"][iz + 1], z_final)
+            if uy > 0.0:
+                y_next = min(mesh["y"][iy + 1], y_final)
+            else:
+                y_next = max(mesh["y"][iy], y_final)
+            dy = (y_next - y) / uy
+        if uz == 0.0:
+            dz = INF
         else:
-            z_next = max(mesh["z"][iz], z_final)
-        dz = (z_next - z) / uz
+            if uz > 0.0:
+                z_next = min(mesh["z"][iz + 1], z_final)
+            else:
+                z_next = max(mesh["z"][iz], z_final)
+            dz = (z_next - z) / uz
         dt = (min(mesh["t"][it + 1], t_final) - t) / ut
 
         # Get the shortest
