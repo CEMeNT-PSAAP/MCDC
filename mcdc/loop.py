@@ -25,8 +25,6 @@ from mcdc.print_ import (
 caching = True
 
 
-
-
 def set_cache(setting):
     caching = setting
 
@@ -82,7 +80,7 @@ def loop_fixed_source(mcdc):
                 # TODO: Output tally (optional)
 
                 # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census,SEED_SPLIT_BANK)
+                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
                 kernel.manage_particle_banks(seed_bank, mcdc)
 
         # Multi-batch closeout
@@ -104,10 +102,6 @@ def loop_fixed_source(mcdc):
         kernel.uq_tally_closeout(mcdc)
     else:
         kernel.tally_closeout(mcdc)
-
-
-
-
 
 
 # =========================================================================
@@ -154,8 +148,6 @@ def loop_eigenvalue(mcdc):
 # =============================================================================
 
 
-
-
 @njit(cache=caching)
 def loop_source(seed, mcdc):
     # Progress bar indicator
@@ -163,7 +155,6 @@ def loop_source(seed, mcdc):
 
     if mcdc["technique"]["domain_decomposition"]:
         kernel.dd_check_in(mcdc)
-
 
     # Loop over particle sources
     work_start = mcdc["mpi_work_start"]
@@ -299,8 +290,6 @@ def loop_source(seed, mcdc):
             if kernel.dd_check_halt(mcdc):
                 kernel.dd_check_out(mcdc)
                 terminated = True
-
-
 
 
 # =========================================================================

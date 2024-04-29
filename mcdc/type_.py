@@ -1027,17 +1027,16 @@ def make_type_uq(input_deck):
     )
 
 
-
 def make_type_dd_turnstile_event(input_deck):
     global dd_turnstile_event, dd_turnstile_event_mpi
-    dd_turnstile_event = np.dtype([
-        ("busy_delta", int32),
-        ("send_delta", int32),
-    ])
+    dd_turnstile_event = np.dtype(
+        [
+            ("busy_delta", int32),
+            ("send_delta", int32),
+        ]
+    )
     dd_turnstile_event_mpi = from_numpy_dtype(dd_turnstile_event)
     dd_turnstile_event_mpi.Commit()
-
-
 
 
 def make_type_domain_decomp(input_deck):
@@ -1058,31 +1057,30 @@ def make_type_domain_decomp(input_deck):
         bank_domain_zp = particle_bank(0)
         bank_domain_zn = particle_bank(0)
 
-
     domain_decomp = np.dtype(
         [
             # Info tracked in all ranks
-            ("bank_xp",    bank_domain_xp),
-            ("bank_xn",    bank_domain_xn),
-            ("bank_yp",    bank_domain_yp),
-            ("bank_yn",    bank_domain_yn),
-            ("bank_zp",    bank_domain_zp),
-            ("bank_zn",    bank_domain_zn),
-
-            ("send_count", int64 ), # Number of particles sent
-            ("recv_count", int64 ), # Number of particles recv'd
-            ("rank_busy",  bool_ ), # True if the rank currently has particles to process
-            ("work_done",  int64 ), # Whether or not there is any outstanding work across any ranks
-
+            ("bank_xp", bank_domain_xp),
+            ("bank_xn", bank_domain_xn),
+            ("bank_yp", bank_domain_yp),
+            ("bank_yn", bank_domain_yn),
+            ("bank_zp", bank_domain_zp),
+            ("bank_zn", bank_domain_zn),
+            ("send_count", int64),  # Number of particles sent
+            ("recv_count", int64),  # Number of particles recv'd
+            ("rank_busy", bool_),  # True if the rank currently has particles to process
+            (
+                "work_done",
+                int64,
+            ),  # Whether or not there is any outstanding work across any ranks
             # Info tracked in "leader" rank zero
-            ("send_total", int64 ), # The total number of particles sent but not yet recv'd
-            ("busy_total", int64 ), # The total number of busy ranks
+            (
+                "send_total",
+                int64,
+            ),  # The total number of particles sent but not yet recv'd
+            ("busy_total", int64),  # The total number of busy ranks
         ]
     )
-
-
-
-
 
 
 param_names = ["tag", "ID", "key", "mean", "delta", "distribution", "rng_seed"]
