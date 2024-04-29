@@ -299,8 +299,6 @@ def prepare():
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
 
-
-
     # =========================================================================
     # Create the global variable container
     #   TODO: Better alternative?
