@@ -155,6 +155,7 @@ def loop_eigenvalue(mcdc):
 
 
 
+
 @njit(cache=caching)
 def loop_source(seed, mcdc):
     # Progress bar indicator
@@ -254,8 +255,6 @@ def loop_source(seed, mcdc):
         kernel.dd_recv(mcdc)
         if mcdc["domain_decomp"]["work_done"]:
             terminated = True
-            with objmode():
-                print(f"rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
 
         while not terminated:
             if mcdc["bank_active"]["size"] > 0:
@@ -289,11 +288,6 @@ def loop_source(seed, mcdc):
 
             kernel.dd_recv(mcdc)
 
-            if mcdc["domain_decomp"]["work_done"]:
-                with objmode():
-                    print(f"rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
-
-
             # Progress printout
             """
             percent = 1 - work_remaining / max_work
@@ -305,7 +299,6 @@ def loop_source(seed, mcdc):
             if kernel.dd_check_halt(mcdc):
                 kernel.dd_check_out(mcdc)
                 terminated = True
-
 
 
 

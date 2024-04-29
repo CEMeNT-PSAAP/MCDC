@@ -74,19 +74,33 @@ def domain_crossing(P, mcdc):
 
 
 
+
 requests = []
 
-def save_request(req):
+def save_request(req_pair):
     global requests
-    requests.append(req)
 
+    updated_requests = []
+
+    status = MPI.Status()
+    for (req,buf) in requests:
+        if not req.Test(status):
+            updated_requests.append((req,buf))
+
+    updated_requests.append(req_pair)
+    requests = updated_requests
+
+
+def clear_requests():
+    global requests
+    for (req,buf) in requests:
+        req.Free()
+
+    requests = []
 
 
 @njit
 def dd_check_halt(mcdc):
-    if mcdc["domain_decomp"]["work_done"]:
-        with objmode():
-            print(f"Terminating from rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
     return mcdc["domain_decomp"]["work_done"]
 
 @njit
@@ -138,6 +152,9 @@ def dd_check_out(mcdc):
             print(f"Domain decomposed loop closed out with rank {rank} still marked as busy")
             mcdc["domain_decomp"]["rank_busy"] = 0
 
+        clear_requests()
+
+
 @njit
 def dd_signal_halt(mcdc):
 
@@ -145,8 +162,6 @@ def dd_signal_halt(mcdc):
         for rank in range(1,MPI.COMM_WORLD.Get_size()):
             dummy_buff = np.zeros((1,),dtype=np.int32)
             MPI.COMM_WORLD.Send(dummy_buff, dest=rank, tag=3)
-            #print(f"Sent halt notice to rank {rank}",flush=True)
-        #print(f"Halting in rank {MPI.COMM_WORLD.Get_rank()}",flush=True)
 
     mcdc["domain_decomp"]["work_done"] = True
 
@@ -201,125 +216,39 @@ def dd_signal_unblock(mcdc):
 
 
 
+@njit
+def dd_distribute_bank(mcdc,bank,dest_list):
 
+    with objmode(send_delta="int64"):
+        dest_count = len(dest_list)
+        send_delta = 0
+        for i, dest in enumerate(dest_list):
+            size = bank["size"]
+            ratio = int(size / dest_count)
+            start = ratio * i
+            end = start + ratio
+            if i == dest_count - 1:
+                end = size
+            sub_bank = np.array(bank["particles"][start:end])
+            if sub_bank.shape[0] > 0:
+                req = MPI.COMM_WORLD.Isend(
+                    [sub_bank,type_.particle_record_mpi], dest=dest, tag=1
+                )
+                save_request((req,sub_bank))
+                send_delta += (end-start)
 
-
+    mcdc["domain_decomp"]["send_count"] += send_delta
+    bank["size"] = 0
 
 
 @njit
 def dd_particle_send(mcdc):
-
-    with objmode(send_delta="int64"):
-        rank = MPI.COMM_WORLD.Get_rank()
-
-        send_delta = 0
-
-        for i in range(
-            max(
-                len(mcdc["technique"]["dd_xp_neigh"]),
-                len(mcdc["technique"]["dd_xn_neigh"]),
-                len(mcdc["technique"]["dd_yp_neigh"]),
-                len(mcdc["technique"]["dd_yn_neigh"]),
-                len(mcdc["technique"]["dd_zp_neigh"]),
-                len(mcdc["technique"]["dd_zn_neigh"]),
-            )
-        ):
-            if mcdc["technique"]["dd_xp_neigh"].size > i:
-                size = mcdc["domain_decomp"]["bank_xp"]["size"]
-                ratio = int(size / len(mcdc["technique"]["dd_xp_neigh"]))
-                start = ratio * i
-                end = start + ratio
-                if i == len(mcdc["technique"]["dd_xp_neigh"]) - 1:
-                    end = size
-                bank = np.array(mcdc["domain_decomp"]["bank_xp"]["particles"][start:end])
-                request1 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_xp_neigh"][i], tag=1
-                )
-                send_delta += (end-start)
-
-            if mcdc["technique"]["dd_xn_neigh"].size > i:
-                size = mcdc["domain_decomp"]["bank_xn"]["size"]
-                ratio = int(size / len(mcdc["technique"]["dd_xn_neigh"]))
-                start = ratio * i
-                end = start + ratio
-                if i == len(mcdc["technique"]["dd_xn_neigh"]) - 1:
-                    end = size
-                bank = np.array(mcdc["domain_decomp"]["bank_xn"]["particles"][start:end])
-                request2 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_xn_neigh"][i], tag=1
-                )
-                send_delta += (end-start)
-
-            if mcdc["technique"]["dd_yp_neigh"].size > i:
-                size = mcdc["domain_decomp"]["bank_yp"]["size"]
-                ratio = int(size / len(mcdc["technique"]["dd_yp_neigh"]))
-                start = ratio * i
-                end = start + ratio
-                if i == len(mcdc["technique"]["dd_yp_neigh"]) - 1:
-                    end = size
-                bank = np.array(mcdc["domain_decomp"]["bank_yp"]["particles"][start:end])
-                request3 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_yp_neigh"][i], tag=1
-                )
-                send_delta += (end-start)
-
-            if mcdc["technique"]["dd_yn_neigh"].size > i:
-                size = mcdc["domain_decomp"]["bank_yn"]["size"]
-                ratio = int(size / len(mcdc["technique"]["dd_yn_neigh"]))
-                start = ratio * i
-                end = start + ratio
-                if i == len(mcdc["technique"]["dd_yn_neigh"]) - 1:
-                    end = size
-                bank = np.array(mcdc["domain_decomp"]["bank_yn"]["particles"][start:end])
-                request4 = MPI.COMM_WORLD.isend(
-                    bank, dest=mcdc["technique"]["dd_yn_neigh"][i], tag=1
-                )
-                send_delta += (end-start)
-
-            if mcdc["technique"]["dd_zp_neigh"].size > i:
-                size = mcdc["domain_decomp"]["bank_zp"]["size"]
-                ratio = int(size / len(mcdc["technique"]["dd_zp_neigh"]))
-                start = ratio * i
-                end = start + ratio
-                if i == len(mcdc["technique"]["dd_zp_neigh"]) - 1:
-                    end = size
-                bank = np.array(mcdc["domain_decomp"]["bank_zp"]["particles"][start:end])
-                dest = mcdc["technique"]["dd_zp_neigh"][i]
-                if bank.shape[0] > 0:
-                    dest = mcdc["technique"]["dd_zp_neigh"][i]
-                    #print(f"Sending {end-start}",flush=True)
-                    r5 = MPI.COMM_WORLD.Isend(
-                        [bank,type_.particle_record_mpi] , dest=dest, tag=1
-                    )
-                    save_request((r5,bank))
-                    send_delta += (end-start)
-
-            if mcdc["technique"]["dd_zn_neigh"].size > i:
-                size = mcdc["domain_decomp"]["bank_zn"]["size"]
-                ratio = int(size / len(mcdc["technique"]["dd_zn_neigh"]))
-                start = ratio * i
-                end = start + ratio
-                if i == len(mcdc["technique"]["dd_zn_neigh"]) - 1:
-                    end = size
-                bank = np.array(mcdc["domain_decomp"]["bank_zn"]["particles"][start:end])
-                dest = mcdc["technique"]["dd_zn_neigh"][i]
-                if bank.shape[0] > 0:
-                    dest = mcdc["technique"]["dd_zn_neigh"][i]
-                    #print(f"Sending {end-start}",flush=True)
-                    r6 = MPI.COMM_WORLD.Isend(
-                        [bank,type_.particle_record_mpi], dest=dest, tag=1
-                    )
-                    save_request((r6,bank))
-                    send_delta += (end-start)
-
-    mcdc["domain_decomp"]["send_count"] += send_delta
-
-    mcdc["domain_decomp"]["bank_xp"]["size"] = 0
-    mcdc["domain_decomp"]["bank_xn"]["size"] = 0
-    mcdc["domain_decomp"]["bank_yp"]["size"] = 0
-    mcdc["domain_decomp"]["bank_yn"]["size"] = 0
-    mcdc["domain_decomp"]["bank_zp"]["size"] = 0
-    mcdc["domain_decomp"]["bank_zn"]["size"] = 0
+    dd_distribute_bank(mcdc,mcdc["domain_decomp"]["bank_xp"],mcdc["technique"]["dd_xp_neigh"])
+    dd_distribute_bank(mcdc,mcdc["domain_decomp"]["bank_xn"],mcdc["technique"]["dd_xn_neigh"])
+    dd_distribute_bank(mcdc,mcdc["domain_decomp"]["bank_yp"],mcdc["technique"]["dd_yp_neigh"])
+    dd_distribute_bank(mcdc,mcdc["domain_decomp"]["bank_yn"],mcdc["technique"]["dd_yn_neigh"])
+    dd_distribute_bank(mcdc,mcdc["domain_decomp"]["bank_zp"],mcdc["technique"]["dd_zp_neigh"])
+    dd_distribute_bank(mcdc,mcdc["domain_decomp"]["bank_zn"],mcdc["technique"]["dd_zn_neigh"])
 
 
 # =============================================================================
@@ -350,7 +279,6 @@ def dd_recv_particles(mcdc):
         MPI.COMM_WORLD.Recv([buff,type_.particle_record_mpi],status=status)
         size = status.Get_count(type_.particle_record_mpi)
         rank = MPI.COMM_WORLD.Get_rank()
-        #print(f"Particle {size} in {rank}",flush=True)
 
     mcdc["domain_decomp"]["recv_count"] += size
 
@@ -376,7 +304,6 @@ def dd_recv_turnstile(mcdc):
         rank = MPI.COMM_WORLD.Get_rank()
         busy_total = mcdc["domain_decomp"]["busy_total"]
         send_total = mcdc["domain_decomp"]["send_total"]
-        #print(f"Turnstile in {rank} busy_delta {busy_delta} send_delta {send_delta} (old) busy_total {busy_total} (old) send_total {send_total}",flush=True)
 
     mcdc["domain_decomp"]["busy_total"] += busy_delta
     mcdc["domain_decomp"]["send_total"] += send_delta
@@ -394,7 +321,6 @@ def dd_recv_halt(mcdc):
         MPI.COMM_WORLD.Recv(dummy_buff)
         work_done = 1
         rank = MPI.COMM_WORLD.Get_rank()
-        #print(f"Halting in {rank}",flush=True)
 
     mcdc["domain_decomp"]["work_done"] = True
 
@@ -1124,6 +1050,7 @@ def bank_scanning(bank, mcdc):
     N_global = buff[0]
 
     return idx_start, N_local, N_global
+
 
 
 @njit
