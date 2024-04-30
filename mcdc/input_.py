@@ -1417,9 +1417,9 @@ def domain_decomposition(
     z : array_like[float], optional
         Location of subdomain boundaries in z (default None).
     exchange_rate : float, optional
-        number of particles to acumulate in the domain banks before sending.
+        Number of particles to acumulate in the domain banks before sending.
     work_ratio : array_like[integer], optional
-        Inte
+        Number of processors in each domain
 
     Returns
     -------
