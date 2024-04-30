@@ -111,7 +111,7 @@ for i, name in enumerate(names):
     answer = h5py.File("answer.h5", "r")
 
     runtimes[-1] = output["runtime/total"][()]
-    print("  (%.2f seconds)" % runtimes[-1])
+    print("  (%.2f seconds)" % runtimes[-1][0])
 
     # Compare all scores
     for score in [key for key in output["tally"].keys() if key != "grid"]:
