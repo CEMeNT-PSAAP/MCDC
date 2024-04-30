@@ -1401,7 +1401,7 @@ def domain_decomposition(
     x=None,
     y=None,
     z=None,
-    exchange_rate=100,
+    exchange_rate=100000,
     work_ratio=None,
     repro=True,
 ):
