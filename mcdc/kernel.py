@@ -1217,11 +1217,11 @@ def bank_rebalance(mcdc):
         # Send
         if more_left:
             n = work_start - idx_start
-            request_left = MPI.COMM_WORLD.send(bank[:n], dest=left)
+            request_left = MPI.COMM_WORLD.isend(bank[:n], dest=left)
             bank = bank[n:]
         if more_right:
             n = idx_end - work_end
-            request_right = MPI.COMM_WORLD.send(bank[-n:], dest=right)
+            request_right = MPI.COMM_WORLD.isend(bank[-n:], dest=right)
             bank = bank[:-n]
 
         # Receive
