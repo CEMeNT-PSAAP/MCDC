@@ -3,7 +3,7 @@
 ![mcdc_logo v1](https://user-images.githubusercontent.com/26186244/173467190-74d9b09a-ef7d-4f0e-8bdf-4a076de7c43c.svg)
 
 [![Build](https://github.com/CEMeNT-PSAAP/MCDC/actions/workflows/mpi_numba_reg.yml/badge.svg)](https://github.com/CEMeNT-PSAAP/MCDC/actions/workflows/mpi_numba_reg.yml)
-[![ReadTheDocs](https://readthedocs.org/projects/cement-psaapgithubio/badge/?version=latest&style=flat)](https://cement-psaapgithubio.readthedocs.org/en/latest/ )
+[![ReadTheDocs](https://readthedocs.org/projects/mcdc/badge/?version=latest&style=flat)](https://mcdc.readthedocs.org/en/latest/ )
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 
@@ -12,7 +12,7 @@ MC/DC is a performant, scalable, and machine-portable Python-based Monte Carlo
 neutron transport software currently developed in the Center for Exascale Monte 
 Carlo Neutron Transport ([CEMeNT](https://cement-psaap.github.io/)).
 
-Our documentation on installation, contribution, and a brief user guide is on [Read the Docs](https://cement-psaapgithubio.readthedocs.io/en/latest/).
+Our documentation on installation, contribution, and a brief user guide is on [Read the Docs](https://mcdc.readthedocs.io/en/latest/).
 
 ## Installation
 
@@ -22,18 +22,18 @@ For most users working on a single machine of which they are administrators, MC/
 ```bash
 pip install mcdc
 ```
-For developers or users on HPC machines, we recommend that you *not* use the pip distribution and instead install MC/DC and its dependencies via the included [install script](https://cement-psaapgithubio.readthedocs.io/en/latest/install.html), which builds `mpi4py` from source and uses conda to manage your environment. *This is the most reliable way to install and configure MC/DC*. It also takes care of the [Numba patch]() and can configure the [continuous energy data library](), if you have access.
+For developers or users on HPC machines, we recommend that you *not* use the pip distribution and instead install MC/DC and its dependencies via the included [install script](https://mcdc.readthedocs.io/en/latest/install.html), which builds `mpi4py` from source and uses conda to manage your environment. *This is the most reliable way to install and configure MC/DC*. It also takes care of the [Numba patch]() and can configure the [continuous energy data library](), if you have access.
 
 ### Common issues with `mpi4py`
 
 The `pip mpi4py` distribution commonly has errors when building due to incompatible local MPI dependencies it builds off of. While pip does have some remedy for this, we recommend the following:
 * **Mac users:** we recommend `openmpi` is [installed via homebrew](https://formulae.brew.sh/formula/open-mpi) (note that more reliable mpi4py distribution can also be [found on homebrew](https://formulae.brew.sh/formula/mpi4py)), alternatively you can use `conda` if you don't have admin privileges;
 * **Linux users:** we recommend `openmpi` is installed via a root package manager if possible (e.g. `sudo apt install openmpi`) or a conda distribution (e.g. `conda install openmpi`)
-* **HPC users and developers on any system:** On HPC systems in particular, `mpi4py` must be built using the system's existing `mpi` installation. Installing MC/DC using the [install script](https://cement-psaapgithubio.readthedocs.io/en/latest/install.html) we've included will handle that for you by installing dependencies using conda rather than pip. It also takes care of the [Numba patch]() and can configure the [continuous energy data library](), if you have access.
+* **HPC users and developers on any system:** On HPC systems in particular, `mpi4py` must be built using the system's existing `mpi` installation. Installing MC/DC using the [install script](https://mcdc.readthedocs.io/en/latest/install.html) we've included will handle that for you by installing dependencies using conda rather than pip. It also takes care of the [Numba patch]() and can configure the [continuous energy data library](), if you have access.
 
 ### Numba Config
 
-Running MC/DC performantly in [Numba mode](#numba-mode) requires a patch to a single Numba file. If you installed MC/DC with the [install script](https://cement-psaapgithubio.readthedocs.io/en/latest/install.html), this patch has already been taken care of. If you installed via pip, we have a patch script will make the necessary changes for you:
+Running MC/DC performantly in [Numba mode](#numba-mode) requires a patch to a single Numba file. If you installed MC/DC with the [install script](https://mcdc.readthedocs.io/en/latest/install.html), this patch has already been taken care of. If you installed via pip, we have a patch script will make the necessary changes for you:
 1. Download the `patch.sh` file [here]() (If you've cloned MC/DC's GitHub repository, you already have this file in your MCDC/ directory).
 2. In your active conda environment, run `bash patch_numba.sh`.
 *If you manage your environment with conda, you will not need admin privileges*.
@@ -91,7 +91,7 @@ For systems that do not use SLURM (*i.e.*, a local system) try `mpiexec` or `mpi
 
 We welcome any contributions to this code base.
 Please keep in mind that we do take our [code of conduct](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md) seriously.
-Our development structure is fork-based: a developer makes a personal fork of this repo, commits contributions to their personal fork, then opens a pull request when they're ready to merge their changes into the main code base. Their contributions will then be reviewed by the primary developers. For more information on how to do this, see our [contribution guide](https://cement-psaapgithubio.readthedocs.io/en/latest/contribution.html).
+Our development structure is fork-based: a developer makes a personal fork of this repo, commits contributions to their personal fork, then opens a pull request when they're ready to merge their changes into the main code base. Their contributions will then be reviewed by the primary developers. For more information on how to do this, see our [contribution guide](https://mcdc.readthedocs.io/en/latest/contribution.html).
 
 ## Bugs and Issues
 
