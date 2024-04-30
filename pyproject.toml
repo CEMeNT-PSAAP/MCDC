@@ -67,5 +67,5 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/CEMeNT-PSAAP/MCDC"
 Homepage = "https://cement-psaap.github.io/"
-Documentation = "https://cement-psaapgithubio.readthedocs.io/en/latest/"
+Documentation = "https://mcdc.readthedocs.io/en/latest/"
 Issues = "https://github.com/CEMeNT-PSAAP/MCDC/issues"
