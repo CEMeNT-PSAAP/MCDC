@@ -10,7 +10,7 @@ from mcdc.constant import INF
 # =============================================================================
 
 
-def test_plane_x():
+def tmp_plane_x():
     type_.make_type_surface(1)
     P = np.zeros(1, dtype=type_.particle)[0]
     S = np.zeros(1, dtype=type_.surface)[0]

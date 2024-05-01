@@ -2,7 +2,7 @@ import numba as nb
 import numpy as np
 import sys
 from mpi4py import MPI
-
+from colorama import Fore, Back, Style
 
 master = MPI.COMM_WORLD.Get_rank() == 0
 
@@ -21,7 +21,8 @@ def print_error(msg):
 
 def print_warning(msg):
     if master:
-        print("Warning: %s\n" % msg)
+        print(Fore.RED + "Warning: %s\n" % msg)
+        print(Style.RESET_ALL)
         sys.stdout.flush()
 
 
@@ -48,11 +49,11 @@ def print_banner(mcdc):
             banner += "           Mode | Numba\n"
         if mcdc["technique"]["iQMC"]:
             banner += "      Algorithm | iQMC\n"
-            rng = mcdc["technique"]["iqmc_generator"]
+            rng = mcdc["technique"]["iqmc"]["generator"]
             if mcdc["setting"]["mode_eigenvalue"]:
-                solver = mcdc["technique"]["iqmc_eigenmode_solver"]
+                solver = mcdc["technique"]["iqmc"]["eigenmode_solver"]
             else:
-                solver = mcdc["technique"]["iqmc_fixed_source_solver"]
+                solver = mcdc["technique"]["iqmc"]["fixed_source_solver"]
             banner += "            RNG | " + rng + "\n"
             banner += "         Solver | " + solver + "\n"
         else:
@@ -67,13 +68,13 @@ def print_progress(percent, mcdc):
     if master:
         sys.stdout.write("\r")
         if not mcdc["setting"]["mode_eigenvalue"]:
-            if not mcdc["technique"]["time_census"]:
+            if mcdc["setting"]["N_census"] == 1:
                 sys.stdout.write(
                     " [%-28s] %d%%" % ("=" * int(percent * 28), percent * 100.0)
                 )
             else:
-                idx = mcdc["technique"]["census_idx"] + 1
-                N = len(mcdc["technique"]["census_time"])
+                idx = mcdc["idx_census"] + 1
+                N = len(mcdc["setting"]["census_time"])
                 sys.stdout.write(
                     " Census %i/%i: [%-28s] %d%%"
                     % (idx, N, "=" * int(percent * 28), percent * 100.0)
@@ -90,6 +91,21 @@ def print_progress(percent, mcdc):
         sys.stdout.flush()
 
 
+def print_progress_iqmc(mcdc):
+    # TODO: function was not working with numba when structured like the
+    # other print_progress functions
+    if master:
+        if mcdc["setting"]["progress_bar"]:
+            sys.stdout.write("\r")
+            itt = mcdc["technique"]["iqmc"]["itt"]
+            res = mcdc["technique"]["iqmc"]["res"]
+            print("\n*******************************")
+            print("Iteration  %2d" % (itt))
+            print("Residual %10.3E" % (res))
+            print("*******************************\n")
+            sys.stdout.flush()
+
+
 def print_header_eigenvalue(mcdc):
     if master:
         if mcdc["setting"]["gyration_radius"]:
@@ -103,55 +119,69 @@ def print_header_eigenvalue(mcdc):
             print(" ====  =======  ===================")
 
 
+def print_header_batch(mcdc):
+    idx_batch = mcdc["idx_batch"]
+    if master:
+        print("\nBatch %i/%i" % (idx_batch + 1, mcdc["setting"]["N_batch"]))
+
+
 def print_progress_eigenvalue(mcdc):
     if master:
-        i_cycle = mcdc["i_cycle"]
+        idx_cycle = mcdc["idx_cycle"]
         k_eff = mcdc["k_eff"]
         k_avg = mcdc["k_avg_running"]
         k_sdv = mcdc["k_sdv_running"]
-        gr = mcdc["gyration_radius"][i_cycle]
+        gr = mcdc["gyration_radius"][idx_cycle]
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
             sys.stdout.write("\033[K")
         if mcdc["setting"]["gyration_radius"]:
             if not mcdc["cycle_active"]:
-                print(" %-4i  %.5f  %6.2f" % (i_cycle + 1, k_eff, gr))
+                print(" %-4i  %.5f  %6.2f" % (idx_cycle + 1, k_eff, gr))
             else:
                 print(
                     " %-4i  %.5f  %6.2f  %.5f +/- %.5f"
-                    % (i_cycle + 1, k_eff, gr, k_avg, k_sdv)
+                    % (idx_cycle + 1, k_eff, gr, k_avg, k_sdv)
                 )
         else:
             if not mcdc["cycle_active"]:
-                print(" %-4i  %.5f" % (i_cycle + 1, k_eff))
+                print(" %-4i  %.5f" % (idx_cycle + 1, k_eff))
             else:
-                print(" %-4i  %.5f  %.5f +/- %.5f" % (i_cycle + 1, k_eff, k_avg, k_sdv))
+                print(
+                    " %-4i  %.5f  %.5f +/- %.5f" % (idx_cycle + 1, k_eff, k_avg, k_sdv)
+                )
 
 
 def print_iqmc_eigenvalue_progress(mcdc):
     if master:
-        k_eff = mcdc["k_eff"]
-        itt = mcdc["technique"]["iqmc_itt_outter"]
-        res = mcdc["technique"]["iqmc_res_outter"]
-        print("\n ", itt, " ", np.round(k_eff, 5), " ", np.round(res, 9))
+        if mcdc["setting"]["progress_bar"]:
+            sys.stdout.write("\r")
+            k_eff = mcdc["k_eff"]
+            itt = mcdc["technique"]["iqmc"]["itt_outter"]
+            res = mcdc["technique"]["iqmc"]["res_outter"]
+            print("\n %2d   %2.5f  %10.3E" % (itt, k_eff, res))
+            sys.stdout.flush()
 
 
 def print_iqmc_eigenvalue_exit_code(mcdc):
     if master:
-        maxit = mcdc["technique"]["iqmc_maxitt"]
-        itt = mcdc["technique"]["iqmc_itt_outter"]
-        tol = mcdc["technique"]["iqmc_tol"]
-        res = mcdc["technique"]["iqmc_res_outter"]
-        solver = mcdc["technique"]["iqmc_eigenmode_solver"]
-        if itt >= maxit:
-            print("\n ================================\n ")
-            print(
-                solver
-                + " convergence to tolerance not achieved: Maximum number of iterations."
-            )
-        elif res <= tol:
-            print("\n ================================\n ")
-            print("Successful " + solver + " convergence.")
+        if mcdc["setting"]["progress_bar"]:
+            sys.stdout.write("\r")
+            maxit = mcdc["technique"]["iqmc"]["maxitt"]
+            itt = mcdc["technique"]["iqmc"]["itt_outter"]
+            if itt >= maxit:
+                print("\n")
+                print("================================")
+                print("\n")
+                print(
+                    " Convergence to tolerance not achieved: Maximum number of iterations."
+                )
+            else:
+                print("\n")
+                print("================================")
+                print(" Successful convergence.")
+                print("\n")
+            sys.stdout.flush()
 
 
 def print_runtime(mcdc):
@@ -193,16 +223,3 @@ def print_bank(bank, show_content=False):
         for i in range(size):
             print(" ", particles[i])
     print("\n")
-
-
-def print_progress_iqmc(mcdc):
-    # TODO: function was not working with numba when structured like the
-    # other print_progress functions
-    if master:
-        if mcdc["setting"]["progress_bar"]:
-            itt = mcdc["technique"]["iqmc_itt"]
-            res = mcdc["technique"]["iqmc_res"]
-            print("\n*******************************")
-            print("Iteration ", itt)
-            print("Residual ", res)
-            print("*******************************\n")
