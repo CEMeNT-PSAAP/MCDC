@@ -1401,7 +1401,7 @@ def domain_decomposition(
     x=None,
     y=None,
     z=None,
-    exchange_rate=100,
+    exchange_rate=100000,
     work_ratio=None,
     repro=True,
 ):
@@ -1417,9 +1417,9 @@ def domain_decomposition(
     z : array_like[float], optional
         Location of subdomain boundaries in z (default None).
     exchange_rate : float, optional
-        number of particles to acumulate in the domain banks before sending.
+        Number of particles to acumulate in the domain banks before sending.
     work_ratio : array_like[integer], optional
-        Inte
+        Number of processors in each domain
 
     Returns
     -------
@@ -1428,7 +1428,6 @@ def domain_decomposition(
     """
     card = mcdc.input_deck.technique
     card["domain_decomposition"] = True
-    card["domain_bank_size"] = int(1e5)
     card["dd_exchange_rate"] = int(exchange_rate)
     card["dd_repro"] = repro
     dom_num = 1
