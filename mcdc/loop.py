@@ -3,6 +3,8 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode, jit
 from scipy.linalg import eig
 
+from mpi4py import MPI
+
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
 import pathlib
@@ -151,6 +153,9 @@ def loop_source(seed, mcdc):
     # Progress bar indicator
     N_prog = 0
 
+    if mcdc["technique"]["domain_decomposition"]:
+        kernel.dd_check_in(mcdc)
+
     # Loop over particle sources
     work_start = mcdc["mpi_work_start"]
     work_size = mcdc["mpi_work_size"]
@@ -238,7 +243,10 @@ def loop_source(seed, mcdc):
         kernel.dd_particle_send(mcdc)
         terminated = False
         max_work = 1
-        kernel.dd_particle_receive(mcdc)
+        kernel.dd_recv(mcdc)
+        if mcdc["domain_decomp"]["work_done"]:
+            terminated = True
+
         while not terminated:
             if mcdc["bank_active"]["size"] > 0:
                 # Loop until active bank is exhausted
@@ -246,7 +254,7 @@ def loop_source(seed, mcdc):
 
                     P = kernel.get_particle(mcdc["bank_active"], mcdc)
                     if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                        print("recieved particle not in domain, position:")
+                        print(f"recieved particle not in domain, index")
 
                     # Apply weight window
                     if mcdc["technique"]["weight_window"]:
@@ -266,15 +274,10 @@ def loop_source(seed, mcdc):
                     ):
                         kernel.tally_closeout_history(mcdc)
 
-                # Send all domain particle banks
-                kernel.dd_particle_send(mcdc)
+            # Send all domain particle banks
+            kernel.dd_particle_send(mcdc)
 
-            # Check for incoming particles
-            kernel.dd_particle_receive(mcdc)
-            work_remaining = int(kernel.allreduce(mcdc["bank_active"]["size"]))
-            total_sent = int(kernel.allreduce(mcdc["technique"]["dd_sent"]))
-            if work_remaining > max_work:
-                max_work = work_remaining
+            kernel.dd_recv(mcdc)
 
             # Progress printout
             """
@@ -284,7 +287,8 @@ def loop_source(seed, mcdc):
                 with objmode():
                     print_progress(percent, mcdc)
             """
-            if work_remaining + total_sent == 0:
+            if kernel.dd_check_halt(mcdc):
+                kernel.dd_check_out(mcdc)
                 terminated = True
 
 
