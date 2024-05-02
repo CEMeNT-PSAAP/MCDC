@@ -314,8 +314,6 @@ def loop_iqmc(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     kernel.iqmc_preprocess(mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
-        if iqmc["eigenmode_solver"] == "davidson":
-            davidson(mcdc)
         if iqmc["eigenmode_solver"] == "power_iteration":
             power_iteration(mcdc)
     else:
@@ -562,111 +560,6 @@ def power_iteration(mcdc):
             simulation_end = True
             with objmode():
                 print_iqmc_eigenvalue_exit_code(mcdc)
-
-
-@njit(cache=True)
-def davidson(mcdc):
-    """
-    The generalized Davidson method is a Krylov subspace method for solving
-    the generalized eigenvalue problem. The algorithm here is based on the
-    outline in:
-
-        Subramanian, C., et al. "The Davidson method as an alternative to
-        power iterations for criticality calculations." Annals of nuclear
-        energy 38.12 (2011): 2818-2823.
-
-    """
-    # TODO: handle imaginary eigenvalues
-    iqmc = mcdc["technique"]["iqmc"]
-    # Davidson parameters
-    simulation_end = False
-    maxit = iqmc["maxitt"]
-    tol = iqmc["tol"]
-    # num_sweeps: number of preconditioner sweeps
-    num_sweeps = iqmc["preconditioner_sweeps"]
-    # m : restart parameter
-    m = iqmc["krylov_restart"]
-    k_old = mcdc["k_eff"]
-    # initial size of Krylov subspace
-    Vsize = 1
-    # l : number of eigenvalues to solve for
-    l = 1
-    # vector size
-    Nt = iqmc["total_source"].size
-    # allocate memory then use slice indexing in loop
-    V = np.zeros((Nt, m), dtype=np.float64)
-    HV = np.zeros((Nt, m), dtype=np.float64)
-    FV = np.zeros((Nt, m), dtype=np.float64)
-
-    V0 = iqmc["total_source"].copy()
-    V0 = kernel.preconditioner(V0, mcdc, num_sweeps=5)
-    # orthonormalize initial guess
-    V0 = V0 / np.linalg.norm(V0)
-    V[:, 0] = V0
-
-    if m is None:
-        # unless specified there is no restart parameter
-        m = maxit + 1
-
-    # Davidson Routine
-    while not simulation_end:
-        # Calculate V*H*V (HxV is scattering linear operator function)
-        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)
-        VHV = np.dot(cga(V[:, :Vsize].T), cga(HV[:, :Vsize]))
-        # Calculate V*F*V (FxV is fission linear operator function)
-        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)
-        VFV = np.dot(cga(V[:, :Vsize].T), cga(FV[:, :Vsize]))
-        # solve for eigenvalues and vectors
-        with objmode(Lambda="complex128[:]", w="complex128[:,:]"):
-            Lambda, w = eig(VFV, b=VHV)
-            Lambda = np.array(Lambda, dtype=np.complex128)
-            w = np.array(w, dtype=np.complex128)
-
-        assert Lambda.imag.all() == 0.0
-        Lambda = Lambda.real
-        w = w.real
-        # get indices of eigenvalues from largest to smallest
-        idx = np.flip(Lambda.argsort())
-        # sort eigenvalues from largest to smallest
-        Lambda = Lambda[idx]
-        # take the l largest eigenvalues
-        Lambda = Lambda[:l]
-        # sort corresponding eigenvector (oriented by column)
-        w = w[:, idx]
-        # take the l largest eigenvectors
-        w = w[:, :l]
-        # assign keff
-        mcdc["k_eff"] = Lambda[0]
-        # Ritz vector
-        u = np.dot(cga(V[:, :Vsize]), cga(w))
-        # residual
-        res = kernel.FxV(u, mcdc) - Lambda * kernel.HxV(u, mcdc)
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
-        k_old = mcdc["k_eff"]
-        iqmc["itt_outter"] += 1
-        with objmode():
-            print_iqmc_eigenvalue_progress(mcdc)
-
-        # check convergence criteria
-        if (iqmc["itt_outter"] >= maxit) or (iqmc["res_outter"] <= tol):
-            simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
-            # return
-        else:
-            # Precondition for next iteration
-            t = kernel.preconditioner(res, mcdc, num_sweeps)
-            # check restart condition
-            if Vsize <= m - l:
-                # appends new orthogonalization to V
-                V[:, : Vsize + 1] = kernel.modified_gram_schmidt(V[:, :Vsize], t)
-                Vsize += 1
-            else:
-                # "restarts" by appending to a new array
-                Vsize = l + 1
-                V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-        # TODO: normalize and save final scalar flux
-        iqmc["score"]["flux"] /= iqmc["score"]["flux"].sum()
 
 
 # =============================================================================

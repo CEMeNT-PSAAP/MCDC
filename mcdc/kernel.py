@@ -3109,24 +3109,9 @@ def iqmc_distribute_sources(mcdc):
     score_bin = iqmc["score"]
     Vsize = 0
 
-    # effective sources
-    # in Davidsons method we need to separate scattering and fission
-    # in all other methods we can combine them into one
-    if mcdc["setting"]["mode_eigenvalue"] and iqmc["eigenmode_solver"] == "davidson":
-        # effective scattering
-        score_bin["effective-scattering"] = np.reshape(
-            total_source[Vsize : (Vsize + size)].copy(), shape
-        )
-        Vsize += size
-        # effective fission
-        score_bin["effective-fission"] = np.reshape(
-            total_source[Vsize : (Vsize + size)].copy(), shape
-        )
-        Vsize += size
-    else:
-        # effective source
-        iqmc["source"] = np.reshape(total_source[Vsize : (Vsize + size)].copy(), shape)
-        Vsize += size
+    # effective source
+    iqmc["source"] = np.reshape(total_source[Vsize : (Vsize + size)].copy(), shape)
+    Vsize += size
 
     # source tilting arrays
     tilt_list = [
@@ -3164,24 +3149,9 @@ def iqmc_consolidate_sources(mcdc):
     score_bin = iqmc["score"]
     Vsize = 0
 
-    # effective sources
-    # in Davidsons method we need to separate scattering and fission
-    # in all other methods we can combine them into one
-    if mcdc["setting"]["mode_eigenvalue"] and iqmc["eigenmode_solver"] == "davidson":
-        # effective scattering array
-        total_source[Vsize : (Vsize + size)] = np.reshape(
-            score_bin["effective-scattering"].copy(), size
-        )
-        Vsize += size
-        # effective fission array
-        total_source[Vsize : (Vsize + size)] = np.reshape(
-            score_bin["effective-fission"].copy(), size
-        )
-        Vsize += size
-    else:
-        # effective source
-        total_source[Vsize : (Vsize + size)] = np.reshape(iqmc["source"].copy(), size)
-        Vsize += size
+    # effective source
+    total_source[Vsize : (Vsize + size)] = np.reshape(iqmc["source"].copy(), size)
+    Vsize += size
 
     # source tilting arrays
     tilt_list = [
@@ -3304,11 +3274,6 @@ def iqmc_linear_tilt(mu, x, dx, x_mid, dy, dz, w, distance, SigmaT):
     return Q
 
 
-# =============================================================================
-# iQMC Iterative Method Mapping Functions
-# =============================================================================
-
-
 @njit
 def AxV(V, b, mcdc):
     """
@@ -3337,98 +3302,6 @@ def AxV(V, b, mcdc):
     axv = V - (v_out - b)
 
     return axv
-
-
-@njit
-def HxV(V, mcdc):
-    """
-    Linear operator for Davidson method,
-    scattering + streaming terms -> (I-L^(-1)S)*phi
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    # flux input is most recent iteration of eigenvector
-    v = V[:, -1]
-    iqmc["total_source"] = v.copy()
-    iqmc_distribute_sources(mcdc)
-    # reset bank size
-    mcdc["bank_source"]["size"] = 0
-
-    # QMC Sweep
-    # prepare_qmc_scattering_source(mcdc)
-    iqmc["source"] = iqmc["fixed_source"] + iqmc["score"]["effective-scattering"]
-    iqmc_prepare_particles(mcdc)
-    iqmc_reset_tallies(iqmc)
-    iqmc["sweep_counter"] += 1
-    loop_source(0, mcdc)
-    # sum resultant flux on all processors
-    iqmc_distribute_tallies(iqmc)
-    iqmc_consolidate_sources(mcdc)
-    v_out = iqmc["total_source"].copy()
-    axv = v - v_out
-
-    return axv
-
-
-@njit
-def FxV(V, mcdc):
-    """
-    Linear operator for Davidson method,
-    fission term -> (L^(-1)F*phi)
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    # flux input is most recent iteration of eigenvector
-    v = V[:, -1]
-    # reshape v and assign to iqmc_flux
-    iqmc["total_source"] = v.copy()
-    iqmc_distribute_sources(mcdc)
-    # reset bank size
-    mcdc["bank_source"]["size"] = 0
-
-    # QMC Sweep
-    iqmc["source"] = iqmc["fixed_source"] + iqmc["score"]["effective-fission"]
-    iqmc_prepare_particles(mcdc)
-    iqmc_reset_tallies(iqmc)
-    iqmc["sweep_counter"] += 1
-    loop_source(0, mcdc)
-
-    # sum resultant flux on all processors
-    iqmc_distribute_tallies(iqmc)
-    iqmc_consolidate_sources(mcdc)
-    v_out = iqmc["total_source"].copy()
-
-    return v_out
-
-
-@njit
-def preconditioner(V, mcdc, num_sweeps=3):
-    """
-    Linear operator approximation of (I-L^(-1)S)*phi
-
-    In this case the preconditioner is a specified number of purely scattering
-    transport sweeps.
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    # flux input is most recent iteration of eigenvector
-    iqmc["total_source"] = V.copy()
-    iqmc_distribute_sources(mcdc)
-
-    for i in range(num_sweeps):
-        # reset bank size
-        mcdc["bank_source"]["size"] = 0
-        # QMC Sweep
-        iqmc["source"] = iqmc["fixed_source"] + iqmc["score"]["effective-scattering"]
-        iqmc_prepare_particles(mcdc)
-        iqmc_reset_tallies(iqmc)
-        iqmc["sweep_counter"] += 1
-        loop_source(0, mcdc)
-        # sum resultant flux on all processors
-        iqmc_distribute_tallies(iqmc)
-
-    iqmc_consolidate_sources(mcdc)
-    v_out = iqmc["total_source"].copy()
-    v_out = V - v_out
-
-    return v_out
 
 
 # =============================================================================

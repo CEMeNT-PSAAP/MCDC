@@ -1512,9 +1512,6 @@ def iQMC(
     if source0 is None:
         source0 = np.zeros_like(phi0)
 
-    if eigenmode_solver == "davidson":
-        card["iqmc"]["krylov_vector_size"] += 1
-
     score_list = card["iqmc"]["score_list"]
     for name in score:
         score_list[name] = True
