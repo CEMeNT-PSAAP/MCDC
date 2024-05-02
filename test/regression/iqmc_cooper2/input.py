@@ -55,7 +55,7 @@ mcdc.iQMC(
     maxitt=maxit,
     tol=tol,
     generator=generator,
-    score=["tilt-x", "tilt-y", "tilt-xy"],
+    score=["tilt-x", "tilt-y"],
 )
 
 # =============================================================================
