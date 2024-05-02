@@ -2863,60 +2863,6 @@ def iqmc_score_tallies(P, distance, mcdc):
         tilt = iqmc_linear_tilt(P["uz"], P["z"], dz, z_mid, dx, dy, w, distance, SigmaT)
         score_bin["tilt-z"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
 
-    if score_list["tilt-xy"]:
-        tilt = iqmc_bilinear_tilt(
-            P["ux"],
-            P["x"],
-            dx,
-            x_mid,
-            P["uy"],
-            P["y"],
-            dy,
-            y_mid,
-            dt,
-            dz,
-            w,
-            distance,
-            SigmaT,
-        )
-        score_bin["tilt-xy"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
-
-    if score_list["tilt-xz"]:
-        tilt = iqmc_bilinear_tilt(
-            P["ux"],
-            P["x"],
-            dx,
-            x_mid,
-            P["uz"],
-            P["z"],
-            dz,
-            z_mid,
-            dt,
-            dy,
-            w,
-            distance,
-            SigmaT,
-        )
-        score_bin["tilt-xz"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
-
-    if score_list["tilt-yz"]:
-        tilt = iqmc_bilinear_tilt(
-            P["uy"],
-            P["y"],
-            dy,
-            y_mid,
-            P["uz"],
-            P["z"],
-            dz,
-            z_mid,
-            dt,
-            dx,
-            w,
-            distance,
-            SigmaT,
-        )
-        score_bin["tilt-yz"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
-
 
 @njit
 def iqmc_cell_volume(x, y, z, mesh):
@@ -3136,15 +3082,6 @@ def iqmc_tilt_source(t, x, y, z, P, Q, mcdc):
     # linear z-component
     if score_list["tilt-z"]:
         Q += score_bin["tilt-z"][:, t, x, y, z] * (P["z"] - z_mid)
-    # bilinear xy
-    if score_list["tilt-xy"]:
-        Q += score_bin["tilt-xy"][:, t, x, y, z] * (P["x"] - x_mid) * (P["y"] - y_mid)
-    # bilinear xz
-    if score_list["tilt-xz"]:
-        Q += score_bin["tilt-xz"][:, t, x, y, z] * (P["x"] - x_mid) * (P["z"] - z_mid)
-    # bilinear yz
-    if score_list["tilt-yz"]:
-        Q += score_bin["tilt-yz"][:, t, x, y, z] * (P["y"] - y_mid) * (P["z"] - z_mid)
 
 
 @njit
@@ -3196,9 +3133,6 @@ def iqmc_distribute_sources(mcdc):
         "tilt-x",
         "tilt-y",
         "tilt-z",
-        "tilt-xy",
-        "tilt-xz",
-        "tilt-yz",
     ]
     for name in literal_unroll(tilt_list):
         if score_list[name]:
@@ -3254,9 +3188,6 @@ def iqmc_consolidate_sources(mcdc):
         "tilt-x",
         "tilt-y",
         "tilt-z",
-        "tilt-xy",
-        "tilt-xz",
-        "tilt-yz",
     ]
     for name in literal_unroll(tilt_list):
         if score_list[name]:
@@ -3370,28 +3301,6 @@ def iqmc_linear_tilt(mu, x, dx, x_mid, dy, dz, w, distance, SigmaT):
         Q = 12 * (a + b) / (dx**3 * dy * dz)
     else:
         Q = mu * w * distance ** (2) / 2 + w * (x - x_mid) * distance
-    return Q
-
-
-@njit
-def iqmc_bilinear_tilt(ux, x, dx, x_mid, uy, y, dy, y_mid, dt, dz, w, S, SigmaT):
-    # TODO: integral incase of SigmaT = 0
-    Q = (
-        (1 / SigmaT**3)
-        * w
-        * (
-            (x - x_mid) * SigmaT * (uy + (y - y_mid) * SigmaT)
-            + ux * (2 * uy + (y - y_mid) * SigmaT)
-            + np.exp(-S * SigmaT)
-            * (
-                -2 * ux * uy
-                + ((-x + x_mid) * uy + ux * (-y + y_mid - 2 * S * uy)) * SigmaT
-                - (x - x_mid + S * ux) * (y - y_mid + S * uy) * SigmaT**2
-            )
-        )
-    )
-
-    Q *= 144 / (dt * dx**3 * dy**3 * dz)
     return Q
 
 

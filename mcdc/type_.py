@@ -658,9 +658,6 @@ iqmc_score_list = (
     "tilt-x",
     "tilt-y",
     "tilt-z",
-    "tilt-xy",
-    "tilt-xz",
-    "tilt-yz",
     "fission-power",
     "fission-source",
 )
@@ -765,9 +762,6 @@ def make_type_technique(input_deck):
         ["tilt-x", (Ng, Nt, Nx, Ny, Nz)],
         ["tilt-y", (Ng, Nt, Nx, Ny, Nz)],
         ["tilt-z", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-xy", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-xz", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-yz", (Ng, Nt, Nx, Ny, Nz)],
         ["fission-power", (Ng, Nt, Nx, Ny, Nz)],  # SigmaF*phi
         ["fission-source", (1,)],  # nu*SigmaF*phi
     ]
