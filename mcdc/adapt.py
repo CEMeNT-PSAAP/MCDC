@@ -5,10 +5,14 @@ import mcdc.type_  as type_
 import mcdc.kernel as kernel
 import mcdc.loop   as loop
 
-path_to_harmonize='/home/brax/harmonize/code/'
-import sys
-sys.path.append(path_to_harmonize)
-import harmonize as harm
+
+try:
+    import harmonize as harm
+    HAS_GPU = False
+except:
+    print("Warning: ")
+    HAS_GPU = False
+
 import math
 import inspect
 
@@ -101,18 +105,18 @@ def blankout_fn(func):
     mod_name = func.__module__
     fn_name  = func.__name__
     id = (mod_name,fn_name)
-    
+
     if id not in blankout_roster:
         global do_nothing_id
         name = func.__name__
         #print(f"do_nothing_{do_nothing_id} for {name}")
         arg_count = len(inspect.signature(func).parameters)
         blankout_roster[id] = generate_do_nothing(arg_count,crash_on_call=f"blankout fn for {name} should never be called")
-    
+
     blank = blankout_roster[id]
 
     return blank
-    
+
 
 
 
@@ -176,7 +180,7 @@ def nopython_mode(is_on):
         return
     if not isinstance(target_rosters['cpu'],dict):
         return
-    
+
     for impl in target_rosters['cpu'].values():
         overwrite_func(impl,impl)
 
@@ -331,7 +335,7 @@ def add_IC(particle, prog):
 @for_cpu()
 def local_translate():
     return np.zeros(1, dtype=type_.translate)[0]
-    
+
 @for_gpu()
 def local_translate():
     trans = cuda.local.array(1, type_.translate)[0]
@@ -343,7 +347,7 @@ def local_translate():
 @for_cpu()
 def local_group_array():
     return np.zeros(1, dtype=type_.group_array)[0]
-    
+
 @for_gpu()
 def local_group_array():
     return cuda.local.array(1, type_.group_array)[0]
@@ -352,7 +356,7 @@ def local_group_array():
 @for_cpu()
 def local_j_array():
     return np.zeros(1, dtype=type_.j_array)[0]
-    
+
 @for_gpu()
 def local_j_array():
     return cuda.local.array(1, type_.j_array)[0]
@@ -406,7 +410,7 @@ def global_max(ary,idx,val):
 # Program Specifications
 # =========================================================================
 
-state_spec      = None 
+state_spec      = None
 one_event_fns   = None
 multi_event_fns = None
 
@@ -420,7 +424,7 @@ def make_spec(target):
     global device_gpu, group_gpu, thread_gpu
     global iterate_async
     if target == 'gpu':
-        state_spec = (dev_state_type,grp_state_type,thd_state_type) 
+        state_spec = (dev_state_type,grp_state_type,thd_state_type)
         one_event_fns   = [iterate]
         #multi_event_fns = [source,move,scattering,fission,leakage,bcollision]
         device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
@@ -443,7 +447,7 @@ def make_gpu_loop(state_spec,work_make_fn,step_fn,check_fn,arg_type,initial_fn=e
     def finalize(prog: numba.uintp):
         final_fn(prog)
     def step(prog: numba.uintp, arg: arg_type):
-        
+
         step_async()
 
     step_async, = harm.RuntimeSpec.async_dispatch(step)
