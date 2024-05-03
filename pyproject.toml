@@ -35,7 +35,7 @@ maintainers = [
 
 description = "Monte Carlo / Dynamic Code, a pure python high performance Monte Carlo neutronics package"
 readme = "README.md"
-requires-python = ">=3.9, <=3.11.8"
+requires-python = ">=3.9.1"
 license = {file = "LICENSE"}
 keywords = ["Monte Carlo", "Nuclear", "GPU", "numba", "mpi4py", "neutron transport", "neutronics", "HPC"]
 classifiers = [
@@ -67,5 +67,5 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/CEMeNT-PSAAP/MCDC"
 Homepage = "https://cement-psaap.github.io/"
-Documentation = "https://cement-psaapgithubio.readthedocs.io/en/latest/"
+Documentation = "https://mcdc.readthedocs.io/en/latest/"
 Issues = "https://github.com/CEMeNT-PSAAP/MCDC/issues"
