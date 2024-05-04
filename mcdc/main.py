@@ -86,7 +86,8 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc, set_cache #, build_gpu_progs
+from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc, set_cache, build_gpu_progs
+import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
 # Get input_deck
@@ -337,11 +338,12 @@ def prepare():
         adapt.gpu_forward_declare()
 
     adapt.set_toggle("iQMC",input_deck.technique["iQMC"])
+    adapt.set_toggle("domain_decomp",input_deck.technique["domain_decomposition"])
     adapt.set_toggle("particle_tracker",mcdc["setting"]["track_particle"])
     adapt.eval_toggle()
+    adapt.target_for(target)
     if target == "gpu":
         build_gpu_progs()
-    adapt.target_for(target)
     adapt.nopython_mode(mode=="numba")
 
     # =========================================================================
@@ -377,6 +379,10 @@ def prepare():
                 "chi_p",
                 "chi_d",
             ]:
+                if "padding" in name:
+                    continue
+                if isinstance(input_deck.nuclides[i][name],np.ndarray) and input_deck.nuclides[i][name].shape != mcdc["nuclides"][i][name].shape:
+                    continue
                 mcdc["nuclides"][i][name] = input_deck.nuclides[i][name]
 
         # CE data (load data from XS library)
@@ -894,6 +900,8 @@ def prepare():
                     "w"
                 ]
 
+    loop.setup_gpu(mcdc)
+
     return mcdc
 
 
@@ -1084,6 +1092,9 @@ def generate_hdf5(mcdc):
 
 
 def closeout(mcdc):
+
+    loop.teardown_gpu(mcdc)
+
     # Runtime
     if mcdc["mpi_master"]:
         with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:
