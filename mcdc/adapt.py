@@ -1,5 +1,6 @@
 import numpy as np
-from numba import njit, jit, objmode, literal_unroll, cuda
+from numba import njit, jit, objmode, literal_unroll, cuda, types
+from numba.extending import intrinsic
 import numba
 import mcdc.type_  as type_
 import mcdc.kernel as kernel
@@ -10,7 +11,7 @@ try:
     import harmonize as harm
     HAS_GPU = False
 except:
-    print("Warning: ")
+    print("Warning: GPU capability is not available")
     HAS_GPU = False
 
 import math
@@ -27,6 +28,47 @@ import mcdc.adapt as adapt
 
 def unknown_target(target):
     print_error(f"ERROR: Unrecognized target '{target}'")
+
+
+
+# =============================================================================
+# uintp/voidptr casters
+# =============================================================================
+
+
+@intrinsic
+def cast_uintp_to_voidptr(typingctx, src):
+    # check for accepted types
+    if isinstance(src, types.Integer):
+        # create the expected type signature
+        result_type = types.voidptr
+        sig = result_type(types.uintp)
+        # defines the custom code generation
+        def codegen(context, builder, signature, args):
+            # llvm IRBuilder code here
+            [src] = args
+            rtype = signature.return_type
+            llrtype = context.get_value_type(rtype)
+            return builder.inttoptr(src, llrtype)
+        return sig, codegen
+
+
+@intrinsic
+def cast_voidptr_to_uintp(typingctx, src):
+    # check for accepted types
+    if isinstance(src, types.RawPointer):
+        # create the expected type signature
+        result_type = types.uintp
+        sig = result_type(types.voidptr)
+        # defines the custom code generation
+        def codegen(context, builder, signature, args):
+            # llvm IRBuilder code here
+            [src] = args
+            rtype = signature.return_type
+            llrtype = context.get_value_type(rtype)
+            return builder.ptrtoint(src, llrtype)
+        return sig, codegen
+
 
 
 # =============================================================================

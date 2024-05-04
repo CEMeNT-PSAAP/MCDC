@@ -14,6 +14,7 @@ int32 = np.int32
 uint64 = np.uint64
 uint8 = np.uint8
 bool_ = np.bool_
+uintp = np.uintp
 str_ = "U32"
 
 # MC/DC types, will be defined based on input deck
@@ -177,7 +178,7 @@ def make_type_particle(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    particle = np.dtype(struct)
+    particle = into_dtype(struct)
 
 
 # Particle record (in-bank)
@@ -216,7 +217,7 @@ def make_type_particle_record(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    particle_record = np.dtype(struct)
+    particle_record = into_dtype(struct)
 
     particle_record_mpi = from_numpy_dtype(particle_record)
     particle_record_mpi.Commit()
@@ -381,7 +382,7 @@ def make_type_nuclide(input_deck):
     ]
 
     # Set the type
-    nuclide = np.dtype(struct)
+    nuclide = into_dtype(struct)
 
 
 # ==============================================================================
@@ -438,7 +439,7 @@ def make_type_material(input_deck):
     ]
 
     # Set the type
-    material = np.dtype(struct)
+    material = into_dtype(struct)
 
 
 # ==============================================================================
@@ -454,7 +455,7 @@ def make_type_surface(input_deck):
     for surface in input_deck.surfaces:
         Nmax_slice = max(Nmax_slice, surface["N_slice"])
 
-    surface = np.dtype(
+    surface = into_dtype(
         [
             ("ID", int64),
             ("N_slice", int64),
@@ -528,7 +529,7 @@ def make_type_universe(input_deck):
         card["N_cell"] = N_cell
         card["cell_IDs"] = np.arange(N_cell)
 
-    universe = np.dtype(
+    universe = into_dtype(
         [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
     )
 
@@ -623,7 +624,7 @@ def make_type_source(input_deck):
         ("energy", float64, (2, Nmax_E)),
     ]
 
-    source = np.dtype(struct)
+    source = into_dtype(struct)
 
 
 # ==============================================================================
@@ -725,7 +726,7 @@ def make_type_setting(deck):
         # Misc.
         ("progress_bar", bool_),
         ("caching", bool_),
-        ("output_name", "U30"),
+        ("output_name", "U32"),
         ("save_input_deck", bool_),
         ("track_particle", bool_),
         # Eigenvalue mode
@@ -742,17 +743,17 @@ def make_type_setting(deck):
         ("census_time", float64, (card["N_census"],)),
         # Particle source file
         ("source_file", bool_),
-        ("source_file_name", "U30"),
+        ("source_file_name", "U32"),
         # Initial condition source file
         ("IC_file", bool_),
-        ("IC_file_name", "U30"),
+        ("IC_file_name", "U32"),
         ("N_precursor", uint64),
         # TODO: Move to technique
         ("N_sensitivity", uint64),
     ]
 
     # Finalize setting type
-    setting = np.dtype(struct)
+    setting = into_dtype(struct)
 
 
 # ==============================================================================
@@ -909,7 +910,7 @@ def make_type_technique(input_deck):
     for i in range(len(scores_shapes)):
         name = scores_shapes[i][0]
         score_list += [(name, bool_)]
-    score_list = np.dtype(score_list)
+    score_list = into_dtype(score_list)
     iqmc_list += [("score_list", score_list)]
 
     # Add scores to structure
@@ -923,7 +924,7 @@ def make_type_technique(input_deck):
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     iqmc_list += [("score", scores)]
 
     # Constants
@@ -1009,7 +1010,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -1052,18 +1053,18 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
     global uq, uq_nuc, uq_mat
 
     #    def make_type_parameter(shape):
-    #        return np.dtype(
+    #        return into_dtype(
     #            [
     #                ("tag", str_),             # nuclides, materials, surfaces, sources
     #                ("ID", int64),
@@ -1088,7 +1089,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -1100,7 +1101,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -1117,22 +1118,22 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
     )
 
 
 def make_type_dd_turnstile_event(input_deck):
     global dd_turnstile_event, dd_turnstile_event_mpi
-    dd_turnstile_event = np.dtype(
+    dd_turnstile_event = into_dtype(
         [
             ("busy_delta", int32),
             ("send_delta", int32),
@@ -1160,7 +1161,7 @@ def make_type_domain_decomp(input_deck):
         bank_domain_zp = particle_bank(0)
         bank_domain_zn = particle_bank(0)
 
-    domain_decomp = np.dtype(
+    domain_decomp = into_dtype(
         [
             # Info tracked in all ranks
             ("bank_xp", bank_domain_xp),
@@ -1194,7 +1195,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -1237,18 +1238,18 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
     global uq, uq_nuc, uq_mat
 
     #    def make_type_parameter(shape):
-    #        return np.dtype(
+    #        return into_dtype(
     #            [
     #                ("tag", str_),             # nuclides, materials, surfaces, sources
     #                ("ID", int64),
@@ -1273,7 +1274,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -1285,7 +1286,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -1302,22 +1303,22 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
     )
 
 
 def make_type_dd_turnstile_event(input_deck):
     global dd_turnstile_event, dd_turnstile_event_mpi
-    dd_turnstile_event = np.dtype(
+    dd_turnstile_event = into_dtype(
         [
             ("busy_delta", int32),
             ("send_delta", int32),
@@ -1345,7 +1346,7 @@ def make_type_domain_decomp(input_deck):
         bank_domain_zp = particle_bank(0)
         bank_domain_zn = particle_bank(0)
 
-    domain_decomp = np.dtype(
+    domain_decomp = into_dtype(
         [
             # Info tracked in all ranks
             ("bank_xp", bank_domain_xp),
@@ -1470,8 +1471,6 @@ def make_type_global(input_deck):
             ("bank_precursor", bank_precursor),
             ("rng_seed_base", uint64),
             ("rng_seed", uint64),
-            ("source_seed", uint64),
-            ("source_precursor_seed", uint64),
             ("rng_stride", int64),
             ("dd_idx", int64),
             ("k_eff", float64),
@@ -1514,6 +1513,10 @@ def make_type_global(input_deck):
             ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
+            ("gpu_state", uintp),
+            ("source_program", uintp),
+            ("precursor_program", uintp),
+            ("source_seed", uint64),
         ]
     )
 
