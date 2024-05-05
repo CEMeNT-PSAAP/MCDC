@@ -96,7 +96,9 @@ def align(field_list):
 
 
 def into_dtype(field_list):
-    return np.dtype(align(field_list),align)
+    result = np.dtype(align(field_list),align=True)
+    print(result)
+    return result
 
 
 
