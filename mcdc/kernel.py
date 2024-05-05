@@ -260,7 +260,7 @@ def dd_distribute_bank(mcdc, bank, dest_list):
                 send_delta += end - start
 
     mcdc["domain_decomp"]["send_count"] += send_delta
-    set_bank_size(bank,0)
+    set_bank_size(bank, 0)
 
 
 @njit
@@ -852,7 +852,7 @@ def rng_array(seed, shape, size):
 
 @njit
 def source_particle(seed, mcdc):
-    P : type_.particle_record = adapt.local_particle_record()
+    P: type_.particle_record = adapt.local_particle_record()
     P["rng_seed"] = seed
 
     # Sample source
@@ -917,17 +917,20 @@ def source_particle(seed, mcdc):
 # Particle bank operations
 # =============================================================================
 
+
 @njit
 def get_bank_size(bank):
     return bank["size"][0]
 
-@njit
-def set_bank_size(bank,value):
-    bank["size"][0] = value
 
 @njit
-def add_bank_size(bank,value):
-    return adapt.global_add(bank["size"],0,value)
+def set_bank_size(bank, value):
+    bank["size"][0] = value
+
+
+@njit
+def add_bank_size(bank, value):
+    return adapt.global_add(bank["size"], 0, value)
 
 
 @for_cpu()
@@ -944,27 +947,25 @@ def full_bank_print(bank):
 @njit
 def add_particle(P, bank):
 
-    idx = add_bank_size(bank,1)
+    idx = add_bank_size(bank, 1)
 
     # Check if bank is full
     if idx >= bank["particles"].shape[0]:
         full_bank_print(bank)
 
     # Set particle
-    copy_recordlike(bank["particles"][idx],P)
-
-
+    copy_recordlike(bank["particles"][idx], P)
 
 
 @njit
 def get_particle(P, bank, mcdc):
 
-    idx = add_bank_size(bank,-1) - 1
+    idx = add_bank_size(bank, -1) - 1
 
     # Check if bank is empty
     if idx < 0:
         return False
-        #with objmode():
+        # with objmode():
         #    print_error("Particle %s bank is empty." % bank["tag"])
 
     # Set attribute
@@ -994,6 +995,7 @@ def get_particle(P, bank, mcdc):
     P["event"] = -1
     return True
 
+
 #! Don't touch for now
 @njit
 def manage_particle_banks(seed, mcdc):
@@ -1012,7 +1014,7 @@ def manage_particle_banks(seed, mcdc):
     else:
         # Swap census and source bank
         size = get_bank_size(mcdc["bank_census"])
-        set_bank_size(mcdc["bank_source"],size)
+        set_bank_size(mcdc["bank_source"], size)
         mcdc["bank_source"]["particles"][:size] = mcdc["bank_census"]["particles"][
             :size
         ]
@@ -1022,7 +1024,7 @@ def manage_particle_banks(seed, mcdc):
         bank_rebalance(mcdc)
 
     # Zero out census bank
-    set_bank_size(mcdc["bank_census"],0)
+    set_bank_size(mcdc["bank_census"], 0)
 
     # Manage IC bank
     if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
@@ -1074,8 +1076,8 @@ def manage_IC_bank(mcdc):
 
     # Set global bank from buffer
     if mcdc["mpi_master"]:
-        start_n = add_bank_size(mcdc["technique"]["IC_bank_neutron"],Nn)
-        start_p = add_bank_size(mcdc["technique"]["IC_bank_precursor"],Np)
+        start_n = add_bank_size(mcdc["technique"]["IC_bank_neutron"], Nn)
+        start_p = add_bank_size(mcdc["technique"]["IC_bank_precursor"], Np)
         for i in range(Nn):
             mcdc["technique"]["IC_bank_neutron"]["particles"][start_n + i] = buff_n[i]
         for i in range(Np):
@@ -1084,8 +1086,8 @@ def manage_IC_bank(mcdc):
             ]
 
     # Reset local banks
-    set_bank_size(mcdc["technique"]["IC_bank_neutron_local"],0)
-    set_bank_size(mcdc["technique"]["IC_bank_precursor_local"],0)
+    set_bank_size(mcdc["technique"]["IC_bank_neutron_local"], 0)
+    set_bank_size(mcdc["technique"]["IC_bank_precursor_local"], 0)
 
 
 @njit
@@ -1265,7 +1267,7 @@ def bank_rebalance(mcdc):
             buff[i] = bank[i]
 
     # Set source bank from buffer
-    set_bank_size(mcdc["bank_source"],size)
+    set_bank_size(mcdc["bank_source"], size)
     for i in range(size):
         mcdc["bank_source"]["particles"][i] = buff[i]
 
@@ -1318,6 +1320,7 @@ def pn_over_one():
 @for_gpu()
 def pn_over_one():
     pass
+
 
 @for_cpu()
 def pp_over_one():
@@ -1372,8 +1375,8 @@ def bank_IC(P, prog):
 
         # Accumulate fission
         SigmaF = material["fission"][g]
-        #mcdc["technique"]["IC_fission_score"][0] += v * SigmaF
-        adapt.global_add(mcdc["technique"]["IC_fission_score"],0,v * SigmaF)
+        # mcdc["technique"]["IC_fission_score"][0] += v * SigmaF
+        adapt.global_add(mcdc["technique"]["IC_fission_score"], 0, v * SigmaF)
 
     # =========================================================================
     # Precursor
@@ -1411,7 +1414,7 @@ def bank_IC(P, prog):
 
     # Sample precursor
     if rng(P) < Pp:
-        idx = add_bank_size(mcdc["technique"]["IC_bank_precursor_local"],1)
+        idx = add_bank_size(mcdc["technique"]["IC_bank_precursor_local"], 1)
         precursor = mcdc["technique"]["IC_bank_precursor_local"]["precursors"][idx]
         precursor["x"] = P["x"]
         precursor["y"] = P["y"]
@@ -1474,7 +1477,7 @@ def pct_combing(seed, mcdc):
     tooth_end = math.floor((idx_end - offset) / td) + 1
 
     # Locally sample particles from census bank
-    set_bank_size(bank_source,0)
+    set_bank_size(bank_source, 0)
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
@@ -1511,7 +1514,7 @@ def pct_combing_weight(seed, mcdc):
     tooth_end = math.floor((w_end - offset) / td) + 1
 
     # Locally sample particles from census bank
-    set_bank_size(bank_source,0)
+    set_bank_size(bank_source, 0)
     idx = 0
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
@@ -1645,19 +1648,20 @@ def copy_recordlike(P_new, P):
     P_new["rng_seed"] = P["rng_seed"]
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
-    copy_track_data(P_new,P)
+    copy_track_data(P_new, P)
 
 
 @njit
 def copy_record(P):
     P_new = adapt.local_particle_record()
-    copy_recordlike(P_new,P)
+    copy_recordlike(P_new, P)
     return P_new
+
 
 @njit
 def recordlike_to_particle(P_rec):
     P_new = adapt.local_particle()
-    copy_recordlike(P_new,P_rec)
+    copy_recordlike(P_new, P_rec)
     P_new["fresh"] = True
     P_new["alive"] = True
     P_new["material_ID"] = -1
@@ -1665,6 +1669,7 @@ def recordlike_to_particle(P_rec):
     P_new["surface_ID"] = -1
     P_new["event"] = -1
     return P_new
+
 
 @njit
 def copy_particle(P):
@@ -1688,7 +1693,7 @@ def copy_particle(P):
     P_new["sensitivity_ID"] = P["sensitivity_ID"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
-    copy_track_data(P_new,P)
+    copy_track_data(P_new, P)
     return P_new
 
 
@@ -2146,18 +2151,18 @@ def score_exit(P, x, mcdc):
 
 @njit
 def score_flux(s, g, t, x, y, z, mu, azi, flux, score):
-    #score["bin"][s, g, t, x, y, z, mu, azi] += flux
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, mu, azi),flux)
+    # score["bin"][s, g, t, x, y, z, mu, azi] += flux
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, mu, azi), flux)
 
 
 @njit
 def score_current(s, g, t, x, y, z, flux, P, score):
-    #score["bin"][s, g, t, x, y, z, 0] += flux * P["ux"]
-    #score["bin"][s, g, t, x, y, z, 1] += flux * P["uy"]
-    #score["bin"][s, g, t, x, y, z, 2] += flux * P["uz"]
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 0),flux * P["ux"])
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 1),flux * P["uy"])
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 2),flux * P["uz"])
+    # score["bin"][s, g, t, x, y, z, 0] += flux * P["ux"]
+    # score["bin"][s, g, t, x, y, z, 1] += flux * P["uy"]
+    # score["bin"][s, g, t, x, y, z, 2] += flux * P["uz"]
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 0), flux * P["ux"])
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 1), flux * P["uy"])
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 2), flux * P["uz"])
 
 
 @njit
@@ -2165,18 +2170,19 @@ def score_eddington(s, g, t, x, y, z, flux, P, score):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    #score["bin"][s, g, t, x, y, z, 0] += flux * ux * ux
-    #score["bin"][s, g, t, x, y, z, 1] += flux * ux * uy
-    #score["bin"][s, g, t, x, y, z, 2] += flux * ux * uz
-    #score["bin"][s, g, t, x, y, z, 3] += flux * uy * uy
-    #score["bin"][s, g, t, x, y, z, 4] += flux * uy * uz
-    #score["bin"][s, g, t, x, y, z, 5] += flux * uz * uz
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 0),flux * ux * ux)
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 1),flux * ux * uy)
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 2),flux * ux * uz)
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 3),flux * uy * uy)
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 4),flux * uy * uz)
-    adapt.global_add(score["bin"],(s, g, t, x, y, z, 5),flux * uz * uz)
+    # score["bin"][s, g, t, x, y, z, 0] += flux * ux * ux
+    # score["bin"][s, g, t, x, y, z, 1] += flux * ux * uy
+    # score["bin"][s, g, t, x, y, z, 2] += flux * ux * uz
+    # score["bin"][s, g, t, x, y, z, 3] += flux * uy * uy
+    # score["bin"][s, g, t, x, y, z, 4] += flux * uy * uz
+    # score["bin"][s, g, t, x, y, z, 5] += flux * uz * uz
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 0), flux * ux * ux)
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 1), flux * ux * uy)
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 2), flux * ux * uz)
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 3), flux * uy * uy)
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 4), flux * uy * uz)
+    adapt.global_add(score["bin"], (s, g, t, x, y, z, 5), flux * uz * uz)
+
 
 #! Don't touch for now
 @njit
@@ -2199,6 +2205,7 @@ def score_closeout_history(score):
 
     # Reset bin
     score["bin"].fill(0.0)
+
 
 #! Don't touch for now
 @njit
@@ -2270,15 +2277,15 @@ def eigenvalue_tally(P, distance, mcdc):
     nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P, mcdc)
 
     # Fission production (needed even during inactive cycle)
-    #mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
-    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"],0,flux*nuSigmaF)
+    # mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
+    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
 
     if mcdc["cycle_active"]:
         # Neutron density
         v = get_particle_speed(P, mcdc)
         n_density = flux / v
-        #mcdc["eigenvalue_tally_n"][0] += n_density
-        adapt.global_add(mcdc["eigenvalue_tally_n"],0,n_density)
+        # mcdc["eigenvalue_tally_n"][0] += n_density
+        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
         # Maximum neutron density
         if mcdc["n_max"] < n_density:
             mcdc["n_max"] = n_density
@@ -2307,11 +2314,12 @@ def eigenvalue_tally(P, distance, mcdc):
                     decay = nuclide["ce_decay"][j]
                     total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
-        #mcdc["eigenvalue_tally_C"][0] += C_density
-        adapt.global_add(mcdc["eigenvalue_tally_C"],0,C_density)
+        # mcdc["eigenvalue_tally_C"][0] += C_density
+        adapt.global_add(mcdc["eigenvalue_tally_C"], 0, C_density)
         # Maximum precursor density
         if mcdc["C_max"] < C_density:
             mcdc["C_max"] = C_density
+
 
 #! Don't touch for now
 @njit
@@ -2485,7 +2493,7 @@ def move_to_event(P, mcdc):
     # Also set particle material and speed
     d_boundary, event = distance_to_boundary(P, mcdc)
 
-    #print(P["material_ID"])
+    # print(P["material_ID"])
     # Distance to tally mesh
     d_mesh = INF
     if mcdc["cycle_active"]:
@@ -4254,7 +4262,7 @@ def AxV(V, b, mcdc):
     # distribute segments of V to appropriate sources
     iqmc_distribute_sources(mcdc)
     # reset bank size
-    set_bank_size(mcdc["bank_source"],0)
+    set_bank_size(mcdc["bank_source"], 0)
 
     # QMC Sweep
     iqmc_prepare_particles(mcdc)
@@ -4285,7 +4293,7 @@ def HxV(V, mcdc):
     iqmc["total_source"] = v.copy()
     iqmc_distribute_sources(mcdc)
     # reset bank size
-    set_bank_size(mcdc["bank_source"],0)
+    set_bank_size(mcdc["bank_source"], 0)
 
     # QMC Sweep
     # prepare_qmc_scattering_source(mcdc)
@@ -4316,7 +4324,7 @@ def FxV(V, mcdc):
     iqmc["total_source"] = v.copy()
     iqmc_distribute_sources(mcdc)
     # reset bank size
-    set_bank_size(mcdc["bank_source"],0)
+    set_bank_size(mcdc["bank_source"], 0)
 
     # QMC Sweep
     iqmc["source"] = iqmc["fixed_source"] + iqmc["score"]["effective-fission"]
@@ -4348,7 +4356,7 @@ def preconditioner(V, mcdc, num_sweeps=3):
 
     for i in range(num_sweeps):
         # reset bank size
-        set_bank_size(mcdc["bank_source"],0)
+        set_bank_size(mcdc["bank_source"], 0)
 
         # QMC Sweep
         iqmc["source"] = iqmc["fixed_source"] + iqmc["score"]["effective-scattering"]
@@ -4561,7 +4569,6 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
         xi = rng(P_new) * p_total
         tot = 0.0
 
-
         for idx in range(2):
 
             if idx == 0:
@@ -4731,7 +4738,7 @@ def sensitivity_material(P, prog):
 
 @toggle("particle_tracker")
 def track_particle(P, mcdc):
-    idx = adapt.global_add(mcdc["particle_track_N"],0,1)
+    idx = adapt.global_add(mcdc["particle_track_N"], 0, 1)
     mcdc["particle_track"][idx, 0] = P["track_hid"]
     mcdc["particle_track"][idx, 1] = P["track_pid"]
     mcdc["particle_track"][idx, 2] = P["g"] + 1
@@ -4749,13 +4756,13 @@ def copy_track_data(P_new, P):
 
 
 @toggle("particle_tracker")
-def allocate_hid(P,mcdc):
-    P["track_hid"] = adapt.global_add(mcdc["particle_track_history_ID"],0,1)
+def allocate_hid(P, mcdc):
+    P["track_hid"] = adapt.global_add(mcdc["particle_track_history_ID"], 0, 1)
+
 
 @toggle("particle_tracker")
-def allocate_pid(P,mcdc):
-    P["track_pid"] = adapt.global_add(mcdc["particle_track_particle_ID"],0,1)
-
+def allocate_pid(P, mcdc):
+    P["track_pid"] = adapt.global_add(mcdc["particle_track_particle_ID"], 0, 1)
 
 
 # ==============================================================================
@@ -4935,9 +4942,10 @@ def get_nu_group(type_, nuclide, E, group):
             nuclide["ce_nu_d"][group], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
         )
 
+
 @njit
 def get_nu(type_, nuclide, E):
-    return get_nu_group(type_,nuclide,E,-1)
+    return get_nu_group(type_, nuclide, E, -1)
 
 
 @njit
@@ -5004,8 +5012,8 @@ def binary_search_length(val, grid, length):
 
 
 @njit
-def binary_search(val,grid):
-    return binary_search_length(val,grid,0)
+def binary_search(val, grid):
+    return binary_search_length(val, grid, 0)
 
 
 @njit
