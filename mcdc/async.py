@@ -16,10 +16,6 @@ from mcdc.print_ import (
 )
 
 
-
-
-
-
 def loop_main(mcdc):
     simulation_end = False
     while not simulation_end:
@@ -80,7 +76,7 @@ def loop_main(mcdc):
 
 def loop_source_async_factory():
 
-    def loop_source(prog : numba.uintp, P: type_.particle):
+    def loop_source(prog: numba.uintp, P: type_.particle):
 
         # Rebase rng skip_ahead seed
         kernel.rng_skip_ahead_strides(device(prog)["mpi_work_start"], device(prog))
@@ -91,7 +87,7 @@ def loop_source_async_factory():
 
         #! Static Branch
         if device(prog)["technique"]["iQMC"]:
-            kernel.global_add(device(prog)["technique"]["iqmc_sweep_counter"],0,1)
+            kernel.global_add(device(prog)["technique"]["iqmc_sweep_counter"], 0, 1)
 
         # Loop over particle sources
         for work_idx in range(device(prog)["mpi_work_size"]):
@@ -177,29 +173,25 @@ def loop_source_async_factory():
 # =========================================================================
 
 
-
-
 @njit
 def loop_particle(P, mcdc):
 
-
     if mcdc["setting"]["track_particle"]:
         #! Work making candidate
-        #- Modifies global state by incrementing "particle_track_N"
+        # - Modifies global state by incrementing "particle_track_N"
         kernel.track_particle(P, mcdc)
 
     while P["alive"]:
         # Find cell from root universe if unknown
         #! Significant branch - get_particle_cell
-        #- No modifications found, though it does have printing
+        # - No modifications found, though it does have printing
         if P["cell_ID"] == -1:
             trans = np.zeros(3)
             P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
 
-
         # Determine and move to event
         #! Significant action between branches - move_to_event
-        #- Lots of global max/sum accumulations
+        # - Lots of global max/sum accumulations
         kernel.move_to_event(P, mcdc)
         event = P["event"]
 
@@ -208,12 +200,12 @@ def loop_particle(P, mcdc):
 
         # Collision
         #! Significant branch
-        #- Can create particles
-        #- Performs global accumulations
+        # - Can create particles
+        # - Performs global accumulations
         if event & EVENT_COLLISION:
             # Generate IC?
             #! Can create particles
-            #- Performs global accumulations
+            # - Performs global accumulations
             if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
                 kernel.bank_IC(P, mcdc)
 
@@ -235,7 +227,7 @@ def loop_particle(P, mcdc):
                     kernel.scattering(P, mcdc)
                 elif event == EVENT_FISSION:
                     #! Can create particles
-                    #- new particles are either banked as census or active - figure out what that means
+                    # - new particles are either banked as census or active - figure out what that means
                     kernel.fission(P, mcdc)
 
                 # Sensitivity quantification for nuclide?

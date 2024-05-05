@@ -36,15 +36,13 @@ j_array = None
 global_ = None
 
 
-
 # ==============================================================================
 # Alignment Logic
 # ==============================================================================
 
 
 def fixup_dims(dim_tuple):
-    return tuple([max(d,1) for d in dim_tuple])
-
+    return tuple([max(d, 1) for d in dim_tuple])
 
 
 def align(field_list):
@@ -53,16 +51,17 @@ def align(field_list):
     pad_id = 0
     for field in field_list:
         if len(field) > 3:
-            print_error("Unexpected struct field specification. Specifications \
-                        usually only consist of 3 or fewer members")
+            print_error(
+                "Unexpected struct field specification. Specifications \
+                        usually only consist of 3 or fewer members"
+            )
         multiplier = 1
         if len(field) == 3:
-            field = ( field[0], field[1], fixup_dims(field[2]) )
+            field = (field[0], field[1], fixup_dims(field[2]))
             for d in field[2]:
                 multiplier *= d
         kind = np.dtype(field[1])
         size = kind.itemsize
-
 
         if kind.isbuiltin == 0:
             alignment = 8
@@ -77,7 +76,7 @@ def align(field_list):
         size *= multiplier
 
         if offset % alignment != 0:
-            pad_size = alignment - (offset%alignment)
+            pad_size = alignment - (offset % alignment)
             result.append((f"padding_{pad_id}", uint8, (pad_size,)))
             pad_id += 1
             offset += pad_size
@@ -86,20 +85,17 @@ def align(field_list):
         offset += size
 
     if offset % 8 != 0:
-        pad_size = 8 - (offset%8)
+        pad_size = 8 - (offset % 8)
         result.append((f"padding_{pad_id}", uint8, (pad_size,)))
         pad_id += 1
 
     return result
 
 
-
-
 def into_dtype(field_list):
-    result = np.dtype(align(field_list),align=True)
+    result = np.dtype(align(field_list), align=True)
     print(result)
     return result
-
 
 
 # ==============================================================================
@@ -110,7 +106,7 @@ def into_dtype(field_list):
 type_roster = {}
 
 
-def copy_fn_for(kind,name):
+def copy_fn_for(kind, name):
     code = f"@njit\ndef copy_{name}(dst,src):\n"
     for f_name, spec in kind.fields.items():
         f_dtype = spec[0]
@@ -122,19 +118,12 @@ def copy_fn_for(kind,name):
     type_roster[kind] = {}
     type_roster[kind]["name"] = name
     exec(code)
-    return eval(f'copy_{name}')
-
-
-
-
+    return eval(f"copy_{name}")
 
 
 # ==============================================================================
 # Particle
 # ==============================================================================
-
-
-
 
 
 # Particle (in-flight)
@@ -244,7 +233,11 @@ precursor = into_dtype(
 
 def particle_bank(max_size):
     return into_dtype(
-        [("particles", particle_record, (max_size,)), ("size", int64, (1,)), ("tag", "U16")]
+        [
+            ("particles", particle_record, (max_size,)),
+            ("size", int64, (1,)),
+            ("tag", "U16"),
+        ]
     )
 
 
@@ -483,7 +476,6 @@ def make_type_surface(input_deck):
             ("dsm_Np", float64),
         ]
     )
-
 
 
 # ==============================================================================
@@ -986,7 +978,7 @@ def make_type_technique(input_deck):
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
-        ("IC_fission_score", float64, (1,) ),
+        ("IC_fission_score", float64, (1,)),
         ("IC_fission", float64),
     ]
 
@@ -1381,8 +1373,10 @@ param_names = ["tag", "ID", "key", "mean", "delta", "distribution", "rng_seed"]
 # Global
 # ==============================================================================
 
-def copy_global(dst,src):
+
+def copy_global(dst, src):
     pass
+
 
 def make_type_global(input_deck):
     global global_
@@ -1523,15 +1517,14 @@ def make_type_global(input_deck):
     )
 
 
-
 # ==============================================================================
 # Util
 # ==============================================================================
 
+
 def make_type_translate(input_deck):
     global translate
     translate = into_dtype([("values", float64, (3,))])
-
 
 
 def make_type_group_array(input_deck):

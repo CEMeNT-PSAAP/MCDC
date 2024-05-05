@@ -86,7 +86,13 @@ import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import loop_fixed_source, loop_eigenvalue, loop_iqmc, set_cache, build_gpu_progs
+from mcdc.loop import (
+    loop_fixed_source,
+    loop_eigenvalue,
+    loop_iqmc,
+    set_cache,
+    build_gpu_progs,
+)
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
@@ -153,10 +159,11 @@ def run():
 # utilities for handling discrepancies between input and state types
 # =============================================================================
 
-def copy_field(dst,src,name):
+
+def copy_field(dst, src, name):
     if "padding" in name:
         return
-    if isinstance(dst[name],np.ndarray) and dst[name].shape != src[name].shape:
+    if isinstance(dst[name], np.ndarray) and dst[name].shape != src[name].shape:
         if src[name].shape == 0:
             return
         else:
@@ -325,11 +332,9 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-
     type_.make_type_translate(input_deck)
     type_.make_type_group_array(input_deck)
     type_.make_type_j_array(input_deck)
-
 
     # =========================================================================
     # Create the global variable container
@@ -344,23 +349,21 @@ def prepare():
     mode_CE = input_deck.setting["mode_CE"]
     mode_MG = input_deck.setting["mode_MG"]
 
-
     # =========================================================================
     # Platform Targeting, Adapters, Toggles, etc
     # =========================================================================
 
-
     if target == "gpu":
         adapt.gpu_forward_declare()
 
-    adapt.set_toggle("iQMC",input_deck.technique["iQMC"])
-    adapt.set_toggle("domain_decomp",input_deck.technique["domain_decomposition"])
-    adapt.set_toggle("particle_tracker",mcdc["setting"]["track_particle"])
+    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
+    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
+    adapt.set_toggle("particle_tracker", mcdc["setting"]["track_particle"])
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
         build_gpu_progs()
-    adapt.nopython_mode(mode=="numba")
+    adapt.nopython_mode(mode == "numba")
 
     # =========================================================================
     # Nuclides
@@ -370,7 +373,7 @@ def prepare():
     for i in range(N_nuclide):
         # General data
         for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
-            copy_field(mcdc["nuclides"][i],input_deck.nuclides[i],name)
+            copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # MG data
         if mode_MG:
@@ -391,7 +394,7 @@ def prepare():
                 "chi_p",
                 "chi_d",
             ]:
-                copy_field(mcdc["nuclides"][i],input_deck.nuclides[i],name)
+                copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # CE data (load data from XS library)
         dir_name = os.getenv("MCDC_XSLIB")
@@ -452,7 +455,7 @@ def prepare():
                     input_deck.materials[i][name]
                 )
             else:
-                copy_field(mcdc["materials"][i],input_deck.materials[i],name)
+                copy_field(mcdc["materials"][i], input_deck.materials[i], name)
 
     # =========================================================================
     # Surfaces
@@ -462,7 +465,7 @@ def prepare():
     for i in range(N_surface):
         for name in type_.surface.names:
             if name not in ["J", "t"]:
-                copy_field(mcdc["surfaces"][i],input_deck.surfaces[i],name)
+                copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
 
         # Variables with possible different sizes
         for name in ["J", "t"]:
@@ -477,7 +480,7 @@ def prepare():
     for i in range(N_cell):
         for name in type_.cell.names:
             if name not in ["surface_IDs", "positive_flags"]:
-                copy_field(mcdc["cells"][i],input_deck.cells[i],name)
+                copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Variables with possible different sizes
         for name in ["surface_IDs", "positive_flags"]:
@@ -524,7 +527,7 @@ def prepare():
     N_source = len(input_deck.sources)
     for i in range(N_source):
         for name in type_.source.names:
-            copy_field(mcdc["sources"][i],input_deck.sources[i],name)
+            copy_field(mcdc["sources"][i], input_deck.sources[i], name)
 
     # Normalize source probabilities
     tot = 0.0
@@ -539,17 +542,17 @@ def prepare():
 
     for name in type_.tally.names:
         if name not in ["score", "mesh"]:
-            copy_field(mcdc["tally"],input_deck.tally,name)
+            copy_field(mcdc["tally"], input_deck.tally, name)
     # Set mesh
     for name in type_.mesh_names:
-        copy_field(mcdc["tally"]["mesh"],input_deck.tally["mesh"],name)
+        copy_field(mcdc["tally"]["mesh"], input_deck.tally["mesh"], name)
 
     # =========================================================================
     # Setting
     # =========================================================================
 
     for name in type_.setting.names:
-        copy_field(mcdc["setting"],input_deck.setting,name)
+        copy_field(mcdc["setting"], input_deck.setting, name)
 
     # Check if time boundary is above the final tally mesh time grid
     if mcdc["setting"]["time_boundary"] > mcdc["tally"]["mesh"]["t"][-1]:
@@ -581,7 +584,7 @@ def prepare():
         "branchless_collision",
         "uq",
     ]:
-        copy_field(mcdc["technique"],input_deck.technique,name)
+        copy_field(mcdc["technique"], input_deck.technique, name)
 
     # =========================================================================
     # Population control
@@ -603,7 +606,7 @@ def prepare():
         "IC_precursor_density",
         "IC_precursor_density_max",
     ]:
-        copy_field(mcdc["technique"],input_deck.technique,name)
+        copy_field(mcdc["technique"], input_deck.technique, name)
 
     # =========================================================================
     # Weight window (WW)
@@ -611,7 +614,7 @@ def prepare():
 
     # WW mesh
     for name in type_.mesh_names[:-1]:
-        copy_field(mcdc["technique"]["ww_mesh"],input_deck.technique["ww_mesh"],name)
+        copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
 
     # WW windows
     mcdc["technique"]["ww"] = input_deck.technique["ww"]
@@ -632,16 +635,18 @@ def prepare():
 
     # Set domain mesh
     if input_deck.technique["domain_decomposition"]:
-        for name in ["x","y","z","t","mu","azi"]:
-            copy_field(mcdc["technique"]["dd_mesh"],input_deck.technique["dd_mesh"],name)
+        for name in ["x", "y", "z", "t", "mu", "azi"]:
+            copy_field(
+                mcdc["technique"]["dd_mesh"], input_deck.technique["dd_mesh"], name
+            )
         # Set exchange rate
         for name in ["dd_exchange_rate", "dd_repro"]:
             copy_field(mcdc["technique"], input_deck.technique, name)
         # Set domain index
-        copy_field(mcdc,input_deck.technique,"dd_idx")
-        for name in ["xp","xn","yp","yn","zp","zn"]:
-            copy_field(mcdc["technique"],input_deck.technique,f"dd_{name}_neigh")
-        copy_field(mcdc["technique"],input_deck.technique,"dd_work_ratio")
+        copy_field(mcdc, input_deck.technique, "dd_idx")
+        for name in ["xp", "xn", "yp", "yn", "zp", "zn"]:
+            copy_field(mcdc["technique"], input_deck.technique, f"dd_{name}_neigh")
+        copy_field(mcdc["technique"], input_deck.technique, "dd_work_ratio")
 
     # =========================================================================
     # Quasi Monte Carlo
@@ -659,13 +664,13 @@ def prepare():
             "score_list",
             "score",
         ]:
-            copy_field(mcdc["technique"]["iqmc"],input_deck.technique["iqmc"],name)
+            copy_field(mcdc["technique"]["iqmc"], input_deck.technique["iqmc"], name)
 
     if input_deck.technique["iQMC"]:
         # pass in mesh
         iqmc = mcdc["technique"]["iqmc"]
-        for name in ["x","y","z","t"]:
-            copy_field(iqmc["mesh"],input_deck.technique["iqmc"]["mesh"],name)
+        for name in ["x", "y", "z", "t"]:
+            copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
             iqmc["score_list"][name] = value
@@ -722,7 +727,7 @@ def prepare():
         # Assumes that all tallies will also be uq tallies
         for name in type_.uq_tally.names:
             if name != "score":
-                copy_field(mcdc["technique"]["uq_tally"],input_deck.tally,name)
+                copy_field(mcdc["technique"]["uq_tally"], input_deck.tally, name)
 
         M = len(input_deck.uq_deltas["materials"])
         for i in range(M):
@@ -756,12 +761,20 @@ def prepare():
             idn = input_deck.uq_deltas["nuclides"][i]["ID"]
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
-                copy_field(mcdc["technique"]["uq_"]["nuclides"][i]["mean"],input_deck.nuclides[idn],name)
+                copy_field(
+                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
+                    input_deck.nuclides[idn],
+                    name,
+                )
             for name in input_deck.uq_deltas["nuclides"][i]["flags"]:
                 if "padding" in name:
                     continue
                 mcdc["technique"]["uq_"]["nuclides"][i]["flags"][name] = True
-                copy_field(mcdc["technique"]["uq_"]["nuclides"][i]["delta"],input_deck.uq_deltas["nuclides"][i],name)
+                copy_field(
+                    mcdc["technique"]["uq_"]["nuclides"][i]["delta"],
+                    input_deck.uq_deltas["nuclides"][i],
+                    name,
+                )
             flags = mcdc["technique"]["uq_"]["nuclides"][i]["flags"]
             if flags["capture"] or flags["scatter"] or flags["fission"]:
                 flags["total"] = True
