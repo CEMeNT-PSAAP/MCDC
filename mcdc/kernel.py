@@ -245,7 +245,7 @@ def dd_distribute_bank(mcdc, bank, dest_list):
         dest_count = len(dest_list)
         send_delta = 0
         for i, dest in enumerate(dest_list):
-            size = bank["size"]
+            size = get_bank_size(bank)
             ratio = int(size / dest_count)
             start = ratio * i
             end = start + ratio
