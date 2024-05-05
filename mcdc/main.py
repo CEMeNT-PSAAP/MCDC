@@ -165,9 +165,7 @@ def copy_field(dst, src, name):
         return
     if isinstance(dst[name], np.ndarray):
         if isinstance(src[name], np.ndarray) and dst[name].shape != src[name].shape:
-            print(dst[name].shape, src[name].shape)
             for dim in src[name].shape:
-                print(dim)
                 if dim == 0:
                     return
             print(
@@ -178,7 +176,6 @@ def copy_field(dst, src, name):
             )
             return
         elif isinstance(src[name], list) and dst[name].shape[0] != len(src[name]):
-            print(dst[name].shape, len(src[name]))
             if len(src[name]) == 0:
                 return
             print(
