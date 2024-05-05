@@ -165,20 +165,28 @@ def copy_field(dst, src, name):
         return
     if isinstance(dst[name], np.ndarray):
         if isinstance(src[name], np.ndarray) and dst[name].shape != src[name].shape:
-            print(dst[name].shape,src[name].shape)
-            for dim in src[name].shape :
+            print(dst[name].shape, src[name].shape)
+            for dim in src[name].shape:
                 print(dim)
                 if dim == 0:
                     return
-            print(f"Warning: Dimension mismatch between input deck and global state for field '{name}'.")
-            print(f"State dimension {dst[name].shape} does not match input dimension {src[name].shape}")
+            print(
+                f"Warning: Dimension mismatch between input deck and global state for field '{name}'."
+            )
+            print(
+                f"State dimension {dst[name].shape} does not match input dimension {src[name].shape}"
+            )
             return
-        elif isinstance(src[name],list) and dst[name].shape[0] != len(src[name]):
-            print(dst[name].shape,len(src[name]))
+        elif isinstance(src[name], list) and dst[name].shape[0] != len(src[name]):
+            print(dst[name].shape, len(src[name]))
             if len(src[name]) == 0:
                 return
-            print(f"Warning: Dimension mismatch between input deck and global state for field '{name}'.")
-            print(f"State dimension {dst[name].shape} does not match input dimension {len(src[name])}")
+            print(
+                f"Warning: Dimension mismatch between input deck and global state for field '{name}'."
+            )
+            print(
+                f"State dimension {dst[name].shape} does not match input dimension {len(src[name])}"
+            )
             return
     dst[name] = src[name]
 
