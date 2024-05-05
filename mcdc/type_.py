@@ -94,7 +94,6 @@ def align(field_list):
 
 def into_dtype(field_list):
     result = np.dtype(align(field_list), align=True)
-    print(result)
     return result
 
 
@@ -941,7 +940,7 @@ def make_type_technique(input_deck):
         ("w_min", float64),
     ]
 
-    struct += [("iqmc", iqmc_list)]
+    struct += [("iqmc", into_dtype(iqmc_list))]
 
     # =========================================================================
     # IC generator
