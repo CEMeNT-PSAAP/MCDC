@@ -28,6 +28,7 @@ from mcdc.print_ import (
     print_runtime,
     print_header_eigenvalue,
     print_warning,
+    print_error,
 )
 
 # Set mode
@@ -368,6 +369,10 @@ def prepare():
     # =========================================================================
 
     if target == "gpu":
+        if not adapt.HAS_HARMONIZE:
+            print_error(
+                "No module named 'harmonize' - GPU functionality not available. "
+            )
         adapt.gpu_forward_declare()
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
