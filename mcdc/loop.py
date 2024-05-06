@@ -1216,7 +1216,6 @@ def build_gpu_progs():
 
     @njit
     def real_setup_gpu(mcdc):
-        print("Real setup")
         arena_size = 0x10000
         block_count = 240
         mcdc["gpu_state"] = adapt.cast_voidptr_to_uintp(alloc_state())
@@ -1231,7 +1230,6 @@ def build_gpu_progs():
 
     @njit
     def real_teardown_gpu(mcdc):
-        print("Real teardown")
         src_free_program(adapt.cast_uintp_to_voidptr(mcdc["source_program"]))
         pre_free_program(adapt.cast_uintp_to_voidptr(mcdc["precursor_program"]))
         free_state(adapt.cast_uintp_to_voidptr(mcdc["gpu_state"]))
