@@ -997,7 +997,6 @@ def get_particle(P, bank, mcdc):
     return True
 
 
-#! Don't touch for now
 @njit
 def manage_particle_banks(seed, mcdc):
     # Record time
@@ -1038,7 +1037,6 @@ def manage_particle_banks(seed, mcdc):
         mcdc["runtime_bank_management"] += time_end - time_start
 
 
-#! Don't touch for now
 @njit
 def manage_IC_bank(mcdc):
     # Buffer bank
@@ -1421,7 +1419,6 @@ def bank_IC(P, prog):
         precursor["y"] = P["y"]
         precursor["z"] = P["z"]
         precursor["w"] = wp_prime / wn_prime
-        #! Ask Ilham about this
 
         # Sample group
         xi = rng(P) * total
@@ -2184,7 +2181,6 @@ def score_eddington(s, g, t, x, y, z, flux, P, score):
     adapt.global_add(score["bin"], (s, g, t, x, y, z, 5), flux * uz * uz)
 
 
-#! Don't touch for now
 @njit
 def score_reduce_bin(score, mcdc):
     # Normalize
@@ -2207,7 +2203,6 @@ def score_closeout_history(score):
     score["bin"].fill(0.0)
 
 
-#! Don't touch for now
 @njit
 def score_closeout(score, mcdc):
     N_history = mcdc["setting"]["N_particle"]
@@ -2321,7 +2316,6 @@ def eigenvalue_tally(P, distance, mcdc):
             mcdc["C_max"] = C_density
 
 
-#! Don't touch for now
 @njit
 def eigenvalue_tally_closeout_history(mcdc):
     N_particle = mcdc["setting"]["N_particle"]
