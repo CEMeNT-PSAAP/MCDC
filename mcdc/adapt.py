@@ -6,15 +6,12 @@ import mcdc.type_ as type_
 import mcdc.kernel as kernel
 import mcdc.loop as loop
 
-
 try:
     import harmonize as harm
 
-    HAS_GPU = False
+    HAS_HARMONIZE = True
 except:
-    if mcdc.main.target == "gpu":
-        print("Warning: GPU capability is not available")
-    HAS_GPU = False
+    HAS_HARMONIZE = False
 
 import math
 import inspect

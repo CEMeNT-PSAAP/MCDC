@@ -138,7 +138,6 @@ for i, name in enumerate(names):
                     "Differences in %s"
                     % (name + "/" + score + "/" + result + "\n" + "{}".format(a - b))
                 )
-                error_msgs[-1].append(f"Max diff: {(a-b).max()} Min diff: {(a-b).min()}" )
                 print(
                     Fore.RED
                     + "  {}: Failed".format(score + "/" + result)
