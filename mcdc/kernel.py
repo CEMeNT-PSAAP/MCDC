@@ -130,7 +130,7 @@ def dd_check_out(mcdc):
         recv_count = mcdc["domain_decomp"]["recv_count"]
         send_total = mcdc["domain_decomp"]["send_total"]
         busy_total = mcdc["domain_decomp"]["busy_total"]
-        rank_busy  = mcdc["domain_decomp"]["rank_busy"]
+        rank_busy = mcdc["domain_decomp"]["rank_busy"]
 
         if send_count != 0:
             print(
@@ -320,10 +320,6 @@ def dd_recv_particles(mcdc):
 
     # Set source bank from buffer
     for i in range(size):
-        if(buff[i]["rng_seed"] == 0):
-            with objmode():
-                rank = MPI.COMM_WORLD.Get_rank()
-                print(f"Probably bad particle {i}/{size} at {rank}")
         add_particle(buff[i], mcdc["bank_active"])
 
     if (
@@ -1895,7 +1891,7 @@ def surface_distance(P, surface, trans, mcdc):
         d_max = (t_max - P["t"]) * v
 
         div = G * ux + H * uy + I_ * uz + J1 / v
-        if abs(div) < 0.00001 :
+        if abs(div) < 0.00001:
             with objmode():
                 seed = P["rng_seed"]
                 print(f"seed: {seed}")
