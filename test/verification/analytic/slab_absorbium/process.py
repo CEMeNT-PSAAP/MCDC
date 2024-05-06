@@ -38,8 +38,7 @@ for k, N_particle in enumerate(N_particle_list):
         I = len(z) - 1
         N = len(mu) - 1
 
-        psi = f["tally/flux/mean"][:]
-        J = f["tally/current/mean"][:, 2]
+        psi = np.transpose(f["tally/flux/mean"][:])
 
     # Scalar flux
     phi = np.zeros(I)
@@ -49,23 +48,19 @@ for k, N_particle in enumerate(N_particle_list):
     psi_norm = np.zeros(psi.shape)
     # Normalize
     phi /= dz
-    J /= dz
     for n in range(N):
         psi[:, n] = psi[:, n] / dz / dmu[n]
 
     # Get error
     error[k] = tool.rerror(phi, phi_ref)
-    error_J[k] = tool.rerror(J, J_ref)
     error_psi[k] = tool.rerror(psi, psi_ref)
 
     error_max[k] = tool.rerror_max(phi, phi_ref)
-    error_max_J[k] = tool.rerror_max(J, J_ref)
     error_max_psi[k] = tool.rerror_max(psi, psi_ref)
 
 
 # Plot
 tool.plot_convergence("slab_absorbium_flux", N_particle_list, error, error_max)
-tool.plot_convergence("slab_absorbium_current", N_particle_list, error_J, error_max_J)
 tool.plot_convergence(
     "slab_absorbium_angular_flux", N_particle_list, error_psi, error_max_psi
 )

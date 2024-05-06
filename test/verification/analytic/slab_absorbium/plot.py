@@ -24,10 +24,8 @@ with h5py.File(output, "r") as f:
     I = len(z) - 1
     N = len(mu) - 1
 
-    psi = f["tally/flux/mean"][:]
-    psi_sd = f["tally/flux/sdev"][:]
-    J = f["tally/current/mean"][:, 2]
-    J_sd = f["tally/current/sdev"][:, 2]
+    psi = np.transpose(f["tally/flux/mean"][:])
+    psi_sd = np.transpose(f["tally/flux/sdev"][:])
 
 # Scalar flux
 phi = np.zeros(I)
@@ -39,8 +37,6 @@ for i in range(I):
 # Normalize
 phi /= dz
 phi_sd /= dz
-J /= dz
-J_sd /= dz
 for n in range(N):
     psi[:, n] = psi[:, n] / dz / dmu[n]
     psi_sd[:, n] = psi_sd[:, n] / dz / dmu[n]
@@ -55,18 +51,6 @@ plt.ylim([0.06, 0.16])
 plt.grid()
 plt.legend()
 plt.title(r"$\bar{\phi}_i$")
-plt.show()
-
-# Current - spatial average
-plt.plot(z_mid, J, "-b", label="MC")
-plt.fill_between(z_mid, J - J_sd, J + J_sd, alpha=0.2, color="b")
-plt.plot(z_mid, J_ref, "--r", label="Ref.")
-plt.xlabel(r"$z$, cm")
-plt.ylabel("Current")
-plt.ylim([-0.03, 0.045])
-plt.grid()
-plt.legend()
-plt.title(r"$\bar{J}_i$")
 plt.show()
 
 # Angular flux - spatial average

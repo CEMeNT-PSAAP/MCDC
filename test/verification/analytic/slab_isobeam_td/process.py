@@ -47,4 +47,4 @@ for i, N_particle in enumerate(N_particle_list):
     error_max[i] = tool.error_max(phi, phi_ref)
 
 # Plot
-tool.plot_convergence("slab_isoBeam_td_flux_t", N_particle_list, error, error_max)
+tool.plot_convergence("slab_isoBeam_td_flux", N_particle_list, error, error_max)
