@@ -174,7 +174,6 @@ def copy_field(dst, src, name):
             print(
                 f"State dimension {dst[name].shape} does not match input dimension {src[name].shape}"
             )
-            return
         elif isinstance(src[name], list) and dst[name].shape[0] != len(src[name]):
             if len(src[name]) == 0:
                 return
@@ -184,7 +183,6 @@ def copy_field(dst, src, name):
             print(
                 f"State dimension {dst[name].shape} does not match input dimension {len(src[name])}"
             )
-            return
     dst[name] = src[name]
 
 

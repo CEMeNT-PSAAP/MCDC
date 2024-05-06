@@ -98,7 +98,7 @@ def loop_fixed_source(mcdc):
             loop_source(seed_source, mcdc)
 
             # Loop over source precursors
-            if mcdc["bank_precursor"]["size"] > 0:
+            if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
                 seed_source_precursor = kernel.split_seed(
                     seed_census, SEED_SPLIT_SOURCE_PRECURSOR
                 )
@@ -239,7 +239,7 @@ def exhaust_active_bank(prog):
     mcdc = adapt.device(prog)
     P = adapt.local_particle()
     # Loop until active bank is exhausted
-    while mcdc["bank_active"]["size"] > 0:
+    while kernel.get_bank_size(mcdc["bank_active"]) > 0:
         # Get particle from active bank
         kernel.get_particle(P, mcdc["bank_active"], mcdc)
 
@@ -281,14 +281,14 @@ def source_dd_resolution(prog):
         terminated = True
 
     while not terminated:
-        if mcdc["bank_active"]["size"] > 0:
+        if kernel.get_bank_size(mcdc["bank_active"]) > 0:
             P = adapt.local_particle()
             # Loop until active bank is exhausted
-            while mcdc["bank_active"]["size"] > 0:
+            while kernel.get_bank_size(mcdc["bank_active"]) > 0:
 
                 kernel.get_particle(P, mcdc["bank_active"], mcdc)
                 if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
-                    print(f"recieved particle not in domain, index")
+                    print(f"recieved particle not in domain")
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
@@ -532,7 +532,7 @@ def step_particle(P, prog):
     # Census time crossing
     if event & EVENT_CENSUS:
         P["t"] += SHIFT
-        adapt.add_census(kernel.copy_particle(P), prog)
+        adapt.add_census(P, prog)
         P["alive"] = False
 
     # Time boundary crossing
@@ -1003,7 +1003,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
         ) = kernel.sample_isotropic_direction(P_new)
 
         # Push to active bank
-        adapt.add_active(kernel.copy_particle(P_new), prog)
+        adapt.add_active(P_new, prog)
 
 
 @njit(cache=caching)

@@ -25,6 +25,7 @@ from mcdc.adapt import toggle, for_cpu, for_gpu
 @toggle("domain_decomp")
 def domain_crossing(P, mcdc):
     # Domain mesh crossing
+    seed = P["rng_seed"]
     max_size = mcdc["technique"]["dd_exchange_rate"]
     if mcdc["technique"]["domain_decomposition"]:
         mesh = mcdc["technique"]["dd_mesh"]
@@ -43,28 +44,28 @@ def domain_crossing(P, mcdc):
         flag = directions[0]
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
-            add_particle(copy_particle(P), mcdc["domain_decomp"]["bank_xp"])
-            if mcdc["domain_decomp"]["bank_xp"]["size"] == max_size:
+            add_particle(P, mcdc["domain_decomp"]["bank_xp"])
+            if get_bank_size(mcdc["domain_decomp"]["bank_xp"]) == max_size:
                 dd_particle_send(mcdc)
         if flag == MESH_X and P["ux"] < 0:
-            add_particle(copy_particle(P), mcdc["domain_decomp"]["bank_xn"])
-            if mcdc["domain_decomp"]["bank_xn"]["size"] == max_size:
+            add_particle(P, mcdc["domain_decomp"]["bank_xn"])
+            if get_bank_size(mcdc["domain_decomp"]["bank_xn"]) == max_size:
                 dd_particle_send(mcdc)
         if flag == MESH_Y and P["uy"] > 0:
-            add_particle(copy_particle(P), mcdc["domain_decomp"]["bank_yp"])
-            if mcdc["domain_decomp"]["bank_yp"]["size"] == max_size:
+            add_particle(P, mcdc["domain_decomp"]["bank_yp"])
+            if get_bank_size(mcdc["domain_decomp"]["bank_yp"]) == max_size:
                 dd_particle_send(mcdc)
         if flag == MESH_Y and P["uy"] < 0:
-            add_particle(copy_particle(P), mcdc["domain_decomp"]["bank_yn"])
-            if mcdc["domain_decomp"]["bank_yn"]["size"] == max_size:
+            add_particle(P, mcdc["domain_decomp"]["bank_yn"])
+            if get_bank_size(mcdc["domain_decomp"]["bank_yn"]) == max_size:
                 dd_particle_send(mcdc)
         if flag == MESH_Z and P["uz"] > 0:
-            add_particle(copy_particle(P), mcdc["domain_decomp"]["bank_zp"])
-            if mcdc["domain_decomp"]["bank_zp"]["size"] == max_size:
+            add_particle(P, mcdc["domain_decomp"]["bank_zp"])
+            if get_bank_size(mcdc["domain_decomp"]["bank_zp"]) == max_size:
                 dd_particle_send(mcdc)
         if flag == MESH_Z and P["uz"] < 0:
-            add_particle(copy_particle(P), mcdc["domain_decomp"]["bank_zn"])
-            if mcdc["domain_decomp"]["bank_zn"]["size"] == max_size:
+            add_particle(P, mcdc["domain_decomp"]["bank_zn"])
+            if get_bank_size(mcdc["domain_decomp"]["bank_zn"]) == max_size:
                 dd_particle_send(mcdc)
         P["alive"] = False
 
@@ -129,7 +130,7 @@ def dd_check_out(mcdc):
         recv_count = mcdc["domain_decomp"]["recv_count"]
         send_total = mcdc["domain_decomp"]["send_total"]
         busy_total = mcdc["domain_decomp"]["busy_total"]
-        rank_busy = mcdc["domain_decomp"]["rank_busy"]
+        rank_busy  = mcdc["domain_decomp"]["rank_busy"]
 
         if send_count != 0:
             print(
@@ -319,6 +320,10 @@ def dd_recv_particles(mcdc):
 
     # Set source bank from buffer
     for i in range(size):
+        if(buff[i]["rng_seed"] == 0):
+            with objmode():
+                rank = MPI.COMM_WORLD.Get_rank()
+                print(f"Probably bad particle {i}/{size} at {rank}")
         add_particle(buff[i], mcdc["bank_active"])
 
     if (
@@ -1672,8 +1677,7 @@ def recordlike_to_particle(P_rec):
 
 
 @njit
-def copy_particle(P):
-    P_new = adapt.local_particle()
+def copy_particle(P_new, P):
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -1694,7 +1698,6 @@ def copy_particle(P):
     P_new["rng_seed"] = P["rng_seed"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
     copy_track_data(P_new, P)
-    return P_new
 
 
 @njit
@@ -1891,6 +1894,12 @@ def surface_distance(P, surface, trans, mcdc):
         t_max = surface["t"][idx + 1]
         d_max = (t_max - P["t"]) * v
 
+        div = G * ux + H * uy + I_ * uz + J1 / v
+        if abs(div) < 0.00001 :
+            with objmode():
+                seed = P["rng_seed"]
+                print(f"seed: {seed}")
+                print(f"{G}*{ux}+{H}*{uy}+{I_}*{uz}+{J1}")
         distance = -surface_evaluate(P, surface, trans) / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
