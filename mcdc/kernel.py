@@ -1869,6 +1869,7 @@ def surface_normal_component(P, surface, trans):
     return nx * ux + ny * uy + nz * uz
 
 
+
 @njit
 def surface_distance(P, surface, trans, mcdc):
     ux = P["ux"]
@@ -1891,11 +1892,6 @@ def surface_distance(P, surface, trans, mcdc):
         d_max = (t_max - P["t"]) * v
 
         div = G * ux + H * uy + I_ * uz + J1 / v
-        if abs(div) < 0.00001:
-            with objmode():
-                seed = P["rng_seed"]
-                print(f"seed: {seed}")
-                print(f"{G}*{ux}+{H}*{uy}+{I_}*{uz}+{J1}")
         distance = -surface_evaluate(P, surface, trans) / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
