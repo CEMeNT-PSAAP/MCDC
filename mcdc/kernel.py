@@ -1869,7 +1869,6 @@ def surface_normal_component(P, surface, trans):
     return nx * ux + ny * uy + nz * uz
 
 
-
 @njit
 def surface_distance(P, surface, trans, mcdc):
     ux = P["ux"]
