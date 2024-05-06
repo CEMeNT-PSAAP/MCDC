@@ -5,6 +5,7 @@ from colorama import Fore, Style
 # Option parser
 parser = argparse.ArgumentParser(description="MC/DC regression test")
 parser.add_argument("--mode", type=str, choices=["python", "numba"], default="python")
+parser.add_argument("--target", type=str, choices=["cpu", "gpu"], default="cpu")
 parser.add_argument("--mpiexec", type=int, default=0)
 parser.add_argument("--srun", type=int, default=0)
 parser.add_argument("--name", type=str, default="ALL")
@@ -13,6 +14,7 @@ args, unargs = parser.parse_known_args()
 
 # Parse
 mode = args.mode
+target = args.target
 mpiexec = args.mpiexec
 srun = args.srun
 name = args.name
@@ -22,6 +24,8 @@ skip = args.skip
 if name == "ALL":
     names = []
     for item in os.listdir():
+        if (target == "gpu") and ("iqmc" in item):
+            continue
         if os.path.isdir(item):
             names.append(item)
 else:
@@ -81,18 +85,18 @@ for i, name in enumerate(names):
     # Run the test problem (redirect the stdout)
     if mpiexec > 1:
         os.system(
-            "mpiexec -n %i python input.py --mode=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (mpiexec, mode)
+            "mpiexec -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            % (mpiexec, mode, target)
         )
     elif srun > 1:
         os.system(
-            "srun -n %i python input.py --mode=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (srun, mode)
+            "srun -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            % (srun, mode, target)
         )
     else:
         os.system(
-            "python input.py --mode=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (mode)
+            "python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            % (mode, target)
         )
     with open("tmp") as f:
         printouts.append(f.read())
@@ -134,6 +138,7 @@ for i, name in enumerate(names):
                     "Differences in %s"
                     % (name + "/" + score + "/" + result + "\n" + "{}".format(a - b))
                 )
+                error_msgs[-1].append(f"Max diff: {(a-b).max()} Min diff: {(a-b).min()}" )
                 print(
                     Fore.RED
                     + "  {}: Failed".format(score + "/" + result)
