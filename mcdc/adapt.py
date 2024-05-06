@@ -12,7 +12,8 @@ try:
 
     HAS_GPU = False
 except:
-    print("Warning: GPU capability is not available")
+    if mcdc.main.target == "gpu":
+        print("Warning: GPU capability is not available")
     HAS_GPU = False
 
 import math

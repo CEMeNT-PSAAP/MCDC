@@ -41,6 +41,34 @@ global_ = None
 # ==============================================================================
 
 
+# While CPU execution can robustly handle all sorts of Numba types, GPU
+# execution requires structs to follow some of the basic properties expected of
+# C-style structs with standard layout:
+#
+#      - Every primitive field is aligned by its size, and padding is inserted
+#        between fields to ensure alignment in arrays and nested data structures
+#
+#      - Every field has a unique address
+#
+# If these rules are violated, memory accesses made in GPUs may encounter
+# problems. For example, in cases where an access is not at an address aligned
+# by their size, a segfault or similar fault will occur, or information will be
+# lost. These issues were fixed by providing a function, align, which ensures the
+# field lists fed to np.dtype fulfill these requirements.
+#
+# The align function does the following:
+#
+#      - Tracks the cumulative offset of fields as they appear in the input list.
+#
+#      - Inserts additional padding fields to ensure that primitive fields are
+#        aligned by their size
+#
+#      - Re-sizes arrays to have at least one element in their array (this ensure
+#        they have a non-zero size, and hence cannot overlap base addresses with
+#        other fields.
+#
+
+
 def fixup_dims(dim_tuple):
     return tuple([max(d, 1) for d in dim_tuple])
 
@@ -69,9 +97,6 @@ def align(field_list):
             alignment = size
         else:
             print_error("Unexpected field item type")
-
-        if multiplier == 0:
-            multiplier = 1
 
         size *= multiplier
 
@@ -1186,10 +1211,6 @@ param_names = ["tag", "ID", "key", "mean", "delta", "distribution", "rng_seed"]
 # ==============================================================================
 # Global
 # ==============================================================================
-
-
-def copy_global(dst, src):
-    pass
 
 
 def make_type_global(input_deck):
