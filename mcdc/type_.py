@@ -271,14 +271,14 @@ def particle_bank(max_size):
         [
             ("particles", particle_record, (max_size,)),
             ("size", int64, (1,)),
-            ("tag", "U16"),
+            ("tag", str_),
         ]
     )
 
 
 def precursor_bank(max_size):
     return into_dtype(
-        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", "U16")]
+        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", str_)]
     )
 
 
@@ -755,7 +755,7 @@ def make_type_setting(deck):
         # Misc.
         ("progress_bar", bool_),
         ("caching", bool_),
-        ("output_name", "U32"),
+        ("output_name", str_),
         ("save_input_deck", bool_),
         ("track_particle", bool_),
         # Eigenvalue mode
@@ -772,10 +772,10 @@ def make_type_setting(deck):
         ("census_time", float64, (card["N_census"],)),
         # Particle source file
         ("source_file", bool_),
-        ("source_file_name", "U32"),
+        ("source_file_name", str_),
         # Initial condition source file
         ("IC_file", bool_),
-        ("IC_file_name", "U32"),
+        ("IC_file_name", str_),
         ("N_precursor", uint64),
         # TODO: Move to technique
         ("N_sensitivity", uint64),
