@@ -24,33 +24,39 @@ skip = args.skip
 if name == "ALL":
     names = []
     for item in os.listdir():
-        if (target == "gpu") and ("iqmc" in item):
-            continue
         if os.path.isdir(item):
             names.append(item)
 else:
     names = [item for item in os.listdir() if fnmatch.fnmatch(item, name)]
 names.sort()
 
-
 # Remove skipped if specified
 if skip != "NONE":
     skips = [item for item in os.listdir() if fnmatch.fnmatch(item, skip)]
     for name in skips:
+        print(Fore.YELLOW + "Note: Skipping %s"%name + Style.RESET_ALL)
         names.remove(name)
-# Skip cache if any
-if "__pycache__" in names:
-    names.remove("__pycache__")
-# Skip domain decomp tests unless there are 4 MPI processes
-temp = names.copy()
-for name in names:
-    if name[:3] == "dd_" and mpiexec != 4:
-        temp.remove(name)
-names = temp
 
 # Skip cache if any
 if "__pycache__" in names:
     names.remove("__pycache__")
+
+# Skip domain decomp tests unless there are 4 MPI processes
+temp = names.copy()
+for name in names:
+    if name[:3] == "dd_" and not (mpiexec == 4 or srun == 4):
+        temp.remove(name)
+        print(Fore.YELLOW + "Note: Skipping %s (require 4 MPI ranks)"%name + Style.RESET_ALL)
+names = temp
+
+# Skip iqmc if GPU run
+if target == 'gpu':
+    temp = names.copy()
+    for name in names:
+        if "iqmc" in name:
+            temp.remove(name)
+            print(Fore.YELLOW + "Note: Skipping %s (GPU target)"%name + Style.RESET_ALL)
+names = temp
 
 # Data for each test
 printouts = []
