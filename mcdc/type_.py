@@ -1,13 +1,18 @@
-import math, sys, os, h5py
+import h5py
+import math
 import numpy as np
-import sys
-from numba import njit
-from mcdc.print_ import print_error
+import os
 
 from mpi4py import MPI
 from mpi4py.util.dtlib import from_numpy_dtype
 
+from mcdc.print_ import print_error
+
+
+# ==============================================================================
 # Basic types
+# ==============================================================================
+
 float64 = np.float64
 int64 = np.int64
 int32 = np.int32
@@ -17,7 +22,13 @@ bool_ = np.bool_
 uintp = np.uintp
 str_ = "U32"
 
-# MC/DC types, will be defined based on input deck
+
+# ==============================================================================
+# MC/DC types
+# ==============================================================================
+# Currently defined based on input deck
+# TODO: This causes JIT recompilation in certain cases
+
 particle = None
 particle_record = None
 nuclide = None
@@ -30,6 +41,8 @@ source = None
 setting = None
 tally = None
 technique = None
+
+# GPU mode related
 translate = None
 group_array = None
 j_array = None
@@ -39,8 +52,6 @@ global_ = None
 # ==============================================================================
 # Alignment Logic
 # ==============================================================================
-
-
 # While CPU execution can robustly handle all sorts of Numba types, GPU
 # execution requires structs to follow some of the basic properties expected of
 # C-style structs with standard layout:
