@@ -34,7 +34,7 @@ names.sort()
 if skip != "NONE":
     skips = [item for item in os.listdir() if fnmatch.fnmatch(item, skip)]
     for name in skips:
-        print(Fore.YELLOW + "Note: Skipping %s"%name + Style.RESET_ALL)
+        print(Fore.YELLOW + "Note: Skipping %s" % name + Style.RESET_ALL)
         names.remove(name)
 
 # Skip cache if any
@@ -46,16 +46,22 @@ temp = names.copy()
 for name in names:
     if name[:3] == "dd_" and not (mpiexec == 4 or srun == 4):
         temp.remove(name)
-        print(Fore.YELLOW + "Note: Skipping %s (require 4 MPI ranks)"%name + Style.RESET_ALL)
+        print(
+            Fore.YELLOW
+            + "Note: Skipping %s (require 4 MPI ranks)" % name
+            + Style.RESET_ALL
+        )
 names = temp
 
 # Skip iqmc if GPU run
-if target == 'gpu':
+if target == "gpu":
     temp = names.copy()
     for name in names:
         if "iqmc" in name:
             temp.remove(name)
-            print(Fore.YELLOW + "Note: Skipping %s (GPU target)"%name + Style.RESET_ALL)
+            print(
+                Fore.YELLOW + "Note: Skipping %s (GPU target)" % name + Style.RESET_ALL
+            )
 names = temp
 
 # Data for each test
