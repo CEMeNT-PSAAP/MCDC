@@ -11,12 +11,12 @@ class InputDeck:
         self.nuclides = []
         self.materials = []
         self.surfaces = []
+        self.regions = []
         self.cells = []
         self.universes = [{}]
         self.lattices = []
         self.sources = []
         self.meshes = []
-        # Default cards are set by functions make_card_*
 
         # Root universe
         self.universes[0] = make_card_universe(0)
@@ -164,122 +164,213 @@ class InputDeck:
         }
 
 
-class SurfaceHandle:
-    def __init__(self, card):
-        self.card = card
+# =============================================================================
+# Cards
+# =============================================================================
+
+
+class InputCard:
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __str__(self):
+        print(self.tag + " card")
+        for key in self.data:
+            print("  " + key + " : " + str(self.data[key]))
+
+
+class NuclideCard(InputCard):
+    count = 0
+    def __init__(self, G=1, J=0):
+        InputCard.__init__(self, "Nuclide")
+
+        # Set card data
+        self.data = {
+            "name": "Nuclide %i" % NuclideCard.count,
+            "ID": NuclideCard.count,
+            "fissionable": False,
+            "G": G,
+            "J": J,
+            "speed": np.ones(G),
+            "decay": np.ones(J) * INF,
+            "capture": np.zeros(G),
+            "scatter": np.zeros(G),
+            "fission": np.zeros(G),
+            "total": np.zeros(G),
+            "nu_s": np.ones(G),
+            "nu_p": np.zeros(G),
+            "nu_d": np.zeros([G, J]),
+            "nu_f": np.zeros(G),
+            "chi_s": np.zeros([G, G]),
+            "chi_p": np.zeros([G, G]),
+            "chi_d": np.zeros([J, G]),
+            "sensitivity": False,
+            "sensitivity_ID": 0,
+            "dsm_Np": 1.0,
+            "uq": False,
+        }
+
+        NuclideCard.count += 1
+
+
+class MaterialCard(InputCard):
+    count = 0
+
+    def __init__(self, N_nuclide, G=1, J=0):
+        InputCard.__init__(self, "Material")
+
+        # Set card data
+        self.data = {
+            "name": "Material %i" % MaterialCard.count
+            "ID": MaterialCard.count
+            "N_nuclide": N_nuclide
+            "nuclide_IDs": np.zeros(N_nuclide, dtype=int)
+            "nuclide_densities": np.zeros(N_nuclide, dtype=float)
+            "G": G
+            "J": J
+            "speed": np.zeros(G)
+            "capture": np.zeros(G)
+            "scatter": np.zeros(G)
+            "fission": np.zeros(G)
+            "total": np.zeros(G)
+            "nu_s": np.ones(G)
+            "nu_p": np.zeros(G)
+            "nu_d": np.zeros([G, J])
+            "nu_f": np.zeros(G)
+            "chi_s": np.zeros([G, G])
+            "chi_p": np.zeros([G, G])
+            "sensitivity": False
+            "uq": False
+        }
+
+        MaterialCard.count += 1
+
+class RegionCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Region")
+
+        # Set card data
+        self.data = {
+            "ID": RegionCard.count,
+            'half_space': False,
+            "intersection": False,
+            "union": False,
+            "complement": False,
+            "A": -1,
+            "B": -1,
+        }
+
+        RegionCard.count += 1
+
+    def __AND__(self, other):
+        region = RegionCard()
+        region.data['intersection'] = True
+        region.data['A'] = self.data['ID']
+        region.data['B'] = other.data['ID']
+        return region
+
+    def __OR__(self, other):
+        region = RegionCard()
+        region.data['union'] = True
+        region.data['A'] = self.data['ID']
+        region.data['B'] = other.data['ID']
+        return region
+
+    def __INVERT__(self, other):
+        region = RegionCard()
+        region.data['complement'] = True
+        region.data['A'] = self.data['ID']
+        return region
+
+
+class SurfaceCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Surface")
+
+        # Set card data
+        self.data = {
+            "name": "Surface %i" % SurfaceCard.count,
+            "ID": SurfaceCard.count,
+            "type": "",
+            "vacuum": False,
+            "reflective": False,
+            "linear": False,
+            "A": 0.0,
+            "B": 0.0,
+            "C": 0.0,
+            "D": 0.0,
+            "E": 0.0,
+            "F": 0.0,
+            "G": 0.0,
+            "H": 0.0,
+            "I": 0.0,
+            "J": np.array([[0.0, 0.0]]),
+            "t": np.array([-SHIFT, INF]),
+            "N_slice": 1,
+            "nx": 0.0,
+            "ny": 0.0,
+            "nz": 0.0,
+            "sensitivity": False,
+            "sensitivity_ID": 0,
+            "dsm_Np": 1.0,
+        }
+
+        SurfaceCard.count += 1
 
     def __pos__(self):
-        return [self.card, True]
+        region = RegionCard()
+        region.data['half_space'] = True
+        region.data['A'] = self.data['ID']
+        region.data['B'] = 1
+        return region
 
     def __neg__(self):
-        return [self.card, False]
+        region = RegionCard()
+        region.data['half_space'] = True
+        region.data['A'] = self.data['ID']
+        region.data['B'] = 0
+        return region
 
 
-def make_card_nuclide(G=1, J=0):
-    card = {}
-    card["tag"] = "Nuclide"
-    card["name"] = ""
-    card["ID"] = -1
-    card["fissionable"] = False
-    card["G"] = G
-    card["J"] = J
-    card["speed"] = np.ones(G)
-    card["decay"] = np.ones(J) * INF
-    card["capture"] = np.zeros(G)
-    card["scatter"] = np.zeros(G)
-    card["fission"] = np.zeros(G)
-    card["total"] = np.zeros(G)
-    card["nu_s"] = np.ones(G)
-    card["nu_p"] = np.zeros(G)
-    card["nu_d"] = np.zeros([G, J])
-    card["nu_f"] = np.zeros(G)
-    card["chi_s"] = np.zeros([G, G])
-    card["chi_p"] = np.zeros([G, G])
-    card["chi_d"] = np.zeros([J, G])
-    card["sensitivity"] = False
-    card["sensitivity_ID"] = 0
-    card["dsm_Np"] = 1.0
-    card["uq"] = False
-    return card
+class CellCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Cell")
+
+        # Set card data
+        self.data = {
+            "name": "Cell %i" % CellCard.count,
+            "ID": CellCard.count,
+            "region_ID": 0
+            "material_ID": 0
+            "lattice": False
+            "lattice_ID": 0
+            "lattice_center": np.array([0.0, 0.0, 0.0])
+        }
+
+        CellCard.count += 1
 
 
-def make_card_material(N_nuclide, G=1, J=0):
-    card = {}
-    card["tag"] = "Material"
-    card["ID"] = -1
-    card["N_nuclide"] = N_nuclide
-    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
-    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
-    card["G"] = G
-    card["J"] = J
-    card["speed"] = np.zeros(G)
-    card["capture"] = np.zeros(G)
-    card["scatter"] = np.zeros(G)
-    card["fission"] = np.zeros(G)
-    card["total"] = np.zeros(G)
-    card["nu_s"] = np.ones(G)
-    card["nu_p"] = np.zeros(G)
-    card["nu_d"] = np.zeros([G, J])
-    card["nu_f"] = np.zeros(G)
-    card["chi_s"] = np.zeros([G, G])
-    card["chi_p"] = np.zeros([G, G])
-    card["name"] = None
-    card["sensitivity"] = False
-    card["uq"] = False
-    return card
+class UniverseCard(InputCard):
+    count = 0
 
+    def __init__(self, N)cell):
+        InputCard.__init__(self, "Universe")
 
-def make_card_surface():
-    card = {}
-    card["tag"] = "Surface"
-    card["ID"] = -1
-    card["vacuum"] = False
-    card["reflective"] = False
-    card["A"] = 0.0
-    card["B"] = 0.0
-    card["C"] = 0.0
-    card["D"] = 0.0
-    card["E"] = 0.0
-    card["F"] = 0.0
-    card["G"] = 0.0
-    card["H"] = 0.0
-    card["I"] = 0.0
-    card["J"] = np.array([[0.0, 0.0]])
-    card["t"] = np.array([-SHIFT, INF])
-    card["N_slice"] = 1
-    card["linear"] = False
-    card["nx"] = 0.0
-    card["ny"] = 0.0
-    card["nz"] = 0.0
-    card["sensitivity"] = False
-    card["sensitivity_ID"] = 0
-    card["type"] = " "
-    card["dsm_Np"] = 1.0
-    return card
+        # Set card data
+        self.data = {
+            "name": "Universe %i" % UniverseCard.count,
+            "ID": universeCard.count,
+            "N_cell": N_cell
+            "cell_IDs": np.zeros(N_cell, dtype=int)
+        }
 
-
-def make_card_cell(N_surface):
-    card = {}
-    card["tag"] = "Cell"
-    card["ID"] = -1
-    card["N_surface"] = N_surface
-    card["surface_IDs"] = np.zeros(N_surface, dtype=int)
-    card["positive_flags"] = np.zeros(N_surface, dtype=bool)
-    card["material_ID"] = 0
-    card["material_name"] = None
-    card["lattice"] = False
-    card["lattice_ID"] = 0
-    card["lattice_center"] = np.array([0.0, 0.0, 0.0])
-    return card
-
-
-def make_card_universe(N_cell):
-    card = {}
-    card["tag"] = "Universe"
-    card["ID"] = -1
-    card["N_cell"] = N_cell
-    card["cell_IDs"] = np.zeros(N_cell, dtype=int)
-    return card
+        UniverseCard.count += 1
 
 
 def make_card_lattice():
@@ -299,6 +390,33 @@ def make_card_lattice():
     }
     card["universe_IDs"] = np.array([[[[0]]]])
     return card
+
+
+class LatticeCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Lattice")
+
+        # Set card data
+        self.data = {
+            "name": "Cell %i" % LatticeCard.count,
+            "ID": LatticeCard.count,
+            "universe_IDs": np.array([[[[0]]]]),
+            "mesh": {
+                "x0": -INF,
+                "dx": 2 * INF,
+                "Nx": 1,
+                "y0": -INF,
+                "dy": 2 * INF,
+                "Ny": 1,
+                "z0": -INF,
+                "dz": 2 * INF,
+                "Nz": 1,
+            },
+        }
+
+        LatticeCard.count += 1
 
 
 def make_card_source():
@@ -327,6 +445,26 @@ def make_card_source():
     return card
 
 
+class CellCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Cell")
+
+        # Set card data
+        self.data = {
+            "name": "Cell %i" % CellCard.count,
+            "ID": CellCard.count,
+            "region_ID": 0
+            "material_ID": 0
+            "lattice": False
+            "lattice_ID": 0
+            "lattice_center": np.array([0.0, 0.0, 0.0])
+        }
+
+        CellCard.count += 1
+
+
 def make_card_mesh():
     return {
         "x": np.array([-INF, INF]),
@@ -337,6 +475,26 @@ def make_card_mesh():
         "azi": np.array([-PI, PI]),
         "g": np.array([-INF, INF]),
     }
+
+
+class CellCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Cell")
+
+        # Set card data
+        self.data = {
+            "name": "Cell %i" % CellCard.count,
+            "ID": CellCard.count,
+            "region_ID": 0
+            "material_ID": 0
+            "lattice": False
+            "lattice_ID": 0
+            "lattice_center": np.array([0.0, 0.0, 0.0])
+        }
+
+        CellCard.count += 1
 
 
 def make_card_uq():
@@ -351,3 +509,23 @@ def make_card_uq():
         "group": False,
         "group_group": False,
     }
+class CellCard(InputCard):
+    count = 0
+
+    def __init__(self):
+        InputCard.__init__(self, "Cell")
+
+        # Set card data
+        self.data = {
+            "name": "Cell %i" % CellCard.count,
+            "ID": CellCard.count,
+            "region_ID": 0
+            "material_ID": 0
+            "lattice": False
+            "lattice_ID": 0
+            "lattice_center": np.array([0.0, 0.0, 0.0])
+        }
+
+        CellCard.count += 1
+
+

@@ -11,15 +11,14 @@ import scipy as sp
 import mcdc.type_ as type_
 
 from mcdc.card import (
-    SurfaceHandle,
-    make_card_nuclide,
-    make_card_material,
-    make_card_surface,
-    make_card_cell,
-    make_card_universe,
-    make_card_lattice,
-    make_card_source,
-    make_card_uq,
+    NuclideCard,
+    MaterialCard,
+    SurfaceCard,
+    CellCard,
+    UniverseCard,
+    LatticeCard,
+    SourceCard,
+    UQCard,
 )
 from mcdc.constant import (
     GYRATION_RADIUS_ALL,
@@ -1878,16 +1877,6 @@ def get_nuclide(name):
     for card in mcdc.input_deck.nuclides:
         if name == card["name"]:
             return card
-
-
-def print_card(card):
-    if isinstance(card, SurfaceHandle):
-        card = card.card
-    for key in card:
-        if key == "tag":
-            print(card[key] + " card")
-        else:
-            print("  " + key + " : " + str(card[key]))
 
 
 def check_support(label, value, supported, replace=True):
