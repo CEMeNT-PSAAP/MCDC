@@ -519,6 +519,7 @@ def prepare():
             mcdc['surfaces'][i]['BC'] = BC_VACUUM
         elif input_deck.surfaces[i].boundary_type == "reflective":
             mcdc['surfaces'][i]['BC'] = BC_REFLECTIVE
+        print(input_deck.surfaces[i])
 
         # Variables with possible different sizes
         for name in ["J", "t"]:
