@@ -23,7 +23,7 @@ s1 = mcdc.surface("plane-x", x=0.0, bc="vacuum")
 s2 = mcdc.surface("plane-x", x=6.01275, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m1)
+mcdc.cell(+s1 & -s2, m1)
 
 # =========================================================================
 # iQMC Parameters

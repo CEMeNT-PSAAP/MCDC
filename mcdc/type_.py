@@ -200,7 +200,7 @@ def make_type_particle(input_deck):
 
     # iQMC vector of weights
     if iQMC:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     iqmc_struct = [("w", float64, (G,))]
     struct += [("iqmc", iqmc_struct)]
 
@@ -239,7 +239,7 @@ def make_type_particle_record(input_deck):
 
     # iQMC vector of weights
     if iQMC:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     iqmc_struct = [("w", float64, (G,))]
     struct += [("iqmc", iqmc_struct)]
 

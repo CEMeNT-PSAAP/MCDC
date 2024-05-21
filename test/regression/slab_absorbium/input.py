@@ -21,9 +21,9 @@ s3 = mcdc.surface("plane-z", z=4.0)
 s4 = mcdc.surface("plane-z", z=6.0, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m2)
-mcdc.cell([+s2, -s3], m3)
-mcdc.cell([+s3, -s4], m1)
+mcdc.cell(+s1 & -s2, m2)
+mcdc.cell(+s2 & -s3, m3)
+mcdc.cell(+s3 & -s4, m1)
 
 # =============================================================================
 # Set source
