@@ -105,7 +105,7 @@ class RegionCard(InputCard):
         global_.input_deck.regions.append(region)
         return region
 
-    def __invert__(self, other):
+    def __invert__(self):
         region = RegionCard('complement')
         region.A = self.ID
         # Set ID and push to deck

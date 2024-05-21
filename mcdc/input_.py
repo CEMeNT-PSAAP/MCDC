@@ -504,7 +504,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
             "reflective",
         ],
     )
-    surface_boundary_type = bc
+    card.boundary_type = bc
 
     # Sensitivity
     if sensitivity:

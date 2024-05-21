@@ -1807,9 +1807,9 @@ def surface_evaluate(P, surface, trans):
 
 @njit
 def surface_bc(P, surface, trans):
-    if surface["vacuum"]:
+    if surface["BC"] == BC_VACUUM:
         P["alive"] = False
-    elif surface["reflective"]:
+    elif surface["BC"] == BC_REFLECTIVE:
         surface_reflect(P, surface, trans)
 
 
@@ -2785,7 +2785,7 @@ def surface_crossing(P, prog):
         score_exit(P, exit_idx, mcdc)
 
     # Check new cell?
-    if P["alive"] and not surface["reflective"]:
+    if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         cell = mcdc["cells"][P["cell_ID"]]
         if not cell_check(P, cell, trans, mcdc):
             trans_struct = adapt.local_translate()
