@@ -775,7 +775,7 @@ def universe(cells, root=False):
 
     # Create new universe
     else:
-        card = make_card_universe(N_cell)
+        card = UniverseCard(N_cell)
         card.ID = len(global_.input_deck.universes)
 
     # Cells
@@ -1046,7 +1046,7 @@ def tally(
 
     # Set energy group grid
     if type(g) == type("string") and g == "all":
-        G = global_.input_deck.materials[0]["G"]
+        G = global_.input_deck.materials[0].G
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g

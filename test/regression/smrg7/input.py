@@ -48,16 +48,16 @@ z0 = mcdc.surface("plane-z", z=-100.0)
 z1 = mcdc.surface("plane-z", z=100.0)
 
 # Cells
-fc = mcdc.cell([-cy, +z0], mat_fc)  # Fission chamber (in and above core)
-uo2 = mcdc.cell([-cy, +z0, -z1], mat_uo2)  # Fuel rods (in core)
-mox4 = mcdc.cell([-cy, +z0, -z1], mat_mox43)
-mox7 = mcdc.cell([-cy, +z0, -z1], mat_mox7)
-mox8 = mcdc.cell([-cy, +z0, -z1], mat_mox87)
-cr = mcdc.cell([-cy, +z1], mat_cr)  # Control rod (above core)
-gti = mcdc.cell([-cy, +z0, -z1], mat_gt)  # Guide tube (in core)
-gta = mcdc.cell([-cy, +z1], mat_gt)  #            (above core)
-mod = mcdc.cell([+cy], mat_mod)  # Moderator (outside rod)
-modu = mcdc.cell([-cy, -z0], mat_mod)  #           (under rod)
+fc = mcdc.cell(-cy & +z0, mat_fc)  # Fission chamber (in and above core)
+uo2 = mcdc.cell(-cy & +z0 & -z1, mat_uo2)  # Fuel rods (in core)
+mox4 = mcdc.cell(-cy & +z0 & -z1, mat_mox43)
+mox7 = mcdc.cell(-cy & +z0 & -z1, mat_mox7)
+mox8 = mcdc.cell(-cy & +z0 & -z1, mat_mox87)
+cr = mcdc.cell(-cy & +z1, mat_cr)  # Control rod (above core)
+gti = mcdc.cell(-cy & +z0 & -z1, mat_gt)  # Guide tube (in core)
+gta = mcdc.cell(-cy & +z1, mat_gt)  #            (above core)
+mod = mcdc.cell(+cy, mat_mod)  # Moderator (outside rod)
+modu = mcdc.cell(-cy & -z0, mat_mod)  #           (under rod)
 
 # Universes (pin cells)
 f = mcdc.universe([fc, mod, modu])["ID"]
@@ -170,9 +170,9 @@ lattice_mox_cr = mcdc.lattice(
 )
 
 # Reflector
-gt = mcdc.cell([-cy], mat_gt)  # Reflector
-gto = mcdc.cell([+cy], mat_gt)  #
-modi = mcdc.cell([-cy], mat_mod)  # Moderator (inside rod)
+gt = mcdc.cell(-cy, mat_gt)  # Reflector
+gto = mcdc.cell(+cy, mat_gt)  #
+modi = mcdc.cell(-cy, mat_mod)  # Moderator (inside rod)
 g = mcdc.universe([gt, gto])["ID"]
 w = mcdc.universe([modi, mod])["ID"]
 lattice_r = mcdc.lattice(
@@ -302,13 +302,13 @@ x1 = mcdc.surface("plane-x", x=pitch * 17 / 2)
 y0 = mcdc.surface("plane-y", y=-pitch * 17 / 2)
 y1 = mcdc.surface("plane-y", y=pitch * 17 / 2)
 # Cells
-assembly_uo2 = mcdc.cell([+x0, -x1, +y0, -y1], lattice_uo2)
-assembly_mox = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mox)
-assembly_rll = mcdc.cell([+x0, -x1, +y0, -y1], lattice_rll)
-assembly_rul = mcdc.cell([+x0, -x1, +y0, -y1], lattice_rul)
-assembly_rur = mcdc.cell([+x0, -x1, +y0, -y1], lattice_rur)
-assembly_rlr = mcdc.cell([+x0, -x1, +y0, -y1], lattice_rlr)
-assembly_r = mcdc.cell([+x0, -x1, +y0, -y1], lattice_r)
+assembly_uo2 = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_uo2)
+assembly_mox = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_mox)
+assembly_rll = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_rll)
+assembly_rul = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_rul)
+assembly_rur = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_rur)
+assembly_rlr = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_rlr)
+assembly_r = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_r)
 
 # Set assemblies in their respective universes
 u = mcdc.universe([assembly_uo2])["ID"]
@@ -351,10 +351,10 @@ cy3 = mcdc.surface(
 zlo = mcdc.surface("plane-z", z=-130, bc="vacuum")
 zup = mcdc.surface("plane-z", z=130, bc="vacuum")
 # Cell
-core = mcdc.cell([-cy0, +zlo, -zup], lattice_core)
-barrel = mcdc.cell([+cy0, -cy1, +zlo, -zup], mat_gt)
-water = mcdc.cell([+cy1, -cy2, +zlo, -zup], mat_mod)
-vessel = mcdc.cell([+cy2, -cy3, +zlo, -zup], mat_gt)
+core = mcdc.cell(-cy0 & +zlo & -zup, lattice_core)
+barrel = mcdc.cell(+cy0 & -cy1 & +zlo & -zup, mat_gt)
+water = mcdc.cell(+cy1 & -cy2 & +zlo & -zup, mat_mod)
+vessel = mcdc.cell(+cy2 & -cy3 & +zlo & -zup, mat_gt)
 
 # Root universe
 mcdc.universe([core, barrel, water, vessel], root=True)

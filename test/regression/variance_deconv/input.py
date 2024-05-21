@@ -17,9 +17,9 @@ s2 = mcdc.surface("plane-x", x=2.0)
 s3 = mcdc.surface("plane-x", x=5.0)
 s4 = mcdc.surface("plane-x", x=6.0, bc="vacuum")
 
-mcdc.cell([+s1, -s2], m1)
-mcdc.cell([+s2, -s3], m2)
-mcdc.cell([+s3, -s4], m3)
+mcdc.cell(+s1 & -s2, m1)
+mcdc.cell(+s2 & -s3, m2)
+mcdc.cell(+s3 & -s4, m3)
 
 mcdc.source(point=[0.0, 0.0, 0.0], direction=[1.0, 0.0, 0.0])
 

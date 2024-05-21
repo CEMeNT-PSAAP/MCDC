@@ -1594,7 +1594,7 @@ def get_particle_material(P, mcdc):
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
         # Lattice cell?
-        if cell["lattice"]:
+        if cell["fill_type"] == FILL_LATTICE:
             # Get lattice
             lattice = mcdc["lattices"][cell["lattice_ID"]]
 
@@ -1620,7 +1620,7 @@ def get_particle_material(P, mcdc):
             # Material cell found, return material_ID
             break
 
-    return cell["material_ID"]
+    return cell["fill_ID"]
 
 
 @njit
