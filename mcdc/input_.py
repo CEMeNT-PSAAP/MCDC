@@ -411,7 +411,6 @@ def material(
             card.nu_d[:, j] = total / card.fission
             card.nu_f += card.nu_d[:, j]
 
-
     # Add to deck
     global_.input_deck.materials.append(card)
 
@@ -696,11 +695,11 @@ def cell(region, fill, translation=(0.0, 0.0, 0.0)):
 
     # Fill type?
     if fill.tag == "Material":
-        card.fill_type = 'material'
+        card.fill_type = "material"
     elif fill.tag == "Universe":
-        card.fill_type = 'universe'
+        card.fill_type = "universe"
     elif fill.tag == "Lattice":
-        card.fill_type = 'lattice'
+        card.fill_type = "lattice"
 
     # Fill ID
     card.fill_ID = fill.ID
@@ -723,19 +722,20 @@ def cell(region, fill, translation=(0.0, 0.0, 0.0)):
 
     return card
 
+
 def get_all_surface_IDs(region, surface_IDs):
-    if region.type == 'halfspace':
+    if region.type == "halfspace":
         surface = global_.input_deck.surfaces[region.A]
         surface_IDs.append(surface.ID)
 
-    elif region.type in ['intersection', 'union']:
+    elif region.type in ["intersection", "union"]:
         region1 = global_.input_deck.regions[region.A]
         region2 = global_.input_deck.regions[region.B]
 
         get_all_surface_IDs(region1, surface_IDs)
         get_all_surface_IDs(region2, surface_IDs)
 
-    elif region.type in ['complement']:
+    elif region.type in ["complement"]:
         region1 = global_.input_deck.regions[region.A]
 
         get_all_surface_IDs(region1, surface_IDs)
@@ -1841,7 +1841,9 @@ def uq(**kw):
     global_.input_deck.technique["uq"] = True
     # Make sure N_batch > 1
     if global_.input_deck.setting["N_batch"] <= 1:
-        print_error("Must set N_batch>1 with global_.setting() prior to global_.uq() call.")
+        print_error(
+            "Must set N_batch>1 with global_.setting() prior to global_.uq() call."
+        )
 
     # Check uq parameter
     parameter_ = check_support(

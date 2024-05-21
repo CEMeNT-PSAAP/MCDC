@@ -101,8 +101,8 @@ from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eig
 
 # Get input_deck
 import mcdc.global_ as mcdc_
-input_deck = mcdc_.input_deck
 
+input_deck = mcdc_.input_deck
 
 
 def run():
@@ -411,13 +411,7 @@ def prepare():
     N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
         # General data
-        for name in [
-            "ID",
-            "fissionable",
-            "sensitivity",
-            "sensitivity_ID",
-            "dsm_Np"
-        ]:
+        for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
             copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # MG data
@@ -509,16 +503,16 @@ def prepare():
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
         for name in type_.surface.names:
-            if name not in ["J", "t", 'BC']:
+            if name not in ["J", "t", "BC"]:
                 copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
 
         # Boundary condition
         if input_deck.surfaces[i].boundary_type == "interface":
-            mcdc['surfaces'][i]['BC'] = BC_NONE
+            mcdc["surfaces"][i]["BC"] = BC_NONE
         elif input_deck.surfaces[i].boundary_type == "vacuum":
-            mcdc['surfaces'][i]['BC'] = BC_VACUUM
+            mcdc["surfaces"][i]["BC"] = BC_VACUUM
         elif input_deck.surfaces[i].boundary_type == "reflective":
-            mcdc['surfaces'][i]['BC'] = BC_REFLECTIVE
+            mcdc["surfaces"][i]["BC"] = BC_REFLECTIVE
 
         # Variables with possible different sizes
         for name in ["J", "t"]:
@@ -532,18 +526,18 @@ def prepare():
     N_region = len(input_deck.regions)
     for i in range(N_region):
         for name in type_.region.names:
-            if name not in ['type']:
+            if name not in ["type"]:
                 copy_field(mcdc["regions"][i], input_deck.regions[i], name)
 
         # Type
-        if input_deck.regions[i].type == 'halfspace':
-            mcdc['regions'][i]['type'] = REGION_HALFSPACE
-        elif input_deck.regions[i].type == 'intersection':
-            mcdc['regions'][i]['type'] = REGION_INTERSECTION
-        elif input_deck.regions[i].type == 'union':
-            mcdc['regions'][i]['type'] = REGION_UNION
-        elif input_deck.regions[i].type == 'complement':
-            mcdc['regions'][i]['type'] = REGION_COMPLEMENT
+        if input_deck.regions[i].type == "halfspace":
+            mcdc["regions"][i]["type"] = REGION_HALFSPACE
+        elif input_deck.regions[i].type == "intersection":
+            mcdc["regions"][i]["type"] = REGION_INTERSECTION
+        elif input_deck.regions[i].type == "union":
+            mcdc["regions"][i]["type"] = REGION_UNION
+        elif input_deck.regions[i].type == "complement":
+            mcdc["regions"][i]["type"] = REGION_COMPLEMENT
 
     # =========================================================================
     # Cells
@@ -552,16 +546,16 @@ def prepare():
     N_cell = len(input_deck.cells)
     for i in range(N_cell):
         for name in type_.cell.names:
-            if name not in ['fill_type', 'surface_IDs']:
+            if name not in ["fill_type", "surface_IDs"]:
                 copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Fill type
-        if input_deck.cells[i].fill_type == 'material':
-            mcdc['cells'][i]['fill_type'] = FILL_MATERIAL
-        elif input_deck.cells[i].fill_type == 'universe':
-            mcdc['cells'][i]['fill_type'] = FILL_UNIVERSE
-        elif input_deck.cells[i].fill_type == 'lattice':
-            mcdc['cells'][i]['fill_type'] = FILL_LATTICE
+        if input_deck.cells[i].fill_type == "material":
+            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
+        elif input_deck.cells[i].fill_type == "universe":
+            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
+        elif input_deck.cells[i].fill_type == "lattice":
+            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
 
         # Variables with possible different sizes
         for name in ["surface_IDs"]:
@@ -991,9 +985,7 @@ def card_to_h5group(card, group):
     for name in [
         a
         for a in dir(card)
-        if not a.startswith("__")
-        and not callable(getattr(card, a))
-        and a != "tag"
+        if not a.startswith("__") and not callable(getattr(card, a)) and a != "tag"
     ]:
         value = getattr(card, name)
         if type(value) == dict:
