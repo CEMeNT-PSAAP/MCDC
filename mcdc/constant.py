@@ -2,6 +2,26 @@ import math
 import numpy as np
 import numba as nb
 
+
+# Boundary condition
+BC_NONE = 0
+BC_VACUUM = 1
+BC_REFLECTIVE = 2
+
+# Cell fill
+FILL_MATERIAL = 0
+FILL_UNIVERSE = 1
+FILL_LATTICE = 2
+
+# Region
+REGION_HALFSPACE = 0
+REGION_INTERSECTION = 1
+REGION_UNION = 2
+REGION_COMPLEMENT = 3
+
+# UNIVERSE
+UNIVERSE_ROOT = 0
+
 # Events
 # The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
 EVENT_COLLISION = 1 << 0

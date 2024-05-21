@@ -17,8 +17,6 @@ m = mcdc.material(
     nu_p=np.array([2.3]),
 )
 
-mcdc.print_card(m)
-
 # Set surfaces
 s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
 s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
