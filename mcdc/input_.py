@@ -1,8 +1,10 @@
 """
 This module contains functions for setting MC/DC input deck.
-The input deck class is defined in `card.py` and instantiated in `global_.py`.
 Docstrings use NumPy formatting.
 """
+
+# Instantiate and get the global variable container
+import mcdc.global_ as global_
 
 import h5py, math, mpi4py, os
 import numpy as np
@@ -18,7 +20,6 @@ from mcdc.card import (
     UniverseCard,
     LatticeCard,
     SourceCard,
-    UQCard,
 )
 from mcdc.constant import (
     GYRATION_RADIUS_ALL,
@@ -37,9 +38,6 @@ from mcdc.constant import (
 )
 from mcdc.print_ import print_error
 
-# Get and rename mcdc global variables
-import mcdc.global_ as mcdc
-
 
 def nuclide(
     capture=None,
@@ -56,7 +54,7 @@ def nuclide(
     dsm_Np=1.0,
 ):
     """
-    Create a nuclide card.
+    Create a nuclide
 
     Parameters
     ----------
@@ -88,8 +86,8 @@ def nuclide(
 
     Returns
     -------
-    dictionary
-        A nuclide card.
+    NuclideCard
+        The nuclide
 
     Notes
     -----
@@ -120,30 +118,32 @@ def nuclide(
         J = len(nu_d)
 
     # Make nuclide card
-    card = make_card_nuclide(G, J)
-    card["ID"] = len(mcdc.input_deck.nuclides)
+    card = NuclideCard(G, J)
+
+    # Set ID
+    card.ID = len(global_.input_deck.nuclides)
 
     # Speed (vector of size G)
     if speed is not None:
-        card["speed"][:] = speed[:]
+        card.speed[:] = speed[:]
 
     # Decay constant (vector of size J)
     if decay is not None:
-        card["decay"][:] = decay[:]
+        card.decay[:] = decay[:]
 
     # Cross-sections (vector of size G)
     if capture is not None:
-        card["capture"][:] = capture[:]
+        card.capture[:] = capture[:]
     if scatter is not None:
-        card["scatter"][:] = np.sum(scatter, 0)[:]
+        card.scatter[:] = np.sum(scatter, 0)[:]
     if fission is not None:
-        card["fission"][:] = fission[:]
-        card["fissionable"] = True
-    card["total"][:] = card["capture"] + card["scatter"] + card["fission"]
+        card.fission[:] = fission[:]
+        card.fissionable = True
+    card.total[:] = card.capture + card.scatter + card.fission
 
     # Scattering multiplication (vector of size G)
     if nu_s is not None:
-        card["nu_s"][:] = nu_s[:]
+        card.nu_s[:] = nu_s[:]
 
     # Check if nu_p or nu_d is not provided, give fission
     if fission is not None:
@@ -152,70 +152,71 @@ def nuclide(
 
     # Prompt fission production (vector of size G)
     if nu_p is not None:
-        card["nu_p"][:] = nu_p[:]
+        card.nu_p[:] = nu_p[:]
 
     # Delayed fission production (matrix of size GxJ)
     if nu_d is not None:
         # Transpose: [dg, gin] -> [gin, dg]
-        card["nu_d"][:, :] = np.swapaxes(nu_d, 0, 1)[:, :]
+        card.nu_d[:, :] = np.swapaxes(nu_d, 0, 1)[:, :]
 
     # Total fission production (vector of size G)
-    card["nu_f"] += card["nu_p"]
+    card.nu_f += card.nu_p
     for j in range(J):
-        card["nu_f"] += card["nu_d"][:, j]
+        card.nu_f += card.nu_d[:, j]
 
     # Scattering spectrum (matrix of size GxG)
     if scatter is not None:
         # Transpose: [gout, gin] -> [gin, gout]
-        card["chi_s"][:, :] = np.swapaxes(scatter, 0, 1)[:, :]
+        card.chi_s[:, :] = np.swapaxes(scatter, 0, 1)[:, :]
         for g in range(G):
-            if card["scatter"][g] > 0.0:
-                card["chi_s"][g, :] /= card["scatter"][g]
+            if card.scatter[g] > 0.0:
+                card.chi_s[g, :] /= card.scatter[g]
 
     # Prompt fission spectrum (matrix of size GxG)
     if nu_p is not None:
         if G == 1:
-            card["chi_p"][:, :] = np.array([[1.0]])
+            card.chi_p[:, :] = np.array([[1.0]])
         elif chi_p is None:
             print_error("Need to supply chi_p if nu_p is provided and G > 1")
         else:
             # Transpose: [gout, gin] -> [gin, gout]
-            card["chi_p"][:, :] = np.swapaxes(chi_p, 0, 1)[:, :]
+            card.chi_p[:, :] = np.swapaxes(chi_p, 0, 1)[:, :]
             # Normalize
             for g in range(G):
-                if np.sum(card["chi_p"][g, :]) > 0.0:
-                    card["chi_p"][g, :] /= np.sum(card["chi_p"][g, :])
+                if np.sum(card.chi_p[g, :]) > 0.0:
+                    card.chi_p[g, :] /= np.sum(card.chi_p[g, :])
 
     # Delayed fission spectrum (matrix of size JxG)
     if nu_d is not None:
         if G == 1:
-            card["chi_d"][:, :] = np.ones([J, G])
+            card.chi_d[:, :] = np.ones([J, G])
         else:
             if chi_d is None:
                 print_error("Need to supply chi_d if nu_d is provided  and G > 1")
             # Transpose: [gout, dg] -> [dg, gout]
-            card["chi_d"][:, :] = np.swapaxes(chi_d, 0, 1)[:, :]
+            card.chi_d[:, :] = np.swapaxes(chi_d, 0, 1)[:, :]
         # Normalize
         for dg in range(J):
-            if np.sum(card["chi_d"][dg, :]) > 0.0:
-                card["chi_d"][dg, :] /= np.sum(card["chi_d"][dg, :])
+            if np.sum(card.chi_d[dg, :]) > 0.0:
+                card.chi_d[dg, :] /= np.sum(card.chi_d[dg, :])
 
     # Sensitivity setup
     if sensitivity:
         # Set flag
-        card["sensitivity"] = True
-        mcdc.input_deck.technique["sensitivity"] = True
-        mcdc.input_deck.technique["weighted_emission"] = False
+        card.sensitivity = True
+        global_.input_deck.technique["sensitivity"] = True
+        global_.input_deck.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_deck.setting["N_sensitivity"] += 1
-        card["sensitivity_ID"] = mcdc.input_deck.setting["N_sensitivity"]
+        global_.input_deck.setting["N_sensitivity"] += 1
+        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
 
         # Set dsm_Np
-        card["dsm_Np"] = dsm_Np
+        card.dsm_Np = dsm_Np
 
-    # Push card
-    mcdc.input_deck.nuclides.append(card)
+    # Add to deck
+    global_.input_deck.nuclides.append(card)
+
     return card
 
 
@@ -231,14 +232,13 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
-    name="P",
     sensitivity=False,
     dsm_Np=1.0,
 ):
     """
-    Create a material card.
+    Create a material
 
-    The material card is defined either as a collection of nuclides or directly by its
+    A material is defined either as a collection of nuclides or directly by its
     macroscopic constants.
 
     Parameters
@@ -274,8 +274,8 @@ def material(
 
     Returns
     -------
-    dictionary
-        A material card.
+    MaterialCard
+        The material
 
     See also
     --------
@@ -305,22 +305,21 @@ def material(
 
     # Continuous energy mode?
     if isinstance(nuclides[0][0], str):
-        mcdc.input_deck.setting["mode_CE"] = True
-        mcdc.input_deck.setting["mode_MG"] = False
+        global_.input_deck.setting["mode_CE"] = True
+        global_.input_deck.setting["mode_MG"] = False
 
         # Make material card
-        card = make_card_material(N_nuclide)
-        card["ID"] = len(mcdc.input_deck.materials)
+        card = MaterialCard(N_nuclide)
+
+        # Set ID
+        card.ID = len(global_.input_deck.materials)
 
         # Set the nuclides
         for i in range(N_nuclide):
             nuc_name = nuclides[i][0]
             density = nuclides[i][1]
             if not nuclide_registered(nuc_name):
-                nuc_ID = len(mcdc.input_deck.nuclides)
-                nuc_card = make_card_nuclide()
-                nuc_card["name"] = nuc_name
-                nuc_card["ID"] = nuc_ID
+                nuc_card = NuclideCard()
 
                 dir_name = os.getenv("MCDC_XSLIB")
                 if dir_name == None:
@@ -329,40 +328,37 @@ def material(
                     )
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
-                        nuc_card["fissionable"] = True
-
-                mcdc.input_deck.nuclides.append(nuc_card)
+                        nuc_card.fissionable = True
             else:
                 nuc_card = get_nuclide(nuc_name)
-            card["nuclide_IDs"][i] = nuc_card["ID"]
-            card["nuclide_densities"][i] = density
+            card.nuclide_IDs[i] = nuc_card.ID
+            card.nuclide_densities[i] = density
 
-        # Add to deck
-        mcdc.input_deck.materials.append(card)
         return card
 
     # Nuclide and group sizes
-    G = nuclides[0][0]["G"]
-    J = nuclides[0][0]["J"]
+    G = nuclides[0][0].G
+    J = nuclides[0][0].J
 
     # Make material card
-    card = make_card_material(N_nuclide, G, J)
-    card["ID"] = len(mcdc.input_deck.materials)
+    card = MaterialCard(N_nuclide, G, J)
 
-    if name is not None:
-        card["name"] = name
-    else:
-        card["name"] = card["ID"]
+    # Set ID
+    card.ID = len(global_.input_deck.materials)
 
     # Calculate basic XS and determine sensitivity flag
     for i in range(N_nuclide):
         nuc = nuclides[i][0]
         density = nuclides[i][1]
-        card["nuclide_IDs"][i] = nuc["ID"]
-        card["nuclide_densities"][i] = density
-        for tag in ["capture", "scatter", "fission", "total", "sensitivity"]:
-            card[tag] += nuc[tag] * density
-    card["sensitivity"] = bool(card["sensitivity"])
+        card.nuclide_IDs[i] = nuc.ID
+        card.nuclide_densities[i] = density
+
+        card.capture += nuc.capture * density
+        card.scatter += nuc.scatter * density
+        card.fission += nuc.fission * density
+        card.total += nuc.total * density
+        card.sensitivity += nuc.sensitivity * density
+    card.sensitivity = bool(card.sensitivity)
 
     # Calculate effective speed
     # Current approach: weighted by nuclide macroscopic total cross section
@@ -370,105 +366,115 @@ def material(
     for i in range(N_nuclide):
         nuc = nuclides[i][0]
         density = nuclides[i][1]
-        card["speed"] += nuc["speed"] * nuc["total"] * density
-    # Check if vacuum material
-    if max(card["total"]) == 0.0:
-        card["speed"][:] = nuc["speed"][:]
+        card.speed += nuc.speed * nuc.total * density
+    # If vacuum material, just pick the last nuclide
+    if max(card.total) == 0.0:
+        card.speed[:] = nuc.speed
     else:
-        card["speed"] /= card["total"]
+        card.speed /= card.total
 
     # Calculate effective spectra and multiplicities of scattering and prompt fission
-    if max(card["scatter"]) > 0.0:
+    if max(card.scatter) > 0.0:
         nuSigmaS = np.zeros((G, G), dtype=float)
         for i in range(N_nuclide):
             nuc = nuclides[i][0]
             density = nuclides[i][1]
-            SigmaS = np.diag(nuc["scatter"]) * density
-            nu_s = np.diag(nuc["nu_s"])
-            chi_s = np.transpose(nuc["chi_s"])
+            SigmaS = np.diag(nuc.scatter) * density
+            nu_s = np.diag(nuc.nu_s)
+            chi_s = np.transpose(nuc.chi_s)
             nuSigmaS += chi_s.dot(nu_s.dot(SigmaS))
-        chi_nu_s = nuSigmaS.dot(np.diag(1.0 / card["scatter"]))
-        card["nu_s"] = np.sum(chi_nu_s, axis=0)
-        card["chi_s"] = np.transpose(chi_nu_s.dot(np.diag(1.0 / card["nu_s"])))
-    if max(card["fission"]) > 0.0:
+        chi_nu_s = nuSigmaS.dot(np.diag(1.0 / card.scatter))
+        card.nu_s = np.sum(chi_nu_s, axis=0)
+        card.chi_s = np.transpose(chi_nu_s.dot(np.diag(1.0 / card.nu_s)))
+    if max(card.fission) > 0.0:
         nuSigmaF = np.zeros((G, G), dtype=float)
         for i in range(N_nuclide):
             nuc = nuclides[i][0]
             density = nuclides[i][1]
-            SigmaF = np.diag(nuc["fission"]) * density
-            nu_p = np.diag(nuc["nu_p"])
-            chi_p = np.transpose(nuc["chi_p"])
+            SigmaF = np.diag(nuc.fission) * density
+            nu_p = np.diag(nuc.nu_p)
+            chi_p = np.transpose(nuc.chi_p)
             nuSigmaF += chi_p.dot(nu_p.dot(SigmaF))
-        chi_nu_p = nuSigmaF.dot(np.diag(1.0 / card["fission"]))
-        card["nu_p"] = np.sum(chi_nu_p, axis=0)
-        card["chi_p"] = np.transpose(chi_nu_p.dot(np.diag(1.0 / card["nu_p"])))
+        chi_nu_p = nuSigmaF.dot(np.diag(1.0 / card.fission))
+        card.nu_p = np.sum(chi_nu_p, axis=0)
+        card.chi_p = np.transpose(chi_nu_p.dot(np.diag(1.0 / card.nu_p)))
 
     # Calculate delayed and total fission multiplicities
-    if max(card["fission"]) > 0.0:
-        card["nu_f"][:] = card["nu_p"][:]
+    if max(card.fission) > 0.0:
+        card.nu_f[:] = card.nu_p[:]
         for j in range(J):
             total = np.zeros(G)
             for i in range(N_nuclide):
                 nuc = nuclides[i][0]
                 density = nuclides[i][1]
-                total += nuc["nu_d"][:, j] * nuc["fission"] * density
-            card["nu_d"][:, j] = total / card["fission"]
-            card["nu_f"] += card["nu_d"][:, j]
+                total += nuc.nu_d[:, j] * nuc.fission * density
+            card.nu_d[:, j] = total / card.fission
+            card.nu_f += card.nu_d[:, j]
 
-    # Push card
-    mcdc.input_deck.materials.append(card)
+
+    # Add to deck
+    global_.input_deck.materials.append(card)
+
     return card
 
 
 def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     """
-    Create a surface card and return SurfaceHandle to define cell domain.
+    Create a surface to define the region of a cell.
 
     Parameters
     ----------
-    type\_ : {'plane-x', 'plane-y', 'plane-z', 'plane', 'cylinder-x', 'cylinder-y', 'cylinder-z', 'sphere', 'quadric'}
+    type\_ : {"plane-x", "plane-y", "plane-z", "plane", "cylinder-x", "cylinder-y",
+              "cylinder-z", "sphere", "quadric"}
         Surface type.
-    bc : {'interface', 'vacuum', 'reflective'}
+    bc : {"interface", "vacuum", "reflective"}
         Surface boundary condition.
     sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the nuclide.
+        Set to `True` to calculate sensitivities to the surface position.
     dsm_Np : int
         Average number of derivative particles produced at each
         sensitivity surface crossing.
 
     Other Parameters
     ----------------
-    x : {float, array_like}
-        x-position [cm] for `plane-x`. If a vector is passed, positions of the surface
-        at the times specified by the parameter `t`.
-    y : {float, array_like}
-        y-position [cm] for `plane-y`. If a vector is passed, positions of the surface
-        at the times specified by the parameter `t`.
-    z : {float, array_like}
-        z-position [cm] for `plane-z`. If a vector is passed, positions of the surface
-        at the times specified by the parameter `t`.
-    center : array_like
-        Center point [cm] for `cylinder-x` (y,z), `cylinder-y` (x,z),
-        `cylinder-z` (x,y), and `sphere` (x,y,z).
+    x : {float, array_like[float]}
+        x-position [cm] for `"plane-x"`.
+        If a vector is passed, positions of the surface at the times specified by the
+        parameter `"t"`.
+    y : {float, array_like[float]}
+        y-position [cm] for `"plane-y"`.
+        If a vector is passed, positions of the surface at the times specified by the
+        parameter `t`.
+    z : {float, array_like[float]}
+        z-position [cm] for `"plane-z"`.
+        If a vector is passed, positions of the surface at the times specified by the
+        parameter `t`.
+    t : {array_like[float]}
+        Time to specify the position of `"plane-x"`, `"plane-y"`, or `"plane-z"`.
+    center : array_like[float]
+        Center point [cm] for `"cylinder-x"` (y,z), `"cylinder-y"` (x,z),
+        `"cylinder-z"` (x,y), or `"sphere"` (x,y,z).
     radius : float
-        Radius [cm] for `cylinder-x`, `cylinder-y`, `cylinder-z`, and `sphere`.
+        Radius [cm] for `"cylinder-x"`, `"cylinder-y"`, `"cylinder-z"`, and `"sphere"`.
     A, B, C, D : float
-        Coefficients [cm] for `plane`.
+        Coefficients [cm] for `"plane"`.
     A, B, C, D, E, F, G, H, I, J : float
-        Coefficients [cm] for `quadric`.
+        Coefficients [cm] for `"quadric"`.
 
     Returns
     -------
-    SurfaceHandle
-        A surface handle used for assigning surface, and its sense, to a cell card.
+    SurfaceCard
+        The surface card
 
     See also
     --------
-    mcdc.cell : SurfaceHandle is used to define cell domain.
+    mcdc.cell : Create a cell whose region is defined by surfaces.
     """
     # Make surface card
-    card = make_card_surface()
-    card["ID"] = len(mcdc.input_deck.surfaces)
+    card = SurfaceCard()
+
+    # Set ID
+    card.ID = len(global_.input_deck.surfaces)
 
     # Check if the selected type is supported
     type_ = check_support(
@@ -486,6 +492,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
             "quadric",
         ],
     )
+    card.type = type_
 
     # Boundary condition
     bc = check_support(
@@ -497,25 +504,21 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
             "reflective",
         ],
     )
-    # Set bc flags
-    if bc == "vacuum":
-        card["vacuum"] = True
-    elif bc == "reflective":
-        card["reflective"] = True
+    surface_boundary_type = bc
 
     # Sensitivity
     if sensitivity:
         # Set flag
-        card["sensitivity"] = True
-        mcdc.input_deck.technique["sensitivity"] = True
-        mcdc.input_deck.technique["weighted_emission"] = False
+        card.sensitivity = True
+        global_.input_deck.technique["sensitivity"] = True
+        global_.input_deck.technique["weighted_emission"] = False
 
         # Set ID
-        mcdc.input_deck.setting["N_sensitivity"] += 1
-        card["sensitivity_ID"] = mcdc.input_deck.setting["N_sensitivity"]
+        global_.input_deck.setting["N_sensitivity"] += 1
+        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
 
         # Set dsm_Np
-        card["dsm_Np"] = dsm_Np
+        card.dsm_Np = dsm_Np
 
     # ==========================================================================
     # Surface attributes
@@ -523,118 +526,119 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
     #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
 
-    card["type"] = type_
+    card.type = type_
 
     # Set up surface attributes
     if type_ == "plane-x":
         check_requirement("surface plane-x", kw, ["x"])
-        card["G"] = 1.0
-        card["linear"] = True
+        card.G = 1.0
+        card.linear = True
         if type(kw.get("x")) in [type([]), type(np.array([]))]:
-            _set_J(kw.get("x"), kw.get("t"), card)
+            set_J(kw.get("x"), kw.get("t"), card)
         else:
-            card["J"][0, 0] = -kw.get("x")
+            card.J[0, 0] = -kw.get("x")
     elif type_ == "plane-y":
         check_requirement("surface plane-y", kw, ["y"])
-        card["H"] = 1.0
-        card["linear"] = True
+        card.H = 1.0
+        card.linear = True
         if type(kw.get("y")) in [type([]), type(np.array([]))]:
-            _set_J(kw.get("y"), kw.get("t"), card)
+            set_J(kw.get("y"), kw.get("t"), card)
         else:
-            card["J"][0, 0] = -kw.get("y")
+            card.J[0, 0] = -kw.get("y")
     elif type_ == "plane-z":
         check_requirement("surface plane-z", kw, ["z"])
-        card["I"] = 1.0
-        card["linear"] = True
+        card.I = 1.0
+        card.linear = True
         if type(kw.get("z")) in [type([]), type(np.array([]))]:
-            _set_J(kw.get("z"), kw.get("t"), card)
+            set_J(kw.get("z"), kw.get("t"), card)
         else:
-            card["J"][0, 0] = -kw.get("z")
+            card.J[0, 0] = -kw.get("z")
     elif type_ == "plane":
         check_requirement("surface plane", kw, ["A", "B", "C", "D"])
-        card["G"] = kw.get("A")
-        card["H"] = kw.get("B")
-        card["I"] = kw.get("C")
-        card["J"][0, 0] = kw.get("D")
-        card["linear"] = True
+        card.G = kw.get("A")
+        card.H = kw.get("B")
+        card.I = kw.get("C")
+        card.J[0, 0] = kw.get("D")
+        card.linear = True
     elif type_ == "cylinder-x":
         check_requirement("surface cylinder-x", kw, ["center", "radius"])
         y, z = kw.get("center")[:]
         r = kw.get("radius")
-        card["B"] = 1.0
-        card["C"] = 1.0
-        card["H"] = -2.0 * y
-        card["I"] = -2.0 * z
-        card["J"][0, 0] = y**2 + z**2 - r**2
+        card.B = 1.0
+        card.C = 1.0
+        card.H = -2.0 * y
+        card.I = -2.0 * z
+        card.J[0, 0] = y**2 + z**2 - r**2
     elif type_ == "cylinder-y":
         check_requirement("surface cylinder-y", kw, ["center", "radius"])
         x, z = kw.get("center")[:]
         r = kw.get("radius")
-        card["A"] = 1.0
-        card["C"] = 1.0
-        card["G"] = -2.0 * x
-        card["I"] = -2.0 * z
-        card["J"][0, 0] = x**2 + z**2 - r**2
+        card.A = 1.0
+        card.C = 1.0
+        card.G = -2.0 * x
+        card.I = -2.0 * z
+        card.J[0, 0] = x**2 + z**2 - r**2
     elif type_ == "cylinder-z":
         check_requirement("surface cylinder-z", kw, ["center", "radius"])
         x, y = kw.get("center")[:]
         r = kw.get("radius")
-        card["A"] = 1.0
-        card["B"] = 1.0
-        card["G"] = -2.0 * x
-        card["H"] = -2.0 * y
-        card["J"][0, 0] = x**2 + y**2 - r**2
+        card.A = 1.0
+        card.B = 1.0
+        card.G = -2.0 * x
+        card.H = -2.0 * y
+        card.J[0, 0] = x**2 + y**2 - r**2
     elif type_ == "sphere":
         check_requirement("surface sphere", kw, ["center", "radius"])
         x, y, z = kw.get("center")[:]
         r = kw.get("radius")
-        card["A"] = 1.0
-        card["B"] = 1.0
-        card["C"] = 1.0
-        card["G"] = -2.0 * x
-        card["H"] = -2.0 * y
-        card["I"] = -2.0 * z
-        card["J"][0, 0] = x**2 + y**2 + z**2 - r**2
+        card.A = 1.0
+        card.B = 1.0
+        card.C = 1.0
+        card.G = -2.0 * x
+        card.H = -2.0 * y
+        card.I = -2.0 * z
+        card.J[0, 0] = x**2 + y**2 + z**2 - r**2
     elif type_ == "quadric":
         check_requirement(
             "surface quadric", kw, ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
         )
-        card["A"] = kw.get("A")
-        card["B"] = kw.get("B")
-        card["C"] = kw.get("C")
-        card["D"] = kw.get("D")
-        card["E"] = kw.get("E")
-        card["F"] = kw.get("F")
-        card["G"] = kw.get("G")
-        card["H"] = kw.get("H")
-        card["I"] = kw.get("I")
-        card["J"][0, 0] = kw.get("J")
+        card.A = kw.get("A")
+        card.B = kw.get("B")
+        card.C = kw.get("C")
+        card.D = kw.get("D")
+        card.E = kw.get("E")
+        card.F = kw.get("F")
+        card.G = kw.get("G")
+        card.H = kw.get("H")
+        card.I = kw.get("I")
+        card.J[0, 0] = kw.get("J")
 
     # Set normal vector if linear
-    if card["linear"]:
-        nx = card["G"]
-        ny = card["H"]
-        nz = card["I"]
+    if card.linear:
+        nx = card.G
+        ny = card.H
+        nz = card.I
         # Normalize
         norm = (nx**2 + ny**2 + nz**2) ** 0.5
-        card["nx"] = nx / norm
-        card["ny"] = ny / norm
-        card["nz"] = nz / norm
+        card.nx = nx / norm
+        card.ny = ny / norm
+        card.nz = nz / norm
 
-    # Push card
-    mcdc.input_deck.surfaces.append(card)
-    return SurfaceHandle(card)
+    # Add to deck
+    global_.input_deck.surfaces.append(card)
+
+    return card
 
 
-def _set_J(x, t, card):
+def set_J(x, t, card):
     # Edit and add the edges
     t[0] = -SHIFT
     t = np.append(t, INF)
     x = np.append(x, x[-1])
 
     # Reset the constants
-    card["J"] = np.zeros([0, 2])
-    card["t"] = np.array([-SHIFT])
+    card.J = np.zeros([0, 2])
+    card.t = np.array([-SHIFT])
 
     # Iterate over inputs
     idx = 0
@@ -647,103 +651,140 @@ def _set_J(x, t, card):
         J0 = x[i]
         J1 = (x[i + 1] - x[i]) / (t[i + 1] - t[i])
 
-        # Append to card
-        card["J"] = np.append(card["J"], [[J0, J1]], axis=0)
-        card["t"] = np.append(card["t"], t[i + 1])
+        # Append to surface
+        card.J = np.append(card.J, [[J0, J1]], axis=0)
+        card.t = np.append(card.t, t[i + 1])
 
-    card["J"] *= -1
-    card["N_slice"] = len(card["J"])
+    card.J *= -1
+    card.N_slice = len(card.J)
 
 
-def cell(surfaces_flags, fill, lattice_center=None):
+def cell(region, fill, translation=(0.0, 0.0, 0.0)):
     """
-    Define a cell as a building block of geometry.
+    Create a cell as model building block.
 
     Parameters
     ----------
-    surfaces_flags : list of SurfaceHandle
-        List of surfaces that contain the cell.
-    fill : dictionary
-        Material that fills the cell.
-    lattice_center : array_like[float], optional
-        Defines the center of the lattice (default None, implies no lattice).
+    region : RegionCard
+        Region that defines the cell geometry.
+    fill : MaterialCard or UniverseCard or LatticeCard
+        Material/universe/lattice that fills the cell.
+    translation : array_like[float], optional
+        To translate the origin of the fill (if universe or lattice).
 
     Returns
     -------
-    dictionary
-        A cell card.
+    CellCard
+        The cell card.
 
     See also
     --------
-    mcdc.surface : Creates SurfaceHandle used to define cell domain.
-    mcdc.material : Defines material used to fill cell.
+    mcdc.surface : Create a surface to define the region of a cell.
+    mcdc.material : Create a material to fill a cell.
+    mcdc.universe : Create a universe to fill a cell.
+    mcdc.lattice : Create a lattice to fill a cell.
     """
-    N_surface = len(surfaces_flags)
 
     # Make cell card
-    card = make_card_cell(N_surface)
-    card["ID"] = len(mcdc.input_deck.cells)
+    card = CellCard()
 
-    # Surfaces and flags
-    for i in range(N_surface):
-        card["surface_IDs"][i] = surfaces_flags[i][0]["ID"]
-        card["positive_flags"][i] = surfaces_flags[i][1]
+    # Set ID
+    card.ID = len(global_.input_deck.cells)
 
-    # Lattice cell?
-    if fill["tag"] == "Lattice":
-        card["lattice"] = True
-        card["lattice_ID"] = fill["ID"]
-        if lattice_center is not None:
-            card["lattice_center"] = np.array(lattice_center)
+    # Assign region
+    card.region_ID = region.ID
 
-    # Material cell
-    else:
-        card["material_ID"] = fill["ID"]
-        card["material_name"] = fill["name"]
+    # Fill type?
+    if fill.tag == "Material":
+        card.fill_type = 'material'
+    elif fill.tag == "Universe":
+        card.fill_type = 'universe'
+    elif fill.tag == "Lattice":
+        card.fill_type = 'lattice'
 
-    # Push card
-    mcdc.input_deck.cells.append(card)
+    # Fill ID
+    card.fill_ID = fill.ID
+
+    # Translation
+    card.translation[:] = translation
+
+    # Get all surface IDs
+    surface_IDs = []
+
+    region = global_.input_deck.regions[card.region_ID]
+    get_all_surface_IDs(region, surface_IDs)
+    surface_IDs = list(set(surface_IDs))
+
+    card.N_surface = len(surface_IDs)
+    card.surface_IDs = np.array(surface_IDs)
+
+    # Add to deck
+    global_.input_deck.cells.append(card)
+
     return card
+
+def get_all_surface_IDs(region, surface_IDs):
+    if region.type == 'halfspace':
+        surface = global_.input_deck.surfaces[region.A]
+        surface_IDs.append(surface.ID)
+
+    elif region.type in ['intersection', 'union']:
+        region1 = global_.input_deck.regions[region.A]
+        region2 = global_.input_deck.regions[region.B]
+
+        get_all_surface_IDs(region1, surface_IDs)
+        get_all_surface_IDs(region2, surface_IDs)
+
+    elif region.type in ['complement']:
+        region1 = global_.input_deck.regions[region.A]
+
+        get_all_surface_IDs(region1, surface_IDs)
 
 
 def universe(cells, root=False):
     """
-    Define the region where particles will be tracked.
+    Define a list of cells as a universe.
 
     Parameters
     ----------
-    cells : list of dictionary
+    cells : list of CellCard
         List of cells that comprise the universe.
-    root : bool, optional
-        Defines whether the universe is the root universe (default False).
+    root : bool
+        Flag to edit the root universe
 
     Returns
     -------
-    dictionary
-        A universe card.
+    UniverseCard
+        The universe card
 
     See also
     --------
-    mcdc.cell : Creates cells used to define universe.
+    mcdc.cell : Creates a cell that can be used to define a universe.
     """
     N_cell = len(cells)
 
-    # Set default card values (c.f. type_.py)
-    if not root:
-        card = make_card_universe(N_cell)
-        card["ID"] = len(mcdc.input_deck.universes)
+    # Edit root universe
+    if root:
+        # Create and replace placeholder if root is not yet created
+        if global_.input_deck.universes[0] == None:
+            card = UniverseCard(N_cell)
+            card.ID = 0
+            global_.input_deck.universes[0] = card
+        else:
+            card = global_.input_deck.universes[0]
+
+    # Create new universe
     else:
-        card = mcdc.input_deck.universes[0]
-        card["N_cell"] = N_cell
-        card["cell_IDs"] = np.zeros(N_cell, dtype=int)
+        card = make_card_universe(N_cell)
+        card.ID = len(global_.input_deck.universes)
 
     # Cells
     for i in range(N_cell):
-        card["cell_IDs"][i] = cells[i]["ID"]
+        card.cell_IDs[i] = cells[i].ID
 
     # Push card
     if not root:
-        mcdc.input_deck.universes.append(card)
+        global_.input_deck.universes.append(card)
 
     return card
 
@@ -770,21 +811,21 @@ def lattice(x=None, y=None, z=None, universes=None):
     """
     # Make lattice card
     card = make_card_lattice()
-    card["ID"] = len(mcdc.input_deck.lattices)
+    card.ID = len(global_.input_deck.lattices)
 
     # Set mesh
     if x is not None:
-        card["mesh"]["x0"] = x[0]
-        card["mesh"]["dx"] = x[1]
-        card["mesh"]["Nx"] = x[2]
+        card.mesh["x0"] = x[0]
+        card.mesh["dx"] = x[1]
+        card.mesh["Nx"] = x[2]
     if y is not None:
-        card["mesh"]["y0"] = y[0]
-        card["mesh"]["dy"] = y[1]
-        card["mesh"]["Ny"] = y[2]
+        card.mesh["y0"] = y[0]
+        card.mesh["dy"] = y[1]
+        card.mesh["Ny"] = y[2]
     if z is not None:
-        card["mesh"]["z0"] = z[0]
-        card["mesh"]["dz"] = z[1]
-        card["mesh"]["Nz"] = z[2]
+        card.mesh["z0"] = z[0]
+        card.mesh["dz"] = z[1]
+        card.mesh["Nz"] = z[2]
 
     # Set universe IDs
     universe_IDs = np.array(universes, dtype=np.int64)
@@ -801,10 +842,10 @@ def lattice(x=None, y=None, z=None, universes=None):
     # Change indexing structure: [z(flip), y(flip), x] --> [x, y, z]
     tmp = np.transpose(universe_IDs)
     tmp = np.flip(tmp, axis=1)
-    card["universe_IDs"] = np.flip(tmp, axis=2)
+    card.universe_IDs = np.flip(tmp, axis=2)
 
     # Push card
-    mcdc.input_deck.lattices.append(card)
+    global_.input_deck.lattices.append(card)
     return card
 
 
@@ -876,75 +917,78 @@ def source(**kw):
     prob = kw.get("prob")
 
     # Make source card
-    card = make_card_source()
-    card["ID"] = len(mcdc.input_deck.sources)
+    card = SourceCard()
+
+    # Set ID
+    card.ID = len(global_.input_deck.sources)
 
     # Set position
     if point is not None:
-        card["x"] = point[0]
-        card["y"] = point[1]
-        card["z"] = point[2]
+        card.x = point[0]
+        card.y = point[1]
+        card.z = point[2]
     else:
-        card["box"] = True
+        card.box = True
         if x is not None:
-            card["box_x"] = np.array(x)
+            card.box_x = np.array(x)
         if y is not None:
-            card["box_y"] = np.array(y)
+            card.box_y = np.array(y)
         if z is not None:
-            card["box_z"] = np.array(z)
+            card.box_z = np.array(z)
 
     # Set direction
     if white is not None:
-        card["isotropic"] = False
-        card["white"] = True
+        card.isotropic = False
+        card.white = True
         ux = white[0]
         uy = white[1]
         uz = white[2]
         # Normalize
         norm = (ux**2 + uy**2 + uz**2) ** 0.5
-        card["white_x"] = ux / norm
-        card["white_y"] = uy / norm
-        card["white_z"] = uz / norm
+        card.white_x = ux / norm
+        card.white_y = uy / norm
+        card.white_z = uz / norm
     elif direction is not None:
-        card["isotropic"] = False
+        card.isotropic = False
         ux = direction[0]
         uy = direction[1]
         uz = direction[2]
         # Normalize
         norm = (ux**2 + uy**2 + uz**2) ** 0.5
-        card["ux"] = ux / norm
-        card["uy"] = uy / norm
-        card["uz"] = uz / norm
+        card.ux = ux / norm
+        card.uy = uy / norm
+        card.uz = uz / norm
 
     # Set energy
     if energy is not None:
-        if mcdc.input_deck.setting["mode_MG"]:
+        if global_.input_deck.setting["mode_MG"]:
             group = np.array(energy)
             # Normalize
-            card["group"] = group / np.sum(group)
-        if mcdc.input_deck.setting["mode_CE"]:
+            card.group = group / np.sum(group)
+        if global_.input_deck.setting["mode_CE"]:
             energy = np.array(energy)
             # Resize
-            card["energy"] = np.zeros(energy.shape)
+            card.energy = np.zeros(energy.shape)
             # Set energy
-            card["energy"][0, :] = energy[0, :]
+            card.energy[0, :] = energy[0, :]
             # Normalize pdf
-            card["energy"][1, :] = energy[1, :] / np.trapz(energy[1, :], x=energy[0, :])
+            card.energy[1, :] = energy[1, :] / np.trapz(energy[1, :], x=energy[0, :])
             # Make cdf
-            card["energy"][1, :] = sp.integrate.cumulative_trapezoid(
-                card["energy"][1], x=card["energy"][0], initial=0.0
+            card.energy[1, :] = sp.integrate.cumulative_trapezoid(
+                card.energy[1], x=card.energy[0], initial=0.0
             )
 
     # Set time
     if time is not None:
-        card["time"] = np.array(time)
+        card.time = np.array(time)
 
     # Set probability
     if prob is not None:
-        card["prob"] = prob
+        card.prob = prob
 
     # Push card
-    mcdc.input_deck.sources.append(card)
+    global_.input_deck.sources.append(card)
+
     return card
 
 
@@ -990,7 +1034,7 @@ def tally(
     """
 
     # Get tally card
-    card = mcdc.input_deck.tally
+    card = global_.input_deck.tally
 
     # Set mesh
     card["mesh"]["x"] = x
@@ -1002,11 +1046,11 @@ def tally(
 
     # Set energy group grid
     if type(g) == type("string") and g == "all":
-        G = mcdc.input_deck.materials[0]["G"]
+        G = global_.input_deck.materials[0]["G"]
         card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
     else:
         card["mesh"]["g"] = g
-    if mcdc.input_deck.setting["mode_CE"]:
+    if global_.input_deck.setting["mode_CE"]:
         card["mesh"]["g"] = E
 
     # Set score flags
@@ -1112,7 +1156,7 @@ def setting(**kw):
     caching = kw.get("caching")
 
     # Check if setting card has been initialized
-    card = mcdc.input_deck.setting
+    card = global_.input_deck.setting
 
     # Number of particles
     if N_particle is not None:
@@ -1170,7 +1214,7 @@ def setting(**kw):
         card["source_file_name"] = source_file
 
         # Set number of particles
-        card_setting = mcdc.input_deck.setting
+        card_setting = global_.input_deck.setting
         with h5py.File(source_file, "r") as f:
             card_setting["N_particle"] = f["particles_size"][()]
 
@@ -1180,7 +1224,7 @@ def setting(**kw):
         card["IC_file_name"] = IC_file
 
         # Set number of particles
-        card_setting = mcdc.input_deck.setting
+        card_setting = global_.input_deck.setting
         with h5py.File(IC_file, "r") as f:
             card_setting["N_particle"] = f["IC/neutrons_size"][()]
             card_setting["N_precursor"] = f["IC/precursors_size"][()]
@@ -1216,7 +1260,7 @@ def eigenmode(
     """
 
     # Update setting card
-    card = mcdc.input_deck.setting
+    card = global_.input_deck.setting
     card["N_inactive"] = N_inactive
     card["N_active"] = N_active
     card["N_cycle"] = N_inactive + N_active
@@ -1245,7 +1289,7 @@ def eigenmode(
             print_error("Unknown gyration radius type")
 
     # Update tally card
-    card = mcdc.input_deck.tally
+    card = global_.input_deck.tally
     card["tracklength"] = True
 
 
@@ -1258,7 +1302,7 @@ def implicit_capture():
     """
     Activate implicit capture (implies no weighted emission).
     """
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["implicit_capture"] = True
     card["weighted_emission"] = False
 
@@ -1273,7 +1317,7 @@ def weighted_emission(flag):
         True to activate weighted emission.
     """
 
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["weighted_emission"] = flag
 
 
@@ -1287,7 +1331,7 @@ def population_control(pct="combing"):
         Population control method (default "combing").
     """
 
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["population_control"] = True
     card["weighted_emission"] = False
     if pct == "combing":
@@ -1302,7 +1346,7 @@ def branchless_collision():
     """
     Activate branchless collision variance reduction technique (implies no weighted emission).
     """
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["branchless_collision"] = True
     card["weighted_emission"] = False
 
@@ -1323,7 +1367,7 @@ def time_census(t):
 
     # Remove census beyond the final tally time grid point
     while True:
-        if t[-1] >= mcdc.input_deck.tally["mesh"]["t"][-1]:
+        if t[-1] >= global_.input_deck.tally["mesh"]["t"][-1]:
             t = t[:-1]
         else:
             break
@@ -1332,7 +1376,7 @@ def time_census(t):
     t = np.append(t, INF)
 
     # Set the time census parameters
-    card = mcdc.input_deck.setting
+    card = global_.input_deck.setting
     card["census_time"] = t
     card["N_census"] = len(t)
 
@@ -1361,7 +1405,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
         A weight window card.
 
     """
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["weight_window"] = True
 
     # Set width
@@ -1425,7 +1469,7 @@ def domain_decomposition(
         A domain decomposition card.
 
     """
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["domain_decomposition"] = True
     card["dd_exchange_rate"] = int(exchange_rate)
     card["dd_repro"] = repro
@@ -1549,7 +1593,7 @@ def iQMC(
         None (in-place card alterations).
     """
 
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
     card["iqmc"]["maxitt"] = maxitt
@@ -1667,7 +1711,7 @@ def weight_roulette(w_threshold=0.2, w_survive=1.0):
     -------
         None (in-place card alterations).
     """
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["weight_roulette"] = True
     card["wr_threshold"] = w_threshold
     card["wr_survive"] = w_survive
@@ -1712,13 +1756,13 @@ def IC_generator(
     population_control()
 
     # Set parameters
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     card["IC_generator"] = True
     card["IC_N_neutron"] = N_neutron
     card["IC_N_precursor"] = N_precursor
 
     # Setting parameters
-    card_setting = mcdc.input_deck.setting
+    card_setting = global_.input_deck.setting
     N_particle = card_setting["N_particle"]
 
     # Check optional parameters
@@ -1761,7 +1805,7 @@ def dsm(order=1):
         order of the sensitivity to probe, by default 1
     """
 
-    card = mcdc.input_deck.technique
+    card = global_.input_deck.technique
     if order > 2:
         print_error("DSM currently only supports up to second-order sensitivities")
     card["dsm_order"] = order
@@ -1792,12 +1836,12 @@ def uq(**kw):
             check_support(parameter["tag"] + " parameter", key, parameter_list, False)
             delta_card["flags"].append(key)
             delta_card[key] = kw[key]
-        mcdc.input_deck.uq_deltas[global_tag].append(delta_card)
+        global_.input_deck.uq_deltas[global_tag].append(delta_card)
 
-    mcdc.input_deck.technique["uq"] = True
+    global_.input_deck.technique["uq"] = True
     # Make sure N_batch > 1
-    if mcdc.input_deck.setting["N_batch"] <= 1:
-        print_error("Must set N_batch>1 with mcdc.setting() prior to mcdc.uq() call.")
+    if global_.input_deck.setting["N_batch"] <= 1:
+        print_error("Must set N_batch>1 with global_.setting() prior to global_.uq() call.")
 
     # Check uq parameter
     parameter_ = check_support(
@@ -1867,16 +1911,26 @@ def uq(**kw):
 
 
 def nuclide_registered(name):
-    for card in mcdc.input_deck.nuclides:
+    for card in global_.input_deck.nuclides:
         if name == card["name"]:
             return True
     return False
 
 
 def get_nuclide(name):
-    for card in mcdc.input_deck.nuclides:
+    for card in global_.input_deck.nuclides:
         if name == card["name"]:
             return card
+
+
+def print_card(card):
+    if isinstance(card, SurfaceHandle):
+        card = card.card
+    for key in card:
+        if key == "tag":
+            print(card[key] + " card")
+        else:
+            print("  " + key + " : " + str(card[key]))
 
 
 def check_support(label, value, supported, replace=True):
@@ -1908,5 +1962,5 @@ def check_requirement(label, kw, required):
 # ==============================================================================
 
 
-def reset_cards():
-    mcdc.input_deck.reset()
+def reset():
+    global_.input_deck.reset()

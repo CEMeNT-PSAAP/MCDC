@@ -468,7 +468,7 @@ def step_particle(P, prog):
     if P["cell_ID"] == -1:
         trans_struct = adapt.local_translate()
         trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+        P["cell_ID"] = kernel.get_particle_cell(P, UNIVERSE_ROOT, trans, mcdc)
 
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
@@ -945,7 +945,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     # Get material
     trans_struct = adapt.local_translate()
     trans = trans_struct["values"]
-    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
+    P_new["cell_ID"] = kernel.get_particle_cell(P_new, UNIVERSE_ROOT, trans, mcdc)
     material_ID = kernel.get_particle_material(P_new, mcdc)
     material = mcdc["materials"][material_ID]
     G = material["G"]

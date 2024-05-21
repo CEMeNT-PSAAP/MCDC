@@ -1576,8 +1576,8 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
         if cell_check(P, cell, trans, mcdc):
             return cell["ID"]
 
-    lost_particle(P)
     # Particle is not found
+    lost_particle(P)
     P["alive"] = False
     return -1
 
@@ -1708,16 +1708,56 @@ def split_particle(P):
 
 @njit
 def cell_check(P, cell, trans, mcdc):
-    for i in range(cell["N_surface"]):
-        surface = mcdc["surfaces"][cell["surface_IDs"][i]]
-        result = surface_evaluate(P, surface, trans)
-        if cell["positive_flags"][i]:
-            if result < 0.0:
-                return False
+    region = mcdc['regions'][cell['region_ID']]
+    return region_check(P, region, trans, mcdc)
+
+@njit
+def region_check(P, region, trans, mcdc):
+    if region['type'] == REGION_HALFSPACE:
+        surface_ID = region['A']
+        positive_side = region['B']
+
+        surface = mcdc['surfaces'][surface_ID]
+        side = surface_evaluate(P, surface, trans)
+
+        if positive_side:
+            if side > 0.0:
+                return True
+        elif side < 0.0:
+            return True
+
+        return False
+
+    elif region['type'] == REGION_INTERSECTION:
+        region_A = mcdc['regions'][region['A']]
+        region_B = mcdc['regions'][region['B']]
+
+        check_A = region_check(P, region_A, trans, mcdc)
+        check_B = region_check(P, region_B, trans, mcdc)
+
+        if check_A and check_B:
+            return True
         else:
-            if result > 0.0:
-                return False
-    return True
+            return False
+
+    elif region['type'] == REGION_COMPLEMENT:
+        region_A = mcdc['regions'][region['A']]
+        if not region_check(P, region_A, trans, mcdc):
+            return True
+        else:
+            return False
+
+    elif region['type'] == REGION_UNION:
+        region_A = mcdc['regions'][region['A']]
+        region_B = mcdc['regions'][region['B']]
+
+        if region_check(P, region_A, trans, mcdc):
+            return True
+
+        if region_check(P, region_B, trans, mcdc):
+            return True
+
+        return False
 
 
 # =============================================================================
@@ -2622,14 +2662,17 @@ def distance_to_boundary(P, mcdc):
             if surface_move:
                 event = EVENT_SURFACE_MOVE
 
-        # Lattice cell?
-        if cell["lattice"]:
+        if cell['fill_type'] == FILL_MATERIAL:
+            P["material_ID"] = cell["fill_ID"]
+            break
+
+        elif cell['fill_type'] == FILL_LATTICE:
             # Get lattice
-            lattice = mcdc["lattices"][cell["lattice_ID"]]
+            lattice = mcdc["lattices"][cell["fill_ID"]]
 
             # Get lattice center for translation)
             for i in range(3):
-                trans[i] -= cell["lattice_center"][i]
+                trans[i] -= cell["translation"][i]
 
             # Distance to lattice
             d_lattice = distance_to_lattice(P, lattice, trans)
@@ -2653,11 +2696,6 @@ def distance_to_boundary(P, mcdc):
             # Get inner cell
             cell_ID = get_particle_cell(P, universe_ID, trans, mcdc)
             cell = mcdc["cells"][cell_ID]
-
-        else:
-            # Material cell found, set material_ID
-            P["material_ID"] = cell["material_ID"]
-            break
 
     return distance, event
 
@@ -2752,7 +2790,7 @@ def surface_crossing(P, prog):
         if not cell_check(P, cell, trans, mcdc):
             trans_struct = adapt.local_translate()
             trans = trans_struct["values"]
-            P["cell_ID"] = get_particle_cell(P, 0, trans, mcdc)
+            P["cell_ID"] = get_particle_cell(P, UNIVERSE_ROOT, trans, mcdc)
 
     # Sensitivity quantification for surface?
     if surface["sensitivity"] and (
@@ -3904,7 +3942,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
 
                     # set cell_ID
-                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+                    P_temp["cell_ID"] = get_particle_cell(P_temp, UNIVERSE_ROOT, trans, mcdc)
 
                     # set material_ID
                     material_ID = get_particle_material(P_temp, mcdc)
