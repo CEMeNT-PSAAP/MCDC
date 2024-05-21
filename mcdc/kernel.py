@@ -1596,11 +1596,11 @@ def get_particle_material(P, mcdc):
         # Lattice cell?
         if cell["fill_type"] == FILL_LATTICE:
             # Get lattice
-            lattice = mcdc["lattices"][cell["lattice_ID"]]
+            lattice = mcdc["lattices"][cell["fill_ID"]]
 
             # Get lattice center for translation)
             for i in range(3):
-                trans[i] -= cell["lattice_center"][i]
+                trans[i] -= cell["translation"][i]
 
             # Get universe
             mesh = lattice["mesh"]
@@ -1708,16 +1708,17 @@ def split_particle(P):
 
 @njit
 def cell_check(P, cell, trans, mcdc):
-    region = mcdc['regions'][cell['region_ID']]
+    region = mcdc["regions"][cell["region_ID"]]
     return region_check(P, region, trans, mcdc)
+
 
 @njit
 def region_check(P, region, trans, mcdc):
-    if region['type'] == REGION_HALFSPACE:
-        surface_ID = region['A']
-        positive_side = region['B']
+    if region["type"] == REGION_HALFSPACE:
+        surface_ID = region["A"]
+        positive_side = region["B"]
 
-        surface = mcdc['surfaces'][surface_ID]
+        surface = mcdc["surfaces"][surface_ID]
         side = surface_evaluate(P, surface, trans)
 
         if positive_side:
@@ -1728,9 +1729,9 @@ def region_check(P, region, trans, mcdc):
 
         return False
 
-    elif region['type'] == REGION_INTERSECTION:
-        region_A = mcdc['regions'][region['A']]
-        region_B = mcdc['regions'][region['B']]
+    elif region["type"] == REGION_INTERSECTION:
+        region_A = mcdc["regions"][region["A"]]
+        region_B = mcdc["regions"][region["B"]]
 
         check_A = region_check(P, region_A, trans, mcdc)
         check_B = region_check(P, region_B, trans, mcdc)
@@ -1740,16 +1741,16 @@ def region_check(P, region, trans, mcdc):
         else:
             return False
 
-    elif region['type'] == REGION_COMPLEMENT:
-        region_A = mcdc['regions'][region['A']]
+    elif region["type"] == REGION_COMPLEMENT:
+        region_A = mcdc["regions"][region["A"]]
         if not region_check(P, region_A, trans, mcdc):
             return True
         else:
             return False
 
-    elif region['type'] == REGION_UNION:
-        region_A = mcdc['regions'][region['A']]
-        region_B = mcdc['regions'][region['B']]
+    elif region["type"] == REGION_UNION:
+        region_A = mcdc["regions"][region["A"]]
+        region_B = mcdc["regions"][region["B"]]
 
         if region_check(P, region_A, trans, mcdc):
             return True
@@ -2662,11 +2663,11 @@ def distance_to_boundary(P, mcdc):
             if surface_move:
                 event = EVENT_SURFACE_MOVE
 
-        if cell['fill_type'] == FILL_MATERIAL:
+        if cell["fill_type"] == FILL_MATERIAL:
             P["material_ID"] = cell["fill_ID"]
             break
 
-        elif cell['fill_type'] == FILL_LATTICE:
+        elif cell["fill_type"] == FILL_LATTICE:
             # Get lattice
             lattice = mcdc["lattices"][cell["fill_ID"]]
 
@@ -3942,7 +3943,9 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
 
                     # set cell_ID
-                    P_temp["cell_ID"] = get_particle_cell(P_temp, UNIVERSE_ROOT, trans, mcdc)
+                    P_temp["cell_ID"] = get_particle_cell(
+                        P_temp, UNIVERSE_ROOT, trans, mcdc
+                    )
 
                     # set material_ID
                     material_ID = get_particle_material(P_temp, mcdc)

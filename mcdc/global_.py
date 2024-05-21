@@ -7,6 +7,7 @@ from mcdc.constant import INF, GYRATION_RADIUS_ALL, PCT_NONE, PI
 # Input Deck
 # ======================================================================================
 
+
 def make_card_mesh():
     return {
         "x": np.array([-INF, INF]),
@@ -18,6 +19,7 @@ def make_card_mesh():
         "g": np.array([-INF, INF]),
     }
 
+
 class InputDeck:
     def __init__(self):
         self.reset()
@@ -28,7 +30,7 @@ class InputDeck:
         self.surfaces = []
         self.regions = []
         self.cells = []
-        self.universes = [None] # Placeholder for the root universe
+        self.universes = [None]  # Placeholder for the root universe
         self.lattices = []
         self.sources = []
 
@@ -172,5 +174,6 @@ class InputDeck:
             "materials": [],
             "surfaces": [],
         }
+
 
 input_deck = InputDeck()

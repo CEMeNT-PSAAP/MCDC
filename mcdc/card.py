@@ -5,6 +5,7 @@ from mcdc.constant import INF, SHIFT
 # Get the global variable container
 import mcdc.global_ as global_
 
+
 class InputCard:
     def __init__(self, tag):
         self.tag = tag
@@ -15,9 +16,7 @@ class InputCard:
         for name in [
             a
             for a in dir(self)
-            if not a.startswith("__")
-            and not callable(getattr(self, a))
-            and a != "tag"
+            if not a.startswith("__") and not callable(getattr(self, a)) and a != "tag"
         ]:
             text += "  %s : %s\n" % (name, str(getattr(self, name)))
         return text
@@ -88,7 +87,7 @@ class RegionCard(InputCard):
         self.B = -1
 
     def __and__(self, other):
-        region = RegionCard('intersection')
+        region = RegionCard("intersection")
         region.A = self.ID
         region.B = other.ID
         # Set ID and push to deck
@@ -97,7 +96,7 @@ class RegionCard(InputCard):
         return region
 
     def __or__(self, other):
-        region = RegionCard('union')
+        region = RegionCard("union")
         region.A = self.ID
         region.B = other.ID
         # Set ID and push to deck
@@ -106,7 +105,7 @@ class RegionCard(InputCard):
         return region
 
     def __invert__(self):
-        region = RegionCard('complement')
+        region = RegionCard("complement")
         region.A = self.ID
         # Set ID and push to deck
         region.ID = len(global_.input_deck.regions)
@@ -121,7 +120,7 @@ class SurfaceCard(InputCard):
         # Set card data
         self.ID = None
         self.type = ""
-        self.boundary_type = 'interface'
+        self.boundary_type = "interface"
         self.linear = False
         self.A = 0.0
         self.B = 0.0
@@ -143,7 +142,7 @@ class SurfaceCard(InputCard):
         self.dsm_Np = 1.0
 
     def __pos__(self):
-        region = RegionCard('halfspace')
+        region = RegionCard("halfspace")
         region.A = self.ID
         region.B = 1
         # Set ID and push to deck
@@ -152,7 +151,7 @@ class SurfaceCard(InputCard):
         return region
 
     def __neg__(self):
-        region = RegionCard('halfspace')
+        region = RegionCard("halfspace")
         region.A = self.ID
         region.B = 0
         # Set ID and push to deck

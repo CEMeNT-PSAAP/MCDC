@@ -512,10 +512,7 @@ def step_particle(P, prog):
     if event & EVENT_SURFACE:
         kernel.surface_crossing(P, prog)
         if event & EVENT_DOMAIN:
-            if not (
-                mcdc["surfaces"][P["surface_ID"]]["reflective"]
-                or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
-            ):
+            if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)
 
     # Lattice or mesh crossing (skipped if surface crossing)
