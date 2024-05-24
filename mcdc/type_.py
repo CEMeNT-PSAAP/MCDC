@@ -1118,7 +1118,7 @@ def make_type_uq(input_deck):
         struct = [
             ("speed", float64, (G,)),
             ("capture", float64, (G,)),
-            ("scatter", float64, (G,)),
+            ("scatter", float64, (G, G)),
             ("fission", float64, (G,)),
             ("nu_s", float64, (G,)),
             ("nu_p", float64, (G,)),
