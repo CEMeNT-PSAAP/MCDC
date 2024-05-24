@@ -34,8 +34,8 @@ def iqmc_dummy_mcdc_variable():
     s3 = MCDC.surface("plane-x", x=2.5, bc="vacuum")
 
     # Set cells
-    MCDC.cell([+s1, -s2], m1)
-    MCDC.cell([+s2, -s3], m2)
+    MCDC.cell(+s1 & -s2, m1)
+    MCDC.cell(+s2 & -s3, m2)
 
     # =============================================================================
     # iQMC Parameters
@@ -81,7 +81,7 @@ def test_rn_basic():
         Trans. Am. Nucl. Soc, 71, 202 (1994)
 
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
     ref_data = np.array(
         (
@@ -113,7 +113,7 @@ def test_AxV_linearity():
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
     mcdc = iqmc_dummy_mcdc_variable()
 
@@ -142,7 +142,7 @@ def test_FxV_linearity():
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
     mcdc = iqmc_dummy_mcdc_variable()
 
@@ -170,7 +170,7 @@ def test_HxV_linearity():
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
     mcdc = iqmc_dummy_mcdc_variable()
 
@@ -198,7 +198,7 @@ def test_preconditioner_linearity():
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
     mcdc = iqmc_dummy_mcdc_variable()
 
