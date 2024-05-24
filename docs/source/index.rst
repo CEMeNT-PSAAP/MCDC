@@ -83,7 +83,9 @@ A full exhaustive list of publications can be found on the `CEMeNT site <https:/
     install
     user
     contribution
+    theory/index
     pythonapi/index
+    pubs
 
 .. sidebar-links::
     :caption: Links
@@ -112,15 +114,32 @@ To build the docs
 To Cite MC/DC
 =============
 
-If you use or devlope in MC/DC and would like to publish your results
+If you use MC/DC and would like to provide proper attribution
 please cite our article in the Journal of Open Source software
 
-.. code-block:: 
-
+.. code-block:: bibtex
+        
     @article{morgan2024mcdc,
-        booktitle = {}
-        title = {},
-        author = {},
-        date = {},
-        doi = {},
+        title = {Monte {Carlo} / {Dynamic} {Code} ({MC}/{DC}): {An} accelerated
+                 {Python} package for fully transient neutron transport and
+                 rapid methods development},
+        author = {Morgan, Joanna Piper and Variansyah, Ilham and Pasmann, Samuel L. and 
+                  Clements, Kayla B. and Cuneo, Braxton and Mote, Alexander and
+                  Goodman, Charles and Shaw, Caleb and Northrop, Jordan and Pankaj, Rohan and
+                  Lame, Ethan and Whewell, Benjamin and McClarren, Ryan G. and Palmer, Todd S.
+                  and Chen, Lizhong and Anistratov, Dmitriy Y. and Kelley, C. T. and
+                  Palmer, Camille J. and Niemeyer, Kyle E.},
+        journal = {Journal of Open Source Software},
+        volume = {9},
+        number = {96},
+        year = {2024},
+        pages = {6415},
+        url = {https://joss.theoj.org/papers/10.21105/joss.06415},
+        doi = {10.21105/joss.06415},
     }
+
+If you are developing or working with specific numerical methods please take greater care
+to cite the specific publications where that work is presented.
+An exhaustive list can be found on our :ref:`pubs` page.
+Also check out and even longer list of associated publications on our
+`center's publications page <https://cement-psaap.github.io/publications/>`_

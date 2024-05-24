@@ -1046,6 +1046,9 @@ def setting(**kw):
         The time edge of the problem, after which all particles will be killed.
     progress_bar : bool
         Whether to display the progress bar (default True; disable when running MC/DC in a loop).
+    caching : bool
+        Whether to store or delete compiled Numba kernels (default True will store; False will delete existing __pycache__ folder).
+        see :ref:`Caching`.
     output_name : str
         Name of the output file MC/DC should save data in (default "output.h5").
     save_input_deck : bool
@@ -1088,6 +1091,7 @@ def setting(**kw):
                 "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
+                "caching",
             ],
             False,
         )
@@ -1106,6 +1110,7 @@ def setting(**kw):
     IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
+    caching = kw.get("caching")
 
     # Check if setting card has been initialized
     card = mcdc.input_deck.setting
@@ -1145,6 +1150,10 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
+
+    # caching is normally enabled
+    if caching is not None:
+        card["caching"] = caching
 
     # Particle tracker
     if particle_tracker is not None:
@@ -1385,6 +1394,65 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
         window = np.expand_dims(window, axis=ax)
     card["ww"] = window
 
+    return card
+
+
+def domain_decomposition(
+    x=None,
+    y=None,
+    z=None,
+    exchange_rate=100000,
+    work_ratio=None,
+    repro=True,
+):
+    """
+    Activate domain decomposition.
+
+    Parameters
+    ----------
+    x : array_like[float], optional
+        Location of subdomain boundaries in x (default None).
+    y : array_like[float], optional
+        Location of subdomain boundaries in y (default None).
+    z : array_like[float], optional
+        Location of subdomain boundaries in z (default None).
+    exchange_rate : float, optional
+        Number of particles to acumulate in the domain banks before sending.
+    work_ratio : array_like[integer], optional
+        Number of processors in each domain
+
+    Returns
+    -------
+        A domain decomposition card.
+
+    """
+    card = mcdc.input_deck.technique
+    card["domain_decomposition"] = True
+    card["dd_exchange_rate"] = int(exchange_rate)
+    card["dd_repro"] = repro
+    dom_num = 1
+    # Set mesh
+    if x is not None:
+        card["dd_mesh"]["x"] = x
+        dom_num *= len(x)
+    if y is not None:
+        card["dd_mesh"]["y"] = y
+        dom_num *= len(y)
+    if z is not None:
+        card["dd_mesh"]["z"] = z
+        dom_num += len(z)
+    # Set work ratio
+    if work_ratio is None:
+        card["dd_work_ratio"] = None
+    elif work_ratio is not None:
+        card["dd_work_ratio"] = work_ratio
+    card["dd_idx"] = 0
+    card["dd_xp_neigh"] = []
+    card["dd_xn_neigh"] = []
+    card["dd_yp_neigh"] = []
+    card["dd_yn_neigh"] = []
+    card["dd_zp_neigh"] = []
+    card["dd_zn_neigh"] = []
     return card
 
 
