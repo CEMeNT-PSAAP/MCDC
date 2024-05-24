@@ -60,13 +60,13 @@ mod = mcdc.cell(+cy, mat_mod)  # Moderator (outside rod)
 modu = mcdc.cell(-cy & -z0, mat_mod)  #           (under rod)
 
 # Universes (pin cells)
-f = mcdc.universe([fc, mod, modu])["ID"]
-u = mcdc.universe([uo2, gta, mod, modu])["ID"]
-l = mcdc.universe([mox4, gta, mod, modu])["ID"]
-m = mcdc.universe([mox7, gta, mod, modu])["ID"]
-n = mcdc.universe([mox8, gta, mod, modu])["ID"]
-c = mcdc.universe([gti, cr, mod, modu])["ID"]
-g = mcdc.universe([gti, gta, mod, modu])["ID"]
+f = mcdc.universe([fc, mod, modu])
+u = mcdc.universe([uo2, gta, mod, modu])
+l = mcdc.universe([mox4, gta, mod, modu])
+m = mcdc.universe([mox7, gta, mod, modu])
+n = mcdc.universe([mox8, gta, mod, modu])
+c = mcdc.universe([gti, cr, mod, modu])
+g = mcdc.universe([gti, gta, mod, modu])
 
 # =============================================================================
 # Assemblies
@@ -173,8 +173,8 @@ lattice_mox_cr = mcdc.lattice(
 gt = mcdc.cell(-cy, mat_gt)  # Reflector
 gto = mcdc.cell(+cy, mat_gt)  #
 modi = mcdc.cell(-cy, mat_mod)  # Moderator (inside rod)
-g = mcdc.universe([gt, gto])["ID"]
-w = mcdc.universe([modi, mod])["ID"]
+g = mcdc.universe([gt, gto])
+w = mcdc.universe([modi, mod])
 lattice_r = mcdc.lattice(
     x=[-pitch * 17 / 2, pitch, 17],
     y=[-pitch * 17 / 2, pitch, 17],
@@ -311,13 +311,13 @@ assembly_rlr = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_rlr)
 assembly_r = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_r)
 
 # Set assemblies in their respective universes
-u = mcdc.universe([assembly_uo2])["ID"]
-m = mcdc.universe([assembly_mox])["ID"]
-a = mcdc.universe([assembly_rll])["ID"]
-b = mcdc.universe([assembly_rul])["ID"]
-c = mcdc.universe([assembly_rur])["ID"]
-d = mcdc.universe([assembly_rlr])["ID"]
-e = mcdc.universe([assembly_r])["ID"]
+u = mcdc.universe([assembly_uo2])
+m = mcdc.universe([assembly_mox])
+a = mcdc.universe([assembly_rll])
+b = mcdc.universe([assembly_rul])
+c = mcdc.universe([assembly_rur])
+d = mcdc.universe([assembly_rlr])
+e = mcdc.universe([assembly_r])
 
 # =============================================================================
 # Root universe: core

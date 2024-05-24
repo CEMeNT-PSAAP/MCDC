@@ -810,7 +810,7 @@ def lattice(x=None, y=None, z=None, universes=None):
         Lattice card.
     """
     # Make lattice card
-    card = make_card_lattice()
+    card = LatticeCard()
     card.ID = len(global_.input_deck.lattices)
 
     # Set mesh
@@ -828,7 +828,8 @@ def lattice(x=None, y=None, z=None, universes=None):
         card.mesh["Nz"] = z[2]
 
     # Set universe IDs
-    universe_IDs = np.array(universes, dtype=np.int64)
+    get_ID = np.vectorize(lambda obj: obj.ID)
+    universe_IDs = get_ID(universes)
     ax_expand = []
     if x is None:
         ax_expand.append(2)
@@ -1830,12 +1831,12 @@ def uq(**kw):
     """
 
     def append_card(delta_card, global_tag):
-        delta_card["distribution"] = dist
-        delta_card["flags"] = []
+        delta_card.uq_parameters["distribution"] = dist
+        delta_card.uq_parameters["flags"] = []
         for key in kw.keys():
-            check_support(parameter["tag"] + " parameter", key, parameter_list, False)
-            delta_card["flags"].append(key)
-            delta_card[key] = kw[key]
+            check_support(parameter.tag + " parameter", key, parameter_list, False)
+            delta_card.uq_parameters["flags"].append(key)
+            delta_card.uq_parameters[key] = kw[key]
         global_.input_deck.uq_deltas[global_tag].append(delta_card)
 
     global_.input_deck.technique["uq"] = True
@@ -1854,7 +1855,7 @@ def uq(**kw):
     )
     parameter = kw[parameter_]
     del kw[parameter_]
-    parameter["uq"] = True
+    parameter.uq = True
 
     # Confirm supplied distribution
     check_requirement("uq", kw, ["distribution"])
@@ -1863,7 +1864,7 @@ def uq(**kw):
 
     # Only remaining keywords should be the parameter delta(s)
 
-    if parameter["tag"] == "Material":
+    if parameter.tag == "Material":
         parameter_list = [
             "capture",
             "scatter",
@@ -1877,16 +1878,16 @@ def uq(**kw):
             "decay",
         ]
         global_tag = "materials"
-        if parameter["N_nuclide"] == 1:
-            nuc_card = make_card_nuclide(parameter["G"], parameter["J"])
-            nuc_card["ID"] = parameter["nuclide_IDs"][0]
+        if parameter.N_nuclide == 1:
+            nuc_card = NuclideCard(parameter.G, parameter.J)
+            nuc_card.ID = parameter.nuclide_IDs[0]
             append_card(nuc_card, "nuclides")
-        delta_card = make_card_material(
-            parameter["N_nuclide"], parameter["G"], parameter["J"]
+        delta_card = MaterialCard(
+            parameter.N_nuclide, parameter.G, parameter.J
         )
         for name in ["ID", "nuclide_IDs", "nuclide_densities"]:
-            delta_card[name] = parameter[name]
-    elif parameter["tag"] == "Nuclide":
+            setattr(delta_card, name, getattr(parameter, name))
+    elif parameter.tag == "Nuclide":
         parameter_list = [
             "capture",
             "scatter",
@@ -1900,8 +1901,8 @@ def uq(**kw):
             "decay",
         ]
         global_tag = "nuclides"
-        delta_card = make_card_nuclide(parameter["G"], parameter["J"])
-        delta_card["ID"] = parameter["ID"]
+        delta_card = make_card_nuclide(parameter.G, parameter.J)
+        delta_card["ID"] = parameter.ID
     append_card(delta_card, global_tag)
     # elif parameter['tag'] is 'Surface':
     # elif parameter['tag'] is 'Source':

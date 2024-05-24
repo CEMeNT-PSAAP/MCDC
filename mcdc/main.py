@@ -585,15 +585,13 @@ def prepare():
     for i in range(N_lattice):
         # Mesh
         for name in type_.mesh_uniform.names:
-            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i]["mesh"][name]
+            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i].mesh[name]
 
         # Universe IDs
         Nx = mcdc["lattices"][i]["mesh"]["Nx"]
         Ny = mcdc["lattices"][i]["mesh"]["Ny"]
         Nz = mcdc["lattices"][i]["mesh"]["Nz"]
-        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[i][
-            "universe_IDs"
-        ]
+        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[i].universe_IDs
 
     # =========================================================================
     # Source
@@ -806,15 +804,15 @@ def prepare():
 
         M = len(input_deck.uq_deltas["materials"])
         for i in range(M):
-            idm = input_deck.uq_deltas["materials"][i]["ID"]
+            idm = input_deck.uq_deltas["materials"][i].ID
             mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"] = idm
             mcdc["technique"]["uq_"]["materials"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["materials"][i]["distribution"]
+                input_deck.uq_deltas["materials"][i].uq_parameters["distribution"]
             )
-            for name in input_deck.uq_deltas["materials"][i]["flags"]:
+            for name in input_deck.uq_deltas["materials"][i].uq_parameters["flags"]:
                 mcdc["technique"]["uq_"]["materials"][i]["flags"][name] = True
                 mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = (
-                    input_deck.uq_deltas["materials"][i][name]
+                    getattr(input_deck.uq_deltas["materials"][i], name)
                 )
             flags = mcdc["technique"]["uq_"]["materials"][i]["flags"]
             if flags["capture"] or flags["scatter"] or flags["fission"]:
@@ -831,17 +829,17 @@ def prepare():
         N = len(input_deck.uq_deltas["nuclides"])
         for i in range(N):
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["nuclides"][i]["distribution"]
+                input_deck.uq_deltas["nuclides"][i].uq_parameters["distribution"]
             )
-            idn = input_deck.uq_deltas["nuclides"][i]["ID"]
+            idn = input_deck.uq_deltas["nuclides"][i].ID
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
                 copy_field(
                     mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
-                    input_deck.nuclides[idn],
-                    name,
+                    input_deck.nuclides[idn], name
                 )
-            for name in input_deck.uq_deltas["nuclides"][i]["flags"]:
+
+            for name in input_deck.uq_deltas["nuclides"][i].uq_parameters["flags"]:
                 if "padding" in name:
                     continue
                 mcdc["technique"]["uq_"]["nuclides"][i]["flags"][name] = True
@@ -989,7 +987,7 @@ def card_to_h5group(card, group):
     ]:
         value = getattr(card, name)
         if type(value) == dict:
-            dict_to_h5group(dict_[k], group.create_group(k))
+            dict_to_h5group(value, group.create_group(name))
         elif value is None:
             next
         else:

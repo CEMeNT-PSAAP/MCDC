@@ -599,9 +599,9 @@ def make_type_lattice(input_deck):
     Nmax_y = 0
     Nmax_z = 0
     for card in input_deck.lattices:
-        Nmax_x = max(Nmax_x, card["mesh"]["Nx"])
-        Nmax_y = max(Nmax_y, card["mesh"]["Ny"])
-        Nmax_z = max(Nmax_z, card["mesh"]["Nz"])
+        Nmax_x = max(Nmax_x, card.mesh["Nx"])
+        Nmax_y = max(Nmax_y, card.mesh["Ny"])
+        Nmax_z = max(Nmax_z, card.mesh["Nz"])
 
     lattice = into_dtype(
         [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
@@ -1118,7 +1118,7 @@ def make_type_uq(input_deck):
         struct = [
             ("speed", float64, (G,)),
             ("capture", float64, (G,)),
-            ("scatter", float64, (G, G)),
+            ("scatter", float64, (G,)),
             ("fission", float64, (G,)),
             ("nu_s", float64, (G,)),
             ("nu_p", float64, (G,)),
