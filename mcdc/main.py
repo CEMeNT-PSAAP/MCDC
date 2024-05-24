@@ -591,7 +591,9 @@ def prepare():
         Nx = mcdc["lattices"][i]["mesh"]["Nx"]
         Ny = mcdc["lattices"][i]["mesh"]["Ny"]
         Nz = mcdc["lattices"][i]["mesh"]["Nz"]
-        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[i].universe_IDs
+        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[
+            i
+        ].universe_IDs
 
     # =========================================================================
     # Source
@@ -807,12 +809,12 @@ def prepare():
             idm = input_deck.uq_deltas["materials"][i].ID
             mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"] = idm
             mcdc["technique"]["uq_"]["materials"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["materials"][i].uq_parameters["distribution"]
+                input_deck.uq_deltas["materials"][i].distribution
             )
-            for name in input_deck.uq_deltas["materials"][i].uq_parameters["flags"]:
+            for name in input_deck.uq_deltas["materials"][i].flags:
                 mcdc["technique"]["uq_"]["materials"][i]["flags"][name] = True
-                mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = (
-                    getattr(input_deck.uq_deltas["materials"][i], name)
+                mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = getattr(
+                    input_deck.uq_deltas["materials"][i], name
                 )
             flags = mcdc["technique"]["uq_"]["materials"][i]["flags"]
             if flags["capture"] or flags["scatter"] or flags["fission"]:
@@ -829,17 +831,18 @@ def prepare():
         N = len(input_deck.uq_deltas["nuclides"])
         for i in range(N):
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["nuclides"][i].uq_parameters["distribution"]
+                input_deck.uq_deltas["nuclides"][i].distribution
             )
             idn = input_deck.uq_deltas["nuclides"][i].ID
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
                 copy_field(
                     mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
-                    input_deck.nuclides[idn], name
+                    input_deck.nuclides[idn],
+                    name,
                 )
 
-            for name in input_deck.uq_deltas["nuclides"][i].uq_parameters["flags"]:
+            for name in input_deck.uq_deltas["nuclides"][i].flags:
                 if "padding" in name:
                     continue
                 mcdc["technique"]["uq_"]["nuclides"][i]["flags"][name] = True
