@@ -836,11 +836,23 @@ def prepare():
             idn = input_deck.uq_deltas["nuclides"][i].ID
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
-                copy_field(
-                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
-                    input_deck.nuclides[idn],
-                    name,
-                )
+                if name == "scatter":
+                    G = input_deck.nuclides[idn].G
+                    chi_s = input_deck.nuclides[idn].chi_s
+                    scatter = input_deck.nuclides[idn].scatter
+                    scatter_matrix = np.zeros((G, G))
+                    for g in range(G):
+                        scatter_matrix[g, :] = chi_s[g, :] * scatter[g]
+
+                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"][
+                        name
+                    ] = scatter_matrix
+                else:
+                    copy_field(
+                        mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
+                        input_deck.nuclides[idn],
+                        name,
+                    )
 
             for name in input_deck.uq_deltas["nuclides"][i].flags:
                 if "padding" in name:
