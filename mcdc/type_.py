@@ -1,17 +1,34 @@
-import math, sys, os, h5py
+import h5py
+import math
 import numpy as np
+import os
 
 from mpi4py import MPI
+from mpi4py.util.dtlib import from_numpy_dtype
 
+from mcdc.print_ import print_error
+
+
+# ==============================================================================
 # Basic types
+# ==============================================================================
+
 float64 = np.float64
 int64 = np.int64
 int32 = np.int32
 uint64 = np.uint64
+uint8 = np.uint8
 bool_ = np.bool_
-str_ = "U30"
+uintp = np.uintp
+str_ = "U32"
 
-# MC/DC types, will be defined based on input deck
+
+# ==============================================================================
+# MC/DC types
+# ==============================================================================
+# Currently defined based on input deck
+# TODO: This causes JIT recompilation in certain cases
+
 particle = None
 particle_record = None
 nuclide = None
@@ -24,7 +41,119 @@ source = None
 setting = None
 tally = None
 technique = None
+
+# GPU mode related
+translate = None
+group_array = None
+j_array = None
 global_ = None
+
+
+# ==============================================================================
+# Alignment Logic
+# ==============================================================================
+# While CPU execution can robustly handle all sorts of Numba types, GPU
+# execution requires structs to follow some of the basic properties expected of
+# C-style structs with standard layout:
+#
+#      - Every primitive field is aligned by its size, and padding is inserted
+#        between fields to ensure alignment in arrays and nested data structures
+#
+#      - Every field has a unique address
+#
+# If these rules are violated, memory accesses made in GPUs may encounter
+# problems. For example, in cases where an access is not at an address aligned
+# by their size, a segfault or similar fault will occur, or information will be
+# lost. These issues were fixed by providing a function, align, which ensures the
+# field lists fed to np.dtype fulfill these requirements.
+#
+# The align function does the following:
+#
+#      - Tracks the cumulative offset of fields as they appear in the input list.
+#
+#      - Inserts additional padding fields to ensure that primitive fields are
+#        aligned by their size
+#
+#      - Re-sizes arrays to have at least one element in their array (this ensure
+#        they have a non-zero size, and hence cannot overlap base addresses with
+#        other fields.
+#
+
+
+def fixup_dims(dim_tuple):
+    return tuple([max(d, 1) for d in dim_tuple])
+
+
+def align(field_list):
+    result = []
+    offset = 0
+    pad_id = 0
+    for field in field_list:
+        if len(field) > 3:
+            print_error(
+                "Unexpected struct field specification. Specifications \
+                        usually only consist of 3 or fewer members"
+            )
+        multiplier = 1
+        if len(field) == 3:
+            field = (field[0], field[1], fixup_dims(field[2]))
+            for d in field[2]:
+                multiplier *= d
+        kind = np.dtype(field[1])
+        size = kind.itemsize
+
+        if kind.isbuiltin == 0:
+            alignment = 8
+        elif kind.isbuiltin == 1:
+            alignment = size
+        else:
+            print_error("Unexpected field item type")
+
+        size *= multiplier
+
+        if offset % alignment != 0:
+            pad_size = alignment - (offset % alignment)
+            result.append((f"padding_{pad_id}", uint8, (pad_size,)))
+            pad_id += 1
+            offset += pad_size
+
+        result.append(field)
+        offset += size
+
+    if offset % 8 != 0:
+        pad_size = 8 - (offset % 8)
+        result.append((f"padding_{pad_id}", uint8, (pad_size,)))
+        pad_id += 1
+
+    return result
+
+
+def into_dtype(field_list):
+    result = np.dtype(align(field_list), align=True)
+    return result
+
+
+# ==============================================================================
+# Copy Logic
+# ==============================================================================
+
+
+type_roster = {}
+
+
+def copy_fn_for(kind, name):
+    code = f"@njit\ndef copy_{name}(dst,src):\n"
+    for f_name, spec in kind.fields.items():
+        f_dtype = spec[0]
+        if f_dtype in type_roster:
+            kind_name = type_roster[f_dtype]["name"]
+            code += f"    copy_{kind_name}(dst['{f_name}'],src['{f_name}'])"
+        else:
+            code += f"    dst['{f_name}'] = src['{f_name}']\n"
+    type_roster[kind] = {}
+    type_roster[kind]["name"] = name
+    exec(code)
+    return eval(f"copy_{name}")
 
 
 # ==============================================================================
@@ -48,6 +177,7 @@ def make_type_particle(input_deck):
         ("E", float64),
         ("w", float64),
         ("alive", bool_),
+        ("fresh", bool_),
         ("material_ID", int64),
         ("cell_ID", int64),
         ("surface_ID", int64),
@@ -74,12 +204,12 @@ def make_type_particle(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    particle = np.dtype(struct)
+    particle = into_dtype(struct)
 
 
 # Particle record (in-bank)
 def make_type_particle_record(input_deck):
-    global particle_record
+    global particle_record, particle_record_mpi
 
     struct = [
         ("x", float64),
@@ -113,10 +243,13 @@ def make_type_particle_record(input_deck):
     struct += [("iqmc", iqmc_struct)]
 
     # Save type
-    particle_record = np.dtype(struct)
+    particle_record = into_dtype(struct)
+
+    particle_record_mpi = from_numpy_dtype(particle_record)
+    particle_record_mpi.Commit()
 
 
-precursor = np.dtype(
+precursor = into_dtype(
     [
         ("x", float64),
         ("y", float64),
@@ -134,14 +267,18 @@ precursor = np.dtype(
 
 
 def particle_bank(max_size):
-    return np.dtype(
-        [("particles", particle_record, (max_size,)), ("size", int64), ("tag", "U10")]
+    return into_dtype(
+        [
+            ("particles", particle_record, (max_size,)),
+            ("size", int64, (1,)),
+            ("tag", str_),
+        ]
     )
 
 
 def precursor_bank(max_size):
-    return np.dtype(
-        [("precursors", precursor, (max_size,)), ("size", int64), ("tag", "U10")]
+    return into_dtype(
+        [("precursors", precursor, (max_size,)), ("size", int64, (1,)), ("tag", str_)]
     )
 
 
@@ -275,7 +412,7 @@ def make_type_nuclide(input_deck):
     ]
 
     # Set the type
-    nuclide = np.dtype(struct)
+    nuclide = into_dtype(struct)
 
 
 # ==============================================================================
@@ -332,7 +469,7 @@ def make_type_material(input_deck):
     ]
 
     # Set the type
-    material = np.dtype(struct)
+    material = into_dtype(struct)
 
 
 # ==============================================================================
@@ -348,7 +485,7 @@ def make_type_surface(input_deck):
     for surface in input_deck.surfaces:
         Nmax_slice = max(Nmax_slice, surface["N_slice"])
 
-    surface = np.dtype(
+    surface = into_dtype(
         [
             ("ID", int64),
             ("N_slice", int64),
@@ -387,7 +524,7 @@ def make_type_cell(input_deck):
     # Maximum number of surfaces per cell
     Nmax_surface = max([cell["N_surface"] for cell in input_deck.cells])
 
-    cell = np.dtype(
+    cell = into_dtype(
         [
             ("ID", int64),
             ("N_surface", int64),
@@ -421,7 +558,7 @@ def make_type_universe(input_deck):
         card["N_cell"] = N_cell
         card["cell_IDs"] = np.arange(N_cell)
 
-    universe = np.dtype(
+    universe = into_dtype(
         [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
     )
 
@@ -431,7 +568,7 @@ def make_type_universe(input_deck):
 # ==============================================================================
 
 
-mesh_uniform = np.dtype(
+mesh_uniform = into_dtype(
     [
         ("x0", float64),
         ("dx", float64),
@@ -458,7 +595,7 @@ def make_type_lattice(input_deck):
         Nmax_y = max(Nmax_y, card["mesh"]["Ny"])
         Nmax_z = max(Nmax_z, card["mesh"]["Nz"])
 
-    lattice = np.dtype(
+    lattice = into_dtype(
         [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
     )
 
@@ -516,7 +653,7 @@ def make_type_source(input_deck):
         ("energy", float64, (2, Nmax_E)),
     ]
 
-    source = np.dtype(struct)
+    source = into_dtype(struct)
 
 
 # ==============================================================================
@@ -554,7 +691,7 @@ def make_type_tally(input_deck):
     struct = [("tracklength", bool_)]
 
     def make_type_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("bin", float64, shape),
                 ("mean", float64, shape),
@@ -590,11 +727,11 @@ def make_type_tally(input_deck):
         if not card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    tally = np.dtype(struct)
+    tally = into_dtype(struct)
 
 
 # ==============================================================================
@@ -617,7 +754,8 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
-        ("output_name", "U30"),
+        ("caching", bool_),
+        ("output_name", str_),
         ("save_input_deck", bool_),
         ("track_particle", bool_),
         # Eigenvalue mode
@@ -634,17 +772,17 @@ def make_type_setting(deck):
         ("census_time", float64, (card["N_census"],)),
         # Particle source file
         ("source_file", bool_),
-        ("source_file_name", "U30"),
+        ("source_file_name", str_),
         # Initial condition source file
         ("IC_file", bool_),
-        ("IC_file_name", "U30"),
+        ("IC_file_name", str_),
         ("N_precursor", uint64),
         # TODO: Move to technique
         ("N_sensitivity", uint64),
     ]
 
     # Finalize setting type
-    setting = np.dtype(struct)
+    setting = into_dtype(struct)
 
 
 # ==============================================================================
@@ -691,6 +829,7 @@ def make_type_technique(input_deck):
         ("iQMC", bool_),
         ("IC_generator", bool_),
         ("branchless_collision", bool_),
+        ("domain_decomposition", bool_),
         ("uq", bool_),
     ]
 
@@ -699,6 +838,24 @@ def make_type_technique(input_deck):
     # =========================================================================
 
     struct += [("pct", int64), ("pc_factor", float64)]
+
+    # =========================================================================
+    # domain decomp
+    # =========================================================================
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["dd_mesh"])
+    struct += [("dd_mesh", mesh)]
+    struct += [("dd_idx", int64)]
+    struct += [("dd_sent", int64)]
+    struct += [("dd_work_ratio", int64, (len(card["dd_work_ratio"]),))]
+    struct += [("dd_exchange_rate", int64)]
+    struct += [("dd_repro", bool_)]
+    struct += [("dd_xp_neigh", int64, (len(card["dd_xp_neigh"]),))]
+    struct += [("dd_xn_neigh", int64, (len(card["dd_xn_neigh"]),))]
+    struct += [("dd_yp_neigh", int64, (len(card["dd_yp_neigh"]),))]
+    struct += [("dd_yn_neigh", int64, (len(card["dd_yn_neigh"]),))]
+    struct += [("dd_zp_neigh", int64, (len(card["dd_zp_neigh"]),))]
+    struct += [("dd_zn_neigh", int64, (len(card["dd_zn_neigh"]),))]
 
     # =========================================================================
     # Weight window
@@ -776,7 +933,7 @@ def make_type_technique(input_deck):
     for i in range(len(scores_shapes)):
         name = scores_shapes[i][0]
         score_list += [(name, bool_)]
-    score_list = np.dtype(score_list)
+    score_list = into_dtype(score_list)
     iqmc_list += [("score_list", score_list)]
 
     # Add scores to structure
@@ -790,7 +947,7 @@ def make_type_technique(input_deck):
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     iqmc_list += [("score", scores)]
 
     # Constants
@@ -813,7 +970,7 @@ def make_type_technique(input_deck):
         ("w_min", float64),
     ]
 
-    struct += [("iqmc", iqmc_list)]
+    struct += [("iqmc", into_dtype(iqmc_list))]
 
     # =========================================================================
     # IC generator
@@ -850,7 +1007,7 @@ def make_type_technique(input_deck):
         ("IC_bank_precursor_local", bank_precursor_local),
         ("IC_bank_neutron", bank_neutron),
         ("IC_bank_precursor", bank_precursor),
-        ("IC_fission_score", float64),
+        ("IC_fission_score", float64, (1,)),
         ("IC_fission", float64),
     ]
 
@@ -868,7 +1025,7 @@ def make_type_technique(input_deck):
     struct += [("uq_tally", uq_tally), ("uq_", uq)]
 
     # Finalize technique type
-    technique = np.dtype(struct)
+    technique = into_dtype(struct)
 
 
 # UQ
@@ -876,7 +1033,7 @@ def make_type_uq_tally(input_deck):
     global uq_tally
 
     def make_type_uq_score(shape):
-        return np.dtype(
+        return into_dtype(
             [
                 ("batch_bin", float64, shape),
                 ("batch_var", float64, shape),
@@ -919,18 +1076,18 @@ def make_type_uq_tally(input_deck):
         if not tally_card[name]:
             shape = (0,) * len(shape)
         scores_struct += [(name, make_type_uq_score(shape))]
-    scores = np.dtype(scores_struct)
+    scores = into_dtype(scores_struct)
     struct += [("score", scores)]
 
     # Make tally structure
-    uq_tally = np.dtype(struct)
+    uq_tally = into_dtype(struct)
 
 
 def make_type_uq(input_deck):
     global uq, uq_nuc, uq_mat
 
     #    def make_type_parameter(shape):
-    #        return np.dtype(
+    #        return into_dtype(
     #            [
     #                ("tag", str_),             # nuclides, materials, surfaces, sources
     #                ("ID", int64),
@@ -955,7 +1112,7 @@ def make_type_uq(input_deck):
             ("chi_p", float64, (G, G)),
         ]
         struct += [("decay", float64, (J,)), ("chi_d", float64, (J, G))]
-        return np.dtype(struct)
+        return into_dtype(struct)
 
     # Size numbers
     G = input_deck.materials[0]["G"]
@@ -967,7 +1124,7 @@ def make_type_uq(input_deck):
     uq_nuc = make_type_parameter(G, J, True)
     uq_mat = make_type_parameter(G, J)
 
-    flags = np.dtype(
+    flags = into_dtype(
         [
             ("speed", bool_),
             ("decay", bool_),
@@ -984,16 +1141,72 @@ def make_type_uq(input_deck):
             ("chi_d", bool_),
         ]
     )
-    info = np.dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
+    info = into_dtype([("distribution", str_), ("ID", int64), ("rng_seed", uint64)])
 
-    container = np.dtype(
+    container = into_dtype(
         [("mean", uq_nuc), ("delta", uq_mat), ("flags", flags), ("info", info)]
     )
 
     N_nuclide = len(uq_deck["nuclides"])
     N_material = len(uq_deck["materials"])
-    uq = np.dtype(
+    uq = into_dtype(
         [("nuclides", container, (N_nuclide,)), ("materials", container, (N_material,))]
+    )
+
+
+def make_type_dd_turnstile_event(input_deck):
+    global dd_turnstile_event, dd_turnstile_event_mpi
+    dd_turnstile_event = into_dtype(
+        [
+            ("busy_delta", int32),
+            ("send_delta", int32),
+        ]
+    )
+    dd_turnstile_event_mpi = from_numpy_dtype(dd_turnstile_event)
+    dd_turnstile_event_mpi.Commit()
+
+
+def make_type_domain_decomp(input_deck):
+    global domain_decomp
+    # Domain banks if needed
+    if input_deck.technique["domain_decomposition"]:
+        bank_domain_xp = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_xn = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_yp = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_yn = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_zp = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_domain_zn = particle_bank(input_deck.technique["dd_exchange_rate"])
+    else:
+        bank_domain_xp = particle_bank(0)
+        bank_domain_xn = particle_bank(0)
+        bank_domain_yp = particle_bank(0)
+        bank_domain_yn = particle_bank(0)
+        bank_domain_zp = particle_bank(0)
+        bank_domain_zn = particle_bank(0)
+
+    domain_decomp = into_dtype(
+        [
+            # Info tracked in all ranks
+            ("bank_xp", bank_domain_xp),
+            ("bank_xn", bank_domain_xn),
+            ("bank_yp", bank_domain_yp),
+            ("bank_yn", bank_domain_yn),
+            ("bank_zp", bank_domain_zp),
+            ("bank_zn", bank_domain_zn),
+            ("send_count", int64),  # Number of particles sent
+            ("recv_count", int64),  # Number of particles recv'd
+            ("rank_busy", bool_),  # True if the rank currently has particles to process
+            (
+                "work_done",
+                int64,
+            ),  # Whether or not there is any outstanding work across any ranks
+            # Info tracked in "leader" rank zero
+            (
+                "send_total",
+                int64,
+            ),  # The total number of particles sent but not yet recv'd
+            ("busy_total", int64),  # The total number of busy ranks
+        ]
     )
 
 
@@ -1075,7 +1288,7 @@ def make_type_global(input_deck):
         bank_source = particle_bank(N_work)
 
     # GLobal type
-    global_ = np.dtype(
+    global_ = into_dtype(
         [
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
@@ -1087,10 +1300,15 @@ def make_type_global(input_deck):
             ("tally", tally),
             ("setting", setting),
             ("technique", technique),
+            ("domain_decomp", domain_decomp),
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
             ("bank_precursor", bank_precursor),
+            ("rng_seed_base", uint64),
+            ("rng_seed", uint64),
+            ("rng_stride", int64),
+            ("dd_idx", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
@@ -1106,9 +1324,9 @@ def make_type_global(input_deck):
             ("gyration_radius", float64, (N_cycle,)),
             ("idx_cycle", int64),
             ("cycle_active", bool_),
-            ("eigenvalue_tally_nuSigmaF", float64),
-            ("eigenvalue_tally_n", float64),
-            ("eigenvalue_tally_C", float64),
+            ("eigenvalue_tally_nuSigmaF", float64, (1,)),
+            ("eigenvalue_tally_n", float64, (1,)),
+            ("eigenvalue_tally_C", float64, (1,)),
             ("idx_census", int64),
             ("idx_batch", int64),
             ("mpi_size", int64),
@@ -1126,10 +1344,15 @@ def make_type_global(input_deck):
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
             ("particle_track", float64, (N_track, 8)),
-            ("particle_track_N", int64),
-            ("particle_track_history_ID", int64),
-            ("particle_track_particle_ID", int64),
+            ("particle_track_N", int64, (1,)),
+            ("particle_track_history_ID", int64, (1,)),
+            ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
+            ("mpi_work_iter", int64, (1,)),
+            ("gpu_state", uintp),
+            ("source_program", uintp),
+            ("precursor_program", uintp),
+            ("source_seed", uint64),
         ]
     )
 
@@ -1137,6 +1360,23 @@ def make_type_global(input_deck):
 # ==============================================================================
 # Util
 # ==============================================================================
+
+
+def make_type_translate(input_deck):
+    global translate
+    translate = into_dtype([("values", float64, (3,))])
+
+
+def make_type_group_array(input_deck):
+    global group_array
+    G = input_deck.materials[0]["G"]
+    group_array = into_dtype([("values", float64, (G,))])
+
+
+def make_type_j_array(input_deck):
+    global j_array
+    J = input_deck.materials[0]["J"]
+    j_array = into_dtype([("values", float64, (J,))])
 
 
 def make_type_mesh(card):
@@ -1148,7 +1388,7 @@ def make_type_mesh(card):
     N_azi = len(card["azi"]) - 1
     Ng = len(card["g"]) - 1
     return (
-        np.dtype(
+        into_dtype(
             [
                 ("x", float64, (Nx + 1,)),
                 ("y", float64, (Ny + 1,)),
@@ -1177,7 +1417,7 @@ def make_type_mesh_(card):
     Nmu = len(card["mu"]) - 1
     N_azi = len(card["azi"]) - 1
     return (
-        np.dtype(
+        into_dtype(
             [
                 ("x", float64, (Nx + 1,)),
                 ("y", float64, (Ny + 1,)),

@@ -13,6 +13,9 @@ __pycache__
 *.nbc
 *.nbi
 
+# GPU cache
+__ptxcache__
+
 # Editor
 .spyproject
 *.swp
@@ -51,3 +54,4 @@ pytestdebug.log
 docs/build
 docs/source/pythonapi/generated/
 
+*.csv
