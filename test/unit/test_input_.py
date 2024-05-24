@@ -85,7 +85,7 @@ def test_nuclide_basic():
 
 
 def test_nuclide_default():
-    """ Create nuclides with incomplete definitions. """
+    """Create nuclides with incomplete definitions."""
     mcdc.reset()
 
     n1 = mcdc.nuclide(capture=np.ones(5))
@@ -326,7 +326,7 @@ def test_material_IDs_sensitivity():
 def test_surface_input_lower():
     type_ = "pLaNe x"
     result = mcdc.surface(type_, bc="RefLeCtiVe", x=0.0)
-    assert result.boundary_type == 'reflective'
+    assert result.boundary_type == "reflective"
     assert result.A == 0.0
     assert result.B == 0.0
     assert result.C == 0.0
