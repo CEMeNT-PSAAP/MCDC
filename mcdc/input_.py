@@ -1831,12 +1831,12 @@ def uq(**kw):
     """
 
     def append_card(delta_card, global_tag):
-        delta_card.uq_parameters["distribution"] = dist
-        delta_card.uq_parameters["flags"] = []
+        delta_card.distribution = dist
+        delta_card.flags = []
         for key in kw.keys():
             check_support(parameter.tag + " parameter", key, parameter_list, False)
-            delta_card.uq_parameters["flags"].append(key)
-            delta_card.uq_parameters[key] = kw[key]
+            delta_card.flags.append(key)
+            setattr(delta_card, key, kw[key])
         global_.input_deck.uq_deltas[global_tag].append(delta_card)
 
     global_.input_deck.technique["uq"] = True
@@ -1882,9 +1882,7 @@ def uq(**kw):
             nuc_card = NuclideCard(parameter.G, parameter.J)
             nuc_card.ID = parameter.nuclide_IDs[0]
             append_card(nuc_card, "nuclides")
-        delta_card = MaterialCard(
-            parameter.N_nuclide, parameter.G, parameter.J
-        )
+        delta_card = MaterialCard(parameter.N_nuclide, parameter.G, parameter.J)
         for name in ["ID", "nuclide_IDs", "nuclide_densities"]:
             setattr(delta_card, name, getattr(parameter, name))
     elif parameter.tag == "Nuclide":

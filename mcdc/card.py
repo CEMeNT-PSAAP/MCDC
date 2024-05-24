@@ -48,7 +48,8 @@ class NuclideCard(InputCard):
         self.sensitivity_ID = 0
         self.dsm_Np = 1.0
         self.uq = False
-        self.uq_parameters = {}
+        self.flags = []
+        self.distribution = ""
 
 
 class MaterialCard(InputCard):
@@ -75,7 +76,8 @@ class MaterialCard(InputCard):
         self.chi_p = np.zeros([G, G])
         self.sensitivity = False
         self.uq = False
-        self.uq_parameters = {}
+        self.flags = []
+        self.distribution = ""
 
 
 class RegionCard(InputCard):
