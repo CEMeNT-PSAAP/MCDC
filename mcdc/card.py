@@ -48,6 +48,7 @@ class NuclideCard(InputCard):
         self.sensitivity_ID = 0
         self.dsm_Np = 1.0
         self.uq = False
+        self.uq_parameters = {}
 
 
 class MaterialCard(InputCard):
@@ -74,6 +75,7 @@ class MaterialCard(InputCard):
         self.chi_p = np.zeros([G, G])
         self.sensitivity = False
         self.uq = False
+        self.uq_parameters = {}
 
 
 class RegionCard(InputCard):
@@ -191,7 +193,17 @@ class LatticeCard(InputCard):
         # Set card data
         self.ID = None
         self.universe_IDs = np.array([[[[0]]]])
-        self.mesh = None
+        self.mesh = {
+            "x0": -INF,
+            "dx": 2 * INF,
+            "Nx": 1,
+            "y0": -INF,
+            "dy": 2 * INF,
+            "Ny": 1,
+            "z0": -INF,
+            "dz": 2 * INF,
+            "Nz": 1,
+        }
 
 
 class SourceCard(InputCard):
