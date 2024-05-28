@@ -1529,11 +1529,6 @@ def iQMC(
     source_x0=None,
     source_y0=None,
     source_z0=None,
-    source_xy0=None,
-    source_xz0=None,
-    source_yz0=None,
-    source_xyz0=None,
-    fission_source0=None,
     krylov_restart=None,
     fixed_source=None,
     scramble=False,
@@ -1572,16 +1567,6 @@ def iQMC(
         Initial source for tilt-y (default None).
     source_z0 : array_like[float], optional
         Initial source for tilt-z (default None).
-    source_xy0 : array_like[float], optional
-        Initial source for tilt-xy (default None).
-    source_xz0 : array_like[float], optional
-        Initial source for tilt-xz (default None).
-    source_yz0 : array_like[float], optional
-        Initial source for tilt-yz (default None).
-    source_xyz0 : array_like[float], optional
-        Initial source for tilt-xyz (default None).
-    fission_source0 : array_like[float], optional
-        Initial fission source (default None).
     krylov_restart : int, optional
         Max number of iterations for Krylov iteration (default same as maxitt).
     fixed_source : array_like[float], optional
@@ -1657,9 +1642,6 @@ def iQMC(
     if source0 is None:
         source0 = np.zeros_like(phi0)
 
-    if eigenmode_solver == "davidson":
-        card["iqmc"]["krylov_vector_size"] += 1
-
     score_list = card["iqmc"]["score_list"]
     for name in score:
         score_list[name] = True
@@ -1679,31 +1661,10 @@ def iQMC(
         if source_z0 is None:
             source_z0 = np.zeros_like(phi0)
 
-    if score_list["tilt-xy"]:
-        card["iqmc"]["krylov_vector_size"] += 1
-        if source_xy0 is None:
-            source_xy0 = np.zeros_like(phi0)
-
-    if score_list["tilt-xz"]:
-        card["iqmc"]["krylov_vector_size"] += 1
-        if source_xz0 is None:
-            source_xz0 = np.zeros_like(phi0)
-
-    if score_list["tilt-yz"]:
-        card["iqmc"]["krylov_vector_size"] += 1
-        if source_yz0 is None:
-            source_yz0 = np.zeros_like(phi0)
-
-    if fission_source0 is not None:
-        card["iqmc"]["score"]["fission-source"] = fission_source0
-
     card["iqmc"]["score"]["flux"] = phi0
     card["iqmc"]["score"]["tilt-x"] = source_x0
     card["iqmc"]["score"]["tilt-y"] = source_y0
     card["iqmc"]["score"]["tilt-z"] = source_z0
-    card["iqmc"]["score"]["tilt-xy"] = source_xy0
-    card["iqmc"]["score"]["tilt-xz"] = source_xz0
-    card["iqmc"]["score"]["tilt-yz"] = source_yz0
     card["iqmc"]["source"] = source0
     card["iqmc"]["fixed_source"] = fixed_source
     card["iqmc"]["fixed_source_solver"] = fixed_source_solver
