@@ -15,6 +15,7 @@ import mcdc.type_ as type_
 from mcdc.card import (
     NuclideCard,
     MaterialCard,
+    RegionCard,
     SurfaceCard,
     CellCard,
     UniverseCard,
@@ -35,6 +36,7 @@ from mcdc.constant import (
     INF,
     PI,
     SHIFT,
+    REGION_ALL,
 )
 from mcdc.print_ import print_error
 
@@ -179,6 +181,12 @@ def nuclide(
         elif chi_p is None:
             print_error("Need to supply chi_p if nu_p is provided and G > 1")
         else:
+            # Convert 1D spectrum to 2D
+            if chi_p.ndim == 1:
+                tmp = np.zeros((G, G))
+                for g in range(G):
+                    tmp[:, g] = chi_p
+                chi_p = tmp
             # Transpose: [gout, gin] -> [gin, gout]
             card.chi_p[:, :] = np.swapaxes(chi_p, 0, 1)[:, :]
             # Normalize
@@ -658,7 +666,7 @@ def set_J(x, t, card):
     card.N_slice = len(card.J)
 
 
-def cell(region, fill, translation=(0.0, 0.0, 0.0)):
+def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     """
     Create a cell as model building block.
 
@@ -690,18 +698,22 @@ def cell(region, fill, translation=(0.0, 0.0, 0.0)):
     # Set ID
     card.ID = len(global_.input_deck.cells)
 
+    # If region is not assigned, create a region that encompass all
+    if region is None:
+        region = RegionCard("all")
+        region.ID = len(global_.input_deck.regions)
+        global_.input_deck.regions.append(region)
+
     # Assign region
     card.region_ID = region.ID
 
-    # Fill type?
+    # Assign fill type and ID
     if fill.tag == "Material":
         card.fill_type = "material"
     elif fill.tag == "Universe":
         card.fill_type = "universe"
     elif fill.tag == "Lattice":
         card.fill_type = "lattice"
-
-    # Fill ID
     card.fill_ID = fill.ID
 
     # Translation
@@ -978,6 +990,12 @@ def source(**kw):
             card.energy[1, :] = sp.integrate.cumulative_trapezoid(
                 card.energy[1], x=card.energy[0], initial=0.0
             )
+    else:
+        # Default for MG
+        if global_.input_deck.setting["mode_MG"]:
+            G = global_.input_deck.materials[0].G
+            group = np.ones(G)
+            card.group = group / np.sum(group)
 
     # Set time
     if time is not None:

@@ -1760,6 +1760,9 @@ def region_check(P, region, trans, mcdc):
 
         return False
 
+    elif region["type"] == REGION_ALL:
+        return True
+
 
 # =============================================================================
 # Surface operations
