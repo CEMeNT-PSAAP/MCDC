@@ -538,6 +538,8 @@ def prepare():
             mcdc["regions"][i]["type"] = REGION_UNION
         elif input_deck.regions[i].type == "complement":
             mcdc["regions"][i]["type"] = REGION_COMPLEMENT
+        elif input_deck.regions[i].type == "all":
+            mcdc["regions"][i]["type"] = REGION_ALL
 
     # =========================================================================
     # Cells
