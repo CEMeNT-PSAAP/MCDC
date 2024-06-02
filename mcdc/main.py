@@ -700,10 +700,6 @@ def prepare():
         iqmc["generator"] = input_deck.technique["iqmc"]["generator"]
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-        # variables to generate samples
-        scramble = iqmc["scramble"]
-        N_dim = iqmc["N_dim"]
-        seed = iqmc["seed"]
         N_particle = mcdc["setting"]["N_particle"]
 
         mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
@@ -711,23 +707,23 @@ def prepare():
         kernel.distribute_work(N_particle, mcdc)
         N_work = int(mcdc["mpi_work_size"])
         N_start = int(mcdc["mpi_work_start"])
-
+        N_dim = 6
         # generate LDS
         if input_deck.technique["iqmc"]["generator"] == "sobol":
-            sampler = qmc.Sobol(d=N_dim, scramble=scramble)
+            sampler = qmc.Sobol(d=N_dim, scramble=False)
             # skip the first entry in Sobol sequence because its 0.0
             # skip the second because it maps to ux = 0.0
             sampler.fast_forward(2)
             sampler.fast_forward(N_start)
             iqmc["lds"] = sampler.random(N_work)
         if input_deck.technique["iqmc"]["generator"] == "halton":
-            sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
+            sampler = qmc.Halton(d=N_dim, scramble=False)
             # skip the first entry in Halton sequence because its 0.0
             sampler.fast_forward(1)
             sampler.fast_forward(N_start)
             iqmc["lds"] = sampler.random(N_work)
         if input_deck.technique["iqmc"]["generator"] == "random":
-            np.random.seed(seed)
+            np.random.seed(12345)
             seeds = np.random.randint(1e6, size=mcdc["mpi_size"])
             np.random.seed(seeds[mcdc["mpi_rank"]])
             iqmc["lds"] = np.random.random((N_work, N_dim))

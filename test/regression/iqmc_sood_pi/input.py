@@ -46,7 +46,7 @@ mcdc.iQMC(
     x=x,
     phi0=phi0,
     fixed_source=fixed_source,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
     generator=generator,
     eigenmode_solver=solver,
