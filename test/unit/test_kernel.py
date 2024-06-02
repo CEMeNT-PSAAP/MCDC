@@ -58,7 +58,7 @@ def iqmc_dummy_mcdc_variable():
         x=x,
         fixed_source=fixed_source,
         phi0=phi0,
-        maxitt=maxit,
+        maxit=maxit,
         tol=tol,
         generator=generator,
         eigenmode_solver=solver,
