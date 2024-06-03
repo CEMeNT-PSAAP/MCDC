@@ -26,7 +26,7 @@ mcdc.cell(+s1 & -s2, m)
 mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
 
 mcdc.tally.mesh_tally(
-    scores = ["flux"],
+    scores=["flux"],
     x=np.linspace(-20.0, 20.0, 202),
     t=np.linspace(0.0, 20.0, 21),
 )

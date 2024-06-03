@@ -2167,7 +2167,7 @@ def score_tracklength(P, distance, data, mcdc):
 @njit
 def tally_reduce(data, mcdc):
     tally = data[TALLY]
-    N_bin = mcdc['tally']['N_bin']
+    N_bin = mcdc["tally"]["N_bin"]
 
     # Normalize
     N_particle = mcdc["setting"]["N_particle"]
@@ -2184,7 +2184,7 @@ def tally_reduce(data, mcdc):
 @njit
 def tally_accumulate(data, mcdc):
     tally = data[TALLY]
-    N_bin = mcdc['tally']['N_bin']
+    N_bin = mcdc["tally"]["N_bin"]
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq

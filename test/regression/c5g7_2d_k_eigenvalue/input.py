@@ -184,8 +184,8 @@ source = mcdc.source(
 # Tally
 mcdc.tally.mesh_tally(
     scores=["flux"],
-    x = np.linspace(0.0, pitch * 17 * 3, 17 * 3 + 1),
-    y = np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1),
+    x=np.linspace(0.0, pitch * 17 * 3, 17 * 3 + 1),
+    y=np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1),
 )
 
 # Setting

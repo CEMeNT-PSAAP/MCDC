@@ -658,11 +658,10 @@ def prepare():
     if Ns > 1:
         mcdc["tally"]["stride"]["sensitivity"] = stride
     N_bin = Ns * Nmu * N_azi * Ng * Nt * Nx * Ny * Nz
-    mcdc['tally']['N_bin'] = N_bin
+    mcdc["tally"]["N_bin"] = N_bin
 
     # Set tally data
     tally = np.zeros((3, N_bin), dtype=type_.float64)
-
 
     # =========================================================================
     # Setting
@@ -1073,8 +1072,12 @@ def generate_hdf5(data, mcdc):
             N_sensitivity = input_deck.setting["N_sensitivity"]
             Ns = 1 + N_sensitivity
             if input_deck.technique["dsm_order"] == 2:
-                Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-            card = input_deck.tally['mesh']
+                Ns = (
+                    1
+                    + 2 * N_sensitivity
+                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                )
+            card = input_deck.tally["mesh"]
             Nmu = len(card["mu"]) - 1
             N_azi = len(card["azi"]) - 1
             Ng = len(card["g"]) - 1
