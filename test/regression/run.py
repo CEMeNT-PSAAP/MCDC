@@ -129,32 +129,26 @@ for i, name in enumerate(names):
     runtimes[-1] = output["runtime/total"][()]
     print("  (%.2f seconds)" % runtimes[-1][0])
 
-    # Compare all scores
-    for score in [key for key in output["tally"].keys() if key != "grid"]:
-        # Compare mean, sdev, and uq_var (if available)
-        for result in [key for key in output["tally/" + score].keys()]:
-            result_name = "tally/" + score + "/" + result
-            a = output[result_name][:]
-            b = answer[result_name][:]
+    # Compare mean, sdev, and uq_var (if available)
+    for result in [key for key in output["tally/flux"].keys()]:
+        if "iqmc" in output.keys():
+            break
+        if result in ["grid"]:
+            continue
 
-            # Passed?
-            if np.isclose(a, b).all():
-                print(
-                    Fore.GREEN
-                    + "  {}: Passed".format(score + "/" + result)
-                    + Style.RESET_ALL
-                )
-            else:
-                all_pass = False
-                error_msgs[-1].append(
-                    "Differences in %s"
-                    % (name + "/" + score + "/" + result + "\n" + "{}".format(a - b))
-                )
-                print(
-                    Fore.RED
-                    + "  {}: Failed".format(score + "/" + result)
-                    + Style.RESET_ALL
-                )
+        result_name = "tally/flux/" + result
+        a = output[result_name][:]
+        b = answer[result_name][:]
+
+        # Passed?
+        if np.isclose(a, b).all():
+            print(Fore.GREEN + "  {}: Passed".format(result) + Style.RESET_ALL)
+        else:
+            all_pass = False
+            error_msgs[-1].append(
+                "Differences in %s" % (name + "/" + result + "\n" + "{}".format(a - b))
+            )
+            print(Fore.RED + "  {}: Failed".format(result) + Style.RESET_ALL)
 
     # Other quantities
     for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:

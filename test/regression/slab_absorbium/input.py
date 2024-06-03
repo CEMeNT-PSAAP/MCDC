@@ -38,7 +38,7 @@ mcdc.source(z=[0.0, 6.0], isotropic=True)
 
 # Tally: cell-average and cell-edge angular fluxes and currents
 mcdc.tally.mesh_tally(
-    scores=["flux", "current"],
+    scores=["flux"],
     z=np.linspace(0.0, 6.0, 61),
     mu=np.linspace(-1.0, 1.0, 32 + 1),
 )

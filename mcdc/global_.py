@@ -36,14 +36,6 @@ class InputDeck:
 
         self.tally = {
             "tag": "Tally",
-            "tracklength": True,
-            "flux": False,
-            "density": False,
-            "fission": False,
-            "total": False,
-            "current": False,
-            "eddington": False,
-            "exit": False,
             "mesh": make_card_mesh(),
         }
 

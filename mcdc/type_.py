@@ -669,74 +669,30 @@ def make_type_source(input_deck):
 # ==============================================================================
 
 
-# Score lists
-score_list = (
-    "flux",
-    "density",
-    "fission",
-    "total",
-    "current",
-    "eddington",
-    "exit",
-)
-
-
 def make_type_tally(input_deck):
     global tally
 
-    # Number of sensitivitys parameters
-    N_sensitivity = input_deck.setting["N_sensitivity"]
-
-    # Number of tally scores
-    Ns = 1 + N_sensitivity
-    if input_deck.technique["dsm_order"] == 2:
-        Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-
-    # Get card
-    card = input_deck.tally
-
-    # Tally estimator flags
-    struct = [("tracklength", bool_)]
-
-    def make_type_score(shape):
-        return into_dtype(
-            [
-                ("bin", float64, shape),
-                ("mean", float64, shape),
-                ("sdev", float64, shape),
-            ]
-        )
-
     # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
-    struct += [("mesh", mesh)]
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(input_deck.tally["mesh"])
+    struct = [("mesh", mesh)]
 
     # Scores and shapes
-    scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+    # Make tally structure
+    # Tally strides
+    stride = [
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+        ("x", int64),
+        ("y", int64),
+        ("z", int64),
     ]
+    struct += [("stride", stride)]
 
-    # Add score flags to structure
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        struct += [(name, bool_)]
-
-    # Add scores to structure
-    scores_struct = []
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        shape = scores_shapes[i][1]
-        if not card[name]:
-            shape = (0,) * len(shape)
-        scores_struct += [(name, make_type_score(shape))]
-    scores = into_dtype(scores_struct)
-    struct += [("score", scores)]
+    # Total number of bins
+    struct += [("N_bin", int64)]
 
     # Make tally structure
     tally = into_dtype(struct)
@@ -1036,52 +992,24 @@ def make_type_technique(input_deck):
 def make_type_uq_tally(input_deck):
     global uq_tally
 
-    def make_type_uq_score(shape):
-        return into_dtype(
-            [
-                ("batch_bin", float64, shape),
-                ("batch_var", float64, shape),
-            ]
-        )
-
     # Tally estimator flags
     struct = []
-
-    # Number of tally scores
-    Ns = 1 + input_deck.setting["N_sensitivity"]
 
     # Tally card
     tally_card = input_deck.tally
 
     # Mesh, but doesn't need to be added
+    tally_card
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
 
-    # Scores and shapes
-    scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
-    ]
-
-    # Add score flags to structure
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        struct += [(name, bool_)]
-
-    # Add scores to structure
-    scores_struct = []
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        shape = scores_shapes[i][1]
-        if not tally_card[name]:
-            shape = (0,) * len(shape)
-        scores_struct += [(name, make_type_uq_score(shape))]
-    scores = into_dtype(scores_struct)
-    struct += [("score", scores)]
+    # Tally shape and bins
+    if input_deck.technique['uq']:
+        N_bin = Ns * Nmu * N_azi * Ng * Nt * Nx * Ny * Nz
+    else:
+        N_bin = 0
+    shape = (N_bin,)
+    struct += [("batch_bin", float64, shape)]
+    struct += [("batch_var", float64, shape)]
 
     # Make tally structure
     uq_tally = into_dtype(struct)
