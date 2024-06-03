@@ -70,7 +70,7 @@ x = np.array(
     ]
 )
 scores = ["flux"]
-mcdc.tally(scores=scores, x=x)
+mcdc.tally.mesh_tally(scores=scores, x=x)
 
 # Setting
 mcdc.setting(N_particle=100, progress_bar=False, census_bank_buff=2.0)

@@ -31,7 +31,7 @@ mcdc.source(point=[1e-10, 0.0, 0.0], time=[0.0, 5.0], white_direction=[1.0, 0.0,
 # =============================================================================
 
 # Tally
-mcdc.tally(
+mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 5.0, 51),
     t=np.linspace(0.0, 5.0, 51),

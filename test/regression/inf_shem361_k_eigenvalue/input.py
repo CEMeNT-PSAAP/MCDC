@@ -47,7 +47,10 @@ source = mcdc.source(energy=np.ones(G))  # Arbitrary
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=["flux"], g="all")
+mcdc.tally.mesh_tally(
+    scores=["flux"],
+    g="all",
+)
 
 # Setting
 mcdc.setting(N_particle=1e2)
