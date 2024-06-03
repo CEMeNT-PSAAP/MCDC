@@ -6,7 +6,6 @@ from mcdc.input_ import (
     universe,
     lattice,
     source,
-    tally,
     setting,
     eigenmode,
     implicit_capture,
@@ -23,5 +22,6 @@ from mcdc.input_ import (
     reset,
     domain_decomposition,
 )
+import mcdc.tally
 from mcdc.main import run, prepare
 from mcdc.visualizer import visualize
