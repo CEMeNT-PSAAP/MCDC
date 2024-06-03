@@ -257,7 +257,7 @@ def source_closeout(prog, idx_work, N_prog, data):
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_accumulate(data, mcdc)
+        kernel.uq_tally_closeout_history(data, mcdc)
 
     # Progress printout
     percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
@@ -636,7 +636,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
 
 @njit(cache=caching)
-def source_precursor_closeout(prog, idx_work, N_prog):
+def source_precursor_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.device(prog)
 
     # Tally history closeout for fixed-source simulation
@@ -698,7 +698,7 @@ def loop_source_precursor(seed, data, mcdc):
         # Closeout
         # =====================================================================
 
-        source_precursor_closeout(mcdc, idx_work, N_prog)
+        source_precursor_closeout(mcdc, idx_work, N_prog, data)
 
 
 def gpu_precursor_spec():
@@ -802,7 +802,7 @@ def gpu_loop_source_precursor(seed, mcdc):
     # Closeout (moved out of loop)
     # =====================================================================
 
-    source_precursor_closeout(mcdc, 1, 1)
+    source_precursor_closeout(mcdc, 1, 1, data)
 
 
 def build_gpu_progs():
