@@ -42,7 +42,7 @@ mcdc.cell(+s3 & -s4, mat_cr)
 mcdc.source(point=[1.0, 0.0, 0.0], energy=[1, 0, 0, 0, 0, 0, 0], isotropic=True)
 
 mcdc.tally.mesh_tally(
-    scores = ["flux"],
+    scores=["flux"],
     x=np.linspace(0.0, 2.0, 11),
     g="all",
 )
