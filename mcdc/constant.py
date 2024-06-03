@@ -3,6 +3,14 @@ import numpy as np
 import numba as nb
 
 
+# Data index
+TALLY = 0
+
+# Tally bins
+TALLY_SCORE = 0
+TALLY_SUM = 1
+TALLY_SUM_SQ = 2
+
 # Boundary condition
 BC_NONE = 0
 BC_VACUUM = 1

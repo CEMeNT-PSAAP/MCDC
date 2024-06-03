@@ -71,16 +71,4 @@ def mesh_tally(
     if global_.input_deck.setting["mode_CE"]:
         card["mesh"]["g"] = E
 
-    # Set score flags
-    for s in scores:
-        found = False
-        for score_name in type_.score_list:
-            if s.replace("-", "_") == score_name:
-                card["tracklength"] = True
-                card[score_name] = True
-                found = True
-                break
-        if not found:
-            print_error("Unknown tally score %s" % s)
-
     return card
