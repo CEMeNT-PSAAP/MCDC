@@ -40,7 +40,8 @@ universe = None
 lattice = None
 source = None
 setting = None
-tally = None
+mesh_tally = None
+surface_tally = None
 technique = None
 
 # GPU mode related
@@ -481,10 +482,12 @@ def make_type_material(input_deck):
 def make_type_surface(input_deck):
     global surface
 
-    # Maximum number of time-dependent surface slices
+    # Maximum number of time-dependent surface slices and tallies
     Nmax_slice = 0
+    Nmax_tally = 0
     for surface in input_deck.surfaces:
         Nmax_slice = max(Nmax_slice, surface.N_slice)
+        Nmax_tally = max(Nmax_tally, len(surface.tally_IDs))
 
     surface = into_dtype(
         [
@@ -509,6 +512,8 @@ def make_type_surface(input_deck):
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
             ("dsm_Np", float64),
+            ("N_tally", int64),
+            ("tally_IDs", int64, (Nmax_tally,)),
         ]
     )
 
@@ -665,21 +670,48 @@ def make_type_source(input_deck):
 
 
 # ==============================================================================
-# Tally
+# Tallies
 # ==============================================================================
 
 
-def make_type_tally(input_deck):
-    global tally
+def make_type_mesh_tally(input_deck):
+    global mesh_tally
+    struct = []
 
-    # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(input_deck.tally["mesh"])
-    struct = [("mesh", mesh)]
+    # Maximum numbers of mesh and filter grids and scores
+    Nmax_x = 2
+    Nmax_y = 2
+    Nmax_z = 2
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+    for card in input_deck.mesh_tallies:
+        Nmax_x = max(Nmax_x, len(card.x))
+        Nmax_y = max(Nmax_y, len(card.y))
+        Nmax_z = max(Nmax_z, len(card.z))
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
 
-    # Scores and shapes
-    # Make tally structure
+    # Set the filter
+    filter_ = [
+        ("x", float64, (Nmax_x,)),
+        ("y", float64, (Nmax_y,)),
+        ("z", float64, (Nmax_z,)),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
+    ]
+    struct += [("filter", filter_)]
+
     # Tally strides
     stride = [
+        ("tally", int64),
         ("sensitivity", int64),
         ("mu", int64),
         ("azi", int64),
@@ -694,8 +726,65 @@ def make_type_tally(input_deck):
     # Total number of bins
     struct += [("N_bin", int64)]
 
+    # Scores
+    struct += [
+        ("N_score", int64),
+        ("scores", int64, (Nmax_score,))
+    ]
+
     # Make tally structure
-    tally = into_dtype(struct)
+    mesh_tally = into_dtype(struct)
+
+
+def make_type_surface_tally(input_deck):
+    global surface_tally
+    struct = []
+
+    # Maximum number of grid for each mesh coordinate and filter
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+    for card in input_deck.mesh_tallies:
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
+
+    # Set the filter
+    filter_ = [
+        ("surface_ID", int64),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
+    ]
+    struct = [("filter", filter_)]
+
+    # Tally strides
+    stride = [
+        ("tally", int64),
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+    ]
+    struct += [("stride", stride)]
+
+    # Total number of bins
+    struct += [("N_bin", int64)]
+
+    # Scores
+    struct += [
+        ("N_score", int64),
+        ("scores", int64, (Nmax_score,))
+    ]
+
+    # Make tally structure
+    surface_tally = into_dtype(struct)
 
 
 # ==============================================================================
@@ -982,39 +1071,14 @@ def make_type_technique(input_deck):
     # =========================================================================
     # Variance Deconvolution
     # =========================================================================
-    struct += [("uq_tally", uq_tally), ("uq_", uq)]
+
+    struct += [("uq_", uq)]
 
     # Finalize technique type
     technique = into_dtype(struct)
 
 
 # UQ
-def make_type_uq_tally(input_deck):
-    global uq_tally
-
-    # Tally estimator flags
-    struct = []
-
-    # Tally card
-    tally_card = input_deck.tally
-
-    # Mesh, but doesn't need to be added
-    tally_card
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
-
-    # Tally shape and bins
-    if input_deck.technique["uq"]:
-        N_bin = Ns * Nmu * N_azi * Ng * Nt * Nx * Ny * Nz
-    else:
-        N_bin = 0
-    shape = (N_bin,)
-    struct += [("batch_bin", float64, shape)]
-    struct += [("batch_var", float64, shape)]
-
-    # Make tally structure
-    uq_tally = into_dtype(struct)
-
-
 def make_type_uq(input_deck):
     global uq, uq_nuc, uq_mat
 
@@ -1166,6 +1230,8 @@ def make_type_global(input_deck):
     N_source = len(input_deck.sources)
     N_universe = len(input_deck.universes)
     N_lattice = len(input_deck.lattices)
+    N_mesh_tally = len(input_deck.mesh_tallies)
+    N_surface_tally = len(input_deck.surface_tallies)
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1231,7 +1297,8 @@ def make_type_global(input_deck):
             ("universes", universe, (N_universe,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
-            ("tally", tally),
+            ("mesh_tallies", mesh_tally, (N_mesh_tally,)),
+            ("surface_tallies", surface_tally, (N_surface_tally,)),
             ("setting", setting),
             ("technique", technique),
             ("domain_decomp", domain_decomp),

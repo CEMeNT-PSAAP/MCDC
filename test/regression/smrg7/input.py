@@ -379,7 +379,13 @@ source = mcdc.source(
 x_grid = np.linspace(-pitch * 17 * 9 / 2, pitch * 17 * 9 / 2, 9 + 1)
 y_grid = np.linspace(-pitch * 17 * 9 / 2, pitch * 17 * 9 / 2, 9 + 1)
 z_grid = np.linspace(-130, 130, 14)
-mcdc.tally.mesh_tally(scores=["flux"], x=x_grid, y=y_grid, z=z_grid, g="all")
+mcdc.tally.mesh_tally(
+    x=x_grid,
+    y=y_grid,
+    z=z_grid,
+    g="all",
+    scores=["flux", "total", "fission"],
+)
 
 # Setting
 mcdc.setting(N_particle=30, census_bank_buff=2)

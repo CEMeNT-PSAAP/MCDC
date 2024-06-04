@@ -1,6 +1,6 @@
 import numpy as np
 
-from mcdc.constant import INF, SHIFT
+from mcdc.constant import INF, SHIFT, PI
 
 # Get the global variable container
 import mcdc.global_ as global_
@@ -144,6 +144,8 @@ class SurfaceCard(InputCard):
         self.sensitivity = False
         self.sensitivity_ID = 0
         self.dsm_Np = 1.0
+        self.N_tally = 0
+        self.tally_IDs = []
 
     def __pos__(self):
         region = RegionCard("halfspace")
@@ -233,3 +235,44 @@ class SourceCard(InputCard):
         self.energy = np.array([[14e6, 14e6], [1.0, 1.0]])
         self.time = np.array([0.0, 0.0])
         self.prob = 1.0
+
+
+# ======================================================================================
+# Tally cards
+# ======================================================================================
+
+
+class TallyCard(InputCard):
+    def __init__(self, type_):
+        InputCard.__init__(self, type_)
+
+        # Set card data
+        self.ID = None
+        self.scores = []
+        self.N_bin = 0
+
+        # Filters
+        self.t = np.array([-INF, INF])
+        self.mu = np.array([-1.0, 1.0])
+        self.azi = np.array([-PI, PI])
+        self.g = np.array([-INF, INF])
+
+
+class MeshTallyCard(TallyCard):
+    def __init__(self):
+        TallyCard.__init__(self, "Mesh tally")
+
+        # Set card data
+        self.x = np.array([-INF, INF])
+        self.y = np.array([-INF, INF])
+        self.z = np.array([-INF, INF])
+        self.N_bin = 1
+
+
+class SurfaceTallyCard(TallyCard):
+    def __init__(self, surface_ID):
+        TallyCard.__init__(self, "Surface tally")
+
+        # Set card data
+        self.surface_ID = surface_ID
+        self.N_bin = 1

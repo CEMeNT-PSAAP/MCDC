@@ -23,8 +23,7 @@ mcdc.cell(+s3 & -s4, m3)
 
 mcdc.source(point=[0.0, 0.0, 0.0], direction=[1.0, 0.0, 0.0])
 
-scores = ["exit"]
-mcdc.tally.mesh_tally(scores=scores, x=np.linspace(0.0, 6.0, 2))
+mcdc.tally.surface_tally(s4, scores=["net-current"])
 
 mcdc.setting(N_particle=1e1, N_batch=1e1, progress_bar=False)
 

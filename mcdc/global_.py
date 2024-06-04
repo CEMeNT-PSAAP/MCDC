@@ -33,11 +33,8 @@ class InputDeck:
         self.universes = [None]  # Placeholder for the root universe
         self.lattices = []
         self.sources = []
-
-        self.tally = {
-            "tag": "Tally",
-            "mesh": make_card_mesh(),
-        }
+        self.mesh_tallies = []
+        self.surface_tallies = []
 
         self.setting = {
             "tag": "Setting",
