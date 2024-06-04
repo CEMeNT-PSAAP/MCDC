@@ -123,7 +123,7 @@ def loop_fixed_source(data, mcdc):
             kernel.tally_accumulate(data, mcdc)
             # Uq closeout
             if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(mcdc)
+                kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
     if mcdc["technique"]["uq"]:
@@ -508,7 +508,7 @@ def step_particle(P, data, prog):
 
     # Surface crossing
     if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, prog)
+        kernel.surface_crossing(P, data, prog)
         if event & EVENT_DOMAIN:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)

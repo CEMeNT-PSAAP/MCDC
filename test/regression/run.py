@@ -130,41 +130,44 @@ for i, name in enumerate(names):
     print("  (%.2f seconds)" % runtimes[-1][0])
 
     # Compare mean, sdev, and uq_var (if available)
-    for result in [key for key in output["tally/flux"].keys()]:
-        if "iqmc" in output.keys():
-            break
-        if result in ["grid"]:
-            continue
+    if "iqmc" not in output.keys():
+        name_root = "tallies"
+        for tally in [key for key in answer[name_root].keys()]:
+            name_tally = name_root + "/" + tally
+            for score in [key for key in answer[name_tally].keys()]:
+                if score in ["grid"]:
+                    continue
+                name_score = name_tally + "/" + score
+                for result in [key for key in answer[name_score].keys()]:
+                    name = name_score + "/" + result
+                    a = output[name][()]
+                    b = answer[name][()]
 
-        result_name = "tally/flux/" + result
-        a = output[result_name][:]
-        b = answer[result_name][:]
+                    # Passed?
+                    if np.isclose(a, b).all():
+                        print(Fore.GREEN + "  {}: Passed".format(name) + Style.RESET_ALL)
+                    else:
+                        all_pass = False
+                        error_msgs[-1].append(
+                            "Differences in %s" % (name + "/" + result + "\n" + "{}".format(a - b))
+                        )
+                        print(Fore.RED + "  {}: Failed".format(name) + Style.RESET_ALL)
 
-        # Passed?
-        if np.isclose(a, b).all():
-            print(Fore.GREEN + "  {}: Passed".format(result) + Style.RESET_ALL)
-        else:
-            all_pass = False
-            error_msgs[-1].append(
-                "Differences in %s" % (name + "/" + result + "\n" + "{}".format(a - b))
-            )
-            print(Fore.RED + "  {}: Failed".format(result) + Style.RESET_ALL)
+        # Other quantities
+        for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:
+            if result_name not in output.keys():
+                continue
 
-    # Other quantities
-    for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:
-        if result_name not in output.keys():
-            continue
+            a = output[result_name][()]
+            b = answer[result_name][()]
 
-        a = output[result_name][()]
-        b = answer[result_name][()]
-
-        # Passed?
-        if np.isclose(a, b).all():
-            print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
-        else:
-            all_pass = False
-            error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
-            print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
+            # Passed?
+            if np.isclose(a, b).all():
+                print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
+            else:
+                all_pass = False
+                error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
+                print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
 
     # iQMC flux
     if "iqmc" in output.keys():

@@ -2131,11 +2131,11 @@ def mesh_crossing_evaluate(P, mesh):
 
 
 @njit
-def score_tracklength(P, distance, data, mcdc):
-    tally = data[TALLY]
+def score_mesh_tally(P, distance, tally, data, mcdc):
+    tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
-    mesh = mcdc["tally"]["mesh"]
-    stride = mcdc["tally"]["stride"]
+    mesh = tally['filter']
+    stride = tally["stride"]
 
     # Get indices
     s = P["sensitivity_ID"]
@@ -2149,7 +2149,8 @@ def score_tracklength(P, distance, data, mcdc):
 
     # The tally index
     idx = (
-        s * stride["sensitivity"]
+        stride["tally"]
+        + s * stride["sensitivity"]
         + mu * stride["mu"]
         + azi * stride["azi"]
         + g * stride["g"]
@@ -2161,39 +2162,74 @@ def score_tracklength(P, distance, data, mcdc):
 
     # Score
     flux = distance * P["w"]
-    tally[TALLY_SCORE, idx] += flux
+    for i in range(tally['N_score']):
+        score_type = tally['scores'][i]
+        if score_type == SCORE_FLUX:
+            score = flux
+        elif score_type == SCORE_TOTAL:
+            SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+            score = flux * SigmaT
+        elif score_type == SCORE_FISSION:
+            SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+            score = flux * SigmaF
+        tally_bin[TALLY_SCORE, idx + i] += score
+
+
+@njit
+def score_surface_tally(P, surface, tally, data, mcdc):
+    # TODO: currently not supporting filters
+
+    tally_bin = data[TALLY]
+    stride = tally["stride"]
+
+    # The tally index
+    idx = stride["tally"]
+
+    # Flux
+    trans = P["translation"]
+    mu = surface_normal_component(P, surface, trans)
+    flux = P["w"] / abs(mu)
+
+    # Score
+    for i in range(tally['N_score']):
+        score_type = tally['scores'][i]
+        if score_type == SCORE_FLUX:
+            score = flux
+        elif score_type == SCORE_NET_CURRENT:
+            score = flux * mu
+        tally_bin[TALLY_SCORE, idx + i] += score
 
 
 @njit
 def tally_reduce(data, mcdc):
-    tally = data[TALLY]
-    N_bin = mcdc["tally"]["N_bin"]
+    tally_bin = data[TALLY]
+    N_bin = tally_bin.shape[1]
 
     # Normalize
     N_particle = mcdc["setting"]["N_particle"]
     for i in range(N_bin):
-        tally[TALLY_SCORE][i] /= N_particle
+        tally_bin[TALLY_SCORE][i] /= N_particle
 
     # MPI Reduce
-    buff = np.zeros_like(tally[TALLY_SCORE])
+    buff = np.zeros_like(tally_bin[TALLY_SCORE])
     with objmode():
-        MPI.COMM_WORLD.Reduce(tally[TALLY_SCORE], buff, MPI.SUM, 0)
-    tally[TALLY_SCORE][:] = buff
+        MPI.COMM_WORLD.Reduce(tally_bin[TALLY_SCORE], buff, MPI.SUM, 0)
+    tally_bin[TALLY_SCORE][:] = buff
 
 
 @njit
 def tally_accumulate(data, mcdc):
-    tally = data[TALLY]
-    N_bin = mcdc["tally"]["N_bin"]
+    tally_bin = data[TALLY]
+    N_bin = tally_bin.shape[1]
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq
-        score = tally[TALLY_SCORE, i]
-        tally[TALLY_SUM, i] += score
-        tally[TALLY_SUM_SQ, i] += score * score
+        score = tally_bin[TALLY_SCORE, i]
+        tally_bin[TALLY_SUM, i] += score
+        tally_bin[TALLY_SUM_SQ, i] += score * score
 
         # Reset score bin
-        tally[TALLY_SCORE, i] = 0.0
+        tally_bin[TALLY_SCORE, i] = 0.0
 
 
 @njit
@@ -2234,7 +2270,6 @@ def tally_closeout(data, mcdc):
 
 @njit
 def eigenvalue_tally(P, distance, mcdc):
-    tally = mcdc["tally"]
     material = mcdc["materials"][P["material_ID"]]
     flux = distance * P["w"]
 
@@ -2457,11 +2492,11 @@ def move_to_event(P, data, mcdc):
     # Also set particle material and speed
     d_boundary, event = distance_to_boundary(P, mcdc)
 
-    # print(P["material_ID"])
     # Distance to tally mesh
     d_mesh = INF
     if mcdc["cycle_active"]:
-        d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
+        for tally in mcdc['mesh_tallies']:
+            d_mesh = min(d_mesh, distance_to_mesh(P, tally['filter'], mcdc))
 
     d_domain = INF
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
@@ -2513,7 +2548,8 @@ def move_to_event(P, data, mcdc):
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
-        score_tracklength(P, distance, data, mcdc)
+        for tally in mcdc['mesh_tallies']:
+            score_mesh_tally(P, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P, distance, mcdc)
 
@@ -2665,6 +2701,26 @@ def distance_to_mesh(P, mesh, mcdc):
     d = min(d, mesh_distance_search(t, 1.0 / v, mesh["t"]))
     return d
 
+@njit
+def distance_to_tally_mesh(P, mcdc):
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    v = get_particle_speed(P, mcdc)
+
+    d = INF
+
+    for tally in mcdc['mesh_tallies']:
+        d = min(d, mesh_distance_search(x, ux, tally['filter']["x"]))
+        d = min(d, mesh_distance_search(y, uy, tally['filter']["y"]))
+        d = min(d, mesh_distance_search(z, uz, tally['filter']["z"]))
+        d = min(d, mesh_distance_search(t, 1.0 / v, tally['filter']["t"]))
+
+    return d
 
 # =============================================================================
 # Surface crossing
@@ -2672,16 +2728,23 @@ def distance_to_mesh(P, mesh, mcdc):
 
 
 @njit
-def surface_crossing(P, prog):
-
+def surface_crossing(P, data, prog):
     mcdc = adapt.device(prog)
 
+    surface = mcdc["surfaces"][P["surface_ID"]]
+
+    # Translation
     trans_struct = adapt.local_translate()
     trans = trans_struct["values"]
     trans = P["translation"]
 
+    # Score tally
+    for i in range(surface['N_tally']):
+        ID = surface['tally_IDs'][i]
+        tally = mcdc['surface_tallies'][ID]
+        score_surface_tally(P, surface, tally, data, mcdc)
+
     # Implement BC
-    surface = mcdc["surfaces"][P["surface_ID"]]
     surface_bc(P, surface, trans)
 
     # Small shift to ensure crossing
@@ -4958,47 +5021,48 @@ def uq_reset(mcdc, seed):
 
 @njit
 def uq_tally_closeout_history(data, mcdc):
-    tally = data[TALLY]
-    uq_tally = mcdc["technique"]["uq_tally"]
+    tally_bin = data[TALLY]
 
     # Assumes N_batch > 1
     # Accumulate square of history score, but continue to accumulate bin
-    history_bin = tally[TALLY_SCORE] - uq_tally["batch_bin"]
-    uq_tally["batch_var"][:] += history_bin**2
-    uq_tally["batch_bin"] = tally[TALLY_SCORE]
+    history_bin = tally_bin[TALLY_SCORE] - tally_bin[TALLY_UQ_BATCH]
+    tally_bin[TALLY_UQ_BATCH_VAR] += history_bin**2
+    tally_bin[TALLY_UQ_BATCH] = tally_bin[TALLY_SCORE]
 
 
 @njit
-def uq_tally_closeout_batch(mcdc):
-    uq_tally = mcdc["technique"]["uq_tally"]
+def uq_tally_closeout_batch(data, mcdc):
+    tally_bin = data[TALLY]
 
     # Reset bin
-    uq_tally["batch_bin"].fill(0.0)
+    N_bin = tally_bin.shape[1]
+    for i in range(N_bin):
+        # Reset score bin
+        tally_bin[TALLY_UQ_BATCH, i] = 0.0
 
     # MPI Reduce
-    buff = np.zeros_like(uq_tally["batch_var"])
+    buff = np.zeros(N_bin)
     with objmode():
-        MPI.COMM_WORLD.Reduce(np.array(uq_tally["batch_var"]), buff, MPI.SUM, 0)
-    uq_tally["batch_var"][:] = buff
+        MPI.COMM_WORLD.Reduce(np.array(tally_bin[TALLY_UQ_BATCH_VAR]), buff, MPI.SUM, 0)
+    tally_bin[TALLY_UQ_BATCH_VAR][:] = buff
 
 
 @njit
 def uq_tally_closeout(data, mcdc):
-    tally = data[TALLY]
-    uq_tally = mcdc["technique"]["uq_tally"]
+    tally_bin = data[TALLY]
 
     N_history = mcdc["setting"]["N_particle"]
 
-    uq_tally["batch_var"] = (
-        uq_tally["batch_var"] / N_history - tally[TALLY_SUM_SQ]
+    tally_bin[TALLY_UQ_BATCH_VAR] = (
+        tally_bin[TALLY_UQ_BATCH_VAR] / N_history - tally_bin[TALLY_SUM_SQ]
     ) / (N_history - 1)
 
     # If we're here, N_batch > 1
     N_history = mcdc["setting"]["N_batch"]
 
     # Store results
-    mean = tally[TALLY_SUM] / N_history
-    uq_tally["batch_var"] /= N_history
-    uq_tally["batch_bin"] = (tally[TALLY_SUM_SQ] - N_history * np.square(mean)) / (
+    mean = tally_bin[TALLY_SUM] / N_history
+    tally_bin[TALLY_UQ_BATCH_VAR] /= N_history
+    tally_bin[TALLY_UQ_BATCH] = (tally_bin[TALLY_SUM_SQ] - N_history * np.square(mean)) / (
         N_history - 1
     )

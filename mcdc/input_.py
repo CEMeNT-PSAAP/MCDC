@@ -1230,10 +1230,6 @@ def eigenmode(
         else:
             print_error("Unknown gyration radius type")
 
-    # Update tally card
-    card = global_.input_deck.tally
-    card["tracklength"] = True
-
 
 # ==============================================================================
 # Technique
