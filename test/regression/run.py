@@ -145,11 +145,14 @@ for i, name in enumerate(names):
 
                     # Passed?
                     if np.isclose(a, b).all():
-                        print(Fore.GREEN + "  {}: Passed".format(name) + Style.RESET_ALL)
+                        print(
+                            Fore.GREEN + "  {}: Passed".format(name) + Style.RESET_ALL
+                        )
                     else:
                         all_pass = False
                         error_msgs[-1].append(
-                            "Differences in %s" % (name + "/" + result + "\n" + "{}".format(a - b))
+                            "Differences in %s"
+                            % (name + "/" + result + "\n" + "{}".format(a - b))
                         )
                         print(Fore.RED + "  {}: Failed".format(name) + Style.RESET_ALL)
 
@@ -166,7 +169,9 @@ for i, name in enumerate(names):
                 print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
             else:
                 all_pass = False
-                error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
+                error_msgs[-1].append(
+                    "Differences in {}\n{}".format(result_name, a - b)
+                )
                 print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
 
     # iQMC flux

@@ -519,7 +519,6 @@ def prepare():
             N = len(getattr(input_deck.surfaces[i], name))
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
-
     # =========================================================================
     # Regions
     # =========================================================================
@@ -630,11 +629,13 @@ def prepare():
         # Filters (variables with possible different sizes)
         for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
             N = len(getattr(input_deck.mesh_tallies[i], name))
-            mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(input_deck.mesh_tallies[i], name)
+            mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
+                input_deck.mesh_tallies[i], name
+            )
 
         # Set tally scores
         N_score = len(input_deck.mesh_tallies[i].scores)
-        mcdc["mesh_tallies"][i]['N_score'] = N_score
+        mcdc["mesh_tallies"][i]["N_score"] = N_score
         for j in range(N_score):
             score_name = input_deck.mesh_tallies[i].scores[j]
             score_type = None
@@ -646,7 +647,7 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
-            mcdc["mesh_tallies"][i]['scores'][j] = score_type
+            mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
         N_sensitivity = input_deck.setting["N_sensitivity"]
@@ -691,7 +692,7 @@ def prepare():
             mcdc["mesh_tallies"][i]["stride"]["sensitivity"] = stride
 
         # Set tally stride and accumulate total tally size
-        mcdc["mesh_tallies"][i]['stride']["tally"] = tally_size
+        mcdc["mesh_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["mesh_tallies"][i]["N_bin"]
 
     # Surface tallies
@@ -702,11 +703,13 @@ def prepare():
         # Filters (variables with possible different sizes)
         for name in ["t", "mu", "azi", "g"]:
             N = len(getattr(input_deck.surface_tallies[i], name))
-            mcdc["surface_tallies"][i]["filter"][name][:N] = getattr(input_deck.surface_tallies[i], name)
+            mcdc["surface_tallies"][i]["filter"][name][:N] = getattr(
+                input_deck.surface_tallies[i], name
+            )
 
         # Set tally scores and their strides
         N_score = len(input_deck.surface_tallies[i].scores)
-        mcdc["surface_tallies"][i]['N_score'] = N_score
+        mcdc["surface_tallies"][i]["N_score"] = N_score
         for j in range(N_score):
             score_name = input_deck.surface_tallies[i].scores[j]
             score_type = None
@@ -716,7 +719,7 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
-            mcdc["surface_tallies"][i]['scores'][j] = score_type
+            mcdc["surface_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
         N_sensitivity = input_deck.setting["N_sensitivity"]
@@ -749,11 +752,11 @@ def prepare():
             mcdc["surface_tallies"][i]["stride"]["sensitivity"] = stride
 
         # Set tally stride and accumulate total tally size
-        mcdc["surface_tallies"][i]['stride']["tally"] = tally_size
+        mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
     # Set tally data
-    if not input_deck.technique['uq']:
+    if not input_deck.technique["uq"]:
         tally = np.zeros((3, tally_size), dtype=type_.float64)
     else:
         tally = np.zeros((5, tally_size), dtype=type_.float64)
@@ -765,7 +768,12 @@ def prepare():
     for name in type_.setting.names:
         copy_field(mcdc["setting"], input_deck.setting, name)
 
-    t_limit = max([tally['filter']['t'][-1] for tally in list(mcdc['mesh_tallies']) + list(mcdc['surface_tallies'])])
+    t_limit = max(
+        [
+            tally["filter"]["t"][-1]
+            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"])
+        ]
+    )
 
     # Check if time boundary is above the final tally mesh time grid
     if mcdc["setting"]["time_boundary"] > t_limit:
@@ -1150,25 +1158,29 @@ def generate_hdf5(data, mcdc):
                 cardlist_to_h5group(input_deck.lattices, input_group, "lattice")
                 cardlist_to_h5group(input_deck.sources, input_group, "source")
                 cardlist_to_h5group(input_deck.mesh_tallies, input_group, "mesh_tallie")
-                cardlist_to_h5group(input_deck.surface_tallies, input_group, "surface_tally")
+                cardlist_to_h5group(
+                    input_deck.surface_tallies, input_group, "surface_tally"
+                )
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
                 )
 
             # Mesh tallies
-            for ID, tally in enumerate(mcdc['mesh_tallies']):
+            for ID, tally in enumerate(mcdc["mesh_tallies"]):
                 if mcdc["technique"]["iQMC"]:
                     break
 
-                mesh = tally['filter']
-                f.create_dataset("tallies/mesh_tally_%i/grid/t"%ID, data=mesh["t"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/x"%ID, data=mesh["x"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/y"%ID, data=mesh["y"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/z"%ID, data=mesh["z"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/mu"%ID, data=mesh["mu"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/azi"%ID, data=mesh["azi"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/g"%ID, data=mesh["g"])
+                mesh = tally["filter"]
+                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"])
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"]
+                )
+                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
 
                 # Shape
                 N_sensitivity = input_deck.setting["N_sensitivity"]
@@ -1186,7 +1198,7 @@ def generate_hdf5(data, mcdc):
                 Ny = len(mesh["y"]) - 1
                 Nz = len(mesh["z"]) - 1
                 Nt = len(mesh["t"]) - 1
-                N_score = tally['N_score']
+                N_score = tally["N_score"]
 
                 if not mcdc["technique"]["uq"]:
                     shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
@@ -1194,9 +1206,9 @@ def generate_hdf5(data, mcdc):
                     shape = (5, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
 
                 # Reshape tally
-                N_bin = tally['N_bin']
-                start = tally['stride']['tally']
-                tally_bin = data[TALLY][:,start:start+N_bin]
+                N_bin = tally["N_bin"]
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -1204,7 +1216,7 @@ def generate_hdf5(data, mcdc):
 
                 # Iterate over scores
                 for i in range(N_score):
-                    score_type = tally['scores'][i]
+                    score_type = tally["scores"][i]
                     score_tally_bin = np.squeeze(tally_bin[i])
                     if score_type == SCORE_FLUX:
                         score_name = "flux"
@@ -1212,7 +1224,7 @@ def generate_hdf5(data, mcdc):
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
                         score_name = "fission"
-                    group_name = "tallies/mesh_tally_%i/%s/"%(ID,score_name)
+                    group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
@@ -1226,12 +1238,12 @@ def generate_hdf5(data, mcdc):
                         f.create_dataset(group_name + "uq_var", data=uq_var)
 
             # Surface tallies
-            for ID, tally in enumerate(mcdc['surface_tallies']):
+            for ID, tally in enumerate(mcdc["surface_tallies"]):
                 if mcdc["technique"]["iQMC"]:
                     break
 
                 # Shape
-                N_score = tally['N_score']
+                N_score = tally["N_score"]
 
                 if not mcdc["technique"]["uq"]:
                     shape = (3, N_score)
@@ -1239,9 +1251,9 @@ def generate_hdf5(data, mcdc):
                     shape = (5, N_score)
 
                 # Reshape tally
-                N_bin = tally['N_bin']
-                start = tally['stride']['tally']
-                tally_bin = data[TALLY][:,start:start+N_bin]
+                N_bin = tally["N_bin"]
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -1249,13 +1261,13 @@ def generate_hdf5(data, mcdc):
 
                 # Iterate over scores
                 for i in range(N_score):
-                    score_type = tally['scores'][i]
+                    score_type = tally["scores"][i]
                     score_tally_bin = np.squeeze(tally_bin[i])
                     if score_type == SCORE_FLUX:
                         score_name = "flux"
                     elif score_type == SCORE_NET_CURRENT:
                         score_name = "net-current"
-                    group_name = "tallies/surface_tally_%i/%s/"%(ID,score_name)
+                    group_name = "tallies/surface_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
