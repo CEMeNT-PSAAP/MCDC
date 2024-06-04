@@ -727,10 +727,7 @@ def make_type_mesh_tally(input_deck):
     struct += [("N_bin", int64)]
 
     # Scores
-    struct += [
-        ("N_score", int64),
-        ("scores", int64, (Nmax_score,))
-    ]
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
 
     # Make tally structure
     mesh_tally = into_dtype(struct)
@@ -778,10 +775,7 @@ def make_type_surface_tally(input_deck):
     struct += [("N_bin", int64)]
 
     # Scores
-    struct += [
-        ("N_score", int64),
-        ("scores", int64, (Nmax_score,))
-    ]
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
 
     # Make tally structure
     surface_tally = into_dtype(struct)

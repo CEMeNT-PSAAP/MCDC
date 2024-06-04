@@ -2134,7 +2134,7 @@ def mesh_crossing_evaluate(P, mesh):
 def score_mesh_tally(P, distance, tally, data, mcdc):
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
-    mesh = tally['filter']
+    mesh = tally["filter"]
     stride = tally["stride"]
 
     # Get indices
@@ -2162,8 +2162,8 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
 
     # Score
     flux = distance * P["w"]
-    for i in range(tally['N_score']):
-        score_type = tally['scores'][i]
+    for i in range(tally["N_score"]):
+        score_type = tally["scores"][i]
         if score_type == SCORE_FLUX:
             score = flux
         elif score_type == SCORE_TOTAL:
@@ -2191,8 +2191,8 @@ def score_surface_tally(P, surface, tally, data, mcdc):
     flux = P["w"] / abs(mu)
 
     # Score
-    for i in range(tally['N_score']):
-        score_type = tally['scores'][i]
+    for i in range(tally["N_score"]):
+        score_type = tally["scores"][i]
         if score_type == SCORE_FLUX:
             score = flux
         elif score_type == SCORE_NET_CURRENT:
@@ -2495,8 +2495,8 @@ def move_to_event(P, data, mcdc):
     # Distance to tally mesh
     d_mesh = INF
     if mcdc["cycle_active"]:
-        for tally in mcdc['mesh_tallies']:
-            d_mesh = min(d_mesh, distance_to_mesh(P, tally['filter'], mcdc))
+        for tally in mcdc["mesh_tallies"]:
+            d_mesh = min(d_mesh, distance_to_mesh(P, tally["filter"], mcdc))
 
     d_domain = INF
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
@@ -2548,7 +2548,7 @@ def move_to_event(P, data, mcdc):
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
-        for tally in mcdc['mesh_tallies']:
+        for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P, distance, mcdc)
@@ -2701,6 +2701,7 @@ def distance_to_mesh(P, mesh, mcdc):
     d = min(d, mesh_distance_search(t, 1.0 / v, mesh["t"]))
     return d
 
+
 @njit
 def distance_to_tally_mesh(P, mcdc):
     x = P["x"]
@@ -2714,13 +2715,14 @@ def distance_to_tally_mesh(P, mcdc):
 
     d = INF
 
-    for tally in mcdc['mesh_tallies']:
-        d = min(d, mesh_distance_search(x, ux, tally['filter']["x"]))
-        d = min(d, mesh_distance_search(y, uy, tally['filter']["y"]))
-        d = min(d, mesh_distance_search(z, uz, tally['filter']["z"]))
-        d = min(d, mesh_distance_search(t, 1.0 / v, tally['filter']["t"]))
+    for tally in mcdc["mesh_tallies"]:
+        d = min(d, mesh_distance_search(x, ux, tally["filter"]["x"]))
+        d = min(d, mesh_distance_search(y, uy, tally["filter"]["y"]))
+        d = min(d, mesh_distance_search(z, uz, tally["filter"]["z"]))
+        d = min(d, mesh_distance_search(t, 1.0 / v, tally["filter"]["t"]))
 
     return d
+
 
 # =============================================================================
 # Surface crossing
@@ -2739,9 +2741,9 @@ def surface_crossing(P, data, prog):
     trans = P["translation"]
 
     # Score tally
-    for i in range(surface['N_tally']):
-        ID = surface['tally_IDs'][i]
-        tally = mcdc['surface_tallies'][ID]
+    for i in range(surface["N_tally"]):
+        ID = surface["tally_IDs"][i]
+        tally = mcdc["surface_tallies"][ID]
         score_surface_tally(P, surface, tally, data, mcdc)
 
     # Implement BC
@@ -5063,6 +5065,6 @@ def uq_tally_closeout(data, mcdc):
     # Store results
     mean = tally_bin[TALLY_SUM] / N_history
     tally_bin[TALLY_UQ_BATCH_VAR] /= N_history
-    tally_bin[TALLY_UQ_BATCH] = (tally_bin[TALLY_SUM_SQ] - N_history * np.square(mean)) / (
-        N_history - 1
-    )
+    tally_bin[TALLY_UQ_BATCH] = (
+        tally_bin[TALLY_SUM_SQ] - N_history * np.square(mean)
+    ) / (N_history - 1)

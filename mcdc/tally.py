@@ -24,7 +24,7 @@ def mesh_tally(
     azi=np.array([-PI, PI]),
     g=np.array([-INF, INF]),
     E=np.array([0.0, INF]),
-    scores=['flux'],
+    scores=["flux"],
 ):
     """
     Create a tally card to collect MC solutions.
@@ -110,7 +110,7 @@ def mesh_tally(
 
 def surface_tally(
     surface,
-    scores=['net-current'],
+    scores=["net-current"],
 ):
     """
     Create a tally card to collect MC solutions.
@@ -139,26 +139,8 @@ def surface_tally(
     surface.tally_IDs.append(card.ID)
     surface.N_tally += 1
 
-    # Set other filters
-    card.t = t
-    card.mu = mu
-    card.azi = azi
-
-    # Set energy group grid
-    if type(g) == type("string") and g == "all":
-        G = global_.input_deck.materials[0].G
-        card.g = np.linspace(0, G, G + 1) - 0.5
-    else:
-        card.g = g
-    if global_.input_deck.setting["mode_CE"]:
-        card.g = E
-
     # Calculate total number bins
-    Nt = len(t) - 1
-    Nmu = len(mu) - 1
-    N_azi = len(azi) - 1
-    Ng = len(g) - 1
-    card.N_bin = Nt * Nmu * N_azi * Ng
+    card.N_bin = 1
 
     # Scores
     for s in scores:
