@@ -775,6 +775,9 @@ def prepare():
         ]
     )
 
+    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) == 0:
+        t_limit = INF
+
     # Check if time boundary is above the final tally mesh time grid
     if mcdc["setting"]["time_boundary"] > t_limit:
         mcdc["setting"]["time_boundary"] = t_limit
