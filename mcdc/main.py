@@ -437,7 +437,7 @@ def prepare():
         # CE data (load data from XS library)
         dir_name = os.getenv("MCDC_XSLIB")
         if mode_CE:
-            nuc_name = input_deck.nuclides[i]["name"]
+            nuc_name = input_deck.nuclides[i].name
             with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                 # Atomic weight ratio
                 mcdc["nuclides"][i]["A"] = f["A"][()]

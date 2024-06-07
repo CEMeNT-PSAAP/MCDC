@@ -326,22 +326,34 @@ def material(
             nuc_name = nuclides[i][0]
             density = nuclides[i][1]
             if not nuclide_registered(nuc_name):
-                nuc_card = NuclideCard()
+                nuc_card = NuclideCard(name=nuc_name)
+
+                # Set ID
+                nuc_card.ID = len(global_.input_deck.nuclides)
 
                 dir_name = os.getenv("MCDC_XSLIB")
                 if dir_name == None:
                     print_error(
-                        "Continuous energy data directory not configured \n       see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
+                        "Continuous energy data directory not configured \n"+
+                        "see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
                     )
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card.fissionable = True
+
+                global_.input_deck.nuclides.append(nuc_card)
             else:
                 nuc_card = get_nuclide(nuc_name)
             card.nuclide_IDs[i] = nuc_card.ID
             card.nuclide_densities[i] = density
 
-        return card
+        # Check if identical material already exists
+        identical_material = get_identical_material(card)
+        if identical_material is None:
+            global_.input_deck.materials.append(card)
+            return card
+        else:
+            return identical_material
 
     # Nuclide and group sizes
     G = nuclides[0][0].G
@@ -995,6 +1007,14 @@ def source(**kw):
             G = global_.input_deck.materials[0].G
             group = np.ones(G)
             card.group = group / np.sum(group)
+        # Default for CE
+        if global_.input_deck.setting["mode_CE"]:
+            # Normalize pdf
+            card.energy[1, :] = card.energy[1, :] / np.trapz(card.energy[1, :], x=card.energy[0, :])
+            # Make cdf
+            card.energy[1, :] = sp.integrate.cumulative_trapezoid(
+                card.energy[1], x=card.energy[0], initial=0.0
+            )
 
     # Set time
     if time is not None:
@@ -1807,15 +1827,25 @@ def uq(**kw):
 
 def nuclide_registered(name):
     for card in global_.input_deck.nuclides:
-        if name == card["name"]:
+        if name == card.name:
             return True
     return False
 
 
 def get_nuclide(name):
     for card in global_.input_deck.nuclides:
-        if name == card["name"]:
+        if name == card.name:
             return card
+
+
+def get_identical_material(card):
+    nuclide_IDs = card.nuclide_IDs
+    nuclide_densities = card.nuclide_densities
+    for material in global_.input_deck.materials:
+        if len(nuclide_IDs) == len(material.nuclide_IDs):
+            if (nuclide_IDs == material.nuclide_IDs).all() and (nuclide_densities == material.nuclide_densities).all():
+                return material
+    return None
 
 
 def print_card(card):
