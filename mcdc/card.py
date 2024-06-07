@@ -23,11 +23,17 @@ class InputCard:
 
 
 class NuclideCard(InputCard):
-    def __init__(self, G=1, J=0):
+    def __init__(self, G=1, J=0, name=None):
         InputCard.__init__(self, "Nuclide")
+
+        # Continuous energy?
+        if name is not None:
+            G = 0
+            J = 0
 
         # Set card data
         self.ID = None
+        self.name = name
         self.G = G
         self.J = J
         self.fissionable = False
@@ -232,7 +238,7 @@ class SourceCard(InputCard):
         self.white_y = 0.0
         self.white_z = 0.0
         self.group = np.array([1.0])
-        self.energy = np.array([[14e6, 14e6], [1.0, 1.0]])
+        self.energy = np.array([[1e6 - 1.0, 1e6 + 1.0], [1.0, 1.0]])
         self.time = np.array([0.0, 0.0])
         self.prob = 1.0
 

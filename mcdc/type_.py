@@ -316,7 +316,7 @@ def make_type_nuclide(input_deck):
 
         dir_name = os.getenv("MCDC_XSLIB")
         for nuc in input_deck.nuclides:
-            with h5py.File(dir_name + "/" + nuc["name"] + ".h5", "r") as f:
+            with h5py.File(dir_name + "/" + nuc.name + ".h5", "r") as f:
                 NE_xs = max(NE_xs, len(f["E_xs"][:]))
                 NE_nu_p = max(NE_nu_p, len(f["E_nu_p"][:]))
                 NE_nu_d = max(NE_nu_d, len(f["E_nu_d"][:]))
@@ -629,7 +629,7 @@ def make_type_source(input_deck):
     if mode_CE:
         G = 1
         # Maximum number of data point in energy pdf
-        Nmax_E = max([source["energy"].shape[1] for source in input_deck.sources])
+        Nmax_E = max([source.energy.shape[1] for source in input_deck.sources])
     if mode_MG:
         G = input_deck.materials[0].G
         Nmax_E = 2
