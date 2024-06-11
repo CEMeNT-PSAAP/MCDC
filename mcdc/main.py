@@ -90,10 +90,11 @@ from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
     loop_eigenvalue,
-    loop_iqmc,
     set_cache,
     build_gpu_progs,
 )
+from mcdc.iqmc.iqmc_loop import iqmc_simulation
+
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
@@ -136,7 +137,7 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        loop_iqmc(mcdc)
+        iqmc_simulation(mcdc)
     elif mcdc["setting"]["mode_eigenvalue"]:
         loop_eigenvalue(mcdc)
     else:
