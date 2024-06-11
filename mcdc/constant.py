@@ -14,6 +14,7 @@ EVENT_CAPTURE = 1 << 6
 EVENT_TIME_BOUNDARY = 1 << 7
 EVENT_LATTICE = 1 << 8
 EVENT_SURFACE_MOVE = 1 << 9
+EVENT_DOMAIN = 1 << 10
 
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
@@ -37,6 +38,12 @@ PI_HALF = PI / 2.0
 SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
+
+# Domain Decomp mesh crossing flags
+MESH_X = 0
+MESH_Y = 1
+MESH_Z = 2
+MESH_T = 3
 
 # RNG LCG parameters
 RNG_G = nb.uint64(2806196910506780709)
