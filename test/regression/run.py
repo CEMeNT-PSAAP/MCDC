@@ -5,6 +5,7 @@ from colorama import Fore, Style
 # Option parser
 parser = argparse.ArgumentParser(description="MC/DC regression test")
 parser.add_argument("--mode", type=str, choices=["python", "numba"], default="python")
+parser.add_argument("--target", type=str, choices=["cpu", "gpu"], default="cpu")
 parser.add_argument("--mpiexec", type=int, default=0)
 parser.add_argument("--srun", type=int, default=0)
 parser.add_argument("--name", type=str, default="ALL")
@@ -13,6 +14,7 @@ args, unargs = parser.parse_known_args()
 
 # Parse
 mode = args.mode
+target = args.target
 mpiexec = args.mpiexec
 srun = args.srun
 name = args.name
@@ -32,7 +34,35 @@ names.sort()
 if skip != "NONE":
     skips = [item for item in os.listdir() if fnmatch.fnmatch(item, skip)]
     for name in skips:
+        print(Fore.YELLOW + "Note: Skipping %s" % name + Style.RESET_ALL)
         names.remove(name)
+
+# Skip cache if any
+if "__pycache__" in names:
+    names.remove("__pycache__")
+
+# Skip domain decomp tests unless there are 4 MPI processes
+temp = names.copy()
+for name in names:
+    if name[:3] == "dd_" and not (mpiexec == 4 or srun == 4):
+        temp.remove(name)
+        print(
+            Fore.YELLOW
+            + "Note: Skipping %s (require 4 MPI ranks)" % name
+            + Style.RESET_ALL
+        )
+names = temp
+
+# Skip iqmc if GPU run
+if target == "gpu":
+    temp = names.copy()
+    for name in names:
+        if "iqmc" in name:
+            temp.remove(name)
+            print(
+                Fore.YELLOW + "Note: Skipping %s (GPU target)" % name + Style.RESET_ALL
+            )
+names = temp
 
 # Data for each test
 printouts = []
@@ -44,10 +74,6 @@ all_pass = True
 
 # Run all tests
 for i, name in enumerate(names):
-    # Skip cache if any
-    if name == "__pycache__":
-        continue
-
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
@@ -71,18 +97,18 @@ for i, name in enumerate(names):
     # Run the test problem (redirect the stdout)
     if mpiexec > 1:
         os.system(
-            "mpiexec -n %i python input.py --mode=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (mpiexec, mode)
+            "mpiexec -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            % (mpiexec, mode, target)
         )
     elif srun > 1:
         os.system(
-            "srun -n %i python input.py --mode=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (srun, mode)
+            "srun -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            % (srun, mode, target)
         )
     else:
         os.system(
-            "python input.py --mode=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (mode)
+            "python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            % (mode, target)
         )
     with open("tmp") as f:
         printouts.append(f.read())
@@ -101,7 +127,7 @@ for i, name in enumerate(names):
     answer = h5py.File("answer.h5", "r")
 
     runtimes[-1] = output["runtime/total"][()]
-    print("  (%.2f seconds)" % runtimes[-1])
+    print("  (%.2f seconds)" % runtimes[-1][0])
 
     # Compare all scores
     for score in [key for key in output["tally"].keys() if key != "grid"]:

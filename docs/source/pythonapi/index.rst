@@ -27,12 +27,10 @@ Defining geometry
    :nosignatures:
    :template: omcfunction.rst
 
-   mcdc.surface
    mcdc.cell
-   mcdc.universe
    mcdc.lattice
-   
-
+   mcdc.surface
+   mcdc.universe
 
 Defining simulation
 -------------------
@@ -42,12 +40,10 @@ Defining simulation
    :nosignatures:
    :template: omcfunction.rst
 
-   mcdc.source
-   mcdc.tally
    mcdc.eigenmode
    mcdc.setting
-
-
+   mcdc.source
+   mcdc.tally
 
 Defining techniques
 -------------------
@@ -57,16 +53,20 @@ Defining techniques
    :nosignatures:
    :template: omcfunction.rst
 
-   mcdc.implicit_capture
-   mcdc.weighted_emission
-   mcdc.population_control
    mcdc.branchless_collision
-   mcdc.time_census
-   mcdc.weight_window
-   mcdc.iQMC
-   mcdc.weight_roulette
-   mcdc.IC_generator
+   mcdc.domain_decomposition
    mcdc.dsm
+   mcdc.IC_generator
+   mcdc.iQMC
+   mcdc.implicit_capture
+   mcdc.population_control
+   mcdc.time_census
+   mcdc.weighted_emission
+   mcdc.weight_roulette
+   mcdc.weight_window
+
+
+
 
 
 
