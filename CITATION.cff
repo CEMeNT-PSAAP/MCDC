@@ -93,7 +93,7 @@ identifiers:
     value: 10.21105/joss.06415
     description: Paper description of MC/DC
 repository-code: 'https://github.com/CEMeNT-PSAAP/MCDC'
-url: 'https://cement-psaapgithubio.readthedocs.io/en/latest/'
+url: 'https://mcdc.readthedocs.io/en/latest/'
 abstract: >-
   MC/DC is a performant, scalable, and machine-portable
   Python-based Monte Carlo neutron transport software
