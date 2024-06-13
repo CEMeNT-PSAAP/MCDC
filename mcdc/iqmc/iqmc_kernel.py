@@ -5,6 +5,8 @@ Created on Mon Jun 10 21:52:17 2024
 
 @author: sam pasmann
 """
+from mpi4py import MPI
+
 import mcdc.adapt as adapt
 import numpy as np
 
@@ -12,6 +14,7 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode, literal_unroll
 from mcdc.loop import caching
 from mcdc.type_ import iqmc_score_list
+from mcdc.kernel import distance_to_boundary, distance_to_mesh
 
 # from mcdc.iqmc.iqmc_loop import iqmc_loop_source
 from mcdc.adapt import toggle, for_cpu, for_gpu
@@ -26,7 +29,7 @@ from mcdc.kernel import (
 
 
 @toggle("iQMC")
-def move_to_event(P, mcdc):
+def iqmc_move_to_event(P, mcdc):
     # =========================================================================
     # Get distances to events
     # =========================================================================
@@ -634,39 +637,3 @@ def iqmc_linear_tilt(mu, x, dx, x_mid, dy, dz, w, distance, SigmaT):
     else:
         Q = mu * w * distance ** (2) / 2 + w * (x - x_mid) * distance
     return Q
-
-
-# =============================================================================
-# Linear operators
-# =============================================================================
-
-
-@toggle("iQMC")
-def AxV(V, b, mcdc):
-    """
-    Linear operator to be used with GMRES.
-    Calculate action of A on input vector V, where A is a transport sweep
-    and V is the total source (constant and tilted).
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    iqmc["total_source"] = V.copy()
-    # distribute segments of V to appropriate sources
-    iqmc_distribute_sources(mcdc)
-    # reset bank size
-    set_bank_size(mcdc["bank_source"], 0)
-
-    # QMC Sweep
-    iqmc_prepare_particles(mcdc)
-    iqmc_reset_tallies(iqmc)
-    iqmc["sweep_counter"] += 1
-    iqmc_loop_source(0, mcdc)
-    # sum resultant flux on all processors
-    iqmc_distribute_tallies(iqmc)
-    # update source adds effective scattering + fission + fixed-source
-    iqmc_update_source(mcdc)
-    # combine all sources (constant and tilted) into one vector
-    iqmc_consolidate_sources(mcdc)
-    v_out = iqmc["total_source"].copy()
-    axv = V - (v_out - b)
-
-    return axv
