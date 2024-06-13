@@ -114,8 +114,9 @@ def iqmc_loop_source(mcdc):
 
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
+            P = adapt.local_particle()
             # Get particle from active bank
-            P = kernel.get_particle(mcdc["bank_active"], mcdc)
+            kernel.get_particle(P, mcdc["bank_active"], mcdc)
             # Particle loop
             iqmc_loop_particle(P, mcdc)
 
@@ -125,39 +126,6 @@ def iqmc_loop_source(mcdc):
             N_prog += 1
             with objmode():
                 print_progress(percent, mcdc)
-
-
-@njit
-def source_iteration(mcdc):
-    simulation_end = False
-    iqmc = mcdc["technique"]["iqmc"]
-    total_source_old = iqmc["source"].copy()
-    while not simulation_end:
-        # reset particle bank size
-        mcdc["bank_source"]["size"] = 0
-        # initialize particles with LDS
-        iqmc_kernel.iqmc_prepare_particles(mcdc)
-        # reset tallies for next loop
-        iqmc_kernel.iqmc_reset_tallies(iqmc)
-        # sweep particles
-        iqmc_loop_source(mcdc)
-        # sum resultant flux on all processors
-        iqmc_kernel.iqmc_distribute_tallies(mcdc)
-        iqmc["itt"] += 1
-        # kernel.iqmc_update_source(mcdc)
-        # calculate norm of sources
-        iqmc["res"] = kernel.iqmc_res(iqmc["source"], total_source_old, mcdc)
-        # iQMC convergence criteria
-        if (iqmc["itt"] == iqmc["maxitt"]) or (iqmc["res"] <= iqmc["tol"]):
-            simulation_end = True
-
-        # Print progress
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            with objmode():
-                print_progress_iqmc(mcdc)
-
-        # set  source_old = current source
-        total_source_old = iqmc["source"].copy()
 
 
 @njit(cache=caching)
@@ -174,17 +142,16 @@ def source_iteration(mcdc):
         # reset tallies for next loop
         iqmc_kernel.iqmc_reset_tallies(iqmc)
         # sweep particles
-        iqmc["sweep_counter"] += 1
         iqmc_loop_source(mcdc)
 
         # sum resultant flux on all processors
-        kernel.iqmc_distribute_tallies(iqmc)
+        iqmc_kernel.iqmc_distribute_tallies(iqmc)
         iqmc["itt"] += 1
-        kernel.iqmc_update_source(mcdc)
+        iqmc_kernel.iqmc_update_source(mcdc)
         # combine source tallies into one vector
-        kernel.iqmc_consolidate_sources(mcdc)
+        iqmc_kernel.iqmc_consolidate_sources(mcdc)
         # calculate norm of sources
-        iqmc["res"] = kernel.iqmc_res(iqmc["total_source"], total_source_old)
+        iqmc["res"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
         # iQMC convergence criteria
         if (iqmc["itt"] == iqmc["maxitt"]) or (iqmc["res"] <= iqmc["tol"]):
             simulation_end = True
@@ -272,7 +239,7 @@ def gmres(mcdc):
     b[:single_vector] = np.reshape(fixed_source, fixed_source.size)
     X = iqmc["total_source"].copy()
     # initial residual
-    r = b - iqmc_kernel.AxV(X, b, mcdc)
+    r = b - AxV(X, b, mcdc)
     normr = np.linalg.norm(r)
 
     # Defining dimension
@@ -324,7 +291,7 @@ def gmres(mcdc):
         for inner in range(max_inner):
             # New search direction
             v = V[inner + 1, :]
-            v[:] = iqmc_kernel.AxV(vs[-1], b, mcdc)
+            v[:] = AxV(vs[-1], b, mcdc)
             vs.append(v)
 
             # Modified Gram Schmidt
@@ -388,7 +355,7 @@ def gmres(mcdc):
         y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
         update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
         X = X + update
-        aux = iqmc_kernel.AxV(X, b, mcdc)
+        aux = AxV(X, b, mcdc)
         r = b - aux
         normr = np.linalg.norm(r)
         rel_resid = normr / res_0
@@ -397,3 +364,39 @@ def gmres(mcdc):
             break
         if iqmc["itt"] >= max_iter:
             return
+
+
+# =============================================================================
+# Linear operators
+# =============================================================================
+
+
+@njit(cache=caching)
+def AxV(V, b, mcdc):
+    """
+    Linear operator to be used with GMRES.
+    Calculate action of A on input vector V, where A is a transport sweep
+    and V is the total source (constant and tilted).
+    """
+    iqmc = mcdc["technique"]["iqmc"]
+    iqmc["total_source"] = V.copy()
+    # distribute segments of V to appropriate sources
+    iqmc_kernel.iqmc_distribute_sources(mcdc)
+    # reset bank size
+    kernel.set_bank_size(mcdc["bank_source"], 0)
+
+    # QMC Sweep
+    iqmc_kernel.iqmc_prepare_particles(mcdc)
+    iqmc_kernel.iqmc_reset_tallies(iqmc)
+    iqmc["sweep_counter"] += 1
+    iqmc_loop_source(mcdc)
+    # sum resultant flux on all processors
+    iqmc_kernel.iqmc_distribute_tallies(iqmc)
+    # update source adds effective scattering + fission + fixed-source
+    iqmc_kernel.iqmc_update_source(mcdc)
+    # combine all sources (constant and tilted) into one vector
+    iqmc_kernel.iqmc_consolidate_sources(mcdc)
+    v_out = iqmc["total_source"].copy()
+    axv = V - (v_out - b)
+
+    return axv
