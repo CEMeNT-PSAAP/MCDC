@@ -676,9 +676,9 @@ def prepare():
             "mesh",
             "res",
             "lds",
-            "generator",
             "sweep_counter",
             "total_source",
+            "material_idx",
             "w_min",
             "score_list",
             "score",
@@ -696,8 +696,6 @@ def prepare():
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
             mcdc["technique"]["iqmc"]["score"][name] = value
-        # LDS generator
-        iqmc["generator"] = input_deck.technique["iqmc"]["generator"]
         # minimum particle weight
         iqmc["w_min"] = 1e-13
         N_particle = mcdc["setting"]["N_particle"]

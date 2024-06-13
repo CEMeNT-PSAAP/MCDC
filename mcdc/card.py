@@ -105,7 +105,6 @@ class InputDeck:
                 "itt_outter": 0,
                 "maxitt": 5,
                 "fixed_source": np.ones([1, 1, 1, 1]),
-                "material_idx": np.ones([1, 1, 1, 1]),
                 "source": np.ones([1, 1, 1, 1]),
                 "score": {
                     "flux": np.ones([1, 1, 1, 1]),
