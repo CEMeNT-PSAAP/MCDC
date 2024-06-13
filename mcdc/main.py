@@ -549,7 +549,7 @@ def prepare():
             copy_field(mcdc["sources"][i], input_deck.sources[i], name)
 
     # Normalize source probabilities
-    tot = 0.0
+    tot = 1e-16
     for S in mcdc["sources"]:
         tot += S["prob"]
     for S in mcdc["sources"]:
