@@ -29,6 +29,7 @@ def iqmc_simulation(mcdc):
     # function calls from specified solvers
     iqmc = mcdc["technique"]["iqmc"]
     iqmc_kernel.iqmc_preprocess(mcdc)
+    iqmc_kernel.lds_init(mcdc)
 
     if mcdc["setting"]["mode_eigenvalue"]:
         if iqmc["eigenmode_solver"] == "power_iteration":

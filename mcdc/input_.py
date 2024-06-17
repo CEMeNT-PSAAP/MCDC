@@ -1472,7 +1472,6 @@ def iQMC(
     maxit=25,
     tol=1e-6,
     preconditioner_sweeps=5,
-    generator="halton",
     fixed_source_solver="source_iteration",
     eigenmode_solver="power_iteration",
     score=[],
@@ -1515,8 +1514,6 @@ def iQMC(
         Convergence tolerance (default 1e-6).
     preconditioner_sweeps : int, optional
         Number of preconditioner sweeps (default 5).
-    generator : {'halton', 'sobol', 'random'}
-        Low-discrepancy sequence generator (default "halton").
     fixed_source_solver : {'source_iteration', 'gmres'}
         Deterministic solver for fixed-source problem (default "source_iteration").
     eigenmode_solver : {'power_iteration'}
@@ -1542,7 +1539,6 @@ def iQMC(
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
     card["iqmc"]["maxitt"] = maxit
-    card["iqmc"]["generator"] = generator
 
     # Set mesh
     if g is not None:
