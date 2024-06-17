@@ -42,7 +42,6 @@ Nx = 16
 maxit = 10
 tol = 1e-3
 x = np.linspace(-8, 8, num=Nx + 1)
-generator = "sobol"
 solver = "gmres"
 
 fixed_source = np.zeros(Nx)
@@ -58,7 +57,6 @@ mcdc.iQMC(
     phi0=phi0,
     maxit=maxit,
     tol=tol,
-    generator=generator,
     fixed_source_solver=solver,
     score=["tilt-x"],
 )

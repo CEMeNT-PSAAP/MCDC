@@ -27,6 +27,81 @@ from mcdc.kernel import (
     mesh_get_index,
 )
 
+# =========================================================================
+# Low-Discrepency Sequences
+# =========================================================================
+
+
+@toggle("iQMC")
+def lds_init(mcdc):
+    N, dim = mcdc["technique"]["iqmc"]["lds"].shape
+    N_start = mcdc["mpi_work_start"]
+    mcdc["technique"]["iqmc"]["lds"] = halton(N, dim, skip=N_start)
+
+
+@toggle("iQMC")
+def scramble_LDS(mcdc):
+    # TODO: use MCDC seed system
+    seed_batch = np.random.randint(1000, 1000000)
+    N, dim = mcdc["technique"]["iqmc"]["lds"].shape
+    N_start = mcdc["mpi_work_start"]
+    mcdc["technique"]["iqmc"]["lds"] = rhalton(N, dim, seed=seed_batch, skip=N_start)
+
+
+@toggle("iQMC")
+def rhalton(N, dim, seed=12345, skip=0):
+    np.random.seed(seed)
+    primes = np.array((2, 3, 5, 7, 11, 13, 17, 19, 23, 29), dtype=np.int64)
+    halton = np.zeros((N, dim), dtype=np.float64)
+
+    for D in range(dim):
+        b = primes[D]
+        # b = np.int64(2)
+        ind = np.arange(skip, skip + N, dtype=np.int64)
+        b2r = 1 / b
+        ans = np.zeros(ind.shape, dtype=np.float64)
+        res = ind.copy()
+        while (1.0 - b2r) < 1.0:
+            dig = np.mod(res, b)
+            perm = np.random.permutation(b)
+            pdig = perm[dig]
+            ans = ans + pdig.astype(np.float64) * b2r
+            b2r = b2r / np.float64(b)
+            res = ((res - dig) / b).astype(np.int64)
+        halton[:, D] = ans
+
+    return halton
+
+
+@toggle("iQMC")
+def halton(N, dim, skip=0):
+    # TODO: find more efficient implementation of Halton Sequence
+    primes = np.array((2, 3, 5, 7, 11, 13, 17, 19, 23, 29), dtype=np.int64)
+    halton = np.zeros((N, dim), dtype=np.float64)
+
+    for D in range(dim):
+        b = primes[D]
+        n, d = 0, 1
+        for i in range(skip + N):
+            x = d - n
+            if x == 1:
+                n = 1
+                d *= b
+            else:
+                y = d // b
+                while x <= y:
+                    y //= b
+                n = (b + 1) * y - x
+            if i >= skip:
+                halton[i - skip, D] = n / d
+
+    return halton
+
+
+# =========================================================================
+# Core iQMC functions
+# =========================================================================
+
 
 @toggle("iQMC")
 def iqmc_move_to_event(P, mcdc):
