@@ -8,7 +8,7 @@ import mcdc.type_ as type_
 
 from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
-from mcdc.type_ import score_list, iqmc_score_list
+from mcdc.type_ import score_list
 from mcdc.loop import loop_source
 import mcdc.adapt as adapt
 from mcdc.adapt import toggle, for_cpu, for_gpu
@@ -2497,11 +2497,6 @@ def move_to_event(P, mcdc):
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
         d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
 
-    if mcdc["technique"]["iQMC"]:
-        d_iqmc_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc"]["mesh"], mcdc)
-        if d_iqmc_mesh < d_mesh:
-            d_mesh = d_iqmc_mesh
-
     # Distance to time boundary
     speed = get_particle_speed(P, mcdc)
     d_time_boundary = speed * (mcdc["setting"]["time_boundary"] - P["t"])
@@ -2510,11 +2505,8 @@ def move_to_event(P, mcdc):
     idx = mcdc["idx_census"]
     d_time_census = speed * (mcdc["setting"]["census_time"][idx] - P["t"])
 
-    # Distance to collision
-    if mcdc["technique"]["iQMC"]:
-        d_collision = INF
-    else:
-        d_collision = distance_to_collision(P, mcdc)
+    # Distance to next collision
+    d_collision = distance_to_collision(P, mcdc)
 
     # =========================================================================
     # Determine event
@@ -2548,15 +2540,6 @@ def move_to_event(P, mcdc):
     # =========================================================================
     # Move particle
     # =========================================================================
-
-    # score iQMC tallies
-    if mcdc["technique"]["iQMC"]:
-        if mcdc["setting"]["track_particle"]:
-            track_particle(P, mcdc)
-        iqmc_score_tallies(P, distance, mcdc)
-        iqmc_continuous_weight_reduction(P, distance, mcdc)
-        if abs(P["w"]) <= mcdc["technique"]["iqmc"]["w_min"]:
-            P["alive"] = False
 
     # Score tracklength tallies
     if mcdc["tally"]["tracklength"] and mcdc["cycle_active"]:
