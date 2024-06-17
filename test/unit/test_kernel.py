@@ -2,7 +2,8 @@ import numpy as np
 import mcdc as MCDC
 from mcdc import type_
 from mcdc.main import closeout
-from mcdc.kernel import rng, AxV
+from mcdc.iqmc.iqmc_loop import AxV
+from mcdc.kernel import rng
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
