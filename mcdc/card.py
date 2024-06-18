@@ -92,7 +92,6 @@ class InputDeck:
             "wr_survive": 1.0,
             "iQMC": False,
             "iqmc": {
-                "generator": "sobol",
                 "fixed_source_solver": "source_iteration",
                 "eigenmode_solver": "power_iteration",
                 "preconditioner_sweeps": 5,
