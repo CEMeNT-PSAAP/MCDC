@@ -34,12 +34,14 @@ particle_record = None
 nuclide = None
 material = None
 surface = None
+region = None
 cell = None
 universe = None
 lattice = None
 source = None
 setting = None
-tally = None
+mesh_tally = None
+surface_tally = None
 technique = None
 
 # GPU mode related
@@ -199,7 +201,7 @@ def make_type_particle(input_deck):
 
     # iQMC vector of weights
     if iQMC:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     iqmc_struct = [("w", float64, (G,))]
     struct += [("iqmc", iqmc_struct)]
 
@@ -238,7 +240,7 @@ def make_type_particle_record(input_deck):
 
     # iQMC vector of weights
     if iQMC:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     iqmc_struct = [("w", float64, (G,))]
     struct += [("iqmc", iqmc_struct)]
 
@@ -314,7 +316,7 @@ def make_type_nuclide(input_deck):
 
         dir_name = os.getenv("MCDC_XSLIB")
         for nuc in input_deck.nuclides:
-            with h5py.File(dir_name + "/" + nuc["name"] + ".h5", "r") as f:
+            with h5py.File(dir_name + "/" + nuc.name + ".h5", "r") as f:
                 NE_xs = max(NE_xs, len(f["E_xs"][:]))
                 NE_nu_p = max(NE_nu_p, len(f["E_nu_p"][:]))
                 NE_nu_d = max(NE_nu_d, len(f["E_nu_d"][:]))
@@ -328,8 +330,8 @@ def make_type_nuclide(input_deck):
 
     # Get MG sizes
     if mode_MG:
-        G = input_deck.materials[0]["G"]
-        J = input_deck.materials[0]["J"]
+        G = input_deck.materials[0].G
+        J = input_deck.materials[0].J
 
         # Zeros for CE sizes
         NE_xs = 0
@@ -424,7 +426,7 @@ def make_type_material(input_deck):
     global material
 
     # Maximum number of nuclides per material
-    Nmax_nuclide = max([material["N_nuclide"] for material in input_deck.materials])
+    Nmax_nuclide = max([material.N_nuclide for material in input_deck.materials])
 
     # Get modes
     mode_CE = input_deck.setting["mode_CE"]
@@ -438,8 +440,8 @@ def make_type_material(input_deck):
 
     # Get MG sizes
     if mode_MG:
-        G = input_deck.materials[0]["G"]
-        J = input_deck.materials[0]["J"]
+        G = input_deck.materials[0].G
+        J = input_deck.materials[0].J
 
     # General data
     struct = [
@@ -480,17 +482,18 @@ def make_type_material(input_deck):
 def make_type_surface(input_deck):
     global surface
 
-    # Maximum number of time-dependent surface slices
+    # Maximum number of time-dependent surface slices and tallies
     Nmax_slice = 0
+    Nmax_tally = 0
     for surface in input_deck.surfaces:
-        Nmax_slice = max(Nmax_slice, surface["N_slice"])
+        Nmax_slice = max(Nmax_slice, surface.N_slice)
+        Nmax_tally = max(Nmax_tally, len(surface.tally_IDs))
 
     surface = into_dtype(
         [
             ("ID", int64),
             ("N_slice", int64),
-            ("vacuum", bool_),
-            ("reflective", bool_),
+            ("BC", int64),
             ("A", float64),
             ("B", float64),
             ("C", float64),
@@ -509,6 +512,26 @@ def make_type_surface(input_deck):
             ("sensitivity", bool_),
             ("sensitivity_ID", int64),
             ("dsm_Np", float64),
+            ("N_tally", int64),
+            ("tally_IDs", int64, (Nmax_tally,)),
+        ]
+    )
+
+
+# ==============================================================================
+# Region
+# ==============================================================================
+
+
+def make_type_region():
+    global region
+
+    region = into_dtype(
+        [
+            ("ID", int64),
+            ("type", int64),
+            ("A", int64),
+            ("B", int64),
         ]
     )
 
@@ -522,18 +545,17 @@ def make_type_cell(input_deck):
     global cell
 
     # Maximum number of surfaces per cell
-    Nmax_surface = max([cell["N_surface"] for cell in input_deck.cells])
+    Nmax_surface = max([cell.N_surface for cell in input_deck.cells])
 
     cell = into_dtype(
         [
             ("ID", int64),
+            ("region_ID", int64),
+            ("fill_type", int64),
+            ("fill_ID", int64),
+            ("translation", float64, (3,)),
             ("N_surface", int64),
             ("surface_IDs", int64, (Nmax_surface,)),
-            ("positive_flags", bool_, (Nmax_surface,)),
-            ("material_ID", int64),
-            ("lattice", bool_),
-            ("lattice_ID", int64),
-            ("lattice_center", float64, (3,)),
         ]
     )
 
@@ -547,16 +569,7 @@ def make_type_universe(input_deck):
     global universe
 
     # Maximum number of cells per universe
-    Nmax_cell = max([universe["N_cell"] for universe in input_deck.universes])
-
-    # Default root universe, if not defined
-    N_cell = len(input_deck.cells)
-    N_universe = len(input_deck.universes)
-    if N_universe == 1:
-        Nmax_cell = N_cell
-        card = input_deck.universes[0]
-        card["N_cell"] = N_cell
-        card["cell_IDs"] = np.arange(N_cell)
+    Nmax_cell = max([universe.N_cell for universe in input_deck.universes])
 
     universe = into_dtype(
         [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
@@ -591,9 +604,9 @@ def make_type_lattice(input_deck):
     Nmax_y = 0
     Nmax_z = 0
     for card in input_deck.lattices:
-        Nmax_x = max(Nmax_x, card["mesh"]["Nx"])
-        Nmax_y = max(Nmax_y, card["mesh"]["Ny"])
-        Nmax_z = max(Nmax_z, card["mesh"]["Nz"])
+        Nmax_x = max(Nmax_x, card.mesh["Nx"])
+        Nmax_y = max(Nmax_y, card.mesh["Ny"])
+        Nmax_z = max(Nmax_z, card.mesh["Nz"])
 
     lattice = into_dtype(
         [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
@@ -616,9 +629,9 @@ def make_type_source(input_deck):
     if mode_CE:
         G = 1
         # Maximum number of data point in energy pdf
-        Nmax_E = max([source["energy"].shape[1] for source in input_deck.sources])
+        Nmax_E = max([source.energy.shape[1] for source in input_deck.sources])
     if mode_MG:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
         Nmax_E = 2
 
     # General data
@@ -657,81 +670,115 @@ def make_type_source(input_deck):
 
 
 # ==============================================================================
-# Tally
+# Tallies
 # ==============================================================================
 
 
-# Score lists
-score_list = (
-    "flux",
-    "density",
-    "fission",
-    "total",
-    "current",
-    "eddington",
-    "exit",
-)
+def make_type_mesh_tally(input_deck):
+    global mesh_tally
+    struct = []
 
+    # Maximum numbers of mesh and filter grids and scores
+    Nmax_x = 2
+    Nmax_y = 2
+    Nmax_z = 2
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+    for card in input_deck.mesh_tallies:
+        Nmax_x = max(Nmax_x, len(card.x))
+        Nmax_y = max(Nmax_y, len(card.y))
+        Nmax_z = max(Nmax_z, len(card.z))
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
 
-def make_type_tally(input_deck):
-    global tally
-
-    # Number of sensitivitys parameters
-    N_sensitivity = input_deck.setting["N_sensitivity"]
-
-    # Number of tally scores
-    Ns = 1 + N_sensitivity
-    if input_deck.technique["dsm_order"] == 2:
-        Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-
-    # Get card
-    card = input_deck.tally
-
-    # Tally estimator flags
-    struct = [("tracklength", bool_)]
-
-    def make_type_score(shape):
-        return into_dtype(
-            [
-                ("bin", float64, shape),
-                ("mean", float64, shape),
-                ("sdev", float64, shape),
-            ]
-        )
-
-    # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
-    struct += [("mesh", mesh)]
-
-    # Scores and shapes
-    scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+    # Set the filter
+    filter_ = [
+        ("x", float64, (Nmax_x,)),
+        ("y", float64, (Nmax_y,)),
+        ("z", float64, (Nmax_z,)),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
     ]
+    struct += [("filter", filter_)]
 
-    # Add score flags to structure
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        struct += [(name, bool_)]
+    # Tally strides
+    stride = [
+        ("tally", int64),
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+        ("x", int64),
+        ("y", int64),
+        ("z", int64),
+    ]
+    struct += [("stride", stride)]
 
-    # Add scores to structure
-    scores_struct = []
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        shape = scores_shapes[i][1]
-        if not card[name]:
-            shape = (0,) * len(shape)
-        scores_struct += [(name, make_type_score(shape))]
-    scores = into_dtype(scores_struct)
-    struct += [("score", scores)]
+    # Total number of bins
+    struct += [("N_bin", int64)]
+
+    # Scores
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
 
     # Make tally structure
-    tally = into_dtype(struct)
+    mesh_tally = into_dtype(struct)
+
+
+def make_type_surface_tally(input_deck):
+    global surface_tally
+    struct = []
+
+    # Maximum number of grid for each mesh coordinate and filter
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+    for card in input_deck.mesh_tallies:
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
+
+    # Set the filter
+    filter_ = [
+        ("surface_ID", int64),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
+    ]
+    struct = [("filter", filter_)]
+
+    # Tally strides
+    stride = [
+        ("tally", int64),
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+    ]
+    struct += [("stride", stride)]
+
+    # Total number of bins
+    struct += [("N_bin", int64)]
+
+    # Scores
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
+
+    # Make tally structure
+    surface_tally = into_dtype(struct)
 
 
 # ==============================================================================
@@ -815,7 +862,7 @@ def make_type_technique(input_deck):
 
     # Number of groups
     if mode_MG:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     else:
         G = 1
 
@@ -1022,67 +1069,14 @@ def make_type_technique(input_deck):
     # =========================================================================
     # Variance Deconvolution
     # =========================================================================
-    struct += [("uq_tally", uq_tally), ("uq_", uq)]
+
+    struct += [("uq_", uq)]
 
     # Finalize technique type
     technique = into_dtype(struct)
 
 
 # UQ
-def make_type_uq_tally(input_deck):
-    global uq_tally
-
-    def make_type_uq_score(shape):
-        return into_dtype(
-            [
-                ("batch_bin", float64, shape),
-                ("batch_var", float64, shape),
-            ]
-        )
-
-    # Tally estimator flags
-    struct = []
-
-    # Number of tally scores
-    Ns = 1 + input_deck.setting["N_sensitivity"]
-
-    # Tally card
-    tally_card = input_deck.tally
-
-    # Mesh, but doesn't need to be added
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(tally_card["mesh"])
-
-    # Scores and shapes
-    scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
-    ]
-
-    # Add score flags to structure
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        struct += [(name, bool_)]
-
-    # Add scores to structure
-    scores_struct = []
-    for i in range(len(scores_shapes)):
-        name = scores_shapes[i][0]
-        shape = scores_shapes[i][1]
-        if not tally_card[name]:
-            shape = (0,) * len(shape)
-        scores_struct += [(name, make_type_uq_score(shape))]
-    scores = into_dtype(scores_struct)
-    struct += [("score", scores)]
-
-    # Make tally structure
-    uq_tally = into_dtype(struct)
-
-
 def make_type_uq(input_deck):
     global uq, uq_nuc, uq_mat
 
@@ -1115,8 +1109,8 @@ def make_type_uq(input_deck):
         return into_dtype(struct)
 
     # Size numbers
-    G = input_deck.materials[0]["G"]
-    J = input_deck.materials[0]["J"]
+    G = input_deck.materials[0].G
+    J = input_deck.materials[0].J
 
     # UQ deck
     uq_deck = input_deck.uq_deltas
@@ -1229,10 +1223,13 @@ def make_type_global(input_deck):
     N_nuclide = len(input_deck.nuclides)
     N_material = len(input_deck.materials)
     N_surface = len(input_deck.surfaces)
+    N_region = len(input_deck.regions)
     N_cell = len(input_deck.cells)
     N_source = len(input_deck.sources)
     N_universe = len(input_deck.universes)
     N_lattice = len(input_deck.lattices)
+    N_mesh_tally = len(input_deck.mesh_tallies)
+    N_surface_tally = len(input_deck.surface_tallies)
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1245,7 +1242,7 @@ def make_type_global(input_deck):
 
     # Number of precursor groups
     if mode_MG:
-        J = input_deck.materials[0]["J"]
+        J = input_deck.materials[0].J
     if mode_CE:
         J = 6
 
@@ -1293,11 +1290,13 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
+            ("regions", region, (N_region,)),
             ("cells", cell, (N_cell,)),
             ("universes", universe, (N_universe,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
-            ("tally", tally),
+            ("mesh_tallies", mesh_tally, (N_mesh_tally,)),
+            ("surface_tallies", surface_tally, (N_surface_tally,)),
             ("setting", setting),
             ("technique", technique),
             ("domain_decomp", domain_decomp),
@@ -1369,13 +1368,13 @@ def make_type_translate(input_deck):
 
 def make_type_group_array(input_deck):
     global group_array
-    G = input_deck.materials[0]["G"]
+    G = input_deck.materials[0].G
     group_array = into_dtype([("values", float64, (G,))])
 
 
 def make_type_j_array(input_deck):
     global j_array
-    J = input_deck.materials[0]["J"]
+    J = input_deck.materials[0].J
     j_array = into_dtype([("values", float64, (J,))])
 
 

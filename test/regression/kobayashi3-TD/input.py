@@ -30,21 +30,21 @@ sz5 = mcdc.surface("plane-z", z=60.0, bc="vacuum")
 
 # Set cells
 # Soruce
-mcdc.cell([+sx1, -sx2, +sy1, -sy2, +sz1, -sz2], m)
+mcdc.cell(+sx1 & -sx2 & +sy1 & -sy2 & +sz1 & -sz2, m)
 # Voids
-mcdc.cell([+sx1, -sx2, +sy2, -sy3, +sz1, -sz2], m_void)
-mcdc.cell([+sx1, -sx3, +sy3, -sy4, +sz1, -sz2], m_void)
-mcdc.cell([+sx3, -sx4, +sy3, -sy4, +sz1, -sz3], m_void)
-mcdc.cell([+sx3, -sx4, +sy3, -sy5, +sz3, -sz4], m_void)
+mcdc.cell(+sx1 & -sx2 & +sy2 & -sy3 & +sz1 & -sz2, m_void)
+mcdc.cell(+sx1 & -sx3 & +sy3 & -sy4 & +sz1 & -sz2, m_void)
+mcdc.cell(+sx3 & -sx4 & +sy3 & -sy4 & +sz1 & -sz3, m_void)
+mcdc.cell(+sx3 & -sx4 & +sy3 & -sy5 & +sz3 & -sz4, m_void)
 # Shield
-mcdc.cell([+sx1, -sx3, +sy1, -sy5, +sz2, -sz5], m)
-mcdc.cell([+sx2, -sx5, +sy1, -sy3, +sz1, -sz2], m)
-mcdc.cell([+sx3, -sx5, +sy1, -sy3, +sz2, -sz5], m)
-mcdc.cell([+sx3, -sx5, +sy4, -sy5, +sz1, -sz3], m)
-mcdc.cell([+sx4, -sx5, +sy4, -sy5, +sz3, -sz5], m)
-mcdc.cell([+sx4, -sx5, +sy3, -sy4, +sz1, -sz5], m)
-mcdc.cell([+sx3, -sx4, +sy3, -sy5, +sz4, -sz5], m)
-mcdc.cell([+sx1, -sx3, +sy4, -sy5, +sz1, -sz2], m)
+mcdc.cell(+sx1 & -sx3 & +sy1 & -sy5 & +sz2 & -sz5, m)
+mcdc.cell(+sx2 & -sx5 & +sy1 & -sy3 & +sz1 & -sz2, m)
+mcdc.cell(+sx3 & -sx5 & +sy1 & -sy3 & +sz2 & -sz5, m)
+mcdc.cell(+sx3 & -sx5 & +sy4 & -sy5 & +sz1 & -sz3, m)
+mcdc.cell(+sx4 & -sx5 & +sy4 & -sy5 & +sz3 & -sz5, m)
+mcdc.cell(+sx4 & -sx5 & +sy3 & -sy4 & +sz1 & -sz5, m)
+mcdc.cell(+sx3 & -sx4 & +sy3 & -sy5 & +sz4 & -sz5, m)
+mcdc.cell(+sx1 & -sx3 & +sy4 & -sy5 & +sz1 & -sz2, m)
 
 # =============================================================================
 # Set source
@@ -60,7 +60,7 @@ mcdc.source(
 # =============================================================================
 
 # Tally: z-integrated flux (X-Y section view)
-mcdc.tally(
+mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 61),
     y=np.linspace(0.0, 100.0, 101),

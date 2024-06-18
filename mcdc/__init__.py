@@ -1,4 +1,3 @@
-# User interface
 from mcdc.input_ import (
     nuclide,
     material,
@@ -7,7 +6,6 @@ from mcdc.input_ import (
     universe,
     lattice,
     source,
-    tally,
     setting,
     eigenmode,
     implicit_capture,
@@ -21,9 +19,9 @@ from mcdc.input_ import (
     IC_generator,
     dsm,
     uq,
-    print_card,
-    reset_cards,
+    reset,
     domain_decomposition,
 )
+import mcdc.tally
 from mcdc.main import run, prepare
 from mcdc.visualizer import visualize

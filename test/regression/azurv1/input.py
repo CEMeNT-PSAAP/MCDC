@@ -1,5 +1,5 @@
 import numpy as np
-
+from pprint import pprint
 import mcdc
 
 # =============================================================================
@@ -22,7 +22,7 @@ s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
 s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
 
 # Set cells
-mcdc.cell([+s1, -s2], m)
+mcdc.cell(+s1 & -s2, m)
 
 # =============================================================================
 # Set source
@@ -35,8 +35,7 @@ mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True, time=[1e-10, 1e-10])
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-# Tally: cell-average, cell-edge, and time-edge scalar fluxes
-mcdc.tally(
+mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(-20.5, 20.5, 202),
     t=np.linspace(0.0, 20.0, 21),

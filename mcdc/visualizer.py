@@ -15,11 +15,11 @@ except ImportError as e:
 import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
 import math
 
-# Get input_card and set global variables as "mcdc_"
+# Get input deck
 
 import mcdc.global_ as mcdc_
 
-input_card = mcdc_.input_deck
+input_deck = mcdc_.input_deck
 
 
 # get a point on the plane based on the current time in the system
@@ -261,8 +261,8 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
 # called by visualize()
 def draw_Geometry(current_time, start_time, end_time, material_colors):
     # create lists that contain all cells and surfaces
-    surface_list = input_card.surfaces
-    cell_list = input_card.cells
+    surface_list = input_deck.surfaces
+    cell_list = input_deck.cells
 
     geo = CSGeometry()  # create the ngsolve geometry object
 

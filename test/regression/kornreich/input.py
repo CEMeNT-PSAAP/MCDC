@@ -30,8 +30,8 @@ s2 = mcdc.surface("plane-x", x=1.5)
 s3 = mcdc.surface("plane-x", x=2.5, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m1)
-mcdc.cell([+s2, -s3], m2)
+mcdc.cell(+s1 & -s2, m1)
+mcdc.cell(+s2 & -s3, m2)
 
 # =========================================================================
 # Set source
@@ -70,7 +70,7 @@ x = np.array(
     ]
 )
 scores = ["flux"]
-mcdc.tally(scores=scores, x=x)
+mcdc.tally.mesh_tally(scores=scores, x=x)
 
 # Setting
 mcdc.setting(N_particle=100, progress_bar=False, census_bank_buff=2.0)

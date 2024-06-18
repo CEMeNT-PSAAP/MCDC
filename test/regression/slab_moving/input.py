@@ -19,8 +19,8 @@ s2 = mcdc.surface(
 s3 = mcdc.surface("plane-x", x=6.0, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m)
-mcdc.cell([+s2, -s3], m_abs)
+mcdc.cell(+s1 & -s2, m)
+mcdc.cell(+s2 & -s3, m_abs)
 
 # =============================================================================
 # Set source
@@ -33,7 +33,9 @@ mcdc.source(x=[0.0, 6.0], time=[0.0, 10.0], isotropic=True)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=["flux"], x=np.linspace(0.0, 6.0, 61), t=np.linspace(0.0, 15.0, 151))
+mcdc.tally.mesh_tally(
+    scores=["flux"], x=np.linspace(0.0, 6.0, 61), t=np.linspace(0.0, 15.0, 151)
+)
 
 # Setting
 mcdc.setting(N_particle=1e2)

@@ -2,6 +2,43 @@ import math
 import numpy as np
 import numba as nb
 
+
+# Data index
+TALLY = 0
+
+# Tally bins
+TALLY_SCORE = 0
+TALLY_SUM = 1
+TALLY_SUM_SQ = 2
+TALLY_UQ_BATCH = 3
+TALLY_UQ_BATCH_VAR = 4
+
+# Tally scores
+SCORE_FLUX = 0
+SCORE_TOTAL = 1
+SCORE_FISSION = 2
+SCORE_NET_CURRENT = 3
+
+# Boundary condition
+BC_NONE = 0
+BC_VACUUM = 1
+BC_REFLECTIVE = 2
+
+# Cell fill
+FILL_MATERIAL = 0
+FILL_UNIVERSE = 1
+FILL_LATTICE = 2
+
+# Region
+REGION_HALFSPACE = 0
+REGION_INTERSECTION = 1
+REGION_UNION = 2
+REGION_COMPLEMENT = 3
+REGION_ALL = 4
+
+# UNIVERSE
+UNIVERSE_ROOT = 0
+
 # Events
 # The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
 EVENT_COLLISION = 1 << 0
