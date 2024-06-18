@@ -172,8 +172,6 @@ Ny = 17 * 3 * 2
 G = 7
 x_grid = np.linspace(0.0, pitch * 17 * 3, Nx + 1)
 y_grid = np.linspace(-pitch * 17 * 3, 0.0, Ny + 1)
-
-generator = "halton"
 solver = "power_iteration"
 
 phi0 = np.ones((G, Nx, Ny))
@@ -188,7 +186,6 @@ mcdc.iQMC(
     eigenmode_solver=solver,
     maxit=maxit,
     tol=tol,
-    generator=generator,
 )
 
 # =============================================================================

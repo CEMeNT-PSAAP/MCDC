@@ -178,7 +178,7 @@ for i, name in enumerate(names):
             result_name = "iqmc/tally/" + score
             a = output[result_name][:]
             b = answer[result_name][:]
-            if a.size == 0:
+            if np.isnan(b).all():
                 continue
             # Passed?
             if np.isclose(a, b).all():

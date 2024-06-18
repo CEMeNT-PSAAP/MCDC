@@ -49,12 +49,10 @@ def print_banner(mcdc):
             banner += "           Mode | Numba\n"
         if mcdc["technique"]["iQMC"]:
             banner += "      Algorithm | iQMC\n"
-            rng = mcdc["technique"]["iqmc"]["generator"]
             if mcdc["setting"]["mode_eigenvalue"]:
                 solver = mcdc["technique"]["iqmc"]["eigenmode_solver"]
             else:
                 solver = mcdc["technique"]["iqmc"]["fixed_source_solver"]
-            banner += "            RNG | " + rng + "\n"
             banner += "         Solver | " + solver + "\n"
         else:
             banner += "      Algorithm | History-based\n"
