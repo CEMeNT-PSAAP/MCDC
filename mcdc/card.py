@@ -92,7 +92,6 @@ class InputDeck:
             "wr_survive": 1.0,
             "iQMC": False,
             "iqmc": {
-                "generator": "sobol",
                 "fixed_source_solver": "source_iteration",
                 "eigenmode_solver": "power_iteration",
                 "preconditioner_sweeps": 5,
@@ -104,11 +103,7 @@ class InputDeck:
                 "itt": 0,
                 "itt_outter": 0,
                 "maxitt": 5,
-                "N_dim": 6,
-                "seed": 12345,
-                "scramble": False,
                 "fixed_source": np.ones([1, 1, 1, 1]),
-                "material_idx": np.ones([1, 1, 1, 1]),
                 "source": np.ones([1, 1, 1, 1]),
                 "score": {
                     "flux": np.ones([1, 1, 1, 1]),
