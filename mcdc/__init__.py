@@ -1,4 +1,3 @@
-# User interface
 from mcdc.input_ import (
     nuclide,
     material,
@@ -21,8 +20,7 @@ from mcdc.input_ import (
     IC_generator,
     dsm,
     uq,
-    print_card,
-    reset_cards,
+    reset,
     domain_decomposition,
 )
 from mcdc.main import run, prepare

@@ -1,5 +1,5 @@
 import numpy as np
-
+from pprint import pprint
 import mcdc
 
 # =============================================================================
@@ -22,7 +22,7 @@ s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
 s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
 
 # Set cells
-mcdc.cell([+s1, -s2], m)
+mcdc.cell(+s1 & -s2, m)
 
 # =============================================================================
 # Set source
