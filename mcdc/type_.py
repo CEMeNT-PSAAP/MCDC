@@ -34,6 +34,7 @@ particle_record = None
 nuclide = None
 material = None
 surface = None
+region = None
 cell = None
 universe = None
 lattice = None
@@ -199,7 +200,7 @@ def make_type_particle(input_deck):
 
     # iQMC vector of weights
     if iQMC:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     iqmc_struct = [("w", float64, (G,))]
     struct += [("iqmc", iqmc_struct)]
 
@@ -238,7 +239,7 @@ def make_type_particle_record(input_deck):
 
     # iQMC vector of weights
     if iQMC:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     iqmc_struct = [("w", float64, (G,))]
     struct += [("iqmc", iqmc_struct)]
 
@@ -328,8 +329,8 @@ def make_type_nuclide(input_deck):
 
     # Get MG sizes
     if mode_MG:
-        G = input_deck.materials[0]["G"]
-        J = input_deck.materials[0]["J"]
+        G = input_deck.materials[0].G
+        J = input_deck.materials[0].J
 
         # Zeros for CE sizes
         NE_xs = 0
@@ -424,7 +425,7 @@ def make_type_material(input_deck):
     global material
 
     # Maximum number of nuclides per material
-    Nmax_nuclide = max([material["N_nuclide"] for material in input_deck.materials])
+    Nmax_nuclide = max([material.N_nuclide for material in input_deck.materials])
 
     # Get modes
     mode_CE = input_deck.setting["mode_CE"]
@@ -438,8 +439,8 @@ def make_type_material(input_deck):
 
     # Get MG sizes
     if mode_MG:
-        G = input_deck.materials[0]["G"]
-        J = input_deck.materials[0]["J"]
+        G = input_deck.materials[0].G
+        J = input_deck.materials[0].J
 
     # General data
     struct = [
@@ -483,14 +484,13 @@ def make_type_surface(input_deck):
     # Maximum number of time-dependent surface slices
     Nmax_slice = 0
     for surface in input_deck.surfaces:
-        Nmax_slice = max(Nmax_slice, surface["N_slice"])
+        Nmax_slice = max(Nmax_slice, surface.N_slice)
 
     surface = into_dtype(
         [
             ("ID", int64),
             ("N_slice", int64),
-            ("vacuum", bool_),
-            ("reflective", bool_),
+            ("BC", int64),
             ("A", float64),
             ("B", float64),
             ("C", float64),
@@ -514,6 +514,24 @@ def make_type_surface(input_deck):
 
 
 # ==============================================================================
+# Region
+# ==============================================================================
+
+
+def make_type_region():
+    global region
+
+    region = into_dtype(
+        [
+            ("ID", int64),
+            ("type", int64),
+            ("A", int64),
+            ("B", int64),
+        ]
+    )
+
+
+# ==============================================================================
 # Cell
 # ==============================================================================
 
@@ -522,18 +540,17 @@ def make_type_cell(input_deck):
     global cell
 
     # Maximum number of surfaces per cell
-    Nmax_surface = max([cell["N_surface"] for cell in input_deck.cells])
+    Nmax_surface = max([cell.N_surface for cell in input_deck.cells])
 
     cell = into_dtype(
         [
             ("ID", int64),
+            ("region_ID", int64),
+            ("fill_type", int64),
+            ("fill_ID", int64),
+            ("translation", float64, (3,)),
             ("N_surface", int64),
             ("surface_IDs", int64, (Nmax_surface,)),
-            ("positive_flags", bool_, (Nmax_surface,)),
-            ("material_ID", int64),
-            ("lattice", bool_),
-            ("lattice_ID", int64),
-            ("lattice_center", float64, (3,)),
         ]
     )
 
@@ -547,16 +564,7 @@ def make_type_universe(input_deck):
     global universe
 
     # Maximum number of cells per universe
-    Nmax_cell = max([universe["N_cell"] for universe in input_deck.universes])
-
-    # Default root universe, if not defined
-    N_cell = len(input_deck.cells)
-    N_universe = len(input_deck.universes)
-    if N_universe == 1:
-        Nmax_cell = N_cell
-        card = input_deck.universes[0]
-        card["N_cell"] = N_cell
-        card["cell_IDs"] = np.arange(N_cell)
+    Nmax_cell = max([universe.N_cell for universe in input_deck.universes])
 
     universe = into_dtype(
         [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
@@ -591,9 +599,9 @@ def make_type_lattice(input_deck):
     Nmax_y = 0
     Nmax_z = 0
     for card in input_deck.lattices:
-        Nmax_x = max(Nmax_x, card["mesh"]["Nx"])
-        Nmax_y = max(Nmax_y, card["mesh"]["Ny"])
-        Nmax_z = max(Nmax_z, card["mesh"]["Nz"])
+        Nmax_x = max(Nmax_x, card.mesh["Nx"])
+        Nmax_y = max(Nmax_y, card.mesh["Ny"])
+        Nmax_z = max(Nmax_z, card.mesh["Nz"])
 
     lattice = into_dtype(
         [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
@@ -618,7 +626,7 @@ def make_type_source(input_deck):
         # Maximum number of data point in energy pdf
         Nmax_E = max([source["energy"].shape[1] for source in input_deck.sources])
     if mode_MG:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
         Nmax_E = 2
 
     # General data
@@ -815,7 +823,7 @@ def make_type_technique(input_deck):
 
     # Number of groups
     if mode_MG:
-        G = input_deck.materials[0]["G"]
+        G = input_deck.materials[0].G
     else:
         G = 1
 
@@ -1111,8 +1119,8 @@ def make_type_uq(input_deck):
         return into_dtype(struct)
 
     # Size numbers
-    G = input_deck.materials[0]["G"]
-    J = input_deck.materials[0]["J"]
+    G = input_deck.materials[0].G
+    J = input_deck.materials[0].J
 
     # UQ deck
     uq_deck = input_deck.uq_deltas
@@ -1225,6 +1233,7 @@ def make_type_global(input_deck):
     N_nuclide = len(input_deck.nuclides)
     N_material = len(input_deck.materials)
     N_surface = len(input_deck.surfaces)
+    N_region = len(input_deck.regions)
     N_cell = len(input_deck.cells)
     N_source = len(input_deck.sources)
     N_universe = len(input_deck.universes)
@@ -1241,7 +1250,7 @@ def make_type_global(input_deck):
 
     # Number of precursor groups
     if mode_MG:
-        J = input_deck.materials[0]["J"]
+        J = input_deck.materials[0].J
     if mode_CE:
         J = 6
 
@@ -1289,6 +1298,7 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
+            ("regions", region, (N_region,)),
             ("cells", cell, (N_cell,)),
             ("universes", universe, (N_universe,)),
             ("lattices", lattice, (N_lattice,)),
@@ -1365,13 +1375,13 @@ def make_type_translate(input_deck):
 
 def make_type_group_array(input_deck):
     global group_array
-    G = input_deck.materials[0]["G"]
+    G = input_deck.materials[0].G
     group_array = into_dtype([("values", float64, (G,))])
 
 
 def make_type_j_array(input_deck):
     global j_array
-    J = input_deck.materials[0]["J"]
+    J = input_deck.materials[0].J
     j_array = into_dtype([("values", float64, (J,))])
 
 

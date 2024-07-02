@@ -21,7 +21,7 @@ m = mcdc.material(nuclides=[(n1, 1.0), (n2, 1.0)])
 s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
 s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
 
-mcdc.cell([+s1, -s2], m)
+mcdc.cell(+s1 & -s2, m)
 
 mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True)
 

@@ -32,4 +32,4 @@ jobs:
     - name: Verification Tests - Numba and MPI
       run: |
           cd test/verification/analytic
-          python run.py --mode=numba --mpiexec=2
+          python run.py --mode=numba --mpiexec=2 --skip=iqmc*

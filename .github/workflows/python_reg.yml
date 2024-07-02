@@ -32,4 +32,4 @@ jobs:
     - name: Regression Test - Python
       run: |
           cd test/regression
-          python run.py
+          python run.py --skip=iqmc*

@@ -22,6 +22,7 @@ parser.add_argument("--progress_bar", default=True, action="store_true")
 parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
 args, unargs = parser.parse_known_args()
 
+from mcdc.card import UniverseCard
 from mcdc.print_ import (
     print_banner,
     print_msg,
@@ -85,6 +86,7 @@ from mpi4py import MPI
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
+import mcdc.adapt as adapt
 from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
@@ -101,8 +103,6 @@ from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eig
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
-
-import mcdc.adapt as adapt
 
 
 def run():
@@ -157,16 +157,22 @@ def run():
 
 
 # =============================================================================
-# utilities for handling discrepancies between input and state types
+# utilities for handling discrepancies between input and program types
 # =============================================================================
 
 
 def copy_field(dst, src, name):
     if "padding" in name:
         return
+
+    if isinstance(src, dict):
+        data = src[name]
+    else:
+        data = getattr(src, name)
+
     if isinstance(dst[name], np.ndarray):
-        if isinstance(src[name], np.ndarray) and dst[name].shape != src[name].shape:
-            for dim in src[name].shape:
+        if isinstance(data, np.ndarray) and dst[name].shape != data.shape:
+            for dim in data.shape:
                 if dim == 0:
                     return
             print(
@@ -175,7 +181,7 @@ def copy_field(dst, src, name):
             print(
                 f"State dimension {dst[name].shape} does not match input dimension {src[name].shape}"
             )
-        elif isinstance(src[name], list) and dst[name].shape[0] != len(src[name]):
+        elif isinstance(data, list) and dst[name].shape[0] != len(data):
             if len(src[name]) == 0:
                 return
             print(
@@ -184,7 +190,8 @@ def copy_field(dst, src, name):
             print(
                 f"State dimension {dst[name].shape} does not match input dimension {len(src[name])}"
             )
-    dst[name] = src[name]
+
+    dst[name] = data
 
 
 # =============================================================================
@@ -319,6 +326,18 @@ def prepare():
     dd_prepare()
 
     # =========================================================================
+    # Create root universe if not defined
+    # =========================================================================
+
+    N_cell = len(input_deck.cells)
+    if input_deck.universes[0] == None:
+        root_universe = UniverseCard(N_cell)
+        root_universe.ID = 0
+        for i, cell in enumerate(input_deck.cells):
+            root_universe.cell_IDs[i] = cell.ID
+        input_deck.universes[0] = root_universe
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -333,6 +352,7 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
+    type_.make_type_region()
     type_.make_type_cell(input_deck)
     type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
@@ -471,7 +491,7 @@ def prepare():
         for name in type_.material.names:
             if name in ["nuclide_IDs", "nuclide_densities"]:
                 mcdc["materials"][i][name][: mcdc["materials"][i]["N_nuclide"]] = (
-                    input_deck.materials[i][name]
+                    getattr(input_deck.materials[i], name)
                 )
             else:
                 copy_field(mcdc["materials"][i], input_deck.materials[i], name)
@@ -483,13 +503,43 @@ def prepare():
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
         for name in type_.surface.names:
-            if name not in ["J", "t"]:
+            if name not in ["J", "t", "BC"]:
                 copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
+
+        # Boundary condition
+        if input_deck.surfaces[i].boundary_type == "interface":
+            mcdc["surfaces"][i]["BC"] = BC_NONE
+        elif input_deck.surfaces[i].boundary_type == "vacuum":
+            mcdc["surfaces"][i]["BC"] = BC_VACUUM
+        elif input_deck.surfaces[i].boundary_type == "reflective":
+            mcdc["surfaces"][i]["BC"] = BC_REFLECTIVE
 
         # Variables with possible different sizes
         for name in ["J", "t"]:
-            N = len(input_deck.surfaces[i][name])
-            mcdc["surfaces"][i][name][:N] = input_deck.surfaces[i][name]
+            N = len(getattr(input_deck.surfaces[i], name))
+            mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
+
+    # =========================================================================
+    # Regions
+    # =========================================================================
+
+    N_region = len(input_deck.regions)
+    for i in range(N_region):
+        for name in type_.region.names:
+            if name not in ["type"]:
+                copy_field(mcdc["regions"][i], input_deck.regions[i], name)
+
+        # Type
+        if input_deck.regions[i].type == "halfspace":
+            mcdc["regions"][i]["type"] = REGION_HALFSPACE
+        elif input_deck.regions[i].type == "intersection":
+            mcdc["regions"][i]["type"] = REGION_INTERSECTION
+        elif input_deck.regions[i].type == "union":
+            mcdc["regions"][i]["type"] = REGION_UNION
+        elif input_deck.regions[i].type == "complement":
+            mcdc["regions"][i]["type"] = REGION_COMPLEMENT
+        elif input_deck.regions[i].type == "all":
+            mcdc["regions"][i]["type"] = REGION_ALL
 
     # =========================================================================
     # Cells
@@ -498,13 +548,21 @@ def prepare():
     N_cell = len(input_deck.cells)
     for i in range(N_cell):
         for name in type_.cell.names:
-            if name not in ["surface_IDs", "positive_flags"]:
+            if name not in ["fill_type", "surface_IDs"]:
                 copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
+        # Fill type
+        if input_deck.cells[i].fill_type == "material":
+            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
+        elif input_deck.cells[i].fill_type == "universe":
+            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
+        elif input_deck.cells[i].fill_type == "lattice":
+            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+
         # Variables with possible different sizes
-        for name in ["surface_IDs", "positive_flags"]:
-            N = len(input_deck.cells[i][name])
-            mcdc["cells"][i][name][:N] = input_deck.cells[i][name]
+        for name in ["surface_IDs"]:
+            N = mcdc["cells"][i]["N_surface"]
+            mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
 
     # =========================================================================
     # Universes
@@ -514,12 +572,12 @@ def prepare():
     for i in range(N_universe):
         for name in type_.universe.names:
             if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = input_deck.universes[i][name]
+                mcdc["universes"][i][name] = getattr(input_deck.universes[i], name)
 
         # Variables with possible different sizes
         for name in ["cell_IDs"]:
             N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = input_deck.universes[i][name]
+            mcdc["universes"][i][name][:N] = getattr(input_deck.universes[i], name)
 
     # =========================================================================
     # Lattices
@@ -529,15 +587,15 @@ def prepare():
     for i in range(N_lattice):
         # Mesh
         for name in type_.mesh_uniform.names:
-            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i]["mesh"][name]
+            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i].mesh[name]
 
         # Universe IDs
         Nx = mcdc["lattices"][i]["mesh"]["Nx"]
         Ny = mcdc["lattices"][i]["mesh"]["Ny"]
         Nz = mcdc["lattices"][i]["mesh"]["Nz"]
-        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[i][
-            "universe_IDs"
-        ]
+        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[
+            i
+        ].universe_IDs
 
     # =========================================================================
     # Source
@@ -716,15 +774,15 @@ def prepare():
 
         M = len(input_deck.uq_deltas["materials"])
         for i in range(M):
-            idm = input_deck.uq_deltas["materials"][i]["ID"]
+            idm = input_deck.uq_deltas["materials"][i].ID
             mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"] = idm
             mcdc["technique"]["uq_"]["materials"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["materials"][i]["distribution"]
+                input_deck.uq_deltas["materials"][i].distribution
             )
-            for name in input_deck.uq_deltas["materials"][i]["flags"]:
+            for name in input_deck.uq_deltas["materials"][i].flags:
                 mcdc["technique"]["uq_"]["materials"][i]["flags"][name] = True
-                mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = (
-                    input_deck.uq_deltas["materials"][i][name]
+                mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = getattr(
+                    input_deck.uq_deltas["materials"][i], name
                 )
             flags = mcdc["technique"]["uq_"]["materials"][i]["flags"]
             if flags["capture"] or flags["scatter"] or flags["fission"]:
@@ -741,17 +799,30 @@ def prepare():
         N = len(input_deck.uq_deltas["nuclides"])
         for i in range(N):
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["nuclides"][i]["distribution"]
+                input_deck.uq_deltas["nuclides"][i].distribution
             )
-            idn = input_deck.uq_deltas["nuclides"][i]["ID"]
+            idn = input_deck.uq_deltas["nuclides"][i].ID
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
-                copy_field(
-                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
-                    input_deck.nuclides[idn],
-                    name,
-                )
-            for name in input_deck.uq_deltas["nuclides"][i]["flags"]:
+                if name == "scatter":
+                    G = input_deck.nuclides[idn].G
+                    chi_s = input_deck.nuclides[idn].chi_s
+                    scatter = input_deck.nuclides[idn].scatter
+                    scatter_matrix = np.zeros((G, G))
+                    for g in range(G):
+                        scatter_matrix[g, :] = chi_s[g, :] * scatter[g]
+
+                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"][
+                        name
+                    ] = scatter_matrix
+                else:
+                    copy_field(
+                        mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
+                        input_deck.nuclides[idn],
+                        name,
+                    )
+
+            for name in input_deck.uq_deltas["nuclides"][i].flags:
                 if "padding" in name:
                     continue
                 mcdc["technique"]["uq_"]["nuclides"][i]["flags"][name] = True
@@ -884,6 +955,28 @@ def prepare():
     return mcdc
 
 
+def cardlist_to_h5group(dictlist, input_group, name):
+    main_group = input_group.create_group(name + "s")
+    for item in dictlist:
+        group = main_group.create_group(name + "_%i" % getattr(item, "ID"))
+        card_to_h5group(item, group)
+
+
+def card_to_h5group(card, group):
+    for name in [
+        a
+        for a in dir(card)
+        if not a.startswith("__") and not callable(getattr(card, a)) and a != "tag"
+    ]:
+        value = getattr(card, name)
+        if type(value) == dict:
+            dict_to_h5group(value, group.create_group(name))
+        elif value is None:
+            next
+        else:
+            group[name] = value
+
+
 def dictlist_to_h5group(dictlist, input_group, name):
     main_group = input_group.create_group(name + "s")
     for item in dictlist:
@@ -911,13 +1004,13 @@ def generate_hdf5(mcdc):
             # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
-                dictlist_to_h5group(input_deck.nuclides, input_group, "nuclide")
-                dictlist_to_h5group(input_deck.materials, input_group, "material")
-                dictlist_to_h5group(input_deck.surfaces, input_group, "surface")
-                dictlist_to_h5group(input_deck.cells, input_group, "cell")
-                dictlist_to_h5group(input_deck.universes, input_group, "universe")
-                dictlist_to_h5group(input_deck.lattices, input_group, "lattice")
-                dictlist_to_h5group(input_deck.sources, input_group, "source")
+                cardlist_to_h5group(input_deck.nuclides, input_group, "nuclide")
+                cardlist_to_h5group(input_deck.materials, input_group, "material")
+                cardlist_to_h5group(input_deck.surfaces, input_group, "surface")
+                cardlist_to_h5group(input_deck.cells, input_group, "cell")
+                cardlist_to_h5group(input_deck.universes, input_group, "universe")
+                cardlist_to_h5group(input_deck.lattices, input_group, "lattice")
+                cardlist_to_h5group(input_deck.sources, input_group, "source")
                 dict_to_h5group(input_deck.tally, input_group.create_group("tally"))
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(

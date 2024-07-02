@@ -17,7 +17,7 @@ s1 = mcdc.surface("plane-x", x=0.0, bc="vacuum")
 s2 = mcdc.surface("plane-x", x=5.0, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m)
+mcdc.cell(+s1 & -s2, m)
 
 # =============================================================================
 # Set source

@@ -35,9 +35,9 @@ s2 = mcdc.surface("plane-x", x=0.5, sensitivity=True)
 s3 = mcdc.surface("plane-x", x=1.5, sensitivity=True)
 s4 = mcdc.surface("plane-x", x=2.0, bc="reflective")
 
-mcdc.cell([+s1, -s2], mat_uo2)
-mcdc.cell([+s2, -s3], mat_mod)
-mcdc.cell([+s3, -s4], mat_cr)
+mcdc.cell(+s1 & -s2, mat_uo2)
+mcdc.cell(+s2 & -s3, mat_mod)
+mcdc.cell(+s3 & -s4, mat_cr)
 
 mcdc.source(point=[1.0, 0.0, 0.0], energy=[1, 0, 0, 0, 0, 0, 0], isotropic=True)
 

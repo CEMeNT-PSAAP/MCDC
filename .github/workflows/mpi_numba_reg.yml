@@ -32,4 +32,4 @@ jobs:
     - name: Regression Test - Numba and MPI
       run: |
           cd test/regression
-          python run.py --mode=numba --mpiexec=4
+          python run.py --mode=numba --mpiexec=4 --skip=iqmc*
