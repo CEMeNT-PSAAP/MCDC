@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 10 21:52:17 2024
-
-@author: sam pasmann
-"""
 from mpi4py import MPI
 
 import mcdc.adapt as adapt
