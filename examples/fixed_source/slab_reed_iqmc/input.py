@@ -42,7 +42,6 @@ Nx = 64
 maxit = 20
 tol = 1e-4
 x = np.linspace(-8, 8, num=Nx + 1)
-generator = "halton"
 solver = "gmres"
 
 
@@ -82,9 +81,8 @@ mcdc.iQMC(
     x=x,
     fixed_source=fixed_source,
     phi0=phi0,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
-    generator=generator,
     fixed_source_solver=solver,
     score=["tilt-x"],
 )

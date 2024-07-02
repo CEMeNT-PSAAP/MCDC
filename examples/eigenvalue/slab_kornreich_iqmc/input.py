@@ -40,7 +40,6 @@ maxit = 25
 tol = 1e-3
 x = np.arange(0.0, 2.6, 0.1)
 Nx = len(x) - 1
-generator = "halton"
 solver = "power_iteration"
 fixed_source = np.zeros(Nx)
 phi0 = np.ones((Nx))
@@ -53,9 +52,8 @@ mcdc.iQMC(
     x=x,
     fixed_source=fixed_source,
     phi0=phi0,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
-    generator=generator,
     eigenmode_solver=solver,
     score=["tilt-x"],
 )

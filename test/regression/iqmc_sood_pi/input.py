@@ -33,7 +33,6 @@ N = 10
 maxit = 5
 tol = 1e-3
 x = np.linspace(0.0, 6.01275, num=Nx + 1)
-generator = "halton"
 solver = "power_iteration"
 fixed_source = np.zeros(Nx)
 phi0 = np.ones((Nx))
@@ -46,9 +45,8 @@ mcdc.iQMC(
     x=x,
     phi0=phi0,
     fixed_source=fixed_source,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
-    generator=generator,
     eigenmode_solver=solver,
 )
 # Setting
