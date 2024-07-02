@@ -27,12 +27,12 @@ def verify_card_quantities_with_input_quantities(
     mat, capture, scatter, fission, nu_s, nu_p, nu_d, chi_p, chi_d, speed, decay
 ):
     # Verify pass-through quantities are correct
-    assert np.allclose(mat["capture"], capture)
-    assert np.allclose(mat["fission"], fission)
-    assert np.allclose(mat["nu_p"], nu_p)
-    assert np.allclose(mat["nu_s"], nu_s)
-    assert np.allclose(mat["speed"], speed)
-    assert np.allclose(mat["decay"], decay)
+    assert np.allclose(mat.capture, capture)
+    assert np.allclose(mat.fission, fission)
+    assert np.allclose(mat.nu_p, nu_p)
+    assert np.allclose(mat.nu_s, nu_s)
+    assert np.allclose(mat.speed, speed)
+    assert np.allclose(mat.decay, decay)
 
     # Verify modified and/or calculated quantities are correct
     n_neutron_groups = len(capture)
@@ -43,15 +43,15 @@ def verify_card_quantities_with_input_quantities(
     normalized_chi_s = scatter * np.divide(1.0, np.sum(scatter, 0))
     normalized_chi_p = chi_p * np.divide(1.0, np.sum(chi_p, 0))
     normalized_chi_d = chi_d * np.divide(1.0, np.sum(chi_d, 0))
-    assert mat["G"] == n_neutron_groups
-    assert mat["J"] == n_dnp_groups
-    assert np.allclose(mat["scatter"], total_scatter)
-    assert np.allclose(mat["total"], total)
-    assert np.allclose(mat["nu_d"], np.transpose(nu_d))
-    assert np.allclose(mat["nu_f"], nu_f)
-    assert np.allclose(mat["chi_s"], np.transpose(normalized_chi_s))
-    assert np.allclose(mat["chi_p"], np.transpose(normalized_chi_p))
-    assert np.allclose(mat["chi_d"], np.transpose(normalized_chi_d))
+    assert mat.G == n_neutron_groups
+    assert mat.J == n_dnp_groups
+    assert np.allclose(mat.scatter, total_scatter)
+    assert np.allclose(mat.total, total)
+    assert np.allclose(mat.nu_d, np.transpose(nu_d))
+    assert np.allclose(mat.nu_f, nu_f)
+    assert np.allclose(mat.chi_s, np.transpose(normalized_chi_s))
+    assert np.allclose(mat.chi_p, np.transpose(normalized_chi_p))
+    assert np.allclose(mat.chi_d, np.transpose(normalized_chi_d))
 
 
 def test_single_neutron_energy_and_zero_dnp_group_nuclide():

@@ -46,25 +46,25 @@ radius = 0.54
 cy = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=radius)
 
 # Cells
-uo2 = mcdc.cell([-cy], mat_uo2)
-mox4 = mcdc.cell([-cy], mat_mox43)
-mox7 = mcdc.cell([-cy], mat_mox7)
-mox8 = mcdc.cell([-cy], mat_mox87)
-gt = mcdc.cell([-cy], mat_gt)
-fc = mcdc.cell([-cy], mat_fc)
-cr = mcdc.cell([-cy], mat_cr)
-mod = mcdc.cell([+cy], mat_mod)
-modi = mcdc.cell([-cy], mat_mod)  # For all-water lattice
+uo2 = mcdc.cell(-cy, mat_uo2)
+mox4 = mcdc.cell(-cy, mat_mox43)
+mox7 = mcdc.cell(-cy, mat_mox7)
+mox8 = mcdc.cell(-cy, mat_mox87)
+gt = mcdc.cell(-cy, mat_gt)
+fc = mcdc.cell(-cy, mat_fc)
+cr = mcdc.cell(-cy, mat_cr)
+mod = mcdc.cell(+cy, mat_mod)
+modi = mcdc.cell(-cy, mat_mod)  # For all-water lattice
 
 # Universes
-u = mcdc.universe([uo2, mod])["ID"]
-l = mcdc.universe([mox4, mod])["ID"]
-m = mcdc.universe([mox7, mod])["ID"]
-n = mcdc.universe([mox8, mod])["ID"]
-g = mcdc.universe([gt, mod])["ID"]
-f = mcdc.universe([fc, mod])["ID"]
-c = mcdc.universe([cr, mod])["ID"]
-w = mcdc.universe([modi, mod])["ID"]
+u = mcdc.universe([uo2, mod])
+l = mcdc.universe([mox4, mod])
+m = mcdc.universe([mox7, mod])
+n = mcdc.universe([mox8, mod])
+g = mcdc.universe([gt, mod])
+f = mcdc.universe([fc, mod])
+c = mcdc.universe([cr, mod])
+w = mcdc.universe([modi, mod])
 
 # =============================================================================
 # Assemblies
@@ -132,14 +132,14 @@ x1 = mcdc.surface("plane-x", x=pitch * 17 / 2)
 y0 = mcdc.surface("plane-y", y=-pitch * 17 / 2)
 y1 = mcdc.surface("plane-y", y=pitch * 17 / 2)
 # Cells
-assembly_uo2 = mcdc.cell([+x0, -x1, +y0, -y1], lattice_uo2)
-assembly_mox = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mox)
-assembly_mod = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mod)
+assembly_uo2 = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_uo2)
+assembly_mox = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_mox)
+assembly_mod = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_mod)
 
 # Set assemblies in their respective universes
-u_ = mcdc.universe([assembly_uo2])["ID"]
-m_ = mcdc.universe([assembly_mox])["ID"]
-w_ = mcdc.universe([assembly_mod])["ID"]
+u_ = mcdc.universe([assembly_uo2])
+m_ = mcdc.universe([assembly_mox])
+w_ = mcdc.universe([assembly_mod])
 
 # =============================================================================
 # Root universe: core
@@ -160,9 +160,9 @@ y0_ = mcdc.surface("plane-y", y=-pitch * 17 * 3, bc="vacuum")
 y1_ = mcdc.surface("plane-y", y=0.0, bc="reflective")
 # Cell
 core = mcdc.cell(
-    [+x0_, -x1_, +y0_, -y1_],
+    +x0_ & -x1_ & +y0_ & -y1_,
     lattice_core,
-    lattice_center=[pitch * 17 * 3 / 2, -pitch * 17 * 3 / 2, 0.0],
+    translation=[pitch * 17 * 3 / 2, -pitch * 17 * 3 / 2, 0.0],
 )
 
 # Root universe
