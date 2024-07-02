@@ -2,7 +2,8 @@ import numpy as np
 import mcdc as MCDC
 from mcdc import type_
 from mcdc.main import closeout
-from mcdc.kernel import rng, AxV
+from mcdc.iqmc.iqmc_loop import AxV
+from mcdc.kernel import rng
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
@@ -45,7 +46,6 @@ def iqmc_dummy_mcdc_variable():
     tol = 1e-3
     x = np.arange(0.0, 2.6, 0.1)
     Nx = len(x) - 1
-    generator = "halton"
     solver = "power_iteration"
     fixed_source = np.zeros(Nx)
     phi0 = np.ones((Nx))
@@ -58,9 +58,8 @@ def iqmc_dummy_mcdc_variable():
         x=x,
         fixed_source=fixed_source,
         phi0=phi0,
-        maxitt=maxit,
+        maxit=maxit,
         tol=tol,
-        generator=generator,
         eigenmode_solver=solver,
     )
     # Setting
