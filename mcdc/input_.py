@@ -334,8 +334,8 @@ def material(
                 dir_name = os.getenv("MCDC_XSLIB")
                 if dir_name == None:
                     print_error(
-                        "Continuous energy data directory not configured \n"+
-                        "see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
+                        "Continuous energy data directory not configured \n"
+                        + "see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
                     )
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
@@ -1010,7 +1010,9 @@ def source(**kw):
         # Default for CE
         if global_.input_deck.setting["mode_CE"]:
             # Normalize pdf
-            card.energy[1, :] = card.energy[1, :] / np.trapz(card.energy[1, :], x=card.energy[0, :])
+            card.energy[1, :] = card.energy[1, :] / np.trapz(
+                card.energy[1, :], x=card.energy[0, :]
+            )
             # Make cdf
             card.energy[1, :] = sp.integrate.cumulative_trapezoid(
                 card.energy[1], x=card.energy[0], initial=0.0
@@ -1843,7 +1845,9 @@ def get_identical_material(card):
     nuclide_densities = card.nuclide_densities
     for material in global_.input_deck.materials:
         if len(nuclide_IDs) == len(material.nuclide_IDs):
-            if (nuclide_IDs == material.nuclide_IDs).all() and (nuclide_densities == material.nuclide_densities).all():
+            if (nuclide_IDs == material.nuclide_IDs).all() and (
+                nuclide_densities == material.nuclide_densities
+            ).all():
                 return material
     return None
 
