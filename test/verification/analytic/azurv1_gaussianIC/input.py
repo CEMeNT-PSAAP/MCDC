@@ -34,6 +34,7 @@ gaussian = np.exp(-4 * x**2)  # manufactured gaussian - matches that which is us
 dx = x[2] - x[1]
 edges_x = np.append(x - dx / 2, x[-1] + dx / 2)
 for ii, (x1, x2) in enumerate(zip(edges_x[:-1], edges_x[1:])):
+    # creates sources with strengths that vary according to manufactured gaussian to create a "gaussian source"
     mcdc.source(
         x=[x1, x2],
         prob=gaussian[ii] * 0.8862269254527580136490837416705725913987747280611935641069038949, # long number is area under manufactured Gaussian
