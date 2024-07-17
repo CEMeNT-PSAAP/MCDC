@@ -6,7 +6,7 @@ import mcdc
 # =============================================================================
 # Set model
 # =============================================================================
-# Infinite medium with isotropic plane surface at the center
+# Infinite medium with isotropic square source at the center
 # Based on Ganapol LA-UR-01-1854 (AZURV1 benchmark), new computations by William Bennett
 # Effective scattering ratio c = 1
 
@@ -28,9 +28,9 @@ mcdc.cell([+s1, -s2], m)
 # =============================================================================
 # Set source
 # =============================================================================
-# Isotropic pulse at x=t=0
+# Square pulse at center from x = -.5 to .5, t = 0
 
-mcdc.source(x=[-.5,.5], isotropic=True, time=[1e-10, 1e-10])
+mcdc.source(x=[-0.5, 0.5], isotropic=True, time=[1e-10, 1e-10])
 
 # =============================================================================
 # Set tally, setting, and run mcdc

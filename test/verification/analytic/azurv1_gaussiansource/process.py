@@ -31,7 +31,11 @@ for i, N_particle in enumerate(N_particle_list):
         dt = t[1:] - t[:-1]
         K = len(t) - 1
 
-        phi = f["tally/flux/mean"][:]*5*0.8862269254527580136490837416705725913987747280611935641069038949
+        phi = (
+            f["tally/flux/mean"][:]
+            * 5
+            * 0.8862269254527580136490837416705725913987747280611935641069038949
+        )
 
     # Normalize
     for k in range(K):

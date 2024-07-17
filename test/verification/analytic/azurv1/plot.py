@@ -29,10 +29,7 @@ with h5py.File(output, "r") as f:
 
 # Flux - average
 fig = plt.figure()
-ax = plt.axes(
-    xlim=(-2,2),#(-21.889999999999997, 21.89), 
-    ylim=(-0.042992644459595206, 2)#0.9028455336514992)
-)
+ax = plt.axes(xlim=(-2, 2), ylim=(-0.042992644459595206, 2))
 ax.grid()
 ax.set_xlabel(r"$x$")
 ax.set_ylabel(r"Flux")
@@ -56,6 +53,6 @@ def animate(k):
     return line1, line2, text
 
 
-simulation = animation.FuncAnimation(fig, animate, frames=1)
+simulation = animation.FuncAnimation(fig, animate, frames=K)
 writervideo = animation.FFMpegWriter(fps=6)
 plt.show()

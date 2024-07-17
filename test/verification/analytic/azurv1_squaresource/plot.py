@@ -19,7 +19,7 @@ with h5py.File(output, "r") as f:
     dt = t[1:] - t[:-1]
     K = len(t) - 1
 
-    phi = f["tally/flux/mean"][:]*5
+    phi = f["tally/flux/mean"][:] * 5
     phi_sd = f["tally/flux/sdev"][:]
 
     # Normalize

@@ -30,8 +30,7 @@ with h5py.File(output, "r") as f:
 # Flux - average
 fig = plt.figure()
 ax = plt.axes(
-    xlim=(-21.889999999999997, 21.89), 
-    ylim=(-0.042992644459595206,  0.9028455336514992)
+    xlim=(-21.889999999999997, 21.89), ylim=(-0.042992644459595206, 0.9028455336514992)
 )
 ax.grid()
 ax.set_xlabel(r"$x$")
@@ -45,7 +44,7 @@ ax.legend()
 
 
 def animate(k):
-    
+
     global fb
     fb.remove()
     line1.set_data(x_mid, phi[k, :])

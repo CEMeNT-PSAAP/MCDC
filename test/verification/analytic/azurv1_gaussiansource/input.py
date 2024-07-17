@@ -6,7 +6,7 @@ import mcdc
 # =============================================================================
 # Set model
 # =============================================================================
-# Infinite medium with isotropic plane surface at the center
+# Infinite medium with gaussian source at the center
 # Based on Ganapol LA-UR-01-1854 (AZURV1 benchmark), new computations by William Bennett
 # Effective scattering ratio c = 1
 
@@ -28,14 +28,19 @@ mcdc.cell([+s1, -s2], m)
 # =============================================================================
 # Set source
 # =============================================================================
-# Isotropic pulse at x=t=0
-x = np.linspace(-15,15,int(1e4))
-gaussian = np.exp(-4*x**2)
-dx = x[2]-x[1]
-edges_x = np.append(x-dx/2,x[-1]+dx/2)
-for ii, (x1,x2) in enumerate(zip(edges_x[:-1],edges_x[1:])):
-    mcdc.source(x=[x1,x2],prob=gaussian[ii]*0.8862269254527580136490837416705725913987747280611935641069038949,time=[1e-10, 5])
-
+# Gaussian source from t = 0 to t = 5
+x = np.linspace(-15, 15, int(1e4))
+gaussian = np.exp(-4 * x**2)  # manufactured gaussian as used in benchmark solutions
+dx = x[2] - x[1]
+edges_x = np.append(x - dx / 2, x[-1] + dx / 2)
+for ii, (x1, x2) in enumerate(zip(edges_x[:-1], edges_x[1:])):
+    mcdc.source(
+        x=[x1, x2],
+        prob=gaussian[ii]
+        * 0.8862269254527580136490837416705725913987747280611935641069038949,
+        time=[1e-10, 5],
+    )
+    # ^ area under manufactured Gaussian
 
 # =============================================================================
 # Set tally, setting, and run mcdc
