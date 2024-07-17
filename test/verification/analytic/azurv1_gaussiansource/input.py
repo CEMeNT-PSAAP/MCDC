@@ -36,11 +36,10 @@ edges_x = np.append(x - dx / 2, x[-1] + dx / 2)
 for ii, (x1, x2) in enumerate(zip(edges_x[:-1], edges_x[1:])):
     mcdc.source(
         x=[x1, x2],
-        prob=gaussian[ii]
-        * 0.8862269254527580136490837416705725913987747280611935641069038949,
+        prob=gaussian[ii] * 0.8862269254527580136490837416705725913987747280611935641069038949, # long number is area under manufactured Gaussian
         time=[1e-10, 5],
     )
-    # ^ area under manufactured Gaussian
+    
 
 # =============================================================================
 # Set tally, setting, and run mcdc
