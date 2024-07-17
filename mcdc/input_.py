@@ -1457,34 +1457,32 @@ def domain_decomposition(
 
 
 def iQMC(
+    phi0=None,
     g=None,
     t=None,
     x=None,
     y=None,
     z=None,
-    phi0=None,
     source0=None,
     source_x0=None,
     source_y0=None,
     source_z0=None,
     krylov_restart=None,
     fixed_source=None,
-    scramble=False,
-    maxitt=25,
+    maxit=25,
     tol=1e-6,
-    N_dim=6,
-    seed=12345,
     preconditioner_sweeps=5,
-    generator="halton",
     fixed_source_solver="source_iteration",
     eigenmode_solver="power_iteration",
     score=[],
 ):
     """
-    Set iQMC settings.
+    Activate the iterative Quasi-Monte Carlo (iQMC) neutron transport method.
 
     Parameters
     ----------
+    phi0 : array_like[float], optional
+        Initial scalar flux approximation (default None).
     g : array_like[float], optional
         Energy values that define energy mesh (default None).
     t : array_like[float], optional
@@ -1495,8 +1493,9 @@ def iQMC(
         y-coordinates that define spacial mesh (default None).
     z : array_like[float], optional
         z-coordinates that define spacial mesh (default None).
-    phi0 : array_like[float], optional
-        Initial scalar flux (default None).
+
+    Other Parameters
+    ----------
     source0 : array_like[float], optional
         Initial particle source (default None).
     source_x0 : array_like[float], optional
@@ -1509,40 +1508,37 @@ def iQMC(
         Max number of iterations for Krylov iteration (default same as maxitt).
     fixed_source : array_like[float], optional
         Fixed source (default same as phi0).
-    scramble : bool, optional
-        Whether to scramble (default False, implies over-easy).
-    maxitt : int, optional
+    maxit : int, optional
         Maximum number of iterations allowed before termination (default 25).
     tol : float, optional
         Convergence tolerance (default 1e-6).
-    N_dim : int, optional
-        Problem dimensionality (default 6).
-    seed : int, optional
-        Random number seed (default 12345).
     preconditioner_sweeps : int, optional
         Number of preconditioner sweeps (default 5).
-    generator : str, optional
-        Low-discrepancy sequence generator (default "halton").
-    fixed_source_solver : str, optional
+    fixed_source_solver : {'source_iteration', 'gmres'}
         Deterministic solver for fixed-source problem (default "source_iteration").
-    eigenmode_solver : str, optional
+    eigenmode_solver : {'power_iteration'}
         Solver for k-eigenvalue problem (default "power_iteration").
-    score : list of str
-        List of tally types (default empty list).
+    score : list of str, optional
+        List of tallies to score in addition to the mandatory flux and
+        source strength. Additional scores include
+        {'tilt-x', 'tilt-y', 'tilt-z', 'fission-power'} (default empty list).
 
     Returns
     -------
         None (in-place card alterations).
+
+    Notes
+    -----
+        phi0 is used to estimate the initial source strength. If source0 is
+        provided, source0 will be used instead of phi0. Either phi0 or
+        source0 must be provided as they are used to initialize particle
+        weights.
     """
 
     card = mcdc.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
-    card["iqmc"]["maxitt"] = maxitt
-    card["iqmc"]["generator"] = generator
-    card["iqmc"]["N_dim"] = N_dim
-    card["iqmc"]["scramble"] = scramble
-    card["iqmc"]["seed"] = seed
+    card["iqmc"]["maxitt"] = maxit
 
     # Set mesh
     if g is not None:
@@ -1575,7 +1571,7 @@ def iQMC(
             fixed_source = np.zeros_like(phi0)
 
     if krylov_restart is None:
-        krylov_restart = maxitt
+        krylov_restart = maxit
 
     if source0 is None:
         source0 = np.zeros_like(phi0)

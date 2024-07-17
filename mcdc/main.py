@@ -81,7 +81,6 @@ import h5py
 import numpy as np
 
 from mpi4py import MPI
-from scipy.stats import qmc
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
@@ -90,10 +89,11 @@ from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
     loop_eigenvalue,
-    loop_iqmc,
     set_cache,
     build_gpu_progs,
 )
+from mcdc.iqmc.iqmc_loop import iqmc_simulation
+
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
@@ -136,7 +136,7 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        loop_iqmc(mcdc)
+        iqmc_simulation(mcdc)
     elif mcdc["setting"]["mode_eigenvalue"]:
         loop_eigenvalue(mcdc)
     else:
@@ -549,7 +549,7 @@ def prepare():
             copy_field(mcdc["sources"][i], input_deck.sources[i], name)
 
     # Normalize source probabilities
-    tot = 0.0
+    tot = 1e-16
     for S in mcdc["sources"]:
         tot += S["prob"]
     for S in mcdc["sources"]:
@@ -676,9 +676,9 @@ def prepare():
             "mesh",
             "res",
             "lds",
-            "generator",
             "sweep_counter",
             "total_source",
+            "material_idx",
             "w_min",
             "score_list",
             "score",
@@ -696,42 +696,8 @@ def prepare():
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
             mcdc["technique"]["iqmc"]["score"][name] = value
-        # LDS generator
-        iqmc["generator"] = input_deck.technique["iqmc"]["generator"]
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-        # variables to generate samples
-        scramble = iqmc["scramble"]
-        N_dim = iqmc["N_dim"]
-        seed = iqmc["seed"]
-        N_particle = mcdc["setting"]["N_particle"]
-
-        mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
-        mcdc["mpi_rank"] = MPI.COMM_WORLD.Get_rank()
-        kernel.distribute_work(N_particle, mcdc)
-        N_work = int(mcdc["mpi_work_size"])
-        N_start = int(mcdc["mpi_work_start"])
-
-        # generate LDS
-        if input_deck.technique["iqmc"]["generator"] == "sobol":
-            sampler = qmc.Sobol(d=N_dim, scramble=scramble)
-            # skip the first entry in Sobol sequence because its 0.0
-            # skip the second because it maps to ux = 0.0
-            sampler.fast_forward(2)
-            sampler.fast_forward(N_start)
-            iqmc["lds"] = sampler.random(N_work)
-        if input_deck.technique["iqmc"]["generator"] == "halton":
-            sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
-            # skip the first entry in Halton sequence because its 0.0
-            sampler.fast_forward(1)
-            sampler.fast_forward(N_start)
-            iqmc["lds"] = sampler.random(N_work)
-        if input_deck.technique["iqmc"]["generator"] == "random":
-            np.random.seed(seed)
-            seeds = np.random.randint(1e6, size=mcdc["mpi_size"])
-            np.random.seed(seeds[mcdc["mpi_rank"]])
-            iqmc["lds"] = np.random.random((N_work, N_dim))
-
     # =========================================================================
     # Derivative Source Method
     # =========================================================================
