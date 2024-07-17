@@ -30,7 +30,7 @@ mcdc.cell([+s1, -s2], m)
 # =============================================================================
 # Isotropic pulse at x=t=0
 
-mcdc.source(x=[-.5,.5], isotropic=True, time=[1e-10, 5])
+mcdc.source(x=[-0.5, 0.5], isotropic=True, time=[1e-10, 5])
 
 # =============================================================================
 # Set tally, setting, and run mcdc

@@ -28,25 +28,25 @@ task["slab_isobeam_td"]["N"] = 9
 # Azurv1 variants
 # Plane IC
 task["azurv1_planeIC"] = {}
-task["azurv1_planeIC"]["N_lim"] = [3,6]
+task["azurv1_planeIC"]["N_lim"] = [3, 6]
 task["azurv1_planeIC"]["N"] = 9
 
 # Square IC
 task["azurv1_squareIC"] = {}
-task["azurv1_squareIC"]["N_lim"] = [3,6]
+task["azurv1_squareIC"]["N_lim"] = [3, 6]
 task["azurv1_squareIC"]["N"] = 9
 
 # Square Source
 task["azurv1_squaresource"] = {}
-task["azurv1_squaresource"]["N_lim"] = [3,6]
+task["azurv1_squaresource"]["N_lim"] = [3, 6]
 task["azurv1_squaresource"]["N"] = 9
 
 # Gaussian IC
 task["azurv1_gaussianIC"] = {}
-task["azurv1_gaussianIC"]["N_lim"] = [3,6]
+task["azurv1_gaussianIC"]["N_lim"] = [3, 6]
 task["azurv1_gaussianIC"]["N"] = 9
 
 # Gaussian Source
 task["azurv1_gaussiansource"] = {}
-task["azurv1_gaussiansource"]["N_lim"] = [3,7]
+task["azurv1_gaussiansource"]["N_lim"] = [3, 7]
 task["azurv1_gaussiansource"]["N"] = 7

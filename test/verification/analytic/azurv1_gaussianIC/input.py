@@ -29,12 +29,17 @@ mcdc.cell([+s1, -s2], m)
 # Set source
 # =============================================================================
 # Isotropic pulse at x=t=0
-x = np.linspace(-15,15,int(1e4))
-gaussian = np.exp(-4*x**2)
-dx = x[2]-x[1]
-edges_x = np.append(x-dx/2,x[-1]+dx/2)
-for ii, (x1,x2) in enumerate(zip(edges_x[:-1],edges_x[1:])):
-    mcdc.source(x=[x1,x2],prob=gaussian[ii]*0.8862269254527580136490837416705725913987747280611935641069038949,time=[1e-10, 1e-10])
+x = np.linspace(-15, 15, int(1e4))
+gaussian = np.exp(-4 * x**2)
+dx = x[2] - x[1]
+edges_x = np.append(x - dx / 2, x[-1] + dx / 2)
+for ii, (x1, x2) in enumerate(zip(edges_x[:-1], edges_x[1:])):
+    mcdc.source(
+        x=[x1, x2],
+        prob=gaussian[ii]
+        * 0.8862269254527580136490837416705725913987747280611935641069038949,
+        time=[1e-10, 1e-10],
+    )
 
 
 # =============================================================================
