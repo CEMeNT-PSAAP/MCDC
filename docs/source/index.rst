@@ -114,8 +114,7 @@ To build the docs
 To Cite MC/DC
 =============
 
-If you use MC/DC and would like to provide proper attribution
-please cite our article in the Journal of Open Source software
+If you use MC/DC and would like to provide proper attribution, please consider citing the following articles (as appropriate):
 
 .. code-block:: bibtex
         
@@ -137,6 +136,19 @@ please cite our article in the Journal of Open Source software
         url = {https://joss.theoj.org/papers/10.21105/joss.06415},
         doi = {10.21105/joss.06415},
     }
+
+.. code-block:: bibtex
+           
+   @misc{variansyah2023developmentmcdcperformantscalable,
+         title={Development of MC/DC: a performant, scalable, and portable Python-based Monte Carlo neutron transport code}, 
+         author={Ilham Variansyah and J. P. Morgan and Jordan Northrop and Kyle E. Niemeyer and Ryan G. McClarren},
+         year={2023},
+         eprint={2305.07636},
+         archivePrefix={arXiv},
+         primaryClass={physics.comp-ph},
+         url={https://arxiv.org/abs/2305.07636}, 
+   }
+
 
 If you are developing or working with specific numerical methods please take greater care
 to cite the specific publications where that work is presented.
