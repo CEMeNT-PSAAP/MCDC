@@ -29,13 +29,7 @@ with h5py.File(output, "r") as f:
 
 # Flux - average
 fig = plt.figure()
-<<<<<<< HEAD
 ax = plt.axes(xlim=(-2, 2), ylim=(-0.042992644459595206, 2))
-=======
-ax = plt.axes(
-    xlim=(-21.889999999999997, 21.89), ylim=(-0.042992644459595206, 0.9028455336514992)
-)
->>>>>>> 37d33f8477e7a05f68c75cfbd60ca4b829461bac
 ax.grid()
 ax.set_xlabel(r"$x$")
 ax.set_ylabel(r"Flux")
