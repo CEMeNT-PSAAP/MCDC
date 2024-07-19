@@ -649,18 +649,58 @@ def prepare():
                 score_type = SCORE_NET_CURRENT
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
-        # Filter grid sizes
-        N_sensitivity = input_deck.setting["N_sensitivity"]
-        Ns = 1 + N_sensitivity
-        if input_deck.technique["dsm_order"] == 2:
-            Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-        Nmu = len(input_deck.mesh_tallies[i].mu) - 1
-        N_azi = len(input_deck.mesh_tallies[i].azi) - 1
-        Ng = len(input_deck.mesh_tallies[i].g) - 1
-        Nx = len(input_deck.mesh_tallies[i].x) - 1
-        Ny = len(input_deck.mesh_tallies[i].y) - 1
-        Nz = len(input_deck.mesh_tallies[i].z) - 1
-        Nt = len(input_deck.mesh_tallies[i].t) - 1
+        if not input_deck.technique["domain_decomposition"]:
+            # Filter grid sizes
+            N_sensitivity = input_deck.setting["N_sensitivity"]
+            Ns = 1 + N_sensitivity
+            if input_deck.technique["dsm_order"] == 2:
+                Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+            Nmu = len(input_deck.mesh_tallies[i].mu) - 1
+            N_azi = len(input_deck.mesh_tallies[i].azi) - 1
+            Ng = len(input_deck.mesh_tallies[i].g) - 1
+            Nx = len(input_deck.mesh_tallies[i].x) - 1
+            Ny = len(input_deck.mesh_tallies[i].y) - 1
+            Nz = len(input_deck.mesh_tallies[i].z) - 1
+            Nt = len(input_deck.mesh_tallies[i].t) - 1
+
+        else: # decompose mesh tallies
+            # find DD mesh index of subdomain
+            d_idx = input_deck.technique["dd_idx"] # subdomain index
+            d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+            d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+            d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+            zmesh_idx = d_idx // (d_Nx * d_Ny)
+            ymesh_idx = (d_idx % (d_Nx * d_Ny)) // d_Nx
+            xmesh_idx = d_idx % d_Nx
+            
+            # find spatial boundaries of subdomain
+            xn = input_deck.technique["dd_mesh"]["x"][xmesh_idx]
+            xp = input_deck.technique["dd_mesh"]["x"][xmesh_idx+1]
+            yn = input_deck.technique["dd_mesh"]["y"][ymesh_idx]
+            yp = input_deck.technique["dd_mesh"]["y"][ymesh_idx+1]
+            zn = input_deck.technique["dd_mesh"]["z"][zmesh_idx]
+            zp = input_deck.technique["dd_mesh"]["z"][zmesh_idx+1]
+            
+            # find boundary indices in tally mesh
+            mesh_xn = int(np.where(input_deck.mesh_tallies[i].x == xn)[0])
+            mesh_xp = int(np.where(input_deck.mesh_tallies[i].x == xp)[0])
+            mesh_yn = int(np.where(input_deck.mesh_tallies[i].y == yn)[0])
+            mesh_yp = int(np.where(input_deck.mesh_tallies[i].y == yp)[0])
+            mesh_zn = int(np.where(input_deck.mesh_tallies[i].z == zn)[0])
+            mesh_zp = int(np.where(input_deck.mesh_tallies[i].z == zp)[0])
+            
+            # Filter grid sizes
+            N_sensitivity = input_deck.setting["N_sensitivity"]
+            Ns = 1 + N_sensitivity
+            if input_deck.technique["dsm_order"] == 2:
+                Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+            Nmu = len(input_deck.mesh_tallies[i].mu) - 1
+            N_azi = len(input_deck.mesh_tallies[i].azi) - 1
+            Ng = len(input_deck.mesh_tallies[i].g) - 1
+            Nx = len(input_deck.mesh_tallies[i].x[mesh_xn:mesh_xp]) - 1
+            Ny = len(input_deck.mesh_tallies[i].y[mesh_yn:mesh_yp]) - 1
+            Nz = len(input_deck.mesh_tallies[i].z[mesh_zn:mesh_zp]) - 1
+            Nt = len(input_deck.mesh_tallies[i].t) - 1
 
         # Update N_bin
         mcdc["mesh_tallies"][i]["N_bin"] *= Ns * N_score
