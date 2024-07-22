@@ -701,6 +701,7 @@ def prepare():
             Ny = len(input_deck.mesh_tallies[i].y[mesh_yn:mesh_yp]) - 1
             Nz = len(input_deck.mesh_tallies[i].z[mesh_zn:mesh_zp]) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
+            mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
 
         # Update N_bin
         mcdc["mesh_tallies"][i]["N_bin"] *= Ns * N_score
