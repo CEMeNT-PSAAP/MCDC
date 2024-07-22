@@ -1724,7 +1724,7 @@ def region_check(P, region, trans, mcdc):
         if positive_side:
             if side > 0.0:
                 return True
-        elif side < 0.0:
+        elif side <= 0.0:
             return True
 
         return False
