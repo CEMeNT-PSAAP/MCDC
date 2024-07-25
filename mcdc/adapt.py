@@ -408,12 +408,12 @@ def local_group_array():
 
 @for_cpu()
 def local_j_array():
-    return np.zeros(6, dtype=type_.j_array)
+    return np.zeros(1, dtype=type_.j_array)[0]
 
 
 @for_gpu()
 def local_j_array():
-    return cuda.local.array(6, type_.j_array)
+    return cuda.local.array(1, type_.j_array)[0]
 
 
 @for_cpu()
