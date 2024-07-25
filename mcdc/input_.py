@@ -322,6 +322,9 @@ def material(
         # Set ID
         card.ID = len(global_.input_deck.materials)
 
+        # Default values
+        card.J = 6
+
         # Set the nuclides
         for i in range(N_nuclide):
             nuc_name = nuclides[i][0]
@@ -334,6 +337,9 @@ def material(
 
                 # Set ID
                 nuc_card.ID = len(global_.input_deck.nuclides)
+
+                # Default values
+                nuc_card.J = 6
 
                 # Check if the nuclide is available in the nuclear data library
                 dir_name = os.getenv("MCDC_XSLIB")
