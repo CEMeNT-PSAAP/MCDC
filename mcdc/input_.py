@@ -326,21 +326,40 @@ def material(
         for i in range(N_nuclide):
             nuc_name = nuclides[i][0]
             density = nuclides[i][1]
+
+            # Create nuclide card if not defined yet
             if not nuclide_registered(nuc_name):
                 nuc_card = NuclideCard()
+                nuc_card.name = nuc_name
 
+                # Set ID
+                nuc_card.ID = len(global_.input_deck.nuclides)
+
+                # Check if the nuclide is available in the nuclear data library
                 dir_name = os.getenv("MCDC_XSLIB")
                 if dir_name == None:
                     print_error(
-                        "Continuous energy data directory not configured \n       see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
+                        "Continuous energy data directory not configured \n       "
+                        "see https://cement-psaapgithubio.readthedocs.io/en/latest"
+                        "/install.html#configuring-continuous-energy-library \n"
                     )
+
+                # Fissionable flag
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card.fissionable = True
+                        card.fissionable = True
+
+                # Add to deck
+                global_.input_deck.nuclides.append(nuc_card)
             else:
                 nuc_card = get_nuclide(nuc_name)
+
             card.nuclide_IDs[i] = nuc_card.ID
             card.nuclide_densities[i] = density
+
+        # Add to deck
+        global_.input_deck.materials.append(card)
 
         return card
 
@@ -1888,14 +1907,14 @@ def uq(**kw):
 
 def nuclide_registered(name):
     for card in global_.input_deck.nuclides:
-        if name == card["name"]:
+        if name == card.name:
             return True
     return False
 
 
 def get_nuclide(name):
     for card in global_.input_deck.nuclides:
-        if name == card["name"]:
+        if name == card.name:
             return card
 
 
