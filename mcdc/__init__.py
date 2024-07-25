@@ -22,6 +22,8 @@ from mcdc.input_ import (
     uq,
     reset,
     domain_decomposition,
+    make_particle_bank,
+    save_particle_bank,
 )
 from mcdc.main import run, prepare
 from mcdc.visualizer import visualize
