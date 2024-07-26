@@ -13,16 +13,16 @@ bank = mcdc.make_particle_bank(N)
 
 for i in range(N):
     particle = bank[i]
-    particle['x'] = rng.random() * 5.0
-    particle['y'] = rng.random()
-    particle['z'] = rng.random()
-    particle['t'] = rng.random() * 5.0
-    particle['ux'] = 1.0 # All going right
-    particle['uy'] = 0.0
-    particle['uz'] = 0.0
-    particle['E'] = 1E6 # Arbitrary
+    particle["x"] = rng.random() * 5.0
+    particle["y"] = rng.random()
+    particle["z"] = rng.random()
+    particle["t"] = rng.random() * 5.0
+    particle["ux"] = 1.0  # All going right
+    particle["uy"] = 0.0
+    particle["uz"] = 0.0
+    particle["E"] = 1e6  # Arbitrary
 
-mcdc.save_particle_bank(bank, 'source_particles')
+mcdc.save_particle_bank(bank, "source_particles")
 
 
 # =============================================================================
@@ -52,7 +52,7 @@ mcdc.tally(
 )
 
 # Setting
-mcdc.setting(source_file='source_particles.h5')
+mcdc.setting(source_file="source_particles.h5")
 
 # Run
 mcdc.run()
