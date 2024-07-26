@@ -1960,19 +1960,19 @@ def check_requirement(label, kw, required):
 
 def make_particle_bank(size):
     struct = [
-                ("x", np.float64),
-                ("y", np.float64),
-                ("z", np.float64),
-                ("t", np.float64),
-                ("ux", np.float64),
-                ("uy", np.float64),
-                ("uz", np.float64),
-                ("g", np.uint64),
-                ("E", np.float64),
-                ("w", np.float64),
-                ("sensitivity_ID", np.int64),
-                ("rng_seed", np.uint64),
-            ]
+        ("x", np.float64),
+        ("y", np.float64),
+        ("z", np.float64),
+        ("t", np.float64),
+        ("ux", np.float64),
+        ("uy", np.float64),
+        ("uz", np.float64),
+        ("g", np.uint64),
+        ("E", np.float64),
+        ("w", np.float64),
+        ("sensitivity_ID", np.int64),
+        ("rng_seed", np.uint64),
+    ]
     iqmc_struct = [("w", np.float64, (1,))]
     struct += [("iqmc", iqmc_struct)]
 
@@ -1980,15 +1980,15 @@ def make_particle_bank(size):
 
     # Set default values
     for i in range(size):
-        bank[i]['ux'] = 1.0
-        bank[i]['w'] = 1.0
-        bank[i]['rng_seed'] = 1
+        bank[i]["ux"] = 1.0
+        bank[i]["w"] = 1.0
+        bank[i]["rng_seed"] = 1
 
     return bank
 
 
 def save_particle_bank(bank, name):
-    with h5py.File(name+".h5", "w") as f:
+    with h5py.File(name + ".h5", "w") as f:
         f.create_dataset("particles", data=bank[:])
         f.create_dataset("particles_size", data=len(bank[:]))
 
