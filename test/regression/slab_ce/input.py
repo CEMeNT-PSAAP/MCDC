@@ -8,7 +8,7 @@ import mcdc
 # Set the XS library directory
 os.environ["MCDC_XSLIB"] = os.getcwd()
 
-# Create the dummy nuclide (only master, rank 0
+# Create the dummy nuclide (only master, rank 0)
 if MPI.COMM_WORLD.Get_rank() == 0:
     with h5py.File("dummy_nuclide.h5", "w") as f:
         f["A"] = 1.0
