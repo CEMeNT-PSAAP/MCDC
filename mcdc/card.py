@@ -50,6 +50,7 @@ class NuclideCard(InputCard):
         self.uq = False
         self.flags = []
         self.distribution = ""
+        self.name = ""
 
 
 class MaterialCard(InputCard):
