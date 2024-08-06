@@ -1,25 +1,44 @@
+import sys
 from mcdc.print_ import print_warning
 
+
+# Launches visualization window; must be in try/except loop so it doesn't launch upon import
+missing = False
+mods = []
 try:
-    # launches visualization window
-    # must be inside this loop so it doesn't launch when the visualizer is imported
     from netgen.meshing import *
     from netgen.csg import *
-    from ngsolve import Draw, Redraw  # just for visualization
-    import distinctipy  # creates unlimited visually distinct colors for visualization
-
-except ImportError as e:
-    msg = "\n >> MC/DC visualization error: \n >> dependencies for visualization not installed \n >> install optional dependencies needed for visualization with \n >>     <pip install mcdc['viz']> (for mac: 'mcdc[viz]')"
+except ImportError:
+    missing = True
+    mods.append("netgen")
+try:
+    from ngsolve import Draw, Redraw  # Just for visualization
+except ImportError:
+    missing = True
+    mods.append("ngsolve")
+try:
+    import distinctipy  # Creates unlimited visually distinct colors for visualization
+except ImportError:
+    missing = True
+    mods.append("distinctipy")
+try:
+    import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
+except ImportError:
+    mods.append("tkinter")
+if missing:
+    msg = "\n >> MC/DC visualization error: \n >> Missing dependencies ({0}). \n >> Install visualization dependencies with \n >>     <pip install mcdc['viz']> ".format(
+        ", ".join(mods)
+    )
     print_warning(msg)
+    sys.exit(1)
 
-import tkinter as tk  # Tkinter is used to create the window for the time slider and color key
 import math
 
-# Get input deck
+# Get input_card and set global variables as "mcdc_"
 
 import mcdc.global_ as mcdc_
 
-input_deck = mcdc_.input_deck
+input_card = mcdc_.input_deck
 
 
 # get a point on the plane based on the current time in the system
@@ -261,8 +280,8 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
 # called by visualize()
 def draw_Geometry(current_time, start_time, end_time, material_colors):
     # create lists that contain all cells and surfaces
-    surface_list = input_deck.surfaces
-    cell_list = input_deck.cells
+    surface_list = input_card.surfaces
+    cell_list = input_card.cells
 
     geo = CSGeometry()  # create the ngsolve geometry object
 
