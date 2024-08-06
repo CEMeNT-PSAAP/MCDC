@@ -30,7 +30,6 @@ if missing:
         ", ".join(mods)
     )
     print_warning(msg)
-    sys.exit(1)
 
 import math
 
