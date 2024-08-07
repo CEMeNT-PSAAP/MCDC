@@ -22,7 +22,7 @@ from mcdc.kernel import (
 
 
 # =========================================================================
-# iQMC Sampling Functions
+# Sampling Operations
 # =========================================================================
 
 
@@ -106,8 +106,261 @@ def random(N, dim, seed=123456):
     return np.random.rand(N, dim)
 
 
+# =============================================================================
+# Preprocess functions
+# =============================================================================
+
+
+@toggle("iQMC")
+def iqmc_preprocess(mcdc):
+    # set bank source
+    iqmc = mcdc["technique"]["iqmc"]
+    eigenmode = mcdc["setting"]["mode_eigenvalue"]
+    # generate material index
+    iqmc_generate_material_idx(mcdc)
+    if iqmc["source"].all() == 0.0:
+        # use material index to generate a first guess for the source
+        iqmc_prepare_source(mcdc)
+        iqmc_update_source(mcdc)
+    if eigenmode:
+        iqmc_prepare_nuSigmaF(mcdc)
+
+    iqmc_consolidate_sources(mcdc)
+    
+
+@toggle("iQMC")
+def iqmc_generate_material_idx(mcdc):
+    """
+    This algorithm is meant to loop through every spatial cell of the
+    iQMC mesh and assign a material index according to the material_ID at
+    the center of the cell.
+
+    Therefore, the whole cell is treated as the material located at the
+    center of the cell, regardless of whethere there are more materials
+    present.
+
+    A crude but quick approximation.
+    """
+    mesh = mcdc["technique"]["iqmc"]["mesh"]
+    Nt = len(mesh["t"]) - 1
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+    dx = dy = dz = 1
+    # variables for cell finding functions
+    trans_struct = adapt.local_translate()
+    trans = trans_struct["values"]
+    # create particle to utilize cell finding functions
+    P_temp = adapt.local_particle()
+    # set default attributes
+    P_temp["alive"] = True
+    P_temp["material_ID"] = -1
+    P_temp["cell_ID"] = -1
+
+    x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
+    y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
+    z_mid = 0.5 * (mesh["z"][1:] + mesh["z"][:-1])
+
+    # loop through every cell
+    for t in range(Nt):
+        for i in range(Nx):
+            x = x_mid[i]
+            for j in range(Ny):
+                y = y_mid[j]
+                for k in range(Nz):
+                    z = z_mid[k]
+
+                    # assign cell center position
+                    P_temp["t"] = t
+                    P_temp["x"] = x
+                    P_temp["y"] = y
+                    P_temp["z"] = z
+
+                    # set cell_ID
+                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+
+                    # set material_ID
+                    material_ID = get_particle_material(P_temp, mcdc)
+
+                    # assign material index
+                    mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = material_ID
+
+
+@toggle("iQMC")
+def iqmc_prepare_nuSigmaF(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    mesh = iqmc["mesh"]
+    flux = iqmc["score"]["flux"]
+    Nt = len(mesh["t"]) - 1
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+    # calculate nu*SigmaF for every cell
+    for t in range(Nt):
+        for i in range(Nx):
+            for j in range(Ny):
+                for k in range(Nz):
+                    t = 0
+                    mat_idx = iqmc["material_idx"][t, i, j, k]
+                    material = mcdc["materials"][mat_idx]
+                    iqmc["score"]["fission-source"] += iqmc_fission_source(
+                        flux[:, t, i, j, k], material
+                    )
+
+
+@toggle("iQMC")
+def iqmc_prepare_source(mcdc):
+    """
+    Iterates trhough all spatial cells to calculate the iQMC source. The source
+    is a combination of the user input Fixed-Source plus the calculated
+    Scattering-Source and Fission-Sources. Resutls are stored in
+    mcdc['technique']['iqmc_source'], a matrix of size [G,Nt,Nx,Ny,Nz].
+
+    """
+    iqmc = mcdc["technique"]["iqmc"]
+    flux_scatter = iqmc["score"]["flux"]
+    flux_fission = iqmc["score"]["flux"]
+    mesh = iqmc["mesh"]
+    Nt = len(mesh["t"]) - 1
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+
+    fission = np.zeros_like(iqmc["source"])
+    scatter = np.zeros_like(iqmc["source"])
+
+    # calculate source for every cell and group in the iqmc_mesh
+    for t in range(Nt):
+        for i in range(Nx):
+            for j in range(Ny):
+                for k in range(Nz):
+                    mat_idx = iqmc["material_idx"][t, i, j, k]
+                    # we can vectorize the multigroup calculation here
+                    fission[:, t, i, j, k] = iqmc_effective_fission(
+                        flux_fission[:, t, i, j, k], mat_idx, mcdc
+                    )
+                    scatter[:, t, i, j, k] = iqmc_effective_scattering(
+                        flux_scatter[:, t, i, j, k], mat_idx, mcdc
+                    )
+    iqmc["score"]["effective-scattering"] = scatter
+    iqmc["score"]["effective-fission"] = fission
+    iqmc["score"]["effective-fission-outter"] = fission
+
+
+# =============================================================================
+# Particle Operations
+# =============================================================================
+
+
+@toggle("iQMC")
+def iqmc_prepare_particles(mcdc):
+    """
+    Create N_particles assigning the position, direction, and group from the
+    QMC Low-Discrepency Sequence. Particles are added to the bank_source.
+
+    """
+    iqmc = mcdc["technique"]["iqmc"]
+    # total number of particles
+    N_particle = mcdc["setting"]["N_particle"]
+    # number of particles this processor will handle
+    N_work = mcdc["mpi_work_size"]
+
+    # low discrepency sequence
+    samples = iqmc["samples"]
+    # source
+    Q = iqmc["source"]
+    mesh = iqmc["mesh"]
+    Nx = len(mesh["x"]) - 1
+    Ny = len(mesh["y"]) - 1
+    Nz = len(mesh["z"]) - 1
+    # total number of spatial cells
+    N_total = Nx * Ny * Nz
+    # outter mesh boundaries for sampling position
+    xa = mesh["x"][0]
+    xb = mesh["x"][-1]
+    ya = mesh["y"][0]
+    yb = mesh["y"][-1]
+    za = mesh["z"][0]
+    zb = mesh["z"][-1]
+
+    for n in range(N_work):
+        # Create new particle
+        P_new = adapt.local_particle_record()
+        # assign initial group, time, and rng_seed (not used)
+        P_new["g"] = 0
+        P_new["t"] = 0
+        P_new["rng_seed"] = 0
+        # assign direction
+        P_new["x"] = iqmc_sample_position(xa, xb, samples[n, 0])
+        P_new["y"] = iqmc_sample_position(ya, yb, samples[n, 4])
+        P_new["z"] = iqmc_sample_position(za, zb, samples[n, 3])
+        # Sample isotropic direction
+        P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
+            samples[n, 1], samples[n, 5]
+        )
+        t, x, y, z, outside = mesh_get_index(P_new, mesh)
+        q = Q[:, t, x, y, z].copy()
+        dV = iqmc_cell_volume(x, y, z, mesh)
+        # Source tilt
+        iqmc_tilt_source(t, x, y, z, P_new, q, mcdc)
+        # set particle weight
+        P_new["iqmc"]["w"] = q * dV * N_total / N_particle
+        P_new["w"] = P_new["iqmc"]["w"].sum()
+        # add to source bank
+        adapt.add_source(P_new, mcdc)
+
+
+@toggle("iQMC")
+def iqmc_cell_volume(x, y, z, mesh):
+    """
+    Calculate the volume of the current spatial cell.
+
+    """
+    dx = dy = dz = 1
+    if (mesh["x"][x] != -INF) and (mesh["x"][x] != INF):
+        dx = mesh["x"][x + 1] - mesh["x"][x]
+    if (mesh["y"][y] != -INF) and (mesh["y"][y] != INF):
+        dy = mesh["y"][y + 1] - mesh["y"][y]
+    if (mesh["z"][z] != -INF) and (mesh["z"][z] != INF):
+        dz = mesh["z"][z + 1] - mesh["z"][z]
+    dV = dx * dy * dz
+    return dV
+
+
+@toggle("iQMC")
+def iqmc_sample_position(a, b, sample):
+    return a + (b - a) * sample
+
+
+@toggle("iQMC")
+def iqmc_sample_isotropic_direction(sample1, sample2):
+    """
+    Sample the an isotropic direction using samples between [0,1].
+
+    """
+    # Sample polar cosine and azimuthal angle uniformly
+    mu = 2.0 * sample1 - 1.0
+    azi = 2.0 * PI * sample2
+
+    # Convert to Cartesian coordinates
+    c = (1.0 - mu**2) ** 0.5
+    uy = math.cos(azi) * c
+    uz = math.sin(azi) * c
+    ux = mu
+    return ux, uy, uz
+
+
+@toggle("iQMC")
+def iqmc_sample_group(sample, G):
+    """
+    Uniformly sample energy group using a random sample between [0,1].
+
+    """
+    return int(np.floor(sample * G))
+
+
 # =========================================================================
-# Core iQMC functions
+# Move to Event
 # =========================================================================
 
 
@@ -179,355 +432,9 @@ def iqmc_continuous_weight_reduction(P, distance, mcdc):
     P["w"] = P["iqmc"]["w"].sum()
 
 
-@toggle("iQMC")
-def iqmc_preprocess(mcdc):
-    # set bank source
-    iqmc = mcdc["technique"]["iqmc"]
-    eigenmode = mcdc["setting"]["mode_eigenvalue"]
-    # generate material index
-    iqmc_generate_material_idx(mcdc)
-    if iqmc["source"].all() == 0.0:
-        # use material index to generate a first guess for the source
-        iqmc_prepare_source(mcdc)
-        iqmc_update_source(mcdc)
-    if eigenmode:
-        iqmc_prepare_nuSigmaF(mcdc)
-
-    iqmc_consolidate_sources(mcdc)
-
-
-@toggle("iQMC")
-def iqmc_prepare_nuSigmaF(mcdc):
-    iqmc = mcdc["technique"]["iqmc"]
-    mesh = iqmc["mesh"]
-    flux = iqmc["score"]["flux"]
-    Nt = len(mesh["t"]) - 1
-    Nx = len(mesh["x"]) - 1
-    Ny = len(mesh["y"]) - 1
-    Nz = len(mesh["z"]) - 1
-    # calculate nu*SigmaF for every cell
-    for t in range(Nt):
-        for i in range(Nx):
-            for j in range(Ny):
-                for k in range(Nz):
-                    t = 0
-                    mat_idx = iqmc["material_idx"][t, i, j, k]
-                    material = mcdc["materials"][mat_idx]
-                    iqmc["score"]["fission-source"] += iqmc_fission_source(
-                        flux[:, t, i, j, k], material
-                    )
-
-
-@toggle("iQMC")
-def iqmc_prepare_source(mcdc):
-    """
-    Iterates trhough all spatial cells to calculate the iQMC source. The source
-    is a combination of the user input Fixed-Source plus the calculated
-    Scattering-Source and Fission-Sources. Resutls are stored in
-    mcdc['technique']['iqmc_source'], a matrix of size [G,Nt,Nx,Ny,Nz].
-
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    flux_scatter = iqmc["score"]["flux"]
-    flux_fission = iqmc["score"]["flux"]
-    mesh = iqmc["mesh"]
-    Nt = len(mesh["t"]) - 1
-    Nx = len(mesh["x"]) - 1
-    Ny = len(mesh["y"]) - 1
-    Nz = len(mesh["z"]) - 1
-
-    fission = np.zeros_like(iqmc["source"])
-    scatter = np.zeros_like(iqmc["source"])
-
-    # calculate source for every cell and group in the iqmc_mesh
-    for t in range(Nt):
-        for i in range(Nx):
-            for j in range(Ny):
-                for k in range(Nz):
-                    mat_idx = iqmc["material_idx"][t, i, j, k]
-                    # we can vectorize the multigroup calculation here
-                    fission[:, t, i, j, k] = iqmc_effective_fission(
-                        flux_fission[:, t, i, j, k], mat_idx, mcdc
-                    )
-                    scatter[:, t, i, j, k] = iqmc_effective_scattering(
-                        flux_scatter[:, t, i, j, k], mat_idx, mcdc
-                    )
-    iqmc["score"]["effective-scattering"] = scatter
-    iqmc["score"]["effective-fission"] = fission
-    iqmc["score"]["effective-fission-outter"] = fission
-
-
-@toggle("iQMC")
-def iqmc_prepare_particles(mcdc):
-    """
-    Create N_particles assigning the position, direction, and group from the
-    QMC Low-Discrepency Sequence. Particles are added to the bank_source.
-
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    # total number of particles
-    N_particle = mcdc["setting"]["N_particle"]
-    # number of particles this processor will handle
-    N_work = mcdc["mpi_work_size"]
-
-    # low discrepency sequence
-    samples = iqmc["samples"]
-    # source
-    Q = iqmc["source"]
-    mesh = iqmc["mesh"]
-    Nx = len(mesh["x"]) - 1
-    Ny = len(mesh["y"]) - 1
-    Nz = len(mesh["z"]) - 1
-    # total number of spatial cells
-    N_total = Nx * Ny * Nz
-    # outter mesh boundaries for sampling position
-    xa = mesh["x"][0]
-    xb = mesh["x"][-1]
-    ya = mesh["y"][0]
-    yb = mesh["y"][-1]
-    za = mesh["z"][0]
-    zb = mesh["z"][-1]
-
-    for n in range(N_work):
-        # Create new particle
-        P_new = adapt.local_particle_record()
-        # assign initial group, time, and rng_seed (not used)
-        P_new["g"] = 0
-        P_new["t"] = 0
-        P_new["rng_seed"] = 0
-        # assign direction
-        P_new["x"] = iqmc_sample_position(xa, xb, samples[n, 0])
-        P_new["y"] = iqmc_sample_position(ya, yb, samples[n, 4])
-        P_new["z"] = iqmc_sample_position(za, zb, samples[n, 3])
-        # Sample isotropic direction
-        P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
-            samples[n, 1], samples[n, 5]
-        )
-        t, x, y, z, outside = mesh_get_index(P_new, mesh)
-        q = Q[:, t, x, y, z].copy()
-        dV = iqmc_cell_volume(x, y, z, mesh)
-        # Source tilt
-        iqmc_tilt_source(t, x, y, z, P_new, q, mcdc)
-        # set particle weight
-        P_new["iqmc"]["w"] = q * dV * N_total / N_particle
-        P_new["w"] = P_new["iqmc"]["w"].sum()
-        # add to source bank
-        adapt.add_source(P_new, mcdc)
-
-
-@toggle("iQMC")
-def iqmc_res(flux_new, flux_old):
-    """
-    Calculate residual between scalar flux iterations.
-
-    """
-    size = flux_old.size
-    flux_new = np.linalg.norm(flux_new.reshape((size,)), ord=2)
-    flux_old = np.linalg.norm(flux_old.reshape((size,)), ord=2)
-    return (flux_new - flux_old) / flux_old
-
-
-@toggle("iQMC")
-def iqmc_score_tallies(P, distance, mcdc):
-    """
-    Tally the scalar flux and linear source tilt.
-
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    score_list = iqmc["score_list"]
-    score_bin = iqmc["score"]
-    # Get indices
-    mesh = iqmc["mesh"]
-    material = mcdc["materials"][P["material_ID"]]
-    w = P["iqmc"]["w"]
-    SigmaT = material["total"]
-    mat_id = P["material_ID"]
-
-    t, x, y, z, outside = mesh_get_index(P, mesh)
-    if outside:
-        return
-
-    dt = dx = dy = dz = 1.0
-    if (mesh["t"][t] != -INF) and (mesh["t"][t] != INF):
-        dt = mesh["t"][t + 1] - mesh["t"][t]
-    if (mesh["x"][x] != -INF) and (mesh["x"][x] != INF):
-        dx = mesh["x"][x + 1] - mesh["x"][x]
-    if (mesh["y"][y] != -INF) and (mesh["y"][y] != INF):
-        dy = mesh["y"][y + 1] - mesh["y"][y]
-    if (mesh["z"][z] != -INF) and (mesh["z"][z] != INF):
-        dz = mesh["z"][z + 1] - mesh["z"][z]
-
-    dV = dx * dy * dz * dt
-
-    flux = iqmc_flux(SigmaT, w, distance, dV)
-    score_bin["flux"][:, t, x, y, z] += flux
-
-    # Score effective source tallies
-    score_bin["effective-scattering"][:, t, x, y, z] += iqmc_effective_scattering(
-        flux, mat_id, mcdc
-    )
-    score_bin["effective-fission"][:, t, x, y, z] += iqmc_effective_fission(
-        flux, mat_id, mcdc
-    )
-
-    if score_list["fission-source"]:
-        score_bin["fission-source"] += iqmc_fission_source(flux, material)
-
-    if score_list["fission-power"]:
-        score_bin["fission-power"][:, t, x, y, z] += iqmc_fission_power(flux, material)
-
-    if score_list["tilt-x"]:
-        x_mid = mesh["x"][x] + (dx * 0.5)
-        tilt = iqmc_linear_tilt(P["ux"], P["x"], dx, x_mid, dy, dz, w, distance, SigmaT)
-        score_bin["tilt-x"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
-
-    if score_list["tilt-y"]:
-        y_mid = mesh["y"][y] + (dy * 0.5)
-        tilt = iqmc_linear_tilt(P["uy"], P["y"], dy, y_mid, dx, dz, w, distance, SigmaT)
-        score_bin["tilt-y"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
-
-    if score_list["tilt-z"]:
-        z_mid = mesh["z"][z] + (dz * 0.5)
-        tilt = iqmc_linear_tilt(P["uz"], P["z"], dz, z_mid, dx, dy, w, distance, SigmaT)
-        score_bin["tilt-z"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
-
-
-@toggle("iQMC")
-def iqmc_cell_volume(x, y, z, mesh):
-    """
-    Calculate the volume of the current spatial cell.
-
-    """
-    dx = dy = dz = 1
-    if (mesh["x"][x] != -INF) and (mesh["x"][x] != INF):
-        dx = mesh["x"][x + 1] - mesh["x"][x]
-    if (mesh["y"][y] != -INF) and (mesh["y"][y] != INF):
-        dy = mesh["y"][y + 1] - mesh["y"][y]
-    if (mesh["z"][z] != -INF) and (mesh["z"][z] != INF):
-        dz = mesh["z"][z + 1] - mesh["z"][z]
-    dV = dx * dy * dz
-    return dV
-
-
-@toggle("iQMC")
-def iqmc_sample_position(a, b, sample):
-    return a + (b - a) * sample
-
-
-@toggle("iQMC")
-def iqmc_sample_isotropic_direction(sample1, sample2):
-    """
-    Sample the an isotropic direction using samples between [0,1].
-
-    """
-    # Sample polar cosine and azimuthal angle uniformly
-    mu = 2.0 * sample1 - 1.0
-    azi = 2.0 * PI * sample2
-
-    # Convert to Cartesian coordinates
-    c = (1.0 - mu**2) ** 0.5
-    uy = math.cos(azi) * c
-    uz = math.sin(azi) * c
-    ux = mu
-    return ux, uy, uz
-
-
-@toggle("iQMC")
-def iqmc_sample_group(sample, G):
-    """
-    Uniformly sample energy group using a random sample between [0,1].
-
-    """
-    return int(np.floor(sample * G))
-
-
-@toggle("iQMC")
-def iqmc_generate_material_idx(mcdc):
-    """
-    This algorithm is meant to loop through every spatial cell of the
-    iQMC mesh and assign a material index according to the material_ID at
-    the center of the cell.
-
-    Therefore, the whole cell is treated as the material located at the
-    center of the cell, regardless of whethere there are more materials
-    present.
-
-    A crude but quick approximation.
-    """
-    mesh = mcdc["technique"]["iqmc"]["mesh"]
-    Nt = len(mesh["t"]) - 1
-    Nx = len(mesh["x"]) - 1
-    Ny = len(mesh["y"]) - 1
-    Nz = len(mesh["z"]) - 1
-    dx = dy = dz = 1
-    # variables for cell finding functions
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
-    # create particle to utilize cell finding functions
-    P_temp = adapt.local_particle()
-    # set default attributes
-    P_temp["alive"] = True
-    P_temp["material_ID"] = -1
-    P_temp["cell_ID"] = -1
-
-    x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
-    y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
-    z_mid = 0.5 * (mesh["z"][1:] + mesh["z"][:-1])
-
-    # loop through every cell
-    for t in range(Nt):
-        for i in range(Nx):
-            x = x_mid[i]
-            for j in range(Ny):
-                y = y_mid[j]
-                for k in range(Nz):
-                    z = z_mid[k]
-
-                    # assign cell center position
-                    P_temp["t"] = t
-                    P_temp["x"] = x
-                    P_temp["y"] = y
-                    P_temp["z"] = z
-
-                    # set cell_ID
-                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
-
-                    # set material_ID
-                    material_ID = get_particle_material(P_temp, mcdc)
-
-                    # assign material index
-                    mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = material_ID
-
-
-@toggle("iQMC")
-def iqmc_reset_tallies(iqmc):
-    score_bin = iqmc["score"]
-    score_list = iqmc["score_list"]
-
-    iqmc["source"].fill(0.0)
-    for name in literal_unroll(iqmc_score_list):
-        if score_list[name]:
-            score_bin[name].fill(0.0)
-
-
-@toggle("iQMC")
-def iqmc_distribute_tallies(iqmc):
-    score_bin = iqmc["score"]
-    score_list = iqmc["score_list"]
-
-    for name in literal_unroll(iqmc_score_list):
-        if score_list[name]:
-            iqmc_score_reduce_bin(score_bin[name])
-
-
-@toggle("iQMC")
-def iqmc_score_reduce_bin(score):
-    # MPI Reduce
-    buff = np.zeros_like(score)
-    with objmode():
-        MPI.COMM_WORLD.Allreduce(np.array(score), buff, op=MPI.SUM)
-    score[:] = buff
-
+# =============================================================================
+# iQMC Source Operations
+# =============================================================================
 
 @toggle("iQMC")
 def iqmc_update_source(mcdc):
@@ -629,10 +536,75 @@ def iqmc_consolidate_sources(mcdc):
 
 
 # =============================================================================
-# iQMC Tallies
+# Tally Operations
 # =============================================================================
 # TODO: Not all ST tallies have been built for case where SigmaT = 0.0
+    
 
+@toggle("iQMC")
+def iqmc_score_tallies(P, distance, mcdc):
+    """
+    Tally the scalar flux and linear source tilt.
+
+    """
+    iqmc = mcdc["technique"]["iqmc"]
+    score_list = iqmc["score_list"]
+    score_bin = iqmc["score"]
+    # Get indices
+    mesh = iqmc["mesh"]
+    material = mcdc["materials"][P["material_ID"]]
+    w = P["iqmc"]["w"]
+    SigmaT = material["total"]
+    mat_id = P["material_ID"]
+
+    t, x, y, z, outside = mesh_get_index(P, mesh)
+    if outside:
+        return
+
+    dt = dx = dy = dz = 1.0
+    if (mesh["t"][t] != -INF) and (mesh["t"][t] != INF):
+        dt = mesh["t"][t + 1] - mesh["t"][t]
+    if (mesh["x"][x] != -INF) and (mesh["x"][x] != INF):
+        dx = mesh["x"][x + 1] - mesh["x"][x]
+    if (mesh["y"][y] != -INF) and (mesh["y"][y] != INF):
+        dy = mesh["y"][y + 1] - mesh["y"][y]
+    if (mesh["z"][z] != -INF) and (mesh["z"][z] != INF):
+        dz = mesh["z"][z + 1] - mesh["z"][z]
+
+    dV = dx * dy * dz * dt
+
+    flux = iqmc_flux(SigmaT, w, distance, dV)
+    score_bin["flux"][:, t, x, y, z] += flux
+
+    # Score effective source tallies
+    score_bin["effective-scattering"][:, t, x, y, z] += iqmc_effective_scattering(
+        flux, mat_id, mcdc
+    )
+    score_bin["effective-fission"][:, t, x, y, z] += iqmc_effective_fission(
+        flux, mat_id, mcdc
+    )
+
+    if score_list["fission-source"]:
+        score_bin["fission-source"] += iqmc_fission_source(flux, material)
+
+    if score_list["fission-power"]:
+        score_bin["fission-power"][:, t, x, y, z] += iqmc_fission_power(flux, material)
+
+    if score_list["tilt-x"]:
+        x_mid = mesh["x"][x] + (dx * 0.5)
+        tilt = iqmc_linear_tilt(P["ux"], P["x"], dx, x_mid, dy, dz, w, distance, SigmaT)
+        score_bin["tilt-x"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
+
+    if score_list["tilt-y"]:
+        y_mid = mesh["y"][y] + (dy * 0.5)
+        tilt = iqmc_linear_tilt(P["uy"], P["y"], dy, y_mid, dx, dz, w, distance, SigmaT)
+        score_bin["tilt-y"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
+
+    if score_list["tilt-z"]:
+        z_mid = mesh["z"][z] + (dz * 0.5)
+        tilt = iqmc_linear_tilt(P["uz"], P["z"], dz, z_mid, dx, dy, w, distance, SigmaT)
+        score_bin["tilt-z"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
+        
 
 @toggle("iQMC")
 def iqmc_flux(SigmaT, w, distance, dV):
@@ -707,3 +679,161 @@ def iqmc_linear_tilt(mu, x, dx, x_mid, dy, dz, w, distance, SigmaT):
     else:
         Q = mu * w * distance ** (2) / 2 + w * (x - x_mid) * distance
     return Q
+
+
+@toggle("iQMC")
+def iqmc_reset_tallies(iqmc):
+    score_bin = iqmc["score"]
+    score_list = iqmc["score_list"]
+
+    iqmc["source"].fill(0.0)
+    for name in literal_unroll(iqmc_score_list):
+        if score_list[name]:
+            score_bin[name].fill(0.0)
+
+
+@toggle("iQMC")
+def iqmc_distribute_tallies(iqmc):
+    score_bin = iqmc["score"]
+    score_list = iqmc["score_list"]
+
+    for name in literal_unroll(iqmc_score_list):
+        if score_list[name]:
+            iqmc_score_reduce_bin(score_bin[name])
+
+
+@toggle("iQMC")
+def iqmc_score_reduce_bin(score):
+    # MPI Reduce
+    buff = np.zeros_like(score)
+    with objmode():
+        MPI.COMM_WORLD.Allreduce(np.array(score), buff, op=MPI.SUM)
+    score[:] = buff
+
+
+# =============================================================================
+# Batch Tally Operations
+# =============================================================================
+
+
+@toggle("iQMC")
+def iqmc_tally_batch_history():
+    iqmc = mcdc["technique"]["iqmc"]
+    score_bin = iqmc["score"]
+    score_list = iqmc["score_list"]
+    
+    # avg = "-avg"
+    if mcdc["cycle_active"]:
+        N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
+    
+        # average tallies
+        # iqmc["source-avg"] += iqmc["source"]
+    
+        score_bin["flux-avg"] += score_bin["flux"]
+        score_bin["flux-sdev"] += np.square(score_bin["flux"])
+    
+        # score_bin["fission-source-avg"] += score_bin["fission-source"]
+    
+        # if score_list["tilt-x"]:
+        #     score_bin["tilt-x-avg"] += score_bin["tilt-x"]
+    
+        # if score_list["tilt-y"]:
+        #     score_bin["tilt-y-avg"] += score_bin["tilt-y"]
+    
+        # if score_list["tilt-z"]:
+        #     score_bin["tilt-z-avg"] += score_bin["tilt-z"]
+    
+        # if score_list["tilt-xy"]:
+        #     score_bin["tilt-xy-avg"] += score_bin["tilt-xy"]
+
+
+@toggle("iQMC")
+def iqmc_eigenvalue_tally_closeout_history(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    score_bin = iqmc["score"]
+    score_list = iqmc["score_list"]
+      
+    # avg = "-avg"
+    N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
+      
+    # average tallies
+    # iqmc["source"] = iqmc["source-avg"] / N
+      
+    score_bin["flux"] = score_bin["flux-avg"] / N
+    
+    allreduce_array(score_bin["flux-sdev"])
+    score_bin["flux-sdev"] = np.sqrt(
+        (score_bin["flux-sdev"] / N - np.square(score_bin["flux"])) / (N - 1)
+    )
+    
+    
+    # score_bin["fission-source"] = score_bin["fission-source-avg"] / N
+      
+    # if score_list["tilt-x"]:
+    #     score_bin["tilt-x"] = score_bin["tilt-x-avg"] / N
+      
+    # if score_list["tilt-y"]:
+    #     score_bin["tilt-y"] = score_bin["tilt-y-avg"] / N
+      
+    # if score_list["tilt-z"]:
+    #     score_bin["tilt-z"] = score_bin["tilt-z-avg"] / N
+      
+    # if score_list["tilt-xy"]:
+    #     score_bin["tilt-xy"] = score_bin["tilt-xy-avg"] / N
+      
+        # TODO: get loop working with numba
+        # for name in literal_unroll(iqmc_score_list):
+        #     if score_list[name]:
+        #         name_avg = name+avg
+        #         score_bin[name_avg] = (
+        #             score_bin[name_avg] + score_bin[name]
+        #         ) / 2
+        #         score_bin[name] = score_bin[name_avg]
+
+
+@toggle("iQMC")
+def iqmc_eigenvalue_tally_closeout_history(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    score_bin = iqmc["score"]
+    idx_cycle = mcdc["idx_cycle"]
+
+    # Update and store k_eff
+    if mcdc["technique"]["domain_decomp"]:
+        score_bin["fission-source"][0] = allreduce(score_bin["fission-source"][0])
+
+    # update k_eff
+    mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
+
+    # store outter iteration values
+    # score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
+    mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
+
+    # Accumulate running average
+    if mcdc["cycle_active"]:
+        mcdc["k_avg"] += mcdc["k_eff"]
+        mcdc["k_sdv"] += mcdc["k_eff"] * mcdc["k_eff"]
+
+        N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
+        mcdc["k_avg_running"] = mcdc["k_avg"] / N
+        if N == 1:
+            mcdc["k_sdv_running"] = 1.0
+        else:
+            mcdc["k_sdv_running"] = math.sqrt(
+                (mcdc["k_sdv"] / N - mcdc["k_avg_running"] ** 2) / (N - 1)
+            )
+
+# =============================================================================
+# Misc
+# =============================================================================
+
+
+@toggle("iQMC")
+def iqmc_res(flux_new, flux_old):
+    """
+    Calculate residual between scalar flux iterations.
+
+    """
+    size = flux_old.size
+    flux_new = np.linalg.norm(flux_new.reshape((size,)), ord=2)
+    flux_old = np.linalg.norm(flux_old.reshape((size,)), ord=2)
+    return (flux_new - flux_old) / flux_old
