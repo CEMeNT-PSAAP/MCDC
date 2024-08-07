@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 10 21:52:17 2024
-
-@author: sam pasmann
-"""
 from mpi4py import MPI
 
 import mcdc.adapt as adapt
@@ -27,20 +20,24 @@ from mcdc.kernel import (
     mesh_get_index,
 )
 
+
 # =========================================================================
-# Low-Discrepency Sequences
+# iQMC Sampling Functions
 # =========================================================================
 
 
 @toggle("iQMC")
-def lds_init(mcdc):
+def samples_init(mcdc):
     N, dim = mcdc["technique"]["iqmc"]["samples"].shape
     N_start = mcdc["mpi_work_start"]
-    mcdc["technique"]["iqmc"]["samples"] = halton(N, dim, skip=N_start)
+    if mcdc["technique"]["iqmc"]["sample_method"] == "halton":
+        mcdc["technique"]["iqmc"]["samples"] = halton(N, dim, skip=N_start)
+    # if mcdc["technique"]["iqmc"]["sample_method"] == "random":
+    #     mcdc["technique"]["iqmc"]["samples"] = random(N, dim, skip=N_start)
 
 
 @toggle("iQMC")
-def scramble_LDS(mcdc):
+def sramble_samples(mcdc):
     # TODO: use MCDC seed system
     seed_batch = np.random.randint(1000, 1000000)
     N, dim = mcdc["technique"]["iqmc"]["samples"].shape

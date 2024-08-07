@@ -104,8 +104,9 @@ class InputDeck:
             "wr_survive": 1.0,
             "iQMC": False,
             "iqmc": {
-                "generator": "halton",
-                "fixed_source_solver": "source_iteration",
+                "sample_method": "halton",
+                "mode": "fixed",
+                "fixed_source_solver": "source iteration",
                 "krylov_restart": 5,
                 "krylov_vector_size": 1,
                 "tol": 1e-6,

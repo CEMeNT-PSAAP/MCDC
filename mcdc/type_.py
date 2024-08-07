@@ -950,13 +950,15 @@ def make_type_technique(input_deck):
     # Constants
     iqmc_list += [
         ("tol", float64),
+        ("w_min", float64),
+        ("residual", float64),
         ("iteration_count", int64),
         ("iterations_max", int64),
-        ("residual", float64),
-        ("fixed_source_solver", str_),
         ("krylov_restart", int64),
         ("sweep_count", int64),
-        ("w_min", float64),
+        ("fixed_source_solver", str_),
+        ("sample_method", str_),
+        ("mode", str_),
     ]
 
     struct += [("iqmc", into_dtype(iqmc_list))]
