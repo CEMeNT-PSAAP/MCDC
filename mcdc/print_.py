@@ -95,8 +95,8 @@ def print_progress_iqmc(mcdc):
     if master:
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
-            itt = mcdc["technique"]["iqmc"]["itt"]
-            res = mcdc["technique"]["iqmc"]["res"]
+            itt = mcdc["technique"]["iqmc"]["iteration_count"]
+            res = mcdc["technique"]["iqmc"]["residual"]
             print("\n*******************************")
             print("Iteration  %2d" % (itt))
             print("Residual %10.3E" % (res))
@@ -155,8 +155,8 @@ def print_iqmc_eigenvalue_progress(mcdc):
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
             k_eff = mcdc["k_eff"]
-            itt = mcdc["technique"]["iqmc"]["itt"]
-            res = mcdc["technique"]["iqmc"]["res"]
+            itt = mcdc["technique"]["iqmc"]["iteration_count"]
+            res = mcdc["technique"]["iqmc"]["residual"]
             print("\n %2d   %2.5f  %10.3E" % (itt, k_eff, res))
             sys.stdout.flush()
 
@@ -165,8 +165,8 @@ def print_iqmc_eigenvalue_exit_code(mcdc):
     if master:
         if mcdc["setting"]["progress_bar"]:
             sys.stdout.write("\r")
-            maxit = mcdc["technique"]["iqmc"]["maxitt"]
-            itt = mcdc["technique"]["iqmc"]["itt"]
+            maxit = mcdc["technique"]["iqmc"]["iterations_max"]
+            itt = mcdc["technique"]["iqmc"]["iteration_count"]
             if itt >= maxit:
                 print("\n")
                 print("================================")

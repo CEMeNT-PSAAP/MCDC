@@ -949,14 +949,13 @@ def make_type_technique(input_deck):
 
     # Constants
     iqmc_list += [
-        ("maxitt", int64),
         ("tol", float64),
-        ("itt", int64),
-        ("res", float64),
+        ("iteration_count", int64),
+        ("iterations_max", int64),
+        ("residual", float64),
         ("fixed_source_solver", str_),
         ("krylov_restart", int64),
-        ("preconditioner_sweeps", int64),
-        ("sweep_counter", int64),
+        ("sweep_count", int64),
         ("w_min", float64),
     ]
 

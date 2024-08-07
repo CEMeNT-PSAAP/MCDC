@@ -131,7 +131,7 @@ def iqmc_loop_source(mcdc):
 def iqmc_sweep(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     # tally sweep count
-    mcdc["technique"]["iqmc"]["sweep_counter"] += 1
+    mcdc["technique"]["iqmc"]["sweep_count"] += 1
     # reset particle bank size
     kernel.set_bank_size(mcdc["bank_source"], 0)
     # initialize particles with LDS
@@ -156,11 +156,11 @@ def source_iteration(mcdc):
 
     while not simulation_end:
         iqmc_sweep(mcdc)
-        iqmc["itt"] += 1
+        iqmc["iteration_count"] += 1
         # calculate norm of sources
-        iqmc["res"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
+        iqmc["residual"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
         # iQMC convergence criteria
-        if (iqmc["itt"] == iqmc["maxitt"]) or (iqmc["res"] <= iqmc["tol"]):
+        if (iqmc["iteration_count"] == iqmc["iterations_max"]) or (iqmc["residual"] <= iqmc["tol"]):
             simulation_end = True
 
         # Print progress
@@ -179,7 +179,7 @@ def power_iteration(mcdc):
     # iteration tolerance
     tol = iqmc["tol"]
     # maximum number of iterations
-    maxit = iqmc["maxitt"]
+    maxit = iqmc["iterations_max"]
     score_bin = iqmc["score"]
     k_old = mcdc["k_eff"]
     solver = iqmc["fixed_source_solver"]
@@ -192,11 +192,11 @@ def power_iteration(mcdc):
         # run sweep
         iqmc_sweep(mcdc)
         # reset counter for inner iteration
-        iqmc["itt"] += 1
+        iqmc["iteration_count"] += 1
         # update k_eff
         mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
         # calculate diff in keff
-        iqmc["res"] = abs(mcdc["k_eff"] - k_old) / k_old
+        iqmc["residual"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
         # store outter iteration values
         score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
@@ -205,7 +205,7 @@ def power_iteration(mcdc):
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
         # iQMC convergence criteria
-        if (iqmc["itt"] == maxit) or (iqmc["res"] <= tol):
+        if (iqmc["iteration_count"] == maxit) or (iqmc["residual"] <= tol):
             simulation_end = True
             with objmode():
                 print_iqmc_eigenvalue_exit_code(mcdc)
@@ -231,7 +231,7 @@ def gmres(mcdc):
     
     """
     iqmc = mcdc["technique"]["iqmc"]
-    max_iter = iqmc["maxitt"]
+    max_iter = iqmc["iterations_max"]
     R = iqmc["krylov_restart"]
     tol = iqmc["tol"]
 
@@ -340,16 +340,16 @@ def gmres(mcdc):
             if inner < max_inner - 1:
                 normr = abs(g[inner + 1])
                 rel_resid = normr / res_0
-                iqmc["res"] = rel_resid
+                iqmc["residual"] = rel_resid
 
-            iqmc["itt"] += 1
+            iqmc["iteration_count"] += 1
             if not mcdc["setting"]["mode_eigenvalue"]:
                 with objmode():
                     print_progress_iqmc(mcdc)
 
             if rel_resid < tol:
                 break
-            if iqmc["itt"] >= max_iter:
+            if iqmc["iteration_count"] >= max_iter:
                 break
 
         # end inner loop, back to outer loop
@@ -361,10 +361,10 @@ def gmres(mcdc):
         r = b - aux
         normr = np.linalg.norm(r)
         rel_resid = normr / res_0
-        iqmc["res"] = rel_resid
+        iqmc["residual"] = rel_resid
         if rel_resid < tol:
             break
-        if iqmc["itt"] >= max_iter:
+        if iqmc["iteration_count"] >= max_iter:
             return
 
 
