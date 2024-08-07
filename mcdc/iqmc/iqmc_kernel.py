@@ -256,7 +256,6 @@ def iqmc_prepare_source(mcdc):
     iqmc["score"]["effective-scattering"] = scatter
     iqmc["score"]["effective-fission"] = fission
     iqmc["score"]["effective-fission-outter"] = fission
-    iqmc_update_source(mcdc)
 
 
 @toggle("iQMC")
