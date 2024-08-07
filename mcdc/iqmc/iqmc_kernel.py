@@ -32,17 +32,22 @@ def samples_init(mcdc):
     N_start = mcdc["mpi_work_start"]
     if mcdc["technique"]["iqmc"]["sample_method"] == "halton":
         mcdc["technique"]["iqmc"]["samples"] = halton(N, dim, skip=N_start)
-    # if mcdc["technique"]["iqmc"]["sample_method"] == "random":
-    #     mcdc["technique"]["iqmc"]["samples"] = random(N, dim, skip=N_start)
+    if mcdc["technique"]["iqmc"]["sample_method"] == "random":
+        mcdc["technique"]["iqmc"]["samples"] = random(N, dim)
 
 
 @toggle("iQMC")
 def sramble_samples(mcdc):
     # TODO: use MCDC seed system
     seed_batch = np.random.randint(1000, 1000000)
-    N, dim = mcdc["technique"]["iqmc"]["samples"].shape
+    iqmc = mcdc["technique"]["iqmc"]
+    N, dim = iqmc["samples"].shape
     N_start = mcdc["mpi_work_start"]
-    mcdc["technique"]["iqmc"]["samples"] = rhalton(N, dim, seed=seed_batch, skip=N_start)
+    
+    if iqmc["sample_method"] == "halton":
+        iqmc["samples"] = rhalton(N, dim, seed=seed_batch, skip=N_start)
+    if iqmc["sample_method"] == "random":
+        iqmc["samples"] = random(N,dim,seed=seed_batch)
 
 
 @toggle("iQMC")
@@ -93,6 +98,12 @@ def halton(N, dim, skip=0):
                 halton[i - skip, D] = n / d
 
     return halton
+
+
+@toggle("iQMC")
+def random(N, dim, seed=123456):
+    np.random.seed(seed)
+    return np.random.rand(N, dim)
 
 
 # =========================================================================
