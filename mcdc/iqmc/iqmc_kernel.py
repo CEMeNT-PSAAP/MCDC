@@ -191,7 +191,7 @@ def iqmc_preprocess(mcdc):
         # use material index to generate a first guess for the source
         iqmc_prepare_source(mcdc)
         iqmc_update_source(mcdc)
-    if eigenmode and iqmc["eigenmode_solver"] == "power_iteration":
+    if eigenmode:
         iqmc_prepare_nuSigmaF(mcdc)
 
     iqmc_consolidate_sources(mcdc)
@@ -538,7 +538,6 @@ def iqmc_update_source(mcdc):
     fixed = iqmc["fixed_source"]
     if (
         mcdc["setting"]["mode_eigenvalue"]
-        and iqmc["eigenmode_solver"] == "power_iteration"
     ):
         fission = iqmc["score"]["effective-fission-outter"]
     else:

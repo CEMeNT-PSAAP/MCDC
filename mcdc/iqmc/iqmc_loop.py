@@ -32,8 +32,7 @@ def iqmc_simulation(mcdc):
     iqmc_kernel.lds_init(mcdc)
 
     if mcdc["setting"]["mode_eigenvalue"]:
-        if iqmc["eigenmode_solver"] == "power_iteration":
-            power_iteration(mcdc)
+        power_iteration(mcdc)
     else:
         if iqmc["fixed_source_solver"] == "source_iteration":
             source_iteration(mcdc)
