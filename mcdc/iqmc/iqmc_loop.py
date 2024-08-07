@@ -186,6 +186,9 @@ def power_iteration(mcdc):
     fission_source_old = score_bin["fission-source"].copy()
 
     while not simulation_end:
+        # scramble samples if in batched mode
+        # if iqmc["mode"] == "batched":
+        #     iqmc_kernel.scramble_LDS(mcdc)
         # run sweep
         iqmc_sweep(mcdc)
         # reset counter for inner iteration
@@ -193,17 +196,16 @@ def power_iteration(mcdc):
         # update k_eff
         mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
         # calculate diff in keff
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
+        iqmc["res"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
         # store outter iteration values
         score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
         fission_source_old = score_bin["fission-source"].copy()
-        iqmc["itt_outter"] += 1
         # print progress
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
         # iQMC convergence criteria
-        if (iqmc["itt_outter"] == maxit) or (iqmc["res_outter"] <= tol):
+        if (iqmc["itt"] == maxit) or (iqmc["res"] <= tol):
             simulation_end = True
             with objmode():
                 print_iqmc_eigenvalue_exit_code(mcdc)
@@ -215,6 +217,8 @@ def gmres(mcdc):
     GMRES solver.
     ----------
     Linear Krylov solver. Solves problem of the form Ax = b.
+    This function is almost entirely linear algebra operations and does not 
+    directly use any functions in mcdc/kernel.py or mcdc/loop.py
 
     References
     ----------
@@ -224,7 +228,7 @@ def gmres(mcdc):
     .. [2] C. T. Kelley, http://www4.ncsu.edu/~ctk/matlab_roots.html
 
     code adapted from: https://github.com/pygbe/pygbe/blob/master/pygbe/gmres.py
-
+    
     """
     iqmc = mcdc["technique"]["iqmc"]
     max_iter = iqmc["maxitt"]
