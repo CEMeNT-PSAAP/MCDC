@@ -756,7 +756,7 @@ def prepare():
             mcdc["technique"]["iqmc"]["score"][name] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-        
+
     # =========================================================================
     # Derivative Source Method
     # =========================================================================
@@ -1102,10 +1102,12 @@ def generate_hdf5(mcdc):
                     "iqmc/tally/source_z", data=T["iqmc"]["score"]["tilt-z"]
                 )
                 # iteration data
-                f.create_dataset("iqmc/iteration_count", data=T["iqmc"]["iteration_count"])
+                f.create_dataset(
+                    "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]
+                )
                 f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_count"])
                 f.create_dataset("iqmc/final_residual", data=T["iqmc"]["residual"])
-                
+
             # Particle tracker
             if mcdc["setting"]["track_particle"]:
                 with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
