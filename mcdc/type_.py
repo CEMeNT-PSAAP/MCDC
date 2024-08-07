@@ -899,27 +899,17 @@ def make_type_technique(input_deck):
 
     iqmc_list += [("mesh", mesh)]
 
-    # Low-discprenecy sequence
-    size = MPI.COMM_WORLD.Get_size()
-    rank = MPI.COMM_WORLD.Get_rank()
-    # Evenly distribute work
-    work_size = math.floor(N_particle / size)
-    # Count reminder
-    rem = N_particle % size
-    # Assign reminder and update starting index
-    if rank < rem:
-        work_size += 1
-
+    #  make low-discprenecy sequence array
+    work_size = get_work_size(N_particle)
     iqmc_list += [("lds", float64, (work_size, N_dim))]
+    # make global arrays
     iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # TODO: make matidx int32
     iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
-    # this is the original source matrix size + all tilted sources
     iqmc_list += [("source", float64, (Ng, Nt, Nx, Ny, Nz))]
     total_size = (Ng * Nt * Nx * Ny * Nz) * card["iqmc"]["krylov_vector_size"]
     iqmc_list += [(("total_source"), float64, (total_size,))]
 
-    # Scores and shapes
+    # Make scores
     scores_shapes = [
         ["flux", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],
@@ -1365,6 +1355,18 @@ def make_type_global(input_deck):
 # Util
 # ==============================================================================
 
+
+def get_work_size(N_particle):
+    size = MPI.COMM_WORLD.Get_size()
+    rank = MPI.COMM_WORLD.Get_rank()
+    # Evenly distribute work
+    work_size = math.floor(N_particle / size)
+    # Count reminder
+    rem = N_particle % size
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size += 1
+    return work_size
 
 def make_type_translate(input_deck):
     global translate
