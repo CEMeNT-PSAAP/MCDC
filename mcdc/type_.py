@@ -1367,6 +1367,7 @@ def get_work_size(N_particle):
         work_size += 1
     return work_size
 
+
 def make_type_translate(input_deck):
     global translate
     translate = into_dtype([("values", float64, (3,))])

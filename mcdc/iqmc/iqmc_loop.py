@@ -153,7 +153,9 @@ def source_iteration(mcdc):
         # calculate norm of sources
         iqmc["residual"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
         # iQMC convergence criteria
-        if (iqmc["iteration_count"] == iqmc["iterations_max"]) or (iqmc["residual"] <= iqmc["tol"]):
+        if (iqmc["iteration_count"] == iqmc["iterations_max"]) or (
+            iqmc["residual"] <= iqmc["tol"]
+        ):
             simulation_end = True
 
         # Print progress
@@ -209,7 +211,7 @@ def gmres(mcdc):
     GMRES solver.
     ----------
     Linear Krylov solver. Solves problem of the form Ax = b.
-    This function is almost entirely linear algebra operations and does not 
+    This function is almost entirely linear algebra operations and does not
     directly use any functions in mcdc/kernel.py or mcdc/loop.py
 
     References
@@ -220,7 +222,7 @@ def gmres(mcdc):
     .. [2] C. T. Kelley, http://www4.ncsu.edu/~ctk/matlab_roots.html
 
     code adapted from: https://github.com/pygbe/pygbe/blob/master/pygbe/gmres.py
-    
+
     """
     iqmc = mcdc["technique"]["iqmc"]
     max_iter = iqmc["iterations_max"]

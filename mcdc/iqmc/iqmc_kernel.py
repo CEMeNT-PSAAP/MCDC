@@ -43,11 +43,11 @@ def sramble_samples(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     N, dim = iqmc["samples"].shape
     N_start = mcdc["mpi_work_start"]
-    
+
     if iqmc["sample_method"] == "halton":
         iqmc["samples"] = rhalton(N, dim, seed=seed_batch, skip=N_start)
     if iqmc["sample_method"] == "random":
-        iqmc["samples"] = random(N,dim,seed=seed_batch)
+        iqmc["samples"] = random(N, dim, seed=seed_batch)
 
 
 @toggle("iQMC")
@@ -544,9 +544,7 @@ def iqmc_update_source(mcdc):
     keff = mcdc["k_eff"]
     scatter = iqmc["score"]["effective-scattering"]
     fixed = iqmc["fixed_source"]
-    if (
-        mcdc["setting"]["mode_eigenvalue"]
-    ):
+    if mcdc["setting"]["mode_eigenvalue"]:
         fission = iqmc["score"]["effective-fission-outter"]
     else:
         fission = iqmc["score"]["effective-fission"]
