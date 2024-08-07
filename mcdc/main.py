@@ -756,6 +756,7 @@ def prepare():
             mcdc["technique"]["iqmc"]["score"][name] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
+        
     # =========================================================================
     # Derivative Source Method
     # =========================================================================

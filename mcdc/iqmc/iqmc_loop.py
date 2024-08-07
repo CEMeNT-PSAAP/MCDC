@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 10 21:52:29 2024
-
-@author: sam pasmann
-"""
 import mcdc.kernel as kernel
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.adapt as adapt
@@ -29,12 +22,12 @@ def iqmc_simulation(mcdc):
     # function calls from specified solvers
     iqmc = mcdc["technique"]["iqmc"]
     iqmc_kernel.iqmc_preprocess(mcdc)
-    iqmc_kernel.lds_init(mcdc)
+    iqmc_kernel.samples_init(mcdc)
 
     if mcdc["setting"]["mode_eigenvalue"]:
         power_iteration(mcdc)
     else:
-        if iqmc["fixed_source_solver"] == "source_iteration":
+        if iqmc["fixed_source_solver"] == "source iteration":
             source_iteration(mcdc)
         if iqmc["fixed_source_solver"] == "gmres":
             gmres(mcdc)
@@ -182,13 +175,12 @@ def power_iteration(mcdc):
     maxit = iqmc["iterations_max"]
     score_bin = iqmc["score"]
     k_old = mcdc["k_eff"]
-    solver = iqmc["fixed_source_solver"]
     fission_source_old = score_bin["fission-source"].copy()
 
     while not simulation_end:
         # scramble samples if in batched mode
-        # if iqmc["mode"] == "batched":
-        #     iqmc_kernel.scramble_LDS(mcdc)
+        if iqmc["mode"] == "batched":
+            iqmc_kernel.scramble_samples(mcdc)
         # run sweep
         iqmc_sweep(mcdc)
         # reset counter for inner iteration
