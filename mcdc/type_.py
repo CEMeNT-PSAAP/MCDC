@@ -511,6 +511,7 @@ def make_type_surface(input_deck):
             ("dsm_Np", float64),
         ]
     )
+    print("\n\nsurface type:\n\n",surface)
 
 
 # ==============================================================================
@@ -536,6 +537,7 @@ def make_type_cell(input_deck):
             ("lattice_center", float64, (3,)),
         ]
     )
+    print("\n\ncell type:\n\n",cell)
 
 
 # ==============================================================================
@@ -1361,6 +1363,7 @@ def make_type_global(input_deck):
             ("source_seed", uint64),
         ]
     )
+    print("\n\nglobal type:\n\n",global_)
 
 
 # ==============================================================================

@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit, jit, objmode, literal_unroll, cuda, types
+from numba import njit, jit, objmode, literal_unroll, types, hip as cuda
 from numba.extending import intrinsic
 import numba
 import mcdc.type_ as type_
@@ -8,9 +8,8 @@ import mcdc.loop as loop
 
 try:
     import harmonize as harm
-
     HAS_HARMONIZE = True
-except:
+except RuntimeError:
     HAS_HARMONIZE = False
 
 import math
@@ -19,6 +18,9 @@ import inspect
 from mcdc.print_ import print_error
 
 import mcdc.adapt as adapt
+
+
+harm.set_rocm_path('/opt/rocm-6.0.0')
 
 
 # =============================================================================
@@ -343,7 +345,8 @@ def add_active(particle, prog):
 
 @for_gpu()
 def add_active(particle, prog):
-    P = kernel.recordlike_to_particle(particle)
+    P = local_particle()
+    kernel.recordlike_to_particle(P,particle)
     if SIMPLE_ASYNC:
         step_async(prog, P)
     else:
@@ -445,7 +448,7 @@ def global_add(ary, idx, val):
 
 @for_gpu()
 def global_add(ary, idx, val):
-    return cuda.atomic.add(ary, idx, val)
+    return harm.array_atomic_add(ary, idx, val)
 
 
 @for_cpu()
@@ -458,7 +461,7 @@ def global_max(ary, idx, val):
 
 @for_gpu()
 def global_max(ary, idx, val):
-    return cuda.atomic.max(ary, idx, val)
+    return harm.array_atomic_max(ary, idx, val)
 
 
 # =========================================================================
