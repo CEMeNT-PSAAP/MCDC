@@ -1569,7 +1569,7 @@ def iQMC(
         Max number of iterations for Krylov iteration (default same as maxitt).
     fixed_source : array_like[float], optional
         Fixed source (default same as phi0).
-    maxit : int, optional
+    iterations_max : int, optional
         Maximum number of iterations allowed before termination (default 25).
     tol : float, optional
         Convergence tolerance (default 1e-6).
@@ -1598,7 +1598,7 @@ def iQMC(
     card = global_.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
-    card["iqmc"]["maxitt"] = maxit
+    card["iqmc"]["iterations_max"] = maxit
 
     # Set mesh
     if g is not None:

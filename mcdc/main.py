@@ -732,9 +732,9 @@ def prepare():
     for name in type_.technique["iqmc"].names:
         if name not in [
             "mesh",
-            "res",
+            "residual",
             "lds",
-            "sweep_counter",
+            "sweep_count",
             "total_source",
             "material_idx",
             "w_min",
@@ -1101,9 +1101,9 @@ def generate_hdf5(mcdc):
                     "iqmc/tally/source_z", data=T["iqmc"]["score"]["tilt-z"]
                 )
                 # iteration data
-                f.create_dataset("iqmc/itteration_count", data=T["iqmc"]["itt"])
-                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["res"])
-                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_counter"])
+                f.create_dataset("iqmc/iteration_count", data=T["iqmc"]["iteration_count"])
+                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_count"])
+                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["residual"])
                 
             # Particle tracker
             if mcdc["setting"]["track_particle"]:
