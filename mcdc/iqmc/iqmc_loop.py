@@ -71,8 +71,8 @@ def iqmc_step_particle(P, prog):
         kernel.surface_crossing(P, prog)
         if event & EVENT_DOMAIN:
             if not (
-                mcdc["surfaces"][P["surface_ID"]]["reflective"]
-                or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
+                mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
+                or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
             ):
                 kernel.domain_crossing(P, mcdc)
 
