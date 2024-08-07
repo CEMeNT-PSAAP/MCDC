@@ -104,7 +104,6 @@ def iqmc_step_particle(P, prog):
 
 @njit(cache=caching)
 def iqmc_loop_source(mcdc):
-    mcdc["technique"]["iqmc"]["sweep_counter"] += 1
     work_size = mcdc["bank_source"]["size"][0]
     N_prog = 0
     # loop over particles
@@ -130,27 +129,35 @@ def iqmc_loop_source(mcdc):
 
 
 @njit(cache=caching)
+def iqmc_sweep(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    # tally sweep count
+    mcdc["technique"]["iqmc"]["sweep_counter"] += 1
+    # reset particle bank size
+    kernel.set_bank_size(mcdc["bank_source"], 0)
+    # initialize particles with LDS
+    iqmc_kernel.iqmc_prepare_particles(mcdc)
+    # reset tallies for next loop
+    iqmc_kernel.iqmc_reset_tallies(iqmc)
+    # sweep particles
+    iqmc_loop_source(mcdc)
+    # sum resultant flux on all processors
+    iqmc_kernel.iqmc_distribute_tallies(iqmc)
+    # update source = scattering + fission/keff + fixed
+    iqmc_kernel.iqmc_update_source(mcdc)
+    # combine source tallies into one vector
+    iqmc_kernel.iqmc_consolidate_sources(mcdc)
+
+
+@njit(cache=caching)
 def source_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
     total_source_old = iqmc["total_source"].copy()
 
     while not simulation_end:
-        # reset particle bank size
-        kernel.set_bank_size(mcdc["bank_source"], 0)
-        # initialize particles with LDS
-        iqmc_kernel.iqmc_prepare_particles(mcdc)
-        # reset tallies for next loop
-        iqmc_kernel.iqmc_reset_tallies(iqmc)
-        # sweep particles
-        iqmc_loop_source(mcdc)
-
-        # sum resultant flux on all processors
-        iqmc_kernel.iqmc_distribute_tallies(iqmc)
+        iqmc_sweep(mcdc)
         iqmc["itt"] += 1
-        iqmc_kernel.iqmc_update_source(mcdc)
-        # combine source tallies into one vector
-        iqmc_kernel.iqmc_consolidate_sources(mcdc)
         # calculate norm of sources
         iqmc["res"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
         # iQMC convergence criteria
@@ -177,23 +184,15 @@ def power_iteration(mcdc):
     score_bin = iqmc["score"]
     k_old = mcdc["k_eff"]
     solver = iqmc["fixed_source_solver"]
-
     fission_source_old = score_bin["fission-source"].copy()
 
     while not simulation_end:
-        # iterate over scattering source
-        if solver == "source_iteration":
-            iqmc["maxitt"] = 1
-            source_iteration(mcdc)
-            iqmc["maxitt"] = maxit
-        if solver == "gmres":
-            gmres(mcdc)
+        # run sweep
+        iqmc_sweep(mcdc)
         # reset counter for inner iteration
-        iqmc["itt"] = 0
-
+        iqmc["itt"] += 1
         # update k_eff
         mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
-
         # calculate diff in keff
         iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
@@ -201,10 +200,9 @@ def power_iteration(mcdc):
         score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
         fission_source_old = score_bin["fission-source"].copy()
         iqmc["itt_outter"] += 1
-
+        # print progress
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
-
         # iQMC convergence criteria
         if (iqmc["itt_outter"] == maxit) or (iqmc["res_outter"] <= tol):
             simulation_end = True
@@ -383,20 +381,7 @@ def AxV(V, b, mcdc):
     iqmc["total_source"] = V.copy()
     # distribute segments of V to appropriate sources
     iqmc_kernel.iqmc_distribute_sources(mcdc)
-    # reset bank size
-    kernel.set_bank_size(mcdc["bank_source"], 0)
-
-    # QMC Sweep
-    iqmc_kernel.iqmc_prepare_particles(mcdc)
-    iqmc_kernel.iqmc_reset_tallies(iqmc)
-    iqmc["sweep_counter"] += 1
-    iqmc_loop_source(mcdc)
-    # sum resultant flux on all processors
-    iqmc_kernel.iqmc_distribute_tallies(iqmc)
-    # update source adds effective scattering + fission + fixed-source
-    iqmc_kernel.iqmc_update_source(mcdc)
-    # combine all sources (constant and tilted) into one vector
-    iqmc_kernel.iqmc_consolidate_sources(mcdc)
+    iqmc_sweep(mcdc)
     v_out = iqmc["total_source"].copy()
     axv = V - (v_out - b)
 
