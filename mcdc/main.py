@@ -733,7 +733,7 @@ def prepare():
         if name not in [
             "mesh",
             "residual",
-            "lds",
+            "samples",
             "sweep_count",
             "total_source",
             "material_idx",
