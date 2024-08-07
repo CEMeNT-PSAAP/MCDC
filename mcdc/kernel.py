@@ -852,12 +852,11 @@ def rng_array(seed, shape, size):
 
 
 @njit
-def source_particle(seed, mcdc):
-    P: type_.particle_record = adapt.local_particle_record()
-    P["rng_seed"] = seed
+def source_particle(P_rec, seed, mcdc):
+    P_rec["rng_seed"] = seed
 
     # Sample source
-    xi = rng(P)
+    xi = rng(P_rec)
     tot = 0.0
     for source in mcdc["sources"]:
         tot += source["prob"]
@@ -866,9 +865,9 @@ def source_particle(seed, mcdc):
 
     # Position
     if source["box"]:
-        x = sample_uniform(source["box_x"][0], source["box_x"][1], P)
-        y = sample_uniform(source["box_y"][0], source["box_y"][1], P)
-        z = sample_uniform(source["box_z"][0], source["box_z"][1], P)
+        x = sample_uniform(source["box_x"][0], source["box_x"][1], P_rec)
+        y = sample_uniform(source["box_y"][0], source["box_y"][1], P_rec)
+        z = sample_uniform(source["box_z"][0], source["box_z"][1], P_rec)
     else:
         x = source["x"]
         y = source["y"]
@@ -876,10 +875,10 @@ def source_particle(seed, mcdc):
 
     # Direction
     if source["isotropic"]:
-        ux, uy, uz = sample_isotropic_direction(P)
+        ux, uy, uz = sample_isotropic_direction(P_rec)
     elif source["white"]:
         ux, uy, uz = sample_white_direction(
-            source["white_x"], source["white_y"], source["white_z"], P
+            source["white_x"], source["white_y"], source["white_z"], P_rec
         )
     else:
         ux = source["ux"]
@@ -888,30 +887,28 @@ def source_particle(seed, mcdc):
 
     # Energy and time
     if mcdc["setting"]["mode_MG"]:
-        g = sample_discrete(source["group"], P)
+        g = sample_discrete(source["group"], P_rec)
         E = 0.0
     else:
         g = 0
-        E = sample_piecewise_linear(source["energy"], P)
+        E = sample_piecewise_linear(source["energy"], P_rec)
 
     # Time
-    t = sample_uniform(source["time"][0], source["time"][1], P)
+    t = sample_uniform(source["time"][0], source["time"][1], P_rec)
 
     # Make and return particle
-    P["x"] = x
-    P["y"] = y
-    P["z"] = z
-    P["t"] = t
-    P["ux"] = ux
-    P["uy"] = uy
-    P["uz"] = uz
-    P["g"] = g
-    P["E"] = E
-    P["w"] = 1.0
+    P_rec["x"] = x
+    P_rec["y"] = y
+    P_rec["z"] = z
+    P_rec["t"] = t
+    P_rec["ux"] = ux
+    P_rec["uy"] = uy
+    P_rec["uz"] = uz
+    P_rec["g"] = g
+    P_rec["E"] = E
+    P_rec["w"] = 1.0
 
-    P["sensitivity_ID"] = 0
-
-    return P
+    P_rec["sensitivity_ID"] = 0
 
 
 # =============================================================================
@@ -1367,7 +1364,8 @@ def bank_IC(P, prog):
 
     # Sample particle
     if rng(P) < Pn:
-        P_new = split_particle(P)
+        P_new = adapt.local_particle()
+        split_particle(P_new,P)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
         adapt.add_IC(P_new, prog)
@@ -1479,7 +1477,8 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        P = copy_record(bank_census["particles"][idx])
+        P = adapt.local_particle()
+        copy_record(P,bank_census["particles"][idx])
         # Set weight
         P["w"] *= td
         adapt.add_source(P, mcdc)
@@ -1517,10 +1516,11 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        P = copy_record(bank_census["particles"][idx])
+        P_rec = adapt.local_particle_record()
+        copy_record(P_rec,bank_census["particles"][idx])
         # Set weight
-        P["w"] = td
-        adapt.add_source(P, mcdc)
+        P_rec["w"] = td
+        adapt.add_source(P_rec, mcdc)
 
 
 # =============================================================================
@@ -1650,15 +1650,12 @@ def copy_recordlike(P_new, P):
 
 
 @njit
-def copy_record(P):
-    P_new = adapt.local_particle_record()
+def copy_record(P_new, P):
     copy_recordlike(P_new, P)
-    return P_new
 
 
 @njit
-def recordlike_to_particle(P_rec):
-    P_new = adapt.local_particle()
+def recordlike_to_particle(P_new, P_rec):
     copy_recordlike(P_new, P_rec)
     P_new["fresh"] = True
     P_new["alive"] = True
@@ -1666,7 +1663,6 @@ def recordlike_to_particle(P_rec):
     P_new["cell_ID"] = -1
     P_new["surface_ID"] = -1
     P_new["event"] = -1
-    return P_new
 
 
 @njit
@@ -1694,11 +1690,10 @@ def copy_particle(P_new, P):
 
 
 @njit
-def split_particle(P):
-    P_new = copy_record(P)
+def split_particle(P_new, P):
+    copy_record(P_new, P)
     P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
-    return P_new
 
 
 # =============================================================================
@@ -1973,10 +1968,11 @@ def mesh_distance_search(value, direction, grid):
     idx = binary_search(value, grid)
     if direction > 0.0:
         idx += 1
-    if idx == -1:
-        idx += 1
-    if idx == len(grid):
-        idx -= 1
+    if idx < 0:
+        idx = 0
+    if idx >= len(grid):
+        idx = len(grid) - 1
+
     dist = (grid[idx] - value) / direction
     # Moving away from mesh?
     if dist < 0.0:
@@ -2848,7 +2844,8 @@ def scattering(P, prog):
 
     for n in range(N):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = adapt.local_particle()
+        split_particle(P_new,P)
 
         # Set weight
         P_new["w"] = weight_new
@@ -3114,7 +3111,8 @@ def fission(P, prog):
 
     for n in range(N):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = adapt.local_particle()
+        split_particle(P_new,P)
 
         # Set weight
         P_new["w"] = weight_new
@@ -3380,7 +3378,9 @@ def branchless_collision(P, prog):
             idx_census = mcdc["idx_census"]
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
                 P["alive"] = False
-                adapt.add_active(split_particle(P), prog)
+                P_new = adapt.local_particle()
+                split_particle(P_new,P)
+                adapt.add_active(P_new, prog)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
 
@@ -3417,13 +3417,17 @@ def weight_window(P, prog):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            adapt.add_active(split_particle(P), prog)
+            P_new = adapt.local_particle()
+            split_particle(P_new,P)
+            adapt.add_active(P_new, prog)
 
         # Russian roulette
         p -= n_split
         xi = rng(P)
         if xi <= p:
-            adapt.add_active(split_particle(P), prog)
+            P_new = adapt.local_particle()
+            split_particle(P_new,P)
+            adapt.add_active(P_new, prog)
 
     # Below target
     elif p < 1.0 / width:
@@ -4404,7 +4408,10 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
 
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
-    adapt.add_active(copy_record(P), prog)
+
+    P_rec = adapt.local_particle_record()
+    copy_record(P_rec,P)
+    adapt.add_active(P_rec, prog)
 
     # Get sensitivity ID
     ID = surface["sensitivity_ID"]
@@ -4469,7 +4476,8 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = adapt.local_particle()
+        split_particle(P_new,P)
 
         # Sample source type
         xi = rng(P) * p_total
@@ -4557,7 +4565,8 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
         source_obtained = False
 
         # Create new particle
-        P_new = split_particle(P)
+        P_new = adapt.local_particle()
+        split_particle(P_new,P)
 
         # Sample term
         xi = rng(P_new) * p_total
@@ -4699,7 +4708,8 @@ def sensitivity_material(P, prog):
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = adapt.local_particle()
+        split_particle(P_new,P)
 
         # Sample source type
         xi = rng(P_new) * total
