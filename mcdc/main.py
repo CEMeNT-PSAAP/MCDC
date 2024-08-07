@@ -438,7 +438,7 @@ def prepare():
         # CE data (load data from XS library)
         dir_name = os.getenv("MCDC_XSLIB")
         if mode_CE:
-            nuc_name = input_deck.nuclides[i]["name"]
+            nuc_name = input_deck.nuclides[i].name
             with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                 # Atomic weight ratio
                 mcdc["nuclides"][i]["A"] = f["A"][()]
@@ -886,22 +886,29 @@ def prepare():
 
     # =========================================================================
     # Source file
+    #   TODO: Use parallel h5py
     # =========================================================================
 
-    if mcdc["setting"]["source_file"]:
-        with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
-            # Get source particle size
-            N_particle = f["particles_size"][()]
+    # All ranks, take turn
+    for i in range(mcdc["mpi_size"]):
+        if mcdc["mpi_rank"] == i:
+            if mcdc["setting"]["source_file"]:
+                with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
+                    # Get source particle size
+                    N_particle = f["particles_size"][()]
 
-            # Redistribute work
-            kernel.distribute_work(N_particle, mcdc)
-            N_local = mcdc["mpi_work_size"]
-            start = mcdc["mpi_work_start"]
-            end = start + N_local
+                    # Redistribute work
+                    kernel.distribute_work(N_particle, mcdc)
+                    N_local = mcdc["mpi_work_size"]
+                    start = mcdc["mpi_work_start"]
+                    end = start + N_local
 
-            # Add particles to source bank
-            mcdc["bank_source"]["particles"][:N_local] = f["particles"][start:end]
-            mcdc["bank_source"]["size"] = N_local
+                    # Add particles to source bank
+                    mcdc["bank_source"]["particles"][:N_local] = f["particles"][
+                        start:end
+                    ]
+                    mcdc["bank_source"]["size"] = N_local
+        MPI.COMM_WORLD.Barrier()
 
     # =========================================================================
     # IC file

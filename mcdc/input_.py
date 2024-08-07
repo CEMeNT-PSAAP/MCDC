@@ -322,25 +322,50 @@ def material(
         # Set ID
         card.ID = len(global_.input_deck.materials)
 
+        # Default values
+        card.J = 6
+
         # Set the nuclides
         for i in range(N_nuclide):
             nuc_name = nuclides[i][0]
             density = nuclides[i][1]
+
+            # Create nuclide card if not defined yet
             if not nuclide_registered(nuc_name):
                 nuc_card = NuclideCard()
+                nuc_card.name = nuc_name
 
+                # Set ID
+                nuc_card.ID = len(global_.input_deck.nuclides)
+
+                # Default values
+                nuc_card.J = 6
+
+                # Check if the nuclide is available in the nuclear data library
                 dir_name = os.getenv("MCDC_XSLIB")
                 if dir_name == None:
                     print_error(
-                        "Continuous energy data directory not configured \n       see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
+                        "Continuous energy data directory not configured \n       "
+                        "see https://cement-psaapgithubio.readthedocs.io/en/latest"
+                        "/install.html#configuring-continuous-energy-library \n"
                     )
+
+                # Fissionable flag
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card.fissionable = True
+                        card.fissionable = True
+
+                # Add to deck
+                global_.input_deck.nuclides.append(nuc_card)
             else:
                 nuc_card = get_nuclide(nuc_name)
+
             card.nuclide_IDs[i] = nuc_card.ID
             card.nuclide_densities[i] = density
+
+        # Add to deck
+        global_.input_deck.materials.append(card)
 
         return card
 
@@ -1889,14 +1914,14 @@ def uq(**kw):
 
 def nuclide_registered(name):
     for card in global_.input_deck.nuclides:
-        if name == card["name"]:
+        if name == card.name:
             return True
     return False
 
 
 def get_nuclide(name):
     for card in global_.input_deck.nuclides:
-        if name == card["name"]:
+        if name == card.name:
             return card
 
 
@@ -1932,6 +1957,41 @@ def check_requirement(label, kw, required):
     missing = missing[:-2] + "}"
     if error:
         print_error("Parameters " + missing + " are required for" + label)
+
+
+def make_particle_bank(size):
+    struct = [
+        ("x", np.float64),
+        ("y", np.float64),
+        ("z", np.float64),
+        ("t", np.float64),
+        ("ux", np.float64),
+        ("uy", np.float64),
+        ("uz", np.float64),
+        ("g", np.uint64),
+        ("E", np.float64),
+        ("w", np.float64),
+        ("sensitivity_ID", np.int64),
+        ("rng_seed", np.uint64),
+    ]
+    iqmc_struct = [("w", np.float64, (1,))]
+    struct += [("iqmc", iqmc_struct)]
+
+    bank = np.zeros(size, dtype=np.dtype(struct))
+
+    # Set default values
+    for i in range(size):
+        bank[i]["ux"] = 1.0
+        bank[i]["w"] = 1.0
+        bank[i]["rng_seed"] = 1
+
+    return bank
+
+
+def save_particle_bank(bank, name):
+    with h5py.File(name + ".h5", "w") as f:
+        f.create_dataset("particles", data=bank[:])
+        f.create_dataset("particles_size", data=len(bank[:]))
 
 
 # ==============================================================================

@@ -55,3 +55,7 @@ docs/build
 docs/source/pythonapi/generated/
 
 *.csv
+
+# Regression tests
+dummy_nuclide.h5
+source_particles.h5
