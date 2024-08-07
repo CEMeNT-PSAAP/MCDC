@@ -17,6 +17,30 @@ from mcdc.print_ import (
 )
 
 
+# =============================================================================
+# Preprocess
+# =============================================================================
+
+@njit(cache=caching)
+def iqmc_simulation(mcdc):
+    # function calls from specified solvers
+    iqmc = mcdc["technique"]["iqmc"]
+    iqmc_kernel.iqmc_preprocess(mcdc)
+    iqmc_kernel.samples_init(mcdc)
+
+    if mcdc["setting"]["mode_eigenvalue"]:
+        power_iteration(mcdc)
+    else:
+        if iqmc["fixed_source_solver"] == "source iteration":
+            source_iteration(mcdc)
+        if iqmc["fixed_source_solver"] == "gmres":
+            gmres(mcdc)
+
+
+# =============================================================================
+# Lower Level loops
+# =============================================================================
+
 @njit(cache=caching)
 def iqmc_simulation(mcdc):
     # function calls from specified solvers
@@ -124,7 +148,7 @@ def iqmc_loop_source(mcdc):
 def iqmc_sweep(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     # tally sweep count
-    mcdc["technique"]["iqmc"]["sweep_count"] += 1
+    iqmc["sweep_count"] += 1
     # reset particle bank size
     kernel.set_bank_size(mcdc["bank_source"], 0)
     # initialize particles with LDS
@@ -139,6 +163,15 @@ def iqmc_sweep(mcdc):
     iqmc_kernel.iqmc_update_source(mcdc)
     # combine source tallies into one vector
     iqmc_kernel.iqmc_consolidate_sources(mcdc)
+    
+    if iqmc["mode"] == "batch":
+        iqmc_kernel.iqmc_tally_batch_history(mcdc)
+        iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(fission_source_old, mcdc)
+
+
+# =============================================================================
+# Primary Iteration Loops
+# =============================================================================
 
 
 @njit(cache=caching)
@@ -180,24 +213,36 @@ def power_iteration(mcdc):
     fission_source_old = score_bin["fission-source"].copy()
 
     while not simulation_end:
-        # scramble samples if in batched mode
+        # Scramble samples if in batched mode
         if iqmc["mode"] == "batched":
             iqmc_kernel.scramble_samples(mcdc)
-        # run sweep
+            
+        # Run sweep
         iqmc_sweep(mcdc)
-        # reset counter for inner iteration
+        # Reset counter for inner iteration
         iqmc["iteration_count"] += 1
-        # update k_eff
+        # Update k_eff
         mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
-        # calculate diff in keff
+        # Calculate diff in keff
         iqmc["residual"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
-        # store outter iteration values
+        # Store outter iteration values
         score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
         fission_source_old = score_bin["fission-source"].copy()
-        # print progress
+        
+        # kernel.iqmc_tally_batch_history(mcdc)
+        # kernel.iqmc_eigenvalue_tally_closeout_history(fission_source_old, mcdc)
+        
+        # Entering active cycle?
+        if iqmc["mode"] == "batched":
+            mcdc["idx_cycle"] += 1
+            if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
+                mcdc["cycle_active"] = True
+                
+        # Print progress
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
+            
         # iQMC convergence criteria
         if (iqmc["iteration_count"] == maxit) or (iqmc["residual"] <= tol):
             simulation_end = True
@@ -363,7 +408,7 @@ def gmres(mcdc):
 
 
 # =============================================================================
-# Linear operators
+# GMRES Linear operator
 # =============================================================================
 
 
