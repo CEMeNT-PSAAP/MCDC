@@ -933,8 +933,7 @@ def make_type_technique(input_deck):
 
     if card["iQMC"]:
         if setting["mode_eigenvalue"]:
-            if card["iqmc"]["eigenmode_solver"] == "power_iteration":
-                card["iqmc"]["score_list"]["fission-source"] = True
+            card["iqmc"]["score_list"]["fission-source"] = True
 
     # Add score flags to structure
     score_list = []
@@ -967,7 +966,6 @@ def make_type_technique(input_deck):
         ("res", float64),
         ("res_outter", float64),
         ("fixed_source_solver", str_),
-        ("eigenmode_solver", str_),
         ("krylov_restart", int64),
         ("preconditioner_sweeps", int64),
         ("sweep_counter", int64),

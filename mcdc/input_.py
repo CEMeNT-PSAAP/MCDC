@@ -1535,7 +1535,6 @@ def iQMC(
     tol=1e-6,
     preconditioner_sweeps=5,
     fixed_source_solver="source_iteration",
-    eigenmode_solver="power_iteration",
     score=[],
 ):
     """
@@ -1578,7 +1577,6 @@ def iQMC(
         Number of preconditioner sweeps (default 5).
     fixed_source_solver : {'source_iteration', 'gmres'}
         Deterministic solver for fixed-source problem (default "source_iteration").
-    eigenmode_solver : {'power_iteration'}
         Solver for k-eigenvalue problem (default "power_iteration").
     score : list of str, optional
         List of tallies to score in addition to the mandatory flux and
@@ -1664,7 +1662,6 @@ def iQMC(
     card["iqmc"]["source"] = source0
     card["iqmc"]["fixed_source"] = fixed_source
     card["iqmc"]["fixed_source_solver"] = fixed_source_solver
-    card["iqmc"]["eigenmode_solver"] = eigenmode_solver
     card["iqmc"]["preconditioner_sweeps"] = preconditioner_sweeps
     card["iqmc"]["krylov_restart"] = krylov_restart
 

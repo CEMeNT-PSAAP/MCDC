@@ -50,7 +50,7 @@ def print_banner(mcdc):
         if mcdc["technique"]["iQMC"]:
             banner += "      Algorithm | iQMC\n"
             if mcdc["setting"]["mode_eigenvalue"]:
-                solver = mcdc["technique"]["iqmc"]["eigenmode_solver"]
+                solver = "power iteration"
             else:
                 solver = mcdc["technique"]["iqmc"]["fixed_source_solver"]
             banner += "         Solver | " + solver + "\n"
