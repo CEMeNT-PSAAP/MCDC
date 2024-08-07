@@ -34,18 +34,18 @@ from mcdc.kernel import (
 
 @toggle("iQMC")
 def lds_init(mcdc):
-    N, dim = mcdc["technique"]["iqmc"]["lds"].shape
+    N, dim = mcdc["technique"]["iqmc"]["samples"].shape
     N_start = mcdc["mpi_work_start"]
-    mcdc["technique"]["iqmc"]["lds"] = halton(N, dim, skip=N_start)
+    mcdc["technique"]["iqmc"]["samples"] = halton(N, dim, skip=N_start)
 
 
 @toggle("iQMC")
 def scramble_LDS(mcdc):
     # TODO: use MCDC seed system
     seed_batch = np.random.randint(1000, 1000000)
-    N, dim = mcdc["technique"]["iqmc"]["lds"].shape
+    N, dim = mcdc["technique"]["iqmc"]["samples"].shape
     N_start = mcdc["mpi_work_start"]
-    mcdc["technique"]["iqmc"]["lds"] = rhalton(N, dim, seed=seed_batch, skip=N_start)
+    mcdc["technique"]["iqmc"]["samples"] = rhalton(N, dim, seed=seed_batch, skip=N_start)
 
 
 @toggle("iQMC")
@@ -272,7 +272,7 @@ def iqmc_prepare_particles(mcdc):
     N_work = mcdc["mpi_work_size"]
 
     # low discrepency sequence
-    lds = iqmc["lds"]
+    samples = iqmc["samples"]
     # source
     Q = iqmc["source"]
     mesh = iqmc["mesh"]
@@ -297,12 +297,12 @@ def iqmc_prepare_particles(mcdc):
         P_new["t"] = 0
         P_new["rng_seed"] = 0
         # assign direction
-        P_new["x"] = iqmc_sample_position(xa, xb, lds[n, 0])
-        P_new["y"] = iqmc_sample_position(ya, yb, lds[n, 4])
-        P_new["z"] = iqmc_sample_position(za, zb, lds[n, 3])
+        P_new["x"] = iqmc_sample_position(xa, xb, samples[n, 0])
+        P_new["y"] = iqmc_sample_position(ya, yb, samples[n, 4])
+        P_new["z"] = iqmc_sample_position(za, zb, samples[n, 3])
         # Sample isotropic direction
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
-            lds[n, 1], lds[n, 5]
+            samples[n, 1], samples[n, 5]
         )
         t, x, y, z, outside = mesh_get_index(P_new, mesh)
         q = Q[:, t, x, y, z].copy()

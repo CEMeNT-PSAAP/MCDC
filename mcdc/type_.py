@@ -901,7 +901,7 @@ def make_type_technique(input_deck):
 
     #  make low-discprenecy sequence array
     work_size = get_work_size(N_particle)
-    iqmc_list += [("lds", float64, (work_size, N_dim))]
+    iqmc_list += [("samples", float64, (work_size, N_dim))]
     # make global arrays
     iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
     iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
