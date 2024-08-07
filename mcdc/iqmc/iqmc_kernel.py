@@ -142,20 +142,11 @@ def iqmc_move_to_event(P, mcdc):
     if d_boundary > distance * PREC:
         event = 0
 
-    d_time_boundary = INF
-    d_time_census = INF
-    d_collision = INF
     # Add each event if it is within PREC of the nearest event
-    if d_time_boundary <= distance * PREC:
-        event += EVENT_TIME_BOUNDARY
-    if d_time_census <= distance * PREC:
-        event += EVENT_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
     if d_domain <= distance * PREC:
         event += EVENT_DOMAIN
-    if d_collision == distance:
-        event = EVENT_COLLISION
 
     # Assign event
     P["event"] = event
