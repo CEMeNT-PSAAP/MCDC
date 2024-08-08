@@ -177,8 +177,8 @@ for i, name in enumerate(names):
         for score in [key for key in output["iqmc/tally/"].keys()]:
             result_name_out = f"iqmc/tally/{score}/mean"
             result_name_ans = f"iqmc/tally/{score}"
-            a = output[result_name_out][:]
-            b = answer[result_name_ans][:]
+            a = np.squeeze(output[result_name_out][:])
+            b = np.squeeze(answer[result_name_ans][:])
             if np.isnan(b).all():
                 continue
             # Passed?

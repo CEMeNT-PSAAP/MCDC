@@ -1100,7 +1100,7 @@ def generate_hdf5(mcdc):
                             data=np.squeeze(T["iqmc"]["score"][name]["sdev"]),
                         )
                 # iQMC source strength
-                f.create_dataset("iqmc/tally/source_constant/mean", data=T["iqmc"]["source"])
+                f.create_dataset("iqmc/tally/source_constant/mean", data=np.squeeze(T["iqmc"]["source"]))
                 # Iteration data
                 f.create_dataset(
                     "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]
