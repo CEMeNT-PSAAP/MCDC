@@ -732,6 +732,11 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     # Assign region
     card.region_ID = region.ID
 
+    # Set region Reverse Polish Notation and region description
+    if region.type != 'all':
+        card.set_region_RPN()
+        card.set_region()
+
     # Assign fill type and ID
     if fill.tag == "Material":
         card.fill_type = "material"
