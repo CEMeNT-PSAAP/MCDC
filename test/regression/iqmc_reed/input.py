@@ -42,7 +42,7 @@ Nx = 16
 maxit = 10
 tol = 1e-3
 x = np.linspace(-8, 8, num=Nx + 1)
-solver = "source iteration"
+solver = "gmres"
 
 fixed_source = np.zeros(Nx)
 fixed_source[int(0.375 * Nx) : int(0.625 * Nx)] = 50.0
