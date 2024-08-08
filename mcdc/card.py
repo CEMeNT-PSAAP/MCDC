@@ -23,7 +23,10 @@ class InputCard:
         for name in [
             a
             for a in dir(self)
-            if not a.startswith("__") and not callable(getattr(self, a)) and a != "tag" and not a.startswith("_")
+            if not a.startswith("__")
+            and not callable(getattr(self, a))
+            and a != "tag"
+            and not a.startswith("_")
         ]:
             text += "  %s : %s\n" % (name, str(getattr(self, name)))
         return text
@@ -125,18 +128,18 @@ class RegionCard(InputCard):
         return region
 
     def __str__(self):
-        if self.type == 'halfspace':
+        if self.type == "halfspace":
             if self.B > 0:
-                return "+s%i"%self.A
+                return "+s%i" % self.A
             else:
-                return "-s%i"%self.A
-        elif self.type == 'intersection':
-            return "r%i & r%i"%(self.A, self.B)
-        elif self.type == 'union':
-            return "r%i | r%i"%(self.A, self.B)
-        elif self.type == 'complement':
-            return "~r%i"%(self.A)
-        elif self.type == 'all':
+                return "-s%i" % self.A
+        elif self.type == "intersection":
+            return "r%i & r%i" % (self.A, self.B)
+        elif self.type == "union":
+            return "r%i | r%i" % (self.A, self.B)
+        elif self.type == "complement":
+            return "~r%i" % (self.A)
+        elif self.type == "all":
             return "all"
 
 
@@ -168,7 +171,6 @@ class SurfaceCard(InputCard):
         self.sensitivity_ID = 0
         self.dsm_Np = 1.0
 
-
     def _create_halfspace(self, positive):
         region = RegionCard("halfspace")
         region.A = self.ID
@@ -179,7 +181,11 @@ class SurfaceCard(InputCard):
 
         # Check if an identical halfspace region already existed
         for idx, existing_region in enumerate(global_.input_deck.regions):
-            if existing_region.type == 'halfspace' and region.A == existing_region.A and region.B == existing_region.B:
+            if (
+                existing_region.type == "halfspace"
+                and region.A == existing_region.A
+                and region.B == existing_region.B
+            ):
                 return global_.input_deck.regions[idx]
 
         # Set ID and push to deck
@@ -187,10 +193,8 @@ class SurfaceCard(InputCard):
         global_.input_deck.regions.append(region)
         return region
 
-
     def __pos__(self):
         return self._create_halfspace(True)
-
 
     def __neg__(self):
         return self._create_halfspace(False)
@@ -208,7 +212,7 @@ class CellCard(InputCard):
         self.fill_ID = None
         self.translation = np.array([0.0, 0.0, 0.0])
         self.surface_IDs = np.zeros(0, dtype=int)
-        self._region_RPN = [] # Reverse Polish Notation
+        self._region_RPN = []  # Reverse Polish Notation
 
     def set_region_RPN(self):
         # Make alias and reset
@@ -221,25 +225,25 @@ class CellCard(InputCard):
         while len(stack) > 0:
             token = stack.pop()
             if isinstance(token, RegionCard):
-                if token.type == 'halfspace':
+                if token.type == "halfspace":
                     rpn.append(token.ID)
-                elif token.type == 'intersection':
+                elif token.type == "intersection":
                     region_A = global_.input_deck.regions[token.A]
                     region_B = global_.input_deck.regions[token.B]
-                    stack += ['&', region_A, region_B]
-                elif token.type == 'union':
+                    stack += ["&", region_A, region_B]
+                elif token.type == "union":
                     region_A = global_.input_deck.regions[token.A]
                     region_B = global_.input_deck.regions[token.B]
-                    stack += ['|', region_A, region_B]
-                elif token.type == 'complement':
+                    stack += ["|", region_A, region_B]
+                elif token.type == "complement":
                     region = global_.input_deck.regions[token.A]
-                    stack += ['~', region]
+                    stack += ["~", region]
             else:
-                if token == '&':
+                if token == "&":
                     rpn.append(BOOL_AND)
-                elif token == '|':
+                elif token == "|":
                     rpn.append(BOOL_OR)
-                elif token == '~':
+                elif token == "~":
                     rpn.append(BOOL_NOT)
                 else:
                     print_error("Something is wrong with cell RPN creation.")
@@ -277,7 +281,7 @@ class CellCard(InputCard):
         surface_IDs = []
 
         for token in self._region_RPN:
-            if token >=0:
+            if token >= 0:
                 ID = global_.input_deck.regions[token].A
                 if not ID in surface_IDs:
                     surface_IDs.append(ID)

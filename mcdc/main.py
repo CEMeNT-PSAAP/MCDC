@@ -544,7 +544,7 @@ def prepare():
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
-        for name in ['ID', 'fill_ID', 'translation']:
+        for name in ["ID", "fill_ID", "translation"]:
             copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Fill type
@@ -556,17 +556,21 @@ def prepare():
             mcdc["cells"][i]["fill_type"] = FILL_LATTICE
 
         # Surface data
-        mcdc["cells"][i]['surface_data_idx'] = surface_data_idx
+        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
         N_surface = len(input_deck.cells[i].surface_IDs)
-        mcdc['cell_surface_data'][surface_data_idx] = N_surface
-        mcdc['cell_surface_data'][surface_data_idx + 1: surface_data_idx + N_surface + 1] = input_deck.cells[i].surface_IDs
+        mcdc["cell_surface_data"][surface_data_idx] = N_surface
+        mcdc["cell_surface_data"][
+            surface_data_idx + 1 : surface_data_idx + N_surface + 1
+        ] = input_deck.cells[i].surface_IDs
         surface_data_idx += N_surface + 1
 
         # Region data
-        mcdc["cells"][i]['region_data_idx'] = region_data_idx
+        mcdc["cells"][i]["region_data_idx"] = region_data_idx
         N_RPN = len(input_deck.cells[i]._region_RPN)
-        mcdc['cell_region_data'][region_data_idx] = N_RPN
-        mcdc['cell_region_data'][region_data_idx + 1: region_data_idx + N_RPN + 1] = input_deck.cells[i]._region_RPN
+        mcdc["cell_region_data"][region_data_idx] = N_RPN
+        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
+            input_deck.cells[i]._region_RPN
+        )
         region_data_idx += N_RPN + 1
 
     # =========================================================================
@@ -986,10 +990,10 @@ def card_to_h5group(card, group):
         elif value is None:
             next
         else:
-            if name not in ['region']:
+            if name not in ["region"]:
                 group[name] = value
 
-            elif name == 'region':
+            elif name == "region":
                 group[name] = str(value)
 
 
