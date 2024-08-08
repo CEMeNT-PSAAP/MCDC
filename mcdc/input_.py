@@ -732,6 +732,11 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     # Assign region
     card.region_ID = region.ID
 
+    # Set region Reverse Polish Notation and region description
+    if region.type != "all":
+        card.set_region_RPN()
+        card.set_region()
+
     # Assign fill type and ID
     if fill.tag == "Material":
         card.fill_type = "material"
@@ -745,37 +750,12 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     card.translation[:] = translation
 
     # Get all surface IDs
-    surface_IDs = []
-
-    region = global_.input_deck.regions[card.region_ID]
-    get_all_surface_IDs(region, surface_IDs)
-    surface_IDs = list(set(surface_IDs))
-
-    card.N_surface = len(surface_IDs)
-    card.surface_IDs = np.array(surface_IDs)
+    card.set_surface_IDs()
 
     # Add to deck
     global_.input_deck.cells.append(card)
 
     return card
-
-
-def get_all_surface_IDs(region, surface_IDs):
-    if region.type == "halfspace":
-        surface = global_.input_deck.surfaces[region.A]
-        surface_IDs.append(surface.ID)
-
-    elif region.type in ["intersection", "union"]:
-        region1 = global_.input_deck.regions[region.A]
-        region2 = global_.input_deck.regions[region.B]
-
-        get_all_surface_IDs(region1, surface_IDs)
-        get_all_surface_IDs(region2, surface_IDs)
-
-    elif region.type in ["complement"]:
-        region1 = global_.input_deck.regions[region.A]
-
-        get_all_surface_IDs(region1, surface_IDs)
 
 
 def universe(cells, root=False):

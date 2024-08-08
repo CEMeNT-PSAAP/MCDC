@@ -417,6 +417,16 @@ def local_j_array():
 
 
 @for_cpu()
+def local_RPN_array():
+    return np.zeros(1, dtype=type_.RPN_array)[0]
+
+
+@for_gpu()
+def local_RPN_array():
+    return cuda.local.array(1, type_.RPN_array)[0]
+
+
+@for_cpu()
 def local_particle():
     return np.zeros(1, dtype=type_.particle)[0]
 
