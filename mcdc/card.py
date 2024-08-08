@@ -179,7 +179,7 @@ class SurfaceCard(InputCard):
 
         # Check if an identical halfspace region already existed
         for idx, existing_region in enumerate(global_.input_deck.regions):
-            if region.A == existing_region.A and region.B == existing_region.B:
+            if existing_region.type == 'halfspace' and region.A == existing_region.A and region.B == existing_region.B:
                 return global_.input_deck.regions[idx]
 
         # Set ID and push to deck
