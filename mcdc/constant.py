@@ -20,7 +20,12 @@ REGION_UNION = 2
 REGION_COMPLEMENT = 3
 REGION_ALL = 4
 
-# UNIVERSE
+# Boolean operator
+BOOL_AND = -1
+BOOL_OR = -2
+BOOL_NOT = -3
+
+# Universe
 UNIVERSE_ROOT = 0
 
 # Events
