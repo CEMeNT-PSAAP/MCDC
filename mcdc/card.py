@@ -274,6 +274,17 @@ class CellCard(InputCard):
 
         self.region = sympy.logic.boolalg.simplify_logic(stack[0])
 
+    def set_surface_IDs(self):
+        surface_IDs = []
+
+        for token in self._region_RPN:
+            if token >=0:
+                ID = global_.input_deck.regions[token].A
+                if not ID in surface_IDs:
+                    surface_IDs.append(ID)
+
+        self.surface_IDs = np.sort(np.array(surface_IDs))
+        self.N_surface = len(surface_IDs)
 
 
 class UniverseCard(InputCard):
