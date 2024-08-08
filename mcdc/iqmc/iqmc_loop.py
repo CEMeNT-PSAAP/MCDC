@@ -13,21 +13,21 @@ from mcdc.print_ import (
     print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
-    print_msg,
 )
 
 
 # =============================================================================
-# Preprocess
+# iQMC Simulation
 # =============================================================================
 
 @njit(cache=caching)
 def iqmc_simulation(mcdc):
-    # function calls from specified solvers
+    # Preprocessing
     iqmc = mcdc["technique"]["iqmc"]
     iqmc_kernel.iqmc_preprocess(mcdc)
     iqmc_kernel.samples_init(mcdc)
 
+    # Iterative Solve
     if mcdc["setting"]["mode_eigenvalue"]:
         power_iteration(mcdc)
     else:
@@ -36,141 +36,14 @@ def iqmc_simulation(mcdc):
         if iqmc["fixed_source_solver"] == "gmres":
             gmres(mcdc)
 
-
-# =============================================================================
-# Lower Level loops
-# =============================================================================
-
-@njit(cache=caching)
-def iqmc_simulation(mcdc):
-    # function calls from specified solvers
-    iqmc = mcdc["technique"]["iqmc"]
-    iqmc_kernel.iqmc_preprocess(mcdc)
-    iqmc_kernel.samples_init(mcdc)
-
-    if mcdc["setting"]["mode_eigenvalue"]:
-        power_iteration(mcdc)
-    else:
-        if iqmc["fixed_source_solver"] == "source iteration":
-            source_iteration(mcdc)
-        if iqmc["fixed_source_solver"] == "gmres":
-            gmres(mcdc)
-
-
-@njit(cache=caching)
-def iqmc_loop_particle(P, prog):
-    mcdc = adapt.device(prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
-    while P["alive"]:
-        iqmc_step_particle(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
-
-@njit(cache=caching)
-def iqmc_step_particle(P, prog):
-    mcdc = adapt.device(prog)
-
-    # Find cell from root universe if unknown
-    if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
-
-    # Determine and move to event
-    iqmc_kernel.iqmc_move_to_event(P, mcdc)
-    event = P["event"]
-
-    # The & operator here is a bitwise and.
-    # It is used to determine if an event type is part of the particle event.
-
-    # Surface crossing
-    if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN:
-            if not (
-                mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
-                or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
-            ):
-                kernel.domain_crossing(P, mcdc)
-
-    # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
-        if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["t"] += SHIFT
-        P["cell_ID"] = -1
-
-    # Apply weight roulette
-    if P["alive"] and mcdc["technique"]["weight_roulette"]:
-        # check if weight has fallen below threshold
-        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
-            kernel.weight_roulette(P, mcdc)
-
-
-@njit(cache=caching)
-def iqmc_loop_source(mcdc):
-    work_size = mcdc["bank_source"]["size"][0]
-    N_prog = 0
-    # loop over particles
-    for idx_work in range(work_size):
-        P = mcdc["bank_source"]["particles"][idx_work]
-        mcdc["bank_source"]["size"] -= 1
-        kernel.add_particle(P, mcdc["bank_active"])
-
-        # Loop until active bank is exhausted
-        while mcdc["bank_active"]["size"] > 0:
-            P = adapt.local_particle()
-            # Get particle from active bank
-            kernel.get_particle(P, mcdc["bank_active"], mcdc)
-            # Particle loop
-            iqmc_loop_particle(P, mcdc)
-
-        # Progress printout
-        percent = (idx_work + 1.0) / work_size
-        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-            N_prog += 1
-            with objmode():
-                print_progress(percent, mcdc)
-
-
-@njit(cache=caching)
-def iqmc_sweep(mcdc):
-    iqmc = mcdc["technique"]["iqmc"]
-    # tally sweep count
-    iqmc["sweep_count"] += 1
-    # reset particle bank size
-    kernel.set_bank_size(mcdc["bank_source"], 0)
-    # initialize particles with LDS
-    iqmc_kernel.iqmc_prepare_particles(mcdc)
-    # reset tallies for next loop
-    iqmc_kernel.iqmc_reset_tallies(iqmc)
-    # sweep particles
-    iqmc_loop_source(mcdc)
-    # sum resultant flux on all processors
-    iqmc_kernel.iqmc_distribute_tallies(iqmc)
-    # update source = scattering + fission/keff + fixed
-    iqmc_kernel.iqmc_update_source(mcdc)
-    # combine source tallies into one vector
-    iqmc_kernel.iqmc_consolidate_sources(mcdc)
-    
-    if iqmc["mode"] == "batch":
-        iqmc_kernel.iqmc_tally_batch_history(mcdc)
-        iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(fission_source_old, mcdc)
+    # Post processing
+    iqmc_kernel.iqmc_tally_closeout_history(mcdc)
+    # if mcdc["setting"]["mode_eigenvalue"]:
+        # iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(mcdc)
 
 
 # =============================================================================
-# Primary Iteration Loops
+# Iterative Solvers
 # =============================================================================
 
 
@@ -204,41 +77,37 @@ def source_iteration(mcdc):
 def power_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
-    # iteration tolerance
     tol = iqmc["tol"]
-    # maximum number of iterations
     maxit = iqmc["iterations_max"]
     score_bin = iqmc["score"]
     k_old = mcdc["k_eff"]
-    fission_source_old = score_bin["fission-source"].copy()
+    fission_source_old = score_bin["fission-source"]["bin"].copy()
 
     while not simulation_end:
         # Scramble samples if in batched mode
         if iqmc["mode"] == "batched":
             iqmc_kernel.scramble_samples(mcdc)
-            
         # Run sweep
         iqmc_sweep(mcdc)
         # Reset counter for inner iteration
         iqmc["iteration_count"] += 1
         # Update k_eff
-        mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
+        mcdc["k_eff"] *= score_bin["fission-source"]["bin"][0] / fission_source_old[0]
         # Calculate diff in keff
         iqmc["residual"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
         # Store outter iteration values
-        score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
-        fission_source_old = score_bin["fission-source"].copy()
-        
-        # kernel.iqmc_tally_batch_history(mcdc)
-        # kernel.iqmc_eigenvalue_tally_closeout_history(fission_source_old, mcdc)
-        
-        # Entering active cycle?
-        if iqmc["mode"] == "batched":
-            mcdc["idx_cycle"] += 1
-            if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
-                mcdc["cycle_active"] = True
-                
+        score_bin["effective-fission-outter"] = score_bin["effective-fission"]["bin"].copy()
+        fission_source_old = score_bin["fission-source"]["bin"].copy()
+
+        # Batch mode 
+        # if iqmc["mode"] == "batched":
+        #     mcdc["idx_cycle"] += 1
+        #     kernel.iqmc_eigenvalue_tally_closeout_history(fission_source_old, mcdc)
+        #     # Entering active cycle ?
+        #     if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
+        #         mcdc["cycle_active"] = True
+    
         # Print progress
         with objmode():
             print_iqmc_eigenvalue_progress(mcdc)
@@ -405,6 +274,119 @@ def gmres(mcdc):
             break
         if iqmc["iteration_count"] >= max_iter:
             return
+
+
+# =============================================================================
+# Lower Level loops
+# =============================================================================
+
+
+@njit(cache=caching)
+def iqmc_loop_particle(P, prog):
+    mcdc = adapt.device(prog)
+
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
+
+    while P["alive"]:
+        iqmc_step_particle(P, prog)
+
+    # Particle tracker
+    if mcdc["setting"]["track_particle"]:
+        kernel.track_particle(P, mcdc)
+
+
+@njit(cache=caching)
+def iqmc_step_particle(P, prog):
+    mcdc = adapt.device(prog)
+
+    # Find cell from root universe if unknown
+    if P["cell_ID"] == -1:
+        trans_struct = adapt.local_translate()
+        trans = trans_struct["values"]
+        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+
+    # Determine and move to event
+    iqmc_kernel.iqmc_move_to_event(P, mcdc)
+    event = P["event"]
+
+    # The & operator here is a bitwise and.
+    # It is used to determine if an event type is part of the particle event.
+
+    # Surface crossing
+    if event & EVENT_SURFACE:
+        kernel.surface_crossing(P, prog)
+        if event & EVENT_DOMAIN:
+            if not (
+                mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
+                or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
+            ):
+                kernel.domain_crossing(P, mcdc)
+
+    # Lattice or mesh crossing (skipped if surface crossing)
+    elif event & EVENT_LATTICE or event & EVENT_MESH:
+        kernel.shift_particle(P, SHIFT)
+        if event & EVENT_DOMAIN:
+            kernel.domain_crossing(P, mcdc)
+
+    # Moving surface transition
+    if event & EVENT_SURFACE_MOVE:
+        P["t"] += SHIFT
+        P["cell_ID"] = -1
+
+    # Apply weight roulette
+    if P["alive"] and mcdc["technique"]["weight_roulette"]:
+        # check if weight has fallen below threshold
+        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
+            kernel.weight_roulette(P, mcdc)
+
+
+@njit(cache=caching)
+def iqmc_loop_source(mcdc):
+    work_size = mcdc["bank_source"]["size"][0]
+    N_prog = 0
+    # loop over particles
+    for idx_work in range(work_size):
+        P = mcdc["bank_source"]["particles"][idx_work]
+        mcdc["bank_source"]["size"] -= 1
+        kernel.add_particle(P, mcdc["bank_active"])
+
+        # Loop until active bank is exhausted
+        while mcdc["bank_active"]["size"] > 0:
+            P = adapt.local_particle()
+            # Get particle from active bank
+            kernel.get_particle(P, mcdc["bank_active"], mcdc)
+            # Particle loop
+            iqmc_loop_particle(P, mcdc)
+
+        # Progress printout
+        percent = (idx_work + 1.0) / work_size
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
+
+
+@njit(cache=caching)
+def iqmc_sweep(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    # tally sweep count
+    iqmc["sweep_count"] += 1
+    # reset particle bank size
+    kernel.set_bank_size(mcdc["bank_source"], 0)
+    # initialize particles with LDS
+    iqmc_kernel.iqmc_prepare_particles(mcdc)
+    # reset tallies for next loop
+    iqmc_kernel.iqmc_reset_tallies(iqmc)
+    # sweep particles
+    iqmc_loop_source(mcdc)
+    # sum resultant flux on all processors
+    iqmc_kernel.iqmc_distribute_tallies(iqmc)
+    # update source = scattering + fission/keff + fixed
+    iqmc_kernel.iqmc_update_source(mcdc)
+    # combine source tallies into one vector
+    iqmc_kernel.iqmc_consolidate_sources(mcdc)
 
 
 # =============================================================================

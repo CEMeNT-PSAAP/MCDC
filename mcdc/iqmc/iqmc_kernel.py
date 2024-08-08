@@ -7,7 +7,7 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode, literal_unroll
 from mcdc.loop import caching
 from mcdc.type_ import iqmc_score_list
-from mcdc.kernel import distance_to_boundary, distance_to_mesh
+from mcdc.kernel import distance_to_boundary, distance_to_mesh, allreduce_array
 
 # from mcdc.iqmc.iqmc_loop import iqmc_loop_source
 from mcdc.adapt import toggle, for_cpu, for_gpu
@@ -37,7 +37,7 @@ def samples_init(mcdc):
 
 
 @toggle("iQMC")
-def sramble_samples(mcdc):
+def scramble_samples(mcdc):
     # TODO: use MCDC seed system
     seed_batch = np.random.randint(1000, 1000000)
     iqmc = mcdc["technique"]["iqmc"]
@@ -123,7 +123,7 @@ def iqmc_preprocess(mcdc):
         iqmc_prepare_source(mcdc)
         iqmc_update_source(mcdc)
     if eigenmode:
-        iqmc_prepare_nuSigmaF(mcdc)
+        iqmc_prepare_nusigmaf(mcdc)
 
     iqmc_consolidate_sources(mcdc)
     
@@ -187,10 +187,11 @@ def iqmc_generate_material_idx(mcdc):
 
 
 @toggle("iQMC")
-def iqmc_prepare_nuSigmaF(mcdc):
+def iqmc_prepare_nusigmaf(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     mesh = iqmc["mesh"]
-    flux = iqmc["score"]["flux"]
+    flux = iqmc["score"]["flux"]["bin"]
+    fission_source = iqmc["score"]["fission-source"]["bin"]
     Nt = len(mesh["t"]) - 1
     Nx = len(mesh["x"]) - 1
     Ny = len(mesh["y"]) - 1
@@ -203,9 +204,7 @@ def iqmc_prepare_nuSigmaF(mcdc):
                     t = 0
                     mat_idx = iqmc["material_idx"][t, i, j, k]
                     material = mcdc["materials"][mat_idx]
-                    iqmc["score"]["fission-source"] += iqmc_fission_source(
-                        flux[:, t, i, j, k], material
-                    )
+                    fission_source += iqmc_fission_source(flux[:,t,i,j,k], material)
 
 
 @toggle("iQMC")
@@ -218,8 +217,6 @@ def iqmc_prepare_source(mcdc):
 
     """
     iqmc = mcdc["technique"]["iqmc"]
-    flux_scatter = iqmc["score"]["flux"]
-    flux_fission = iqmc["score"]["flux"]
     mesh = iqmc["mesh"]
     Nt = len(mesh["t"]) - 1
     Nx = len(mesh["x"]) - 1
@@ -236,14 +233,15 @@ def iqmc_prepare_source(mcdc):
                 for k in range(Nz):
                     mat_idx = iqmc["material_idx"][t, i, j, k]
                     # we can vectorize the multigroup calculation here
+                    flux = iqmc["score"]["flux"]["bin"][:, t, i, j, k]
                     fission[:, t, i, j, k] = iqmc_effective_fission(
-                        flux_fission[:, t, i, j, k], mat_idx, mcdc
+                        flux, mat_idx, mcdc
                     )
                     scatter[:, t, i, j, k] = iqmc_effective_scattering(
-                        flux_scatter[:, t, i, j, k], mat_idx, mcdc
+                        flux, mat_idx, mcdc
                     )
-    iqmc["score"]["effective-scattering"] = scatter
-    iqmc["score"]["effective-fission"] = fission
+    iqmc["score"]["effective-scattering"]["bin"] = scatter
+    iqmc["score"]["effective-fission"]["bin"] = fission
     iqmc["score"]["effective-fission-outter"] = fission
 
 
@@ -257,6 +255,10 @@ def iqmc_prepare_particles(mcdc):
     """
     Create N_particles assigning the position, direction, and group from the
     QMC Low-Discrepency Sequence. Particles are added to the bank_source.
+
+    Particles are prepared as a batch in iQMC so that we only have to call the 
+    low-discprenecy sequence function once for fixed-seed mode or once per sweep
+    for batched mode.
 
     """
     iqmc = mcdc["technique"]["iqmc"]
@@ -313,7 +315,7 @@ def iqmc_prepare_particles(mcdc):
 @toggle("iQMC")
 def iqmc_cell_volume(x, y, z, mesh):
     """
-    Calculate the volume of the current spatial cell.
+    Calculate the volume of the cartesian spatial cell.
 
     """
     dx = dy = dz = 1
@@ -440,12 +442,12 @@ def iqmc_continuous_weight_reduction(P, distance, mcdc):
 def iqmc_update_source(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     keff = mcdc["k_eff"]
-    scatter = iqmc["score"]["effective-scattering"]
+    scatter = iqmc["score"]["effective-scattering"]["bin"]
     fixed = iqmc["fixed_source"]
     if mcdc["setting"]["mode_eigenvalue"]:
         fission = iqmc["score"]["effective-fission-outter"]
     else:
-        fission = iqmc["score"]["effective-fission"]
+        fission = iqmc["score"]["effective-fission"]["bin"]
     iqmc["source"] = scatter + (fission / keff) + fixed
 
 
@@ -462,14 +464,14 @@ def iqmc_tilt_source(t, x, y, z, P, Q, mcdc):
     y_mid = mesh["y"][y] + (0.5 * dy)
     z_mid = mesh["z"][z] + (0.5 * dz)
     # linear x-component
-    if score_list["tilt-x"]:
-        Q += score_bin["tilt-x"][:, t, x, y, z] * (P["x"] - x_mid)
+    if score_list["source-x"]:
+        Q += score_bin["source-x"]["bin"][:, t, x, y, z] * (P["x"] - x_mid)
     # linear y-component
-    if score_list["tilt-y"]:
-        Q += score_bin["tilt-y"][:, t, x, y, z] * (P["y"] - y_mid)
+    if score_list["source-y"]:
+        Q += score_bin["source-y"]["bin"][:, t, x, y, z] * (P["y"] - y_mid)
     # linear z-component
-    if score_list["tilt-z"]:
-        Q += score_bin["tilt-z"][:, t, x, y, z] * (P["z"] - z_mid)
+    if score_list["source-z"]:
+        Q += score_bin["source-z"]["bin"][:, t, x, y, z] * (P["z"] - z_mid)
 
 
 @toggle("iQMC")
@@ -494,13 +496,13 @@ def iqmc_distribute_sources(mcdc):
 
     # source tilting arrays
     tilt_list = [
-        "tilt-x",
-        "tilt-y",
-        "tilt-z",
+        "source-x",
+        "source-y",
+        "source-z",
     ]
     for name in literal_unroll(tilt_list):
         if score_list[name]:
-            score_bin[name] = np.reshape(total_source[Vsize : (Vsize + size)], shape)
+            score_bin[name]["bin"] = np.reshape(total_source[Vsize : (Vsize + size)], shape)
             Vsize += size
 
 
@@ -525,13 +527,13 @@ def iqmc_consolidate_sources(mcdc):
 
     # source tilting arrays
     tilt_list = [
-        "tilt-x",
-        "tilt-y",
-        "tilt-z",
+        "source-x",
+        "source-y",
+        "source-z",
     ]
     for name in literal_unroll(tilt_list):
         if score_list[name]:
-            total_source[Vsize : (Vsize + size)] = np.reshape(score_bin[name], size)
+            total_source[Vsize : (Vsize + size)] = np.reshape(score_bin[name]["bin"], size)
             Vsize += size
 
 
@@ -574,36 +576,36 @@ def iqmc_score_tallies(P, distance, mcdc):
     dV = dx * dy * dz * dt
 
     flux = iqmc_flux(SigmaT, w, distance, dV)
-    score_bin["flux"][:, t, x, y, z] += flux
+    score_bin["flux"]["bin"][:, t, x, y, z] += flux
 
     # Score effective source tallies
-    score_bin["effective-scattering"][:, t, x, y, z] += iqmc_effective_scattering(
+    score_bin["effective-scattering"]["bin"][:, t, x, y, z] += iqmc_effective_scattering(
         flux, mat_id, mcdc
     )
-    score_bin["effective-fission"][:, t, x, y, z] += iqmc_effective_fission(
+    score_bin["effective-fission"]["bin"][:, t, x, y, z] += iqmc_effective_fission(
         flux, mat_id, mcdc
     )
 
     if score_list["fission-source"]:
-        score_bin["fission-source"] += iqmc_fission_source(flux, material)
+        score_bin["fission-source"]["bin"] += iqmc_fission_source(flux, material)
 
     if score_list["fission-power"]:
-        score_bin["fission-power"][:, t, x, y, z] += iqmc_fission_power(flux, material)
+        score_bin["fission-power"]["bin"][:, t, x, y, z] += iqmc_fission_power(flux, material)
 
-    if score_list["tilt-x"]:
+    if score_list["source-x"]:
         x_mid = mesh["x"][x] + (dx * 0.5)
         tilt = iqmc_linear_tilt(P["ux"], P["x"], dx, x_mid, dy, dz, w, distance, SigmaT)
-        score_bin["tilt-x"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
+        score_bin["source-x"]["bin"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
 
-    if score_list["tilt-y"]:
+    if score_list["source-y"]:
         y_mid = mesh["y"][y] + (dy * 0.5)
         tilt = iqmc_linear_tilt(P["uy"], P["y"], dy, y_mid, dx, dz, w, distance, SigmaT)
-        score_bin["tilt-y"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
+        score_bin["source-y"]["bin"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
 
-    if score_list["tilt-z"]:
+    if score_list["source-z"]:
         z_mid = mesh["z"][z] + (dz * 0.5)
         tilt = iqmc_linear_tilt(P["uz"], P["z"], dz, z_mid, dx, dy, w, distance, SigmaT)
-        score_bin["tilt-z"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
+        score_bin["source-z"]["bin"][:, t, x, y, z] += iqmc_effective_source(tilt, mat_id, mcdc)
         
 
 @toggle("iQMC")
@@ -689,7 +691,7 @@ def iqmc_reset_tallies(iqmc):
     iqmc["source"].fill(0.0)
     for name in literal_unroll(iqmc_score_list):
         if score_list[name]:
-            score_bin[name].fill(0.0)
+            score_bin[name]["bin"].fill(0.0)
 
 
 @toggle("iQMC")
@@ -699,7 +701,7 @@ def iqmc_distribute_tallies(iqmc):
 
     for name in literal_unroll(iqmc_score_list):
         if score_list[name]:
-            iqmc_score_reduce_bin(score_bin[name])
+            iqmc_score_reduce_bin(score_bin[name]["bin"])
 
 
 @toggle("iQMC")
@@ -712,115 +714,67 @@ def iqmc_score_reduce_bin(score):
 
 
 # =============================================================================
-# Batch Tally Operations
+# Tally History Operations
 # =============================================================================
 
 
+# @toggle("iQMC")
+# def iqmc_tally_batch_history(mcdc):
+#     iqmc = mcdc["technique"]["iqmc"]
+#     score_bin = iqmc["score"]
+#     score_list = iqmc["score_list"]
+
+#     if mcdc["cycle_active"]:
+#         score_bin["flux-avg"] += score_bin["flux"]
+#         score_bin["flux-sdev"] += np.square(score_bin["flux"])
+
+
 @toggle("iQMC")
-def iqmc_tally_batch_history():
+def iqmc_tally_closeout_history(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     score_bin = iqmc["score"]
     score_list = iqmc["score_list"]
+
+    if iqmc["mode"] == "fixed":
+        for name in literal_unroll(iqmc_score_list):
+            if score_list[name]:
+                score_bin[name]["mean"] = score_bin[name]["bin"]
     
-    # avg = "-avg"
-    if mcdc["cycle_active"]:
-        N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
-    
-        # average tallies
-        # iqmc["source-avg"] += iqmc["source"]
-    
-        score_bin["flux-avg"] += score_bin["flux"]
-        score_bin["flux-sdev"] += np.square(score_bin["flux"])
-    
-        # score_bin["fission-source-avg"] += score_bin["fission-source"]
-    
-        # if score_list["tilt-x"]:
-        #     score_bin["tilt-x-avg"] += score_bin["tilt-x"]
-    
-        # if score_list["tilt-y"]:
-        #     score_bin["tilt-y-avg"] += score_bin["tilt-y"]
-    
-        # if score_list["tilt-z"]:
-        #     score_bin["tilt-z-avg"] += score_bin["tilt-z"]
-    
-        # if score_list["tilt-xy"]:
-        #     score_bin["tilt-xy-avg"] += score_bin["tilt-xy"]
+    # if iqmc["mode"] == "batched":
+    #     # Number of active batches
+    #     N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
+    #     score_bin["flux"]["mean"] = score_bin["flux"]["mean"] / N
+    #     allreduce_array(score_bin["flux-sdev"])
+    #     score_bin["flux"]["sdev"] = np.sqrt(
+    #         (score_bin["flux"]["sdev"] / N - np.square(score_bin["flux"]["mean"])) / (N - 1)
+    #     )
 
 
-@toggle("iQMC")
-def iqmc_eigenvalue_tally_closeout_history(mcdc):
-    iqmc = mcdc["technique"]["iqmc"]
-    score_bin = iqmc["score"]
-    score_list = iqmc["score_list"]
-      
-    # avg = "-avg"
-    N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
-      
-    # average tallies
-    # iqmc["source"] = iqmc["source-avg"] / N
-      
-    score_bin["flux"] = score_bin["flux-avg"] / N
-    
-    allreduce_array(score_bin["flux-sdev"])
-    score_bin["flux-sdev"] = np.sqrt(
-        (score_bin["flux-sdev"] / N - np.square(score_bin["flux"])) / (N - 1)
-    )
-    
-    
-    # score_bin["fission-source"] = score_bin["fission-source-avg"] / N
-      
-    # if score_list["tilt-x"]:
-    #     score_bin["tilt-x"] = score_bin["tilt-x-avg"] / N
-      
-    # if score_list["tilt-y"]:
-    #     score_bin["tilt-y"] = score_bin["tilt-y-avg"] / N
-      
-    # if score_list["tilt-z"]:
-    #     score_bin["tilt-z"] = score_bin["tilt-z-avg"] / N
-      
-    # if score_list["tilt-xy"]:
-    #     score_bin["tilt-xy"] = score_bin["tilt-xy-avg"] / N
-      
-        # TODO: get loop working with numba
-        # for name in literal_unroll(iqmc_score_list):
-        #     if score_list[name]:
-        #         name_avg = name+avg
-        #         score_bin[name_avg] = (
-        #             score_bin[name_avg] + score_bin[name]
-        #         ) / 2
-        #         score_bin[name] = score_bin[name_avg]
+# @toggle("iQMC")
+# def iqmc_eigenvalue_tally_closeout_history(mcdc):
+#     iqmc = mcdc["technique"]["iqmc"]
+#     score_bin = iqmc["score"]
+#     idx_cycle = mcdc["idx_cycle"]
 
+#     # update k_eff
+#     mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
 
-@toggle("iQMC")
-def iqmc_eigenvalue_tally_closeout_history(mcdc):
-    iqmc = mcdc["technique"]["iqmc"]
-    score_bin = iqmc["score"]
-    idx_cycle = mcdc["idx_cycle"]
+#     # store outter iteration values
+#     # score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
+#     mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
 
-    # Update and store k_eff
-    if mcdc["technique"]["domain_decomp"]:
-        score_bin["fission-source"][0] = allreduce(score_bin["fission-source"][0])
-
-    # update k_eff
-    mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
-
-    # store outter iteration values
-    # score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
-    mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
-
-    # Accumulate running average
-    if mcdc["cycle_active"]:
-        mcdc["k_avg"] += mcdc["k_eff"]
-        mcdc["k_sdv"] += mcdc["k_eff"] * mcdc["k_eff"]
-
-        N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
-        mcdc["k_avg_running"] = mcdc["k_avg"] / N
-        if N == 1:
-            mcdc["k_sdv_running"] = 1.0
-        else:
-            mcdc["k_sdv_running"] = math.sqrt(
-                (mcdc["k_sdv"] / N - mcdc["k_avg_running"] ** 2) / (N - 1)
-            )
+#     # Accumulate running average
+#     if mcdc["cycle_active"]:
+#         mcdc["k_avg"] += mcdc["k_eff"]
+#         mcdc["k_sdv"] += mcdc["k_eff"] * mcdc["k_eff"]
+#         N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
+#         mcdc["k_avg_running"] = mcdc["k_avg"] / N
+#         if N == 1:
+#             mcdc["k_sdv_running"] = 1.0
+#         else:
+#             mcdc["k_sdv_running"] = math.sqrt(
+#                 (mcdc["k_sdv"] / N - mcdc["k_avg_running"] ** 2) / (N - 1)
+#             )
 
 # =============================================================================
 # Misc
@@ -828,12 +782,12 @@ def iqmc_eigenvalue_tally_closeout_history(mcdc):
 
 
 @toggle("iQMC")
-def iqmc_res(flux_new, flux_old):
+def iqmc_res(source_new, source_old):
     """
-    Calculate residual between scalar flux iterations.
+    Calculate residual between iterations.
 
     """
-    size = flux_old.size
-    flux_new = np.linalg.norm(flux_new.reshape((size,)), ord=2)
-    flux_old = np.linalg.norm(flux_old.reshape((size,)), ord=2)
-    return (flux_new - flux_old) / flux_old
+    size = source_new.size
+    source_new = np.linalg.norm(source_new.reshape((size,)), ord=2)
+    source_old = np.linalg.norm(source_old.reshape((size,)), ord=2)
+    return (source_new - source_old) / source_old

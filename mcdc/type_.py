@@ -698,15 +698,6 @@ def make_type_tally(input_deck):
     # Tally estimator flags
     struct = [("tracklength", bool_)]
 
-    def make_type_score(shape):
-        return into_dtype(
-            [
-                ("bin", float64, shape),
-                ("mean", float64, shape),
-                ("sdev", float64, shape),
-            ]
-        )
-
     # Mesh
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
     struct += [("mesh", mesh)]
@@ -801,9 +792,9 @@ iqmc_score_list = (
     "flux",
     "effective-scattering",
     "effective-fission",
-    "tilt-x",
-    "tilt-y",
-    "tilt-z",
+    "source-x",
+    "source-y",
+    "source-z",
     "fission-power",
     "fission-source",
 )
@@ -914,9 +905,9 @@ def make_type_technique(input_deck):
         ["flux", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-fission", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-x", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-y", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-z", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-x", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-y", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-z", (Ng, Nt, Nx, Ny, Nz)],
         ["fission-power", (Ng, Nt, Nx, Ny, Nz)],  # SigmaF*phi
         ["fission-source", (1,)],  # nu*SigmaF*phi
     ]
@@ -940,7 +931,7 @@ def make_type_technique(input_deck):
         shape = scores_shapes[i][1]
         if not card["iqmc"]["score_list"][name]:
             shape = (0,) * len(shape)
-        scores_struct += [(name, float64, shape)]
+        scores_struct += [(name, make_type_score(shape))]
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
@@ -1353,6 +1344,16 @@ def make_type_global(input_deck):
 # ==============================================================================
 # Util
 # ==============================================================================
+
+
+def make_type_score(shape):
+    return into_dtype(
+        [
+            ("bin", float64, shape),
+            ("mean", float64, shape),
+            ("sdev", float64, shape),
+        ]
+    )
 
 
 def get_work_size(N_particle):
