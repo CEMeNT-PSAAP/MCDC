@@ -126,7 +126,7 @@ class RegionCard(InputCard):
 
     def __str__(self):
         if self.type == 'halfspace':
-            if self.B > 0.0:
+            if self.B > 0:
                 return "+s%i"%self.A
             else:
                 return "-s%i"%self.A
@@ -207,7 +207,6 @@ class CellCard(InputCard):
         self.fill_type = "material"
         self.fill_ID = None
         self.translation = np.array([0.0, 0.0, 0.0])
-        self.N_surface = 0
         self.surface_IDs = np.zeros(0, dtype=int)
         self._region_RPN = [] # Reverse Polish Notation
 
@@ -284,7 +283,6 @@ class CellCard(InputCard):
                     surface_IDs.append(ID)
 
         self.surface_IDs = np.sort(np.array(surface_IDs))
-        self.N_surface = len(surface_IDs)
 
 
 class UniverseCard(InputCard):
