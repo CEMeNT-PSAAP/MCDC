@@ -750,10 +750,10 @@ def prepare():
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
-            iqmc["score_list"][name] = value
+            copy_field(iqmc["score_list"], input_deck.technique["iqmc"]["score_list"], name)
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
-            mcdc["technique"]["iqmc"]["score"][name] = value
+            mcdc["technique"]["iqmc"]["score"][name]["bin"] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
 
@@ -1081,34 +1081,27 @@ def generate_hdf5(mcdc):
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
-                # dump iQMC mesh
+                # iQMC mesh
                 T = mcdc["technique"]
                 f.create_dataset("iqmc/grid/t", data=T["iqmc"]["mesh"]["t"])
                 f.create_dataset("iqmc/grid/x", data=T["iqmc"]["mesh"]["x"])
                 f.create_dataset("iqmc/grid/y", data=T["iqmc"]["mesh"]["y"])
                 f.create_dataset("iqmc/grid/z", data=T["iqmc"]["mesh"]["z"])
-                # dump x,y,z scalar flux across all groups
-                f.create_dataset(
-                    "iqmc/tally/flux", data=np.squeeze(T["iqmc"]["score"]["flux"])
-                )
-                f.create_dataset(
-                    "iqmc/tally/fission_source",
-                    data=T["iqmc"]["score"]["fission-source"],
-                )
-                f.create_dataset(
-                    "iqmc/tally/fission_power", data=T["iqmc"]["score"]["fission-power"]
-                )
-                f.create_dataset("iqmc/tally/source_constant", data=T["iqmc"]["source"])
-                f.create_dataset(
-                    "iqmc/tally/source_x", data=T["iqmc"]["score"]["tilt-x"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_y", data=T["iqmc"]["score"]["tilt-y"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_z", data=T["iqmc"]["score"]["tilt-z"]
-                )
-                # iteration data
+                # Scores
+                for name in ['flux', 'source-x', 'source-y', 'source-z', 'fission-power']:
+                    if T["iqmc"]["score_list"][name]:
+                        name_h5 = name.replace("-", "_")
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/mean",
+                            data=np.squeeze(T["iqmc"]["score"][name]["mean"]),
+                        )
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/sdev",
+                            data=np.squeeze(T["iqmc"]["score"][name]["sdev"]),
+                        )
+                # iQMC source strength
+                f.create_dataset("iqmc/tally/source_constant/mean", data=T["iqmc"]["source"])
+                # Iteration data
                 f.create_dataset(
                     "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]
                 )

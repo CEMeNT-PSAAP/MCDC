@@ -1191,6 +1191,14 @@ def allreduce(value):
 
 
 @njit
+def allreduce_array(array):
+    buff = np.zeros_like(array)
+    with objmode():
+        MPI.COMM_WORLD.Allreduce(np.array(array), buff, op=MPI.SUM)
+    array[:] = buff
+
+
+@njit
 def bank_rebalance(mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(mcdc["bank_source"], mcdc)
