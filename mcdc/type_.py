@@ -1375,6 +1375,7 @@ def make_type_RPN_array(input_deck):
         N_max = max(N_max, N)
     RPN_array = into_dtype([("values", bool_, (N_max,))])
 
+
 def make_type_mesh(card):
     Nx = len(card["x"]) - 1
     Ny = len(card["y"]) - 1

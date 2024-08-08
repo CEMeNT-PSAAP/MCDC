@@ -1709,22 +1709,22 @@ def split_particle(P):
 @njit
 def cell_check(P, cell, trans, mcdc):
     # Access RPN data
-    idx = cell['region_data_idx']
-    N_token = mcdc['cell_region_data'][idx]
+    idx = cell["region_data_idx"]
+    N_token = mcdc["cell_region_data"][idx]
 
     # Create local value array
     value_struct = adapt.local_RPN_array()
-    value = value_struct['values']
+    value = value_struct["values"]
     N_value = 0
 
     # March forward through RPN tokens
     idx += 1
     idx_end = idx + N_token
     while idx < idx_end:
-        token = mcdc['cell_region_data'][idx]
+        token = mcdc["cell_region_data"][idx]
 
         if token >= 0:
-            surface = mcdc['surfaces'][token]
+            surface = mcdc["surfaces"][token]
             value[N_value] = surface_evaluate(P, surface, trans) > 0.0
             N_value += 1
 
@@ -2724,14 +2724,14 @@ def distance_to_nearest_surface(P, cell, trans, mcdc):
     surface_move = False
 
     # Access cell surface data
-    idx = cell['surface_data_idx']
-    N_surface = mcdc['cell_surface_data'][idx]
+    idx = cell["surface_data_idx"]
+    N_surface = mcdc["cell_surface_data"][idx]
 
     # Iterate over all surfaces
     idx += 1
     idx_end = idx + N_surface
     while idx < idx_end:
-        candidate_surface_ID = mcdc['cell_surface_data'][idx]
+        candidate_surface_ID = mcdc["cell_surface_data"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
         d, sm = surface_distance(P, surface, trans, mcdc)
         if d < distance:
