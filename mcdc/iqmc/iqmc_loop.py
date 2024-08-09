@@ -13,6 +13,7 @@ from mcdc.print_ import (
     print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
+    print_progress_eigenvalue
 )
 
 
@@ -27,6 +28,9 @@ def iqmc_simulation(mcdc):
     iqmc_kernel.iqmc_preprocess(mcdc)
     iqmc_kernel.samples_init(mcdc)
 
+    if iqmc["mode"] == "batched":
+        iqmc["iterations_max"] = mcdc["setting"]["N_active"] + mcdc["setting"]["N_inactive"] - 1
+
     # Iterative Solve
     if mcdc["setting"]["mode_eigenvalue"]:
         power_iteration(mcdc)
@@ -37,9 +41,7 @@ def iqmc_simulation(mcdc):
             gmres(mcdc)
 
     # Post processing
-    iqmc_kernel.iqmc_tally_closeout_history(mcdc)
-    # if mcdc["setting"]["mode_eigenvalue"]:
-        # iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(mcdc)
+    iqmc_kernel.iqmc_tally_closeout(mcdc)
 
 
 # =============================================================================
@@ -101,22 +103,29 @@ def power_iteration(mcdc):
         fission_source_old = score_bin["fission-source"]["bin"].copy()
 
         # Batch mode 
-        # if iqmc["mode"] == "batched":
-        #     mcdc["idx_cycle"] += 1
-        #     kernel.iqmc_eigenvalue_tally_closeout_history(fission_source_old, mcdc)
-        #     # Entering active cycle ?
-        #     if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
-        #         mcdc["cycle_active"] = True
-    
+        if iqmc["mode"] == "batched":
+            mcdc["idx_cycle"] += 1
+            iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(mcdc)
+            if mcdc["cycle_active"]:
+                # Only accumulate statistics
+                iqmc_kernel.iqmc_tally_closeout_history(mcdc)
+            # Entering active cycle ?
+            if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
+                mcdc["cycle_active"] = True
+
         # Print progress
         with objmode():
-            print_iqmc_eigenvalue_progress(mcdc)
-            
+            if iqmc["mode"] == "fixed":
+                print_iqmc_eigenvalue_progress(mcdc)
+            else:
+                print_progress_eigenvalue(mcdc)
+
         # iQMC convergence criteria
         if (iqmc["iteration_count"] == maxit) or (iqmc["residual"] <= tol):
             simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
+            if iqmc["mode"] == "fixed":
+                with objmode():
+                    print_iqmc_eigenvalue_exit_code(mcdc)
 
 
 @njit(cache=caching)
@@ -382,7 +391,7 @@ def iqmc_sweep(mcdc):
     # sweep particles
     iqmc_loop_source(mcdc)
     # sum resultant flux on all processors
-    iqmc_kernel.iqmc_distribute_tallies(iqmc)
+    iqmc_kernel.iqmc_reduce_tallies(iqmc)
     # update source = scattering + fission/keff + fixed
     iqmc_kernel.iqmc_update_source(mcdc)
     # combine source tallies into one vector

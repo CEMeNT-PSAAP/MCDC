@@ -30,11 +30,7 @@ mcdc.cell(+s1 & -s2, m1)
 # =============================================================================
 Nx = 10
 N = 1000
-maxit = 1
-tol = 1e-3
-pre_sweeps = 3
 x = np.linspace(0.0, 6.01275, num=Nx + 1)
-fixed_source = np.zeros((2, Nx))
 phi0 = np.ones((2, Nx))
 
 # =============================================================================
@@ -45,14 +41,11 @@ mcdc.iQMC(
     x=x,
     g=np.ones(2),
     phi0=phi0,
-    fixed_source=fixed_source,
-    maxit=maxit,
-    tol=tol,
-    preconditioner_sweeps=pre_sweeps,
+    mode="batched"
 )
 # Setting
 mcdc.setting(N_particle=N)
-mcdc.eigenmode()
+mcdc.eigenmode(N_inactive=10, N_active=5)
 
 # Run
 mcdc.run()
