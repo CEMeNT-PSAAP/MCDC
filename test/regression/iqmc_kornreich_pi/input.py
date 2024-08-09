@@ -53,7 +53,7 @@ mcdc.iQMC(
     phi0=phi0,
     maxit=maxit,
     tol=tol,
-    score=["source-x"],
+    scores=["source-x"],
 )
 # Setting
 mcdc.setting(N_particle=N)

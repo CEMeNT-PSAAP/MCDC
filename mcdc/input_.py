@@ -1561,7 +1561,7 @@ def iQMC(
     fixed_source_solver="source iteration",
     sample_method="halton",
     mode="fixed",
-    score=[],
+    scores=[],
 ):
     """
     Activate the iterative Quasi-Monte Carlo (iQMC) neutron transport method.
@@ -1606,7 +1606,7 @@ def iQMC(
         Method for generating particle samples.
     mode: {'fixed', batched}
         Set iQMC to run with a fixed-seed or batched iteration scheme.
-    score : list of str, optional
+    scores : list of str, optional
         List of tallies to score in addition to the mandatory flux and
         source strength. Additional scores include
         {'source-x', 'source-y', 'source-z', 'fission-power'} (default empty list).
@@ -1667,7 +1667,7 @@ def iQMC(
         source0 = np.zeros_like(phi0)
 
     score_list = card["iqmc"]["score_list"]
-    for name in score:
+    for name in scores:
         score_list[name] = True
 
     if score_list["source-x"]:

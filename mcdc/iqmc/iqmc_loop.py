@@ -7,14 +7,67 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode
 from mcdc.loop import caching
 from mcdc.constant import *
-
+from mcdc.type_ import iqmc_score_list
 from mcdc.print_ import (
     print_progress,
     print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
     print_progress_eigenvalue,
+    print_error,
 )
+
+
+# =========================================================================
+# Validate inputs
+# =========================================================================
+
+
+def iqmc_validate_inputs(input_deck):
+    iqmc = input_deck.technique["iqmc"]
+    eigenmode = input_deck.setting["mode_eigenvalue"]
+
+    # Batched mode has only been built for eigenvalue problems (so far)
+    if iqmc["mode"] == "batched" and not eigenmode:
+        print_error(
+            "Invalid run mode. iQMC batched mode has not been built for fixed source problems."
+        )
+
+    # Check fixed source solver
+    if iqmc["fixed_source_solver"] not in ["source iteration", "gmres"]:
+        print_error(
+            f"Invalid fixed source solver, '{iqmc['fixed_source_solver']}'. Available iteration solvers inlcude ['source iteration', 'gmres']"
+        )
+
+    # Check sample method
+    if iqmc["sample_method"] not in ["random", "halton"]:
+        print_error(
+            f"Unsupported sample method, '{iqmc['sample_method']}'. Available sample methods: ['halton', 'random']."
+        )
+
+    # Check run mode
+    if iqmc["mode"] not in ["fixed", "batched"]:
+        with objmode():
+            print_error(
+                f"Unsupported run mode, '{iqmc['mode']}'. Available iQMC modes are ['fixed', 'batched']"
+            )
+
+    # Check scores
+    for score in list(iqmc["score_list"].keys()):
+        if score not in iqmc_score_list:
+            print_error(
+                f"Unsupported score, '{score}'. Available iQMC scores are {iqmc_score_list}"
+            )
+
+    # Check N_inactive & N_active batches for batched mode
+    if eigenmode and iqmc["mode"] == "batched":
+        if (
+            input_deck.setting["N_inactive"] == 0
+            and input_deck.setting["N_active"] == 0
+        ):
+            print_error(
+                "Specify N_inactive and N_active batches for iQMC batched mode."
+            )
 
 
 # =============================================================================

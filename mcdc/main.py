@@ -94,7 +94,7 @@ from mcdc.loop import (
     set_cache,
     build_gpu_progs,
 )
-from mcdc.iqmc.iqmc_loop import iqmc_simulation
+from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
@@ -121,6 +121,8 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
+    if input_deck.technique["iQMC"]:
+        iqmc_validate_inputs(input_deck)
     mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 

@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
-import sys
 
 # =============================================================================
 # Import data
@@ -10,7 +9,7 @@ import sys
 with h5py.File("output.h5", "r") as f:
     # Note the spatial (dx) and source strength (100+1) normalization
     keff = f["k_eff"][()]
-    phi_avg = f["iqmc/tally/flux"][:]
+    phi_avg = f["iqmc/tally/flux/mean"][:]
     sweeps = f["iqmc/sweep_count"][()]
     x = f["iqmc/grid/x"][:]
     dx = x[1] - x[0]
@@ -86,10 +85,9 @@ phi_exact /= norm
 # =============================================================================
 # Begin Plot
 # =============================================================================
-plt.figure(dpi=300, figsize=(8, 5))
-plt.plot(x_exact, phi_exact, label="sol")
-
-plt.plot(x_mid, phi_avg)
+plt.figure()
+plt.plot(x_exact, phi_exact, label="analytic")
+plt.plot(x_mid, phi_avg, label="iQMC")
 plt.title("Kornreich et al. Slab")
 plt.ylabel(r"$\phi(x)$")
 plt.xlabel(r"$x$")

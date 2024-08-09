@@ -58,7 +58,7 @@ mcdc.iQMC(
     maxit=maxit,
     tol=tol,
     fixed_source_solver=solver,
-    score=["source-x"],
+    scores=["source-x"],
 )
 
 # =============================================================================
