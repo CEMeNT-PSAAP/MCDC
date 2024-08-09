@@ -109,7 +109,7 @@ def print_header_eigenvalue(mcdc):
         if mcdc["setting"]["gyration_radius"]:
             print("\n #     k        GyRad.  k (avg)            ")
             print(" ====  =======  ======  ===================")
-        elif mcdc["technique"]["iQMC"] and mcdc["technique"]["iqmc"]["mode"]=="fixed":
+        elif mcdc["technique"]["iQMC"] and mcdc["technique"]["iqmc"]["mode"] == "fixed":
             print("\n #     k        Residual         ")
             print(" ==== ======= ===================")
         else:

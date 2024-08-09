@@ -37,12 +37,7 @@ phi0 = np.ones((2, Nx))
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.iQMC(
-    x=x,
-    g=np.ones(2),
-    phi0=phi0,
-    mode="batched"
-)
+mcdc.iQMC(x=x, g=np.ones(2), phi0=phi0, mode="batched")
 # Setting
 mcdc.setting(N_particle=N)
 mcdc.eigenmode(N_inactive=10, N_active=5)
