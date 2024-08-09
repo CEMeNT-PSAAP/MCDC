@@ -1063,6 +1063,11 @@ def generate_hdf5(mcdc):
             if mcdc["setting"]["mode_eigenvalue"]:
                 if mcdc["technique"]["iQMC"]:
                     f.create_dataset("k_eff", data=mcdc["k_eff"])
+                    if mcdc["technique"]["iqmc"]["mode"] == "batched":
+                        N_cycle = mcdc["setting"]["N_cycle"]
+                        f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
+                        f.create_dataset("k_mean", data=mcdc["k_avg_running"])
+                        f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
                 else:
                     N_cycle = mcdc["setting"]["N_cycle"]
                     f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])

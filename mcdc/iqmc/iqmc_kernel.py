@@ -2,19 +2,17 @@ from mpi4py import MPI
 
 import mcdc.adapt as adapt
 import numpy as np
+import math
 
-from numpy import ascontiguousarray as cga
-from numba import njit, objmode, literal_unroll
-from mcdc.loop import caching
+from numba import objmode, literal_unroll
 from mcdc.type_ import iqmc_score_list
 from mcdc.kernel import distance_to_boundary, distance_to_mesh, allreduce_array
 
 # from mcdc.iqmc.iqmc_loop import iqmc_loop_source
-from mcdc.adapt import toggle, for_cpu, for_gpu
+from mcdc.adapt import toggle
 from mcdc.constant import *
 from mcdc.kernel import (
     move_particle,
-    set_bank_size,
     get_particle_cell,
     get_particle_material,
     mesh_get_index,
@@ -39,7 +37,7 @@ def samples_init(mcdc):
 @toggle("iQMC")
 def scramble_samples(mcdc):
     # TODO: use MCDC seed system
-    seed_batch = np.random.randint(1000, 1000000)
+    seed_batch = np.int64(mcdc["setting"]["N_particle"] * mcdc["idx_cycle"] + 1)
     iqmc = mcdc["technique"]["iqmc"]
     N, dim = iqmc["samples"].shape
     N_start = mcdc["mpi_work_start"]
@@ -146,7 +144,6 @@ def iqmc_generate_material_idx(mcdc):
     Nx = len(mesh["x"]) - 1
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
-    dx = dy = dz = 1
     # variables for cell finding functions
     trans_struct = adapt.local_translate()
     trans = trans_struct["values"]
@@ -642,7 +639,6 @@ def iqmc_effective_fission(phi, mat_id, mcdc):
     chi_d = material["chi_d"]
     nu_p = material["nu_p"]
     nu_d = material["nu_d"]
-    J = material["J"]
     SigmaF = material["fission"]
     F_p = np.dot(chi_p.T, nu_p * SigmaF * phi)
     F_d = np.dot(chi_d.T, (nu_d.T * SigmaF * phi).sum(axis=1))
@@ -695,38 +691,18 @@ def iqmc_reset_tallies(iqmc):
 
 
 @toggle("iQMC")
-def iqmc_distribute_tallies(iqmc):
+def iqmc_reduce_tallies(iqmc):
     score_bin = iqmc["score"]
     score_list = iqmc["score_list"]
 
     for name in literal_unroll(iqmc_score_list):
         if score_list[name]:
-            iqmc_score_reduce_bin(score_bin[name]["bin"])
-
-
-@toggle("iQMC")
-def iqmc_score_reduce_bin(score):
-    # MPI Reduce
-    buff = np.zeros_like(score)
-    with objmode():
-        MPI.COMM_WORLD.Allreduce(np.array(score), buff, op=MPI.SUM)
-    score[:] = buff
+            allreduce_array(score_bin[name]["bin"])
 
 
 # =============================================================================
 # Tally History Operations
 # =============================================================================
-
-
-# @toggle("iQMC")
-# def iqmc_tally_batch_history(mcdc):
-#     iqmc = mcdc["technique"]["iqmc"]
-#     score_bin = iqmc["score"]
-#     score_list = iqmc["score_list"]
-
-#     if mcdc["cycle_active"]:
-#         score_bin["flux-avg"] += score_bin["flux"]
-#         score_bin["flux-sdev"] += np.square(score_bin["flux"])
 
 
 @toggle("iQMC")
@@ -735,46 +711,54 @@ def iqmc_tally_closeout_history(mcdc):
     score_bin = iqmc["score"]
     score_list = iqmc["score_list"]
 
+    for name in literal_unroll(iqmc_score_list):
+        if score_list[name]:
+            score_bin[name]["mean"] += score_bin[name]["bin"]
+            score_bin[name]["sdev"] += np.square(score_bin[name]["bin"])
+
+
+@toggle("iQMC")
+def iqmc_tally_closeout(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    score_bin = iqmc["score"]
+    score_list = iqmc["score_list"]
+
     if iqmc["mode"] == "fixed":
         for name in literal_unroll(iqmc_score_list):
             if score_list[name]:
                 score_bin[name]["mean"] = score_bin[name]["bin"]
-    
-    # if iqmc["mode"] == "batched":
-    #     # Number of active batches
-    #     N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
-    #     score_bin["flux"]["mean"] = score_bin["flux"]["mean"] / N
-    #     allreduce_array(score_bin["flux-sdev"])
-    #     score_bin["flux"]["sdev"] = np.sqrt(
-    #         (score_bin["flux"]["sdev"] / N - np.square(score_bin["flux"]["mean"])) / (N - 1)
-    #     )
+
+    if iqmc["mode"] == "batched":
+        N_history = mcdc["setting"]["N_active"]
+        for name in literal_unroll(iqmc_score_list):
+            if score_list[name]:
+                score_bin[name]["mean"] /= N_history
+                score_bin[name]["sdev"] = allreduce_array(score_bin[name]["sdev"])
+                score_bin[name]["sdev"] = np.sqrt(
+                (score_bin[name]["sdev"] / N_history - np.square(score_bin[name]["mean"])) / (N_history - 1)
+                )
 
 
-# @toggle("iQMC")
-# def iqmc_eigenvalue_tally_closeout_history(mcdc):
-#     iqmc = mcdc["technique"]["iqmc"]
-#     score_bin = iqmc["score"]
-#     idx_cycle = mcdc["idx_cycle"]
+@toggle("iQMC")
+def iqmc_eigenvalue_tally_closeout_history(mcdc):
+    idx_cycle = mcdc["idx_cycle"]
 
-#     # update k_eff
-#     mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
+    # store outter iteration values
+    mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
 
-#     # store outter iteration values
-#     # score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
-#     mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
+    # Accumulate running average
+    if mcdc["cycle_active"]:
+        mcdc["k_avg"] += mcdc["k_eff"]
+        mcdc["k_sdv"] += mcdc["k_eff"] * mcdc["k_eff"]
+        N = mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
+        mcdc["k_avg_running"] = mcdc["k_avg"] / N
+        if N == 1:
+            mcdc["k_sdv_running"] = 0.0
+        else:
+            mcdc["k_sdv_running"] = math.sqrt(
+                (mcdc["k_sdv"] / N - mcdc["k_avg_running"] ** 2) / (N - 1)
+            )
 
-#     # Accumulate running average
-#     if mcdc["cycle_active"]:
-#         mcdc["k_avg"] += mcdc["k_eff"]
-#         mcdc["k_sdv"] += mcdc["k_eff"] * mcdc["k_eff"]
-#         N = 1 + mcdc["idx_cycle"] - mcdc["setting"]["N_inactive"]
-#         mcdc["k_avg_running"] = mcdc["k_avg"] / N
-#         if N == 1:
-#             mcdc["k_sdv_running"] = 1.0
-#         else:
-#             mcdc["k_sdv_running"] = math.sqrt(
-#                 (mcdc["k_sdv"] / N - mcdc["k_avg_running"] ** 2) / (N - 1)
-#             )
 
 # =============================================================================
 # Misc

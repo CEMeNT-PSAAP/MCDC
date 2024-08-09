@@ -49,15 +49,13 @@ phi0 = np.ones((Nx))
 
 mcdc.iQMC(
     x=x,
-    fixed_source=fixed_source,
     phi0=phi0,
-    maxit=maxit,
-    tol=tol,
-    score=["tilt-x"],
+    score=["source-x"],
+    mode="batched"
 )
 # Setting
 mcdc.setting(N_particle=N)
-mcdc.eigenmode()
+mcdc.eigenmode(N_inactive=10,N_active=5)
 
 # Run
 mcdc.run()
