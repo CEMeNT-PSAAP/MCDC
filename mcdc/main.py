@@ -750,7 +750,9 @@ def prepare():
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
-            copy_field(iqmc["score_list"], input_deck.technique["iqmc"]["score_list"], name)
+            copy_field(
+                iqmc["score_list"], input_deck.technique["iqmc"]["score_list"], name
+            )
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
             mcdc["technique"]["iqmc"]["score"][name]["bin"] = value
@@ -1093,7 +1095,13 @@ def generate_hdf5(mcdc):
                 f.create_dataset("iqmc/grid/y", data=T["iqmc"]["mesh"]["y"])
                 f.create_dataset("iqmc/grid/z", data=T["iqmc"]["mesh"]["z"])
                 # Scores
-                for name in ['flux', 'source-x', 'source-y', 'source-z', 'fission-power']:
+                for name in [
+                    "flux",
+                    "source-x",
+                    "source-y",
+                    "source-z",
+                    "fission-power",
+                ]:
                     if T["iqmc"]["score_list"][name]:
                         name_h5 = name.replace("-", "_")
                         f.create_dataset(
@@ -1105,7 +1113,10 @@ def generate_hdf5(mcdc):
                             data=np.squeeze(T["iqmc"]["score"][name]["sdev"]),
                         )
                 # iQMC source strength
-                f.create_dataset("iqmc/tally/source_constant/mean", data=np.squeeze(T["iqmc"]["source"]))
+                f.create_dataset(
+                    "iqmc/tally/source_constant/mean",
+                    data=np.squeeze(T["iqmc"]["source"]),
+                )
                 # Iteration data
                 f.create_dataset(
                     "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]

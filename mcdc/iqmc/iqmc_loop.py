@@ -13,13 +13,14 @@ from mcdc.print_ import (
     print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
-    print_progress_eigenvalue
+    print_progress_eigenvalue,
 )
 
 
 # =============================================================================
 # iQMC Simulation
 # =============================================================================
+
 
 @njit(cache=caching)
 def iqmc_simulation(mcdc):
@@ -29,7 +30,9 @@ def iqmc_simulation(mcdc):
     iqmc_kernel.samples_init(mcdc)
 
     if iqmc["mode"] == "batched":
-        iqmc["iterations_max"] = mcdc["setting"]["N_active"] + mcdc["setting"]["N_inactive"] - 1
+        iqmc["iterations_max"] = (
+            mcdc["setting"]["N_active"] + mcdc["setting"]["N_inactive"] - 1
+        )
 
     # Iterative Solve
     if mcdc["setting"]["mode_eigenvalue"]:
@@ -99,10 +102,12 @@ def power_iteration(mcdc):
         iqmc["residual"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
         # Store outter iteration values
-        score_bin["effective-fission-outter"] = score_bin["effective-fission"]["bin"].copy()
+        score_bin["effective-fission-outter"] = score_bin["effective-fission"][
+            "bin"
+        ].copy()
         fission_source_old = score_bin["fission-source"]["bin"].copy()
 
-        # Batch mode 
+        # Batch mode
         if iqmc["mode"] == "batched":
             mcdc["idx_cycle"] += 1
             iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(mcdc)
