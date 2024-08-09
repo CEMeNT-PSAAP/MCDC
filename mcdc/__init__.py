@@ -26,4 +26,3 @@ from mcdc.input_ import (
     save_particle_bank,
 )
 from mcdc.main import run, prepare
-from mcdc.visualizer import visualize
