@@ -314,6 +314,39 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
 
 
+def dd_mesh_bounds(idx):
+    """
+    Defining mesh tally boundaries for domain decomposition.
+    Used in prepare() when domain decomposition is active.
+    """
+    # find DD mesh index of subdomain
+    d_idx = input_deck.technique["dd_idx"]  # subdomain index
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+    zmesh_idx = d_idx // (d_Nx * d_Ny)
+    ymesh_idx = (d_idx % (d_Nx * d_Ny)) // d_Nx
+    xmesh_idx = d_idx % d_Nx
+
+    # find spatial boundaries of subdomain
+    xn = input_deck.technique["dd_mesh"]["x"][xmesh_idx]
+    xp = input_deck.technique["dd_mesh"]["x"][xmesh_idx + 1]
+    yn = input_deck.technique["dd_mesh"]["y"][ymesh_idx]
+    yp = input_deck.technique["dd_mesh"]["y"][ymesh_idx + 1]
+    zn = input_deck.technique["dd_mesh"]["z"][zmesh_idx]
+    zp = input_deck.technique["dd_mesh"]["z"][zmesh_idx + 1]
+
+    # find boundary indices in tally mesh
+    mesh_xn = int(np.where(input_deck.mesh_tallies[idx].x == xn)[0])
+    mesh_xp = int(np.where(input_deck.mesh_tallies[idx].x == xp)[0]) + 1
+    mesh_yn = int(np.where(input_deck.mesh_tallies[idx].y == yn)[0])
+    mesh_yp = int(np.where(input_deck.mesh_tallies[idx].y == yp)[0]) + 1
+    mesh_zn = int(np.where(input_deck.mesh_tallies[idx].z == zn)[0])
+    mesh_zp = int(np.where(input_deck.mesh_tallies[idx].z == zp)[0]) + 1
+
+    return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
+
+
 def prepare():
     """
     Preparing the MC transport simulation:
@@ -627,11 +660,28 @@ def prepare():
         copy_field(mcdc["mesh_tallies"][i], input_deck.mesh_tallies[i], "N_bin")
 
         # Filters (variables with possible different sizes)
-        for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
-            N = len(getattr(input_deck.mesh_tallies[i], name))
-            mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
-                input_deck.mesh_tallies[i], name
-            )
+        if not input_deck.technique["domain_decomposition"]:
+            for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.mesh_tallies[i], name))
+                mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.mesh_tallies[i], name
+                )
+
+        else:  # decomposed mesh filters
+            mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
+
+            # Filters
+            new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
+            new_y = input_deck.mesh_tallies[i].y[myn:myp]
+            new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
+            mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
+            mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
+            mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
+            for name in ["t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.mesh_tallies[i], name))
+                mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.mesh_tallies[i], name
+                )
 
         # Set tally scores
         N_score = len(input_deck.mesh_tallies[i].scores)
@@ -654,7 +704,11 @@ def prepare():
             N_sensitivity = input_deck.setting["N_sensitivity"]
             Ns = 1 + N_sensitivity
             if input_deck.technique["dsm_order"] == 2:
-                Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                Ns = (
+                    1
+                    + 2 * N_sensitivity
+                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                )
             Nmu = len(input_deck.mesh_tallies[i].mu) - 1
             N_azi = len(input_deck.mesh_tallies[i].azi) - 1
             Ng = len(input_deck.mesh_tallies[i].g) - 1
@@ -663,43 +717,23 @@ def prepare():
             Nz = len(input_deck.mesh_tallies[i].z) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
 
-        else: # decompose mesh tallies
-            # find DD mesh index of subdomain
-            d_idx = input_deck.technique["dd_idx"] # subdomain index
-            d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
-            d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
-            d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
-            zmesh_idx = d_idx // (d_Nx * d_Ny)
-            ymesh_idx = (d_idx % (d_Nx * d_Ny)) // d_Nx
-            xmesh_idx = d_idx % d_Nx
-            
-            # find spatial boundaries of subdomain
-            xn = input_deck.technique["dd_mesh"]["x"][xmesh_idx]
-            xp = input_deck.technique["dd_mesh"]["x"][xmesh_idx+1]
-            yn = input_deck.technique["dd_mesh"]["y"][ymesh_idx]
-            yp = input_deck.technique["dd_mesh"]["y"][ymesh_idx+1]
-            zn = input_deck.technique["dd_mesh"]["z"][zmesh_idx]
-            zp = input_deck.technique["dd_mesh"]["z"][zmesh_idx+1]
-            
-            # find boundary indices in tally mesh
-            mesh_xn = int(np.where(input_deck.mesh_tallies[i].x == xn)[0])
-            mesh_xp = int(np.where(input_deck.mesh_tallies[i].x == xp)[0])
-            mesh_yn = int(np.where(input_deck.mesh_tallies[i].y == yn)[0])
-            mesh_yp = int(np.where(input_deck.mesh_tallies[i].y == yp)[0])
-            mesh_zn = int(np.where(input_deck.mesh_tallies[i].z == zn)[0])
-            mesh_zp = int(np.where(input_deck.mesh_tallies[i].z == zp)[0])
-            
+        else:  # decompose mesh tallies
+
             # Filter grid sizes
             N_sensitivity = input_deck.setting["N_sensitivity"]
             Ns = 1 + N_sensitivity
             if input_deck.technique["dsm_order"] == 2:
-                Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                Ns = (
+                    1
+                    + 2 * N_sensitivity
+                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                )
             Nmu = len(input_deck.mesh_tallies[i].mu) - 1
             N_azi = len(input_deck.mesh_tallies[i].azi) - 1
             Ng = len(input_deck.mesh_tallies[i].g) - 1
-            Nx = len(input_deck.mesh_tallies[i].x[mesh_xn:mesh_xp]) - 1
-            Ny = len(input_deck.mesh_tallies[i].y[mesh_yn:mesh_yp]) - 1
-            Nz = len(input_deck.mesh_tallies[i].z[mesh_zn:mesh_zp]) - 1
+            Nx = len(input_deck.mesh_tallies[i].x[mxn:mxp]) - 1
+            Ny = len(input_deck.mesh_tallies[i].y[myn:myp]) - 1
+            Nz = len(input_deck.mesh_tallies[i].z[mzn:mzp]) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
             mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
 
@@ -1185,6 +1219,20 @@ def dict_to_h5group(dict_, group):
 
 
 def generate_hdf5(data, mcdc):
+
+    # recombine tallies before output processing
+    if mcdc["technique"]["domain_decomposition"]:
+        tally = data[TALLY]
+        # create bin for recomposed tallies
+        d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+        d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+        d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+        dd_tally = np.zeros((tally.shape[0], tally.shape[1] * d_Nx * d_Ny * d_Nz))
+        # gather tallies
+        MPI.COMM_WORLD.Gather(tally[0], dd_tally[0], root=0)
+        MPI.COMM_WORLD.Gather(tally[1], dd_tally[1], root=0)
+        MPI.COMM_WORLD.Gather(tally[2], dd_tally[2], root=0)
+
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
             print_msg("")
@@ -1244,6 +1292,11 @@ def generate_hdf5(data, mcdc):
                 Nt = len(mesh["t"]) - 1
                 N_score = tally["N_score"]
 
+                if mcdc["technique"]["domain_decomposition"]:
+                    Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
+                    Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
+                    Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
+
                 if not mcdc["technique"]["uq"]:
                     shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
                 else:
@@ -1251,8 +1304,16 @@ def generate_hdf5(data, mcdc):
 
                 # Reshape tally
                 N_bin = tally["N_bin"]
+                if mcdc["technique"]["domain_decomposition"]:
+                    # use recomposed N_bin
+                    N_bin = 1
+                    for elem in shape:
+                        N_bin *= elem
                 start = tally["stride"]["tally"]
                 tally_bin = data[TALLY][:, start : start + N_bin]
+                if mcdc["technique"]["domain_decomposition"]:
+                    # substitute recomposed tally
+                    tally_bin = dd_tally[:, start : start + N_bin]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front

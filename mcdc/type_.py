@@ -673,23 +673,24 @@ def make_type_source(input_deck):
 # Tallies
 # ==============================================================================
 
+
 def dd_meshtally(input_deck):
     # find DD mesh index of subdomain
-    d_idx = input_deck.technique["dd_idx"] # subdomain index
+    d_idx = input_deck.technique["dd_idx"]  # subdomain index
     d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
     zmesh_idx = d_idx // (d_Nx * d_Ny)
     ymesh_idx = (d_idx % (d_Nx * d_Ny)) // d_Nx
     xmesh_idx = d_idx % d_Nx
-    
+
     # find spatial boundaries of subdomain
     xn = input_deck.technique["dd_mesh"]["x"][xmesh_idx]
-    xp = input_deck.technique["dd_mesh"]["x"][xmesh_idx+1]
+    xp = input_deck.technique["dd_mesh"]["x"][xmesh_idx + 1]
     yn = input_deck.technique["dd_mesh"]["y"][ymesh_idx]
-    yp = input_deck.technique["dd_mesh"]["y"][ymesh_idx+1]
+    yp = input_deck.technique["dd_mesh"]["y"][ymesh_idx + 1]
     zn = input_deck.technique["dd_mesh"]["z"][zmesh_idx]
-    zp = input_deck.technique["dd_mesh"]["z"][zmesh_idx+1]
+    zp = input_deck.technique["dd_mesh"]["z"][zmesh_idx + 1]
 
     # Maximum numbers of mesh and filter grids and scores
     Nx = 2
@@ -698,18 +699,20 @@ def dd_meshtally(input_deck):
     for card in input_deck.mesh_tallies:
         # find boundary indices in tally mesh
         mesh_xn = int(np.where(card.x == xn)[0])
-        mesh_xp = int(np.where(card.x == xp)[0])
+        mesh_xp = int(np.where(card.x == xp)[0]) + 1
         mesh_yn = int(np.where(card.y == yn)[0])
-        mesh_yp = int(np.where(card.y == yp)[0])
+        mesh_yp = int(np.where(card.y == yp)[0]) + 1
         mesh_zn = int(np.where(card.z == zn)[0])
-        mesh_zp = int(np.where(card.z == zp)[0])
+        mesh_zp = int(np.where(card.z == zp)[0]) + 1
 
         # adjust Nmax numbers
-        Nx = max(Nx, len(card.x[mesh_xn:mesh_xp]))
-        Nx = max(Ny, len(card.y[mesh_yn:mesh_yp]))
-        Nx = max(Nz, len(card.z[mesh_zn:mesh_zp]))
+        new_x = card.x[mesh_xn:mesh_xp]
+        new_y = card.y[mesh_yn:mesh_yp]
+        new_z = card.z[mesh_zn:mesh_zp]
+        Nx = max(Nx, len(new_x))
+        Ny = max(Ny, len(new_y))
+        Nz = max(Nz, len(new_z))
     return Nx, Ny, Nz
-
 
 
 def make_type_mesh_tally(input_deck):
@@ -734,7 +737,7 @@ def make_type_mesh_tally(input_deck):
         Nmax_azi = max(Nmax_azi, len(card.azi))
         Nmax_g = max(Nmax_g, len(card.g))
         Nmax_score = max(Nmax_score, len(card.scores))
-    
+
     # reduce tally sizes for subdomains
     if input_deck.technique["domain_decomposition"]:
         Nmax_x, Nmax_y, Nmax_z = dd_meshtally(input_deck)
