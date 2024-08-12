@@ -245,6 +245,7 @@ def dd_distribute_bank(mcdc, bank, dest_list):
     with objmode(send_delta="int64"):
         dest_count = len(dest_list)
         send_delta = 0
+
         for i, dest in enumerate(dest_list):
             size = get_bank_size(bank)
             ratio = int(size / dest_count)
@@ -2160,6 +2161,12 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
         + iz * stride["z"]
     )
 
+    # if mcdc["technique"]["domain_decomposition"]:
+    #    print("old idx:",idx)
+    # offset tally index by subdomain index
+    #    idx += tally_bin.flatten().shape[0] * mcdc["dd_idx"]
+    #    print("new idx:",idx)
+
     # Score
     flux = distance * P["w"]
     for i in range(tally["N_score"]):
@@ -2210,11 +2217,12 @@ def tally_reduce(data, mcdc):
     for i in range(N_bin):
         tally_bin[TALLY_SCORE][i] /= N_particle
 
-    # MPI Reduce
-    buff = np.zeros_like(tally_bin[TALLY_SCORE])
-    with objmode():
-        MPI.COMM_WORLD.Reduce(tally_bin[TALLY_SCORE], buff, MPI.SUM, 0)
-    tally_bin[TALLY_SCORE][:] = buff
+    if not mcdc["technique"]["domain_decomposition"]:
+        # MPI Reduce
+        buff = np.zeros_like(tally_bin[TALLY_SCORE])
+        with objmode():
+            MPI.COMM_WORLD.Reduce(tally_bin[TALLY_SCORE], buff, MPI.SUM, 0)
+        tally_bin[TALLY_SCORE][:] = buff
 
 
 @njit
@@ -2243,7 +2251,7 @@ def tally_closeout(data, mcdc):
     elif mcdc["setting"]["mode_eigenvalue"]:
         N_history = mcdc["setting"]["N_active"]
 
-    else:
+    elif not mcdc["technique"]["domain_decomposition"]:
         # MPI Reduce
         buff = np.zeros_like(tally[TALLY_SUM])
         buff_sq = np.zeros_like(tally[TALLY_SUM_SQ])
