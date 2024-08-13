@@ -703,11 +703,7 @@ def prepare():
         N_sensitivity = input_deck.setting["N_sensitivity"]
         Ns = 1 + N_sensitivity
         if input_deck.technique["dsm_order"] == 2:
-            Ns = (
-                1
-                + 2 * N_sensitivity
-                + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-            )
+            Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
         Nmu = len(input_deck.mesh_tallies[i].mu) - 1
         N_azi = len(input_deck.mesh_tallies[i].azi) - 1
         Ng = len(input_deck.mesh_tallies[i].g) - 1
