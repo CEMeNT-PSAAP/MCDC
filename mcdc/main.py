@@ -699,35 +699,25 @@ def prepare():
                 score_type = SCORE_NET_CURRENT
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
-        if not input_deck.technique["domain_decomposition"]:
-            # Filter grid sizes
-            N_sensitivity = input_deck.setting["N_sensitivity"]
-            Ns = 1 + N_sensitivity
-            if input_deck.technique["dsm_order"] == 2:
-                Ns = (
-                    1
-                    + 2 * N_sensitivity
-                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-                )
-            Nmu = len(input_deck.mesh_tallies[i].mu) - 1
-            N_azi = len(input_deck.mesh_tallies[i].azi) - 1
-            Ng = len(input_deck.mesh_tallies[i].g) - 1
-            Nx = len(input_deck.mesh_tallies[i].x) - 1
-            Ny = len(input_deck.mesh_tallies[i].y) - 1
-            Nz = len(input_deck.mesh_tallies[i].z) - 1
-            Nt = len(input_deck.mesh_tallies[i].t) - 1
+        # Filter grid sizes
+        N_sensitivity = input_deck.setting["N_sensitivity"]
+        Ns = 1 + N_sensitivity
+        if input_deck.technique["dsm_order"] == 2:
+            Ns = (
+                1
+                + 2 * N_sensitivity
+                + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+            )
+        Nmu = len(input_deck.mesh_tallies[i].mu) - 1
+        N_azi = len(input_deck.mesh_tallies[i].azi) - 1
+        Ng = len(input_deck.mesh_tallies[i].g) - 1
+        Nx = len(input_deck.mesh_tallies[i].x) - 1
+        Ny = len(input_deck.mesh_tallies[i].y) - 1
+        Nz = len(input_deck.mesh_tallies[i].z) - 1
+        Nt = len(input_deck.mesh_tallies[i].t) - 1
 
-        else:  # decompose mesh tallies
-
-            # Filter grid sizes
-            N_sensitivity = input_deck.setting["N_sensitivity"]
-            Ns = 1 + N_sensitivity
-            if input_deck.technique["dsm_order"] == 2:
-                Ns = (
-                    1
-                    + 2 * N_sensitivity
-                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-                )
+        # Decompose mesh tallies
+        if input_deck.technique["domain_decomposition"]:
             Nmu = len(input_deck.mesh_tallies[i].mu) - 1
             N_azi = len(input_deck.mesh_tallies[i].azi) - 1
             Ng = len(input_deck.mesh_tallies[i].g) - 1

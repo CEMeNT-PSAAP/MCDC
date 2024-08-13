@@ -2161,12 +2161,6 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
         + iz * stride["z"]
     )
 
-    # if mcdc["technique"]["domain_decomposition"]:
-    #    print("old idx:",idx)
-    # offset tally index by subdomain index
-    #    idx += tally_bin.flatten().shape[0] * mcdc["dd_idx"]
-    #    print("new idx:",idx)
-
     # Score
     flux = distance * P["w"]
     for i in range(tally["N_score"]):
