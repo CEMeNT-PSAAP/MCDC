@@ -32,4 +32,4 @@ jobs:
     - name: Regression Test - MPI
       run: |
         cd test/regression
-        python run.py --mpiexec=4 --skip=iqmc*
+        python run.py --mpiexec=4
