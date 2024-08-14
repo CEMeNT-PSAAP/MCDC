@@ -49,7 +49,7 @@ mcdc.cell(+s1 & -s2, m)
 # =============================================================================
 
 # Tally
-mcdc.tally(
+mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 5.0, 51),
     t=np.linspace(0.0, 5.0, 51),
