@@ -1,5 +1,6 @@
 import numpy as np
 import mcdc, h5py
+from mcdc import visualizer
 
 # =============================================================================
 # Materials
@@ -73,7 +74,7 @@ mcdc.cell(
 
 mcdc.source(x=[-22.0, 22.0], time=[0.0, 5.0], isotropic=True)
 
-mcdc.visualize(
+visualizer.visualize(
     start_time=0, end_time=1, tick_interval=0.1, material_colors={"water": [1, 0, 0]}
 )
 # =============================================================================

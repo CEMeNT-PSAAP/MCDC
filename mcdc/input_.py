@@ -321,39 +321,52 @@ def material(
         # Set ID
         card.ID = len(global_.input_deck.materials)
 
+        # Default values
+        card.J = 6
+
         # Set the nuclides
         for i in range(N_nuclide):
             nuc_name = nuclides[i][0]
             density = nuclides[i][1]
+
+            # Create nuclide card if not defined yet
             if not nuclide_registered(nuc_name):
-                nuc_card = NuclideCard(name=nuc_name)
+                nuc_card = NuclideCard()
+                nuc_card.name = nuc_name
 
                 # Set ID
                 nuc_card.ID = len(global_.input_deck.nuclides)
 
+                # Default values
+                nuc_card.J = 6
+
+                # Check if the nuclide is available in the nuclear data library
                 dir_name = os.getenv("MCDC_XSLIB")
                 if dir_name == None:
                     print_error(
-                        "Continuous energy data directory not configured \n"
-                        + "see https://cement-psaapgithubio.readthedocs.io/en/latest/install.html#configuring-continuous-energy-library \n"
+                        "Continuous energy data directory not configured \n       "
+                        "see https://cement-psaapgithubio.readthedocs.io/en/latest"
+                        "/install.html#configuring-continuous-energy-library \n"
                     )
+
+                # Fissionable flag
                 with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card.fissionable = True
+                        card.fissionable = True
 
+                # Add to deck
                 global_.input_deck.nuclides.append(nuc_card)
             else:
                 nuc_card = get_nuclide(nuc_name)
+
             card.nuclide_IDs[i] = nuc_card.ID
             card.nuclide_densities[i] = density
 
-        # Check if identical material already exists
-        identical_material = get_identical_material(card)
-        if identical_material is None:
-            global_.input_deck.materials.append(card)
-            return card
-        else:
-            return identical_material
+        # Add to deck
+        global_.input_deck.materials.append(card)
+
+        return card
 
     # Nuclide and group sizes
     G = nuclides[0][0].G
@@ -718,6 +731,11 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     # Assign region
     card.region_ID = region.ID
 
+    # Set region Reverse Polish Notation and region description
+    if region.type != "all":
+        card.set_region_RPN()
+        card.set_region()
+
     # Assign fill type and ID
     if fill.tag == "Material":
         card.fill_type = "material"
@@ -731,37 +749,12 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     card.translation[:] = translation
 
     # Get all surface IDs
-    surface_IDs = []
-
-    region = global_.input_deck.regions[card.region_ID]
-    get_all_surface_IDs(region, surface_IDs)
-    surface_IDs = list(set(surface_IDs))
-
-    card.N_surface = len(surface_IDs)
-    card.surface_IDs = np.array(surface_IDs)
+    card.set_surface_IDs()
 
     # Add to deck
     global_.input_deck.cells.append(card)
 
     return card
-
-
-def get_all_surface_IDs(region, surface_IDs):
-    if region.type == "halfspace":
-        surface = global_.input_deck.surfaces[region.A]
-        surface_IDs.append(surface.ID)
-
-    elif region.type in ["intersection", "union"]:
-        region1 = global_.input_deck.regions[region.A]
-        region2 = global_.input_deck.regions[region.B]
-
-        get_all_surface_IDs(region1, surface_IDs)
-        get_all_surface_IDs(region2, surface_IDs)
-
-    elif region.type in ["complement"]:
-        region1 = global_.input_deck.regions[region.A]
-
-        get_all_surface_IDs(region1, surface_IDs)
 
 
 def universe(cells, root=False):
@@ -1840,18 +1833,6 @@ def get_nuclide(name):
             return card
 
 
-def get_identical_material(card):
-    nuclide_IDs = card.nuclide_IDs
-    nuclide_densities = card.nuclide_densities
-    for material in global_.input_deck.materials:
-        if len(nuclide_IDs) == len(material.nuclide_IDs):
-            if (nuclide_IDs == material.nuclide_IDs).all() and (
-                nuclide_densities == material.nuclide_densities
-            ).all():
-                return material
-    return None
-
-
 def print_card(card):
     if isinstance(card, SurfaceHandle):
         card = card.card
@@ -1884,6 +1865,41 @@ def check_requirement(label, kw, required):
     missing = missing[:-2] + "}"
     if error:
         print_error("Parameters " + missing + " are required for" + label)
+
+
+def make_particle_bank(size):
+    struct = [
+        ("x", np.float64),
+        ("y", np.float64),
+        ("z", np.float64),
+        ("t", np.float64),
+        ("ux", np.float64),
+        ("uy", np.float64),
+        ("uz", np.float64),
+        ("g", np.uint64),
+        ("E", np.float64),
+        ("w", np.float64),
+        ("sensitivity_ID", np.int64),
+        ("rng_seed", np.uint64),
+    ]
+    iqmc_struct = [("w", np.float64, (1,))]
+    struct += [("iqmc", iqmc_struct)]
+
+    bank = np.zeros(size, dtype=np.dtype(struct))
+
+    # Set default values
+    for i in range(size):
+        bank[i]["ux"] = 1.0
+        bank[i]["w"] = 1.0
+        bank[i]["rng_seed"] = 1
+
+    return bank
+
+
+def save_particle_bank(bank, name):
+    with h5py.File(name + ".h5", "w") as f:
+        f.create_dataset("particles", data=bank[:])
+        f.create_dataset("particles_size", data=len(bank[:]))
 
 
 # ==============================================================================
