@@ -8,7 +8,7 @@ if ! { python3 -c 'import sys; assert sys.version_info < (3,12)' > /dev/null 2>&
   echo "    Found $v at $p."
   echo "ERROR: Installation failed."
   exit 1
-fi 
+fi
 
 # Install or build mpi4py
 if [ $# -eq 0 ]; then
@@ -44,12 +44,8 @@ done
 # Install MC/DC module
 pip install -e .
 
-
-# Install MC/DC dependencies, reply "y" to conda prompt
-conda install numpy numba matplotlib scipy h5py pytest colorama <<< "y"
+# Patch Numba
+bash patch_numba.sh
 
 # Installing visualization dependencies (required via pip for osx-arm64)
 pip install ngsolve distinctipy
-
-bash patch_numba.sh
-
