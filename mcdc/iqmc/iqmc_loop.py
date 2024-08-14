@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 10 21:52:29 2024
-
-@author: sam pasmann
-"""
 import mcdc.kernel as kernel
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.adapt as adapt
