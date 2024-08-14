@@ -723,7 +723,8 @@ def prepare():
 
     # Set domain mesh
     if input_deck.technique["domain_decomposition"]:
-        for name in ["x", "y",
+        for name in ["x",
+                     "y",
                      "z", "t", "mu", "azi"]:
             copy_field(
                 mcdc["technique"]["dd_mesh"], input_deck.technique["dd_mesh"], name
