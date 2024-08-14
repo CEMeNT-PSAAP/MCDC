@@ -1,16 +1,26 @@
 import numpy as np
-from numba import njit, jit, objmode, literal_unroll, types, hip as cuda
+from numba import njit, jit, objmode, literal_unroll, types
 from numba.extending import intrinsic
 import numba
 import mcdc.type_ as type_
 import mcdc.kernel as kernel
 import mcdc.loop as loop
 
+
+TARGET = "ROCM"
+
+
 try:
     import harmonize as harm
     HAS_HARMONIZE = True
+    if   TARGET == "ROCM":
+        from numba import hip as cuda
+    elif TARGET == "CUDA":
+        from numba import cuda
 except RuntimeError:
     HAS_HARMONIZE = False
+
+
 
 import math
 import inspect
@@ -73,6 +83,158 @@ def cast_voidptr_to_uintp(typingctx, src):
             return builder.ptrtoint(src, llrtype)
 
         return sig, codegen
+
+
+# =============================================================================
+# Generic GPU/CPU Local Array Variable Constructors
+# =============================================================================
+
+
+def local_array(shape,dtype):
+    return np.zeros(shape,dtype=dtype)
+
+@numba.extending.type_callable(local_array)
+def type_local_array(context):
+
+    from numba.core.typing.npydecl import parse_dtype, parse_shape
+
+    print(context)
+    target = numba.core.target_extension.get_local_target(context)
+
+    if isinstance(context,numba.core.typing.context.Context):
+        print( "CPU local_array (TYPE)" )
+
+        # Function repurposed from Numba's ol_np_empty.
+        def typer(shape, dtype):
+            numba.np.arrayobj._check_const_str_dtype("empty", dtype)
+
+            # Only integer shapes, for now.
+            if not isinstance(shape,types.IntegerLiteral):
+                msg = f"Currently, only integer literal input shapes are supported."
+                raise numba.errors.TypingError(msg)
+
+            # No default arguments.
+            nb_dtype = parse_dtype(dtype)
+            nb_shape = parse_shape(shape)
+
+            if nb_dtype is not None and nb_shape is not None:
+                retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout='C')
+                # Inlining the signature construction from numpy_empty_nd
+                sig = retty(shape, dtype)
+                return sig
+            else:
+                msg = f"Cannot parse input types to function np.empty({shape}, {dtype})"
+                raise numba.errors.TypingError(msg)
+        return typer
+
+    elif isinstance(context,numba.cuda.target.CUDATypingContext):
+        print( "CUDA GPU local_array (TYPE)" )
+
+        # Function repurposed from Numba's Cuda_array_decl.
+        def typer(shape, dtype):
+
+            # Only integer literals and tuples of integer literals are valid
+            # shapes
+            if isinstance(shape, types.Integer):
+                if not isinstance(shape, types.IntegerLiteral):
+                    return None
+            elif isinstance(shape, (types.Tuple, types.UniTuple)):
+                if any([not isinstance(s, types.IntegerLiteral)
+                        for s in shape]):
+                    return None
+            else:
+                return None
+
+            ndim = parse_shape(shape)
+            nb_dtype = parse_dtype(dtype)
+            if nb_dtype is not None and ndim is not None:
+                return types.Array(dtype=nb_dtype, ndim=ndim, layout='C')
+
+        return typer
+
+    elif isinstance(context,numba.hip.target.HIPTypingContext):
+        print( "HIP GPU local_array (TYPE)" )
+
+        def typer(shape, dtype):
+            # Only integer literals and tuples of integer literals are valid
+            # shapes
+            if isinstance(shape, types.Integer):
+                if not isinstance(shape, types.IntegerLiteral):
+                    return None
+            elif isinstance(shape, (types.Tuple, types.UniTuple)):
+                if any([not isinstance(s, types.IntegerLiteral) for s in shape]):
+                    return None
+            else:
+                return None
+
+            ndim = parse_shape(shape)
+            nb_dtype = parse_dtype(dtype)
+            if nb_dtype is not None and ndim is not None:
+                return types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
+
+        return typer
+
+    else:
+        raise numba.core.errors.UnsupportedError(f"Unsupported target context {context}.")
+
+
+
+
+@numba.extending.lower_builtin(local_array, types.IntegerLiteral, types.Any)
+def builtin_local_array(context, builder, sig, args):
+
+    shape, dtype = sig.args
+
+    from numba.core.typing.npydecl import parse_dtype, parse_shape
+    import numba.np.arrayobj as arrayobj
+
+    if isinstance(context,numba.core.cpu.CPUContext):
+        print( "CPU local_array (IMPL)" )
+
+        # No default arguments.
+        nb_dtype = parse_dtype(dtype)
+        nb_shape = parse_shape(shape)
+
+        retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout='C')
+
+        # In ol_np_empty, the reference type of the array is fed into the
+        # signatrue as a third argument. This third argument is not used by
+        # _parse_empty_args.
+        sig = retty(shape, dtype)
+
+        arrtype, shapes = arrayobj._parse_empty_args(context, builder, sig, args)
+        ary = arrayobj._empty_nd_impl(context, builder, arrtype, shapes)
+
+        return ary._getvalue()
+    elif isinstance(context,numba.cuda.target.CUDATargetContext):
+        print( "CUDA GPU local_array (IMPL)" )
+        length = sig.args[0].literal_value
+        dtype = parse_dtype(sig.args[1])
+        return numba.cuda.lowering._generic_array(
+            context,
+            builder,
+            shape=(length,),
+            dtype=dtype,
+            symbol_name='_cudapy_harm_lmem',
+            addrspace=numba.cuda.cudadrv.nvvm.ADDRSPACE_LOCAL,
+            can_dynsized=False
+        )
+    elif isinstance(context,numba.hip.target.HIPTargetContext):
+        print( "HIP GPU local_array (IMPL)" )
+        length = sig.args[0].literal_value
+        dtype = parse_dtype(sig.args[1])
+        return numba.hip.typing_lowering.hip.lowering._generic_array(
+            context,
+            builder,
+            shape=(length,),
+            dtype=dtype,
+            symbol_name="_harmpy_lmem",
+            addrspace=numba.hip.amdgcn.ADDRSPACE_LOCAL,
+            can_dynsized=False,
+        )
+    else:
+        raise numba.core.errors.UnsupportedError(f"Unsupported target context {context}.")
+
 
 
 # =============================================================================
@@ -185,7 +347,10 @@ def for_(target, on_target=[]):
         exec(jit_str, globals(), locals())
         result = eval("jit_func")
         blank = blankout_fn(func)
-        numba.core.extending.overload(blank, target=target)(result)
+        if target == 'gpu':
+            numba.core.extending.overload(blank, target=target)(result)
+        else:
+            numba.core.extending.overload(blank, target=target)(result)
         return blank
 
     return for_inner
@@ -201,24 +366,6 @@ def for_gpu(on_target=[]):
 
 def target_for(target):
     pass
-
-
-#
-#    for func in late_jit_roster:
-#        if target == 'cpu':
-#            overwrite_func(func,numba.njit)
-#        elif target == 'gpu':
-#            overwrite_func(func,numba.cuda.jit)
-#        else:
-#            unknown_target(target)
-#
-#    for func, on_target in target_rosters[target].items():
-#        transformed = func
-#        for transformer in on_target:
-#            transformed = transformer(transformed)
-#        name = func.__name__
-#        print(f"Overwriting func {name} for target {target}")
-#        overwrite_func(func, transformed)
 
 
 def jit_on_target():
@@ -238,27 +385,6 @@ def nopython_mode(is_on):
     for impl in target_rosters["cpu"].values():
         overwrite_func(impl, impl)
 
-
-# Function adapted from Phillip Eller's `myjit` solution to the GPU/CPU array
-# problem brought up in https://github.com/numba/numba/issues/2571
-def universal_arrays(target):
-    def universal_arrays_inner(func):
-        if target == "gpu":
-            source = inspect.getsource(func).splitlines()
-            for idx, line in enumerate(source):
-                if "@universal_arrays" in line:
-                    source = "\n".join(source[idx + 1 :]) + "\n"
-                    break
-            source = source.replace("np.empty", "cuda.local.array")
-            # print(source)
-            exec(source)
-            revised_func = eval(func.__name__)
-            overwrite_func(func, revised_func)
-            # module = __import__(func.__module__,fromlist=[func.__name__])
-            # print(inspect.getsource(getattr(module,func.__name__)))
-        return revised_func
-
-    return universal_arrays_inner
 
 
 # =============================================================================
@@ -345,10 +471,10 @@ def add_active(particle, prog):
 
 @for_gpu()
 def add_active(particle, prog):
-    P = local_particle()
+    P = local_array(1,type_.particle)
     kernel.recordlike_to_particle(P,particle)
     if SIMPLE_ASYNC:
-        step_async(prog, P)
+        step_async(prog, P[0])
     else:
         find_cell_async(prog, P)
 

@@ -23,7 +23,7 @@ from mcdc.print_ import (
     print_msg,
 )
 
-caching = True
+caching = False
 
 
 def set_cache(setting):
@@ -177,6 +177,7 @@ def loop_eigenvalue(mcdc):
 # =============================================================================
 
 
+
 @njit(cache=caching)
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.device(prog)
@@ -187,12 +188,13 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     # Get a source particle and put into active bank
     # =====================================================================
 
-    P = adapt.local_particle_record()
+    P_arr = adapt.local_array(1,type_.particle_record)
+    P = P_arr[0]
 
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
         # Sample source
-        kernel.source_particle(P, seed_work, mcdc)
+        kernel.source_particle(P_arr, seed_work, mcdc)
 
     # Get from source bank
     else:
@@ -200,7 +202,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
 
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
-        kernel.allocate_hid(P, mcdc)
+        kernel.allocate_hid(P_arr, mcdc)
 
     # Check if it is beyond current census index
     idx_census = mcdc["idx_census"]
@@ -208,47 +210,53 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
-            if kernel.particle_in_domain(P, mcdc):
-                adapt.add_census(P, prog)
+            if kernel.particle_in_domain(P_arr, mcdc):
+                adapt.add_census(P_arr, prog)
         else:
-            adapt.add_census(P, prog)
+            adapt.add_census(P_arr, prog)
     else:
         # Add the source particle into the active bank
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
-            if kernel.particle_in_domain(P, mcdc):
-                adapt.add_active(P, prog)
+            if kernel.particle_in_domain(P_arr, mcdc):
+                adapt.add_active(P_arr, prog)
         else:
-            adapt.add_active(P, prog)
+            adapt.add_active(P_arr, prog)
 
 
 @njit(cache=caching)
-def prep_particle(P, prog):
+def prep_particle(P_arr, prog):
+    P = P_arr[0]
     mcdc = adapt.device(prog)
 
     # Apply weight window
     if mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, prog)
+        kernel.weight_window(P_arr, prog)
 
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
-        kernel.allocate_pid(P, mcdc)
+        kernel.allocate_pid(P_arr, mcdc)
 
 
-@njit(cache=caching)
+@njit()
 def exhaust_active_bank(prog):
     mcdc = adapt.device(prog)
-    P = adapt.local_particle()
+    P_arr = adapt.local_array(1,type_.particle)
+    P = P_arr[0]
+    #P2 = adapt.local_array(1,type_.particle)[0]
+
+
+
     # Loop until active bank is exhausted
     while kernel.get_bank_size(mcdc["bank_active"]) > 0:
         # Get particle from active bank
-        kernel.get_particle(P, mcdc["bank_active"], mcdc)
+        kernel.get_particle(P_arr, mcdc["bank_active"], mcdc)
 
-        prep_particle(P, prog)
+        prep_particle(P_arr, prog)
 
         # Particle loop
-        loop_particle(P, mcdc)
+        loop_particle(P_arr, mcdc)
 
 
 @njit(cache=caching)
@@ -282,26 +290,28 @@ def source_dd_resolution(prog):
     if mcdc["domain_decomp"]["work_done"]:
         terminated = True
 
+    P_arr = adapt.local_array(1,type_.particle)
+    P = P_arr[0]
+
     while not terminated:
         if kernel.get_bank_size(mcdc["bank_active"]) > 0:
-            P = adapt.local_particle()
             # Loop until active bank is exhausted
             while kernel.get_bank_size(mcdc["bank_active"]) > 0:
 
-                kernel.get_particle(P, mcdc["bank_active"], mcdc)
-                if not kernel.particle_in_domain(P, mcdc) and P["alive"] == True:
+                kernel.get_particle(P_arr, mcdc["bank_active"], mcdc)
+                if not kernel.particle_in_domain(P_arr, mcdc) and P["alive"] == True:
                     print(f"recieved particle not in domain")
 
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
-                    kernel.weight_window(P, mcdc)
+                    kernel.weight_window(P_arr, mcdc)
 
                 # Particle tracker
                 if mcdc["setting"]["track_particle"]:
                     mcdc["particle_track_particle_ID"] += 1
 
                 # Particle loop
-                loop_particle(P, mcdc)
+                loop_particle(P_arr, mcdc)
 
                 # Tally history closeout for one-batch fixed-source simulation
                 if (
@@ -390,12 +400,14 @@ def gpu_sources_spec():
 
     def step(prog: nb.uintp, P: adapt.particle_gpu):
         mcdc = adapt.device(prog)
+        P_arr = adapt.local_array(1,type_.particle)
+        P_arr[0] = P
         if P["fresh"]:
-            prep_particle(P, prog)
+            prep_particle(P_arr, prog)
         P["fresh"] = False
-        step_particle(P, prog)
+        step_particle(P_arr, prog)
         if P["alive"]:
-            adapt.step_async(prog, P)
+            adapt.step_async(prog, P_arr[0])
 
     async_fns = [step]
     return adapt.harm.RuntimeSpec("mcdc_source", adapt.state_spec, base_fns, async_fns,adapt.harm.GPUPlatform.ROCM)
@@ -461,34 +473,51 @@ def gpu_loop_source(seed, mcdc):
 
 
 @njit(cache=caching)
-def loop_particle(P, prog):
+def loop_particle(P_arr, prog):
+    P = P_arr[0]
     mcdc = adapt.device(prog)
 
+    #P_test = adapt.local_array(1,type_.particle)[0]
+    #P_test["rng_seed"] = 12345
+    #if P_test["rng_seed"] == P["rng_seed"]:
+    #    print("BAD STUFF")
+
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
+        kernel.track_particle(P_arr, mcdc)
 
     while P["alive"]:
-        step_particle(P, prog)
+        step_particle(P_arr, prog)
 
     # Particle tracker
     if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
+        kernel.track_particle(P_arr, mcdc)
 
 
 @njit(cache=caching)
-def step_particle(P, prog):
+def step_particle(P_arr, prog):
+    P = P_arr[0]
     mcdc = adapt.device(prog)
 
+    adapt.harm.print_formatted(77777)
+    adapt.harm.print_formatted(P["rng_seed"])
+
+
+
     # Find cell from root universe if unknown
+    adapt.harm.print_formatted(-12)
     if P["cell_ID"] == -1:
         trans_struct = adapt.local_translate()
         trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+        adapt.harm.print_formatted(-23)
+        P["cell_ID"] = kernel.get_particle_cell(P_arr, 0, trans, mcdc)
+        adapt.harm.print_formatted(P["cell_ID"])
 
     # Determine and move to event
-    kernel.move_to_event(P, mcdc)
+    adapt.harm.print_formatted(88888)
+    kernel.move_to_event(P_arr, mcdc)
     event = P["event"]
+    adapt.harm.print_formatted(P["event"])
 
     # The & operator here is a bitwise and.
     # It is used to determine if an event type is part of the particle event.
@@ -497,23 +526,29 @@ def step_particle(P, prog):
     if event & EVENT_COLLISION:
         # Generate IC?
         if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
-            kernel.bank_IC(P, prog)
+            kernel.bank_IC(P_arr, prog)
 
         # Branchless collision?
         if mcdc["technique"]["branchless_collision"]:
-            kernel.branchless_collision(P, prog)
+            pass # adapt.harm.print_formatted(2)
+            kernel.branchless_collision(P_arr, prog)
 
         # Analog collision
         else:
+            pass # adapt.harm.print_formatted(3) #!
             # Get collision type
-            kernel.collision(P, mcdc)
+            kernel.collision(P_arr, mcdc)
             event = P["event"]
 
             # Perform collision
             if event == EVENT_SCATTERING:
-                kernel.scattering(P, prog)
+                adapt.harm.print_formatted(31) #!
+                kernel.scattering(P_arr, prog)
             elif event == EVENT_FISSION:
-                kernel.fission(P, prog)
+                kernel.fission(P_arr, prog)
+                adapt.harm.print_formatted(32) #!
+            else:
+                adapt.harm.print_formatted(33) #!
 
             # Sensitivity quantification for nuclide?
             material = mcdc["materials"][P["material_ID"]]
@@ -522,48 +557,57 @@ def step_particle(P, prog):
                 or mcdc["technique"]["dsm_order"] == 2
                 and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
             ):
-                kernel.sensitivity_material(P, prog)
+                kernel.sensitivity_material(P_arr, prog)
+                adapt.harm.print_formatted(34) #!
 
     # Surface crossing
     if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, prog)
+        pass # adapt.harm.print_formatted(4) #!
+        kernel.surface_crossing(P_arr, prog)
+        # adapt.harm.print_formatted(P["cell_ID"])
         if event & EVENT_DOMAIN:
             if not (
                 mcdc["surfaces"][P["surface_ID"]]["reflective"]
                 or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
             ):
-                kernel.domain_crossing(P, mcdc)
+                kernel.domain_crossing(P_arr, mcdc)
 
     # Lattice or mesh crossing (skipped if surface crossing)
     elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
+        pass # adapt.harm.print_formatted(5) #!
+        kernel.shift_particle(P_arr, SHIFT)
         if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
+            kernel.domain_crossing(P_arr, mcdc)
 
     # Moving surface transition
     if event & EVENT_SURFACE_MOVE:
+        pass # adapt.harm.print_formatted(6)
         P["t"] += SHIFT
         P["cell_ID"] = -1
 
     # Census time crossing
     if event & EVENT_CENSUS:
+        pass # adapt.harm.print_formatted(7)
         P["t"] += SHIFT
-        adapt.add_census(P, prog)
+        adapt.add_census(P_arr, prog)
         P["alive"] = False
 
     # Time boundary crossing
     if event & EVENT_TIME_BOUNDARY:
+        pass # adapt.harm.print_formatted(8) #!
         P["alive"] = False
 
     # Apply weight window
     if P["alive"] and mcdc["technique"]["weight_window"]:
-        kernel.weight_window(P, prog)
+        pass # adapt.harm.print_formatted(9)
+        kernel.weight_window(P_arr, prog)
 
     # Apply weight roulette
     if P["alive"] and mcdc["technique"]["weight_roulette"]:
+        pass # adapt.harm.print_formatted(10)
         # check if weight has fallen below threshold
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
-            kernel.weight_roulette(P, mcdc)
+            kernel.weight_roulette(P_arr, mcdc)
 
 
 # =============================================================================
@@ -946,7 +990,8 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     g = DNP["n_g"]
 
     # Create new particle
-    P_new = adapt.local_particle()
+    P_new_arr = adapt.local_array(1,type_.particle)
+    P_new =  P_new_arr[0]
     part_seed = kernel.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
@@ -961,8 +1006,9 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     # Get material
     trans_struct = adapt.local_translate()
     trans = trans_struct["values"]
-    P_new["cell_ID"] = kernel.get_particle_cell(P_new, 0, trans, mcdc)
-    material_ID = kernel.get_particle_material(P_new, mcdc)
+    adapt.harm.print_formatted(-90)
+    P_new["cell_ID"] = kernel.get_particle_cell(P_new_arr, 0, trans, mcdc)
+    material_ID = kernel.get_particle_material(P_new_arr, mcdc)
     material = mcdc["materials"][material_ID]
     G = material["G"]
 
@@ -975,7 +1021,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     else:
         SigmaF = material["fission"][g]  # MG only
         nu_d = material["nu_d"][g]
-        xi = kernel.rng(P_new) * nu_d[j] * SigmaF
+        xi = kernel.rng(P_new_arr) * nu_d[j] * SigmaF
         tot = 0.0
         for i in range(N_nuclide):
             nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -988,7 +1034,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
                 break
 
     # Sample emission time
-    P_new["t"] = -math.log(kernel.rng(P_new)) / decay
+    P_new["t"] = -math.log(kernel.rng(P_new_arr)) / decay
     idx_census = mcdc["idx_census"]
     if idx_census > 0:
         P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
@@ -1003,7 +1049,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
             return
 
         # Sample energy
-        xi = kernel.rng(P_new)
+        xi = kernel.rng(P_new_arr)
         tot = 0.0
         for g_out in range(G):
             tot += spectrum[g_out]
@@ -1016,10 +1062,10 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
             P_new["ux"],
             P_new["uy"],
             P_new["uz"],
-        ) = kernel.sample_isotropic_direction(P_new)
+        ) = kernel.sample_isotropic_direction(P_new_arr)
 
         # Push to active bank
-        adapt.add_active(P_new, prog)
+        adapt.add_active(P_new_arr, prog)
 
 
 @njit(cache=caching)
@@ -1129,12 +1175,15 @@ def gpu_precursor_spec():
 
     base_fns = (initialize, finalize, make_work)
 
-    def step(prog: nb.uintp, P: adapt.particle_gpu):
+    def step(prog: nb.uintp, P_val: adapt.particle_gpu):
         mcdc = adapt.device(prog)
+        P_arr = adapt.local_array(1,type_.particle)
+        P_arr[0] = P_val
+        P = P_arr[0]
         if P["fresh"]:
-            prep_particle(P, prog)
+            prep_particle(P_arr, prog)
         P["fresh"] = False
-        step_particle(P, prog)
+        step_particle(P_arr, prog)
         if P["alive"]:
             adapt.step_async(prog, P)
 
@@ -1142,6 +1191,8 @@ def gpu_precursor_spec():
     return adapt.harm.RuntimeSpec(
         "mcdc_precursor", adapt.state_spec, base_fns, async_fns, adapt.harm.GPUPlatform.ROCM
     )
+
+
 
 
 @njit
@@ -1205,11 +1256,11 @@ def gpu_loop_source_precursor(seed, mcdc):
     source_precursor_closeout(mcdc, 1, 1)
 
 
-
 def build_gpu_progs():
 
     src_spec = gpu_sources_spec()
     pre_spec = gpu_precursor_spec()
+
 
     adapt.harm.RuntimeSpec.bind_and_load()
 
@@ -1243,6 +1294,7 @@ def build_gpu_progs():
     pre_exec_program = pre_fns["exec_program"]
     pre_complete = pre_fns["complete"]
     pre_clear_flags = pre_fns["clear_flags"]
+
 
     @njit
     def real_setup_gpu(mcdc):
