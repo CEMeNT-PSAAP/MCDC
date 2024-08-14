@@ -34,4 +34,4 @@ jobs:
     - name: Regression Test - Numba
       run: |
           cd test/regression
-          python run.py --mode=numba
+          python run.py --mode=numba --target=gpu
