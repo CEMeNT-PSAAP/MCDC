@@ -6,6 +6,7 @@ from mcdc.constant import (
     BOOL_OR,
     BOOL_NOT,
     INF,
+    PI,
     SHIFT,
 )
 
