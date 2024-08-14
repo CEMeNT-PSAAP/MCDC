@@ -1,9 +1,6 @@
 import numpy as np
 import sympy
 
-<<<<<<< HEAD
-from mcdc.constant import INF, SHIFT, PI
-=======
 from mcdc.constant import (
     BOOL_AND,
     BOOL_OR,
@@ -11,7 +8,6 @@ from mcdc.constant import (
     INF,
     SHIFT,
 )
->>>>>>> dev
 
 # Get the global variable container
 import mcdc.global_ as global_
