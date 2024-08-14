@@ -41,11 +41,14 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Install MC/DC module
+# Install MC/DC module (and the dependencies)
 pip install -e .
 
 # Patch Numba
 bash patch_numba.sh
+
+# Install pre-commit hook
+pre-commit install
 
 # Installing visualization dependencies (required via pip for osx-arm64)
 pip install ngsolve distinctipy
