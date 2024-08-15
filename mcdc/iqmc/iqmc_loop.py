@@ -56,9 +56,8 @@ def iqmc_step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+        kernel.reset_local_coordinate(P)
+        P["cell_ID"] = kernel.get_particle_cell(P, 0, mcdc)
 
     # Determine and move to event
     iqmc_kernel.iqmc_move_to_event(P, mcdc)

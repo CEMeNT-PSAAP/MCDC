@@ -1367,7 +1367,7 @@ def bank_IC(P, prog):
 
     # Sample particle
     if rng(P) < Pn:
-        P_new = split_particle(P)
+        P_new = split_as_record(P)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
         adapt.add_IC(P_new, prog)
@@ -1479,7 +1479,7 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        P = copy_record(bank_census["particles"][idx])
+        P = make_record(bank_census["particles"][idx])
         # Set weight
         P["w"] *= td
         adapt.add_source(P, mcdc)
@@ -1517,7 +1517,7 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        P = copy_record(bank_census["particles"][idx])
+        P = make_record(bank_census["particles"][idx])
         # Set weight
         P["w"] = td
         adapt.add_source(P, mcdc)
@@ -1565,7 +1565,7 @@ def lost_particle(P):
 
 
 @njit
-def get_particle_cell(P, universe_ID, trans, mcdc):
+def get_particle_cell(P, universe_ID, mcdc):
     """
     Find and return particle cell ID in the given universe and translation
     """
@@ -1573,7 +1573,7 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
     universe = mcdc["universes"][universe_ID]
     for cell_ID in universe["cell_IDs"]:
         cell = mcdc["cells"][cell_ID]
-        if cell_check(P, cell, trans, mcdc):
+        if cell_check(P, cell, mcdc):
             return cell["ID"]
 
     # Particle is not found
@@ -1583,42 +1583,66 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
 
 
 @njit
-def get_particle_material(P, mcdc):
-    # Translation accumulator
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
+def reset_local_coordinate(P):
+    P["translation"][0] = 0.0
+    P["translation"][1] = 0.0
+    P["translation"][2] = 0.0
+    P["translated"] = False
 
+
+@njit
+def get_local_coordinate(P):
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+
+    if P["translated"]:
+        x -= P["translation"][0]
+        y -= P["translation"][1]
+        z -= P["translation"][2]
+
+    return x, y, z
+
+
+@njit
+def get_particle_material(P, mcdc):
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
 
+    reset_local_coordinate(P)
+
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
-        # Lattice cell?
-        if cell["fill_type"] == FILL_LATTICE:
-            # Get lattice
-            lattice = mcdc["lattices"][cell["fill_ID"]]
-
-            # Get lattice center for translation)
-            for i in range(3):
-                trans[i] -= cell["translation"][i]
-
-            # Get universe
-            mesh = lattice["mesh"]
-            x, y, z = mesh_uniform_get_index(P, mesh, trans)
-            universe_ID = lattice["universe_IDs"][x, y, z]
-
-            # Update translation
-            trans[0] -= mesh["x0"] + (x + 0.5) * mesh["dx"]
-            trans[1] -= mesh["y0"] + (y + 0.5) * mesh["dy"]
-            trans[2] -= mesh["z0"] + (z + 0.5) * mesh["dz"]
-
-            # Get inner cell
-            cell_ID = get_particle_cell(P, universe_ID, trans, mcdc)
-            cell = mcdc["cells"][cell_ID]
+        if cell["fill_type"] == FILL_MATERIAL:
+            # Material cell found, return material ID
+            break
 
         else:
-            # Material cell found, return material_ID
-            break
+            # Cell is filled with universe or lattice
+
+            # Apply translation
+            if cell["fill_translated"]:
+                P["translation"] += cell["translation"]
+                P["translated"] = True
+
+            if cell["fill_type"] == FILL_LATTICE:
+                # Get lattice
+                lattice = mcdc["lattices"][cell["fill_ID"]]
+
+                # Get universe
+                mesh = lattice["mesh"]
+                x, y, z = mesh_uniform_get_index(P, mesh)
+                universe_ID = lattice["universe_IDs"][x, y, z]
+
+                # Lattice-translate the particle
+                P["translation"][0] += mesh["x0"] + (x + 0.5) * mesh["dx"]
+                P["translation"][1] += mesh["y0"] + (y + 0.5) * mesh["dy"]
+                P["translation"][2] += mesh["z0"] + (z + 0.5) * mesh["dz"]
+                P["translated"] = True
+
+                # Get inner cell
+                cell_ID = get_particle_cell(P, universe_ID, mcdc)
+                cell = mcdc["cells"][cell_ID]
 
     return cell["fill_ID"]
 
@@ -1650,26 +1674,6 @@ def copy_recordlike(P_new, P):
 
 
 @njit
-def copy_record(P):
-    P_new = adapt.local_particle_record()
-    copy_recordlike(P_new, P)
-    return P_new
-
-
-@njit
-def recordlike_to_particle(P_rec):
-    P_new = adapt.local_particle()
-    copy_recordlike(P_new, P_rec)
-    P_new["fresh"] = True
-    P_new["alive"] = True
-    P_new["material_ID"] = -1
-    P_new["cell_ID"] = -1
-    P_new["surface_ID"] = -1
-    P_new["event"] = -1
-    return P_new
-
-
-@njit
 def copy_particle(P_new, P):
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -1694,8 +1698,38 @@ def copy_particle(P_new, P):
 
 
 @njit
+def make_record(P):
+    P_new = adapt.local_particle_record()
+    copy_recordlike(P_new, P)
+    return P_new
+
+
+@njit
+def make_particle(P_rec):
+    P_new = adapt.local_particle()
+    copy_recordlike(P_new, P_rec)
+    P_new["fresh"] = True
+    P_new["alive"] = True
+    P_new["material_ID"] = -1
+    P_new["cell_ID"] = -1
+    P_new["surface_ID"] = -1
+    P_new["event"] = -1
+    return P_new
+
+
+@njit
 def split_particle(P):
-    P_new = copy_record(P)
+    P_new = adapt.local_particle()
+    copy_particle(P_new, P)
+    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
+    rng(P)
+    return P_new
+
+
+@njit
+def split_as_record(P):
+    P_new = adapt.local_particle_record()
+    copy_recordlike(P_new, P)
     P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
     return P_new
@@ -1707,7 +1741,7 @@ def split_particle(P):
 
 
 @njit
-def cell_check(P, cell, trans, mcdc):
+def cell_check(P, cell, mcdc):
     # Access RPN data
     idx = cell["region_data_idx"]
     N_token = mcdc["cell_region_data"][idx]
@@ -1725,7 +1759,7 @@ def cell_check(P, cell, trans, mcdc):
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
-            value[N_value] = surface_evaluate(P, surface, trans) > 0.0
+            value[N_value] = surface_evaluate(P, surface) > 0.0
             N_value += 1
 
         elif token == BOOL_NOT:
@@ -1744,58 +1778,6 @@ def cell_check(P, cell, trans, mcdc):
     return value[0]
 
 
-@njit
-def region_check(P, region, trans, mcdc):
-    if region["type"] == REGION_HALFSPACE:
-        surface_ID = region["A"]
-        positive_side = region["B"]
-
-        surface = mcdc["surfaces"][surface_ID]
-        side = surface_evaluate(P, surface, trans)
-
-        if positive_side:
-            if side > 0.0:
-                return True
-        elif side <= 0.0:
-            return True
-
-        return False
-
-    elif region["type"] == REGION_INTERSECTION:
-        region_A = mcdc["regions"][region["A"]]
-        region_B = mcdc["regions"][region["B"]]
-
-        check_A = region_check(P, region_A, trans, mcdc)
-        check_B = region_check(P, region_B, trans, mcdc)
-
-        if check_A and check_B:
-            return True
-        else:
-            return False
-
-    elif region["type"] == REGION_COMPLEMENT:
-        region_A = mcdc["regions"][region["A"]]
-        if not region_check(P, region_A, trans, mcdc):
-            return True
-        else:
-            return False
-
-    elif region["type"] == REGION_UNION:
-        region_A = mcdc["regions"][region["A"]]
-        region_B = mcdc["regions"][region["B"]]
-
-        if region_check(P, region_A, trans, mcdc):
-            return True
-
-        if region_check(P, region_B, trans, mcdc):
-            return True
-
-        return False
-
-    elif region["type"] == REGION_ALL:
-        return True
-
-
 # =============================================================================
 # Surface operations
 # =============================================================================
@@ -1804,10 +1786,8 @@ def region_check(P, region, trans, mcdc):
 
 
 @njit
-def surface_evaluate(P, surface, trans):
-    x = P["x"] + trans[0]
-    y = P["y"] + trans[1]
-    z = P["z"] + trans[2]
+def surface_evaluate(P, surface):
+    x, y, z = get_local_coordinate(P)
     t = P["t"]
 
     G = surface["G"]
@@ -1842,11 +1822,11 @@ def surface_evaluate(P, surface, trans):
 
 
 @njit
-def surface_bc(P, surface, trans):
+def surface_bc(P, surface):
     if surface["BC"] == BC_VACUUM:
         P["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
-        surface_reflect(P, surface, trans)
+        surface_reflect(P, surface)
 
 
 @njit
@@ -1858,11 +1838,11 @@ def surface_exit_evaluate(P):
 
 
 @njit
-def surface_reflect(P, surface, trans):
+def surface_reflect(P, surface):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    nx, ny, nz = surface_normal(P, surface, trans)
+    nx, ny, nz = surface_normal(P, surface)
     # 2.0*surface_normal_component(...)
     c = 2.0 * (nx * ux + ny * uy + nz * uz)
 
@@ -1872,13 +1852,13 @@ def surface_reflect(P, surface, trans):
 
 
 @njit
-def surface_shift(P, surface, trans, mcdc):
+def surface_shift(P, surface, mcdc):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
 
     # Get surface normal
-    nx, ny, nz = surface_normal(P, surface, trans)
+    nx, ny, nz = surface_normal(P, surface)
 
     # The shift
     shift_x = nx * SHIFT
@@ -1907,7 +1887,7 @@ def surface_shift(P, surface, trans, mcdc):
 
 
 @njit
-def surface_normal(P, surface, trans):
+def surface_normal(P, surface):
     if surface["linear"]:
         return surface["nx"], surface["ny"], surface["nz"]
 
@@ -1920,9 +1900,8 @@ def surface_normal(P, surface, trans):
     G = surface["G"]
     H = surface["H"]
     I_ = surface["I"]
-    x = P["x"] + trans[0]
-    y = P["y"] + trans[1]
-    z = P["z"] + trans[2]
+
+    x, y, z = get_local_coordinate(P)
 
     dx = 2 * A * x + D * y + E * z + G
     dy = 2 * B * y + D * x + F * z + H
@@ -1933,16 +1912,16 @@ def surface_normal(P, surface, trans):
 
 
 @njit
-def surface_normal_component(P, surface, trans):
+def surface_normal_component(P, surface):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    nx, ny, nz = surface_normal(P, surface, trans)
+    nx, ny, nz = surface_normal(P, surface)
     return nx * ux + ny * uy + nz * uz
 
 
 @njit
-def surface_distance(P, surface, trans, mcdc):
+def surface_distance(P, surface, mcdc):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
@@ -1963,9 +1942,7 @@ def surface_distance(P, surface, trans, mcdc):
         d_max = (t_max - P["t"]) * v
 
         div = G * ux + H * uy + I_ * uz + J1 / v
-        distance = -surface_evaluate(P, surface, trans) / (
-            G * ux + H * uy + I_ * uz + J1 / v
-        )
+        distance = -surface_evaluate(P, surface) / (G * ux + H * uy + I_ * uz + J1 / v)
 
         # Go beyond current movement slice?
         if distance > d_max:
@@ -1981,9 +1958,7 @@ def surface_distance(P, surface, trans, mcdc):
         else:
             return distance, surface_move
 
-    x = P["x"] + trans[0]
-    y = P["y"] + trans[1]
-    z = P["z"] + trans[2]
+    x, y, z = get_local_coordinate(P)
 
     A = surface["A"]
     B = surface["B"]
@@ -2010,7 +1985,7 @@ def surface_distance(P, surface, trans, mcdc):
         + H * uy
         + I_ * uz
     )
-    c = surface_evaluate(P, surface, trans)
+    c = surface_evaluate(P, surface)
 
     determinant = b * b - 4.0 * a * c
 
@@ -2128,10 +2103,8 @@ def mesh_get_energy_index(P, mesh, mcdc):
 
 
 @njit
-def mesh_uniform_get_index(P, mesh, trans):
-    Px = P["x"] + trans[0]
-    Py = P["y"] + trans[1]
-    Pz = P["z"] + trans[2]
+def mesh_uniform_get_index(P, mesh):
+    Px, Py, Pz = get_local_coordinate(P)
     x = numba.int64(math.floor((Px - mesh["x0"]) / mesh["dx"]))
     y = numba.int64(math.floor((Py - mesh["y0"]) / mesh["dy"]))
     z = numba.int64(math.floor((Pz - mesh["z0"]) / mesh["dz"]))
@@ -2654,27 +2627,21 @@ def distance_to_boundary(P, mcdc):
     distance = INF
     event = 0
 
-    # Translation accumulator
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
-
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
+
+    reset_local_coordinate(P)
 
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
         # Distance to nearest surface
-        d_surface, surface_ID, surface_move = distance_to_nearest_surface(
-            P, cell, trans, mcdc
-        )
+        d_surface, surface_ID, surface_move = distance_to_nearest_surface(P, cell, mcdc)
 
         # Check if smaller
         if d_surface * PREC < distance:
             distance = d_surface
             event = EVENT_SURFACE
             P["surface_ID"] = surface_ID
-            for i in range(3):
-                P["translation"][i] = trans[i]
 
             if surface_move:
                 event = EVENT_SURFACE_MOVE
@@ -2683,42 +2650,47 @@ def distance_to_boundary(P, mcdc):
             P["material_ID"] = cell["fill_ID"]
             break
 
-        elif cell["fill_type"] == FILL_LATTICE:
-            # Get lattice
-            lattice = mcdc["lattices"][cell["fill_ID"]]
+        else:
+            # Cell is filled with universe or lattice
 
-            # Get lattice center for translation)
-            for i in range(3):
-                trans[i] -= cell["translation"][i]
+            # Apply translation
+            if cell["fill_translated"]:
+                P["translation"] += cell["translation"]
+                P["translated"] = True
 
-            # Distance to lattice
-            d_lattice = distance_to_lattice(P, lattice, trans)
+            if cell["fill_type"] == FILL_LATTICE:
+                # Get lattice
+                lattice = mcdc["lattices"][cell["fill_ID"]]
 
-            # Check if smaller
-            if d_lattice * PREC < distance:
-                distance = d_lattice
-                event = EVENT_LATTICE
-                P["surface_ID"] = -1
+                # Distance to lattice
+                d_lattice = distance_to_lattice(P, lattice)
 
-            # Get universe
-            mesh = lattice["mesh"]
-            x, y, z = mesh_uniform_get_index(P, mesh, trans)
-            universe_ID = lattice["universe_IDs"][x, y, z]
+                # Check if smaller
+                if d_lattice * PREC < distance:
+                    distance = d_lattice
+                    event = EVENT_LATTICE
+                    P["surface_ID"] = -1
 
-            # Update translation
-            trans[0] -= mesh["x0"] + (x + 0.5) * mesh["dx"]
-            trans[1] -= mesh["y0"] + (y + 0.5) * mesh["dy"]
-            trans[2] -= mesh["z0"] + (z + 0.5) * mesh["dz"]
+                # Get universe
+                mesh = lattice["mesh"]
+                x, y, z = mesh_uniform_get_index(P, mesh)
+                universe_ID = lattice["universe_IDs"][x, y, z]
 
-            # Get inner cell
-            cell_ID = get_particle_cell(P, universe_ID, trans, mcdc)
-            cell = mcdc["cells"][cell_ID]
+                # Lattice-translate the particle
+                P["translation"][0] += mesh["x0"] + (x + 0.5) * mesh["dx"]
+                P["translation"][1] += mesh["y0"] + (y + 0.5) * mesh["dy"]
+                P["translation"][2] += mesh["z0"] + (z + 0.5) * mesh["dz"]
+                P["translated"] = True
+
+                # Get inner cell
+                cell_ID = get_particle_cell(P, universe_ID, mcdc)
+                cell = mcdc["cells"][cell_ID]
 
     return distance, event
 
 
 @njit
-def distance_to_nearest_surface(P, cell, trans, mcdc):
+def distance_to_nearest_surface(P, cell, mcdc):
     distance = INF
     surface_ID = -1
     surface_move = False
@@ -2733,7 +2705,7 @@ def distance_to_nearest_surface(P, cell, trans, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cell_surface_data"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d, sm = surface_distance(P, surface, trans, mcdc)
+        d, sm = surface_distance(P, surface, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]
@@ -2743,12 +2715,10 @@ def distance_to_nearest_surface(P, cell, trans, mcdc):
 
 
 @njit
-def distance_to_lattice(P, lattice, trans):
+def distance_to_lattice(P, lattice):
     mesh = lattice["mesh"]
 
-    x = P["x"] + trans[0]
-    y = P["y"] + trans[1]
-    z = P["z"] + trans[2]
+    x, y, z = get_local_coordinate(P)
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
@@ -2789,16 +2759,12 @@ def surface_crossing(P, prog):
 
     mcdc = adapt.device(prog)
 
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
-    trans = P["translation"]
-
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    surface_bc(P, surface, trans)
+    surface_bc(P, surface)
 
     # Small shift to ensure crossing
-    surface_shift(P, surface, trans, mcdc)
+    surface_shift(P, surface, mcdc)
 
     # Record old material for sensitivity quantification
     material_ID_old = P["material_ID"]
@@ -2813,10 +2779,9 @@ def surface_crossing(P, prog):
     # Check new cell?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         cell = mcdc["cells"][P["cell_ID"]]
-        if not cell_check(P, cell, trans, mcdc):
-            trans_struct = adapt.local_translate()
-            trans = trans_struct["values"]
-            P["cell_ID"] = get_particle_cell(P, UNIVERSE_ROOT, trans, mcdc)
+        if not cell_check(P, cell, mcdc):
+            reset_local_coordinate(P)
+            P["cell_ID"] = get_particle_cell(P, UNIVERSE_ROOT, mcdc)
 
     # Sensitivity quantification for surface?
     if surface["sensitivity"] and (
@@ -2912,7 +2877,7 @@ def scattering(P, prog):
 
     for n in range(N):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = split_as_record(P)
 
         # Set weight
         P_new["w"] = weight_new
@@ -3178,7 +3143,7 @@ def fission(P, prog):
 
     for n in range(N):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = split_as_record(P)
 
         # Set weight
         P_new["w"] = weight_new
@@ -3444,7 +3409,7 @@ def branchless_collision(P, prog):
             idx_census = mcdc["idx_census"]
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
                 P["alive"] = False
-                adapt.add_active(split_particle(P), prog)
+                adapt.add_active(split_as_record(P), prog)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
 
@@ -3481,13 +3446,13 @@ def weight_window(P, prog):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            adapt.add_active(split_particle(P), prog)
+            adapt.add_active(split_as_record(P), prog)
 
         # Russian roulette
         p -= n_split
         xi = rng(P)
         if xi <= p:
-            adapt.add_active(split_particle(P), prog)
+            adapt.add_active(split_as_record(P), prog)
 
     # Below target
     elif p < 1.0 / width:
@@ -3535,7 +3500,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
 
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
-    adapt.add_active(copy_record(P), prog)
+    adapt.add_active(make_record(P), prog)
 
     # Get sensitivity ID
     ID = surface["sensitivity_ID"]
@@ -3549,8 +3514,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
     material_new = mcdc["materials"][material_ID_new]
 
     # Determine the plus and minus components and then their weight signs
-    trans = P["translation"]
-    sign_origin = surface_normal_component(P, surface, trans)
+    sign_origin = surface_normal_component(P, surface)
     if sign_origin > 0.0:
         # New is +, old is -
         sign_new = -1.0
@@ -3640,10 +3604,10 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
         P_new["sensitivity_ID"] = ID
 
         # Shift back if needed to ensure crossing
-        sign = surface_normal_component(P_new, surface, trans)
+        sign = surface_normal_component(P_new, surface)
         if sign_origin * sign > 0.0:
             # Get surface normal
-            nx, ny, nz = surface_normal(P_new, surface, trans)
+            nx, ny, nz = surface_normal(P_new, surface)
 
             # The shift
             if sign > 0.0:
@@ -3656,7 +3620,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
                 P_new["z"] += nz * 2 * SHIFT
 
         # Put the current particle into the secondary bank
-        adapt.add_active(P_new, prog)
+        adapt.add_active(make_record(P_new), prog)
 
     # Sample potential second-order sensitivity particles?
     if mcdc["technique"]["dsm_order"] < 2 or P["sensitivity_ID"] > 0:
@@ -3688,7 +3652,7 @@ def sensitivity_surface(P, surface, material_ID_old, material_ID_new, prog):
         source_obtained = False
 
         # Create new particle
-        P_new = split_particle(P)
+        P_new = split_as_record(P)
 
         # Sample term
         xi = rng(P_new) * p_total
@@ -3830,7 +3794,7 @@ def sensitivity_material(P, prog):
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new = split_particle(P)
+        P_new = split_as_record(P)
 
         # Sample source type
         xi = rng(P_new) * total

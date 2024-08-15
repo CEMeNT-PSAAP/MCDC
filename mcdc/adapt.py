@@ -343,7 +343,7 @@ def add_active(particle, prog):
 
 @for_gpu()
 def add_active(particle, prog):
-    P = kernel.recordlike_to_particle(particle)
+    P = kernel.make_particle(particle)
     if SIMPLE_ASYNC:
         step_async(prog, P)
     else:
@@ -381,19 +381,6 @@ def add_IC(particle, prog):
 def add_IC(particle, prog):
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
-
-
-@for_cpu()
-def local_translate():
-    return np.zeros(1, dtype=type_.translate)[0]
-
-
-@for_gpu()
-def local_translate():
-    trans = cuda.local.array(1, type_.translate)[0]
-    for i in range(3):
-        trans["values"][i] = 0
-    return trans
 
 
 @for_cpu()

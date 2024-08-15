@@ -42,7 +42,6 @@ tally = None
 technique = None
 
 # GPU mode related
-translate = None
 group_array = None
 j_array = None
 RPN_array = None
@@ -167,24 +166,32 @@ def make_type_particle(input_deck):
     global particle
 
     struct = [
+        # Coordinate
         ("x", float64),
         ("y", float64),
         ("z", float64),
         ("t", float64),
+        # Spatial direction
         ("ux", float64),
         ("uy", float64),
         ("uz", float64),
+        # Energy
         ("g", uint64),
         ("E", float64),
+        # Weight
         ("w", float64),
-        ("alive", bool_),
-        ("fresh", bool_),
+        # Local coordinate
+        ("translated", bool_),
+        ("translation", float64, (3,)),
+        # IDs
         ("material_ID", int64),
         ("cell_ID", int64),
         ("surface_ID", int64),
-        ("translation", float64, (3,)),
-        ("event", int64),
         ("sensitivity_ID", int64),
+        # Misc.
+        ("alive", bool_),
+        ("fresh", bool_),
+        ("event", int64),
         ("rng_seed", uint64),
     ]
 
@@ -521,9 +528,13 @@ def make_type_surface(input_deck):
 cell = into_dtype(
     [
         ("ID", int64),
+        # Fill status
         ("fill_type", int64),
         ("fill_ID", int64),
+        ("fill_translated", bool),
+        # Local coordinate modifier
         ("translation", float64, (3,)),
+        # Data indices
         ("surface_data_idx", int64),
         ("region_data_idx", int64),
     ]
@@ -1348,11 +1359,6 @@ def make_type_global(input_deck):
 # ==============================================================================
 # Util
 # ==============================================================================
-
-
-def make_type_translate(input_deck):
-    global translate
-    translate = into_dtype([("values", float64, (3,))])
 
 
 def make_type_group_array(input_deck):

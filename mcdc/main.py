@@ -383,7 +383,6 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    type_.make_type_translate(input_deck)
     type_.make_type_group_array(input_deck)
     type_.make_type_j_array(input_deck)
     type_.make_type_RPN_array(input_deck)
@@ -554,6 +553,10 @@ def prepare():
             mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
         elif input_deck.cells[i].fill_type == "lattice":
             mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+
+        # Fill translation flag
+        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
+            mcdc["cells"][i]["fill_translated"] = True
 
         # Surface data
         mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
