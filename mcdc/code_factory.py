@@ -18,9 +18,7 @@ def make_locals(input_deck):
     # Problem-dependent sizes
     G = input_deck.materials[0].G
     J = input_deck.materials[0].J
-    N_RPN = max(
-        [np.sum(np.array(x._region_RPN) >= 0.0) for x in input_deck.cells]
-    )
+    N_RPN = max([np.sum(np.array(x._region_RPN) >= 0.0) for x in input_deck.cells])
 
     # Make the locals
     local.translation = local_array(type_.float64, 3, target)
