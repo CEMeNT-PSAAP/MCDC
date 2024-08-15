@@ -1,23 +1,24 @@
-from mpi4py import MPI
-
-import mcdc.adapt as adapt
 import numpy as np
 
+from mpi4py import MPI
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode, literal_unroll
-from mcdc.loop import caching
-from mcdc.type_ import iqmc_score_list
-from mcdc.kernel import distance_to_boundary, distance_to_mesh
 
-# from mcdc.iqmc.iqmc_loop import iqmc_loop_source
+import mcdc.adapt as adapt
+import mcdc.local as local
+
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
+from mcdc.loop import caching
+from mcdc.type_ import iqmc_score_list
 from mcdc.kernel import (
-    move_particle,
-    set_bank_size,
+    distance_to_boundary,
+    distance_to_mesh,
     get_particle_cell,
     get_particle_material,
     mesh_get_index,
+    move_particle,
+    set_bank_size,
 )
 
 # =========================================================================
@@ -285,7 +286,7 @@ def iqmc_prepare_particles(mcdc):
 
     for n in range(N_work):
         # Create new particle
-        P_new = adapt.local_particle_record()
+        P_new = local.particle_record()
         # assign initial group, time, and rng_seed (not used)
         P_new["g"] = 0
         P_new["t"] = 0
@@ -456,10 +457,10 @@ def iqmc_generate_material_idx(mcdc):
     Nz = len(mesh["z"]) - 1
     dx = dy = dz = 1
     # variables for cell finding functions
-    trans_struct = adapt.local_translate()
+    trans_struct = local.translation()
     trans = trans_struct["values"]
     # create particle to utilize cell finding functions
-    P_temp = adapt.local_particle()
+    P_temp = local.particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1

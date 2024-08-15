@@ -384,69 +384,6 @@ def add_IC(particle, prog):
 
 
 @for_cpu()
-def local_translate():
-    return np.zeros(1, dtype=type_.translate)[0]
-
-
-@for_gpu()
-def local_translate():
-    trans = cuda.local.array(1, type_.translate)[0]
-    for i in range(3):
-        trans["values"][i] = 0
-    return trans
-
-
-@for_cpu()
-def local_group_array():
-    return np.zeros(1, dtype=type_.group_array)[0]
-
-
-@for_gpu()
-def local_group_array():
-    return cuda.local.array(1, type_.group_array)[0]
-
-
-@for_cpu()
-def local_j_array():
-    return np.zeros(1, dtype=type_.j_array)[0]
-
-
-@for_gpu()
-def local_j_array():
-    return cuda.local.array(1, type_.j_array)[0]
-
-
-@for_cpu()
-def local_RPN_array():
-    return np.zeros(1, dtype=type_.RPN_array)[0]
-
-
-@for_gpu()
-def local_RPN_array():
-    return cuda.local.array(1, type_.RPN_array)[0]
-
-
-@for_cpu()
-def local_particle():
-    return np.zeros(1, dtype=type_.particle)[0]
-
-
-@for_gpu()
-def local_particle():
-    return cuda.local.array(1, dtype=type_.particle)[0]
-
-
-@for_cpu()
-def local_particle_record():
-    return np.zeros(1, dtype=type_.particle_record)[0]
-
-
-@for_gpu()
-def local_particle_record():
-    return cuda.local.array(1, dtype=type_.particle_record)[0]
-
-
-@for_cpu()
 def global_add(ary, idx, val):
     result = ary[idx]
     ary[idx] += val
