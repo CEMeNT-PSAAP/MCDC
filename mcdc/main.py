@@ -384,7 +384,7 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    input_deck.setting['target'] = target
+    input_deck.setting["target"] = target
     code_factory.make_locals(input_deck)
 
     # =========================================================================

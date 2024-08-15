@@ -1,6 +1,6 @@
 import numpy as np
 
-from numba import njit
+from numba import cuda, njit
 
 import mcdc.local as local
 import mcdc.type_ as type_
@@ -36,7 +36,7 @@ def local_array(dtype, size, target):
     def cpu():
         return np.zeros(1, dtype=struct)[0]
 
-    @njit
+    @cuda.jit(device=True)
     def gpu():
         return cuda.local.array(1, dtype=struct)[0]
 
@@ -49,7 +49,7 @@ def local_object(dtype, target):
     def cpu():
         return np.zeros(1, dtype=dtype)[0]
 
-    @njit
+    @cuda.jit(device=True)
     def gpu():
         return cuda.local.array(1, dtype=dtype)[0]
 
