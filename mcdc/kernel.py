@@ -1709,8 +1709,40 @@ def split_particle(P):
 
 @njit
 def cell_check(P, cell, trans, mcdc):
-    region = mcdc["regions"][cell["region_ID"]]
-    return region_check(P, region, trans, mcdc)
+    # Access RPN data
+    idx = cell["region_data_idx"]
+    N_token = mcdc["cell_region_data"][idx]
+
+    # Create local value array
+    value_struct = adapt.local_RPN_array()
+    value = value_struct["values"]
+    N_value = 0
+
+    # March forward through RPN tokens
+    idx += 1
+    idx_end = idx + N_token
+    while idx < idx_end:
+        token = mcdc["cell_region_data"][idx]
+
+        if token >= 0:
+            surface = mcdc["surfaces"][token]
+            value[N_value] = surface_evaluate(P, surface, trans) > 0.0
+            N_value += 1
+
+        elif token == BOOL_NOT:
+            value[N_value - 1] = not value[N_value - 1]
+
+        elif token == BOOL_AND:
+            value[N_value - 2] = value[N_value - 2] & value[N_value - 1]
+            N_value -= 1
+
+        elif token == BOOL_OR:
+            value[N_value - 2] = value[N_value - 2] | value[N_value - 1]
+            N_value -= 1
+
+        idx += 1
+
+    return value[0]
 
 
 @njit
@@ -1725,7 +1757,7 @@ def region_check(P, region, trans, mcdc):
         if positive_side:
             if side > 0.0:
                 return True
-        elif side < 0.0:
+        elif side <= 0.0:
             return True
 
         return False
@@ -1857,7 +1889,6 @@ def surface_shift(P, surface, trans, mcdc):
         dot = ux * nx + uy * ny + uz * nz + J1 / v
     else:
         dot = ux * nx + uy * ny + uz * nz
-
     if dot > 0.0:
         P["x"] += shift_x
         P["y"] += shift_y
@@ -2160,12 +2191,6 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
         + iy * stride["y"]
         + iz * stride["z"]
     )
-
-    # if mcdc["technique"]["domain_decomposition"]:
-    #    print("old idx:",idx)
-    # offset tally index by subdomain index
-    #    idx += tally_bin.flatten().shape[0] * mcdc["dd_idx"]
-    #    print("new idx:",idx)
 
     # Score
     flux = distance * P["w"]
@@ -2663,13 +2688,22 @@ def distance_to_nearest_surface(P, cell, trans, mcdc):
     surface_ID = -1
     surface_move = False
 
-    for i in range(cell["N_surface"]):
-        surface = mcdc["surfaces"][cell["surface_IDs"][i]]
+    # Access cell surface data
+    idx = cell["surface_data_idx"]
+    N_surface = mcdc["cell_surface_data"][idx]
+
+    # Iterate over all surfaces
+    idx += 1
+    idx_end = idx + N_surface
+    while idx < idx_end:
+        candidate_surface_ID = mcdc["cell_surface_data"][idx]
+        surface = mcdc["surfaces"][candidate_surface_ID]
         d, sm = surface_distance(P, surface, trans, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]
             surface_move = sm
+        idx += 1
     return distance, surface_ID, surface_move
 
 
