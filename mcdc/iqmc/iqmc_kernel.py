@@ -18,7 +18,6 @@ from mcdc.kernel import (
     get_particle_material,
     mesh_get_index,
     move_particle,
-    set_bank_size,
 )
 
 # =========================================================================
@@ -456,15 +455,19 @@ def iqmc_generate_material_idx(mcdc):
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
     dx = dy = dz = 1
+<<<<<<< HEAD
     # variables for cell finding functions
     trans_struct = local.translation()
     trans = trans_struct["values"]
+=======
+>>>>>>> 0c91c9d (reconfigure translation)
     # create particle to utilize cell finding functions
     P_temp = local.particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
     P_temp["cell_ID"] = -1
+    reset_local_coordinate(P_temp)
 
     x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
     y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
@@ -486,7 +489,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
 
                     # set cell_ID
-                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, mcdc)
 
                     # set material_ID
                     material_ID = get_particle_material(P_temp, mcdc)
