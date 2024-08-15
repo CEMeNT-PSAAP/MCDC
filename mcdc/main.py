@@ -1266,7 +1266,7 @@ def dd_mergetally(mcdc, data):
                         ind_z = zi + dz * zlen
                         buff_idx = ind_x + ind_y + ind_z
                         # place tally value in correct position
-                        buff[:,buff_idx] = dd_tally[:,tally_idx]
+                        buff[:, buff_idx] = dd_tally[:, tally_idx]
                         tally_idx += 1
         # replace old tally with reorganized tally
         dd_tally = buff
