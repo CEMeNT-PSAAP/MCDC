@@ -1,25 +1,25 @@
+import pathlib
+
 import numpy as np
-from numpy import ascontiguousarray as cga
-from numba import njit, objmode, jit
 
 from mpi4py import MPI
+from numba import njit, objmode, jit
+from numpy import ascontiguousarray as cga
 
 import mcdc.adapt as adapt
 import mcdc.kernel as kernel
+import mcdc.local as local
 import mcdc.type_ as type_
-import pathlib
-
-import mcdc.print_ as print_module
 
 from mcdc.constant import *
 from mcdc.print_ import (
     print_header_batch,
-    print_progress,
-    print_progress_eigenvalue,
-    print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
     print_msg,
+    print_progress,
+    print_progress_eigenvalue,
+    print_progress_iqmc,
 )
 
 caching = True
@@ -228,7 +228,7 @@ def prep_particle(P, prog):
 @njit(cache=caching)
 def exhaust_active_bank(prog):
     mcdc = adapt.device(prog)
-    P = adapt.local_particle()
+    P = local.particle()
     # Loop until active bank is exhausted
     while kernel.get_bank_size(mcdc["bank_active"]) > 0:
         # Get particle from active bank
@@ -445,7 +445,7 @@ def step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
+        trans_struct = local.translation()
         trans = trans_struct["values"]
         P["cell_ID"] = kernel.get_particle_cell(P, UNIVERSE_ROOT, trans, mcdc)
 

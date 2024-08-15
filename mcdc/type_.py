@@ -3,6 +3,7 @@ import math
 import numpy as np
 import os
 
+from numba import njit
 from mpi4py import MPI
 from mpi4py.util.dtlib import from_numpy_dtype
 
@@ -26,27 +27,24 @@ str_ = "U32"
 # ==============================================================================
 # MC/DC types
 # ==============================================================================
-# Currently defined based on input deck
-# TODO: This causes JIT recompilation in certain cases
+"""
+Some types are problem-dependent and defined in code_factory.py
+"""
 
 particle = None
 particle_record = None
+
 nuclide = None
 material = None
+
 surface = None
 universe = None
 lattice = None
+
 source = None
 setting = None
 tally = None
 technique = None
-
-# GPU mode related
-translate = None
-group_array = None
-j_array = None
-RPN_array = None
-
 global_ = None
 
 
@@ -1309,32 +1307,6 @@ def make_type_global(input_deck):
 # ==============================================================================
 # Util
 # ==============================================================================
-
-
-def make_type_translate(input_deck):
-    global translate
-    translate = into_dtype([("values", float64, (3,))])
-
-
-def make_type_group_array(input_deck):
-    global group_array
-    G = input_deck.materials[0].G
-    group_array = into_dtype([("values", float64, (G,))])
-
-
-def make_type_j_array(input_deck):
-    global j_array
-    J = input_deck.materials[0].J
-    j_array = into_dtype([("values", float64, (J,))])
-
-
-def make_type_RPN_array(input_deck):
-    global RPN_array
-    N_max = 0
-    for cell_ in input_deck.cells:
-        N = np.sum(np.array(cell_._region_RPN) >= 0.0)
-        N_max = max(N_max, N)
-    RPN_array = into_dtype([("values", bool_, (N_max,))])
 
 
 def make_type_mesh(card):

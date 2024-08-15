@@ -4,6 +4,7 @@ from mpi4py import MPI
 from numba import njit, objmode, literal_unroll
 import numba
 
+import mcdc.local as local
 import mcdc.type_ as type_
 
 from mcdc.constant import *
@@ -852,7 +853,7 @@ def rng_array(seed, shape, size):
 
 @njit
 def source_particle(seed, mcdc):
-    P: type_.particle_record = adapt.local_particle_record()
+    P = local.particle_record()
     P["rng_seed"] = seed
 
     # Sample source
@@ -1581,7 +1582,7 @@ def get_particle_cell(P, universe_ID, trans, mcdc):
 @njit
 def get_particle_material(P, mcdc):
     # Translation accumulator
-    trans_struct = adapt.local_translate()
+    trans_struct = local.translation()
     trans = trans_struct["values"]
 
     # Top level cell
@@ -1645,7 +1646,7 @@ def copy_recordlike(P_new, P):
 
 @njit
 def copy_record(P):
-    P_new = adapt.local_particle_record()
+    P_new = local.particle_record()
     copy_recordlike(P_new, P)
     return P_new
 
@@ -1705,7 +1706,7 @@ def cell_check(P, cell, trans, mcdc):
     N_token = mcdc["cell_region_data"][idx]
 
     # Create local value array
-    value_struct = adapt.local_RPN_array()
+    value_struct = local.RPN_array()
     value = value_struct["values"]
     N_value = 0
 
@@ -2645,7 +2646,7 @@ def distance_to_boundary(P, mcdc):
     event = 0
 
     # Translation accumulator
-    trans_struct = adapt.local_translate()
+    trans_struct = local.translation()
     trans = trans_struct["values"]
 
     # Top level cell
@@ -2779,7 +2780,7 @@ def surface_crossing(P, prog):
 
     mcdc = adapt.device(prog)
 
-    trans_struct = adapt.local_translate()
+    trans_struct = local.translation()
     trans = trans_struct["values"]
     trans = P["translation"]
 
@@ -2801,7 +2802,7 @@ def surface_crossing(P, prog):
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         cell = mcdc["cells"][P["cell_ID"]]
         if not cell_check(P, cell, trans, mcdc):
-            trans_struct = adapt.local_translate()
+            trans_struct = local.translation()
             trans = trans_struct["values"]
             P["cell_ID"] = get_particle_cell(P, UNIVERSE_ROOT, trans, mcdc)
 
@@ -3324,7 +3325,7 @@ def fission_CE(P, nuclide, P_new):
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d_struct = adapt.local_j_array()
+    nu_d_struct = local.precursor_group_array()
     nu_d = nu_d_struct["values"]
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)

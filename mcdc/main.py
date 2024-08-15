@@ -85,6 +85,7 @@ from mpi4py import MPI
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
+import mcdc.code_factory as code_factory
 
 import mcdc.adapt as adapt
 from mcdc.constant import *
@@ -383,10 +384,7 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    type_.make_type_translate(input_deck)
-    type_.make_type_group_array(input_deck)
-    type_.make_type_j_array(input_deck)
-    type_.make_type_RPN_array(input_deck)
+    code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
