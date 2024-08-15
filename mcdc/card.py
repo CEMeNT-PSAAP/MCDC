@@ -1,6 +1,14 @@
 import numpy as np
+import sympy
 
-from mcdc.constant import INF, SHIFT, PI
+from mcdc.constant import (
+    BOOL_AND,
+    BOOL_OR,
+    BOOL_NOT,
+    INF,
+    PI,
+    SHIFT,
+)
 
 # Get the global variable container
 import mcdc.global_ as global_
@@ -16,7 +24,10 @@ class InputCard:
         for name in [
             a
             for a in dir(self)
-            if not a.startswith("__") and not callable(getattr(self, a)) and a != "tag"
+            if not a.startswith("__")
+            and not callable(getattr(self, a))
+            and a != "tag"
+            and not a.startswith("_")
         ]:
             text += "  %s : %s\n" % (name, str(getattr(self, name)))
         return text
@@ -56,6 +67,7 @@ class NuclideCard(InputCard):
         self.uq = False
         self.flags = []
         self.distribution = ""
+        self.name = ""
 
 
 class MaterialCard(InputCard):
@@ -93,8 +105,8 @@ class RegionCard(InputCard):
         # Set card data
         self.ID = None
         self.type = type_
-        self.A = -1
-        self.B = -1
+        self.A = None
+        self.B = None
 
     def __and__(self, other):
         region = RegionCard("intersection")
@@ -121,6 +133,21 @@ class RegionCard(InputCard):
         region.ID = len(global_.input_deck.regions)
         global_.input_deck.regions.append(region)
         return region
+
+    def __str__(self):
+        if self.type == "halfspace":
+            if self.B > 0:
+                return "+s%i" % self.A
+            else:
+                return "-s%i" % self.A
+        elif self.type == "intersection":
+            return "r%i & r%i" % (self.A, self.B)
+        elif self.type == "union":
+            return "r%i | r%i" % (self.A, self.B)
+        elif self.type == "complement":
+            return "~r%i" % (self.A)
+        elif self.type == "all":
+            return "all"
 
 
 class SurfaceCard(InputCard):
@@ -153,23 +180,33 @@ class SurfaceCard(InputCard):
         self.N_tally = 0
         self.tally_IDs = []
 
-    def __pos__(self):
+    def _create_halfspace(self, positive):
         region = RegionCard("halfspace")
         region.A = self.ID
-        region.B = 1
+        if positive:
+            region.B = 1
+        else:
+            region.B = -1
+
+        # Check if an identical halfspace region already existed
+        for idx, existing_region in enumerate(global_.input_deck.regions):
+            if (
+                existing_region.type == "halfspace"
+                and region.A == existing_region.A
+                and region.B == existing_region.B
+            ):
+                return global_.input_deck.regions[idx]
+
         # Set ID and push to deck
         region.ID = len(global_.input_deck.regions)
         global_.input_deck.regions.append(region)
         return region
 
+    def __pos__(self):
+        return self._create_halfspace(True)
+
     def __neg__(self):
-        region = RegionCard("halfspace")
-        region.A = self.ID
-        region.B = 0
-        # Set ID and push to deck
-        region.ID = len(global_.input_deck.regions)
-        global_.input_deck.regions.append(region)
-        return region
+        return self._create_halfspace(False)
 
 
 class CellCard(InputCard):
@@ -178,12 +215,87 @@ class CellCard(InputCard):
 
         # Set card data
         self.ID = None
-        self.region_ID = -1
+        self.region_ID = None
+        self.region = "all"
         self.fill_type = "material"
-        self.fill_ID = -1
+        self.fill_ID = None
         self.translation = np.array([0.0, 0.0, 0.0])
-        self.N_surface = 0
-        self.surface_ID = np.zeros(0, dtype=int)
+        self.surface_IDs = np.zeros(0, dtype=int)
+        self._region_RPN = []  # Reverse Polish Notation
+
+    def set_region_RPN(self):
+        # Make alias and reset
+        rpn = self._region_RPN
+        rpn.clear()
+
+        # Build RPN based on the assigned region
+        region = global_.input_deck.regions[self.region_ID]
+        stack = [region]
+        while len(stack) > 0:
+            token = stack.pop()
+            if isinstance(token, RegionCard):
+                if token.type == "halfspace":
+                    rpn.append(token.ID)
+                elif token.type == "intersection":
+                    region_A = global_.input_deck.regions[token.A]
+                    region_B = global_.input_deck.regions[token.B]
+                    stack += ["&", region_A, region_B]
+                elif token.type == "union":
+                    region_A = global_.input_deck.regions[token.A]
+                    region_B = global_.input_deck.regions[token.B]
+                    stack += ["|", region_A, region_B]
+                elif token.type == "complement":
+                    region = global_.input_deck.regions[token.A]
+                    stack += ["~", region]
+            else:
+                if token == "&":
+                    rpn.append(BOOL_AND)
+                elif token == "|":
+                    rpn.append(BOOL_OR)
+                elif token == "~":
+                    rpn.append(BOOL_NOT)
+                else:
+                    print_error("Something is wrong with cell RPN creation.")
+
+    def set_region(self):
+        stack = []
+
+        for token in self._region_RPN:
+            if token >= 0:
+                stack.append(token)
+            else:
+                if token == BOOL_AND or token == BOOL_OR:
+                    item_1 = stack.pop()
+                    if isinstance(item_1, int):
+                        item_1 = sympy.symbols(str(global_.input_deck.regions[item_1]))
+
+                    item_2 = stack.pop()
+                    if isinstance(item_2, int):
+                        item_2 = sympy.symbols(str(global_.input_deck.regions[item_2]))
+
+                    if token == BOOL_AND:
+                        stack.append(item_1 & item_2)
+                    else:
+                        stack.append(item_1 | item_2)
+
+                elif token == BOOL_NOT:
+                    item = stack.pop()
+                    if isinstance(item, int):
+                        item = sympy.symbols(str(global_.input_deck.regions[item]))
+                    stack.append(~item)
+
+        self.region = sympy.logic.boolalg.simplify_logic(stack[0])
+
+    def set_surface_IDs(self):
+        surface_IDs = []
+
+        for token in self._region_RPN:
+            if token >= 0:
+                ID = global_.input_deck.regions[token].A
+                if not ID in surface_IDs:
+                    surface_IDs.append(ID)
+
+        self.surface_IDs = np.sort(np.array(surface_IDs))
 
 
 class UniverseCard(InputCard):

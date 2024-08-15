@@ -34,8 +34,6 @@ particle_record = None
 nuclide = None
 material = None
 surface = None
-region = None
-cell = None
 universe = None
 lattice = None
 source = None
@@ -48,6 +46,8 @@ technique = None
 translate = None
 group_array = None
 j_array = None
+RPN_array = None
+
 global_ = None
 
 
@@ -519,45 +519,20 @@ def make_type_surface(input_deck):
 
 
 # ==============================================================================
-# Region
-# ==============================================================================
-
-
-def make_type_region():
-    global region
-
-    region = into_dtype(
-        [
-            ("ID", int64),
-            ("type", int64),
-            ("A", int64),
-            ("B", int64),
-        ]
-    )
-
-
-# ==============================================================================
 # Cell
 # ==============================================================================
 
 
-def make_type_cell(input_deck):
-    global cell
-
-    # Maximum number of surfaces per cell
-    Nmax_surface = max([cell.N_surface for cell in input_deck.cells])
-
-    cell = into_dtype(
-        [
-            ("ID", int64),
-            ("region_ID", int64),
-            ("fill_type", int64),
-            ("fill_ID", int64),
-            ("translation", float64, (3,)),
-            ("N_surface", int64),
-            ("surface_IDs", int64, (Nmax_surface,)),
-        ]
-    )
+cell = into_dtype(
+    [
+        ("ID", int64),
+        ("fill_type", int64),
+        ("fill_ID", int64),
+        ("translation", float64, (3,)),
+        ("surface_data_idx", int64),
+        ("region_data_idx", int64),
+    ]
+)
 
 
 # ==============================================================================
@@ -1264,13 +1239,19 @@ def make_type_global(input_deck):
     N_nuclide = len(input_deck.nuclides)
     N_material = len(input_deck.materials)
     N_surface = len(input_deck.surfaces)
-    N_region = len(input_deck.regions)
     N_cell = len(input_deck.cells)
     N_source = len(input_deck.sources)
     N_universe = len(input_deck.universes)
     N_lattice = len(input_deck.lattices)
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
+
+    # Cell data sizes
+    N_cell_surface = 0
+    N_cell_region = 0
+    for cell_ in input_deck.cells:
+        N_cell_surface += 1 + len(cell_.surface_IDs)
+        N_cell_region += 1 + len(cell_._region_RPN)
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1331,8 +1312,9 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
-            ("regions", region, (N_region,)),
             ("cells", cell, (N_cell,)),
+            ("cell_surface_data", int64, (N_cell_surface,)),
+            ("cell_region_data", int64, (N_cell_region,)),
             ("universes", universe, (N_universe,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
@@ -1417,6 +1399,15 @@ def make_type_j_array(input_deck):
     global j_array
     J = input_deck.materials[0].J
     j_array = into_dtype([("values", float64, (J,))])
+
+
+def make_type_RPN_array(input_deck):
+    global RPN_array
+    N_max = 0
+    for cell_ in input_deck.cells:
+        N = np.sum(np.array(cell_._region_RPN) >= 0.0)
+        N_max = max(N_max, N)
+    RPN_array = into_dtype([("values", bool_, (N_max,))])
 
 
 def make_type_mesh(card):
