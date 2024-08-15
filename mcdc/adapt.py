@@ -343,7 +343,7 @@ def add_active(particle, prog):
 
 @for_gpu()
 def add_active(particle, prog):
-    P = kernel.recordlike_to_particle(particle)
+    P = kernel.make_particle(particle)
     if SIMPLE_ASYNC:
         step_async(prog, P)
     else:
