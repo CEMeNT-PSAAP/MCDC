@@ -370,24 +370,6 @@ def prepare():
         input_deck.universes[0] = root_universe
 
     # =========================================================================
-    # Prepare cell region RPN (Reverse Polish Notation)
-    #   - Replace halfspace region ID with its surface and insert
-    #     complement operator if the sense is negative.
-    # =========================================================================
-
-    for cell in input_deck.cells:
-        i = 0
-        while i < len(cell._region_RPN):
-            token = cell._region_RPN[i]
-            if token >= 0:
-                surface_ID = input_deck.regions[token].A
-                sense = input_deck.regions[token].B
-                cell._region_RPN[i] = surface_ID
-                if sense < 0:
-                    cell._region_RPN.insert(i + 1, BOOL_NOT)
-            i += 1
-
-    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -402,6 +384,8 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
+    type_.make_type_region()
+    type_.make_type_cell(input_deck)
     type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
@@ -418,7 +402,6 @@ def prepare():
     type_.make_type_translate(input_deck)
     type_.make_type_group_array(input_deck)
     type_.make_type_j_array(input_deck)
-    type_.make_type_RPN_array(input_deck)
 
     # =========================================================================
     # Create the global variable container
@@ -570,15 +553,36 @@ def prepare():
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
     # =========================================================================
+    # Regions
+    # =========================================================================
+
+    N_region = len(input_deck.regions)
+    for i in range(N_region):
+        for name in type_.region.names:
+            if name not in ["type"]:
+                copy_field(mcdc["regions"][i], input_deck.regions[i], name)
+
+        # Type
+        if input_deck.regions[i].type == "halfspace":
+            mcdc["regions"][i]["type"] = REGION_HALFSPACE
+        elif input_deck.regions[i].type == "intersection":
+            mcdc["regions"][i]["type"] = REGION_INTERSECTION
+        elif input_deck.regions[i].type == "union":
+            mcdc["regions"][i]["type"] = REGION_UNION
+        elif input_deck.regions[i].type == "complement":
+            mcdc["regions"][i]["type"] = REGION_COMPLEMENT
+        elif input_deck.regions[i].type == "all":
+            mcdc["regions"][i]["type"] = REGION_ALL
+
+    # =========================================================================
     # Cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
-    surface_data_idx = 0
-    region_data_idx = 0
     for i in range(N_cell):
-        for name in ["ID", "fill_ID", "translation"]:
-            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+        for name in type_.cell.names:
+            if name not in ["fill_type", "surface_IDs"]:
+                copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Fill type
         if input_deck.cells[i].fill_type == "material":
@@ -588,23 +592,10 @@ def prepare():
         elif input_deck.cells[i].fill_type == "lattice":
             mcdc["cells"][i]["fill_type"] = FILL_LATTICE
 
-        # Surface data
-        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
-        N_surface = len(input_deck.cells[i].surface_IDs)
-        mcdc["cell_surface_data"][surface_data_idx] = N_surface
-        mcdc["cell_surface_data"][
-            surface_data_idx + 1 : surface_data_idx + N_surface + 1
-        ] = input_deck.cells[i].surface_IDs
-        surface_data_idx += N_surface + 1
-
-        # Region data
-        mcdc["cells"][i]["region_data_idx"] = region_data_idx
-        N_RPN = len(input_deck.cells[i]._region_RPN)
-        mcdc["cell_region_data"][region_data_idx] = N_RPN
-        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
-            input_deck.cells[i]._region_RPN
-        )
-        region_data_idx += N_RPN + 1
+        # Variables with possible different sizes
+        for name in ["surface_IDs"]:
+            N = mcdc["cells"][i]["N_surface"]
+            mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
 
     # =========================================================================
     # Universes
@@ -708,21 +699,35 @@ def prepare():
                 score_type = SCORE_NET_CURRENT
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
-        # Filter grid sizes
-        N_sensitivity = input_deck.setting["N_sensitivity"]
-        Ns = 1 + N_sensitivity
-        if input_deck.technique["dsm_order"] == 2:
-            Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-        Nmu = len(input_deck.mesh_tallies[i].mu) - 1
-        N_azi = len(input_deck.mesh_tallies[i].azi) - 1
-        Ng = len(input_deck.mesh_tallies[i].g) - 1
-        Nx = len(input_deck.mesh_tallies[i].x) - 1
-        Ny = len(input_deck.mesh_tallies[i].y) - 1
-        Nz = len(input_deck.mesh_tallies[i].z) - 1
-        Nt = len(input_deck.mesh_tallies[i].t) - 1
+        if not input_deck.technique["domain_decomposition"]:
+            # Filter grid sizes
+            N_sensitivity = input_deck.setting["N_sensitivity"]
+            Ns = 1 + N_sensitivity
+            if input_deck.technique["dsm_order"] == 2:
+                Ns = (
+                    1
+                    + 2 * N_sensitivity
+                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                )
+            Nmu = len(input_deck.mesh_tallies[i].mu) - 1
+            N_azi = len(input_deck.mesh_tallies[i].azi) - 1
+            Ng = len(input_deck.mesh_tallies[i].g) - 1
+            Nx = len(input_deck.mesh_tallies[i].x) - 1
+            Ny = len(input_deck.mesh_tallies[i].y) - 1
+            Nz = len(input_deck.mesh_tallies[i].z) - 1
+            Nt = len(input_deck.mesh_tallies[i].t) - 1
 
-        # Decompose mesh tallies
-        if input_deck.technique["domain_decomposition"]:
+        else:  # decompose mesh tallies
+
+            # Filter grid sizes
+            N_sensitivity = input_deck.setting["N_sensitivity"]
+            Ns = 1 + N_sensitivity
+            if input_deck.technique["dsm_order"] == 2:
+                Ns = (
+                    1
+                    + 2 * N_sensitivity
+                    + int(0.5 * N_sensitivity * (N_sensitivity - 1))
+                )
             Nmu = len(input_deck.mesh_tallies[i].mu) - 1
             N_azi = len(input_deck.mesh_tallies[i].azi) - 1
             Ng = len(input_deck.mesh_tallies[i].g) - 1
@@ -1098,29 +1103,22 @@ def prepare():
 
     # =========================================================================
     # Source file
-    #   TODO: Use parallel h5py
     # =========================================================================
 
-    # All ranks, take turn
-    for i in range(mcdc["mpi_size"]):
-        if mcdc["mpi_rank"] == i:
-            if mcdc["setting"]["source_file"]:
-                with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
-                    # Get source particle size
-                    N_particle = f["particles_size"][()]
+    if mcdc["setting"]["source_file"]:
+        with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
+            # Get source particle size
+            N_particle = f["particles_size"][()]
 
-                    # Redistribute work
-                    kernel.distribute_work(N_particle, mcdc)
-                    N_local = mcdc["mpi_work_size"]
-                    start = mcdc["mpi_work_start"]
-                    end = start + N_local
+            # Redistribute work
+            kernel.distribute_work(N_particle, mcdc)
+            N_local = mcdc["mpi_work_size"]
+            start = mcdc["mpi_work_start"]
+            end = start + N_local
 
-                    # Add particles to source bank
-                    mcdc["bank_source"]["particles"][:N_local] = f["particles"][
-                        start:end
-                    ]
-                    mcdc["bank_source"]["size"] = N_local
-        MPI.COMM_WORLD.Barrier()
+            # Add particles to source bank
+            mcdc["bank_source"]["particles"][:N_local] = f["particles"][start:end]
+            mcdc["bank_source"]["size"] = N_local
 
     # =========================================================================
     # IC file
@@ -1200,11 +1198,7 @@ def card_to_h5group(card, group):
         elif value is None:
             next
         else:
-            if name not in ["region"]:
-                group[name] = value
-
-            elif name == "region":
-                group[name] = str(value)
+            group[name] = value
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
@@ -1255,16 +1249,16 @@ def dd_mergetally(mcdc, data):
             dz = di // (d_Nx * d_Ny)
             dy = (di % (d_Nx * d_Ny)) // d_Nx
             dx = di % d_Nx
-            for zi in range(0, zlen):
+            for xi in range(0, xlen):
                 for yi in range(0, ylen):
-                    for xi in range(0, xlen):
+                    for zi in range(0, zlen):
                         # calculate reorganized index
-                        ind_z = zi * (xlen * d_Nx * ylen * d_Ny) + dz * (
-                            zlen * xlen * d_Nx * ylen * d_Ny
+                        ind_x = xi * (ylen * d_Ny * zlen * d_Nz) + dx * (
+                            xlen * ylen * d_Ny * zlen * d_Nz
                         )
                         ind_y = yi * (xlen * d_Nx) + dy * (ylen * xlen * d_Nx)
-                        ind_x = xi + dx * xlen
-                        buff_idx = ind_z + ind_y + ind_x
+                        ind_z = zi + dz * zlen
+                        buff_idx = ind_x + ind_y + ind_z
                         # place tally value in correct position
                         buff[:,buff_idx] = dd_tally[:,tally_idx]
                         tally_idx += 1
