@@ -44,11 +44,18 @@ if "__pycache__" in names:
 # Skip domain decomp tests unless there are 4 MPI processes
 temp = names.copy()
 for name in names:
-    if name[:3] == "dd_" and not (mpiexec == 4 or srun == 4):
+    if name[:4] == "dd_s" and not (mpiexec == 4 or srun == 4):
         temp.remove(name)
         print(
             Fore.YELLOW
             + "Note: Skipping %s (require 4 MPI ranks)" % name
+            + Style.RESET_ALL
+        )
+    elif name[:4] == "dd_c" and not (mpiexec == 8 or srun == 8):
+        temp.remove(name)
+        print(
+            Fore.YELLOW
+            + "Note: Skipping %s (require 8 MPI ranks)" % name
             + Style.RESET_ALL
         )
 names = temp
