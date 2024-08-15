@@ -553,6 +553,10 @@ def prepare():
         elif input_deck.cells[i].fill_type == "lattice":
             mcdc["cells"][i]["fill_type"] = FILL_LATTICE
 
+        # Fill translation flag
+        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
+            mcdc["cells"][i]["fill_translated"] = True
+
         # Surface data
         mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
         N_surface = len(input_deck.cells[i].surface_IDs)
