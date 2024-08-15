@@ -273,7 +273,7 @@ def source_dd_resolution(prog):
 
     while not terminated:
         if kernel.get_bank_size(mcdc["bank_active"]) > 0:
-            P = adapt.local_particle()
+            P = local.particle()
             # Loop until active bank is exhausted
             while kernel.get_bank_size(mcdc["bank_active"]) > 0:
 
@@ -531,7 +531,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     g = DNP["n_g"]
 
     # Create new particle
-    P_new = adapt.local_particle()
+    P_new = local.particle()
     part_seed = kernel.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
@@ -543,7 +543,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    trans_struct = adapt.local_translate()
+    trans_struct = local.translation()
     trans = trans_struct["values"]
     P_new["cell_ID"] = kernel.get_particle_cell(P_new, UNIVERSE_ROOT, trans, mcdc)
     material_ID = kernel.get_particle_material(P_new, mcdc)

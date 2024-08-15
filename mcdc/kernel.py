@@ -1653,7 +1653,7 @@ def copy_record(P):
 
 @njit
 def recordlike_to_particle(P_rec):
-    P_new = adapt.local_particle()
+    P_new = local.particle()
     copy_recordlike(P_new, P_rec)
     P_new["fresh"] = True
     P_new["alive"] = True
