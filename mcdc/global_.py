@@ -78,6 +78,8 @@ class InputDeck:
             # Below are parameters not copied to mcdc.setting
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
+            # Portability
+            "target": 'cpu'
         }
 
         self.technique = {
