@@ -1609,8 +1609,7 @@ def get_particle_cell(P_arr, universe_ID, trans, mcdc):
 def get_particle_material(P_arr, mcdc):
     P = P_arr[0]
     # Translation accumulator
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
+    trans = adapt.local_array(3,nb.types.float64)
 
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
@@ -2693,8 +2692,7 @@ def distance_to_boundary(P_arr, mcdc):
     event = 0
 
     # Translation accumulator
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
+    trans = adapt.local_array(3,nb.types.float64)
     adapt.harm.print_formatted(trans[0])
     adapt.harm.print_formatted(trans[1])
     adapt.harm.print_formatted(trans[2])
@@ -2830,8 +2828,7 @@ def surface_crossing(P_arr, prog):
     mcdc = adapt.device(prog)
 
 
-    trans_struct = adapt.local_array(1,type_.translate)
-    trans = trans_struct[0]["values"]
+    trans = adapt.local_array(3,nb.types.float64)
     for i in range(3):
         trans[i] = P["translation"][i]
 
@@ -2860,8 +2857,7 @@ def surface_crossing(P_arr, prog):
         cell = mcdc["cells"][P["cell_ID"]]
         adapt.harm.print_formatted(-45)
         if not cell_check(P_arr, cell, trans, mcdc):
-            trans_struct = adapt.local_translate()
-            trans = trans_struct["values"]
+            #other_trans = adapt.local_array(3,nb.types.float64)
             adapt.harm.print_formatted(-56)
             P["cell_ID"] = get_particle_cell(P_arr, 0, trans, mcdc)
             adapt.harm.print_formatted(P["cell_ID"])
@@ -4028,10 +4024,10 @@ def iqmc_generate_material_idx(mcdc):
     Nz = len(mesh["z"]) - 1
     dx = dy = dz = 1
     # variables for cell finding functions
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
+    trans = adapt.local_array(3,nb.types.float64)
     # create particle to utilize cell finding functions
-    P_temp = adapt.local_array(1,type_.particle_record)[0]
+    P_temp_array = adapt.local_array(1,type_.particle_record)
+    P_temp = P_temp_array[0]
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
@@ -4715,6 +4711,8 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
     # Base weight
     w = p_total * flux / surface["dsm_Np"]
 
+    source_obtained = False
+
     # Sample source
     for n in range(Np):
         source_obtained = False
@@ -4771,16 +4769,16 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
                             tot += nusigmaS
                             if tot > xi:
                                 # Scattering source
-                                sample_phasespace_scattering_nuclide(
-                                    P_arr, nuclide, P_new_arr, mcdc
-                                )
+                                #sample_phasespace_scattering_nuclide(
+                                #    P_arr, nuclide, P_new_arr, mcdc
+                                #)
                                 P_new["sensitivity_ID"] = ID_source
-                                adapt.add_active(P_new_arr, prog)
+                                adapt.add_active(P_new_arr, prog) # Mystery
                                 source_obtained = True
                             else:
-                                tot += nusigmaF
+                                #tot += nusigmaF
                                 if tot > xi:
-                                    # Fission source
+                                    ## Fission source
                                     sample_phasespace_fission_nuclide(
                                         P_arr, nuclide, P_new_arr, mcdc
                                     )
