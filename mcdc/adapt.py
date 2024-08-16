@@ -99,7 +99,6 @@ def type_local_array(context):
     from numba.core.typing.npydecl import parse_dtype, parse_shape
 
     print(context)
-    target = numba.core.target_extension.get_local_target(context)
 
     if isinstance(context,numba.core.typing.context.Context):
         print( "CPU local_array (TYPE)" )
@@ -156,6 +155,7 @@ def type_local_array(context):
         print( "HIP GPU local_array (TYPE)" )
 
         def typer(shape, dtype):
+            print(f"shape: {shape}\ndtype: {dtype}")
             # Only integer literals and tuples of integer literals are valid
             # shapes
             if isinstance(shape, types.Integer):
@@ -170,7 +170,9 @@ def type_local_array(context):
             ndim = parse_shape(shape)
             nb_dtype = parse_dtype(dtype)
             if nb_dtype is not None and ndim is not None:
-                return types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
+                result = types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
+                print("\n\nRESULT IS: \n",result)
+                return result
 
         return typer
 
@@ -223,15 +225,17 @@ def builtin_local_array(context, builder, sig, args):
         print( "HIP GPU local_array (IMPL)" )
         length = sig.args[0].literal_value
         dtype = parse_dtype(sig.args[1])
-        return numba.hip.typing_lowering.hip.lowering._generic_array(
+        result = numba.hip.typing_lowering.hip.lowering._generic_array(
             context,
             builder,
             shape=(length,),
             dtype=dtype,
-            symbol_name="_harmpy_lmem",
+            symbol_name="_HIPpy_lmem",
             addrspace=numba.hip.amdgcn.ADDRSPACE_LOCAL,
             can_dynsized=False,
         )
+        print(result)
+        return result
     else:
         raise numba.core.errors.UnsupportedError(f"Unsupported target context {context}.")
 
@@ -476,7 +480,7 @@ def add_active(particle, prog):
     if SIMPLE_ASYNC:
         step_async(prog, P[0])
     else:
-        find_cell_async(prog, P)
+        find_cell_async(prog, P[0])
 
 
 @for_cpu()
@@ -513,19 +517,6 @@ def add_IC(particle, prog):
 
 
 @for_cpu()
-def local_translate():
-    return np.zeros(1, dtype=type_.translate)[0]
-
-
-@for_gpu()
-def local_translate():
-    trans = cuda.local.array(1, type_.translate)[0]
-    for i in range(3):
-        trans["values"][i] = 0
-    return trans
-
-
-@for_cpu()
 def local_group_array():
     return np.zeros(1, dtype=type_.group_array)[0]
 
@@ -543,26 +534,6 @@ def local_j_array():
 @for_gpu()
 def local_j_array():
     return cuda.local.array(1, type_.j_array)[0]
-
-
-@for_cpu()
-def local_particle():
-    return np.zeros(1, dtype=type_.particle)[0]
-
-
-@for_gpu()
-def local_particle():
-    return cuda.local.array(1, dtype=type_.particle)[0]
-
-
-@for_cpu()
-def local_particle_record():
-    return np.zeros(1, dtype=type_.particle_record)[0]
-
-
-@for_gpu()
-def local_particle_record():
-    return cuda.local.array(1, dtype=type_.particle_record)[0]
 
 
 @for_cpu()

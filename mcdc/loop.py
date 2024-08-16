@@ -507,8 +507,7 @@ def step_particle(P_arr, prog):
     # Find cell from root universe if unknown
     adapt.harm.print_formatted(-12)
     if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
+        trans = adapt.local_array(3,nb.types.float64)
         adapt.harm.print_formatted(-23)
         P["cell_ID"] = kernel.get_particle_cell(P_arr, 0, trans, mcdc)
         adapt.harm.print_formatted(P["cell_ID"])
@@ -1004,8 +1003,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
+    trans = adapt.local_array(3,nb.types.float64)
     adapt.harm.print_formatted(-90)
     P_new["cell_ID"] = kernel.get_particle_cell(P_new_arr, 0, trans, mcdc)
     material_ID = kernel.get_particle_material(P_new_arr, mcdc)
