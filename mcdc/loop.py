@@ -498,15 +498,6 @@ def step_particle(P, prog):
             elif event == EVENT_FISSION:
                 kernel.fission(P, prog)
 
-            # Sensitivity quantification for nuclide?
-            material = mcdc["materials"][P["material_ID"]]
-            if material["sensitivity"] and (
-                P["sensitivity_ID"] == 0
-                or mcdc["technique"]["dsm_order"] == 2
-                and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
-            ):
-                kernel.sensitivity_material(P, prog)
-
     # Surface crossing
     if event & EVENT_SURFACE:
         kernel.surface_crossing(P, prog)
@@ -565,7 +556,6 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
     P_new["w"] = 1.0
-    P_new["sensitivity_ID"] = 0
 
     # Set position
     P_new["x"] = DNP["x"]
