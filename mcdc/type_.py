@@ -1219,11 +1219,6 @@ def make_type_global(input_deck):
         bank_source = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
-    # Particle tracker
-    N_track = 0
-    if input_deck.setting["track_particle"]:
-        N_track = N_work * 1000
-
     # iQMC bank adjustment
     if input_deck.technique["iQMC"]:
         bank_source = particle_bank(N_work)
@@ -1301,10 +1296,6 @@ def make_type_global(input_deck):
             ("runtime_simulation", float64),
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
-            ("particle_track", float64, (N_track, 8)),
-            ("particle_track_N", int64, (1,)),
-            ("particle_track_history_ID", int64, (1,)),
-            ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
             ("gpu_state", uintp),
