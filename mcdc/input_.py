@@ -1068,8 +1068,6 @@ def setting(**kw):
         Name of the output file MC/DC should save data in (default "output.h5").
     save_input_deck : bool
         Whether to save the input deck information to the output file (default False).
-    particle_tracker : bool
-        Whether to track paths of all individual particles histories, memory issues abound (default False).
     k_eff : str
         Whether to run a k-eigenvalue problem.
     source_file : str
@@ -1100,7 +1098,6 @@ def setting(**kw):
                 "progress_bar",
                 "output_name",
                 "save_input_deck",
-                "particle_tracker",
                 "k_eff",
                 "source_file",
                 "IC_file",
@@ -1119,7 +1116,6 @@ def setting(**kw):
     progress_bar = kw.get("progress_bar")
     output = kw.get("output_name")
     save_input_deck = kw.get("save_input_deck")
-    particle_tracker = kw.get("particle_tracker")
     k_eff = kw.get("k_eff")
     source_file = kw.get("source_file")
     IC_file = kw.get("IC_file")
@@ -1170,12 +1166,6 @@ def setting(**kw):
     if caching is not None:
         card["caching"] = caching
 
-    # Particle tracker
-    if particle_tracker is not None:
-        card["track_particle"] = particle_tracker
-        if particle_tracker and mpi4py.MPI.COMM_WORLD.Get_size() > 1:
-            print_error("Particle tracker currently only runs on a single MPI rank")
-
     # Save input deck?
     if save_input_deck is not None:
         card["save_input_deck"] = save_input_deck
@@ -1223,7 +1213,7 @@ def eigenmode(
     gyration_radius : float, optional
         Specify a gyration radius (default None).
     save_particle : bool
-        Whether particle track outputs in a tally mesh (default False).
+        Whether final particle bank outputs (default False).
 
     Returns
     -------

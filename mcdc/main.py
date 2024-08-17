@@ -414,7 +414,6 @@ def prepare():
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.set_toggle("particle_tracker", mcdc["setting"]["track_particle"])
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
@@ -1125,12 +1124,6 @@ def generate_hdf5(mcdc):
                     f.create_dataset(
                         "iqmc/outter_final_residual", data=T["iqmc"]["res_outter"]
                     )
-
-            # Particle tracker
-            if mcdc["setting"]["track_particle"]:
-                with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
-                    N_track = mcdc["particle_track_N"][0]
-                    f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:

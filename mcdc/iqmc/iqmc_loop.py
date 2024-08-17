@@ -38,16 +38,8 @@ def iqmc_simulation(mcdc):
 def iqmc_loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
     while P["alive"]:
         iqmc_step_particle(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
 
 
 @njit(cache=caching)
