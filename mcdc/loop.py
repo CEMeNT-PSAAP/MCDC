@@ -195,10 +195,6 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     else:
         P = mcdc["bank_source"]["particles"][idx_work]
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_hid(P, mcdc)
-
     # Check if it is beyond current census index
     idx_census = mcdc["idx_census"]
     if P["t"] > mcdc["setting"]["census_time"][idx_census]:
@@ -227,10 +223,6 @@ def prep_particle(P, prog):
     # Apply weight window
     if mcdc["technique"]["weight_window"]:
         kernel.weight_window(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_pid(P, mcdc)
 
 
 @njit(cache=caching)
@@ -292,10 +284,6 @@ def source_dd_resolution(prog):
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
                     kernel.weight_window(P, mcdc)
-
-                # Particle tracker
-                if mcdc["setting"]["track_particle"]:
-                    mcdc["particle_track_particle_ID"] += 1
 
                 # Particle loop
                 loop_particle(P, mcdc)
@@ -447,16 +435,8 @@ def gpu_loop_source(seed, mcdc):
 def loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
     while P["alive"]:
         step_particle(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
 
 
 @njit(cache=caching)

@@ -1641,7 +1641,6 @@ def copy_recordlike(P_new, P):
     P_new["w"] = P["w"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
-    copy_track_data(P_new, P)
 
 
 @njit
@@ -1684,7 +1683,6 @@ def copy_particle(P_new, P):
     P_new["event"] = P["event"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
-    copy_track_data(P_new, P)
 
 
 @njit
@@ -3488,40 +3486,6 @@ def weight_roulette(P, mcdc):
             P["iqmc"]["w"][:] = w_survive
     else:
         P["alive"] = False
-
-
-# ==============================================================================
-# Particle tracker
-# ==============================================================================
-
-
-@toggle("particle_tracker")
-def track_particle(P, mcdc):
-    idx = adapt.global_add(mcdc["particle_track_N"], 0, 1)
-    mcdc["particle_track"][idx, 0] = P["track_hid"]
-    mcdc["particle_track"][idx, 1] = P["track_pid"]
-    mcdc["particle_track"][idx, 2] = P["g"] + 1
-    mcdc["particle_track"][idx, 3] = P["t"]
-    mcdc["particle_track"][idx, 4] = P["x"]
-    mcdc["particle_track"][idx, 5] = P["y"]
-    mcdc["particle_track"][idx, 6] = P["z"]
-    mcdc["particle_track"][idx, 7] = P["w"]
-
-
-@toggle("particle_tracker")
-def copy_track_data(P_new, P):
-    P_new["track_hid"] = P["track_hid"]
-    P_new["track_pid"] = P["track_pid"]
-
-
-@toggle("particle_tracker")
-def allocate_hid(P, mcdc):
-    P["track_hid"] = adapt.global_add(mcdc["particle_track_history_ID"], 0, 1)
-
-
-@toggle("particle_tracker")
-def allocate_pid(P, mcdc):
-    P["track_pid"] = adapt.global_add(mcdc["particle_track_particle_ID"], 0, 1)
 
 
 # =============================================================================
