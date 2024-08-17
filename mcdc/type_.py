@@ -184,7 +184,6 @@ def make_type_particle(input_deck):
         ("surface_ID", int64),
         ("translation", float64, (3,)),
         ("event", int64),
-        ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
 
@@ -223,7 +222,6 @@ def make_type_particle_record(input_deck):
         ("g", uint64),
         ("E", float64),
         ("w", float64),
-        ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
 
@@ -348,9 +346,6 @@ def make_type_nuclide(input_deck):
     struct = [
         ("ID", int64),
         ("fissionable", bool_),
-        ("sensitivity", bool_),
-        ("sensitivity_ID", int64),
-        ("dsm_Np", float64),
         ("uq", bool_),
     ]
 
@@ -446,7 +441,6 @@ def make_type_material(input_deck):
     struct = [
         ("ID", int64),
         ("N_nuclide", int64),
-        ("sensitivity", bool_),
         ("nuclide_IDs", int64, (Nmax_nuclide,)),
         ("nuclide_densities", float64, (Nmax_nuclide,)),
         ("uq", bool_),
@@ -506,9 +500,6 @@ def make_type_surface(input_deck):
             ("nx", float64),
             ("ny", float64),
             ("nz", float64),
-            ("sensitivity", bool_),
-            ("sensitivity_ID", int64),
-            ("dsm_Np", float64),
         ]
     )
 
@@ -659,14 +650,6 @@ score_list = (
 def make_type_tally(input_deck):
     global tally
 
-    # Number of sensitivitys parameters
-    N_sensitivity = input_deck.setting["N_sensitivity"]
-
-    # Number of tally scores
-    Ns = 1 + N_sensitivity
-    if input_deck.technique["dsm_order"] == 2:
-        Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-
     # Get card
     card = input_deck.tally
 
@@ -688,13 +671,13 @@ def make_type_tally(input_deck):
 
     # Scores and shapes
     scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+        ["flux", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["density", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["fission", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["total", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["current", (Ng, Nt, Nx, Ny, Nz, 3)],
+        ["eddington", (Ng, Nt, Nx, Ny, Nz, 6)],
+        ["exit", (Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
     ]
 
     # Add score flags to structure
@@ -760,8 +743,6 @@ def make_type_setting(deck):
         ("IC_file", bool_),
         ("IC_file_name", str_),
         ("N_precursor", uint64),
-        # TODO: Move to technique
-        ("N_sensitivity", uint64),
     ]
 
     # Finalize setting type
@@ -991,14 +972,6 @@ def make_type_technique(input_deck):
     ]
 
     # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    struct += [
-        ("dsm_order", int64),
-    ]
-
-    # =========================================================================
     # Variance Deconvolution
     # =========================================================================
     struct += [("uq_tally", uq_tally), ("uq_", uq)]
@@ -1022,9 +995,6 @@ def make_type_uq_tally(input_deck):
     # Tally estimator flags
     struct = []
 
-    # Number of tally scores
-    Ns = 1 + input_deck.setting["N_sensitivity"]
-
     # Tally card
     tally_card = input_deck.tally
 
@@ -1033,13 +1003,13 @@ def make_type_uq_tally(input_deck):
 
     # Scores and shapes
     scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+        ["flux", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["density", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["fission", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["total", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["current", (Ng, Nt, Nx, Ny, Nz, 3)],
+        ["eddington", (Ng, Nt, Nx, Ny, Nz, 6)],
+        ["exit", (Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
     ]
 
     # Add score flags to structure

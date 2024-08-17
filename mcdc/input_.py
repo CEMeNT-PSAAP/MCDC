@@ -52,8 +52,6 @@ def nuclide(
     chi_d=None,
     speed=None,
     decay=None,
-    sensitivity=False,
-    dsm_Np=1.0,
 ):
     """
     Create a nuclide
@@ -80,11 +78,6 @@ def nuclide(
         Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s].
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the nuclide.
-    dsm_Np : float
-        Average number of derivative particles produced at each
-        sensitivity nuclide collision.
 
     Returns
     -------
@@ -208,20 +201,6 @@ def nuclide(
             if np.sum(card.chi_d[dg, :]) > 0.0:
                 card.chi_d[dg, :] /= np.sum(card.chi_d[dg, :])
 
-    # Sensitivity setup
-    if sensitivity:
-        # Set flag
-        card.sensitivity = True
-        global_.input_deck.technique["sensitivity"] = True
-        global_.input_deck.technique["weighted_emission"] = False
-
-        # Set ID
-        global_.input_deck.setting["N_sensitivity"] += 1
-        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
-
-        # Set dsm_Np
-        card.dsm_Np = dsm_Np
-
     # Add to deck
     global_.input_deck.nuclides.append(card)
 
@@ -240,8 +219,6 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
-    sensitivity=False,
-    dsm_Np=1.0,
 ):
     """
     Create a material
@@ -273,12 +250,6 @@ def material(
         Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s].
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the material
-        (only relevant for single-nuclide material).
-    dsm_Np : float
-        Average number of derivative particles produced at each
-        sensitivity material collision (only relevant for single_nuclide material).
 
     Returns
     -------
@@ -303,8 +274,6 @@ def material(
             chi_d,
             speed,
             decay,
-            sensitivity,
-            dsm_Np,
         )
         nuclides = [[card_nuclide, 1.0]]
 
@@ -379,7 +348,7 @@ def material(
     # Set ID
     card.ID = len(global_.input_deck.materials)
 
-    # Calculate basic XS and determine sensitivity flag
+    # Calculate basic XS
     for i in range(N_nuclide):
         nuc = nuclides[i][0]
         density = nuclides[i][1]
@@ -390,8 +359,6 @@ def material(
         card.scatter += nuc.scatter * density
         card.fission += nuc.fission * density
         card.total += nuc.total * density
-        card.sensitivity += nuc.sensitivity * density
-    card.sensitivity = bool(card.sensitivity)
 
     # Calculate effective speed
     # Current approach: weighted by nuclide macroscopic total cross section
@@ -450,7 +417,7 @@ def material(
     return card
 
 
-def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
+def surface(type_, bc="interface", **kw):
     """
     Create a surface to define the region of a cell.
 
@@ -461,11 +428,6 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         Surface type.
     bc : {"interface", "vacuum", "reflective"}
         Surface boundary condition.
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the surface position.
-    dsm_Np : int
-        Average number of derivative particles produced at each
-        sensitivity surface crossing.
 
     Other Parameters
     ----------------
@@ -537,20 +499,6 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         ],
     )
     card.boundary_type = bc
-
-    # Sensitivity
-    if sensitivity:
-        # Set flag
-        card.sensitivity = True
-        global_.input_deck.technique["sensitivity"] = True
-        global_.input_deck.technique["weighted_emission"] = False
-
-        # Set ID
-        global_.input_deck.setting["N_sensitivity"] += 1
-        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
-
-        # Set dsm_Np
-        card.dsm_Np = dsm_Np
 
     # ==========================================================================
     # Surface attributes
@@ -1776,22 +1724,6 @@ def IC_generator(
     card_setting["N_active"] = N_cycle
 
 
-def dsm(order=1):
-    """
-    Direct sensitivity method
-
-    Parameters
-    ----------
-    order : int, optional
-        order of the sensitivity to probe, by default 1
-    """
-
-    card = global_.input_deck.technique
-    if order > 2:
-        print_error("DSM currently only supports up to second-order sensitivities")
-    card["dsm_order"] = order
-
-
 def uq(**kw):
     """
     Activate uncertainty quantification.
@@ -1950,7 +1882,6 @@ def make_particle_bank(size):
         ("g", np.uint64),
         ("E", np.float64),
         ("w", np.float64),
-        ("sensitivity_ID", np.int64),
         ("rng_seed", np.uint64),
     ]
     iqmc_struct = [("w", np.float64, (1,))]

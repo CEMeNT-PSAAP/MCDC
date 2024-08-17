@@ -428,7 +428,7 @@ def prepare():
     N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
         # General data
-        for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
+        for name in ["ID", "fissionable"]:
             copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # MG data
@@ -765,12 +765,6 @@ def prepare():
             mcdc["technique"]["iqmc"]["score"][name] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-    # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    # Threshold
-    mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
 
     # =========================================================================
     # Variance Deconvolution - UQ
