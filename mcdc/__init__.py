@@ -18,7 +18,6 @@ from mcdc.input_ import (
     iQMC,
     weight_roulette,
     IC_generator,
-    dsm,
     uq,
     reset,
     domain_decomposition,
