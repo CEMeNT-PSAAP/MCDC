@@ -50,7 +50,7 @@ def iqmc_step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        kernel.reset_local_coordinate(P)
+        geometry.reset_local_coordinate(P)
         P["cell_ID"] = kernel.get_particle_cell(P, 0, mcdc)
 
     # Determine and move to event
