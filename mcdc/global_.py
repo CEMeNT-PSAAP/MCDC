@@ -79,7 +79,7 @@ class InputDeck:
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
             # Portability
-            "target": 'cpu'
+            "target": "cpu",
         }
 
         self.technique = {
