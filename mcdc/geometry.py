@@ -8,6 +8,9 @@ from numba import njit
 
 @njit
 def reset_local_coordinate(particle):
+    """
+    Reset particle's local coordinate
+    """
     particle["translation"][0] = 0.0
     particle["translation"][1] = 0.0
     particle["translation"][2] = 0.0
@@ -16,6 +19,9 @@ def reset_local_coordinate(particle):
 
 @njit
 def get_local_coordinate(particle):
+    """
+    Get particle's local coordinate
+    """
     x = particle["x"]
     y = particle["y"]
     z = particle["z"]
@@ -26,5 +32,3 @@ def get_local_coordinate(particle):
         z -= particle["translation"][2]
 
     return x, y, z
-
-
