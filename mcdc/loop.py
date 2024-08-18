@@ -1,14 +1,11 @@
-import pathlib
-
-import numpy as np
-
 from mpi4py import MPI
-from numba import njit, objmode, jit
-from numpy import ascontiguousarray as cga
+from numba import njit, objmode
 
 import mcdc.adapt as adapt
+import mcdc.geometry as geometry
 import mcdc.kernel as kernel
 import mcdc.local as local
+import mcdc.print_ as print_module
 import mcdc.type_ as type_
 
 from mcdc.constant import *
@@ -30,8 +27,6 @@ def set_cache(setting):
 
     if setting == False:
         print_msg(" Caching has been disabled")
-        # p.unlink() for p in pathlib.Path('.').rglob('*.py[co]')
-        # p.rmdir() for p in pathlib.Path('.').rglob('__pycache__')
 
 
 # =============================================================================
@@ -445,7 +440,7 @@ def step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        kernel.reset_local_coordinate(P)
+        geometry.reset_local_coordinate(P)
         P["cell_ID"] = kernel.get_particle_cell(P, UNIVERSE_ROOT, mcdc)
 
     # Determine and move to event
@@ -542,7 +537,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    kernel.reset_local_coordinate(P_new)
+    geometry.reset_local_coordinate(P_new)
     P_new["cell_ID"] = kernel.get_particle_cell(P_new, UNIVERSE_ROOT, mcdc)
     material_ID = kernel.get_particle_material(P_new, mcdc)
     material = mcdc["materials"][material_ID]

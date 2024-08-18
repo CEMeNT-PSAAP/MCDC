@@ -9,8 +9,9 @@ import mcdc.local as local
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
-from mcdc.loop import caching
-from mcdc.type_ import iqmc_score_list
+from mcdc.geometry import (
+    reset_local_coordinate,
+)
 from mcdc.kernel import (
     distance_to_boundary,
     distance_to_mesh,
@@ -19,6 +20,8 @@ from mcdc.kernel import (
     mesh_get_index,
     move_particle,
 )
+from mcdc.loop import caching
+from mcdc.type_ import iqmc_score_list
 
 # =========================================================================
 # Low-Discrepency Sequences
@@ -455,12 +458,6 @@ def iqmc_generate_material_idx(mcdc):
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
     dx = dy = dz = 1
-<<<<<<< HEAD
-    # variables for cell finding functions
-    trans_struct = local.translation()
-    trans = trans_struct["values"]
-=======
->>>>>>> 0c91c9d (reconfigure translation)
     # create particle to utilize cell finding functions
     P_temp = local.particle()
     # set default attributes
