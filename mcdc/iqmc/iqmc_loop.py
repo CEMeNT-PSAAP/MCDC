@@ -4,6 +4,7 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode
 
 import mcdc.adapt as adapt
+import mcdc.geometry as geometry
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.kernel as kernel
 import mcdc.local as local
