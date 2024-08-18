@@ -12,9 +12,11 @@ from numba import (
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
 import mcdc.local as local
+import mcdc.physics as physics
 import mcdc.type_ as type_
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
+from mcdc.algorithm import binary_search
 from mcdc.constant import *
 from mcdc.loop import loop_source
 from mcdc.print_ import print_error, print_msg
@@ -1536,7 +1538,7 @@ def move_particle(P, distance, mcdc):
     P["x"] += P["ux"] * distance
     P["y"] += P["uy"] * distance
     P["z"] += P["uz"] * distance
-    P["t"] += distance / get_particle_speed(P, mcdc)
+    P["t"] += distance / physics.get_speed(P, mcdc)
 
 
 @njit
@@ -1554,35 +1556,6 @@ def shift_particle(P, shift):
     else:
         P["z"] -= shift
     P["t"] += shift
-
-
-@for_cpu()
-def lost_particle(P):
-    with objmode():
-        print("A particle is lost at (", P["x"], P["y"], P["z"], ")")
-
-
-@for_gpu()
-def lost_particle(P):
-    pass
-
-
-@njit
-def get_particle_cell(P, universe_ID, mcdc):
-    """
-    Find and return particle cell ID in the given universe and translation
-    """
-
-    universe = mcdc["universes"][universe_ID]
-    for cell_ID in universe["cell_IDs"]:
-        cell = mcdc["cells"][cell_ID]
-        if cell_check(P, cell, mcdc):
-            return cell["ID"]
-
-    # Particle is not found
-    lost_particle(P)
-    P["alive"] = False
-    return -1
 
 
 @njit
@@ -1624,18 +1597,10 @@ def get_particle_material(P, mcdc):
                 P["translated"] = True
 
                 # Get inner cell
-                cell_ID = get_particle_cell(P, universe_ID, mcdc)
+                cell_ID = geometry.get_cell(P, universe_ID, mcdc)
                 cell = mcdc["cells"][cell_ID]
 
     return cell["fill_ID"]
-
-
-@njit
-def get_particle_speed(P, mcdc):
-    if mcdc["setting"]["mode_MG"]:
-        return mcdc["materials"][P["material_ID"]]["speed"][P["g"]]
-    else:
-        return math.sqrt(P["E"]) * SQRT_E_TO_SPEED
 
 
 @njit
@@ -1712,282 +1677,6 @@ def split_as_record(P):
     P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
     return P_new
-
-
-# =============================================================================
-# Cell operations
-# =============================================================================
-
-
-@njit
-def cell_check(P, cell, mcdc):
-    # Access RPN data
-    idx = cell["region_data_idx"]
-    N_token = mcdc["cell_region_data"][idx]
-
-    # Create local value array
-    value_struct = local.RPN_array()
-    value = value_struct["values"]
-    N_value = 0
-
-    # March forward through RPN tokens
-    idx += 1
-    idx_end = idx + N_token
-    while idx < idx_end:
-        token = mcdc["cell_region_data"][idx]
-
-        if token >= 0:
-            surface = mcdc["surfaces"][token]
-            value[N_value] = surface_evaluate(P, surface) > 0.0
-            N_value += 1
-
-        elif token == BOOL_NOT:
-            value[N_value - 1] = not value[N_value - 1]
-
-        elif token == BOOL_AND:
-            value[N_value - 2] = value[N_value - 2] & value[N_value - 1]
-            N_value -= 1
-
-        elif token == BOOL_OR:
-            value[N_value - 2] = value[N_value - 2] | value[N_value - 1]
-            N_value -= 1
-
-        idx += 1
-
-    return value[0]
-
-
-# =============================================================================
-# Surface operations
-# =============================================================================
-# Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
-#   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
-
-
-@njit
-def surface_evaluate(P, surface):
-    x, y, z = geometry.get_local_coordinate(P)
-    t = P["t"]
-
-    G = surface["G"]
-    H = surface["H"]
-    I_ = surface["I"]
-
-    # Get time indices
-    idx = 0
-    if surface["N_slice"] > 1:
-        idx = binary_search(t, surface["t"][: surface["N_slice"] + 1])
-
-    # Get constant
-    J0 = surface["J"][idx][0]
-    J1 = surface["J"][idx][1]
-    J = J0 + J1 * (t - surface["t"][idx])
-
-    result = G * x + H * y + I_ * z + J
-
-    if surface["linear"]:
-        return result
-
-    A = surface["A"]
-    B = surface["B"]
-    C = surface["C"]
-    D = surface["D"]
-    E = surface["E"]
-    F = surface["F"]
-
-    return (
-        result + A * x * x + B * y * y + C * z * z + D * x * y + E * x * z + F * y * z
-    )
-
-
-@njit
-def surface_bc(P, surface):
-    if surface["BC"] == BC_VACUUM:
-        P["alive"] = False
-    elif surface["BC"] == BC_REFLECTIVE:
-        surface_reflect(P, surface)
-
-
-@njit
-def surface_exit_evaluate(P):
-    if P["surface_ID"] == 0:
-        return 0
-    else:
-        return 1
-
-
-@njit
-def surface_reflect(P, surface):
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-    nx, ny, nz = surface_normal(P, surface)
-    # 2.0*surface_normal_component(...)
-    c = 2.0 * (nx * ux + ny * uy + nz * uz)
-
-    P["ux"] = ux - c * nx
-    P["uy"] = uy - c * ny
-    P["uz"] = uz - c * nz
-
-
-@njit
-def surface_shift(P, surface, mcdc):
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-
-    # Get surface normal
-    nx, ny, nz = surface_normal(P, surface)
-
-    # The shift
-    shift_x = nx * SHIFT
-    shift_y = ny * SHIFT
-    shift_z = nz * SHIFT
-
-    # Get dot product to determine shift sign
-    if surface["linear"]:
-        # Get time indices
-        idx = 0
-        if surface["N_slice"] > 1:
-            idx = binary_search(P["t"], surface["t"][: surface["N_slice"] + 1])
-        J1 = surface["J"][idx][1]
-        v = get_particle_speed(P, mcdc)
-        dot = ux * nx + uy * ny + uz * nz + J1 / v
-    else:
-        dot = ux * nx + uy * ny + uz * nz
-    if dot > 0.0:
-        P["x"] += shift_x
-        P["y"] += shift_y
-        P["z"] += shift_z
-    else:
-        P["x"] -= shift_x
-        P["y"] -= shift_y
-        P["z"] -= shift_z
-
-
-@njit
-def surface_normal(P, surface):
-    if surface["linear"]:
-        return surface["nx"], surface["ny"], surface["nz"]
-
-    A = surface["A"]
-    B = surface["B"]
-    C = surface["C"]
-    D = surface["D"]
-    E = surface["E"]
-    F = surface["F"]
-    G = surface["G"]
-    H = surface["H"]
-    I_ = surface["I"]
-
-    x, y, z = geometry.get_local_coordinate(P)
-
-    dx = 2 * A * x + D * y + E * z + G
-    dy = 2 * B * y + D * x + F * z + H
-    dz = 2 * C * z + E * x + F * y + I_
-
-    norm = (dx**2 + dy**2 + dz**2) ** 0.5
-    return dx / norm, dy / norm, dz / norm
-
-
-@njit
-def surface_normal_component(P, surface):
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-    nx, ny, nz = surface_normal(P, surface)
-    return nx * ux + ny * uy + nz * uz
-
-
-@njit
-def surface_distance(P, surface, mcdc):
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-
-    G = surface["G"]
-    H = surface["H"]
-    I_ = surface["I"]
-
-    surface_move = False
-    if surface["linear"]:
-        idx = 0
-        if surface["N_slice"] > 1:
-            idx = binary_search(P["t"], surface["t"][: surface["N_slice"] + 1])
-        J1 = surface["J"][idx][1]
-        v = get_particle_speed(P, mcdc)
-
-        t_max = surface["t"][idx + 1]
-        d_max = (t_max - P["t"]) * v
-
-        div = G * ux + H * uy + I_ * uz + J1 / v
-        distance = -surface_evaluate(P, surface) / (G * ux + H * uy + I_ * uz + J1 / v)
-
-        # Go beyond current movement slice?
-        if distance > d_max:
-            distance = d_max
-            surface_move = True
-        elif distance < 0 and idx < surface["N_slice"] - 1:
-            distance = d_max
-            surface_move = True
-
-        # Moving away from the surface
-        if distance < 0.0:
-            return INF, surface_move
-        else:
-            return distance, surface_move
-
-    x, y, z = geometry.get_local_coordinate(P)
-
-    A = surface["A"]
-    B = surface["B"]
-    C = surface["C"]
-    D = surface["D"]
-    E = surface["E"]
-    F = surface["F"]
-
-    # Quadratic equation constants
-    a = (
-        A * ux * ux
-        + B * uy * uy
-        + C * uz * uz
-        + D * ux * uy
-        + E * ux * uz
-        + F * uy * uz
-    )
-    b = (
-        2 * (A * x * ux + B * y * uy + C * z * uz)
-        + D * (x * uy + y * ux)
-        + E * (x * uz + z * ux)
-        + F * (y * uz + z * uy)
-        + G * ux
-        + H * uy
-        + I_ * uz
-    )
-    c = surface_evaluate(P, surface)
-
-    determinant = b * b - 4.0 * a * c
-
-    # Roots are complex  : no intersection
-    # Roots are identical: tangent
-    # ==> return huge number
-    if determinant <= 0.0:
-        return INF, surface_move
-    else:
-        # Get the roots
-        denom = 2.0 * a
-        sqrt = math.sqrt(determinant)
-        root_1 = (-b + sqrt) / denom
-        root_2 = (-b - sqrt) / denom
-
-        # Negative roots, moving away from the surface
-        if root_1 < 0.0:
-            root_1 = INF
-        if root_2 < 0.0:
-            root_2 = INF
-
-        # Return the smaller root
-        return min(root_1, root_2), surface_move
 
 
 # =============================================================================
@@ -2140,7 +1829,7 @@ def score_tracklength(P, distance, mcdc):
     if tally["flux"]:
         score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["flux"])
     if tally["density"]:
-        flux /= get_particle_speed(P, mcdc)
+        flux /= physics.get_speed(P, mcdc)
         score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["density"])
     if tally["fission"]:
         flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
@@ -2302,7 +1991,7 @@ def eigenvalue_tally(P, distance, mcdc):
 
     if mcdc["cycle_active"]:
         # Neutron density
-        v = get_particle_speed(P, mcdc)
+        v = physics.get_speed(P, mcdc)
         n_density = flux / v
         # mcdc["eigenvalue_tally_n"][0] += n_density
         adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
@@ -2522,7 +2211,7 @@ def move_to_event(P, mcdc):
         d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
 
     # Distance to time boundary
-    speed = get_particle_speed(P, mcdc)
+    speed = physics.get_speed(P, mcdc)
     d_time_boundary = speed * (mcdc["setting"]["time_boundary"] - P["t"])
 
     # Distance to census time
@@ -2662,7 +2351,7 @@ def distance_to_boundary(P, mcdc):
                 P["translated"] = True
 
                 # Get inner cell
-                cell_ID = get_particle_cell(P, universe_ID, mcdc)
+                cell_ID = geometry.get_cell(P, universe_ID, mcdc)
                 cell = mcdc["cells"][cell_ID]
 
     return distance, event
@@ -2684,7 +2373,7 @@ def distance_to_nearest_surface(P, cell, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cell_surface_data"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d, sm = surface_distance(P, surface, mcdc)
+        d, sm = geometry.surface_distance(P, surface, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]
@@ -2718,7 +2407,7 @@ def distance_to_mesh(P, mesh, mcdc):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    v = get_particle_speed(P, mcdc)
+    v = physics.get_speed(P, mcdc)
 
     d = INF
     d = min(d, mesh_distance_search(x, ux, mesh["x"]))
@@ -2740,24 +2429,26 @@ def surface_crossing(P, prog):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    surface_bc(P, surface)
+    geometry.apply_surface_bc(P, surface)
 
     # Small shift to ensure crossing
-    surface_shift(P, surface, mcdc)
+    geometry.surface_shift(P, surface, mcdc)
 
     # Tally particle exit
     if mcdc["tally"]["exit"] and not P["alive"]:
         # Reflectance if P["surface_ID"] == 0, else transmittance
-        exit_idx = surface_exit_evaluate(P)
+        exit_idx = 1
+        if P["surface_ID"] == 0:
+            return 0
         # Score on tally
         score_exit(P, exit_idx, mcdc)
 
     # Check new cell?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         cell = mcdc["cells"][P["cell_ID"]]
-        if not cell_check(P, cell, mcdc):
+        if not geometry.cell_check(P, cell, mcdc):
             geometry.reset_local_coordinate(P)
-            P["cell_ID"] = get_particle_cell(P, UNIVERSE_ROOT, mcdc)
+            P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
 
 
 # =============================================================================
@@ -2950,7 +2641,7 @@ def scattering_CE(P, material, P_new, mcdc):
     # =========================================================================
 
     # Particle speed
-    P_speed = get_particle_speed(P, mcdc)
+    P_speed = physics.get_speed(P, mcdc)
 
     # Neutron velocity - LAB
     vx = P_speed * P["ux"]
@@ -3008,7 +2699,7 @@ def scattering_CE(P, material, P_new, mcdc):
 @njit
 def sample_nucleus_speed(A, P, mcdc):
     # Particle speed
-    P_speed = get_particle_speed(P, mcdc)
+    P_speed = physics.get_speed(P, mcdc)
 
     # Maxwellian parameter
     beta = math.sqrt(2.0659834e-11 * A)
@@ -3553,7 +3244,7 @@ def get_microXS(type_, nuclide, E):
 @njit
 def get_XS(data, E, E_grid, NE):
     # Search XS energy bin index
-    idx = binary_search_length(E, E_grid, NE)
+    idx = binary_search(E, E_grid, NE)
 
     # Extrapolate if E is outside the given data
     if idx == -1:
@@ -3623,7 +3314,7 @@ def sample_Eout(P_new, E_grid, NE, chi):
     xi = rng(P_new)
 
     # Determine bin index
-    idx = binary_search_length(xi, chi, NE)
+    idx = binary_search(xi, chi, NE)
 
     # Linear interpolation
     E1 = E_grid[idx]
@@ -3636,38 +3327,6 @@ def sample_Eout(P_new, E_grid, NE, chi):
 # =============================================================================
 # Miscellany
 # =============================================================================
-
-
-@njit
-def binary_search_length(val, grid, length):
-    """
-    Binary search that returns the bin index of the value `val` given grid `grid`.
-
-    Some special cases:
-        val < min(grid)  --> -1
-        val > max(grid)  --> size of bins
-        val = a grid point --> bin location whose upper bound is val
-                                 (-1 if val = min(grid)
-    """
-
-    left = 0
-    if length == 0:
-        right = len(grid) - 1
-    else:
-        right = length - 1
-    mid = -1
-    while left <= right:
-        mid = int((left + right) / 2)
-        if grid[mid] < val:
-            left = mid + 1
-        else:
-            right = mid - 1
-    return int(right)
-
-
-@njit
-def binary_search(val, grid):
-    return binary_search_length(val, grid, 0)
 
 
 @njit
