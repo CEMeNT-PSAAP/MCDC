@@ -1678,14 +1678,14 @@ def copy_particle(P_new, P):
 
 @njit
 def make_record(P):
-    P_new = adapt.local_particle_record()
+    P_new = local.particle_record()
     copy_recordlike(P_new, P)
     return P_new
 
 
 @njit
 def make_particle(P_rec):
-    P_new = adapt.local_particle()
+    P_new = local.particle()
     copy_recordlike(P_new, P_rec)
     P_new["fresh"] = True
     P_new["alive"] = True
@@ -1698,7 +1698,7 @@ def make_particle(P_rec):
 
 @njit
 def split_particle(P):
-    P_new = adapt.local_particle()
+    P_new = local.particle()
     copy_particle(P_new, P)
     P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
@@ -1707,7 +1707,7 @@ def split_particle(P):
 
 @njit
 def split_as_record(P):
-    P_new = adapt.local_particle_record()
+    P_new = local.particle_record()
     copy_recordlike(P_new, P)
     P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
     rng(P)
