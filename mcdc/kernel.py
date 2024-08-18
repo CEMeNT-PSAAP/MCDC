@@ -1619,7 +1619,9 @@ def get_particle_material(P, mcdc):
 
             # Apply translation
             if cell["fill_translated"]:
-                P["translation"] += cell["translation"]
+                P["translation"][0] += cell["translation"][0]
+                P["translation"][1] += cell["translation"][1]
+                P["translation"][2] += cell["translation"][2]
                 P["translated"] = True
 
             if cell["fill_type"] == FILL_LATTICE:
@@ -2646,7 +2648,9 @@ def distance_to_boundary(P, mcdc):
 
             # Apply translation
             if cell["fill_translated"]:
-                P["translation"] += cell["translation"]
+                P["translation"][0] += cell["translation"][0]
+                P["translation"][1] += cell["translation"][1]
+                P["translation"][2] += cell["translation"][2]
                 P["translated"] = True
 
             if cell["fill_type"] == FILL_LATTICE:
