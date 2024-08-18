@@ -1,18 +1,24 @@
-import math
+import math, numba
 
 from mpi4py import MPI
-from numba import njit, objmode, literal_unroll
-import numba
+from numba import (
+    int64,
+    literal_unroll,
+    njit,
+    objmode,
+    uint64,
+)
 
+import mcdc.adapt as adapt
+import mcdc.geometry as geometry
 import mcdc.local as local
 import mcdc.type_ as type_
 
+from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
+from mcdc.loop import loop_source
 from mcdc.print_ import print_error, print_msg
 from mcdc.type_ import score_list
-from mcdc.loop import loop_source
-import mcdc.adapt as adapt
-from mcdc.adapt import toggle, for_cpu, for_gpu
 
 # =============================================================================
 # Domain Decomposition
@@ -776,15 +782,15 @@ def wrapping_add(a, b):
 
 
 def wrapping_mul_python(a, b):
-    a = numba.uint64(a)
-    b = numba.uint64(b)
+    a = uint64(a)
+    b = uint64(b)
     with np.errstate(all="ignore"):
         return a * b
 
 
 def wrapping_add_python(a, b):
-    a = numba.uint64(a)
-    b = numba.uint64(b)
+    a = uint64(a)
+    b = uint64(b)
     with np.errstate(all="ignore"):
         return a + b
 
@@ -799,13 +805,13 @@ def adapt_rng(object_mode=False):
 @njit
 def split_seed(key, seed):
     """murmur_hash64a"""
-    multiplier = numba.uint64(0xC6A4A7935BD1E995)
-    length = numba.uint64(8)
-    rotator = numba.uint64(47)
-    key = numba.uint64(key)
-    seed = numba.uint64(seed)
+    multiplier = uint64(0xC6A4A7935BD1E995)
+    length = uint64(8)
+    rotator = uint64(47)
+    key = uint64(key)
+    seed = uint64(seed)
 
-    hash_value = numba.uint64(seed) ^ wrapping_mul(length, multiplier)
+    hash_value = uint64(seed) ^ wrapping_mul(length, multiplier)
 
     key = wrapping_mul(key, multiplier)
     key ^= key >> rotator
@@ -821,7 +827,7 @@ def split_seed(key, seed):
 
 @njit
 def rng_(seed):
-    seed = numba.uint64(seed)
+    seed = uint64(seed)
     return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
 
 
@@ -1580,33 +1586,11 @@ def get_particle_cell(P, universe_ID, mcdc):
 
 
 @njit
-def reset_local_coordinate(P):
-    P["translation"][0] = 0.0
-    P["translation"][1] = 0.0
-    P["translation"][2] = 0.0
-    P["translated"] = False
-
-
-@njit
-def get_local_coordinate(P):
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-
-    if P["translated"]:
-        x -= P["translation"][0]
-        y -= P["translation"][1]
-        z -= P["translation"][2]
-
-    return x, y, z
-
-
-@njit
 def get_particle_material(P, mcdc):
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
 
-    reset_local_coordinate(P)
+    geometry.reset_local_coordinate(P)
 
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
@@ -1782,7 +1766,7 @@ def cell_check(P, cell, mcdc):
 
 @njit
 def surface_evaluate(P, surface):
-    x, y, z = get_local_coordinate(P)
+    x, y, z = geometry.get_local_coordinate(P)
     t = P["t"]
 
     G = surface["G"]
@@ -1896,7 +1880,7 @@ def surface_normal(P, surface):
     H = surface["H"]
     I_ = surface["I"]
 
-    x, y, z = get_local_coordinate(P)
+    x, y, z = geometry.get_local_coordinate(P)
 
     dx = 2 * A * x + D * y + E * z + G
     dy = 2 * B * y + D * x + F * z + H
@@ -1953,7 +1937,7 @@ def surface_distance(P, surface, mcdc):
         else:
             return distance, surface_move
 
-    x, y, z = get_local_coordinate(P)
+    x, y, z = geometry.get_local_coordinate(P)
 
     A = surface["A"]
     B = surface["B"]
@@ -2099,10 +2083,10 @@ def mesh_get_energy_index(P, mesh, mcdc):
 
 @njit
 def mesh_uniform_get_index(P, mesh):
-    Px, Py, Pz = get_local_coordinate(P)
-    x = numba.int64(math.floor((Px - mesh["x0"]) / mesh["dx"]))
-    y = numba.int64(math.floor((Py - mesh["y0"]) / mesh["dy"]))
-    z = numba.int64(math.floor((Pz - mesh["z0"]) / mesh["dz"]))
+    Px, Py, Pz = geometry.get_local_coordinate(P)
+    x = int64(math.floor((Px - mesh["x0"]) / mesh["dx"]))
+    y = int64(math.floor((Py - mesh["y0"]) / mesh["dy"]))
+    z = int64(math.floor((Pz - mesh["z0"]) / mesh["dz"]))
     return x, y, z
 
 
@@ -2623,7 +2607,7 @@ def distance_to_boundary(P, mcdc):
     # Top level cell
     cell = mcdc["cells"][P["cell_ID"]]
 
-    reset_local_coordinate(P)
+    geometry.reset_local_coordinate(P)
 
     # Recursively check if cell is a lattice cell, until material cell is found
     while True:
@@ -2713,7 +2697,7 @@ def distance_to_nearest_surface(P, cell, mcdc):
 def distance_to_lattice(P, lattice):
     mesh = lattice["mesh"]
 
-    x, y, z = get_local_coordinate(P)
+    x, y, z = geometry.get_local_coordinate(P)
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
@@ -2772,7 +2756,7 @@ def surface_crossing(P, prog):
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         cell = mcdc["cells"][P["cell_ID"]]
         if not cell_check(P, cell, mcdc):
-            reset_local_coordinate(P)
+            geometry.reset_local_coordinate(P)
             P["cell_ID"] = get_particle_cell(P, UNIVERSE_ROOT, mcdc)
 
 
