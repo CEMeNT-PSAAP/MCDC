@@ -53,3 +53,4 @@ pip install ngsolve distinctipy
 
 bash patch_numba.sh
 
+bash install_commit_hooks.sh
