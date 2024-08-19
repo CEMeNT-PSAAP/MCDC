@@ -4,7 +4,6 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.kernel as kernel
 import mcdc.local as local
@@ -48,11 +47,6 @@ def iqmc_loop_particle(P, prog):
 @njit(cache=caching)
 def iqmc_step_particle(P, prog):
     mcdc = adapt.device(prog)
-
-    # Find cell from root universe if unknown
-    if P["cell_ID"] == -1:
-        geometry.reset_local_coordinate(P)
-        P["cell_ID"] = geometry.get_cell(P, 0, mcdc)
 
     # Determine and move to event
     iqmc_kernel.iqmc_move_to_event(P, mcdc)

@@ -596,14 +596,14 @@ def prepare():
 
     N_lattice = len(input_deck.lattices)
     for i in range(N_lattice):
-        # Mesh
-        for name in type_.mesh_uniform.names:
-            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i].mesh[name]
+        for name in type_.lattice.names:
+            if name not in ["universe_IDs"]:
+                mcdc["lattices"][i][name] = getattr(input_deck.lattices[i], name)
 
         # Universe IDs
-        Nx = mcdc["lattices"][i]["mesh"]["Nx"]
-        Ny = mcdc["lattices"][i]["mesh"]["Ny"]
-        Nz = mcdc["lattices"][i]["mesh"]["Nz"]
+        Nx = mcdc["lattices"][i]["Nx"]
+        Ny = mcdc["lattices"][i]["Ny"]
+        Nz = mcdc["lattices"][i]["Nz"]
         mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[
             i
         ].universe_IDs

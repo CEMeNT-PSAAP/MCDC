@@ -761,11 +761,11 @@ def lattice(x=None, y=None, z=None, universes=None):
     Parameters
     ----------
     x : array_like[float], optional
-        x-coordinates that define the lattice mesh (default None).
+        x-coordinates that define the lattice grid (default None).
     y : array_like[float], optional
-        y-coordinates that define the lattice mesh (default None).
+        y-coordinates that define the lattice grid (default None).
     z : array_like[float], optional
-        z-coordinates that define the lattice mesh (default None).
+        z-coordinates that define the lattice grid (default None).
     universes : list of (list of dictionary), optional
         List of lists of universe cards that fill the lattice (default None).
 
@@ -778,19 +778,19 @@ def lattice(x=None, y=None, z=None, universes=None):
     card = LatticeCard()
     card.ID = len(global_.input_deck.lattices)
 
-    # Set mesh
+    # Set grid
     if x is not None:
-        card.mesh["x0"] = x[0]
-        card.mesh["dx"] = x[1]
-        card.mesh["Nx"] = x[2]
+        card.x0 = x[0]
+        card.dx = x[1]
+        card.Nx = x[2]
     if y is not None:
-        card.mesh["y0"] = y[0]
-        card.mesh["dy"] = y[1]
-        card.mesh["Ny"] = y[2]
+        card.y0 = y[0]
+        card.dy = y[1]
+        card.Ny = y[2]
     if z is not None:
-        card.mesh["z0"] = z[0]
-        card.mesh["dz"] = z[1]
-        card.mesh["Nz"] = z[2]
+        card.z0 = z[0]
+        card.dz = z[1]
+        card.Nz = z[2]
 
     # Set universe IDs
     get_ID = np.vectorize(lambda obj: obj.ID)
