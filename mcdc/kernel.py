@@ -16,7 +16,7 @@ import mcdc.physics as physics
 import mcdc.type_ as type_
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
-from mcdc.algorithm import binary_search
+from mcdc.algorithm import binary_search, binary_search_with_length
 from mcdc.constant import *
 from mcdc.loop import loop_source
 from mcdc.print_ import print_error, print_msg
@@ -3244,7 +3244,7 @@ def get_microXS(type_, nuclide, E):
 @njit
 def get_XS(data, E, E_grid, NE):
     # Search XS energy bin index
-    idx = binary_search(E, E_grid, NE)
+    idx = binary_search_with_length(E, E_grid, NE)
 
     # Extrapolate if E is outside the given data
     if idx == -1:
@@ -3314,7 +3314,7 @@ def sample_Eout(P_new, E_grid, NE, chi):
     xi = rng(P_new)
 
     # Determine bin index
-    idx = binary_search(xi, chi, NE)
+    idx = binary_search_with_length(xi, chi, NE)
 
     # Linear interpolation
     E1 = E_grid[idx]
