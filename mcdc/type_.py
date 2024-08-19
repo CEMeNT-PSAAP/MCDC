@@ -3,6 +3,7 @@ import math
 import numpy as np
 import os
 
+from numba import njit
 from mpi4py import MPI
 from mpi4py.util.dtlib import from_numpy_dtype
 
@@ -26,27 +27,25 @@ str_ = "U32"
 # ==============================================================================
 # MC/DC types
 # ==============================================================================
-# Currently defined based on input deck
-# TODO: This causes JIT recompilation in certain cases
+"""
+Some types are problem-dependent and defined in code_factory.py
+"""
 
 particle = None
 particle_record = None
+
 nuclide = None
 material = None
+
 surface = None
-region = None
-cell = None
 universe = None
 lattice = None
+
 source = None
 setting = None
 tally = None
 technique = None
 
-# GPU mode related
-translate = None
-group_array = None
-j_array = None
 global_ = None
 
 
@@ -167,24 +166,31 @@ def make_type_particle(input_deck):
     global particle
 
     struct = [
+        # Coordinate
         ("x", float64),
         ("y", float64),
         ("z", float64),
         ("t", float64),
+        # Spatial direction
         ("ux", float64),
         ("uy", float64),
         ("uz", float64),
+        # Energy
         ("g", uint64),
         ("E", float64),
+        # Weight
         ("w", float64),
-        ("alive", bool_),
-        ("fresh", bool_),
+        # Local coordinate
+        ("translated", bool_),
+        ("translation", float64, (3,)),
+        # IDs
         ("material_ID", int64),
         ("cell_ID", int64),
         ("surface_ID", int64),
-        ("translation", float64, (3,)),
+        # Misc.
+        ("alive", bool_),
+        ("fresh", bool_),
         ("event", int64),
-        ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
 
@@ -223,7 +229,6 @@ def make_type_particle_record(input_deck):
         ("g", uint64),
         ("E", float64),
         ("w", float64),
-        ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
 
@@ -348,9 +353,6 @@ def make_type_nuclide(input_deck):
     struct = [
         ("ID", int64),
         ("fissionable", bool_),
-        ("sensitivity", bool_),
-        ("sensitivity_ID", int64),
-        ("dsm_Np", float64),
         ("uq", bool_),
     ]
 
@@ -446,7 +448,6 @@ def make_type_material(input_deck):
     struct = [
         ("ID", int64),
         ("N_nuclide", int64),
-        ("sensitivity", bool_),
         ("nuclide_IDs", int64, (Nmax_nuclide,)),
         ("nuclide_densities", float64, (Nmax_nuclide,)),
         ("uq", bool_),
@@ -506,27 +507,6 @@ def make_type_surface(input_deck):
             ("nx", float64),
             ("ny", float64),
             ("nz", float64),
-            ("sensitivity", bool_),
-            ("sensitivity_ID", int64),
-            ("dsm_Np", float64),
-        ]
-    )
-
-
-# ==============================================================================
-# Region
-# ==============================================================================
-
-
-def make_type_region():
-    global region
-
-    region = into_dtype(
-        [
-            ("ID", int64),
-            ("type", int64),
-            ("A", int64),
-            ("B", int64),
         ]
     )
 
@@ -536,23 +516,20 @@ def make_type_region():
 # ==============================================================================
 
 
-def make_type_cell(input_deck):
-    global cell
-
-    # Maximum number of surfaces per cell
-    Nmax_surface = max([cell.N_surface for cell in input_deck.cells])
-
-    cell = into_dtype(
-        [
-            ("ID", int64),
-            ("region_ID", int64),
-            ("fill_type", int64),
-            ("fill_ID", int64),
-            ("translation", float64, (3,)),
-            ("N_surface", int64),
-            ("surface_IDs", int64, (Nmax_surface,)),
-        ]
-    )
+cell = into_dtype(
+    [
+        ("ID", int64),
+        # Fill status
+        ("fill_type", int64),
+        ("fill_ID", int64),
+        ("fill_translated", bool),
+        # Local coordinate modifier
+        ("translation", float64, (3,)),
+        # Data indices
+        ("surface_data_idx", int64),
+        ("region_data_idx", int64),
+    ]
+)
 
 
 # ==============================================================================
@@ -684,14 +661,6 @@ score_list = (
 def make_type_tally(input_deck):
     global tally
 
-    # Number of sensitivitys parameters
-    N_sensitivity = input_deck.setting["N_sensitivity"]
-
-    # Number of tally scores
-    Ns = 1 + N_sensitivity
-    if input_deck.technique["dsm_order"] == 2:
-        Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-
     # Get card
     card = input_deck.tally
 
@@ -713,13 +682,13 @@ def make_type_tally(input_deck):
 
     # Scores and shapes
     scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+        ["flux", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["density", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["fission", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["total", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["current", (Ng, Nt, Nx, Ny, Nz, 3)],
+        ["eddington", (Ng, Nt, Nx, Ny, Nz, 6)],
+        ["exit", (Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
     ]
 
     # Add score flags to structure
@@ -785,8 +754,6 @@ def make_type_setting(deck):
         ("IC_file", bool_),
         ("IC_file_name", str_),
         ("N_precursor", uint64),
-        # TODO: Move to technique
-        ("N_sensitivity", uint64),
     ]
 
     # Finalize setting type
@@ -1016,14 +983,6 @@ def make_type_technique(input_deck):
     ]
 
     # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    struct += [
-        ("dsm_order", int64),
-    ]
-
-    # =========================================================================
     # Variance Deconvolution
     # =========================================================================
     struct += [("uq_tally", uq_tally), ("uq_", uq)]
@@ -1047,9 +1006,6 @@ def make_type_uq_tally(input_deck):
     # Tally estimator flags
     struct = []
 
-    # Number of tally scores
-    Ns = 1 + input_deck.setting["N_sensitivity"]
-
     # Tally card
     tally_card = input_deck.tally
 
@@ -1058,13 +1014,13 @@ def make_type_uq_tally(input_deck):
 
     # Scores and shapes
     scores_shapes = [
-        ["flux", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["density", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["fission", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["total", (Ns, Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
-        ["current", (Ns, Ng, Nt, Nx, Ny, Nz, 3)],
-        ["eddington", (Ns, Ng, Nt, Nx, Ny, Nz, 6)],
-        ["exit", (Ns, Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
+        ["flux", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["density", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["fission", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["total", (Ng, Nt, Nx, Ny, Nz, Nmu, N_azi)],
+        ["current", (Ng, Nt, Nx, Ny, Nz, 3)],
+        ["eddington", (Ng, Nt, Nx, Ny, Nz, 6)],
+        ["exit", (Ng, Nt, 2, Ny, Nz, Nmu, N_azi)],
     ]
 
     # Add score flags to structure
@@ -1233,11 +1189,17 @@ def make_type_global(input_deck):
     N_nuclide = len(input_deck.nuclides)
     N_material = len(input_deck.materials)
     N_surface = len(input_deck.surfaces)
-    N_region = len(input_deck.regions)
     N_cell = len(input_deck.cells)
     N_source = len(input_deck.sources)
     N_universe = len(input_deck.universes)
     N_lattice = len(input_deck.lattices)
+
+    # Cell data sizes
+    N_cell_surface = 0
+    N_cell_region = 0
+    for cell_ in input_deck.cells:
+        N_cell_surface += 1 + len(cell_.surface_IDs)
+        N_cell_region += 1 + len(cell_._region_RPN)
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1268,11 +1230,6 @@ def make_type_global(input_deck):
         bank_source = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
-    # Particle tracker
-    N_track = 0
-    if input_deck.setting["track_particle"]:
-        N_track = N_work * 1000
-
     # iQMC bank adjustment
     if input_deck.technique["iQMC"]:
         bank_source = particle_bank(N_work)
@@ -1298,8 +1255,9 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
-            ("regions", region, (N_region,)),
             ("cells", cell, (N_cell,)),
+            ("cell_surface_data", int64, (N_cell_surface,)),
+            ("cell_region_data", int64, (N_cell_region,)),
             ("universes", universe, (N_universe,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
@@ -1349,10 +1307,6 @@ def make_type_global(input_deck):
             ("runtime_simulation", float64),
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
-            ("particle_track", float64, (N_track, 8)),
-            ("particle_track_N", int64, (1,)),
-            ("particle_track_history_ID", int64, (1,)),
-            ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
             ("gpu_state", uintp),
@@ -1366,23 +1320,6 @@ def make_type_global(input_deck):
 # ==============================================================================
 # Util
 # ==============================================================================
-
-
-def make_type_translate(input_deck):
-    global translate
-    translate = into_dtype([("values", float64, (3,))])
-
-
-def make_type_group_array(input_deck):
-    global group_array
-    G = input_deck.materials[0].G
-    group_array = into_dtype([("values", float64, (G,))])
-
-
-def make_type_j_array(input_deck):
-    global j_array
-    J = input_deck.materials[0].J
-    j_array = into_dtype([("values", float64, (J,))])
 
 
 def make_type_mesh(card):

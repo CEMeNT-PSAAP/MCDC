@@ -52,8 +52,6 @@ def nuclide(
     chi_d=None,
     speed=None,
     decay=None,
-    sensitivity=False,
-    dsm_Np=1.0,
 ):
     """
     Create a nuclide
@@ -80,11 +78,6 @@ def nuclide(
         Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s].
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the nuclide.
-    dsm_Np : float
-        Average number of derivative particles produced at each
-        sensitivity nuclide collision.
 
     Returns
     -------
@@ -208,20 +201,6 @@ def nuclide(
             if np.sum(card.chi_d[dg, :]) > 0.0:
                 card.chi_d[dg, :] /= np.sum(card.chi_d[dg, :])
 
-    # Sensitivity setup
-    if sensitivity:
-        # Set flag
-        card.sensitivity = True
-        global_.input_deck.technique["sensitivity"] = True
-        global_.input_deck.technique["weighted_emission"] = False
-
-        # Set ID
-        global_.input_deck.setting["N_sensitivity"] += 1
-        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
-
-        # Set dsm_Np
-        card.dsm_Np = dsm_Np
-
     # Add to deck
     global_.input_deck.nuclides.append(card)
 
@@ -240,8 +219,6 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
-    sensitivity=False,
-    dsm_Np=1.0,
 ):
     """
     Create a material
@@ -273,12 +250,6 @@ def material(
         Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s].
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the material
-        (only relevant for single-nuclide material).
-    dsm_Np : float
-        Average number of derivative particles produced at each
-        sensitivity material collision (only relevant for single_nuclide material).
 
     Returns
     -------
@@ -303,8 +274,6 @@ def material(
             chi_d,
             speed,
             decay,
-            sensitivity,
-            dsm_Np,
         )
         nuclides = [[card_nuclide, 1.0]]
 
@@ -379,7 +348,7 @@ def material(
     # Set ID
     card.ID = len(global_.input_deck.materials)
 
-    # Calculate basic XS and determine sensitivity flag
+    # Calculate basic XS
     for i in range(N_nuclide):
         nuc = nuclides[i][0]
         density = nuclides[i][1]
@@ -390,8 +359,6 @@ def material(
         card.scatter += nuc.scatter * density
         card.fission += nuc.fission * density
         card.total += nuc.total * density
-        card.sensitivity += nuc.sensitivity * density
-    card.sensitivity = bool(card.sensitivity)
 
     # Calculate effective speed
     # Current approach: weighted by nuclide macroscopic total cross section
@@ -450,7 +417,7 @@ def material(
     return card
 
 
-def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
+def surface(type_, bc="interface", **kw):
     """
     Create a surface to define the region of a cell.
 
@@ -461,11 +428,6 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         Surface type.
     bc : {"interface", "vacuum", "reflective"}
         Surface boundary condition.
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the surface position.
-    dsm_Np : int
-        Average number of derivative particles produced at each
-        sensitivity surface crossing.
 
     Other Parameters
     ----------------
@@ -537,20 +499,6 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         ],
     )
     card.boundary_type = bc
-
-    # Sensitivity
-    if sensitivity:
-        # Set flag
-        card.sensitivity = True
-        global_.input_deck.technique["sensitivity"] = True
-        global_.input_deck.technique["weighted_emission"] = False
-
-        # Set ID
-        global_.input_deck.setting["N_sensitivity"] += 1
-        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
-
-        # Set dsm_Np
-        card.dsm_Np = dsm_Np
 
     # ==========================================================================
     # Surface attributes
@@ -732,6 +680,11 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     # Assign region
     card.region_ID = region.ID
 
+    # Set region Reverse Polish Notation and region description
+    if region.type != "all":
+        card.set_region_RPN()
+        card.set_region()
+
     # Assign fill type and ID
     if fill.tag == "Material":
         card.fill_type = "material"
@@ -745,37 +698,12 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     card.translation[:] = translation
 
     # Get all surface IDs
-    surface_IDs = []
-
-    region = global_.input_deck.regions[card.region_ID]
-    get_all_surface_IDs(region, surface_IDs)
-    surface_IDs = list(set(surface_IDs))
-
-    card.N_surface = len(surface_IDs)
-    card.surface_IDs = np.array(surface_IDs)
+    card.set_surface_IDs()
 
     # Add to deck
     global_.input_deck.cells.append(card)
 
     return card
-
-
-def get_all_surface_IDs(region, surface_IDs):
-    if region.type == "halfspace":
-        surface = global_.input_deck.surfaces[region.A]
-        surface_IDs.append(surface.ID)
-
-    elif region.type in ["intersection", "union"]:
-        region1 = global_.input_deck.regions[region.A]
-        region2 = global_.input_deck.regions[region.B]
-
-        get_all_surface_IDs(region1, surface_IDs)
-        get_all_surface_IDs(region2, surface_IDs)
-
-    elif region.type in ["complement"]:
-        region1 = global_.input_deck.regions[region.A]
-
-        get_all_surface_IDs(region1, surface_IDs)
 
 
 def universe(cells, root=False):
@@ -1140,8 +1068,6 @@ def setting(**kw):
         Name of the output file MC/DC should save data in (default "output.h5").
     save_input_deck : bool
         Whether to save the input deck information to the output file (default False).
-    particle_tracker : bool
-        Whether to track paths of all individual particles histories, memory issues abound (default False).
     k_eff : str
         Whether to run a k-eigenvalue problem.
     source_file : str
@@ -1172,7 +1098,6 @@ def setting(**kw):
                 "progress_bar",
                 "output_name",
                 "save_input_deck",
-                "particle_tracker",
                 "k_eff",
                 "source_file",
                 "IC_file",
@@ -1191,7 +1116,6 @@ def setting(**kw):
     progress_bar = kw.get("progress_bar")
     output = kw.get("output_name")
     save_input_deck = kw.get("save_input_deck")
-    particle_tracker = kw.get("particle_tracker")
     k_eff = kw.get("k_eff")
     source_file = kw.get("source_file")
     IC_file = kw.get("IC_file")
@@ -1242,12 +1166,6 @@ def setting(**kw):
     if caching is not None:
         card["caching"] = caching
 
-    # Particle tracker
-    if particle_tracker is not None:
-        card["track_particle"] = particle_tracker
-        if particle_tracker and mpi4py.MPI.COMM_WORLD.Get_size() > 1:
-            print_error("Particle tracker currently only runs on a single MPI rank")
-
     # Save input deck?
     if save_input_deck is not None:
         card["save_input_deck"] = save_input_deck
@@ -1295,7 +1213,7 @@ def eigenmode(
     gyration_radius : float, optional
         Specify a gyration radius (default None).
     save_particle : bool
-        Whether particle track outputs in a tally mesh (default False).
+        Whether final particle bank outputs (default False).
 
     Returns
     -------
@@ -1796,22 +1714,6 @@ def IC_generator(
     card_setting["N_active"] = N_cycle
 
 
-def dsm(order=1):
-    """
-    Direct sensitivity method
-
-    Parameters
-    ----------
-    order : int, optional
-        order of the sensitivity to probe, by default 1
-    """
-
-    card = global_.input_deck.technique
-    if order > 2:
-        print_error("DSM currently only supports up to second-order sensitivities")
-    card["dsm_order"] = order
-
-
 def uq(**kw):
     """
     Activate uncertainty quantification.
@@ -1970,7 +1872,6 @@ def make_particle_bank(size):
         ("g", np.uint64),
         ("E", np.float64),
         ("w", np.float64),
-        ("sensitivity_ID", np.int64),
         ("rng_seed", np.uint64),
     ]
     iqmc_struct = [("w", np.float64, (1,))]

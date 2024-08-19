@@ -1,31 +1,24 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 10 21:52:17 2024
-
-@author: sam pasmann
-"""
-from mpi4py import MPI
-
-import mcdc.adapt as adapt
 import numpy as np
 
+from mpi4py import MPI
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode, literal_unroll
-from mcdc.loop import caching
-from mcdc.type_ import iqmc_score_list
-from mcdc.kernel import distance_to_boundary, distance_to_mesh
 
-# from mcdc.iqmc.iqmc_loop import iqmc_loop_source
+import mcdc.adapt as adapt
+import mcdc.local as local
+import mcdc.geometry as geometry
+
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
 from mcdc.kernel import (
-    move_particle,
-    set_bank_size,
-    get_particle_cell,
+    distance_to_boundary,
+    distance_to_mesh,
     get_particle_material,
     mesh_get_index,
+    move_particle,
 )
+from mcdc.loop import caching
+from mcdc.type_ import iqmc_score_list
 
 # =========================================================================
 # Low-Discrepency Sequences
@@ -292,7 +285,7 @@ def iqmc_prepare_particles(mcdc):
 
     for n in range(N_work):
         # Create new particle
-        P_new = adapt.local_particle_record()
+        P_new = local.particle_record()
         # assign initial group, time, and rng_seed (not used)
         P_new["g"] = 0
         P_new["t"] = 0
@@ -462,15 +455,13 @@ def iqmc_generate_material_idx(mcdc):
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
     dx = dy = dz = 1
-    # variables for cell finding functions
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
     # create particle to utilize cell finding functions
-    P_temp = adapt.local_particle()
+    P_temp = local.particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
     P_temp["cell_ID"] = -1
+    geometry.reset_local_coordinate(P_temp)
 
     x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
     y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
@@ -492,7 +483,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
 
                     # set cell_ID
-                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+                    P_temp["cell_ID"] = geometry.get_cell(P_temp, 0, mcdc)
 
                     # set material_ID
                     material_ID = get_particle_material(P_temp, mcdc)
