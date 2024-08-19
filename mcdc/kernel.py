@@ -1559,51 +1559,6 @@ def shift_particle(P, shift):
 
 
 @njit
-def get_particle_material(P, mcdc):
-    # Top level cell
-    cell = mcdc["cells"][P["cell_ID"]]
-
-    geometry.reset_local_coordinate(P)
-
-    # Recursively check if cell is a lattice cell, until material cell is found
-    while True:
-        if cell["fill_type"] == FILL_MATERIAL:
-            # Material cell found, return material ID
-            break
-
-        else:
-            # Cell is filled with universe or lattice
-
-            # Apply translation
-            if cell["fill_translated"]:
-                P["translation"][0] += cell["translation"][0]
-                P["translation"][1] += cell["translation"][1]
-                P["translation"][2] += cell["translation"][2]
-                P["translated"] = True
-
-            if cell["fill_type"] == FILL_LATTICE:
-                # Get lattice
-                lattice = mcdc["lattices"][cell["fill_ID"]]
-
-                # Get universe
-                mesh = lattice["mesh"]
-                x, y, z = mesh_uniform_get_index(P, mesh)
-                universe_ID = lattice["universe_IDs"][x, y, z]
-
-                # Lattice-translate the particle
-                P["translation"][0] += mesh["x0"] + (x + 0.5) * mesh["dx"]
-                P["translation"][1] += mesh["y0"] + (y + 0.5) * mesh["dy"]
-                P["translation"][2] += mesh["z0"] + (z + 0.5) * mesh["dz"]
-                P["translated"] = True
-
-                # Get inner cell
-                cell_ID = geometry.get_cell(P, universe_ID, mcdc)
-                cell = mcdc["cells"][cell_ID]
-
-    return cell["fill_ID"]
-
-
-@njit
 def copy_recordlike(P_new, P):
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -1703,18 +1658,6 @@ def mesh_distance_search(value, direction, grid):
 
 
 @njit
-def mesh_uniform_distance_search(value, direction, x0, dx):
-    if direction == 0.0:
-        return INF
-    idx = math.floor((value - x0) / dx)
-    if direction > 0.0:
-        idx += 1
-    ref = x0 + idx * dx
-    dist = (ref - value) / direction
-    return dist
-
-
-@njit
 def mesh_get_index(P, mesh):
     # Check if outside grid
     outside = False
@@ -1768,15 +1711,6 @@ def mesh_get_energy_index(P, mesh, mcdc):
             outside = True
             return 0, outside
         return binary_search(P["E"], mesh["g"]), outside
-
-
-@njit
-def mesh_uniform_get_index(P, mesh):
-    Px, Py, Pz = geometry.get_local_coordinate(P)
-    x = int64(math.floor((Px - mesh["x0"]) / mesh["dx"]))
-    y = int64(math.floor((Py - mesh["y0"]) / mesh["dy"]))
-    z = int64(math.floor((Pz - mesh["z0"]) / mesh["dz"]))
-    return x, y, z
 
 
 @njit
@@ -2199,7 +2133,11 @@ def move_to_event(P, mcdc):
 
     # Distance to nearest geometry boundary (surface or lattice)
     # Also set particle material and speed
-    d_boundary, event = distance_to_boundary(P, mcdc)
+    d_boundary, event = geometry.inspect_geometry(P, mcdc)
+
+    # Particle is lost
+    if P["cell_ID"] == -1:
+        return
 
     # Distance to tally mesh
     d_mesh = INF
@@ -2281,124 +2219,6 @@ def distance_to_collision(P, mcdc):
 
 
 @njit
-def distance_to_boundary(P, mcdc):
-    """
-    Find the nearest geometry boundary, which could be lattice or surface, and
-    return the event type (EVENT_SURFACE or EVENT_LATTICE) and the distance
-
-    We recursively check from the top level cell. If surface and lattice are
-    coincident, EVENT_SURFACE is prioritized.
-    """
-
-    distance = INF
-    event = 0
-
-    # Top level cell
-    cell = mcdc["cells"][P["cell_ID"]]
-
-    geometry.reset_local_coordinate(P)
-
-    # Recursively check if cell is a lattice cell, until material cell is found
-    while True:
-        # Distance to nearest surface
-        d_surface, surface_ID, surface_move = distance_to_nearest_surface(P, cell, mcdc)
-
-        # Check if smaller
-        if d_surface * PREC < distance:
-            distance = d_surface
-            event = EVENT_SURFACE
-            P["surface_ID"] = surface_ID
-
-            if surface_move:
-                event = EVENT_SURFACE_MOVE
-
-        if cell["fill_type"] == FILL_MATERIAL:
-            P["material_ID"] = cell["fill_ID"]
-            break
-
-        else:
-            # Cell is filled with universe or lattice
-
-            # Apply translation
-            if cell["fill_translated"]:
-                P["translation"][0] += cell["translation"][0]
-                P["translation"][1] += cell["translation"][1]
-                P["translation"][2] += cell["translation"][2]
-                P["translated"] = True
-
-            if cell["fill_type"] == FILL_LATTICE:
-                # Get lattice
-                lattice = mcdc["lattices"][cell["fill_ID"]]
-
-                # Distance to lattice
-                d_lattice = distance_to_lattice(P, lattice)
-
-                # Check if smaller
-                if d_lattice * PREC < distance:
-                    distance = d_lattice
-                    event = EVENT_LATTICE
-                    P["surface_ID"] = -1
-
-                # Get universe
-                mesh = lattice["mesh"]
-                x, y, z = mesh_uniform_get_index(P, mesh)
-                universe_ID = lattice["universe_IDs"][x, y, z]
-
-                # Lattice-translate the particle
-                P["translation"][0] += mesh["x0"] + (x + 0.5) * mesh["dx"]
-                P["translation"][1] += mesh["y0"] + (y + 0.5) * mesh["dy"]
-                P["translation"][2] += mesh["z0"] + (z + 0.5) * mesh["dz"]
-                P["translated"] = True
-
-                # Get inner cell
-                cell_ID = geometry.get_cell(P, universe_ID, mcdc)
-                cell = mcdc["cells"][cell_ID]
-
-    return distance, event
-
-
-@njit
-def distance_to_nearest_surface(P, cell, mcdc):
-    distance = INF
-    surface_ID = -1
-    surface_move = False
-
-    # Access cell surface data
-    idx = cell["surface_data_idx"]
-    N_surface = mcdc["cell_surface_data"][idx]
-
-    # Iterate over all surfaces
-    idx += 1
-    idx_end = idx + N_surface
-    while idx < idx_end:
-        candidate_surface_ID = mcdc["cell_surface_data"][idx]
-        surface = mcdc["surfaces"][candidate_surface_ID]
-        d, sm = geometry.surface_distance(P, surface, mcdc)
-        if d < distance:
-            distance = d
-            surface_ID = surface["ID"]
-            surface_move = sm
-        idx += 1
-    return distance, surface_ID, surface_move
-
-
-@njit
-def distance_to_lattice(P, lattice):
-    mesh = lattice["mesh"]
-
-    x, y, z = geometry.get_local_coordinate(P)
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-
-    d = INF
-    d = min(d, mesh_uniform_distance_search(x, ux, mesh["x0"], mesh["dx"]))
-    d = min(d, mesh_uniform_distance_search(y, uy, mesh["y0"], mesh["dy"]))
-    d = min(d, mesh_uniform_distance_search(z, uz, mesh["z0"], mesh["dz"]))
-    return d
-
-
-@njit
 def distance_to_mesh(P, mesh, mcdc):
     x = P["x"]
     y = P["y"]
@@ -2429,7 +2249,7 @@ def surface_crossing(P, prog):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.apply_surface_bc(P, surface)
+    geometry.surface_bc(P, surface)
 
     # Small shift to ensure crossing
     geometry.surface_shift(P, surface, mcdc)
@@ -2443,12 +2263,9 @@ def surface_crossing(P, prog):
         # Score on tally
         score_exit(P, exit_idx, mcdc)
 
-    # Check new cell?
+    # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
-        cell = mcdc["cells"][P["cell_ID"]]
-        if not geometry.cell_check(P, cell, mcdc):
-            geometry.reset_local_coordinate(P)
-            P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
+        P["cell_ID"] = -1
 
 
 # =============================================================================

@@ -11,9 +11,7 @@ import mcdc.geometry as geometry
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
 from mcdc.kernel import (
-    distance_to_boundary,
     distance_to_mesh,
-    get_particle_material,
     mesh_get_index,
     move_particle,
 )
@@ -104,7 +102,11 @@ def iqmc_move_to_event(P, mcdc):
 
     # Distance to nearest geometry boundary (surface or lattice)
     # Also set particle material and speed
-    d_boundary, event = distance_to_boundary(P, mcdc)
+    d_boundary, event = geometry.inspect_geometry(P, mcdc)
+
+    # Particle is lost
+    if P["cell_ID"] == -1:
+        return
 
     # Distance to domain decomposition mesh
     d_domain = INF
@@ -460,8 +462,6 @@ def iqmc_generate_material_idx(mcdc):
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
-    P_temp["cell_ID"] = -1
-    geometry.reset_local_coordinate(P_temp)
 
     x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
     y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
@@ -482,11 +482,17 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["y"] = y
                     P_temp["z"] = z
 
-                    # set cell_ID
-                    P_temp["cell_ID"] = geometry.get_cell(P_temp, 0, mcdc)
+                    # Set some parameters so that geometry inspection runs properly
+                    P_temp['ux'] = 1.0
+                    P_temp["cell_ID"] = -1
 
                     # set material_ID
-                    material_ID = get_particle_material(P_temp, mcdc)
+                    _, _ = geometry.inspect_geometry(P_temp, mcdc)
+                    if P_temp["cell_ID"] > -1:
+                        material_ID = P_temp["material_ID"]
+                    # Skip if particle is lost
+                    else:
+                        continue
 
                     # assign material index
                     mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = material_ID

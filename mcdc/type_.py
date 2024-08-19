@@ -180,8 +180,7 @@ def make_type_particle(input_deck):
         ("E", float64),
         # Weight
         ("w", float64),
-        # Local coordinate
-        ("translated", bool_),
+        # TODO: temporary
         ("translation", float64, (3,)),
         # IDs
         ("material_ID", int64),
@@ -553,21 +552,6 @@ def make_type_universe(input_deck):
 # ==============================================================================
 
 
-mesh_uniform = into_dtype(
-    [
-        ("x0", float64),
-        ("dx", float64),
-        ("Nx", int64),
-        ("y0", float64),
-        ("dy", float64),
-        ("Ny", int64),
-        ("z0", float64),
-        ("dz", float64),
-        ("Nz", int64),
-    ]
-)
-
-
 def make_type_lattice(input_deck):
     global lattice
 
@@ -576,12 +560,23 @@ def make_type_lattice(input_deck):
     Nmax_y = 0
     Nmax_z = 0
     for card in input_deck.lattices:
-        Nmax_x = max(Nmax_x, card.mesh["Nx"])
-        Nmax_y = max(Nmax_y, card.mesh["Ny"])
-        Nmax_z = max(Nmax_z, card.mesh["Nz"])
+        Nmax_x = max(Nmax_x, card.Nx)
+        Nmax_y = max(Nmax_y, card.Ny)
+        Nmax_z = max(Nmax_z, card.Nz)
 
     lattice = into_dtype(
-        [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
+        [
+            ("x0", float64),
+            ("dx", float64),
+            ("Nx", int64),
+            ("y0", float64),
+            ("dy", float64),
+            ("Ny", int64),
+            ("z0", float64),
+            ("dz", float64),
+            ("Nz", int64),
+            ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z)),
+        ]
     )
 
 

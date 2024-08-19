@@ -1,53 +1,130 @@
 import math
 
-from numba import njit
+from numba import njit, int64
 
 import mcdc.local as local
 import mcdc.physics as physics
 
 from mcdc.algorithm import binary_search
-from mcdc.constant import (
-    BC_VACUUM,
-    BC_REFLECTIVE,
-    BOOL_AND,
-    BOOL_NOT,
-    BOOL_OR,
-    INF,
-    SHIFT,
-)
+from mcdc.constant import *
 
 
 # ======================================================================================
-# Particle local coordinate
+# Geometry inspection
 # ======================================================================================
 
 
 @njit
-def reset_local_coordinate(particle):
+def inspect_geometry(particle, mcdc):
     """
-    Reset particle's local coordinate
+    Full geometry inspection of the particle
+    This function
+        - sets particle top cell and material IDs (if not lost)
+        - sets surface ID (if surface hit)
+        - returns distance to boundary (surface or lattice)
+        - returns event type (surface or lattice hit or particle lost)
     """
-    particle["translation"][0] = 0.0
-    particle["translation"][1] = 0.0
-    particle["translation"][2] = 0.0
-    particle["translated"] = False
+    # TODO: add universe cell, besides lattice and material cells
 
-
-@njit
-def get_local_coordinate(particle):
-    """
-    Get particle's local coordinate
-    """
+    # Particle local coordinate
     x = particle["x"]
     y = particle["y"]
     z = particle["z"]
+    t = particle["t"]
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+    v = physics.get_speed(particle, mcdc)
 
-    if particle["translated"]:
-        x -= particle["translation"][0]
-        y -= particle["translation"][1]
-        z -= particle["translation"][2]
+    # Default returns
+    distance = INF
+    event = EVENT_LOST
 
-    return x, y, z
+    # Find top cell from root universe if unknown
+    if particle["cell_ID"] == -1:
+        particle["cell_ID"] = get_cell(x, y, z, t, UNIVERSE_ROOT, mcdc)
+        # Particle is lost?
+        if particle["cell_ID"] == -1:
+            lost(particle)
+            return 0.0, EVENT_LOST
+
+    # TODO: temporary
+    particle["translation"][0] = 0.0
+    particle["translation"][1] = 0.0
+    particle["translation"][2] = 0.0
+
+    # The top cell
+    cell = mcdc["cells"][particle["cell_ID"]]
+
+    # Recursively check cell until material cell is found
+    while True:
+        # Distance to nearest surface
+        d_surface, surface_ID, surface_move = distance_to_nearest_surface(
+            x, y, z, t, ux, uy, uz, v, cell, mcdc
+        )
+
+        # Check if smaller
+        if d_surface * PREC < distance:
+            distance = d_surface
+            event = EVENT_SURFACE
+            particle["surface_ID"] = surface_ID
+
+            if surface_move:
+                event = EVENT_SURFACE_MOVE
+
+        # Material cell?
+        if cell["fill_type"] == FILL_MATERIAL:
+            particle["material_ID"] = cell["fill_ID"]
+            break
+
+        else:
+            # Cell is filled with universe or lattice
+
+            # Apply translation
+            if cell["fill_translated"]:
+                x -= cell["translation"][0]
+                y -= cell["translation"][1]
+                z -= cell["translation"][2]
+
+                particle["translation"][0] += cell["translation"][0]
+                particle["translation"][1] += cell["translation"][1]
+                particle["translation"][2] += cell["translation"][2]
+
+            if cell["fill_type"] == FILL_LATTICE:
+                # Get lattice
+                lattice = mcdc["lattices"][cell["fill_ID"]]
+
+                # Distance to lattice grid
+                d_lattice = distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice)
+
+                # Check if smaller
+                if d_lattice * PREC < distance:
+                    distance = d_lattice
+                    event = EVENT_LATTICE
+                    particle["surface_ID"] = -1
+
+                # Get universe
+                ix, iy, iz = lattice_get_index(x, y, z, lattice)
+                universe_ID = lattice["universe_IDs"][ix, iy, iz]
+
+                # Lattice-translate the particle
+                x -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
+                y -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
+                z -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
+
+                particle["translation"][0] += lattice["x0"] + (ix + 0.5) * lattice["dx"]
+                particle["translation"][1] += lattice["y0"] + (iy + 0.5) * lattice["dy"]
+                particle["translation"][2] += lattice["z0"] + (iz + 0.5) * lattice["dz"]
+
+                # Get inner cell
+                cell_ID = get_cell(x, y, z, t, universe_ID, mcdc)
+                if cell_ID > -1:
+                    cell = mcdc["cells"][cell_ID]
+                else:
+                    # Skip if particle is lost
+                    return 0.0, EVENT_LOST
+
+    return distance, event
 
 
 # ======================================================================================
@@ -56,29 +133,27 @@ def get_local_coordinate(particle):
 
 
 @njit
-def get_cell(particle, universe_ID, mcdc):
+def get_cell(x, y, z, t, universe_ID, mcdc):
     """
-    Find and return particle cell ID in the given universe
+    Find and return cell ID of the given local coordinate in the universe
+    Return -1 if particle is lost
     """
     universe = mcdc["universes"][universe_ID]
+
+    # Check all cells in the universe
     for cell_ID in universe["cell_IDs"]:
         cell = mcdc["cells"][cell_ID]
-        if cell_check(particle, cell, mcdc):
+        if cell_check(x, y, z, t, cell, mcdc):
             return cell["ID"]
 
     # Particle is not found
-    x = particle["x"]
-    y = particle["y"]
-    z = particle["z"]
-    print("A particle is lost at (", x, y, z, ")")
-    particle["alive"] = False
     return -1
 
 
 @njit
-def cell_check(particle, cell, mcdc):
+def cell_check(x, y, z, t, cell, mcdc):
     """
-    Check if particle is inside the given cell
+    Check if the given local coordinate is inside the cell
     """
     # Access RPN data
     idx = cell["region_data_idx"]
@@ -97,7 +172,7 @@ def cell_check(particle, cell, mcdc):
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
-            value[N_value] = surface_evaluate(particle, surface) > 0.0
+            value[N_value] = surface_evaluate(x, y, z, t, surface) > 0.0
             N_value += 1
 
         elif token == BOOL_NOT:
@@ -116,6 +191,83 @@ def cell_check(particle, cell, mcdc):
     return value[0]
 
 
+@njit
+def lost(particle):
+    """
+    Report lost particle and terminate it
+    """
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    print("A particle is lost at (", x, y, z, ")")
+    particle["alive"] = False
+
+
+# ======================================================================================
+# Nearest distance search
+# ======================================================================================
+
+
+@njit
+def distance_to_nearest_surface(x, y, z, t, ux, uy, uz, v, cell, mcdc):
+    # TODO: docs
+    distance = INF
+    surface_ID = -1
+    surface_move = False
+
+    # Access cell surface data
+    idx = cell["surface_data_idx"]
+    N_surface = mcdc["cell_surface_data"][idx]
+
+    # Iterate over all surfaces
+    idx += 1
+    idx_end = idx + N_surface
+    while idx < idx_end:
+        candidate_surface_ID = mcdc["cell_surface_data"][idx]
+        surface = mcdc["surfaces"][candidate_surface_ID]
+        d, sm = surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc)
+        if d < distance:
+            distance = d
+            surface_ID = surface["ID"]
+            surface_move = sm
+        idx += 1
+    return distance, surface_ID, surface_move
+
+
+@njit
+def distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice):
+    d = INF
+    d = min(d, lattice_grid_distance(x, ux, lattice["x0"], lattice["dx"]))
+    d = min(d, lattice_grid_distance(y, uy, lattice["y0"], lattice["dy"]))
+    d = min(d, lattice_grid_distance(z, uz, lattice["z0"], lattice["dz"]))
+    return d
+
+
+# ======================================================================================
+# Lattice operations
+# ======================================================================================
+
+
+@njit
+def lattice_grid_distance(value, direction, x0, dx):
+    if direction == 0.0:
+        return INF
+    idx = math.floor((value - x0) / dx)
+    if direction > 0.0:
+        idx += 1
+    ref = x0 + idx * dx
+    dist = (ref - value) / direction
+    return dist
+
+
+@njit
+def lattice_get_index(x, y, z, lattice):
+    ix = int64(math.floor((x - lattice["x0"]) / lattice["dx"]))
+    iy = int64(math.floor((y - lattice["y0"]) / lattice["dy"]))
+    iz = int64(math.floor((z - lattice["z0"]) / lattice["dz"]))
+    return ix, iy, iz
+
+
 # =============================================================================
 # Surface operations
 # =============================================================================
@@ -125,10 +277,7 @@ def cell_check(particle, cell, mcdc):
 
 
 @njit
-def surface_evaluate(particle, surface):
-    x, y, z = get_local_coordinate(particle)
-    t = particle["t"]
-
+def surface_evaluate(x, y, z, t, surface):
     G = surface["G"]
     H = surface["H"]
     I_ = surface["I"]
@@ -161,7 +310,93 @@ def surface_evaluate(particle, surface):
 
 
 @njit
-def apply_surface_bc(particle, surface):
+def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
+    G = surface["G"]
+    H = surface["H"]
+    I_ = surface["I"]
+
+    surface_move = False
+    if surface["linear"]:
+        idx = 0
+        if surface["N_slice"] > 1:
+            idx = binary_search(t, surface["t"][: surface["N_slice"] + 1])
+        J1 = surface["J"][idx][1]
+
+        t_max = surface["t"][idx + 1]
+        d_max = (t_max - t) * v
+
+        div = G * ux + H * uy + I_ * uz + J1 / v
+        distance = -surface_evaluate(x, y, z, t, surface) / (
+            G * ux + H * uy + I_ * uz + J1 / v
+        )
+
+        # Go beyond current movement slice?
+        if distance > d_max:
+            distance = d_max
+            surface_move = True
+        elif distance < 0 and idx < surface["N_slice"] - 1:
+            distance = d_max
+            surface_move = True
+
+        # Moving away from the surface
+        if distance < 0.0:
+            return INF, surface_move
+        else:
+            return distance, surface_move
+
+    A = surface["A"]
+    B = surface["B"]
+    C = surface["C"]
+    D = surface["D"]
+    E = surface["E"]
+    F = surface["F"]
+
+    # Quadratic equation constants
+    a = (
+        A * ux * ux
+        + B * uy * uy
+        + C * uz * uz
+        + D * ux * uy
+        + E * ux * uz
+        + F * uy * uz
+    )
+    b = (
+        2 * (A * x * ux + B * y * uy + C * z * uz)
+        + D * (x * uy + y * ux)
+        + E * (x * uz + z * ux)
+        + F * (y * uz + z * uy)
+        + G * ux
+        + H * uy
+        + I_ * uz
+    )
+    c = surface_evaluate(x, y, z, t, surface)
+
+    determinant = b * b - 4.0 * a * c
+
+    # Roots are complex  : no intersection
+    # Roots are identical: tangent
+    # ==> return huge number
+    if determinant <= 0.0:
+        return INF, surface_move
+    else:
+        # Get the roots
+        denom = 2.0 * a
+        sqrt = math.sqrt(determinant)
+        root_1 = (-b + sqrt) / denom
+        root_2 = (-b - sqrt) / denom
+
+        # Negative roots, moving away from the surface
+        if root_1 < 0.0:
+            root_1 = INF
+        if root_2 < 0.0:
+            root_2 = INF
+
+        # Return the smaller root
+        return min(root_1, root_2), surface_move
+
+
+@njit
+def surface_bc(particle, surface):
     if surface["BC"] == BC_VACUUM:
         particle["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
@@ -232,7 +467,10 @@ def surface_normal(particle, surface):
     H = surface["H"]
     I_ = surface["I"]
 
-    x, y, z = get_local_coordinate(particle)
+    # TODO: temporary
+    x = particle["x"] - particle["translation"][0]
+    y = particle["y"] - particle["translation"][1]
+    z = particle["z"] - particle["translation"][2]
 
     dx = 2 * A * x + D * y + E * z + G
     dy = 2 * B * y + D * x + F * z + H
@@ -249,96 +487,3 @@ def surface_normal_component(particle, surface):
     uz = particle["uz"]
     nx, ny, nz = surface_normal(particle, surface)
     return nx * ux + ny * uy + nz * uz
-
-
-@njit
-def surface_distance(particle, surface, mcdc):
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
-
-    G = surface["G"]
-    H = surface["H"]
-    I_ = surface["I"]
-
-    surface_move = False
-    if surface["linear"]:
-        idx = 0
-        if surface["N_slice"] > 1:
-            idx = binary_search(particle["t"], surface["t"][: surface["N_slice"] + 1])
-        J1 = surface["J"][idx][1]
-        v = physics.get_speed(particle, mcdc)
-
-        t_max = surface["t"][idx + 1]
-        d_max = (t_max - particle["t"]) * v
-
-        div = G * ux + H * uy + I_ * uz + J1 / v
-        distance = -surface_evaluate(particle, surface) / (
-            G * ux + H * uy + I_ * uz + J1 / v
-        )
-
-        # Go beyond current movement slice?
-        if distance > d_max:
-            distance = d_max
-            surface_move = True
-        elif distance < 0 and idx < surface["N_slice"] - 1:
-            distance = d_max
-            surface_move = True
-
-        # Moving away from the surface
-        if distance < 0.0:
-            return INF, surface_move
-        else:
-            return distance, surface_move
-
-    x, y, z = get_local_coordinate(particle)
-
-    A = surface["A"]
-    B = surface["B"]
-    C = surface["C"]
-    D = surface["D"]
-    E = surface["E"]
-    F = surface["F"]
-
-    # Quadratic equation constants
-    a = (
-        A * ux * ux
-        + B * uy * uy
-        + C * uz * uz
-        + D * ux * uy
-        + E * ux * uz
-        + F * uy * uz
-    )
-    b = (
-        2 * (A * x * ux + B * y * uy + C * z * uz)
-        + D * (x * uy + y * ux)
-        + E * (x * uz + z * ux)
-        + F * (y * uz + z * uy)
-        + G * ux
-        + H * uy
-        + I_ * uz
-    )
-    c = surface_evaluate(particle, surface)
-
-    determinant = b * b - 4.0 * a * c
-
-    # Roots are complex  : no intersection
-    # Roots are identical: tangent
-    # ==> return huge number
-    if determinant <= 0.0:
-        return INF, surface_move
-    else:
-        # Get the roots
-        denom = 2.0 * a
-        sqrt = math.sqrt(determinant)
-        root_1 = (-b + sqrt) / denom
-        root_2 = (-b - sqrt) / denom
-
-        # Negative roots, moving away from the surface
-        if root_1 < 0.0:
-            root_1 = INF
-        if root_2 < 0.0:
-            root_2 = INF
-
-        # Return the smaller root
-        return min(root_1, root_2), surface_move
