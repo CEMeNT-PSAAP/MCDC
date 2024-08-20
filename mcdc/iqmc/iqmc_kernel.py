@@ -5,14 +5,14 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode, literal_unroll
 
 import mcdc.adapt as adapt
-import mcdc.local as local
 import mcdc.geometry as geometry
+import mcdc.mesh as mesh_
+import mcdc.local as local
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
 from mcdc.kernel import (
     distance_to_mesh,
-    mesh_get_index,
     move_particle,
 )
 from mcdc.loop import caching
@@ -300,7 +300,7 @@ def iqmc_prepare_particles(mcdc):
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
             lds[n, 1], lds[n, 5]
         )
-        t, x, y, z, outside = mesh_get_index(P_new, mesh)
+        x, y, z, t, outside = mesh_.get_indices(P_new, mesh)
         q = Q[:, t, x, y, z].copy()
         dV = iqmc_cell_volume(x, y, z, mesh)
         # Source tilt
@@ -309,6 +309,7 @@ def iqmc_prepare_particles(mcdc):
         P_new["iqmc"]["w"] = q * dV * N_total / N_particle
         P_new["w"] = P_new["iqmc"]["w"].sum()
         # add to source bank
+        print(P_new["x"], P_new["ux"], x)
         adapt.add_source(P_new, mcdc)
 
 
@@ -340,7 +341,7 @@ def iqmc_score_tallies(P, distance, mcdc):
     SigmaT = material["total"]
     mat_id = P["material_ID"]
 
-    t, x, y, z, outside = mesh_get_index(P, mesh)
+    x, y, z, t, outside = mesh_.get_indices(P, mesh)
     if outside:
         return
 
@@ -481,9 +482,12 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["x"] = x
                     P_temp["y"] = y
                     P_temp["z"] = z
+                    P_temp["g"] = 0
 
                     # Set some parameters so that geometry inspection runs properly
-                    P_temp['ux'] = 1.0
+                    P_temp["ux"] = 1.0
+                    P_temp["uy"] = 1.0
+                    P_temp["uz"] = 1.0
                     P_temp["cell_ID"] = -1
 
                     # set material_ID
