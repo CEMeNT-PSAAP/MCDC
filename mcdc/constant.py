@@ -58,11 +58,12 @@ PCT_COMBING = 1
 PCT_COMBING_WEIGHT = 10
 
 # Misc.
+TINY = 1e-12
+COINCIDENCE_TOLERANCE = TINY
 INF = 1e10
 PI = math.acos(-1.0)
 PI_SQRT = math.sqrt(PI)
 PI_HALF = PI / 2.0
-SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
 PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
 

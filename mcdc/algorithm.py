@@ -11,7 +11,7 @@ def binary_search_with_length(val, grid, length):
         val < min(grid)  --> -1
         val > max(grid)  --> size of bins
         val = a grid point --> bin location whose upper bound is val
-                                 (-1 if val = min(grid)
+                               (-1 if val = min(grid))
     """
     left = 0
     if length == 0:

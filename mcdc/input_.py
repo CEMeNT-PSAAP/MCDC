@@ -30,13 +30,13 @@ from mcdc.constant import (
     GYRATION_RADIUS_ONLY_X,
     GYRATION_RADIUS_ONLY_Y,
     GYRATION_RADIUS_ONLY_Z,
+    INF,
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
-    INF,
     PI,
-    SHIFT,
     REGION_ALL,
+    TINY,
 )
 from mcdc.print_ import print_error
 
@@ -612,13 +612,13 @@ def surface(type_, bc="interface", **kw):
 
 def set_J(x, t, card):
     # Edit and add the edges
-    t[0] = -SHIFT
+    t[0] = -TINY
     t = np.append(t, INF)
     x = np.append(x, x[-1])
 
     # Reset the constants
     card.J = np.zeros([0, 2])
-    card.t = np.array([-SHIFT])
+    card.t = np.array([-TINY])
 
     # Iterate over inputs
     idx = 0

@@ -12,6 +12,7 @@ from numba import (
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
 import mcdc.local as local
+import mcdc.mesh as mesh_
 import mcdc.physics as physics
 import mcdc.type_ as type_
 
@@ -1542,23 +1543,6 @@ def move_particle(P, distance, mcdc):
 
 
 @njit
-def shift_particle(P, shift):
-    if P["ux"] > 0.0:
-        P["x"] += shift
-    else:
-        P["x"] -= shift
-    if P["uy"] > 0.0:
-        P["y"] += shift
-    else:
-        P["y"] -= shift
-    if P["uz"] > 0.0:
-        P["z"] += shift
-    else:
-        P["z"] -= shift
-    P["t"] += shift
-
-
-@njit
 def copy_recordlike(P_new, P):
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -1640,49 +1624,6 @@ def split_as_record(P):
 
 
 @njit
-def mesh_distance_search(value, direction, grid):
-    if direction == 0.0:
-        return INF
-    idx = binary_search(value, grid)
-    if direction > 0.0:
-        idx += 1
-    if idx == -1:
-        idx += 1
-    if idx == len(grid):
-        idx -= 1
-    dist = (grid[idx] - value) / direction
-    # Moving away from mesh?
-    if dist < 0.0:
-        dist = INF
-    return dist
-
-
-@njit
-def mesh_get_index(P, mesh):
-    # Check if outside grid
-    outside = False
-
-    if (
-        P["t"] < mesh["t"][0]
-        or P["t"] > mesh["t"][-1]
-        or P["x"] < mesh["x"][0]
-        or P["x"] > mesh["x"][-1]
-        or P["y"] < mesh["y"][0]
-        or P["y"] > mesh["y"][-1]
-        or P["z"] < mesh["z"][0]
-        or P["z"] > mesh["z"][-1]
-    ):
-        outside = True
-        return 0, 0, 0, 0, outside
-
-    t = binary_search(P["t"], mesh["t"])
-    x = binary_search(P["x"], mesh["x"])
-    y = binary_search(P["y"], mesh["y"])
-    z = binary_search(P["z"], mesh["z"])
-    return t, x, y, z, outside
-
-
-@njit
 def mesh_get_angular_index(P, mesh):
     ux = P["ux"]
     uy = P["uy"]
@@ -1717,11 +1658,11 @@ def mesh_get_energy_index(P, mesh, mcdc):
 def mesh_crossing_evaluate(P, mesh):
     # Shift backward
     shift_particle(P, -2 * SHIFT)
-    t1, x1, y1, z1, outside1 = mesh_get_index(P, mesh)
+    x1, y1, z1, t1, outside1 = mesh_.get_indices(P, mesh)
 
     # Double shift forward
     shift_particle(P, 4 * SHIFT)
-    t2, x2, y2, z2, outside2 = mesh_get_index(P, mesh)
+    x2, y2, z2, t2, outside2 = mesh_.get_indices(P, mesh)
 
     # Return particle to initial position
     shift_particle(P, -2 * SHIFT)
@@ -1749,8 +1690,17 @@ def score_tracklength(P, distance, mcdc):
     tally = mcdc["tally"]
     material = mcdc["materials"][P["material_ID"]]
 
+    # Particle coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+
     # Get indices
-    t, x, y, z, outside = mesh_get_index(P, tally["mesh"])
+    ix, iy, iz, it, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, tally["mesh"])
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
     g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
 
@@ -1761,20 +1711,20 @@ def score_tracklength(P, distance, mcdc):
     # Score
     flux = distance * P["w"]
     if tally["flux"]:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["flux"])
+        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["flux"])
     if tally["density"]:
         flux /= physics.get_speed(P, mcdc)
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["density"])
+        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["density"])
     if tally["fission"]:
         flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["fission"])
+        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["fission"])
     if tally["total"]:
         flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["total"])
+        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["total"])
     if tally["current"]:
-        score_current(g, t, x, y, z, flux, P, tally["score"]["current"])
+        score_current(g, it, ix, iy, iz, flux, P, tally["score"]["current"])
     if tally["eddington"]:
-        score_eddington(g, t, x, y, z, flux, P, tally["score"]["eddington"])
+        score_eddington(g, it, ix, iy, iz, flux, P, tally["score"]["eddington"])
 
 
 @njit
@@ -2230,10 +2180,10 @@ def distance_to_mesh(P, mesh, mcdc):
     v = physics.get_speed(P, mcdc)
 
     d = INF
-    d = min(d, mesh_distance_search(x, ux, mesh["x"]))
-    d = min(d, mesh_distance_search(y, uy, mesh["y"]))
-    d = min(d, mesh_distance_search(z, uz, mesh["z"]))
-    d = min(d, mesh_distance_search(t, 1.0 / v, mesh["t"]))
+    d = min(d, mesh_.nearest_distance_to_grid(x, ux, mesh["x"]))
+    d = min(d, mesh_.nearest_distance_to_grid(y, uy, mesh["y"]))
+    d = min(d, mesh_.nearest_distance_to_grid(z, uz, mesh["z"]))
+    d = min(d, mesh_.nearest_distance_to_grid(t, 1.0 / v, mesh["t"]))
     return d
 
 
@@ -2250,9 +2200,6 @@ def surface_crossing(P, prog):
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
     geometry.surface_bc(P, surface)
-
-    # Small shift to ensure crossing
-    geometry.surface_shift(P, surface, mcdc)
 
     # Tally particle exit
     if mcdc["tally"]["exit"] and not P["alive"]:
@@ -2300,24 +2247,6 @@ def collision(P, mcdc):
         else:
             event = EVENT_CAPTURE
     P["event"] = event
-
-    # =========================================================================
-    # Implement minor events
-    # =========================================================================
-
-    if event & EVENT_CAPTURE:
-        P["alive"] = False
-
-
-# =============================================================================
-# Capture
-# =============================================================================
-
-
-@njit
-def capture(P, mcdc):
-    # Kill the current particle
-    P["alive"] = False
 
 
 # =============================================================================
@@ -2892,11 +2821,22 @@ def branchless_collision(P, prog):
 def weight_window(P, prog):
     mcdc = adapt.device(prog)
 
+    # Particle coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+
     # Get indices
-    t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
+    ix, iy, iz, it, outside = mesh_.get_indices(
+        x, y, z, t, ux, uy, uz, mcdc["technique"]["ww_mesh"]
+    )
 
     # Target weight
-    w_target = mcdc["technique"]["ww"][t, x, y, z]
+    w_target = mcdc["technique"]["ww"][it, ix, iy, iz]
 
     # Population control factor
     w_target *= mcdc["technique"]["pc_factor"]

@@ -462,7 +462,9 @@ def step_particle(P, prog):
             event = P["event"]
 
             # Perform collision
-            if event == EVENT_SCATTERING:
+            if event == EVENT_CAPTURE:
+                P["alive"] = False
+            elif event == EVENT_SCATTERING:
                 kernel.scattering(P, prog)
             elif event == EVENT_FISSION:
                 kernel.fission(P, prog)
@@ -476,18 +478,15 @@ def step_particle(P, prog):
 
     # Lattice or mesh crossing (skipped if surface crossing)
     elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
         if event & EVENT_DOMAIN:
             kernel.domain_crossing(P, mcdc)
 
     # Moving surface transition
     if event & EVENT_SURFACE_MOVE:
-        P["t"] += SHIFT
         P["cell_ID"] = -1
 
     # Census time crossing
     if event & EVENT_CENSUS:
-        P["t"] += SHIFT
         adapt.add_census(P, prog)
         P["alive"] = False
 
