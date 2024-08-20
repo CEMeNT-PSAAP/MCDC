@@ -40,16 +40,9 @@ def domain_crossing(P, mcdc):
     if mcdc["technique"]["domain_decomposition"]:
         mesh = mcdc["technique"]["dd_mesh"]
         # Determine which dimension is crossed
-        x = P['x']
-        y = P['y']
-        z = P['z']
-        t = P['t']
-        ux = P['ux']
-        uy = P['uy']
-        uz = P['uz']
-        ix, iy, iz, it, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, mesh)
+        ix, iy, iz, it, outside = mesh_.get_indices(P, mesh)
 
-        d_idx = mcdc['dd_idx']
+        d_idx = mcdc["dd_idx"]
         d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
         d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
         d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
@@ -423,15 +416,7 @@ def particle_in_domain(P, mcdc):
     d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     mesh = mcdc["technique"]["dd_mesh"]
-    x = P['x']
-    y = P['y']
-    z = P['z']
-    t = P['t']
-    ux = P['ux']
-    uy = P['uy']
-    uz = P['uz']
-
-    x_cell, y_cell, z_cell, t_cell, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, mesh)
+    x_cell, y_cell, z_cell, t_cell, outside = mesh_.get_indices(P, mesh)
 
     if d_ix == x_cell:
         if d_iy == y_cell:
@@ -1685,17 +1670,8 @@ def score_tracklength(P, distance, mcdc):
     tally = mcdc["tally"]
     material = mcdc["materials"][P["material_ID"]]
 
-    # Particle coordinate
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-
     # Get indices
-    ix, iy, iz, it, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, tally["mesh"])
+    ix, iy, iz, it, outside = mesh_.get_indices(P, tally["mesh"])
     mu, azi = mesh_get_angular_index(P, tally["mesh"])
     g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
 
@@ -2816,19 +2792,8 @@ def branchless_collision(P, prog):
 def weight_window(P, prog):
     mcdc = adapt.device(prog)
 
-    # Particle coordinate
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-
     # Get indices
-    ix, iy, iz, it, outside = mesh_.get_indices(
-        x, y, z, t, ux, uy, uz, mcdc["technique"]["ww_mesh"]
-    )
+    ix, iy, iz, it, outside = mesh_.get_indices(P, mcdc["technique"]["ww_mesh"])
 
     # Target weight
     w_target = mcdc["technique"]["ww"][it, ix, iy, iz]

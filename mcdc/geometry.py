@@ -340,9 +340,7 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
         d_max = (t_max - t) * v
 
         div = G * ux + H * uy + I_ * uz + J1 / v
-        distance = -evaluation / (
-            G * ux + H * uy + I_ * uz + J1 / v
-        )
+        distance = -evaluation / (G * ux + H * uy + I_ * uz + J1 / v)
 
         # Go beyond current movement slice?
         if distance > d_max:
