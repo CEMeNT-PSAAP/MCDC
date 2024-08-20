@@ -300,11 +300,18 @@ def iqmc_prepare_particles(mcdc):
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
             lds[n, 1], lds[n, 5]
         )
-        x, y, z, t, outside = mesh.get_indices(P_new, mesh)
-        q = Q[:, t, x, y, z].copy()
-        dV = iqmc_cell_volume(x, y, z, mesh)
+        x = P_new['x']
+        y = P_new['y']
+        z = P_new['z']
+        t = P_new['t']
+        ux = P_new['ux']
+        uy = P_new['uy']
+        uz = P_new['uz']
+        ix, iy, iz, it, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, mesh)
+        q = Q[:, it, ix, iy, iz].copy()
+        dV = iqmc_cell_volume(ix, iy, iz, mesh)
         # Source tilt
-        iqmc_tilt_source(t, x, y, z, P_new, q, mcdc)
+        iqmc_tilt_source(it, ix, iy, iz, P_new, q, mcdc)
         # set particle weight
         P_new["iqmc"]["w"] = q * dV * N_total / N_particle
         P_new["w"] = P_new["iqmc"]["w"].sum()
@@ -340,7 +347,15 @@ def iqmc_score_tallies(P, distance, mcdc):
     SigmaT = material["total"]
     mat_id = P["material_ID"]
 
-    x, y, z, t, outside = mesh.get_indices(P, mesh)
+    x_ = P['x']
+    y_ = P['y']
+    z_ = P['z']
+    t_ = P['t']
+    ux_ = P['ux']
+    uy_ = P['uy']
+    uz_ = P['uz']
+
+    x, y, z, t, outside = mesh_.get_indices(x_, y_, z_, t_, ux_, uy_, uz_, mesh)
     if outside:
         return
 
