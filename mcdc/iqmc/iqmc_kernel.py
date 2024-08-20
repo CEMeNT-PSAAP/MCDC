@@ -5,14 +5,14 @@ from numpy import ascontiguousarray as cga
 from numba import njit, objmode, literal_unroll
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
 import mcdc.local as local
-import mcdc.mesh as mesh_
+import mcdc.geometry as geometry
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
 from mcdc.kernel import (
     distance_to_mesh,
+    mesh_get_index,
     move_particle,
 )
 from mcdc.loop import caching
@@ -300,18 +300,11 @@ def iqmc_prepare_particles(mcdc):
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
             lds[n, 1], lds[n, 5]
         )
-        x = P_new["x"]
-        y = P_new["y"]
-        z = P_new["z"]
-        t = P_new["t"]
-        ux = P_new["ux"]
-        uy = P_new["uy"]
-        uz = P_new["uz"]
-        ix, iy, iz, it, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, mesh)
-        q = Q[:, it, ix, iy, iz].copy()
-        dV = iqmc_cell_volume(ix, iy, iz, mesh)
+        t, x, y, z, outside = mesh_get_index(P_new, mesh)
+        q = Q[:, t, x, y, z].copy()
+        dV = iqmc_cell_volume(x, y, z, mesh)
         # Source tilt
-        iqmc_tilt_source(it, ix, iy, iz, P_new, q, mcdc)
+        iqmc_tilt_source(t, x, y, z, P_new, q, mcdc)
         # set particle weight
         P_new["iqmc"]["w"] = q * dV * N_total / N_particle
         P_new["w"] = P_new["iqmc"]["w"].sum()
@@ -347,15 +340,7 @@ def iqmc_score_tallies(P, distance, mcdc):
     SigmaT = material["total"]
     mat_id = P["material_ID"]
 
-    x_ = P["x"]
-    y_ = P["y"]
-    z_ = P["z"]
-    t_ = P["t"]
-    ux_ = P["ux"]
-    uy_ = P["uy"]
-    uz_ = P["uz"]
-
-    x, y, z, t, outside = mesh_.get_indices(x_, y_, z_, t_, ux_, uy_, uz_, mesh)
+    t, x, y, z, outside = mesh_get_index(P, mesh)
     if outside:
         return
 
@@ -498,7 +483,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
 
                     # Set some parameters so that geometry inspection runs properly
-                    P_temp["ux"] = 1.0
+                    P_temp['ux'] = 1.0
                     P_temp["cell_ID"] = -1
 
                     # set material_ID
