@@ -6,7 +6,7 @@ from mcdc.constant import (
     BOOL_OR,
     BOOL_NOT,
     INF,
-    SHIFT,
+    TINY,
 )
 
 # Get the global variable container
@@ -158,7 +158,7 @@ class SurfaceCard(InputCard):
         self.H = 0.0
         self.I = 0.0
         self.J = np.array([[0.0, 0.0]])
-        self.t = np.array([-SHIFT, INF])
+        self.t = np.array([-TINY, INF])
         self.N_slice = 1
         self.nx = 0.0
         self.ny = 0.0

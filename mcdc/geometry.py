@@ -17,14 +17,13 @@ from mcdc.constant import *
 @njit
 def inspect_geometry(particle, mcdc):
     """
-    Full geometry inspection of the particle
-    This function
-        - sets particle top cell and material IDs (if not lost)
-        - sets surface ID (if surface hit)
-        - returns distance to boundary (surface or lattice)
-        - returns event type (surface or lattice hit or particle lost)
+    Full geometry inspection of the particle:
+        - Set particle top cell and material IDs (if not lost)
+        - Set surface ID (if surface hit)
+        - Return distance to boundary (surface or lattice)
+        - Return event type (surface or lattice hit or particle lost)
     """
-    # TODO: add universe cell, besides lattice and material cells
+    # TODO: add universe cell (besides material and lattice cells)
 
     # Particle local coordinate
     x = particle["x"]
@@ -42,16 +41,11 @@ def inspect_geometry(particle, mcdc):
 
     # Find top cell from root universe if unknown
     if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(x, y, z, t, UNIVERSE_ROOT, mcdc)
+        particle["cell_ID"] = get_cell(x, y, z, t, ux, uy, uz, UNIVERSE_ROOT, mcdc)
         # Particle is lost?
         if particle["cell_ID"] == -1:
             lost(particle)
             return 0.0, EVENT_LOST
-
-    # TODO: temporary
-    particle["translation"][0] = 0.0
-    particle["translation"][1] = 0.0
-    particle["translation"][2] = 0.0
 
     # The top cell
     cell = mcdc["cells"][particle["cell_ID"]]
@@ -86,10 +80,6 @@ def inspect_geometry(particle, mcdc):
                 y -= cell["translation"][1]
                 z -= cell["translation"][2]
 
-                particle["translation"][0] += cell["translation"][0]
-                particle["translation"][1] += cell["translation"][1]
-                particle["translation"][2] += cell["translation"][2]
-
             if cell["fill_type"] == FILL_LATTICE:
                 # Get lattice
                 lattice = mcdc["lattices"][cell["fill_ID"]]
@@ -112,12 +102,8 @@ def inspect_geometry(particle, mcdc):
                 y -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
                 z -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
-                particle["translation"][0] += lattice["x0"] + (ix + 0.5) * lattice["dx"]
-                particle["translation"][1] += lattice["y0"] + (iy + 0.5) * lattice["dy"]
-                particle["translation"][2] += lattice["z0"] + (iz + 0.5) * lattice["dz"]
-
                 # Get inner cell
-                cell_ID = get_cell(x, y, z, t, universe_ID, mcdc)
+                cell_ID = get_cell(x, y, z, t, ux, uy, uz, universe_ID, mcdc)
                 if cell_ID > -1:
                     cell = mcdc["cells"][cell_ID]
                 else:
@@ -133,9 +119,9 @@ def inspect_geometry(particle, mcdc):
 
 
 @njit
-def get_cell(x, y, z, t, universe_ID, mcdc):
+def get_cell(x, y, z, t, ux, uy, uz, universe_ID, mcdc):
     """
-    Find and return cell ID of the given local coordinate in the universe
+    Find and return cell ID of the given local coordinate in the given universe
     Return -1 if particle is lost
     """
     universe = mcdc["universes"][universe_ID]
@@ -143,7 +129,7 @@ def get_cell(x, y, z, t, universe_ID, mcdc):
     # Check all cells in the universe
     for cell_ID in universe["cell_IDs"]:
         cell = mcdc["cells"][cell_ID]
-        if cell_check(x, y, z, t, cell, mcdc):
+        if cell_check(x, y, z, t, ux, uy, uz, cell, mcdc):
             return cell["ID"]
 
     # Particle is not found
@@ -151,7 +137,7 @@ def get_cell(x, y, z, t, universe_ID, mcdc):
 
 
 @njit
-def cell_check(x, y, z, t, cell, mcdc):
+def cell_check(x, y, z, t, ux, uy, uz, cell, mcdc):
     """
     Check if the given local coordinate is inside the cell
     """
@@ -172,7 +158,7 @@ def cell_check(x, y, z, t, cell, mcdc):
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
-            value[N_value] = surface_evaluate(x, y, z, t, surface) > 0.0
+            value[N_value] = surface_sense_check(x, y, z, t, ux, uy, uz, surface)
             N_value += 1
 
         elif token == BOOL_NOT:
@@ -189,6 +175,24 @@ def cell_check(x, y, z, t, cell, mcdc):
         idx += 1
 
     return value[0]
+
+
+@njit
+def surface_sense_check(x, y, z, t, ux, uy, uz, surface):
+    """
+    Check on which side of the surface the local coordinate is
+        - Return True if positive side
+        - Return False otherwise
+    The given local direction is used if coincide within the tolerance
+    """
+    result = surface_evaluate(x, y, z, t, surface)
+
+    # Check if coincident on the surface
+    if abs(result) < COINCIDENCE_TOLERANCE:
+        # Determine sense based on the direction
+        return surface_normal_component(x, y, z, t, ux, uy, uz, surface) > 0.0
+
+    return result > 0.0
 
 
 @njit
@@ -236,6 +240,7 @@ def distance_to_nearest_surface(x, y, z, t, ux, uy, uz, v, cell, mcdc):
 
 @njit
 def distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice):
+    # TODO: docs
     d = INF
     d = min(d, lattice_grid_distance(x, ux, lattice["x0"], lattice["dx"]))
     d = min(d, lattice_grid_distance(y, uy, lattice["y0"], lattice["dy"]))
@@ -250,6 +255,7 @@ def distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice):
 
 @njit
 def lattice_grid_distance(value, direction, x0, dx):
+    # TODO: docs
     if direction == 0.0:
         return INF
     idx = math.floor((value - x0) / dx)
@@ -262,6 +268,7 @@ def lattice_grid_distance(value, direction, x0, dx):
 
 @njit
 def lattice_get_index(x, y, z, lattice):
+    # TODO: docs
     ix = int64(math.floor((x - lattice["x0"]) / lattice["dx"]))
     iy = int64(math.floor((y - lattice["y0"]) / lattice["dy"]))
     iz = int64(math.floor((z - lattice["z0"]) / lattice["dz"]))
@@ -272,12 +279,12 @@ def lattice_get_index(x, y, z, lattice):
 # Surface operations
 # =============================================================================
 # Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
-# TODO: replace shifting mechanics with intersection tolerance
 # TODO: make movement a translation and rotation
 
 
 @njit
 def surface_evaluate(x, y, z, t, surface):
+    # TODO: docs
     G = surface["G"]
     H = surface["H"]
     I_ = surface["I"]
@@ -311,6 +318,13 @@ def surface_evaluate(x, y, z, t, surface):
 
 @njit
 def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
+    # TODO: docs
+
+    # Check if coincident
+    evaluation = surface_evaluate(x, y, z, t, surface)
+    if abs(evaluation) < COINCIDENCE_TOLERANCE:
+        return INF, False
+
     G = surface["G"]
     H = surface["H"]
     I_ = surface["I"]
@@ -326,7 +340,7 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
         d_max = (t_max - t) * v
 
         div = G * ux + H * uy + I_ * uz + J1 / v
-        distance = -surface_evaluate(x, y, z, t, surface) / (
+        distance = -evaluation / (
             G * ux + H * uy + I_ * uz + J1 / v
         )
 
@@ -369,7 +383,7 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
         + H * uy
         + I_ * uz
     )
-    c = surface_evaluate(x, y, z, t, surface)
+    c = evaluation
 
     determinant = b * b - 4.0 * a * c
 
@@ -397,6 +411,7 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
 
 @njit
 def surface_bc(particle, surface):
+    # TODO: docs
     if surface["BC"] == BC_VACUUM:
         particle["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
@@ -405,10 +420,15 @@ def surface_bc(particle, surface):
 
 @njit
 def surface_reflect(particle, surface):
+    # TODO: docs
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    t = particle["t"]
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
-    nx, ny, nz = surface_normal(particle, surface)
+    nx, ny, nz = surface_normal(x, y, z, t, surface)
     # 2.0*surface_normal_component(...)
     c = 2.0 * (nx * ux + ny * uy + nz * uz)
 
@@ -418,42 +438,8 @@ def surface_reflect(particle, surface):
 
 
 @njit
-def surface_shift(particle, surface, mcdc):
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
-
-    # Get surface normal
-    nx, ny, nz = surface_normal(particle, surface)
-
-    # The shift
-    shift_x = nx * SHIFT
-    shift_y = ny * SHIFT
-    shift_z = nz * SHIFT
-
-    # Get dot product to determine shift sign
-    if surface["linear"]:
-        # Get time indices
-        idx = 0
-        if surface["N_slice"] > 1:
-            idx = binary_search(particle["t"], surface["t"][: surface["N_slice"] + 1])
-        J1 = surface["J"][idx][1]
-        v = physics.get_speed(particle, mcdc)
-        dot = ux * nx + uy * ny + uz * nz + J1 / v
-    else:
-        dot = ux * nx + uy * ny + uz * nz
-    if dot > 0.0:
-        particle["x"] += shift_x
-        particle["y"] += shift_y
-        particle["z"] += shift_z
-    else:
-        particle["x"] -= shift_x
-        particle["y"] -= shift_y
-        particle["z"] -= shift_z
-
-
-@njit
-def surface_normal(particle, surface):
+def surface_normal(x, y, z, t, surface):
+    # TODO: docs
     if surface["linear"]:
         return surface["nx"], surface["ny"], surface["nz"]
 
@@ -467,11 +453,6 @@ def surface_normal(particle, surface):
     H = surface["H"]
     I_ = surface["I"]
 
-    # TODO: temporary
-    x = particle["x"] - particle["translation"][0]
-    y = particle["y"] - particle["translation"][1]
-    z = particle["z"] - particle["translation"][2]
-
     dx = 2 * A * x + D * y + E * z + G
     dy = 2 * B * y + D * x + F * z + H
     dz = 2 * C * z + E * x + F * y + I_
@@ -481,9 +462,7 @@ def surface_normal(particle, surface):
 
 
 @njit
-def surface_normal_component(particle, surface):
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
-    nx, ny, nz = surface_normal(particle, surface)
+def surface_normal_component(x, y, z, t, ux, uy, uz, surface):
+    # TODO: docs
+    nx, ny, nz = surface_normal(x, y, z, t, surface)
     return nx * ux + ny * uy + nz * uz

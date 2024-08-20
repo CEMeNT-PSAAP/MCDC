@@ -180,8 +180,6 @@ def make_type_particle(input_deck):
         ("E", float64),
         # Weight
         ("w", float64),
-        # TODO: temporary
-        ("translation", float64, (3,)),
         # IDs
         ("material_ID", int64),
         ("cell_ID", int64),
