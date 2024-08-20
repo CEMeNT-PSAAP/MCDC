@@ -5,7 +5,7 @@ from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 
 
 @njit
-def get_indices(x, y, z, t, ux, uy, uz, mesh):
+def get_indices(particle, mesh):
     """
     Get mesh indices given the coordinate
 
@@ -15,29 +15,47 @@ def get_indices(x, y, z, t, ux, uy, uz, mesh):
     # Check if coordinate is outside the mesh grid
     outside = False
     if (
-        x < mesh["x"][0] - COINCIDENCE_TOLERANCE
-        or x > mesh["x"][-1] + COINCIDENCE_TOLERANCE
-        or y < mesh["y"][0] - COINCIDENCE_TOLERANCE
-        or y > mesh["y"][-1] + COINCIDENCE_TOLERANCE
-        or z < mesh["z"][0] - COINCIDENCE_TOLERANCE
-        or z > mesh["z"][-1] + COINCIDENCE_TOLERANCE
-        or t < mesh["t"][0] - COINCIDENCE_TOLERANCE
-        or t > mesh["t"][-1] + COINCIDENCE_TOLERANCE
-        or (abs(x - mesh["x"][0]) < COINCIDENCE_TOLERANCE and ux < 0.0)
-        or (abs(x - mesh["x"][-1]) < COINCIDENCE_TOLERANCE and ux > 0.0)
-        or (abs(y - mesh["y"][0]) < COINCIDENCE_TOLERANCE and uy < 0.0)
-        or (abs(y - mesh["y"][-1]) < COINCIDENCE_TOLERANCE and uy > 0.0)
-        or (abs(z - mesh["z"][0]) < COINCIDENCE_TOLERANCE and uz < 0.0)
-        or (abs(z - mesh["z"][-1]) < COINCIDENCE_TOLERANCE and uz > 0.0)
-        or (abs(t - mesh["t"][-1]) < COINCIDENCE_TOLERANCE and 1.0 > 0.0)
+        particle["x"] < mesh["x"][0] - COINCIDENCE_TOLERANCE
+        or particle["x"] > mesh["x"][-1] + COINCIDENCE_TOLERANCE
+        or particle["y"] < mesh["y"][0] - COINCIDENCE_TOLERANCE
+        or particle["y"] > mesh["y"][-1] + COINCIDENCE_TOLERANCE
+        or particle["z"] < mesh["z"][0] - COINCIDENCE_TOLERANCE
+        or particle["z"] > mesh["z"][-1] + COINCIDENCE_TOLERANCE
+        or particle["t"] < mesh["t"][0] - COINCIDENCE_TOLERANCE
+        or particle["t"] > mesh["t"][-1] + COINCIDENCE_TOLERANCE
+        or (
+            abs(particle["x"] - mesh["x"][0]) < COINCIDENCE_TOLERANCE
+            and particle["ux"] < 0.0
+        )
+        or (
+            abs(particle["x"] - mesh["x"][-1]) < COINCIDENCE_TOLERANCE
+            and particle["ux"] > 0.0
+        )
+        or (
+            abs(particle["y"] - mesh["y"][0]) < COINCIDENCE_TOLERANCE
+            and particle["uy"] < 0.0
+        )
+        or (
+            abs(particle["y"] - mesh["y"][-1]) < COINCIDENCE_TOLERANCE
+            and particle["uy"] > 0.0
+        )
+        or (
+            abs(particle["z"] - mesh["z"][0]) < COINCIDENCE_TOLERANCE
+            and particle["uz"] < 0.0
+        )
+        or (
+            abs(particle["z"] - mesh["z"][-1]) < COINCIDENCE_TOLERANCE
+            and particle["uz"] > 0.0
+        )
+        or (abs(particle["t"] - mesh["t"][-1]) < COINCIDENCE_TOLERANCE and 1.0 > 0.0)
     ):
         outside = True
         return -1, -1, -1, -1, outside
 
-    ix = get_grid_index(x, ux, mesh["x"])
-    iy = get_grid_index(y, uy, mesh["y"])
-    iz = get_grid_index(z, uz, mesh["z"])
-    it = get_grid_index(t, 1.0, mesh["t"])
+    ix = get_grid_index(particle["x"], particle["ux"], mesh["x"])
+    iy = get_grid_index(particle["y"], particle["uy"], mesh["y"])
+    iz = get_grid_index(particle["z"], particle["uz"], mesh["z"])
+    it = get_grid_index(particle["t"], 1.0, mesh["t"])
 
     return ix, iy, iz, it, outside
 
