@@ -67,7 +67,6 @@ def iqmc_step_particle(P, prog):
 
     # Lattice or mesh crossing (skipped if surface crossing)
     elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
         if event & EVENT_DOMAIN:
             kernel.domain_crossing(P, mcdc)
 

@@ -40,18 +40,32 @@ def domain_crossing(P, mcdc):
     if mcdc["technique"]["domain_decomposition"]:
         mesh = mcdc["technique"]["dd_mesh"]
         # Determine which dimension is crossed
-        x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
-        if len(directions) == 0:
-            return
-        elif len(directions) > 1:
-            for direction in directions[1:]:
-                if direction == MESH_X:
-                    P["x"] -= SHIFT * P["ux"] / np.abs(P["ux"])
-                if direction == MESH_Y:
-                    P["y"] -= SHIFT * P["uy"] / np.abs(P["uy"])
-                if direction == MESH_Z:
-                    P["z"] -= SHIFT * P["uz"] / np.abs(P["uz"])
-        flag = directions[0]
+        x = P['x']
+        y = P['y']
+        z = P['z']
+        t = P['t']
+        ux = P['ux']
+        uy = P['uy']
+        uz = P['uz']
+        ix, iy, iz, it, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, mesh)
+
+        d_idx = mcdc['dd_idx']
+        d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
+        d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
+        d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
+
+        d_iz = int(d_idx / (d_Nx * d_Ny))
+        d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+        d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
+
+        flag = MESH_NONE
+        if d_ix != ix:
+            flag = MESH_X
+        elif d_iy != iy:
+            flag = MESH_Y
+        elif d_iz != iz:
+            flag = MESH_Z
+
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(P, mcdc["domain_decomp"]["bank_xp"])
@@ -408,9 +422,16 @@ def particle_in_domain(P, mcdc):
     d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
     d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
-    x_cell = binary_search(P["x"], mcdc["technique"]["dd_mesh"]["x"])
-    y_cell = binary_search(P["y"], mcdc["technique"]["dd_mesh"]["y"])
-    z_cell = binary_search(P["z"], mcdc["technique"]["dd_mesh"]["z"])
+    mesh = mcdc["technique"]["dd_mesh"]
+    x = P['x']
+    y = P['y']
+    z = P['z']
+    t = P['t']
+    ux = P['ux']
+    uy = P['uy']
+    uz = P['uz']
+
+    x_cell, y_cell, z_cell, t_cell, outside = mesh_.get_indices(x, y, z, t, ux, uy, uz, mesh)
 
     if d_ix == x_cell:
         if d_iy == y_cell:
@@ -1652,32 +1673,6 @@ def mesh_get_energy_index(P, mesh, mcdc):
             outside = True
             return 0, outside
         return binary_search(P["E"], mesh["g"]), outside
-
-
-@njit
-def mesh_crossing_evaluate(P, mesh):
-    # Shift backward
-    shift_particle(P, -2 * SHIFT)
-    x1, y1, z1, t1, outside1 = mesh_.get_indices(P, mesh)
-
-    # Double shift forward
-    shift_particle(P, 4 * SHIFT)
-    x2, y2, z2, t2, outside2 = mesh_.get_indices(P, mesh)
-
-    # Return particle to initial position
-    shift_particle(P, -2 * SHIFT)
-
-    # Determine dimension crossed
-    directions = []
-
-    if x1 != x2:
-        directions.append(MESH_X)
-    if y1 != y2:
-        directions.append(MESH_Y)
-    if z1 != z2:
-        directions.append(MESH_Z)
-
-    return x1, y1, z1, t1, directions
 
 
 # =============================================================================
