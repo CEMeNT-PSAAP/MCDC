@@ -2062,15 +2062,15 @@ def move_to_event(P, mcdc):
 
     # Distance to tally mesh
     d_mesh = INF
+    speed = physics.get_speed(P, mcdc)
     if mcdc["cycle_active"]:
-        d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
+        d_mesh = mesh_.structured.get_crossing_distance(P, speed, mcdc["tally"]["mesh"])
 
     d_domain = INF
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
-        d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
+        d_domain = mesh_.structured.get_crossing_distance(P, speed, mcdc["technique"]["dd_mesh"])
 
     # Distance to time boundary
-    speed = physics.get_speed(P, mcdc)
     d_time_boundary = speed * (mcdc["setting"]["time_boundary"] - P["t"])
 
     # Distance to census time
@@ -2137,25 +2137,6 @@ def distance_to_collision(P, mcdc):
     xi = rng(P)
     distance = -math.log(xi) / SigmaT
     return distance
-
-
-@njit
-def distance_to_mesh(P, mesh, mcdc):
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-    v = physics.get_speed(P, mcdc)
-
-    d = INF
-    d = min(d, mesh_.structured.nearest_distance_to_grid(x, ux, mesh["x"]))
-    d = min(d, mesh_.structured.nearest_distance_to_grid(y, uy, mesh["y"]))
-    d = min(d, mesh_.structured.nearest_distance_to_grid(z, uz, mesh["z"]))
-    d = min(d, mesh_.structured.nearest_distance_to_grid(t, 1.0 / v, mesh["t"]))
-    return d
 
 
 # =============================================================================
