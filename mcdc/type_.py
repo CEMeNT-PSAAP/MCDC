@@ -562,6 +562,9 @@ def make_type_lattice(input_deck):
             ("z0", float64),
             ("dz", float64),
             ("Nz", int64),
+            ("t0", float64),
+            ("dt", float64),
+            ("Nt", int64),
             ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z)),
         ]
     )
