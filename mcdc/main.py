@@ -370,7 +370,6 @@ def prepare():
     type_.make_type_particle_record(input_deck)
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
-    type_.make_type_surface(input_deck)
     type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
@@ -518,7 +517,7 @@ def prepare():
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
         for name in type_.surface.names:
-            if name not in ["J", "t", "BC"]:
+            if name not in ["BC"]:
                 copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
 
         # Boundary condition
@@ -528,11 +527,6 @@ def prepare():
             mcdc["surfaces"][i]["BC"] = BC_VACUUM
         elif input_deck.surfaces[i].boundary_type == "reflective":
             mcdc["surfaces"][i]["BC"] = BC_REFLECTIVE
-
-        # Variables with possible different sizes
-        for name in ["J", "t"]:
-            N = len(getattr(input_deck.surfaces[i], name))
-            mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
     # =========================================================================
     # Cells

@@ -157,9 +157,7 @@ class SurfaceCard(InputCard):
         self.G = 0.0
         self.H = 0.0
         self.I = 0.0
-        self.J = np.array([[0.0, 0.0]])
-        self.t = np.array([-TINY, INF])
-        self.N_slice = 1
+        self.J = 0.0
         self.nx = 0.0
         self.ny = 0.0
         self.nz = 0.0

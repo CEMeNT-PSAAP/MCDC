@@ -433,18 +433,10 @@ def surface(type_, bc="interface", **kw):
     ----------------
     x : {float, array_like[float]}
         x-position [cm] for `"plane-x"`.
-        If a vector is passed, positions of the surface at the times specified by the
-        parameter `"t"`.
     y : {float, array_like[float]}
         y-position [cm] for `"plane-y"`.
-        If a vector is passed, positions of the surface at the times specified by the
-        parameter `t`.
     z : {float, array_like[float]}
         z-position [cm] for `"plane-z"`.
-        If a vector is passed, positions of the surface at the times specified by the
-        parameter `t`.
-    t : {array_like[float]}
-        Time to specify the position of `"plane-x"`, `"plane-y"`, or `"plane-z"`.
     center : array_like[float]
         Center point [cm] for `"cylinder-x"` (y,z), `"cylinder-y"` (x,z),
         `"cylinder-z"` (x,y), or `"sphere"` (x,y,z).
@@ -503,8 +495,7 @@ def surface(type_, bc="interface", **kw):
     # ==========================================================================
     # Surface attributes
     # ==========================================================================
-    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
-    #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
+    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
 
     card.type = type_
 
@@ -512,33 +503,24 @@ def surface(type_, bc="interface", **kw):
     if type_ == "plane-x":
         check_requirement("surface plane-x", kw, ["x"])
         card.G = 1.0
+        card.J = -kw.get("x")
         card.linear = True
-        if type(kw.get("x")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("x"), kw.get("t"), card)
-        else:
-            card.J[0, 0] = -kw.get("x")
     elif type_ == "plane-y":
         check_requirement("surface plane-y", kw, ["y"])
         card.H = 1.0
+        card.J = -kw.get("y")
         card.linear = True
-        if type(kw.get("y")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("y"), kw.get("t"), card)
-        else:
-            card.J[0, 0] = -kw.get("y")
     elif type_ == "plane-z":
         check_requirement("surface plane-z", kw, ["z"])
         card.I = 1.0
+        card.J = -kw.get("z")
         card.linear = True
-        if type(kw.get("z")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("z"), kw.get("t"), card)
-        else:
-            card.J[0, 0] = -kw.get("z")
     elif type_ == "plane":
         check_requirement("surface plane", kw, ["A", "B", "C", "D"])
         card.G = kw.get("A")
         card.H = kw.get("B")
         card.I = kw.get("C")
-        card.J[0, 0] = kw.get("D")
+        card.J = kw.get("D")
         card.linear = True
     elif type_ == "cylinder-x":
         check_requirement("surface cylinder-x", kw, ["center", "radius"])
@@ -548,7 +530,7 @@ def surface(type_, bc="interface", **kw):
         card.C = 1.0
         card.H = -2.0 * y
         card.I = -2.0 * z
-        card.J[0, 0] = y**2 + z**2 - r**2
+        card.J = y**2 + z**2 - r**2
     elif type_ == "cylinder-y":
         check_requirement("surface cylinder-y", kw, ["center", "radius"])
         x, z = kw.get("center")[:]
@@ -557,7 +539,7 @@ def surface(type_, bc="interface", **kw):
         card.C = 1.0
         card.G = -2.0 * x
         card.I = -2.0 * z
-        card.J[0, 0] = x**2 + z**2 - r**2
+        card.J = x**2 + z**2 - r**2
     elif type_ == "cylinder-z":
         check_requirement("surface cylinder-z", kw, ["center", "radius"])
         x, y = kw.get("center")[:]
@@ -566,7 +548,7 @@ def surface(type_, bc="interface", **kw):
         card.B = 1.0
         card.G = -2.0 * x
         card.H = -2.0 * y
-        card.J[0, 0] = x**2 + y**2 - r**2
+        card.J = x**2 + y**2 - r**2
     elif type_ == "sphere":
         check_requirement("surface sphere", kw, ["center", "radius"])
         x, y, z = kw.get("center")[:]
@@ -577,7 +559,7 @@ def surface(type_, bc="interface", **kw):
         card.G = -2.0 * x
         card.H = -2.0 * y
         card.I = -2.0 * z
-        card.J[0, 0] = x**2 + y**2 + z**2 - r**2
+        card.J = x**2 + y**2 + z**2 - r**2
     elif type_ == "quadric":
         check_requirement(
             "surface quadric", kw, ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
@@ -591,7 +573,7 @@ def surface(type_, bc="interface", **kw):
         card.G = kw.get("G")
         card.H = kw.get("H")
         card.I = kw.get("I")
-        card.J[0, 0] = kw.get("J")
+        card.J = kw.get("J")
 
     # Set normal vector if linear
     if card.linear:
@@ -608,35 +590,6 @@ def surface(type_, bc="interface", **kw):
     global_.input_deck.surfaces.append(card)
 
     return card
-
-
-def set_J(x, t, card):
-    # Edit and add the edges
-    t[0] = -TINY
-    t = np.append(t, INF)
-    x = np.append(x, x[-1])
-
-    # Reset the constants
-    card.J = np.zeros([0, 2])
-    card.t = np.array([-TINY])
-
-    # Iterate over inputs
-    idx = 0
-    for i in range(len(t) - 1):
-        # Skip if step
-        if t[i] == t[i + 1]:
-            continue
-
-        # Calculate constants
-        J0 = x[i]
-        J1 = (x[i + 1] - x[i]) / (t[i + 1] - t[i])
-
-        # Append to surface
-        card.J = np.append(card.J, [[J0, J1]], axis=0)
-        card.t = np.append(card.t, t[i + 1])
-
-    card.J *= -1
-    card.N_slice = len(card.J)
 
 
 def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
@@ -1804,8 +1757,6 @@ def uq(**kw):
         delta_card = make_card_nuclide(parameter.G, parameter.J)
         delta_card["ID"] = parameter.ID
     append_card(delta_card, global_tag)
-    # elif parameter['tag'] is 'Surface':
-    # elif parameter['tag'] is 'Source':
 
 
 # ==============================================================================
