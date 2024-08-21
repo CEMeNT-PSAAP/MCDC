@@ -469,17 +469,14 @@ def step_particle(P, prog):
             elif event == EVENT_FISSION:
                 kernel.fission(P, prog)
 
-    # Surface crossing
+    # Surface and domain crossing
     if event & EVENT_SURFACE:
         kernel.surface_crossing(P, prog)
         if event & EVENT_DOMAIN:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)
-
-    # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
+    elif event & EVENT_DOMAIN:
+        kernel.domain_crossing(P, mcdc)
 
     # Moving surface transition
     if event & EVENT_SURFACE_MOVE:
