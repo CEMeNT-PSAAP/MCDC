@@ -37,7 +37,6 @@ particle_record = None
 nuclide = None
 material = None
 
-surface = None
 universe = None
 lattice = None
 
@@ -476,36 +475,26 @@ def make_type_material(input_deck):
 # ==============================================================================
 
 
-def make_type_surface(input_deck):
-    global surface
-
-    # Maximum number of time-dependent surface slices
-    Nmax_slice = 0
-    for surface in input_deck.surfaces:
-        Nmax_slice = max(Nmax_slice, surface.N_slice)
-
-    surface = into_dtype(
-        [
-            ("ID", int64),
-            ("N_slice", int64),
-            ("BC", int64),
-            ("A", float64),
-            ("B", float64),
-            ("C", float64),
-            ("D", float64),
-            ("E", float64),
-            ("F", float64),
-            ("G", float64),
-            ("H", float64),
-            ("I", float64),
-            ("J", float64, (Nmax_slice, 2)),
-            ("t", float64, (Nmax_slice + 1,)),
-            ("linear", bool_),
-            ("nx", float64),
-            ("ny", float64),
-            ("nz", float64),
-        ]
-    )
+surface = into_dtype(
+    [
+        ("ID", int64),
+        ("BC", int64),
+        ("A", float64),
+        ("B", float64),
+        ("C", float64),
+        ("D", float64),
+        ("E", float64),
+        ("F", float64),
+        ("G", float64),
+        ("H", float64),
+        ("I", float64),
+        ("J", float64),
+        ("linear", bool_),
+        ("nx", float64),
+        ("ny", float64),
+        ("nz", float64),
+    ]
+)
 
 
 # ==============================================================================

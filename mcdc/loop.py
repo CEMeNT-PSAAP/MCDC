@@ -431,7 +431,10 @@ def loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
     while P["alive"]:
+        print('start', P['t'])
         step_particle(P, prog)
+        print('end', P['t'])
+        input()
 
 
 @njit(cache=caching)
@@ -477,10 +480,6 @@ def step_particle(P, prog):
                 kernel.domain_crossing(P, mcdc)
     elif event & EVENT_DOMAIN:
         kernel.domain_crossing(P, mcdc)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["cell_ID"] = -1
 
     # Census time crossing
     if event & EVENT_CENSUS:

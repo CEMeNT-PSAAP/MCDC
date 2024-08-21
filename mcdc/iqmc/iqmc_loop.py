@@ -70,10 +70,6 @@ def iqmc_step_particle(P, prog):
         if event & EVENT_DOMAIN:
             kernel.domain_crossing(P, mcdc)
 
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["cell_ID"] = -1
-
     # Apply weight roulette
     if P["alive"] and mcdc["technique"]["weight_roulette"]:
         # check if weight has fallen below threshold

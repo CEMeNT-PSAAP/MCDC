@@ -54,18 +54,13 @@ def inspect_geometry(particle, mcdc):
     # Recursively check cells until material cell is found (or the particle is lost)
     while event != EVENT_LOST:
         # Distance to nearest surface
-        d_surface, surface_ID, surface_move = distance_to_nearest_surface(
-            particle, speed, cell, mcdc
-        )
+        d_surface, surface_ID = distance_to_nearest_surface(particle, cell, mcdc)
 
         # Check if smaller
         if d_surface * PREC < distance:
             distance = d_surface
             event = EVENT_SURFACE
             particle["surface_ID"] = surface_ID
-
-            if surface_move:
-                event = EVENT_SURFACE_MOVE
 
         # Material cell?
         if cell["fill_type"] == FILL_MATERIAL:
@@ -226,16 +221,13 @@ def report_lost(particle):
 
 
 @njit
-def distance_to_nearest_surface(particle, speed, cell, mcdc):
+def distance_to_nearest_surface(particle, cell, mcdc):
     """
-    Get distance to nearest surface of the cell
-
-    Speed is needed to evaluate moving surfaces.
+    The termine the nearest cell surface and the distance to it
     """
     # TODO: docs
     distance = INF
     surface_ID = -1
-    surface_move = False
 
     # Access cell surface data
     idx = cell["surface_data_idx"]
@@ -247,13 +239,12 @@ def distance_to_nearest_surface(particle, speed, cell, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cell_surface_data"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d, sm = surface_distance(particle, speed, surface, mcdc)
+        d = surface_distance(particle, surface, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]
-            surface_move = sm
         idx += 1
-    return distance, surface_ID, surface_move
+    return distance, surface_ID
 
 
 @njit
@@ -320,31 +311,24 @@ def surface_evaluate(particle, surface):
     Evaluate the surface equation wrt the particle coordinate
     """
 
-    # Get coordinate
+    # Particle coordinate
     x = particle["x"]
     y = particle["y"]
     z = particle["z"]
     t = particle["t"]
 
+    # Surface coefficient
     G = surface["G"]
     H = surface["H"]
-    I_ = surface["I"]
+    I = surface["I"]
+    J = surface["J"]
 
-    # Get time indices
-    idx = 0
-    if surface["N_slice"] > 1:
-        idx = binary_search(t, surface["t"][: surface["N_slice"] + 1])
-
-    # Get constant
-    J0 = surface["J"][idx][0]
-    J1 = surface["J"][idx][1]
-    J = J0 + J1 * (t - surface["t"][idx])
-
-    result = G * x + H * y + I_ * z + J
-
+    # Linear surface evaluation
+    result = G * x + H * y + I * z + J
     if surface["linear"]:
         return result
 
+    # Surface coefficient
     A = surface["A"]
     B = surface["B"]
     C = surface["C"]
@@ -352,13 +336,14 @@ def surface_evaluate(particle, surface):
     E = surface["E"]
     F = surface["F"]
 
+    # Quadric surface evaluation
     return (
         result + A * x * x + B * y * y + C * z * z + D * x * y + E * x * z + F * y * z
     )
 
 
 @njit
-def surface_distance(particle, speed, surface, mcdc):
+def surface_distance(particle, surface, mcdc):
     """
     Return particle distance to surface
     """
@@ -374,39 +359,23 @@ def surface_distance(particle, speed, surface, mcdc):
     # Check if coincident
     evaluation = surface_evaluate(particle, surface)
     if abs(evaluation) < COINCIDENCE_TOLERANCE:
-        return INF, False
+        return INF
 
     # Surface coefficients
     G = surface["G"]
     H = surface["H"]
-    I_ = surface["I"]
+    I = surface["I"]
+    J = surface["J"]
 
-    surface_move = False
+    # Distance to linear surface
     if surface["linear"]:
-        idx = 0
-        if surface["N_slice"] > 1:
-            idx = binary_search(t, surface["t"][: surface["N_slice"] + 1])
-        J1 = surface["J"][idx][1]
-
-        t_max = surface["t"][idx + 1]
-        d_max = (t_max - t) * speed
-
-        div = G * ux + H * uy + I_ * uz + J1 / speed
-        distance = -evaluation / (G * ux + H * uy + I_ * uz + J1 / speed)
-
-        # Go beyond current movement slice?
-        if distance > d_max:
-            distance = d_max
-            surface_move = True
-        elif distance < 0 and idx < surface["N_slice"] - 1:
-            distance = d_max
-            surface_move = True
+        distance = -evaluation / (G * ux + H * uy + I * uz)
 
         # Moving away from the surface
         if distance < 0.0:
-            return INF, surface_move
+            return INF
         else:
-            return distance, surface_move
+            return distance
 
     # Surface coefficients
     A = surface["A"]
@@ -432,7 +401,7 @@ def surface_distance(particle, speed, surface, mcdc):
         + F * (y * uz + z * uy)
         + G * ux
         + H * uy
-        + I_ * uz
+        + I * uz
     )
     c = evaluation
 
@@ -442,7 +411,7 @@ def surface_distance(particle, speed, surface, mcdc):
     # Roots are identical: tangent
     # ==> return huge number
     if determinant <= 0.0:
-        return INF, surface_move
+        return INF
     else:
         # Get the roots
         denom = 2.0 * a
@@ -457,7 +426,7 @@ def surface_distance(particle, speed, surface, mcdc):
             root_2 = INF
 
         # Return the smaller root
-        return min(root_1, root_2), surface_move
+        return min(root_1, root_2)
 
 
 @njit
@@ -512,11 +481,11 @@ def surface_normal(particle, surface):
     F = surface["F"]
     G = surface["G"]
     H = surface["H"]
-    I_ = surface["I"]
+    I = surface["I"]
 
     dx = 2 * A * x + D * y + E * z + G
     dy = 2 * B * y + D * x + F * z + H
-    dz = 2 * C * z + E * x + F * y + I_
+    dz = 2 * C * z + E * x + F * y + I
 
     norm = (dx**2 + dy**2 + dz**2) ** 0.5
     return dx / norm, dy / norm, dz / norm
