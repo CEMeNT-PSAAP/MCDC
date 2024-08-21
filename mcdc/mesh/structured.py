@@ -7,67 +7,112 @@ from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 @njit
 def get_indices(particle, mesh):
     """
-    Get mesh indices given the coordinate
-
-    Direction is used to tiebreak when the value is at a grid point
-    (within tolerance).
+    Get mesh indices given the particle coordinate
     """
-    # Check if coordinate is outside the mesh grid
+    # Particle coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    t = particle["t"]
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
+    # Check if particle is outside the mesh grid
     outside = False
     if (
-        particle["x"] < mesh["x"][0] - COINCIDENCE_TOLERANCE
-        or particle["x"] > mesh["x"][-1] + COINCIDENCE_TOLERANCE
-        or particle["y"] < mesh["y"][0] - COINCIDENCE_TOLERANCE
-        or particle["y"] > mesh["y"][-1] + COINCIDENCE_TOLERANCE
-        or particle["z"] < mesh["z"][0] - COINCIDENCE_TOLERANCE
-        or particle["z"] > mesh["z"][-1] + COINCIDENCE_TOLERANCE
-        or particle["t"] < mesh["t"][0] - COINCIDENCE_TOLERANCE
-        or particle["t"] > mesh["t"][-1] + COINCIDENCE_TOLERANCE
+        # Outside the mesh condition
+        x < mesh["x"][0] - COINCIDENCE_TOLERANCE
+        or x > mesh["x"][-1] + COINCIDENCE_TOLERANCE
+        or y < mesh["y"][0] - COINCIDENCE_TOLERANCE
+        or y > mesh["y"][-1] + COINCIDENCE_TOLERANCE
+        or z < mesh["z"][0] - COINCIDENCE_TOLERANCE
+        or z > mesh["z"][-1] + COINCIDENCE_TOLERANCE
+        or t < mesh["t"][0] - COINCIDENCE_TOLERANCE
+        or t > mesh["t"][-1] + COINCIDENCE_TOLERANCE
+
+        # At the outermost-grid but moving away
         or (
-            abs(particle["x"] - mesh["x"][0]) < COINCIDENCE_TOLERANCE
-            and particle["ux"] < 0.0
+            abs(x - mesh["x"][0]) < COINCIDENCE_TOLERANCE
+            and ux < 0.0
         )
         or (
-            abs(particle["x"] - mesh["x"][-1]) < COINCIDENCE_TOLERANCE
-            and particle["ux"] > 0.0
+            abs(x - mesh["x"][-1]) < COINCIDENCE_TOLERANCE
+            and ux > 0.0
         )
         or (
-            abs(particle["y"] - mesh["y"][0]) < COINCIDENCE_TOLERANCE
-            and particle["uy"] < 0.0
+            abs(y - mesh["y"][0]) < COINCIDENCE_TOLERANCE
+            and uy < 0.0
         )
         or (
-            abs(particle["y"] - mesh["y"][-1]) < COINCIDENCE_TOLERANCE
-            and particle["uy"] > 0.0
+            abs(y - mesh["y"][-1]) < COINCIDENCE_TOLERANCE
+            and uy > 0.0
         )
         or (
-            abs(particle["z"] - mesh["z"][0]) < COINCIDENCE_TOLERANCE
-            and particle["uz"] < 0.0
+            abs(z - mesh["z"][0]) < COINCIDENCE_TOLERANCE
+            and uz < 0.0
         )
         or (
-            abs(particle["z"] - mesh["z"][-1]) < COINCIDENCE_TOLERANCE
-            and particle["uz"] > 0.0
+            abs(z - mesh["z"][-1]) < COINCIDENCE_TOLERANCE
+            and uz > 0.0
         )
-        or (abs(particle["t"] - mesh["t"][-1]) < COINCIDENCE_TOLERANCE and 1.0 > 0.0)
+        or (abs(t - mesh["t"][-1]) < COINCIDENCE_TOLERANCE)
     ):
         outside = True
         return -1, -1, -1, -1, outside
 
-    ix = get_grid_index(particle["x"], particle["ux"], mesh["x"])
-    iy = get_grid_index(particle["y"], particle["uy"], mesh["y"])
-    iz = get_grid_index(particle["z"], particle["uz"], mesh["z"])
-    it = get_grid_index(particle["t"], 1.0, mesh["t"])
+    ix = _grid_index(x, ux, mesh["x"])
+    iy = _grid_index(y, uy, mesh["y"])
+    iz = _grid_index(z, uz, mesh["z"])
+    it = _grid_index(t, 1.0, mesh["t"]) # Particle always moves forward in time
 
     return ix, iy, iz, it, outside
 
 
 @njit
-def get_grid_index(value, direction, grid):
+def get_crossing_distance(particle, speed, mesh):
     """
-    Get grid index given a value and direction
+    Get distance for the particle, moving with the given speed,
+    to cross the nearest grid of the mesh
+    """
+    # Particle coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    t = particle["t"]
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
+    # Check if particle is outside the mesh grid and moving away
+    outside = False
+    if (
+        (t > mesh["t"][-1] - COINCIDENCE_TOLERANCE)
+        or (x < mesh["x"][0] + COINCIDENCE_TOLERANCE and ux < 0.0)
+        or (x > mesh["x"][-1] - COINCIDENCE_TOLERANCE and ux > 0.0)
+        or (y < mesh["y"][0] + COINCIDENCE_TOLERANCE and uy < 0.0)
+        or (y > mesh["y"][-1] - COINCIDENCE_TOLERANCE and uy > 0.0)
+        or (z < mesh["z"][0] + COINCIDENCE_TOLERANCE and uz < 0.0)
+        or (z > mesh["z"][-1] - COINCIDENCE_TOLERANCE and uz > 0.0)
+    ):
+        return INF
+
+    d = INF
+    d = min(d, _grid_distance(x, ux, mesh["x"]))
+    d = min(d, _grid_distance(y, uy, mesh["y"]))
+    d = min(d, _grid_distance(z, uz, mesh["z"]))
+    d = min(d, _grid_distance(t, 1.0 / speed, mesh["t"]))
+    return d
+
+
+@njit
+def _grid_index(value, direction, grid):
+    """
+    Get grid index given the value and the direction
 
     Direction is used to tiebreak when the value is at a grid point
     (within tolerance).
-    It assumes value is inside the grid.
+    Note: It assumes the value is inside the grid.
     """
     idx = binary_search(value, grid)
 
@@ -78,16 +123,18 @@ def get_grid_index(value, direction, grid):
     else:
         if abs(grid[idx] - value) < COINCIDENCE_TOLERANCE:
             idx -= 1
+
     return idx
 
 
 @njit
-def nearest_distance_to_grid(value, direction, grid):
+def _grid_distance(value, direction, grid):
     """
-    Get the nearest distance to grid given a value and direction
+    Get distance to nearest grid given a value and direction
 
     Direction is used to tiebreak when the value is at a grid point
     (within tolerance).
+    Note: It assumes that a grid must be hit
     """
     if direction == 0.0:
         return INF
@@ -97,30 +144,13 @@ def nearest_distance_to_grid(value, direction, grid):
     if direction > 0.0:
         idx += 1
 
-    # Edge cases
-    if idx == -1:
-        idx += 1
-    if idx == len(grid):
-        idx -= 1
-
     # Coinciding cases
     if abs(grid[idx] - value) < COINCIDENCE_TOLERANCE:
         if direction > 0.0:
             idx += 1
-
-            if idx == len(grid):
-                # Right-most, going right
-                return INF
         else:
-            if value == grid[0]:
-                # Left-most, going left
-                return INF
-            else:
-                idx -= 1
+            idx -= 1
 
     dist = (grid[idx] - value) / direction
 
-    # Moving away from mesh?
-    if dist < 0.0:
-        dist = INF
     return dist

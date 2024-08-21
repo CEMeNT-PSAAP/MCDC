@@ -6,13 +6,13 @@ from numba import njit, objmode, literal_unroll
 
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
-import mcdc.mesh as mesh_
 import mcdc.local as local
+import mcdc.mesh as mesh_
+import mcdc.physics as physics
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.constant import *
 from mcdc.kernel import (
-    distance_to_mesh,
     move_particle,
 )
 from mcdc.loop import caching
@@ -101,7 +101,7 @@ def iqmc_move_to_event(P, mcdc):
     # =========================================================================
 
     # Distance to nearest geometry boundary (surface or lattice)
-    # Also set particle material and speed
+    # Also set particle material
     d_boundary, event = geometry.inspect_geometry(P, mcdc)
 
     # Particle is lost
@@ -110,11 +110,12 @@ def iqmc_move_to_event(P, mcdc):
 
     # Distance to domain decomposition mesh
     d_domain = INF
+    speed = physics.get_speed(P, mcdc)
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
-        d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
+        d_domain = mesh_.structured.get_crossing_distance(P, speed, mcdc["technique"]["dd_mesh"])
 
     # Distance to iqmc mesh
-    d_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc"]["mesh"], mcdc)
+    d_mesh = mesh_.structured.get_crossing_distance(P, speed, mcdc["technique"]["iqmc"]["mesh"])
 
     # =========================================================================
     # Determine event
@@ -309,7 +310,6 @@ def iqmc_prepare_particles(mcdc):
         P_new["iqmc"]["w"] = q * dV * N_total / N_particle
         P_new["w"] = P_new["iqmc"]["w"].sum()
         # add to source bank
-        print(P_new["x"], P_new["ux"], x)
         adapt.add_source(P_new, mcdc)
 
 
