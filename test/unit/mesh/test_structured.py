@@ -5,7 +5,7 @@ from mcdc.constant import (
     INF,
 )
 
-from mcdc.mesh import (
+from mcdc.mesh.structured import (
     get_indices,
     get_grid_index,
     nearest_distance_to_grid,

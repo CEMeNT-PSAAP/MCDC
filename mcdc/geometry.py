@@ -25,36 +25,37 @@ def inspect_geometry(particle, mcdc):
     """
     # TODO: add universe cell (besides material and lattice cells)
 
-    # Particle local coordinate
-    x = particle["x"]
-    y = particle["y"]
-    z = particle["z"]
-    t = particle["t"]
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
-    v = physics.get_speed(particle, mcdc)
+    # Store particle global coordinate
+    # (particle will be temporarily translated and rotated)
+    x_global = particle["x"]
+    y_global = particle["y"]
+    z_global = particle["z"]
+    t_global = particle["t"]
+    ux_global = particle["ux"]
+    uy_global = particle["uy"]
+    uz_global = particle["uz"]
+    speed = physics.get_speed(particle, mcdc)
 
     # Default returns
     distance = INF
-    event = EVENT_LOST
+    event = EVENT_NONE
 
     # Find top cell from root universe if unknown
     if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(x, y, z, t, ux, uy, uz, UNIVERSE_ROOT, mcdc)
+        particle["cell_ID"] = get_cell(particle, UNIVERSE_ROOT, mcdc)
+
         # Particle is lost?
         if particle["cell_ID"] == -1:
-            lost(particle)
-            return 0.0, EVENT_LOST
+            event = EVENT_LOST
 
     # The top cell
     cell = mcdc["cells"][particle["cell_ID"]]
 
-    # Recursively check cell until material cell is found
-    while True:
+    # Recursively check cells until material cell is found (or the particle is lost)
+    while event != EVENT_LOST:
         # Distance to nearest surface
         d_surface, surface_ID, surface_move = distance_to_nearest_surface(
-            x, y, z, t, ux, uy, uz, v, cell, mcdc
+            particle, speed, cell, mcdc
         )
 
         # Check if smaller
@@ -76,16 +77,16 @@ def inspect_geometry(particle, mcdc):
 
             # Apply translation
             if cell["fill_translated"]:
-                x -= cell["translation"][0]
-                y -= cell["translation"][1]
-                z -= cell["translation"][2]
+                particle["x"] -= cell["translation"][0]
+                particle["y"] -= cell["translation"][1]
+                particle["z"] -= cell["translation"][2]
 
             if cell["fill_type"] == FILL_LATTICE:
                 # Get lattice
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
                 # Distance to lattice grid
-                d_lattice = distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice)
+                d_lattice = distance_to_lattice_grid(particle, lattice)
 
                 # Check if smaller
                 if d_lattice * PREC < distance:
@@ -94,21 +95,33 @@ def inspect_geometry(particle, mcdc):
                     particle["surface_ID"] = -1
 
                 # Get universe
-                ix, iy, iz = lattice_get_index(x, y, z, lattice)
+                ix, iy, iz = lattice_get_indices(particle, lattice)
                 universe_ID = lattice["universe_IDs"][ix, iy, iz]
 
                 # Lattice-translate the particle
-                x -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
-                y -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
-                z -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
+                particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
+                particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
+                particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
                 # Get inner cell
-                cell_ID = get_cell(x, y, z, t, ux, uy, uz, universe_ID, mcdc)
+                cell_ID = get_cell(particle, universe_ID, mcdc)
                 if cell_ID > -1:
                     cell = mcdc["cells"][cell_ID]
                 else:
-                    # Skip if particle is lost
-                    return 0.0, EVENT_LOST
+                    event = EVENT_LOST
+
+    # Reassign the global coordinate
+    particle["x"] = x_global
+    particle["y"] = y_global
+    particle["z"] = z_global
+    particle["t"] = t_global
+    particle["ux"] = ux_global
+    particle["uy"] = uy_global
+    particle["uz"] = uz_global
+
+    # Report lost particle
+    if event == EVENT_LOST:
+        report_lost(particle)
 
     return distance, event
 
@@ -119,9 +132,9 @@ def inspect_geometry(particle, mcdc):
 
 
 @njit
-def get_cell(x, y, z, t, ux, uy, uz, universe_ID, mcdc):
+def get_cell(particle, universe_ID, mcdc):
     """
-    Find and return cell ID of the given local coordinate in the given universe
+    Find and return particle cell ID in the given universe
     Return -1 if particle is lost
     """
     universe = mcdc["universes"][universe_ID]
@@ -129,7 +142,7 @@ def get_cell(x, y, z, t, ux, uy, uz, universe_ID, mcdc):
     # Check all cells in the universe
     for cell_ID in universe["cell_IDs"]:
         cell = mcdc["cells"][cell_ID]
-        if cell_check(x, y, z, t, ux, uy, uz, cell, mcdc):
+        if check_cell(particle, cell, mcdc):
             return cell["ID"]
 
     # Particle is not found
@@ -137,9 +150,9 @@ def get_cell(x, y, z, t, ux, uy, uz, universe_ID, mcdc):
 
 
 @njit
-def cell_check(x, y, z, t, ux, uy, uz, cell, mcdc):
+def check_cell(particle, cell, mcdc):
     """
-    Check if the given local coordinate is inside the cell
+    Check if the particle is inside the cell
     """
     # Access RPN data
     idx = cell["region_data_idx"]
@@ -158,7 +171,7 @@ def cell_check(x, y, z, t, ux, uy, uz, cell, mcdc):
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
-            value[N_value] = surface_sense_check(x, y, z, t, ux, uy, uz, surface)
+            value[N_value] = check_surface_sense(particle, surface)
             N_value += 1
 
         elif token == BOOL_NOT:
@@ -178,25 +191,25 @@ def cell_check(x, y, z, t, ux, uy, uz, cell, mcdc):
 
 
 @njit
-def surface_sense_check(x, y, z, t, ux, uy, uz, surface):
+def check_surface_sense(particle, surface):
     """
-    Check on which side of the surface the local coordinate is
+    Check on which side of the surface the particle is
         - Return True if positive side
         - Return False otherwise
-    The given local direction is used if coincide within the tolerance
+    Particle direction is used if coincide within the tolerance
     """
-    result = surface_evaluate(x, y, z, t, surface)
+    result = surface_evaluate(particle, surface)
 
     # Check if coincident on the surface
     if abs(result) < COINCIDENCE_TOLERANCE:
         # Determine sense based on the direction
-        return surface_normal_component(x, y, z, t, ux, uy, uz, surface) > 0.0
+        return surface_normal_component(particle, surface) > 0.0
 
     return result > 0.0
 
 
 @njit
-def lost(particle):
+def report_lost(particle):
     """
     Report lost particle and terminate it
     """
@@ -213,7 +226,12 @@ def lost(particle):
 
 
 @njit
-def distance_to_nearest_surface(x, y, z, t, ux, uy, uz, v, cell, mcdc):
+def distance_to_nearest_surface(particle, speed, cell, mcdc):
+    """
+    Get distance to nearest surface of the cell
+
+    Speed is needed to evaluate moving surfaces.
+    """
     # TODO: docs
     distance = INF
     surface_ID = -1
@@ -229,7 +247,7 @@ def distance_to_nearest_surface(x, y, z, t, ux, uy, uz, v, cell, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cell_surface_data"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d, sm = surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc)
+        d, sm = surface_distance(particle, speed, surface, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]
@@ -239,7 +257,7 @@ def distance_to_nearest_surface(x, y, z, t, ux, uy, uz, v, cell, mcdc):
 
 
 @njit
-def distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice):
+def distance_to_lattice_grid(particle, lattice):
     # TODO: docs
     d = INF
     d = min(d, lattice_grid_distance(x, ux, lattice["x0"], lattice["dx"]))
@@ -251,6 +269,15 @@ def distance_to_lattice_grid(x, y, z, ux, uy, uz, lattice):
 # ======================================================================================
 # Lattice operations
 # ======================================================================================
+
+
+@njit
+def lattice_get_indices(x, y, z, ux, uy, uz, lattice):
+    # TODO: docs
+    ix = lattice_get_grid_index(x, ux, lattice["x0"], lattice["dx"])
+    iy = lattice_get_grid_index(y, uy, lattice["y0"], lattice["dy"])
+    iz = lattice_get_grid_index(z, uz, lattice["z0"], lattice["dz"])
+    return ix, iy, iz
 
 
 @njit
@@ -267,12 +294,17 @@ def lattice_grid_distance(value, direction, x0, dx):
 
 
 @njit
-def lattice_get_index(x, y, z, lattice):
-    # TODO: docs
-    ix = int64(math.floor((x - lattice["x0"]) / lattice["dx"]))
-    iy = int64(math.floor((y - lattice["y0"]) / lattice["dy"]))
-    iz = int64(math.floor((z - lattice["z0"]) / lattice["dz"]))
-    return ix, iy, iz
+def lattice_get_grid_index(value, direction, x0, dx):
+    idx = int64(math.floor((x - lattice["x0"]) / lattice["dx"]))
+
+    # Coinciding cases
+    if direction > 0.0:
+        if abs(grid[idx + 1] - value) < COINCIDENCE_TOLERANCE:
+            idx += 1
+    else:
+        if abs(grid[idx] - value) < COINCIDENCE_TOLERANCE:
+            idx -= 1
+    return idx
 
 
 # =============================================================================
@@ -283,8 +315,17 @@ def lattice_get_index(x, y, z, lattice):
 
 
 @njit
-def surface_evaluate(x, y, z, t, surface):
-    # TODO: docs
+def surface_evaluate(particle, surface):
+    """
+    Evaluate the surface equation wrt the particle coordinate
+    """
+
+    # Get coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    t = particle["t"]
+
     G = surface["G"]
     H = surface["H"]
     I_ = surface["I"]
@@ -317,14 +358,25 @@ def surface_evaluate(x, y, z, t, surface):
 
 
 @njit
-def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
-    # TODO: docs
+def surface_distance(particle, speed, surface, mcdc):
+    """
+    Return particle distance to surface
+    """
+    # Particle coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    t = particle["t"]
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
 
     # Check if coincident
-    evaluation = surface_evaluate(x, y, z, t, surface)
+    evaluation = surface_evaluate(particle, surface)
     if abs(evaluation) < COINCIDENCE_TOLERANCE:
         return INF, False
 
+    # Surface coefficients
     G = surface["G"]
     H = surface["H"]
     I_ = surface["I"]
@@ -337,10 +389,10 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
         J1 = surface["J"][idx][1]
 
         t_max = surface["t"][idx + 1]
-        d_max = (t_max - t) * v
+        d_max = (t_max - t) * speed
 
-        div = G * ux + H * uy + I_ * uz + J1 / v
-        distance = -evaluation / (G * ux + H * uy + I_ * uz + J1 / v)
+        div = G * ux + H * uy + I_ * uz + J1 / speed
+        distance = -evaluation / (G * ux + H * uy + I_ * uz + J1 / speed)
 
         # Go beyond current movement slice?
         if distance > d_max:
@@ -356,6 +408,7 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
         else:
             return distance, surface_move
 
+    # Surface coefficients
     A = surface["A"]
     B = surface["B"]
     C = surface["C"]
@@ -409,7 +462,9 @@ def surface_distance(x, y, z, t, ux, uy, uz, v, surface, mcdc):
 
 @njit
 def surface_bc(particle, surface):
-    # TODO: docs
+    """
+    Apply surface boundary condition to the particle
+    """
     if surface["BC"] == BC_VACUUM:
         particle["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
@@ -418,16 +473,16 @@ def surface_bc(particle, surface):
 
 @njit
 def surface_reflect(particle, surface):
-    # TODO: docs
-    x = particle["x"]
-    y = particle["y"]
-    z = particle["z"]
-    t = particle["t"]
+    """
+    Surface-reflect the particle
+    """
+    # Particle coordinate
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
-    nx, ny, nz = surface_normal(x, y, z, t, surface)
-    # 2.0*surface_normal_component(...)
+
+    nx, ny, nz = surface_normal(particle, surface)
+
     c = 2.0 * (nx * ux + ny * uy + nz * uz)
 
     particle["ux"] = ux - c * nx
@@ -436,11 +491,19 @@ def surface_reflect(particle, surface):
 
 
 @njit
-def surface_normal(x, y, z, t, surface):
-    # TODO: docs
+def surface_normal(particle, surface):
+    """
+    Get the surface outward-normal vector at the particle coordinate
+    """
     if surface["linear"]:
         return surface["nx"], surface["ny"], surface["nz"]
 
+    # Particle coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+
+    # Surface coefficients
     A = surface["A"]
     B = surface["B"]
     C = surface["C"]
@@ -460,7 +523,18 @@ def surface_normal(x, y, z, t, surface):
 
 
 @njit
-def surface_normal_component(x, y, z, t, ux, uy, uz, surface):
-    # TODO: docs
-    nx, ny, nz = surface_normal(x, y, z, t, surface)
+def surface_normal_component(particle, surface):
+    """
+    Get the surface outward-normal component of the particle
+    (dot product of the two directional vectors)
+    """
+    # Surface outward-normal vector
+    nx, ny, nz = surface_normal(particle, surface)
+
+    # Particle direction vector
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
+    # The dot product
     return nx * ux + ny * uy + nz * uz

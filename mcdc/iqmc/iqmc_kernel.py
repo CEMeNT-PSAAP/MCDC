@@ -300,7 +300,7 @@ def iqmc_prepare_particles(mcdc):
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
             lds[n, 1], lds[n, 5]
         )
-        x, y, z, t, outside = mesh_.get_indices(P_new, mesh)
+        x, y, z, t, outside = mesh_.structured.get_indices(P_new, mesh)
         q = Q[:, t, x, y, z].copy()
         dV = iqmc_cell_volume(x, y, z, mesh)
         # Source tilt
@@ -341,7 +341,7 @@ def iqmc_score_tallies(P, distance, mcdc):
     SigmaT = material["total"]
     mat_id = P["material_ID"]
 
-    x, y, z, t, outside = mesh_.get_indices(P, mesh)
+    x, y, z, t, outside = mesh_.structured.get_indices(P, mesh)
     if outside:
         return
 
