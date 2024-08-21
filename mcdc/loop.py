@@ -431,7 +431,10 @@ def loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
     while P["alive"]:
+        print('start', P['x'], P['y'], P['z'], P['t'])
         step_particle(P, prog)
+        print('end', P['x'], P['y'], P['z'], P['t'])
+        input()
 
 
 @njit(cache=caching)

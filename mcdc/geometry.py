@@ -3,6 +3,7 @@ import math
 from numba import njit, int64
 
 import mcdc.local as local
+import mcdc.mesh as mesh
 import mcdc.physics as physics
 
 from mcdc.algorithm import binary_search
@@ -81,7 +82,7 @@ def inspect_geometry(particle, mcdc):
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
                 # Distance to lattice grid
-                d_lattice = distance_to_lattice_grid(particle, lattice)
+                d_lattice = mesh.uniform.get_crossing_distance(particle, speed, lattice)
 
                 # Check if smaller
                 if d_lattice * PREC < distance:
@@ -90,7 +91,10 @@ def inspect_geometry(particle, mcdc):
                     particle["surface_ID"] = -1
 
                 # Get universe
-                ix, iy, iz = lattice_get_indices(particle, lattice)
+                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle, lattice)
+                if outside:
+                    event = EVENT_LOST
+                    continue
                 universe_ID = lattice["universe_IDs"][ix, iy, iz]
 
                 # Lattice-translate the particle
