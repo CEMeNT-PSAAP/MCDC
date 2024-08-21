@@ -251,57 +251,6 @@ def distance_to_nearest_surface(particle, cell, mcdc):
     return distance, surface_ID
 
 
-@njit
-def distance_to_lattice_grid(particle, lattice):
-    # TODO: docs
-    d = INF
-    d = min(d, lattice_grid_distance(x, ux, lattice["x0"], lattice["dx"]))
-    d = min(d, lattice_grid_distance(y, uy, lattice["y0"], lattice["dy"]))
-    d = min(d, lattice_grid_distance(z, uz, lattice["z0"], lattice["dz"]))
-    return d
-
-
-# ======================================================================================
-# Lattice operations
-# ======================================================================================
-
-
-@njit
-def lattice_get_indices(x, y, z, ux, uy, uz, lattice):
-    # TODO: docs
-    ix = lattice_get_grid_index(x, ux, lattice["x0"], lattice["dx"])
-    iy = lattice_get_grid_index(y, uy, lattice["y0"], lattice["dy"])
-    iz = lattice_get_grid_index(z, uz, lattice["z0"], lattice["dz"])
-    return ix, iy, iz
-
-
-@njit
-def lattice_grid_distance(value, direction, x0, dx):
-    # TODO: docs
-    if direction == 0.0:
-        return INF
-    idx = math.floor((value - x0) / dx)
-    if direction > 0.0:
-        idx += 1
-    ref = x0 + idx * dx
-    dist = (ref - value) / direction
-    return dist
-
-
-@njit
-def lattice_get_grid_index(value, direction, x0, dx):
-    idx = int64(math.floor((x - lattice["x0"]) / lattice["dx"]))
-
-    # Coinciding cases
-    if direction > 0.0:
-        if abs(grid[idx + 1] - value) < COINCIDENCE_TOLERANCE:
-            idx += 1
-    else:
-        if abs(grid[idx] - value) < COINCIDENCE_TOLERANCE:
-            idx -= 1
-    return idx
-
-
 # =============================================================================
 # Surface operations
 # =============================================================================
@@ -360,10 +309,15 @@ def surface_distance(particle, surface, mcdc):
     uy = particle["uy"]
     uz = particle["uz"]
 
-    # Check if coincident
+    # Check if coincident and leaving the surface
     evaluation = surface_evaluate(particle, surface)
+    coincident = False
     if abs(evaluation) < COINCIDENCE_TOLERANCE:
-        return INF
+        coincident = True
+        if surface["linear"]:
+            return INF
+        elif surface_normal_component(particle, surface) > 0.0:
+            return INF
 
     # Surface coefficients
     G = surface["G"]
@@ -422,6 +376,10 @@ def surface_distance(particle, surface, mcdc):
         sqrt = math.sqrt(determinant)
         root_1 = (-b + sqrt) / denom
         root_2 = (-b - sqrt) / denom
+
+        # Coincident treatment
+        if coincident:
+            return max(root_1, root_2)
 
         # Negative roots, moving away from the surface
         if root_1 < 0.0:

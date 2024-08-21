@@ -431,10 +431,7 @@ def loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
     while P["alive"]:
-        print('start', P['x'], P['y'], P['z'], P['t'])
         step_particle(P, prog)
-        print('end', P['x'], P['y'], P['z'], P['t'])
-        input()
 
 
 @njit(cache=caching)
@@ -444,6 +441,9 @@ def step_particle(P, prog):
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
     event = P["event"]
+
+    if event == EVENT_LOST:
+        return
 
     # The & operator here is a bitwise and.
     # It is used to determine if an event type is part of the particle event.
