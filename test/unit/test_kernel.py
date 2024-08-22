@@ -1,7 +1,5 @@
 import numpy as np
 import mcdc as MCDC
-from mcdc import type_
-from mcdc.main import closeout
 from mcdc.iqmc.iqmc_loop import AxV
 from mcdc.kernel import rng
 import mcdc.global_ as mcdc_
@@ -46,7 +44,6 @@ def iqmc_dummy_mcdc_variable():
     tol = 1e-3
     x = np.arange(0.0, 2.6, 0.1)
     Nx = len(x) - 1
-    solver = "power_iteration"
     fixed_source = np.zeros(Nx)
     phi0 = np.ones((Nx))
 
@@ -60,7 +57,6 @@ def iqmc_dummy_mcdc_variable():
         phi0=phi0,
         maxit=maxit,
         tol=tol,
-        eigenmode_solver=solver,
     )
     # Setting
     MCDC.setting(N_particle=N)

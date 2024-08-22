@@ -8,7 +8,7 @@ from scipy.integrate import quad
 # =============================================================================
 
 with h5py.File("output.h5", "r") as f:
-    phi = f["iqmc/tally/flux"][:]
+    phi = f["iqmc/tally/flux/mean"][:]
     x = f["iqmc/grid/x"][:]
     mesh = f["iqmc/grid/x"][:]
     dx = x[1] - x[0]
