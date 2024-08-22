@@ -725,7 +725,6 @@ def make_type_setting(deck):
         ("caching", bool_),
         ("output_name", str_),
         ("save_input_deck", bool_),
-        ("track_particle", bool_),
         # Eigenvalue mode
         ("mode_eigenvalue", bool_),
         ("k_init", float64),
