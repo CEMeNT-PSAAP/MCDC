@@ -85,6 +85,7 @@ from mpi4py import MPI
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
+import mcdc.code_factory as code_factory
 
 import mcdc.adapt as adapt
 from mcdc.constant import *
@@ -340,6 +341,24 @@ def prepare():
         input_deck.universes[0] = root_universe
 
     # =========================================================================
+    # Prepare cell region RPN (Reverse Polish Notation)
+    #   - Replace halfspace region ID with its surface and insert
+    #     complement operator if the sense is negative.
+    # =========================================================================
+
+    for cell in input_deck.cells:
+        i = 0
+        while i < len(cell._region_RPN):
+            token = cell._region_RPN[i]
+            if token >= 0:
+                surface_ID = input_deck.regions[token].A
+                sense = input_deck.regions[token].B
+                cell._region_RPN[i] = surface_ID
+                if sense < 0:
+                    cell._region_RPN.insert(i + 1, BOOL_NOT)
+            i += 1
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -354,8 +373,6 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
-    type_.make_type_region()
-    type_.make_type_cell(input_deck)
     type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
@@ -369,9 +386,8 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    type_.make_type_translate(input_deck)
-    type_.make_type_group_array(input_deck)
-    type_.make_type_j_array(input_deck)
+    input_deck.setting["target"] = target
+    code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
@@ -399,7 +415,6 @@ def prepare():
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.set_toggle("particle_tracker", mcdc["setting"]["track_particle"])
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
@@ -413,7 +428,7 @@ def prepare():
     N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
         # General data
-        for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
+        for name in ["ID", "fissionable"]:
             copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # MG data
@@ -522,36 +537,15 @@ def prepare():
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
     # =========================================================================
-    # Regions
-    # =========================================================================
-
-    N_region = len(input_deck.regions)
-    for i in range(N_region):
-        for name in type_.region.names:
-            if name not in ["type"]:
-                copy_field(mcdc["regions"][i], input_deck.regions[i], name)
-
-        # Type
-        if input_deck.regions[i].type == "halfspace":
-            mcdc["regions"][i]["type"] = REGION_HALFSPACE
-        elif input_deck.regions[i].type == "intersection":
-            mcdc["regions"][i]["type"] = REGION_INTERSECTION
-        elif input_deck.regions[i].type == "union":
-            mcdc["regions"][i]["type"] = REGION_UNION
-        elif input_deck.regions[i].type == "complement":
-            mcdc["regions"][i]["type"] = REGION_COMPLEMENT
-        elif input_deck.regions[i].type == "all":
-            mcdc["regions"][i]["type"] = REGION_ALL
-
-    # =========================================================================
     # Cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
+    surface_data_idx = 0
+    region_data_idx = 0
     for i in range(N_cell):
-        for name in type_.cell.names:
-            if name not in ["fill_type", "surface_IDs"]:
-                copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+        for name in ["ID", "fill_ID", "translation"]:
+            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Fill type
         if input_deck.cells[i].fill_type == "material":
@@ -561,10 +555,27 @@ def prepare():
         elif input_deck.cells[i].fill_type == "lattice":
             mcdc["cells"][i]["fill_type"] = FILL_LATTICE
 
-        # Variables with possible different sizes
-        for name in ["surface_IDs"]:
-            N = mcdc["cells"][i]["N_surface"]
-            mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
+        # Fill translation flag
+        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
+            mcdc["cells"][i]["fill_translated"] = True
+
+        # Surface data
+        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
+        N_surface = len(input_deck.cells[i].surface_IDs)
+        mcdc["cell_surface_data"][surface_data_idx] = N_surface
+        mcdc["cell_surface_data"][
+            surface_data_idx + 1 : surface_data_idx + N_surface + 1
+        ] = input_deck.cells[i].surface_IDs
+        surface_data_idx += N_surface + 1
+
+        # Region data
+        mcdc["cells"][i]["region_data_idx"] = region_data_idx
+        N_RPN = len(input_deck.cells[i]._region_RPN)
+        mcdc["cell_region_data"][region_data_idx] = N_RPN
+        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
+            input_deck.cells[i]._region_RPN
+        )
+        region_data_idx += N_RPN + 1
 
     # =========================================================================
     # Universes
@@ -760,13 +771,6 @@ def prepare():
             mcdc["technique"]["iqmc"]["score"][name]["bin"] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-
-    # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    # Threshold
-    mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
 
     # =========================================================================
     # Variance Deconvolution - UQ
@@ -986,7 +990,11 @@ def card_to_h5group(card, group):
         elif value is None:
             next
         else:
-            group[name] = value
+            if name not in ["region"]:
+                group[name] = value
+
+            elif name == "region":
+                group[name] = str(value)
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
@@ -1125,12 +1133,6 @@ def generate_hdf5(mcdc):
                 )
                 f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_count"])
                 f.create_dataset("iqmc/final_residual", data=T["iqmc"]["residual"])
-
-            # Particle tracker
-            if mcdc["setting"]["track_particle"]:
-                with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
-                    N_track = mcdc["particle_track_N"][0]
-                    f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:

@@ -1,21 +1,24 @@
-import mcdc.kernel as kernel
-import mcdc.iqmc.iqmc_kernel as iqmc_kernel
-import mcdc.adapt as adapt
 import numpy as np
 
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode
-from mcdc.loop import caching
+
+import mcdc.adapt as adapt
+import mcdc.geometry as geometry
+import mcdc.iqmc.iqmc_kernel as iqmc_kernel
+import mcdc.kernel as kernel
+import mcdc.local as local
+
 from mcdc.constant import *
-from mcdc.type_ import iqmc_score_list
+from mcdc.loop import caching
 from mcdc.print_ import (
+    print_iqmc_eigenvalue_exit_code,
+    print_iqmc_eigenvalue_progress,
+    print_msg,
     print_progress,
     print_progress_iqmc,
-    print_iqmc_eigenvalue_progress,
-    print_iqmc_eigenvalue_exit_code,
-    print_progress_eigenvalue,
-    print_error,
 )
+from mcdc.type_ import iqmc_score_list
 
 
 # =========================================================================
@@ -370,9 +373,8 @@ def iqmc_step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
+        geometry.reset_local_coordinate(P)
+        P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
 
     # Determine and move to event
     iqmc_kernel.iqmc_move_to_event(P, mcdc)
@@ -421,7 +423,7 @@ def iqmc_loop_source(mcdc):
 
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
-            P = adapt.local_particle()
+            P = local.particle()
             # Get particle from active bank
             kernel.get_particle(P, mcdc["bank_active"], mcdc)
             # Particle loop

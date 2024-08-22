@@ -1,22 +1,24 @@
+import math
+import numpy as np
+
 from mpi4py import MPI
+from numba import objmode, literal_unroll
 
 import mcdc.adapt as adapt
-import numpy as np
-import math
+import mcdc.local as local
+import mcdc.geometry as geometry
 
-from numba import objmode, literal_unroll
-from mcdc.type_ import iqmc_score_list
-from mcdc.kernel import distance_to_boundary, distance_to_mesh, allreduce_array
-
-# from mcdc.iqmc.iqmc_loop import iqmc_loop_source
 from mcdc.adapt import toggle
 from mcdc.constant import *
 from mcdc.kernel import (
-    move_particle,
-    get_particle_cell,
+    allreduce_array,
+    distance_to_boundary,
+    distance_to_mesh,
     get_particle_material,
     mesh_get_index,
+    move_particle,
 )
+from mcdc.type_ import iqmc_score_list
 
 
 # =========================================================================
@@ -144,15 +146,13 @@ def iqmc_generate_material_idx(mcdc):
     Nx = len(mesh["x"]) - 1
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
-    # variables for cell finding functions
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
     # create particle to utilize cell finding functions
-    P_temp = adapt.local_particle()
+    P_temp = local.particle()
     # set default attributes
     P_temp["alive"] = True
     P_temp["material_ID"] = -1
     P_temp["cell_ID"] = -1
+    geometry.reset_local_coordinate(P_temp)
 
     x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
     y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
@@ -174,7 +174,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
 
                     # set cell_ID
-                    P_temp["cell_ID"] = get_particle_cell(P_temp, 0, trans, mcdc)
+                    P_temp["cell_ID"] = geometry.get_cell(P_temp, 0, mcdc)
 
                     # set material_ID
                     material_ID = get_particle_material(P_temp, mcdc)
@@ -282,7 +282,7 @@ def iqmc_prepare_particles(mcdc):
 
     for n in range(N_work):
         # Create new particle
-        P_new = adapt.local_particle_record()
+        P_new = local.particle_record()
         # assign initial group, time, and rng_seed (not used)
         P_new["g"] = 0
         P_new["t"] = 0
