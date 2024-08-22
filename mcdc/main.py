@@ -95,7 +95,7 @@ from mcdc.loop import (
     set_cache,
     build_gpu_progs,
 )
-from mcdc.iqmc.iqmc_loop import iqmc_simulation
+from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
@@ -122,6 +122,8 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
+    if input_deck.technique["iQMC"]:
+        iqmc_validate_inputs(input_deck)
     mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
@@ -743,9 +745,9 @@ def prepare():
     for name in type_.technique["iqmc"].names:
         if name not in [
             "mesh",
-            "res",
-            "lds",
-            "sweep_counter",
+            "residual",
+            "samples",
+            "sweep_count",
             "total_source",
             "material_idx",
             "w_min",
@@ -761,10 +763,12 @@ def prepare():
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
-            iqmc["score_list"][name] = value
+            copy_field(
+                iqmc["score_list"], input_deck.technique["iqmc"]["score_list"], name
+            )
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
-            mcdc["technique"]["iqmc"]["score"][name] = value
+            mcdc["technique"]["iqmc"]["score"][name]["bin"] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
 
@@ -1071,6 +1075,11 @@ def generate_hdf5(mcdc):
             if mcdc["setting"]["mode_eigenvalue"]:
                 if mcdc["technique"]["iQMC"]:
                     f.create_dataset("k_eff", data=mcdc["k_eff"])
+                    if mcdc["technique"]["iqmc"]["mode"] == "batched":
+                        N_cycle = mcdc["setting"]["N_cycle"]
+                        f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
+                        f.create_dataset("k_mean", data=mcdc["k_avg_running"])
+                        f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
                 else:
                     N_cycle = mcdc["setting"]["N_cycle"]
                     f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
@@ -1089,44 +1098,41 @@ def generate_hdf5(mcdc):
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
-                # dump iQMC mesh
+                # iQMC mesh
                 T = mcdc["technique"]
                 f.create_dataset("iqmc/grid/t", data=T["iqmc"]["mesh"]["t"])
                 f.create_dataset("iqmc/grid/x", data=T["iqmc"]["mesh"]["x"])
                 f.create_dataset("iqmc/grid/y", data=T["iqmc"]["mesh"]["y"])
                 f.create_dataset("iqmc/grid/z", data=T["iqmc"]["mesh"]["z"])
-                # dump x,y,z scalar flux across all groups
+                # Scores
+                for name in [
+                    "flux",
+                    "source-x",
+                    "source-y",
+                    "source-z",
+                    "fission-power",
+                ]:
+                    if T["iqmc"]["score_list"][name]:
+                        name_h5 = name.replace("-", "_")
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/mean",
+                            data=np.squeeze(T["iqmc"]["score"][name]["mean"]),
+                        )
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/sdev",
+                            data=np.squeeze(T["iqmc"]["score"][name]["sdev"]),
+                        )
+                # iQMC source strength
                 f.create_dataset(
-                    "iqmc/tally/flux", data=np.squeeze(T["iqmc"]["score"]["flux"])
+                    "iqmc/tally/source_constant/mean",
+                    data=np.squeeze(T["iqmc"]["source"]),
                 )
+                # Iteration data
                 f.create_dataset(
-                    "iqmc/tally/fission_source",
-                    data=T["iqmc"]["score"]["fission-source"],
+                    "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]
                 )
-                f.create_dataset(
-                    "iqmc/tally/fission_power", data=T["iqmc"]["score"]["fission-power"]
-                )
-                f.create_dataset("iqmc/tally/source_constant", data=T["iqmc"]["source"])
-                f.create_dataset(
-                    "iqmc/tally/source_x", data=T["iqmc"]["score"]["tilt-x"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_y", data=T["iqmc"]["score"]["tilt-y"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_z", data=T["iqmc"]["score"]["tilt-z"]
-                )
-                # iteration data
-                f.create_dataset("iqmc/itteration_count", data=T["iqmc"]["itt"])
-                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["res"])
-                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_counter"])
-                if mcdc["setting"]["mode_eigenvalue"]:
-                    f.create_dataset(
-                        "iqmc/outter_itteration_count", data=T["iqmc"]["itt_outter"]
-                    )
-                    f.create_dataset(
-                        "iqmc/outter_final_residual", data=T["iqmc"]["res_outter"]
-                    )
+                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_count"])
+                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["residual"])
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:
