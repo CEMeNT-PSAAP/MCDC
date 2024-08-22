@@ -499,7 +499,7 @@ def step_particle(P_arr, prog):
     P = P_arr[0]
     mcdc = adapt.device(prog)
 
-    adapt.harm.print_formatted(77777)
+    adapt.harm.print_formatted(123454321)
     adapt.harm.print_formatted(P["rng_seed"])
 
 

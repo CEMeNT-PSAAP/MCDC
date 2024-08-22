@@ -3001,7 +3001,7 @@ def sample_phasespace_scattering(P_arr, material, P_new_arr, mcdc):
 
 
 @njit
-def sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr, mcdc):
+def sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
     # Copy relevant attributes
@@ -3019,7 +3019,7 @@ def scattering_MG(P_arr, material, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
     # Sample scattering angle
-    adapt.harm.print_formatted(777) #!
+    #adapt.harm.print_formatted(777) #!
     mu0 = 2.0 * rng(P_new_arr) - 1.0
 
     # Scatter direction
@@ -3424,8 +3424,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d_struct = adapt.local_j_array()
-    nu_d = nu_d_struct["values"]
+    nu_d  = adapt.local_array(type_.material_j_size(),nb.types.float64)
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 
@@ -4544,9 +4543,9 @@ def weight_roulette(P_arr, mcdc):
 
 @njit
 def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
+    mcdc = adapt.device(prog)
     P = P_arr[0]
 
-    mcdc = adapt.device(prog)
 
     # Sample number of derivative sources
     xi = surface["dsm_Np"]
@@ -4558,7 +4557,7 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
     # Terminate and put the current particle into the secondary bank
     P["alive"] = False
 
-    P_rec_arr = adapt.local_array(1,type_.particle_record)
+    P_rec_arr = adapt.local_array(1,type_.particle)
     P_rec = P_rec_arr[0]
     copy_record(P_rec_arr,P_arr)
     adapt.add_active(P_rec_arr, prog)
@@ -4623,11 +4622,12 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
     # Base weight
     w_hat = p_total * flux / xi
 
+    P_new_arr = adapt.local_array(1,type_.particle)
+    P_new = P_new_arr[0]
+
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new_arr = adapt.local_array(1,type_.particle)
-        P_new = P_new_arr[0]
         split_particle(P_new_arr,P_arr)
 
         # Sample source type
@@ -4718,13 +4718,13 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
         source_obtained = False
 
         # Create new particle
-        P_new_arr = adapt.local_array(1,type_.particle)
-        P_new = P_new_arr[0]
         split_particle(P_new_arr,P_arr)
 
         # Sample term
         xi = rng(P_new_arr) * p_total
         tot = 0.0
+
+        source_type = -1
 
         for idx in range(2):
 
@@ -4759,9 +4759,10 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
                         tot += sigmaT
                         if tot > xi:
                             # Delta source
-                            P_new["w"] = -w * sign
-                            P_new["sensitivity_ID"] = ID_source
-                            adapt.add_active(P_new_arr, prog)
+                            source_type = 0
+                            #P_new["w"] = -w * sign
+                            #P_new["sensitivity_ID"] = ID_source
+                            #adapt.add_active(P_new_arr, prog)
                             source_obtained = True
                         else:
                             P_new["w"] = w * sign
@@ -4769,26 +4770,42 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
                             tot += nusigmaS
                             if tot > xi:
                                 # Scattering source
-                                #sample_phasespace_scattering_nuclide(
-                                #    P_arr, nuclide, P_new_arr, mcdc
-                                #)
-                                P_new["sensitivity_ID"] = ID_source
-                                adapt.add_active(P_new_arr, prog) # Mystery
+                                source_type = 1
+                                #sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr)
+                                #P_new["sensitivity_ID"] = ID_source
+                                #adapt.add_active(P_new_arr, prog) # Mystery
                                 source_obtained = True
                             else:
-                                #tot += nusigmaF
+                                tot += nusigmaF
                                 if tot > xi:
-                                    ## Fission source
-                                    sample_phasespace_fission_nuclide(
-                                        P_arr, nuclide, P_new_arr, mcdc
-                                    )
-                                    P_new["sensitivity_ID"] = ID_source
-                                    adapt.add_active(P_new_arr, prog)
+                                    # Fission source
+                                    source_type = 2
+                                    #sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
+                                    #P_new["sensitivity_ID"] = ID_source
+                                    #adapt.add_active(P_new_arr, prog)
                                     source_obtained = True
                     if source_obtained:
                         break
                 if source_obtained:
                     break
+
+        if   source_type == 0:
+            # Delta source
+            P_new["w"] = -w * sign
+            P_new["sensitivity_ID"] = ID_source
+        elif source_type == 1:
+            # Scattering source
+            sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr)
+            P_new["sensitivity_ID"] = ID_source
+        elif source_type == 2:
+            # Fission source
+            sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
+            P_new["sensitivity_ID"] = ID_source
+
+        if source_type != -1:
+            adapt.add_active(P_new_arr, prog)
+
+
 
 
 @njit
@@ -4860,11 +4877,12 @@ def sensitivity_material(P_arr, prog):
     if double:
         w *= 2
 
+    P_new_arr = adapt.local_array(1,type_.particle)
+    P_new = P_new_arr[0]
+
     # Sample the derivative sources
     for n in range(Np):
         # Create new particle
-        P_new_arr = adapt.local_array(1,type_.particle)
-        P_new = P_new_arr[0]
         split_particle(P_new_arr,P_arr)
 
         # Sample source type
@@ -4879,7 +4897,7 @@ def sensitivity_material(P_arr, prog):
             tot += nusigmaS
             if tot > xi:
                 # Scattering source
-                sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr, mcdc)
+                sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr)
             else:
                 # Fission source
                 sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)

@@ -7,6 +7,7 @@ import mcdc.kernel as kernel
 import mcdc.loop as loop
 
 
+
 TARGET = "ROCM"
 
 
@@ -98,10 +99,8 @@ def type_local_array(context):
 
     from numba.core.typing.npydecl import parse_dtype, parse_shape
 
-    print(context)
 
     if isinstance(context,numba.core.typing.context.Context):
-        print( "CPU local_array (TYPE)" )
 
         # Function repurposed from Numba's ol_np_empty.
         def typer(shape, dtype):
@@ -127,7 +126,6 @@ def type_local_array(context):
         return typer
 
     elif isinstance(context,numba.cuda.target.CUDATypingContext):
-        print( "CUDA GPU local_array (TYPE)" )
 
         # Function repurposed from Numba's Cuda_array_decl.
         def typer(shape, dtype):
@@ -152,10 +150,8 @@ def type_local_array(context):
         return typer
 
     elif isinstance(context,numba.hip.target.HIPTypingContext):
-        print( "HIP GPU local_array (TYPE)" )
 
         def typer(shape, dtype):
-            print(f"shape: {shape}\ndtype: {dtype}")
             # Only integer literals and tuples of integer literals are valid
             # shapes
             if isinstance(shape, types.Integer):
@@ -171,7 +167,6 @@ def type_local_array(context):
             nb_dtype = parse_dtype(dtype)
             if nb_dtype is not None and ndim is not None:
                 result = types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
-                print("\n\nRESULT IS: \n",result)
                 return result
 
         return typer
@@ -191,7 +186,6 @@ def builtin_local_array(context, builder, sig, args):
     import numba.np.arrayobj as arrayobj
 
     if isinstance(context,numba.core.cpu.CPUContext):
-        print( "CPU local_array (IMPL)" )
 
         # No default arguments.
         nb_dtype = parse_dtype(dtype)
@@ -209,7 +203,6 @@ def builtin_local_array(context, builder, sig, args):
 
         return ary._getvalue()
     elif isinstance(context,numba.cuda.target.CUDATargetContext):
-        print( "CUDA GPU local_array (IMPL)" )
         length = sig.args[0].literal_value
         dtype = parse_dtype(sig.args[1])
         return numba.cuda.lowering._generic_array(
@@ -222,7 +215,6 @@ def builtin_local_array(context, builder, sig, args):
             can_dynsized=False
         )
     elif isinstance(context,numba.hip.target.HIPTargetContext):
-        print( "HIP GPU local_array (IMPL)" )
         length = sig.args[0].literal_value
         dtype = parse_dtype(sig.args[1])
         result = numba.hip.typing_lowering.hip.lowering._generic_array(
@@ -234,7 +226,6 @@ def builtin_local_array(context, builder, sig, args):
             addrspace=numba.hip.amdgcn.ADDRSPACE_LOCAL,
             can_dynsized=False,
         )
-        print(result)
         return result
     else:
         raise numba.core.errors.UnsupportedError(f"Unsupported target context {context}.")
@@ -514,26 +505,6 @@ def add_IC(particle, prog):
 def add_IC(particle, prog):
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
-
-
-@for_cpu()
-def local_group_array():
-    return np.zeros(1, dtype=type_.group_array)[0]
-
-
-@for_gpu()
-def local_group_array():
-    return cuda.local.array(1, type_.group_array)[0]
-
-
-@for_cpu()
-def local_j_array():
-    return np.zeros(1, dtype=type_.j_array)[0]
-
-
-@for_gpu()
-def local_j_array():
-    return cuda.local.array(1, type_.j_array)[0]
 
 
 @for_cpu()
