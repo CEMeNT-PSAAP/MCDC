@@ -58,7 +58,6 @@ class InputDeck:
             "progress_bar": True,
             "output_name": "output",
             "save_input_deck": True,
-            "track_particle": False,
             "mode_eigenvalue": False,
             "k_init": 1.0,
             "N_inactive": 0,
