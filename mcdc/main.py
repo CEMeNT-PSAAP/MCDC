@@ -347,10 +347,6 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    type_.make_type_translate(input_deck)
-    type_.make_type_group_array(input_deck)
-    type_.make_type_j_array(input_deck)
-
     # =========================================================================
     # Create the global variable container
     #   TODO: Better alternative?

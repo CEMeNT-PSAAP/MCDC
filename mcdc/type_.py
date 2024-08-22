@@ -1,6 +1,7 @@
 import h5py
 import math
 import numpy as np
+import numba as nb
 import os
 
 from mpi4py import MPI
@@ -21,6 +22,7 @@ uint8 = np.uint8
 bool_ = np.bool_
 uintp = np.uintp
 str_ = "U32"
+
 
 
 # ==============================================================================
@@ -48,6 +50,17 @@ group_array = None
 j_array = None
 global_ = None
 
+
+# ==============================================================================
+# MC/DC Member Array Sizes
+# ==============================================================================
+
+def material_g_size():
+    pass
+
+
+def material_j_size():
+    pass
 
 # ==============================================================================
 # Alignment Logic
@@ -440,6 +453,24 @@ def make_type_material(input_deck):
     if mode_MG:
         G = input_deck.materials[0]["G"]
         J = input_deck.materials[0]["J"]
+
+
+    global material_g_size
+    global material_j_size
+
+    G_adjusted = max(1,G)
+    J_adjusted = max(1,J)
+
+    def g_size():
+        return G_adjusted
+
+    def j_size():
+        return J_adjusted
+
+
+    material_g_size = nb.njit(g_size)
+    material_j_size = nb.njit(j_size)
+
 
     # General data
     struct = [
@@ -1367,22 +1398,6 @@ def make_type_global(input_deck):
 # Util
 # ==============================================================================
 
-
-def make_type_translate(input_deck):
-    global translate
-    translate = into_dtype([("values", float64, (3,))])
-
-
-def make_type_group_array(input_deck):
-    global group_array
-    G = input_deck.materials[0]["G"]
-    group_array = into_dtype([("values", float64, (G,))])
-
-
-def make_type_j_array(input_deck):
-    global j_array
-    J = input_deck.materials[0]["J"]
-    j_array = into_dtype([("values", float64, (J,))])
 
 
 def make_type_mesh(card):
