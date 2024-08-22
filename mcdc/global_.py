@@ -78,8 +78,8 @@ class InputDeck:
             # Below are parameters not copied to mcdc.setting
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
-            # TODO: Move to technique
-            "N_sensitivity": 0,
+            # Portability
+            "target": "cpu",
         }
 
         self.technique = {
@@ -152,7 +152,6 @@ class InputDeck:
             "IC_precursor_density_max": 0.0,
             "IC_cycle_stretch": 1.0,
             "branchless_collision": False,
-            "dsm_order": 1,
             "uq": False,
         }
 

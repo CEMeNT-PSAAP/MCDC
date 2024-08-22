@@ -1,4 +1,4 @@
-name: Regression Test - Numba and MPI
+name: Regression Test - MPI
 
 on: [push, pull_request]
 
@@ -22,14 +22,12 @@ jobs:
     - uses: mpi4py/setup-mpi@v1
     - name: Install dependencies
       run: |
-        #sudo apt-get install libopenmpi-dev
-        #pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py ngsolve distinctipy
-        pip list 
         pip install -e .
+        pip list 
     - name: Patch Numba
       run : |
         bash .github/workflows/patch.sh
-    - name: Regression Test - Numba and MPI
+    - name: Regression Test - MPI
       run: |
-          cd test/regression
-          python run.py --mode=numba --mpiexec=4
+        cd test/regression
+        python run.py --mpiexec=4

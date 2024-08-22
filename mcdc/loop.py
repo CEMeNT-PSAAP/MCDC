@@ -1,25 +1,22 @@
-import numpy as np
-from numpy import ascontiguousarray as cga
-from numba import njit, objmode, jit
-
 from mpi4py import MPI
+from numba import njit, objmode
 
 import mcdc.adapt as adapt
+import mcdc.geometry as geometry
 import mcdc.kernel as kernel
-import mcdc.type_ as type_
-import pathlib
-
+import mcdc.local as local
 import mcdc.print_ as print_module
+import mcdc.type_ as type_
 
 from mcdc.constant import *
 from mcdc.print_ import (
     print_header_batch,
-    print_progress,
-    print_progress_eigenvalue,
-    print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
     print_msg,
+    print_progress,
+    print_progress_eigenvalue,
+    print_progress_iqmc,
 )
 
 caching = True
@@ -30,8 +27,6 @@ def set_cache(setting):
 
     if setting == False:
         print_msg(" Caching has been disabled")
-        # p.unlink() for p in pathlib.Path('.').rglob('*.py[co]')
-        # p.rmdir() for p in pathlib.Path('.').rglob('__pycache__')
 
 
 # =============================================================================
@@ -195,10 +190,6 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     else:
         P = mcdc["bank_source"]["particles"][idx_work]
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_hid(P, mcdc)
-
     # Check if it is beyond current census index
     idx_census = mcdc["idx_census"]
     if P["t"] > mcdc["setting"]["census_time"][idx_census]:
@@ -228,15 +219,11 @@ def prep_particle(P, prog):
     if mcdc["technique"]["weight_window"]:
         kernel.weight_window(P, prog)
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_pid(P, mcdc)
-
 
 @njit(cache=caching)
 def exhaust_active_bank(prog):
     mcdc = adapt.device(prog)
-    P = adapt.local_particle()
+    P = local.particle()
     # Loop until active bank is exhausted
     while kernel.get_bank_size(mcdc["bank_active"]) > 0:
         # Get particle from active bank
@@ -281,7 +268,7 @@ def source_dd_resolution(prog):
 
     while not terminated:
         if kernel.get_bank_size(mcdc["bank_active"]) > 0:
-            P = adapt.local_particle()
+            P = local.particle()
             # Loop until active bank is exhausted
             while kernel.get_bank_size(mcdc["bank_active"]) > 0:
 
@@ -292,10 +279,6 @@ def source_dd_resolution(prog):
                 # Apply weight window
                 if mcdc["technique"]["weight_window"]:
                     kernel.weight_window(P, mcdc)
-
-                # Particle tracker
-                if mcdc["setting"]["track_particle"]:
-                    mcdc["particle_track_particle_ID"] += 1
 
                 # Particle loop
                 loop_particle(P, mcdc)
@@ -447,16 +430,8 @@ def gpu_loop_source(seed, mcdc):
 def loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
     while P["alive"]:
         step_particle(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
 
 
 @njit(cache=caching)
@@ -465,9 +440,8 @@ def step_particle(P, prog):
 
     # Find cell from root universe if unknown
     if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, UNIVERSE_ROOT, trans, mcdc)
+        geometry.reset_local_coordinate(P)
+        P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
 
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
@@ -497,15 +471,6 @@ def step_particle(P, prog):
                 kernel.scattering(P, prog)
             elif event == EVENT_FISSION:
                 kernel.fission(P, prog)
-
-            # Sensitivity quantification for nuclide?
-            material = mcdc["materials"][P["material_ID"]]
-            if material["sensitivity"] and (
-                P["sensitivity_ID"] == 0
-                or mcdc["technique"]["dsm_order"] == 2
-                and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
-            ):
-                kernel.sensitivity_material(P, prog)
 
     # Surface crossing
     if event & EVENT_SURFACE:
@@ -560,12 +525,11 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     g = DNP["n_g"]
 
     # Create new particle
-    P_new = adapt.local_particle()
+    P_new = local.particle()
     part_seed = kernel.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
     P_new["w"] = 1.0
-    P_new["sensitivity_ID"] = 0
 
     # Set position
     P_new["x"] = DNP["x"]
@@ -573,9 +537,8 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    trans_struct = adapt.local_translate()
-    trans = trans_struct["values"]
-    P_new["cell_ID"] = kernel.get_particle_cell(P_new, UNIVERSE_ROOT, trans, mcdc)
+    geometry.reset_local_coordinate(P_new)
+    P_new["cell_ID"] = geometry.get_cell(P_new, UNIVERSE_ROOT, mcdc)
     material_ID = kernel.get_particle_material(P_new, mcdc)
     material = mcdc["materials"][material_ID]
     G = material["G"]

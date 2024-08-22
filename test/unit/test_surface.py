@@ -1,7 +1,7 @@
 import numpy as np
 
 from mcdc import type_
-from mcdc.kernel import surface_evaluate
+from mcdc.geometry import surface_evaluate
 from mcdc.constant import INF
 
 
