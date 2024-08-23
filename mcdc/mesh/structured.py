@@ -30,32 +30,13 @@ def get_indices(particle, mesh):
         or z > mesh["z"][-1] + COINCIDENCE_TOLERANCE
         or t < mesh["t"][0] - COINCIDENCE_TOLERANCE
         or t > mesh["t"][-1] + COINCIDENCE_TOLERANCE
-
         # At the outermost-grid but moving away
-        or (
-            abs(x - mesh["x"][0]) < COINCIDENCE_TOLERANCE
-            and ux < 0.0
-        )
-        or (
-            abs(x - mesh["x"][-1]) < COINCIDENCE_TOLERANCE
-            and ux > 0.0
-        )
-        or (
-            abs(y - mesh["y"][0]) < COINCIDENCE_TOLERANCE
-            and uy < 0.0
-        )
-        or (
-            abs(y - mesh["y"][-1]) < COINCIDENCE_TOLERANCE
-            and uy > 0.0
-        )
-        or (
-            abs(z - mesh["z"][0]) < COINCIDENCE_TOLERANCE
-            and uz < 0.0
-        )
-        or (
-            abs(z - mesh["z"][-1]) < COINCIDENCE_TOLERANCE
-            and uz > 0.0
-        )
+        or (abs(x - mesh["x"][0]) < COINCIDENCE_TOLERANCE and ux < 0.0)
+        or (abs(x - mesh["x"][-1]) < COINCIDENCE_TOLERANCE and ux > 0.0)
+        or (abs(y - mesh["y"][0]) < COINCIDENCE_TOLERANCE and uy < 0.0)
+        or (abs(y - mesh["y"][-1]) < COINCIDENCE_TOLERANCE and uy > 0.0)
+        or (abs(z - mesh["z"][0]) < COINCIDENCE_TOLERANCE and uz < 0.0)
+        or (abs(z - mesh["z"][-1]) < COINCIDENCE_TOLERANCE and uz > 0.0)
         or (abs(t - mesh["t"][-1]) < COINCIDENCE_TOLERANCE)
     ):
         outside = True
@@ -64,7 +45,7 @@ def get_indices(particle, mesh):
     ix = _grid_index(x, ux, mesh["x"])
     iy = _grid_index(y, uy, mesh["y"])
     iz = _grid_index(z, uz, mesh["z"])
-    it = _grid_index(t, 1.0, mesh["t"]) # Particle always moves forward in time
+    it = _grid_index(t, 1.0, mesh["t"])  # Particle always moves forward in time
 
     return ix, iy, iz, it, outside
 

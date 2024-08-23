@@ -591,7 +591,7 @@ def prepare():
     N_lattice = len(input_deck.lattices)
     for i in range(N_lattice):
         for name in type_.lattice.names:
-            if name not in ["universe_IDs", "t0", 'dt', 'Nt']:
+            if name not in ["universe_IDs", "t0", "dt", "Nt"]:
                 mcdc["lattices"][i][name] = getattr(input_deck.lattices[i], name)
 
         # Universe IDs
@@ -606,7 +606,6 @@ def prepare():
         mcdc["lattices"][i]["t0"] = 0.0
         mcdc["lattices"][i]["dt"] = INF
         mcdc["lattices"][i]["Nt"] = 1
-
 
     # =========================================================================
     # Source
