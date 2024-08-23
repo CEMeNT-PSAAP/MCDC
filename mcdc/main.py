@@ -1224,20 +1224,60 @@ def dict_to_h5group(dict_, group):
             group[k] = v
 
 
+def dd_mergetally(mcdc, data):
+    """
+    Performs tally recombination on domain-decomposed mesh tallies.
+    Gathers and re-organizes tally data into a single array as it
+      would appear in a non-decomposed simulation.
+    """
+
+    tally = data[TALLY]
+    # create bin for recomposed tallies
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+
+    # capture tally lengths for reorganizing later
+    xlen = len(mcdc["mesh_tallies"][0]["filter"]["x"]) - 1
+    ylen = len(mcdc["mesh_tallies"][0]["filter"]["y"]) - 1
+    zlen = len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1
+
+    dd_tally = np.zeros((tally.shape[0], tally.shape[1] * d_Nx * d_Ny * d_Nz))
+    # gather tallies
+    for i, t in enumerate(tally):
+        MPI.COMM_WORLD.Gather(tally[i], dd_tally[i], root=0)
+    if mcdc["mpi_master"]:
+        buff = np.zeros_like(dd_tally)
+        # reorganize tally data
+        # TODO: find/develop a more efficient algorithm for this
+        tally_idx = 0
+        for di in range(0, d_Nx * d_Ny * d_Nz):
+            dz = di // (d_Nx * d_Ny)
+            dy = (di % (d_Nx * d_Ny)) // d_Nx
+            dx = di % d_Nx
+            for xi in range(0, xlen):
+                for yi in range(0, ylen):
+                    for zi in range(0, zlen):
+                        # calculate reorganized index
+                        ind_x = xi * (ylen * d_Ny * zlen * d_Nz) + dx * (
+                            xlen * ylen * d_Ny * zlen * d_Nz
+                        )
+                        ind_y = yi * (xlen * d_Nx) + dy * (ylen * xlen * d_Nx)
+                        ind_z = zi + dz * zlen
+                        buff_idx = ind_x + ind_y + ind_z
+                        # place tally value in correct position
+                        buff[:, buff_idx] = dd_tally[:, tally_idx]
+                        tally_idx += 1
+        # replace old tally with reorganized tally
+        dd_tally = buff
+
+    return dd_tally
+
+
 def generate_hdf5(data, mcdc):
 
-    # recombine tallies before output processing
     if mcdc["technique"]["domain_decomposition"]:
-        tally = data[TALLY]
-        # create bin for recomposed tallies
-        d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
-        d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
-        d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
-        dd_tally = np.zeros((tally.shape[0], tally.shape[1] * d_Nx * d_Ny * d_Nz))
-        # gather tallies
-        MPI.COMM_WORLD.Gather(tally[0], dd_tally[0], root=0)
-        MPI.COMM_WORLD.Gather(tally[1], dd_tally[1], root=0)
-        MPI.COMM_WORLD.Gather(tally[2], dd_tally[2], root=0)
+        dd_tally = dd_mergetally(mcdc, data)
 
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
