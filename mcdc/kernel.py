@@ -2041,16 +2041,45 @@ def eigenvalue_tally_closeout(mcdc):
         mcdc["C_sdv"] = 0.0
 
 
-# =============================================================================
+# ======================================================================================
 # Move to event
-# =============================================================================
+# ======================================================================================
 
 
 @njit
 def move_to_event(P, mcdc):
-    # =========================================================================
-    # Get distances to events
-    # =========================================================================
+    # ==================================================================================
+    # Preparation (as needed)
+    # ==================================================================================
+
+    # Multigroup preparation
+    #   In MG mode, particle speed is material-dependent.
+    if mcdc["setting"]["mode_MG"]:
+        # If material is not identified yet, locate the particle
+        if P["material_ID"] == -1:
+            if not geometry.locate_particle(P, mcdc):
+                # Particle is lost
+                P["event"] = EVENT_LOST
+                return
+
+    # ==================================================================================
+    # Geometry inspection
+    # ==================================================================================
+    #   - Set particle top cell and material IDs (if not lost)
+    #   - Set surface ID (if surface hit)
+    #   - Return distance to boundary (surface or lattice)
+    #   - Return geometry event type (surface or lattice crossing or particle lost)
+
+    d_boundary, event = geometry.inspect_geometry(P, mcdc)
+
+    # Particle is lost?
+    if event == EVENT_LOST:
+        P['event'] == EVENT_LOST
+        return
+
+    # ==================================================================================
+    # Get distances to other events
+    # ==================================================================================
 
     # Distance to nearest geometry boundary (surface or lattice)
     # Also set particle material and speed
@@ -2068,7 +2097,9 @@ def move_to_event(P, mcdc):
 
     d_domain = INF
     if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
-        d_domain = mesh_.structured.get_crossing_distance(P, speed, mcdc["technique"]["dd_mesh"])
+        d_domain = mesh_.structured.get_crossing_distance(
+            P, speed, mcdc["technique"]["dd_mesh"]
+        )
 
     # Distance to time boundary
     d_time_boundary = speed * (mcdc["setting"]["time_boundary"] - P["t"])

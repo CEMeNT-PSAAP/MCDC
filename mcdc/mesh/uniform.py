@@ -20,18 +20,18 @@ def get_indices(particle, mesh):
     uz = particle["uz"]
 
     # Mesh parameters
-    x0 = mesh['x0']
-    y0 = mesh['y0']
-    z0 = mesh['z0']
-    t0 = mesh['t0']
-    dx = mesh['dx']
-    dy = mesh['dy']
-    dz = mesh['dz']
-    dt = mesh['dt']
-    Nx = mesh['Nx']
-    Ny = mesh['Ny']
-    Nz = mesh['Nz']
-    Nt = mesh['Nt']
+    x0 = mesh["x0"]
+    y0 = mesh["y0"]
+    z0 = mesh["z0"]
+    t0 = mesh["t0"]
+    dx = mesh["dx"]
+    dy = mesh["dy"]
+    dz = mesh["dz"]
+    dt = mesh["dt"]
+    Nx = mesh["Nx"]
+    Ny = mesh["Ny"]
+    Nz = mesh["Nz"]
+    Nt = mesh["Nt"]
     x_last = x0 + Nx * dx
     y_last = y0 + Ny * dy
     z_last = z0 + Nz * dz
@@ -49,32 +49,13 @@ def get_indices(particle, mesh):
         or z > z_last + COINCIDENCE_TOLERANCE
         or t < t0 - COINCIDENCE_TOLERANCE
         or t > t_last + COINCIDENCE_TOLERANCE
-
         # At the outermost-grid but moving away
-        or (
-            abs(x - x0) < COINCIDENCE_TOLERANCE
-            and ux < 0.0
-        )
-        or (
-            abs(x - x_last) < COINCIDENCE_TOLERANCE
-            and ux > 0.0
-        )
-        or (
-            abs(y - y0) < COINCIDENCE_TOLERANCE
-            and uy < 0.0
-        )
-        or (
-            abs(y - y_last) < COINCIDENCE_TOLERANCE
-            and uy > 0.0
-        )
-        or (
-            abs(z - z0) < COINCIDENCE_TOLERANCE
-            and uz < 0.0
-        )
-        or (
-            abs(z - z_last) < COINCIDENCE_TOLERANCE
-            and uz > 0.0
-        )
+        or (abs(x - x0) < COINCIDENCE_TOLERANCE and ux < 0.0)
+        or (abs(x - x_last) < COINCIDENCE_TOLERANCE and ux > 0.0)
+        or (abs(y - y0) < COINCIDENCE_TOLERANCE and uy < 0.0)
+        or (abs(y - y_last) < COINCIDENCE_TOLERANCE and uy > 0.0)
+        or (abs(z - z0) < COINCIDENCE_TOLERANCE and uz < 0.0)
+        or (abs(z - z_last) < COINCIDENCE_TOLERANCE and uz > 0.0)
         or (abs(t - t_last) < COINCIDENCE_TOLERANCE)
     ):
         outside = True
@@ -83,7 +64,7 @@ def get_indices(particle, mesh):
     ix = _grid_index(x, ux, x0, dx)
     iy = _grid_index(y, uy, y0, dy)
     iz = _grid_index(z, uz, z0, dz)
-    it = _grid_index(t, 1.0, t0, dt) # Particle always moves forward in time
+    it = _grid_index(t, 1.0, t0, dt)  # Particle always moves forward in time
 
     return ix, iy, iz, it, outside
 
@@ -104,18 +85,18 @@ def get_crossing_distance(particle, speed, mesh):
     uz = particle["uz"]
 
     # Mesh parameters
-    x0 = mesh['x0']
-    y0 = mesh['y0']
-    z0 = mesh['z0']
-    t0 = mesh['t0']
-    dx = mesh['dx']
-    dy = mesh['dy']
-    dz = mesh['dz']
-    dt = mesh['dt']
-    Nx = mesh['Nx']
-    Ny = mesh['Ny']
-    Nz = mesh['Nz']
-    Nt = mesh['Nt']
+    x0 = mesh["x0"]
+    y0 = mesh["y0"]
+    z0 = mesh["z0"]
+    t0 = mesh["t0"]
+    dx = mesh["dx"]
+    dy = mesh["dy"]
+    dz = mesh["dz"]
+    dt = mesh["dt"]
+    Nx = mesh["Nx"]
+    Ny = mesh["Ny"]
+    Nz = mesh["Nz"]
+    Nt = mesh["Nt"]
     x_last = x0 + Nx * dx
     y_last = y0 + Ny * dy
     z_last = z0 + Nz * dz
