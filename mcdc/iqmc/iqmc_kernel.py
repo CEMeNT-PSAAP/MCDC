@@ -422,7 +422,7 @@ def iqmc_move_to_event(P, mcdc):
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
     if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN
+        event += EVENT_DOMAIN_CROSSING
 
     # Assign event
     P["event"] = event

@@ -2137,11 +2137,11 @@ def move_to_event(P, mcdc):
     if d_time_boundary <= distance * PREC:
         event += EVENT_TIME_BOUNDARY
     if d_time_census <= distance * PREC:
-        event += EVENT_CENSUS
+        event += EVENT_TIME_CENSUS
     if d_mesh <= distance * PREC:
         event += EVENT_MESH
     if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN
+        event += EVENT_DOMAIN_CROSSING
     if d_collision == distance:
         event = EVENT_COLLISION
 

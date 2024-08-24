@@ -371,9 +371,9 @@ def iqmc_step_particle(P, prog):
     # It is used to determine if an event type is part of the particle event.
 
     # Surface crossing
-    if event & EVENT_SURFACE:
+    if event & EVENT_SURFACE_CROSSING:
         kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN:
+        if event & EVENT_DOMAIN_CROSSING:
             if not (
                 mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
                 or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
@@ -381,8 +381,8 @@ def iqmc_step_particle(P, prog):
                 kernel.domain_crossing(P, mcdc)
 
     # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        if event & EVENT_DOMAIN:
+    elif event & EVENT_LATTICE_CROSSING or event & EVENT_MESH:
+        if event & EVENT_DOMAIN_CROSSING:
             kernel.domain_crossing(P, mcdc)
 
     # Apply weight roulette

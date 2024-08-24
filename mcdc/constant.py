@@ -31,17 +31,20 @@ UNIVERSE_ROOT = 0
 # Events
 # The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
 EVENT_NONE = 1 << 0
-EVENT_COLLISION = 1 << 1
-EVENT_SURFACE = 1 << 2
-EVENT_CENSUS = 1 << 3
-EVENT_MESH = 1 << 4
-EVENT_SCATTERING = 1 << 5
-EVENT_FISSION = 1 << 6
-EVENT_CAPTURE = 1 << 7
-EVENT_TIME_BOUNDARY = 1 << 8
-EVENT_LATTICE = 1 << 9
-EVENT_DOMAIN = 1 << 10
-EVENT_LOST = 1 << 11
+# Geometry events
+EVENT_SURFACE_CROSSING = 1 << 1
+EVENT_LATTICE_CROSSING = 1 << 2
+EVENT_DOMAIN_CROSSING = 1 << 3
+EVENT_LOST = 1 << 4
+# Collision/reaction events
+EVENT_COLLISION = 1 << 5
+EVENT_SCATTERING = 1 << 6
+EVENT_FISSION = 1 << 7
+EVENT_CAPTURE = 1 << 8
+# Miscellanies
+EVENT_TIME_CENSUS = 1 << 9
+EVENT_TIME_BOUNDARY = 1 << 10
+EVENT_MESH = 1 << 11
 
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
