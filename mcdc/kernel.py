@@ -2118,7 +2118,7 @@ def move_to_event(P, mcdc):
     distance = d_boundary
 
     # Check distance to domain
-    if d_domain < distance:
+    if d_domain < distance - COINCIDENCE_TOLERANCE:
         distance = d_domain
         P["event"] = EVENT_DOMAIN_CROSSING
         P["surface_ID"] = -1
@@ -2126,7 +2126,7 @@ def move_to_event(P, mcdc):
         P["event"] += EVENT_DOMAIN_CROSSING
 
     # Check distance to mesh
-    if d_mesh < distance:
+    if d_mesh < distance - COINCIDENCE_TOLERANCE:
         distance = d_mesh
         P["event"] = EVENT_MESH
         P["surface_ID"] = -1
@@ -2134,7 +2134,7 @@ def move_to_event(P, mcdc):
         P["event"] += EVENT_MESH
 
     # Check distance to collision
-    if d_collision < distance:
+    if d_collision < distance - COINCIDENCE_TOLERANCE:
         distance = d_collision
         P["event"] = EVENT_COLLISION
         P["surface_ID"] = -1
@@ -2142,7 +2142,7 @@ def move_to_event(P, mcdc):
         P["event"] += EVENT_COLLISION
 
     # Check distance to time boundary
-    if d_time_boundary < distance:
+    if d_time_boundary < distance - COINCIDENCE_TOLERANCE:
         distance = d_time_boundary
         P["event"] = EVENT_TIME_BOUNDARY
         P["surface_ID"] = -1
@@ -2150,7 +2150,7 @@ def move_to_event(P, mcdc):
         P["event"] += EVENT_TIME_BOUNDARY
 
     # Check distance to time census
-    if d_time_census < distance:
+    if d_time_census < distance - COINCIDENCE_TOLERANCE:
         distance = d_time_census
         P["event"] = EVENT_TIME_CENSUS
         P["surface_ID"] = -1
