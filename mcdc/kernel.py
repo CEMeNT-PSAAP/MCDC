@@ -1677,33 +1677,140 @@ def mesh_get_energy_index(P, mesh, mcdc):
 def score_tracklength(P, distance, mcdc):
     tally = mcdc["tally"]
     material = mcdc["materials"][P["material_ID"]]
+    mesh = tally["mesh"]
 
-    # Get indices
+    # Particle 4D direction
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / physics.get_speed(P, mcdc)
+
+    # Particle initial and final coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    # Easily identified tally bin indices
+    mu, azi = mesh_get_angular_index(P, mesh)
+    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc)
+
+    # Get starting indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(P, tally["mesh"])
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
 
     # Outside grid?
     if outside or outside_energy:
         return
 
-    # Score
-    flux = distance * P["w"]
-    if tally["flux"]:
-        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["flux"])
-    if tally["density"]:
-        flux /= physics.get_speed(P, mcdc)
-        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["density"])
-    if tally["fission"]:
-        flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
-        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["fission"])
-    if tally["total"]:
-        flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
-        score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["total"])
-    if tally["current"]:
-        score_current(g, it, ix, iy, iz, flux, P, tally["score"]["current"])
-    if tally["eddington"]:
-        score_eddington(g, it, ix, iy, iz, flux, P, tally["score"]["eddington"])
+    # Sweep through the distance
+    distance_swept = 0.0
+    while distance_swept < distance:
+        # Find distances to the mesh grids
+        if ux == 0.0:
+            dx = INF
+        else:
+            if ux > 0.0:
+                x_next = min(mesh["x"][ix + 1], x_final)
+            else:
+                x_next = max(mesh["x"][ix], x_final)
+            dx = (x_next - x) / ux
+        if uy == 0.0:
+            dy = INF
+        else:
+            if uy > 0.0:
+                y_next = min(mesh["y"][iy + 1], y_final)
+            else:
+                y_next = max(mesh["y"][iy], y_final)
+            dy = (y_next - y) / uy
+        if uz == 0.0:
+            dz = INF
+        else:
+            if uz > 0.0:
+                z_next = min(mesh["z"][iz + 1], z_final)
+            else:
+                z_next = max(mesh["z"][iz], z_final)
+            dz = (z_next - z) / uz
+        dt = (min(mesh["t"][it + 1], t_final) - t) / ut
+
+        # Get the grid crossed
+        distance_scored = INF
+        mesh_crossed = MESH_NONE
+        if dx <= distance_scored:
+            mesh_crossed = MESH_X
+            distance_scored = dx
+        if dy <= distance_scored:
+            mesh_crossed = MESH_Y
+            distance_scored = dy
+        if dz <= distance_scored:
+            mesh_crossed = MESH_Z
+            distance_scored = dz
+        if dt <= distance_scored:
+            mesh_crossed = MESH_T
+            distance_scored = dt
+
+        # Score
+        flux = distance_scored * P["w"]
+        if tally["flux"]:
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["flux"])
+        if tally["density"]:
+            flux /= physics.get_speed(P, mcdc)
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["density"])
+        if tally["fission"]:
+            flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["fission"])
+        if tally["total"]:
+            flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["total"])
+        if tally["current"]:
+            score_current(g, it, ix, iy, iz, flux, P, tally["score"]["current"])
+        if tally["eddington"]:
+            score_eddington(g, it, ix, iy, iz, flux, P, tally["score"]["eddington"])
+
+        # Accumulate distance swept
+        distance_swept += distance_scored
+
+        # Move the 4D position
+        x += distance_scored * ux
+        y += distance_scored * uy
+        z += distance_scored * uz
+        t += distance_scored * ut
+
+        # Increment index and check if out of bound
+        if mesh_crossed == MESH_X:
+            if ux > 0.0:
+                ix += 1
+                if ix == len(mesh["x"]) - 1:
+                    break
+            else:
+                ix -= 1
+                if ix == -1:
+                    break
+        elif mesh_crossed == MESH_Y:
+            if uy > 0.0:
+                iy += 1
+                if iy == len(mesh["y"]) - 1:
+                    break
+            else:
+                iy -= 1
+                if iy == -1:
+                    break
+        elif mesh_crossed == MESH_Z:
+            if uz > 0.0:
+                iz += 1
+                if iz == len(mesh["z"]) - 1:
+                    break
+            else:
+                iz -= 1
+                if iz == -1:
+                    break
+        elif mesh_crossed == MESH_T:
+            it += 1
+            if it == len(mesh["t"]) - 1:
+                break
 
 
 @njit
@@ -2088,12 +2195,8 @@ def move_to_event(P, mcdc):
     # Get distances to other events
     # ==================================================================================
 
-    # Distance to tally mesh
-    d_mesh = INF
+    # Distance to domain
     speed = physics.get_speed(P, mcdc)
-    if mcdc["cycle_active"]:
-        d_mesh = mesh_.structured.get_crossing_distance(P, speed, mcdc["tally"]["mesh"])
-
     d_domain = INF
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
@@ -2124,14 +2227,6 @@ def move_to_event(P, mcdc):
         P["surface_ID"] = -1
     elif geometry.check_coincidence(d_domain, distance):
         P["event"] += EVENT_DOMAIN_CROSSING
-
-    # Check distance to mesh
-    if d_mesh < distance - COINCIDENCE_TOLERANCE:
-        distance = d_mesh
-        P["event"] = EVENT_MESH
-        P["surface_ID"] = -1
-    elif geometry.check_coincidence(d_mesh, distance):
-        P["event"] += EVENT_MESH
 
     # Check distance to collision
     if d_collision < distance - COINCIDENCE_TOLERANCE:

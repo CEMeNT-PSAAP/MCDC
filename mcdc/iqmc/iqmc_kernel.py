@@ -422,10 +422,10 @@ def iqmc_move_to_event(P, mcdc):
     # Check distance to mesh
     if d_mesh < distance - COINCIDENCE_TOLERANCE:
         distance = d_mesh
-        P["event"] = EVENT_MESH
+        P["event"] = EVENT_IQMC_MESH
         P["surface_ID"] = -1
     elif geometry.check_coincidence(d_mesh, distance):
-        P["event"] += EVENT_MESH
+        P["event"] += EVENT_IQMC_MESH
 
     # =========================================================================
     # Move particle

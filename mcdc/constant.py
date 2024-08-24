@@ -44,7 +44,7 @@ EVENT_CAPTURE = 1 << 8
 # Miscellanies
 EVENT_TIME_CENSUS = 1 << 9
 EVENT_TIME_BOUNDARY = 1 << 10
-EVENT_MESH = 1 << 11
+EVENT_IQMC_MESH = 1 << 11
 
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
