@@ -381,11 +381,10 @@ def iqmc_move_to_event(P, mcdc):
     #   - Return distance to boundary (surface or lattice)
     #   - Return geometry event type (surface or lattice crossing or particle lost)
 
-    d_boundary, event = geometry.inspect_geometry(P, mcdc)
+    d_boundary = geometry.inspect_geometry(P, mcdc)
 
     # Particle is lost?
-    if event == EVENT_LOST:
-        P["event"] == EVENT_LOST
+    if P["event"] == EVENT_LOST:
         return
 
     # ==================================================================================
@@ -406,26 +405,27 @@ def iqmc_move_to_event(P, mcdc):
     )
 
     # =========================================================================
-    # Determine event
-    #   Priority (in case of coincident events):
-    #     boundary  > mesh
+    # Determine event(s)
     # =========================================================================
+    # TODO: Make a function to better maintain the repeating operation
 
-    # Find the minimum
-    distance = min(d_boundary, d_mesh, d_domain)
+    distance = d_boundary
 
-    # Remove the boundary event if it is not the nearest
-    if d_boundary > distance * PREC:
-        event = 0
+    # Check distance to domain
+    if d_domain < distance - COINCIDENCE_TOLERANCE:
+        distance = d_domain
+        P["event"] = EVENT_DOMAIN_CROSSING
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_domain, distance):
+        P["event"] += EVENT_DOMAIN_CROSSING
 
-    # Add each event if it is within PREC of the nearest event
-    if d_mesh <= distance * PREC:
-        event += EVENT_MESH
-    if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN_CROSSING
-
-    # Assign event
-    P["event"] = event
+    # Check distance to mesh
+    if d_mesh < distance - COINCIDENCE_TOLERANCE:
+        distance = d_mesh
+        P["event"] = EVENT_MESH
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_mesh, distance):
+        P["event"] += EVENT_MESH
 
     # =========================================================================
     # Move particle
