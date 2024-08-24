@@ -440,16 +440,13 @@ def step_particle(P, prog):
 
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
-    event = P["event"]
 
-    if event == EVENT_LOST:
+    # Execute events
+    if P["event"] == EVENT_LOST:
         return
 
-    # The & operator here is a bitwise and.
-    # It is used to determine if an event type is part of the particle event.
-
-    # Collision events
-    if event & EVENT_COLLISION:
+    # Collision
+    if P["event"] & EVENT_COLLISION:
         # Generate IC?
         if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
             kernel.bank_IC(P, prog)
@@ -462,32 +459,34 @@ def step_particle(P, prog):
         else:
             # Get collision type
             kernel.collision(P, mcdc)
-            event = P["event"]
 
             # Perform collision
-            if event == EVENT_CAPTURE:
+            if P["event"] & EVENT_CAPTURE:
                 P["alive"] = False
-            elif event == EVENT_SCATTERING:
+
+            elif P["event"] & EVENT_SCATTERING:
                 kernel.scattering(P, prog)
-            elif event == EVENT_FISSION:
+
+            elif P["event"] & EVENT_FISSION:
                 kernel.fission(P, prog)
 
     # Surface and domain crossing
-    if event & EVENT_SURFACE_CROSSING:
+    if P["event"] & EVENT_SURFACE_CROSSING:
         kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN_CROSSING:
+        if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)
-    elif event & EVENT_DOMAIN_CROSSING:
+
+    elif P["event"] & EVENT_DOMAIN_CROSSING:
         kernel.domain_crossing(P, mcdc)
 
     # Census time crossing
-    if event & EVENT_TIME_CENSUS:
+    if P["event"] & EVENT_TIME_CENSUS:
         adapt.add_census(P, prog)
         P["alive"] = False
 
     # Time boundary crossing
-    if event & EVENT_TIME_BOUNDARY:
+    if P["event"] & EVENT_TIME_BOUNDARY:
         P["alive"] = False
 
     # Apply weight window

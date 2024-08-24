@@ -21,8 +21,8 @@ def inspect_geometry(particle, mcdc):
     Full geometry inspection of the particle:
         - Set particle top cell and material IDs (if not lost)
         - Set surface ID (if surface hit)
+        - Set particle boundary event (surface or lattice crossing, or lost)
         - Return distance to boundary (surface or lattice)
-        - Return event type (surface or lattice hit or particle lost)
     """
     # TODO: add universe cell (besides material and lattice cells)
 
@@ -58,10 +58,18 @@ def inspect_geometry(particle, mcdc):
         d_surface, surface_ID = distance_to_nearest_surface(particle, cell, mcdc)
 
         # Check if smaller
-        if d_surface * PREC < distance:
+        if d_surface < distance - COINCIDENCE_TOLERANCE:
             distance = d_surface
             event = EVENT_SURFACE_CROSSING
             particle["surface_ID"] = surface_ID
+
+        # Check if coincident
+        elif check_coincidence(d_surface, distance):
+            # Add event if not there yet
+            if not event & EVENT_SURFACE_CROSSING:
+                event += EVENT_SURFACE_CROSSING
+                particle["surface_ID"] = surface_ID
+            # If surface crossing is already there, prioritize the outer surface ID
 
         # Material cell?
         if cell["fill_type"] == FILL_MATERIAL:
@@ -85,10 +93,16 @@ def inspect_geometry(particle, mcdc):
                 d_lattice = mesh.uniform.get_crossing_distance(particle, speed, lattice)
 
                 # Check if smaller
-                if d_lattice * PREC < distance:
+                if d_lattice < distance - COINCIDENCE_TOLERANCE:
                     distance = d_lattice
                     event = EVENT_LATTICE_CROSSING
                     particle["surface_ID"] = -1
+
+                # Check if coincident
+                if check_coincidence(d_lattice, distance):
+                    # Add event if not there yet
+                    if not event & EVENT_LATTICE_CROSSING:
+                        event += EVENT_LATTICE_CROSSING
 
                 # Get universe
                 ix, iy, iz, it, outside = mesh.uniform.get_indices(particle, lattice)
@@ -122,7 +136,10 @@ def inspect_geometry(particle, mcdc):
     if event == EVENT_LOST:
         report_lost(particle)
 
-    return distance, event
+    # Assign particle event
+    particle["event"] = event
+
+    return distance
 
 
 @njit
@@ -308,6 +325,7 @@ def report_lost(particle):
     z = particle["z"]
     print("A particle is lost at (", x, y, z, ")")
     particle["alive"] = False
+    input()
 
 
 # ======================================================================================
@@ -560,3 +578,16 @@ def surface_normal_component(particle, surface):
 
     # The dot product
     return nx * ux + ny * uy + nz * uz
+
+
+# ======================================================================================
+# Miscellanies
+# ======================================================================================
+
+
+@njit
+def check_coincidence(value_1, value_2):
+    """
+    Check if two values are within coincidence tolerance
+    """
+    return abs(value_1 - value_2) < COINCIDENCE_TOLERANCE
