@@ -652,15 +652,6 @@ def make_type_tally(input_deck):
     # Tally estimator flags
     struct = [("tracklength", bool_)]
 
-    def make_type_score(shape):
-        return into_dtype(
-            [
-                ("bin", float64, shape),
-                ("mean", float64, shape),
-                ("sdev", float64, shape),
-            ]
-        )
-
     # Mesh
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["mesh"])
     struct += [("mesh", mesh)]
@@ -719,7 +710,6 @@ def make_type_setting(deck):
         ("caching", bool_),
         ("output_name", str_),
         ("save_input_deck", bool_),
-        ("track_particle", bool_),
         # Eigenvalue mode
         ("mode_eigenvalue", bool_),
         ("k_init", float64),
@@ -753,9 +743,9 @@ iqmc_score_list = (
     "flux",
     "effective-scattering",
     "effective-fission",
-    "tilt-x",
-    "tilt-y",
-    "tilt-z",
+    "source-x",
+    "source-y",
+    "source-z",
     "fission-power",
     "fission-source",
 )
@@ -851,42 +841,31 @@ def make_type_technique(input_deck):
 
     iqmc_list += [("mesh", mesh)]
 
-    # Low-discprenecy sequence
-    size = MPI.COMM_WORLD.Get_size()
-    rank = MPI.COMM_WORLD.Get_rank()
-    # Evenly distribute work
-    work_size = math.floor(N_particle / size)
-    # Count reminder
-    rem = N_particle % size
-    # Assign reminder and update starting index
-    if rank < rem:
-        work_size += 1
-
-    iqmc_list += [("lds", float64, (work_size, N_dim))]
+    #  make low-discprenecy sequence array
+    work_size = get_work_size(N_particle)
+    iqmc_list += [("samples", float64, (work_size, N_dim))]
+    # make global arrays
     iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # TODO: make matidx int32
     iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
-    # this is the original source matrix size + all tilted sources
     iqmc_list += [("source", float64, (Ng, Nt, Nx, Ny, Nz))]
     total_size = (Ng * Nt * Nx * Ny * Nz) * card["iqmc"]["krylov_vector_size"]
     iqmc_list += [(("total_source"), float64, (total_size,))]
 
-    # Scores and shapes
+    # Make scores
     scores_shapes = [
         ["flux", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-fission", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-x", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-y", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-z", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-x", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-y", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-z", (Ng, Nt, Nx, Ny, Nz)],
         ["fission-power", (Ng, Nt, Nx, Ny, Nz)],  # SigmaF*phi
         ["fission-source", (1,)],  # nu*SigmaF*phi
     ]
 
     if card["iQMC"]:
         if setting["mode_eigenvalue"]:
-            if card["iqmc"]["eigenmode_solver"] == "power_iteration":
-                card["iqmc"]["score_list"]["fission-source"] = True
+            card["iqmc"]["score_list"]["fission-source"] = True
 
     # Add score flags to structure
     score_list = []
@@ -903,7 +882,7 @@ def make_type_technique(input_deck):
         shape = scores_shapes[i][1]
         if not card["iqmc"]["score_list"][name]:
             shape = (0,) * len(shape)
-        scores_struct += [(name, float64, shape)]
+        scores_struct += [(name, make_type_score(shape))]
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
@@ -912,18 +891,16 @@ def make_type_technique(input_deck):
 
     # Constants
     iqmc_list += [
-        ("maxitt", int64),
         ("tol", float64),
-        ("itt", int64),
-        ("itt_outter", int64),
-        ("res", float64),
-        ("res_outter", float64),
-        ("fixed_source_solver", str_),
-        ("eigenmode_solver", str_),
-        ("krylov_restart", int64),
-        ("preconditioner_sweeps", int64),
-        ("sweep_counter", int64),
         ("w_min", float64),
+        ("residual", float64),
+        ("iteration_count", int64),
+        ("iterations_max", int64),
+        ("krylov_restart", int64),
+        ("sweep_count", int64),
+        ("fixed_source_solver", str_),
+        ("sample_method", str_),
+        ("mode", str_),
     ]
 
     struct += [("iqmc", into_dtype(iqmc_list))]
@@ -1305,6 +1282,29 @@ def make_type_global(input_deck):
 # ==============================================================================
 # Util
 # ==============================================================================
+
+
+def make_type_score(shape):
+    return into_dtype(
+        [
+            ("bin", float64, shape),
+            ("mean", float64, shape),
+            ("sdev", float64, shape),
+        ]
+    )
+
+
+def get_work_size(N_particle):
+    size = MPI.COMM_WORLD.Get_size()
+    rank = MPI.COMM_WORLD.Get_rank()
+    # Evenly distribute work
+    work_size = math.floor(N_particle / size)
+    # Count reminder
+    rem = N_particle % size
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size += 1
+    return work_size
 
 
 def make_type_mesh(card):
