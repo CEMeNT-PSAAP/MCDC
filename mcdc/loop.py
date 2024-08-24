@@ -473,16 +473,16 @@ def step_particle(P, prog):
                 kernel.fission(P, prog)
 
     # Surface and domain crossing
-    if event & EVENT_SURFACE:
+    if event & EVENT_SURFACE_CROSSING:
         kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN:
+        if event & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)
-    elif event & EVENT_DOMAIN:
+    elif event & EVENT_DOMAIN_CROSSING:
         kernel.domain_crossing(P, mcdc)
 
     # Census time crossing
-    if event & EVENT_CENSUS:
+    if event & EVENT_TIME_CENSUS:
         adapt.add_census(P, prog)
         P["alive"] = False
 

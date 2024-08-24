@@ -60,7 +60,7 @@ def inspect_geometry(particle, mcdc):
         # Check if smaller
         if d_surface * PREC < distance:
             distance = d_surface
-            event = EVENT_SURFACE
+            event = EVENT_SURFACE_CROSSING
             particle["surface_ID"] = surface_ID
 
         # Material cell?
@@ -87,7 +87,7 @@ def inspect_geometry(particle, mcdc):
                 # Check if smaller
                 if d_lattice * PREC < distance:
                     distance = d_lattice
-                    event = EVENT_LATTICE
+                    event = EVENT_LATTICE_CROSSING
                     particle["surface_ID"] = -1
 
                 # Get universe
