@@ -1203,6 +1203,14 @@ def allreduce(value):
 
 
 @njit
+def allreduce_array(array):
+    buff = np.zeros_like(array)
+    with objmode():
+        MPI.COMM_WORLD.Allreduce(np.array(array), buff, op=MPI.SUM)
+    array[:] = buff
+
+
+@njit
 def bank_rebalance(mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(mcdc["bank_source"], mcdc)
@@ -2074,7 +2082,7 @@ def move_to_event(P, mcdc):
 
     # Particle is lost?
     if event == EVENT_LOST:
-        P['event'] == EVENT_LOST
+        P["event"] == EVENT_LOST
         return
 
     # ==================================================================================
@@ -2096,7 +2104,7 @@ def move_to_event(P, mcdc):
         d_mesh = mesh_.structured.get_crossing_distance(P, speed, mcdc["tally"]["mesh"])
 
     d_domain = INF
-    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
+    if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
             P, speed, mcdc["technique"]["dd_mesh"]
         )

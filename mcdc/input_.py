@@ -1429,10 +1429,10 @@ def iQMC(
     fixed_source=None,
     maxit=25,
     tol=1e-6,
-    preconditioner_sweeps=5,
-    fixed_source_solver="source_iteration",
-    eigenmode_solver="power_iteration",
-    score=[],
+    fixed_source_solver="source iteration",
+    sample_method="halton",
+    mode="fixed",
+    scores=[],
 ):
     """
     Activate the iterative Quasi-Monte Carlo (iQMC) neutron transport method.
@@ -1457,29 +1457,30 @@ def iQMC(
     source0 : array_like[float], optional
         Initial particle source (default None).
     source_x0 : array_like[float], optional
-        Initial source for tilt-x (default None).
+        Initial source for source-x (default None).
     source_y0 : array_like[float], optional
-        Initial source for tilt-y (default None).
+        Initial source for source-y (default None).
     source_z0 : array_like[float], optional
-        Initial source for tilt-z (default None).
+        Initial source for source-z (default None).
     krylov_restart : int, optional
-        Max number of iterations for Krylov iteration (default same as maxitt).
+        Max number of iterations for Krylov iteration (default same as maxit).
     fixed_source : array_like[float], optional
         Fixed source (default same as phi0).
-    maxit : int, optional
+    iterations_max : int, optional
         Maximum number of iterations allowed before termination (default 25).
     tol : float, optional
         Convergence tolerance (default 1e-6).
-    preconditioner_sweeps : int, optional
-        Number of preconditioner sweeps (default 5).
-    fixed_source_solver : {'source_iteration', 'gmres'}
-        Deterministic solver for fixed-source problem (default "source_iteration").
-    eigenmode_solver : {'power_iteration'}
+    fixed_source_solver : {'source iteration', 'gmres'}
+        Deterministic solver for fixed-source problem (default "source iteration").
         Solver for k-eigenvalue problem (default "power_iteration").
-    score : list of str, optional
+    sample_method: {'halton', 'random'}
+        Method for generating particle samples.
+    mode: {'fixed', batched}
+        Set iQMC to run with a fixed-seed or batched iteration scheme.
+    scores : list of str, optional
         List of tallies to score in addition to the mandatory flux and
         source strength. Additional scores include
-        {'tilt-x', 'tilt-y', 'tilt-z', 'fission-power'} (default empty list).
+        {'source-x', 'source-y', 'source-z', 'fission-power'} (default empty list).
 
     Returns
     -------
@@ -1496,7 +1497,9 @@ def iQMC(
     card = global_.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
-    card["iqmc"]["maxitt"] = maxit
+    card["iqmc"]["iterations_max"] = maxit
+    card["iqmc"]["sample_method"] = sample_method
+    card["iqmc"]["mode"] = mode
 
     # Set mesh
     if g is not None:
@@ -1535,33 +1538,31 @@ def iQMC(
         source0 = np.zeros_like(phi0)
 
     score_list = card["iqmc"]["score_list"]
-    for name in score:
+    for name in scores:
         score_list[name] = True
 
-    if score_list["tilt-x"]:
+    if score_list["source-x"]:
         card["iqmc"]["krylov_vector_size"] += 1
         if source_x0 is None:
             source_x0 = np.zeros_like(phi0)
 
-    if score_list["tilt-y"]:
+    if score_list["source-y"]:
         card["iqmc"]["krylov_vector_size"] += 1
         if source_y0 is None:
             source_y0 = np.zeros_like(phi0)
 
-    if score_list["tilt-z"]:
+    if score_list["source-z"]:
         card["iqmc"]["krylov_vector_size"] += 1
         if source_z0 is None:
             source_z0 = np.zeros_like(phi0)
 
     card["iqmc"]["score"]["flux"] = phi0
-    card["iqmc"]["score"]["tilt-x"] = source_x0
-    card["iqmc"]["score"]["tilt-y"] = source_y0
-    card["iqmc"]["score"]["tilt-z"] = source_z0
+    card["iqmc"]["score"]["source-x"] = source_x0
+    card["iqmc"]["score"]["source-y"] = source_y0
+    card["iqmc"]["score"]["source-z"] = source_z0
     card["iqmc"]["source"] = source0
     card["iqmc"]["fixed_source"] = fixed_source
     card["iqmc"]["fixed_source_solver"] = fixed_source_solver
-    card["iqmc"]["eigenmode_solver"] = eigenmode_solver
-    card["iqmc"]["preconditioner_sweeps"] = preconditioner_sweeps
     card["iqmc"]["krylov_restart"] = krylov_restart
 
 
