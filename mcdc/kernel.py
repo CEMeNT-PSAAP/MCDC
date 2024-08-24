@@ -2075,27 +2075,18 @@ def move_to_event(P, mcdc):
     # ==================================================================================
     #   - Set particle top cell and material IDs (if not lost)
     #   - Set surface ID (if surface hit)
+    #   - Set particle boundary event (surface or lattice crossing, or lost)
     #   - Return distance to boundary (surface or lattice)
-    #   - Return geometry event type (surface or lattice crossing or particle lost)
 
-    d_boundary, event = geometry.inspect_geometry(P, mcdc)
+    d_boundary = geometry.inspect_geometry(P, mcdc)
 
     # Particle is lost?
-    if event == EVENT_LOST:
-        P["event"] == EVENT_LOST
+    if P["event"] == EVENT_LOST:
         return
 
     # ==================================================================================
     # Get distances to other events
     # ==================================================================================
-
-    # Distance to nearest geometry boundary (surface or lattice)
-    # Also set particle material and speed
-    d_boundary, event = geometry.inspect_geometry(P, mcdc)
-
-    # Particle is lost
-    if P["cell_ID"] == -1:
-        return
 
     # Distance to tally mesh
     d_mesh = INF
@@ -2120,33 +2111,51 @@ def move_to_event(P, mcdc):
     d_collision = distance_to_collision(P, mcdc)
 
     # =========================================================================
-    # Determine event
-    #   Priority (in case of coincident events):
-    #     boundary > time_boundary > mesh > collision
+    # Determine event(s)
     # =========================================================================
+    # TODO: Make a function to better maintain the repeating operation
 
-    # Find the minimum
-    distance = min(
-        d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision, d_domain
-    )
-    # Remove the boundary event if it is not the nearest
-    if d_boundary > distance * PREC:
-        event = 0
+    distance = d_boundary
 
-    # Add each event if it is within PREC of the nearest event
-    if d_time_boundary <= distance * PREC:
-        event += EVENT_TIME_BOUNDARY
-    if d_time_census <= distance * PREC:
-        event += EVENT_TIME_CENSUS
-    if d_mesh <= distance * PREC:
-        event += EVENT_MESH
-    if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN_CROSSING
-    if d_collision == distance:
-        event = EVENT_COLLISION
+    # Check distance to domain
+    if d_domain < distance:
+        distance = d_domain
+        P["event"] = EVENT_DOMAIN_CROSSING
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_domain, distance):
+        P["event"] += EVENT_DOMAIN_CROSSING
 
-    # Assign event
-    P["event"] = event
+    # Check distance to mesh
+    if d_mesh < distance:
+        distance = d_mesh
+        P["event"] = EVENT_MESH
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_mesh, distance):
+        P["event"] += EVENT_MESH
+
+    # Check distance to collision
+    if d_collision < distance:
+        distance = d_collision
+        P["event"] = EVENT_COLLISION
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_collision, distance):
+        P["event"] += EVENT_COLLISION
+
+    # Check distance to time boundary
+    if d_time_boundary < distance:
+        distance = d_time_boundary
+        P["event"] = EVENT_TIME_BOUNDARY
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_time_boundary, distance):
+        P["event"] += EVENT_TIME_BOUNDARY
+
+    # Check distance to time census
+    if d_time_census < distance:
+        distance = d_time_census
+        P["event"] = EVENT_TIME_CENSUS
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_time_census, distance):
+        P["event"] += EVENT_TIME_CENSUS
 
     # =========================================================================
     # Move particle
@@ -2230,14 +2239,13 @@ def collision(P, mcdc):
     xi = rng(P) * SigmaT
     tot = SigmaS
     if tot > xi:
-        event = EVENT_SCATTERING
+        P["event"] += EVENT_SCATTERING
     else:
         tot += SigmaF
         if tot > xi:
-            event = EVENT_FISSION
+            P["event"] += EVENT_FISSION
         else:
-            event = EVENT_CAPTURE
-    P["event"] = event
+            P["event"] += EVENT_CAPTURE
 
 
 # =============================================================================
