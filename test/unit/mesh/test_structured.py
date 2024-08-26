@@ -16,6 +16,7 @@ from mcdc.mesh.structured import (
 def particle(x, y, z, t, ux, uy, uz):
     return {"x": x, "y": y, "z": z, "t": t, "ux": ux, "uy": uy, "uz": uz}
 
+
 grid = np.array([-6.0, -3.0, -1.0, 0.0, 1.0, 3.0, 6.0])
 
 mesh = {}
@@ -132,25 +133,25 @@ def test_get_indices():
 def test_get_corssing_distance():
     # Inside bin
     distance = get_crossing_distance(
-        particle(-3.2, -3.3, -3.4, -3.5, 0.4, 0.4, 0.4), 1.0/0.4, mesh
+        particle(-3.2, -3.3, -3.4, -3.5, 0.4, 0.4, 0.4), 1.0 / 0.4, mesh
     )
     assert np.isclose(distance, 0.2 / 0.4)
     distance = get_crossing_distance(
-        particle(-3.2, -3.3, -5.9, -3.5, 0.4, 0.4, -0.4), 1.0/0.4, mesh
+        particle(-3.2, -3.3, -5.9, -3.5, 0.4, 0.4, -0.4), 1.0 / 0.4, mesh
     )
     assert np.isclose(distance, 0.1 / 0.4)
 
     # Outside, moving away
     distance = get_crossing_distance(
-        particle(8.2, -3.3, -3.4, -3.5, 0.4, 0.4, 0.4), 1.0/0.4, mesh
+        particle(8.2, -3.3, -3.4, -3.5, 0.4, 0.4, 0.4), 1.0 / 0.4, mesh
     )
     assert np.isclose(distance, INF)
 
     # Outside, moving closer
     distance = get_crossing_distance(
-        particle(-6.1, -3.3, -3.4, -3.5, 0.4, 0.4, 0.4), 1.0/0.4, mesh
+        particle(-6.1, -3.3, -3.4, -3.5, 0.4, 0.4, 0.4), 1.0 / 0.4, mesh
     )
-    assert np.isclose(distance, 0.1/0.4)
+    assert np.isclose(distance, 0.1 / 0.4)
 
     # At internal grid
     distance = get_crossing_distance(
@@ -164,83 +165,83 @@ def test_get_corssing_distance():
 
     # At left-most grid, going right
     distance = get_crossing_distance(
-        particle(-6.0, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(-6.0, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
 
     # At left-most grid, going left
     distance = get_crossing_distance(
-        particle(-6.0, -3.0, -3.0, -3.0, -0.1, 0.1, 0.1), 1.0/0.1, mesh
+        particle(-6.0, -3.0, -3.0, -3.0, -0.1, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, INF)
 
     # At right-most grid, going right
     distance = get_crossing_distance(
-        particle(6.0, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(6.0, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, INF)
 
     # At right-most grid, going left
     distance = get_crossing_distance(
-        particle(6.0, -3.0, -3.0, -3.0, -1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(6.0, -3.0, -3.0, -3.0, -1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
 
     # At internal grid (within tolerance)
     distance = get_crossing_distance(
-        particle(-3.0 + tiny, -3.0, -3.0, -3.0, 1.0, 0.3, 0.2), 1.0/0.1, mesh
+        particle(-3.0 + tiny, -3.0, -3.0, -3.0, 1.0, 0.3, 0.2), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 2.0)
     distance = get_crossing_distance(
-        particle(-3.0 - tiny, -3.0, -3.0, -3.0, 1.0, 0.3, 0.2), 1.0/0.1, mesh
+        particle(-3.0 - tiny, -3.0, -3.0, -3.0, 1.0, 0.3, 0.2), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 2.0)
     distance = get_crossing_distance(
-        particle(-3.0 + tiny, -3.0, -3.0, -3.0, -1.0, -0.3, -0.2), -1.0/0.1, mesh
+        particle(-3.0 + tiny, -3.0, -3.0, -3.0, -1.0, -0.3, -0.2), -1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
     distance = get_crossing_distance(
-        particle(-3.0 - tiny, -3.0, -3.0, -3.0, -1.0, -0.3, -0.2), -1.0/0.1, mesh
+        particle(-3.0 - tiny, -3.0, -3.0, -3.0, -1.0, -0.3, -0.2), -1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
 
     # At left-most grid, going right (within tolerance)
     distance = get_crossing_distance(
-        particle(-6.0 + tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(-6.0 + tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
     distance = get_crossing_distance(
-        particle(-6.0 - tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(-6.0 - tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
 
     # At left-most grid, going left (within tolerance)
     distance = get_crossing_distance(
-        particle(-6.0 + tiny, -3.0, -3.0, -3.0, -0.1, 0.1, 0.1), 1.0/0.1, mesh
+        particle(-6.0 + tiny, -3.0, -3.0, -3.0, -0.1, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, INF)
     distance = get_crossing_distance(
-        particle(-6.0 - tiny, -3.0, -3.0, -3.0, -0.1, 0.1, 0.1), 1.0/0.1, mesh
+        particle(-6.0 - tiny, -3.0, -3.0, -3.0, -0.1, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, INF)
 
     # At right-most grid, going right (within tolerance)
     distance = get_crossing_distance(
-        particle(6.0 + tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(6.0 + tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, INF)
     distance = get_crossing_distance(
-        particle(6.0 - tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(6.0 - tiny, -3.0, -3.0, -3.0, 1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, INF)
 
     # At right-most grid, going left (within tolerance)
     distance = get_crossing_distance(
-        particle(6.0 + tiny, -3.0, -3.0, -3.0, -1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(6.0 + tiny, -3.0, -3.0, -3.0, -1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
     distance = get_crossing_distance(
-        particle(6.0 - tiny, -3.0, -3.0, -3.0, -1.0, 0.1, 0.1), 1.0/0.1, mesh
+        particle(6.0 - tiny, -3.0, -3.0, -3.0, -1.0, 0.1, 0.1), 1.0 / 0.1, mesh
     )
     assert np.isclose(distance, 3.0)
 
