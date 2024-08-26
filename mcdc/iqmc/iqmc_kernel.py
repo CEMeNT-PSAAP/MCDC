@@ -393,13 +393,13 @@ def iqmc_move_to_event(P, mcdc):
 
     # Distance to domain decomposition mesh
     d_domain = INF
+    speed = physics.get_speed(P, mcdc)
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
             P, speed, mcdc["technique"]["dd_mesh"]
         )
 
     # Distance to iqmc mesh
-    speed = physics.get_speed(P, mcdc)
     d_mesh = mesh_.structured.get_crossing_distance(
         P, speed, mcdc["technique"]["iqmc"]["mesh"]
     )
