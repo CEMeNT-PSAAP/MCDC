@@ -1,4 +1,5 @@
 import argparse, os, sys
+import importlib.metadata
 import numba as nb
 
 # Parse command-line arguments
@@ -1021,6 +1022,10 @@ def generate_hdf5(mcdc):
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output_name"] + ".h5", "w") as f:
+            # Version
+            version = importlib.metadata.version("mcdc")
+            f["version"] = version
+
             # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
