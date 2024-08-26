@@ -1,3 +1,5 @@
+import importlib.metadata
+
 from mcdc.input_ import (
     nuclide,
     material,
@@ -25,3 +27,5 @@ from mcdc.input_ import (
     save_particle_bank,
 )
 from mcdc.main import run, prepare
+
+__version__ = importlib.metadata.version("mcdc")
