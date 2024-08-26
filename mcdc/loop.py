@@ -526,7 +526,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    _, _ = geometry.inspect_geometry(P_new, mcdc)
+    _ = geometry.inspect_geometry(P_new, mcdc)
     if P_new["cell_ID"] > -1:
         material_ID = P_new["material_ID"]
     # Skip if particle is lost

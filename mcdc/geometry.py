@@ -325,7 +325,6 @@ def report_lost(particle):
     z = particle["z"]
     print("A particle is lost at (", x, y, z, ")")
     particle["alive"] = False
-    input()
 
 
 # ======================================================================================
