@@ -177,7 +177,6 @@ def loop_eigenvalue(mcdc):
 # =============================================================================
 
 
-
 @njit(cache=caching)
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.device(prog)
@@ -190,6 +189,8 @@ def generate_source_particle(work_start, idx_work, seed, prog):
 
     P_arr = adapt.local_array(1,type_.particle_record)
     P = P_arr[0]
+
+    adapt.harm.print_formatted(987656789)
 
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
@@ -215,14 +216,19 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         else:
             adapt.add_census(P_arr, prog)
     else:
+        P_new = adapt.local_array(1,type_.particle)
         # Add the source particle into the active bank
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
             if kernel.particle_in_domain(P_arr, mcdc):
-                adapt.add_active(P_arr, prog)
+                kernel.recordlike_to_particle(P_new,P_arr)
+                adapt.add_active(P_new, prog)
+                adapt.harm.print_formatted(19191919191)
         else:
-            adapt.add_active(P_arr, prog)
+            kernel.recordlike_to_particle(P_new,P_arr)
+            adapt.add_active(P_new, prog)
+            adapt.harm.print_formatted(19191919191)
 
 
 @njit(cache=caching)
@@ -375,6 +381,7 @@ def loop_source(seed, mcdc):
         source_dd_resolution(mcdc)
 
 
+
 def gpu_sources_spec():
 
     def make_work(prog: nb.uintp) -> nb.boolean:
@@ -385,6 +392,7 @@ def gpu_sources_spec():
         if idx_work >= mcdc["mpi_work_size"]:
             return False
 
+        adapt.harm.print_formatted(1292129)
         generate_source_particle(
             mcdc["mpi_work_start"], nb.uint64(idx_work), mcdc["source_seed"], prog
         )
@@ -398,16 +406,17 @@ def gpu_sources_spec():
 
     base_fns = (initialize, finalize, make_work)
 
-    def step(prog: nb.uintp, P: adapt.particle_gpu):
+    def step(prog: nb.uintp, P_input: adapt.particle_gpu):
         mcdc = adapt.device(prog)
         P_arr = adapt.local_array(1,type_.particle)
-        P_arr[0] = P
+        P_arr[0] = P_input
+        P = P_arr[0]
         if P["fresh"]:
             prep_particle(P_arr, prog)
         P["fresh"] = False
         step_particle(P_arr, prog)
         if P["alive"]:
-            adapt.step_async(prog, P_arr[0])
+            adapt.step_async(prog, P)
 
     async_fns = [step]
     return adapt.harm.RuntimeSpec("mcdc_source", adapt.state_spec, base_fns, async_fns,adapt.harm.GPUPlatform.ROCM)
@@ -438,6 +447,7 @@ def gpu_loop_source(seed, mcdc):
 
     ASYNC_EXECUTION = False
 
+    print("About to execute gpu_loop_source\n\n")
     # Execute the program, and continue to do so until it is done
     if ASYNC_EXECUTION:
         src_exec_program(mcdc["source_program"], block_count, iter_count)
@@ -508,6 +518,8 @@ def step_particle(P_arr, prog):
     adapt.harm.print_formatted(-12)
     if P["cell_ID"] == -1:
         trans = adapt.local_array(3,nb.types.float64)
+        for i in range(3):
+            trans[i] = 0
         adapt.harm.print_formatted(-23)
         P["cell_ID"] = kernel.get_particle_cell(P_arr, 0, trans, mcdc)
         adapt.harm.print_formatted(P["cell_ID"])
@@ -607,6 +619,9 @@ def step_particle(P_arr, prog):
         # check if weight has fallen below threshold
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
             kernel.weight_roulette(P_arr, mcdc)
+
+    if not P["alive"]:
+        adapt.harm.print_formatted(8675309)
 
 
 # =============================================================================
@@ -1064,6 +1079,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
         # Push to active bank
         adapt.add_active(P_new_arr, prog)
+        adapt.harm.print_formatted(19191919191)
 
 
 @njit(cache=caching)
@@ -1173,10 +1189,10 @@ def gpu_precursor_spec():
 
     base_fns = (initialize, finalize, make_work)
 
-    def step(prog: nb.uintp, P_val: adapt.particle_gpu):
+    def step(prog: nb.uintp, P_input: adapt.particle_gpu):
         mcdc = adapt.device(prog)
         P_arr = adapt.local_array(1,type_.particle)
-        P_arr[0] = P_val
+        P_arr[0] = P_input
         P = P_arr[0]
         if P["fresh"]:
             prep_particle(P_arr, prog)
@@ -1254,6 +1270,7 @@ def gpu_loop_source_precursor(seed, mcdc):
     source_precursor_closeout(mcdc, 1, 1)
 
 
+
 def build_gpu_progs():
 
     src_spec = gpu_sources_spec()
@@ -1296,7 +1313,7 @@ def build_gpu_progs():
 
     @njit
     def real_setup_gpu(mcdc):
-        arena_size = 0x100000
+        arena_size = 0x1000000
         block_count = 240
         mcdc["gpu_state"] = adapt.cast_voidptr_to_uintp(alloc_state())
         mcdc["source_program"] = adapt.cast_voidptr_to_uintp(

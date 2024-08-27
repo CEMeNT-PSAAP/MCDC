@@ -7,7 +7,6 @@ import mcdc.kernel as kernel
 import mcdc.loop as loop
 
 
-
 TARGET = "ROCM"
 
 
@@ -460,12 +459,12 @@ def thread(prog):
 
 
 @for_cpu()
-def add_active(particle, prog):
+def add_active(particle,prog):
     kernel.add_particle(particle, prog["bank_active"])
 
 
 @for_gpu()
-def add_active(particle, prog):
+def add_active(particle,prog):
     P = local_array(1,type_.particle)
     kernel.recordlike_to_particle(P,particle)
     if SIMPLE_ASYNC:
@@ -474,35 +473,66 @@ def add_active(particle, prog):
         find_cell_async(prog, P[0])
 
 
+
+#def add_active(particle, prog):
+#    pass
+#
+#@numba.extending.overload(add_active,target="cpu")
+#def cpu_add_active(particle, prog):
+#    def impl(particle,prog):
+#        harm.print_formatted(191919)
+#        kernel.add_particle(particle, prog["bank_active"])
+#    return impl
+#
+#
+#@numba.extending.overload(add_active,target="gpu")
+#def gpu_add_active(particle, prog):
+#    def impl(particle,prog):
+#        #harm.print_formatted(191919)
+#        P = local_array(1,type_.particle)
+#        kernel.recordlike_to_particle(P,particle)
+#        if SIMPLE_ASYNC:
+#            step_async(prog, P[0])
+#        else:
+#            find_cell_async(prog, P[0])
+#    return impl
+
+
 @for_cpu()
 def add_source(particle, prog):
+    harm.print_formatted(10000001)
     kernel.add_particle(particle, prog["bank_source"])
 
 
 @for_gpu()
 def add_source(particle, prog):
+    harm.print_formatted(10000001)
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["bank_source"])
 
 
 @for_cpu()
 def add_census(particle, prog):
+    harm.print_formatted(20000002)
     kernel.add_particle(particle, prog["bank_census"])
 
 
 @for_gpu()
 def add_census(particle, prog):
+    harm.print_formatted(20000002)
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["bank_census"])
 
 
 @for_cpu()
 def add_IC(particle, prog):
+    harm.print_formatted(30000003)
     kernel.add_particle(particle, prog["technique"]["IC_bank_neutron_local"])
 
 
 @for_gpu()
 def add_IC(particle, prog):
+    harm.print_formatted(30000003)
     mcdc = device(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
 
