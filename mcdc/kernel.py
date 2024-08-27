@@ -2705,7 +2705,7 @@ def distance_to_boundary(P_arr, mcdc):
     event = 0
 
     # Translation accumulator
-    trans = adapt.local_array(3,nb.types.float64)
+    trans = adapt.local_array(3,np.float64)
     adapt.harm.print_formatted(trans[0])
     adapt.harm.print_formatted(trans[1])
     adapt.harm.print_formatted(trans[2])
@@ -2841,7 +2841,7 @@ def surface_crossing(P_arr, prog):
     mcdc = adapt.device(prog)
 
 
-    trans = adapt.local_array(3,nb.types.float64)
+    trans = adapt.local_array(3,np.float64)
     for i in range(3):
         trans[i] = P["translation"][i]
 

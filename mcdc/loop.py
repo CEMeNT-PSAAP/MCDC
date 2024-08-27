@@ -517,7 +517,7 @@ def step_particle(P_arr, prog):
     # Find cell from root universe if unknown
     adapt.harm.print_formatted(-12)
     if P["cell_ID"] == -1:
-        trans = adapt.local_array(3,nb.types.float64)
+        trans = adapt.local_array(3,np.float64)
         for i in range(3):
             trans[i] = 0
         adapt.harm.print_formatted(-23)
