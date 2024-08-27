@@ -3,6 +3,7 @@ import math
 import numpy as np
 import os
 
+from numba import njit
 from mpi4py import MPI
 from mpi4py.util.dtlib import from_numpy_dtype
 
@@ -26,27 +27,24 @@ str_ = "U32"
 # ==============================================================================
 # MC/DC types
 # ==============================================================================
-# Currently defined based on input deck
-# TODO: This causes JIT recompilation in certain cases
+"""
+Some types are problem-dependent and defined in code_factory.py
+"""
 
 particle = None
 particle_record = None
+
 nuclide = None
 material = None
-surface = None
+
 universe = None
 lattice = None
+
 source = None
 setting = None
 mesh_tally = None
 surface_tally = None
 technique = None
-
-# GPU mode related
-translate = None
-group_array = None
-j_array = None
-RPN_array = None
 
 global_ = None
 
@@ -168,24 +166,28 @@ def make_type_particle(input_deck):
     global particle
 
     struct = [
+        # Coordinate
         ("x", float64),
         ("y", float64),
         ("z", float64),
         ("t", float64),
+        # Spatial direction
         ("ux", float64),
         ("uy", float64),
         ("uz", float64),
+        # Energy
         ("g", uint64),
         ("E", float64),
+        # Weight
         ("w", float64),
-        ("alive", bool_),
-        ("fresh", bool_),
+        # IDs
         ("material_ID", int64),
         ("cell_ID", int64),
         ("surface_ID", int64),
-        ("translation", float64, (3,)),
+        # Misc.
+        ("alive", bool_),
+        ("fresh", bool_),
         ("event", int64),
-        ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
 
@@ -224,7 +226,6 @@ def make_type_particle_record(input_deck):
         ("g", uint64),
         ("E", float64),
         ("w", float64),
-        ("sensitivity_ID", int64),
         ("rng_seed", uint64),
     ]
 
@@ -349,9 +350,6 @@ def make_type_nuclide(input_deck):
     struct = [
         ("ID", int64),
         ("fissionable", bool_),
-        ("sensitivity", bool_),
-        ("sensitivity_ID", int64),
-        ("dsm_Np", float64),
         ("uq", bool_),
     ]
 
@@ -447,7 +445,6 @@ def make_type_material(input_deck):
     struct = [
         ("ID", int64),
         ("N_nuclide", int64),
-        ("sensitivity", bool_),
         ("nuclide_IDs", int64, (Nmax_nuclide,)),
         ("nuclide_densities", float64, (Nmax_nuclide,)),
         ("uq", bool_),
@@ -482,17 +479,14 @@ def make_type_material(input_deck):
 def make_type_surface(input_deck):
     global surface
 
-    # Maximum number of time-dependent surface slices and tallies
-    Nmax_slice = 0
+    # Maximum number tallies
     Nmax_tally = 0
     for surface in input_deck.surfaces:
-        Nmax_slice = max(Nmax_slice, surface.N_slice)
         Nmax_tally = max(Nmax_tally, len(surface.tally_IDs))
 
     surface = into_dtype(
         [
             ("ID", int64),
-            ("N_slice", int64),
             ("BC", int64),
             ("A", float64),
             ("B", float64),
@@ -503,15 +497,11 @@ def make_type_surface(input_deck):
             ("G", float64),
             ("H", float64),
             ("I", float64),
-            ("J", float64, (Nmax_slice, 2)),
-            ("t", float64, (Nmax_slice + 1,)),
+            ("J", float64),
             ("linear", bool_),
             ("nx", float64),
             ("ny", float64),
             ("nz", float64),
-            ("sensitivity", bool_),
-            ("sensitivity_ID", int64),
-            ("dsm_Np", float64),
             ("N_tally", int64),
             ("tally_IDs", int64, (Nmax_tally,)),
         ]
@@ -526,9 +516,13 @@ def make_type_surface(input_deck):
 cell = into_dtype(
     [
         ("ID", int64),
+        # Fill status
         ("fill_type", int64),
         ("fill_ID", int64),
+        ("fill_translated", bool),
+        # Local coordinate modifier
         ("translation", float64, (3,)),
+        # Data indices
         ("surface_data_idx", int64),
         ("region_data_idx", int64),
     ]
@@ -556,21 +550,6 @@ def make_type_universe(input_deck):
 # ==============================================================================
 
 
-mesh_uniform = into_dtype(
-    [
-        ("x0", float64),
-        ("dx", float64),
-        ("Nx", int64),
-        ("y0", float64),
-        ("dy", float64),
-        ("Ny", int64),
-        ("z0", float64),
-        ("dz", float64),
-        ("Nz", int64),
-    ]
-)
-
-
 def make_type_lattice(input_deck):
     global lattice
 
@@ -579,12 +558,26 @@ def make_type_lattice(input_deck):
     Nmax_y = 0
     Nmax_z = 0
     for card in input_deck.lattices:
-        Nmax_x = max(Nmax_x, card.mesh["Nx"])
-        Nmax_y = max(Nmax_y, card.mesh["Ny"])
-        Nmax_z = max(Nmax_z, card.mesh["Nz"])
+        Nmax_x = max(Nmax_x, card.Nx)
+        Nmax_y = max(Nmax_y, card.Ny)
+        Nmax_z = max(Nmax_z, card.Nz)
 
     lattice = into_dtype(
-        [("mesh", mesh_uniform), ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z))]
+        [
+            ("x0", float64),
+            ("dx", float64),
+            ("Nx", int64),
+            ("y0", float64),
+            ("dy", float64),
+            ("Ny", int64),
+            ("z0", float64),
+            ("dz", float64),
+            ("Nz", int64),
+            ("t0", float64),
+            ("dt", float64),
+            ("Nt", int64),
+            ("universe_IDs", int64, (Nmax_x, Nmax_y, Nmax_z)),
+        ]
     )
 
 
@@ -824,7 +817,6 @@ def make_type_setting(deck):
         ("caching", bool_),
         ("output_name", str_),
         ("save_input_deck", bool_),
-        ("track_particle", bool_),
         # Eigenvalue mode
         ("mode_eigenvalue", bool_),
         ("k_init", float64),
@@ -844,8 +836,6 @@ def make_type_setting(deck):
         ("IC_file", bool_),
         ("IC_file_name", str_),
         ("N_precursor", uint64),
-        # TODO: Move to technique
-        ("N_sensitivity", uint64),
     ]
 
     # Finalize setting type
@@ -860,9 +850,9 @@ iqmc_score_list = (
     "flux",
     "effective-scattering",
     "effective-fission",
-    "tilt-x",
-    "tilt-y",
-    "tilt-z",
+    "source-x",
+    "source-y",
+    "source-z",
     "fission-power",
     "fission-source",
 )
@@ -958,42 +948,31 @@ def make_type_technique(input_deck):
 
     iqmc_list += [("mesh", mesh)]
 
-    # Low-discprenecy sequence
-    size = MPI.COMM_WORLD.Get_size()
-    rank = MPI.COMM_WORLD.Get_rank()
-    # Evenly distribute work
-    work_size = math.floor(N_particle / size)
-    # Count reminder
-    rem = N_particle % size
-    # Assign reminder and update starting index
-    if rank < rem:
-        work_size += 1
-
-    iqmc_list += [("lds", float64, (work_size, N_dim))]
+    #  make low-discprenecy sequence array
+    work_size = get_work_size(N_particle)
+    iqmc_list += [("samples", float64, (work_size, N_dim))]
+    # make global arrays
     iqmc_list += [("fixed_source", float64, (Ng, Nt, Nx, Ny, Nz))]
-    # TODO: make matidx int32
     iqmc_list += [("material_idx", int64, (Nt, Nx, Ny, Nz))]
-    # this is the original source matrix size + all tilted sources
     iqmc_list += [("source", float64, (Ng, Nt, Nx, Ny, Nz))]
     total_size = (Ng * Nt * Nx * Ny * Nz) * card["iqmc"]["krylov_vector_size"]
     iqmc_list += [(("total_source"), float64, (total_size,))]
 
-    # Scores and shapes
+    # Make scores
     scores_shapes = [
         ["flux", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-scattering", (Ng, Nt, Nx, Ny, Nz)],
         ["effective-fission", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-x", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-y", (Ng, Nt, Nx, Ny, Nz)],
-        ["tilt-z", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-x", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-y", (Ng, Nt, Nx, Ny, Nz)],
+        ["source-z", (Ng, Nt, Nx, Ny, Nz)],
         ["fission-power", (Ng, Nt, Nx, Ny, Nz)],  # SigmaF*phi
         ["fission-source", (1,)],  # nu*SigmaF*phi
     ]
 
     if card["iQMC"]:
         if setting["mode_eigenvalue"]:
-            if card["iqmc"]["eigenmode_solver"] == "power_iteration":
-                card["iqmc"]["score_list"]["fission-source"] = True
+            card["iqmc"]["score_list"]["fission-source"] = True
 
     # Add score flags to structure
     score_list = []
@@ -1010,7 +989,7 @@ def make_type_technique(input_deck):
         shape = scores_shapes[i][1]
         if not card["iqmc"]["score_list"][name]:
             shape = (0,) * len(shape)
-        scores_struct += [(name, float64, shape)]
+        scores_struct += [(name, make_type_score(shape))]
     # TODO: make outter effective fission size zero if not eigenmode
     # (causes problems with numba)
     scores_struct += [("effective-fission-outter", float64, (Ng, Nt, Nx, Ny, Nz))]
@@ -1019,18 +998,16 @@ def make_type_technique(input_deck):
 
     # Constants
     iqmc_list += [
-        ("maxitt", int64),
         ("tol", float64),
-        ("itt", int64),
-        ("itt_outter", int64),
-        ("res", float64),
-        ("res_outter", float64),
-        ("fixed_source_solver", str_),
-        ("eigenmode_solver", str_),
-        ("krylov_restart", int64),
-        ("preconditioner_sweeps", int64),
-        ("sweep_counter", int64),
         ("w_min", float64),
+        ("residual", float64),
+        ("iteration_count", int64),
+        ("iterations_max", int64),
+        ("krylov_restart", int64),
+        ("sweep_count", int64),
+        ("fixed_source_solver", str_),
+        ("sample_method", str_),
+        ("mode", str_),
     ]
 
     struct += [("iqmc", into_dtype(iqmc_list))]
@@ -1072,14 +1049,6 @@ def make_type_technique(input_deck):
         ("IC_bank_precursor", bank_precursor),
         ("IC_fission_score", float64, (1,)),
         ("IC_fission", float64),
-    ]
-
-    # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    struct += [
-        ("dsm_order", int64),
     ]
 
     # =========================================================================
@@ -1282,11 +1251,6 @@ def make_type_global(input_deck):
         bank_source = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
-    # Particle tracker
-    N_track = 0
-    if input_deck.setting["track_particle"]:
-        N_track = N_work * 1000
-
     # iQMC bank adjustment
     if input_deck.technique["iQMC"]:
         bank_source = particle_bank(N_work)
@@ -1365,10 +1329,6 @@ def make_type_global(input_deck):
             ("runtime_simulation", float64),
             ("runtime_output", float64),
             ("runtime_bank_management", float64),
-            ("particle_track", float64, (N_track, 8)),
-            ("particle_track_N", int64, (1,)),
-            ("particle_track_history_ID", int64, (1,)),
-            ("particle_track_particle_ID", int64, (1,)),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
             ("gpu_state", uintp),
@@ -1384,30 +1344,27 @@ def make_type_global(input_deck):
 # ==============================================================================
 
 
-def make_type_translate(input_deck):
-    global translate
-    translate = into_dtype([("values", float64, (3,))])
+def make_type_score(shape):
+    return into_dtype(
+        [
+            ("bin", float64, shape),
+            ("mean", float64, shape),
+            ("sdev", float64, shape),
+        ]
+    )
 
 
-def make_type_group_array(input_deck):
-    global group_array
-    G = input_deck.materials[0].G
-    group_array = into_dtype([("values", float64, (G,))])
-
-
-def make_type_j_array(input_deck):
-    global j_array
-    J = input_deck.materials[0].J
-    j_array = into_dtype([("values", float64, (J,))])
-
-
-def make_type_RPN_array(input_deck):
-    global RPN_array
-    N_max = 0
-    for cell_ in input_deck.cells:
-        N = np.sum(np.array(cell_._region_RPN) >= 0.0)
-        N_max = max(N_max, N)
-    RPN_array = into_dtype([("values", bool_, (N_max,))])
+def get_work_size(N_particle):
+    size = MPI.COMM_WORLD.Get_size()
+    rank = MPI.COMM_WORLD.Get_rank()
+    # Evenly distribute work
+    work_size = math.floor(N_particle / size)
+    # Count reminder
+    rem = N_particle % size
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size += 1
+    return work_size
 
 
 def make_type_mesh(card):

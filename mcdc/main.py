@@ -1,4 +1,5 @@
 import argparse, os, sys
+import importlib.metadata
 import numba as nb
 
 # Parse command-line arguments
@@ -85,6 +86,7 @@ from mpi4py import MPI
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
+import mcdc.code_factory as code_factory
 
 import mcdc.adapt as adapt
 from mcdc.constant import *
@@ -94,7 +96,7 @@ from mcdc.loop import (
     set_cache,
     build_gpu_progs,
 )
-from mcdc.iqmc.iqmc_loop import iqmc_simulation
+from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
@@ -121,6 +123,8 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
+    if input_deck.technique["iQMC"]:
+        iqmc_validate_inputs(input_deck)
     data, mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
@@ -415,10 +419,8 @@ def prepare():
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    type_.make_type_translate(input_deck)
-    type_.make_type_group_array(input_deck)
-    type_.make_type_j_array(input_deck)
-    type_.make_type_RPN_array(input_deck)
+    input_deck.setting["target"] = target
+    code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
@@ -446,7 +448,6 @@ def prepare():
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.set_toggle("particle_tracker", mcdc["setting"]["track_particle"])
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
@@ -460,7 +461,7 @@ def prepare():
     N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
         # General data
-        for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
+        for name in ["ID", "fissionable"]:
             copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # MG data
@@ -553,7 +554,7 @@ def prepare():
     for i in range(N_surface):
         # Direct assignment
         for name in type_.surface.names:
-            if name not in ["J", "t", "BC", "tally_IDs"]:
+            if name not in ["BC", "tally_IDs"]:
                 copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
 
         # Boundary condition
@@ -565,7 +566,7 @@ def prepare():
             mcdc["surfaces"][i]["BC"] = BC_REFLECTIVE
 
         # Variables with possible different sizes
-        for name in ["J", "t", "tally_IDs"]:
+        for name in ["tally_IDs"]:
             N = len(getattr(input_deck.surfaces[i], name))
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
@@ -587,6 +588,10 @@ def prepare():
             mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
         elif input_deck.cells[i].fill_type == "lattice":
             mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+
+        # Fill translation flag
+        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
+            mcdc["cells"][i]["fill_translated"] = True
 
         # Surface data
         mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
@@ -627,17 +632,22 @@ def prepare():
 
     N_lattice = len(input_deck.lattices)
     for i in range(N_lattice):
-        # Mesh
-        for name in type_.mesh_uniform.names:
-            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i].mesh[name]
+        for name in type_.lattice.names:
+            if name not in ["universe_IDs", "t0", "dt", "Nt"]:
+                mcdc["lattices"][i][name] = getattr(input_deck.lattices[i], name)
 
         # Universe IDs
-        Nx = mcdc["lattices"][i]["mesh"]["Nx"]
-        Ny = mcdc["lattices"][i]["mesh"]["Ny"]
-        Nz = mcdc["lattices"][i]["mesh"]["Nz"]
+        Nx = mcdc["lattices"][i]["Nx"]
+        Ny = mcdc["lattices"][i]["Ny"]
+        Nz = mcdc["lattices"][i]["Nz"]
         mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[
             i
         ].universe_IDs
+
+        # Default for time grid
+        mcdc["lattices"][i]["t0"] = 0.0
+        mcdc["lattices"][i]["dt"] = INF
+        mcdc["lattices"][i]["Nt"] = 1
 
     # =========================================================================
     # Source
@@ -709,10 +719,6 @@ def prepare():
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
-        N_sensitivity = input_deck.setting["N_sensitivity"]
-        Ns = 1 + N_sensitivity
-        if input_deck.technique["dsm_order"] == 2:
-            Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
         Nmu = len(input_deck.mesh_tallies[i].mu) - 1
         N_azi = len(input_deck.mesh_tallies[i].azi) - 1
         Ng = len(input_deck.mesh_tallies[i].g) - 1
@@ -733,7 +739,7 @@ def prepare():
             mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
 
         # Update N_bin
-        mcdc["mesh_tallies"][i]["N_bin"] *= Ns * N_score
+        mcdc["mesh_tallies"][i]["N_bin"] *= N_score
 
         # Filter strides
         stride = N_score
@@ -758,8 +764,6 @@ def prepare():
         if Nmu > 1:
             mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
             stride *= Nmu
-        if Ns > 1:
-            mcdc["mesh_tallies"][i]["stride"]["sensitivity"] = stride
 
         # Set tally stride and accumulate total tally size
         mcdc["mesh_tallies"][i]["stride"]["tally"] = tally_size
@@ -792,17 +796,13 @@ def prepare():
             mcdc["surface_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
-        N_sensitivity = input_deck.setting["N_sensitivity"]
-        Ns = 1 + N_sensitivity
-        if input_deck.technique["dsm_order"] == 2:
-            Ns = 1 + 2 * N_sensitivity + int(0.5 * N_sensitivity * (N_sensitivity - 1))
         Nmu = len(input_deck.surface_tallies[i].mu) - 1
         N_azi = len(input_deck.surface_tallies[i].azi) - 1
         Ng = len(input_deck.surface_tallies[i].g) - 1
         Nt = len(input_deck.surface_tallies[i].t) - 1
 
         # Update N_bin
-        mcdc["surface_tallies"][i]["N_bin"] *= Ns * N_score
+        mcdc["surface_tallies"][i]["N_bin"] *= N_score
 
         # Filter strides
         stride = N_score
@@ -818,8 +818,6 @@ def prepare():
         if Nmu > 1:
             mcdc["surface_tallies"][i]["stride"]["mu"] = stride
             stride *= Nmu
-        if Ns > 1:
-            mcdc["surface_tallies"][i]["stride"]["sensitivity"] = stride
 
         # Set tally stride and accumulate total tally size
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
@@ -950,9 +948,9 @@ def prepare():
     for name in type_.technique["iqmc"].names:
         if name not in [
             "mesh",
-            "res",
-            "lds",
-            "sweep_counter",
+            "residual",
+            "samples",
+            "sweep_count",
             "total_source",
             "material_idx",
             "w_min",
@@ -968,18 +966,14 @@ def prepare():
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
-            iqmc["score_list"][name] = value
+            copy_field(
+                iqmc["score_list"], input_deck.technique["iqmc"]["score_list"], name
+            )
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
-            mcdc["technique"]["iqmc"]["score"][name] = value
+            mcdc["technique"]["iqmc"]["score"][name]["bin"] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-    # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    # Threshold
-    mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
 
     # =========================================================================
     # Variance Deconvolution - UQ
@@ -1285,6 +1279,10 @@ def generate_hdf5(data, mcdc):
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output_name"] + ".h5", "w") as f:
+            # Version
+            version = importlib.metadata.version("mcdc")
+            f["version"] = version
+
             # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
@@ -1321,14 +1319,6 @@ def generate_hdf5(data, mcdc):
                 f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
 
                 # Shape
-                N_sensitivity = input_deck.setting["N_sensitivity"]
-                Ns = 1 + N_sensitivity
-                if input_deck.technique["dsm_order"] == 2:
-                    Ns = (
-                        1
-                        + 2 * N_sensitivity
-                        + int(0.5 * N_sensitivity * (N_sensitivity - 1))
-                    )
                 Nmu = len(mesh["mu"]) - 1
                 N_azi = len(mesh["azi"]) - 1
                 Ng = len(mesh["g"]) - 1
@@ -1344,9 +1334,9 @@ def generate_hdf5(data, mcdc):
                     Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
 
                 if not mcdc["technique"]["uq"]:
-                    shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+                    shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
                 else:
-                    shape = (5, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+                    shape = (5, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
 
                 # Reshape tally
                 N_bin = tally["N_bin"]
@@ -1363,7 +1353,7 @@ def generate_hdf5(data, mcdc):
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
-                tally_bin = np.rollaxis(tally_bin, 9, 0)
+                tally_bin = np.rollaxis(tally_bin, 8, 0)
 
                 # Iterate over scores
                 for i in range(N_score):
@@ -1435,6 +1425,11 @@ def generate_hdf5(data, mcdc):
             if mcdc["setting"]["mode_eigenvalue"]:
                 if mcdc["technique"]["iQMC"]:
                     f.create_dataset("k_eff", data=mcdc["k_eff"])
+                    if mcdc["technique"]["iqmc"]["mode"] == "batched":
+                        N_cycle = mcdc["setting"]["N_cycle"]
+                        f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
+                        f.create_dataset("k_mean", data=mcdc["k_avg_running"])
+                        f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
                 else:
                     N_cycle = mcdc["setting"]["N_cycle"]
                     f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
@@ -1453,50 +1448,41 @@ def generate_hdf5(data, mcdc):
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
-                # dump iQMC mesh
+                # iQMC mesh
                 T = mcdc["technique"]
                 f.create_dataset("iqmc/grid/t", data=T["iqmc"]["mesh"]["t"])
                 f.create_dataset("iqmc/grid/x", data=T["iqmc"]["mesh"]["x"])
                 f.create_dataset("iqmc/grid/y", data=T["iqmc"]["mesh"]["y"])
                 f.create_dataset("iqmc/grid/z", data=T["iqmc"]["mesh"]["z"])
-                # dump x,y,z scalar flux across all groups
+                # Scores
+                for name in [
+                    "flux",
+                    "source-x",
+                    "source-y",
+                    "source-z",
+                    "fission-power",
+                ]:
+                    if T["iqmc"]["score_list"][name]:
+                        name_h5 = name.replace("-", "_")
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/mean",
+                            data=np.squeeze(T["iqmc"]["score"][name]["mean"]),
+                        )
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/sdev",
+                            data=np.squeeze(T["iqmc"]["score"][name]["sdev"]),
+                        )
+                # iQMC source strength
                 f.create_dataset(
-                    "iqmc/tally/flux", data=np.squeeze(T["iqmc"]["score"]["flux"])
+                    "iqmc/tally/source_constant/mean",
+                    data=np.squeeze(T["iqmc"]["source"]),
                 )
+                # Iteration data
                 f.create_dataset(
-                    "iqmc/tally/fission_source",
-                    data=T["iqmc"]["score"]["fission-source"],
+                    "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]
                 )
-                f.create_dataset(
-                    "iqmc/tally/fission_power", data=T["iqmc"]["score"]["fission-power"]
-                )
-                f.create_dataset("iqmc/tally/source_constant", data=T["iqmc"]["source"])
-                f.create_dataset(
-                    "iqmc/tally/source_x", data=T["iqmc"]["score"]["tilt-x"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_y", data=T["iqmc"]["score"]["tilt-y"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_z", data=T["iqmc"]["score"]["tilt-z"]
-                )
-                # iteration data
-                f.create_dataset("iqmc/itteration_count", data=T["iqmc"]["itt"])
-                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["res"])
-                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_counter"])
-                if mcdc["setting"]["mode_eigenvalue"]:
-                    f.create_dataset(
-                        "iqmc/outter_itteration_count", data=T["iqmc"]["itt_outter"]
-                    )
-                    f.create_dataset(
-                        "iqmc/outter_final_residual", data=T["iqmc"]["res_outter"]
-                    )
-
-            # Particle tracker
-            if mcdc["setting"]["track_particle"]:
-                with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
-                    N_track = mcdc["particle_track_N"][0]
-                    f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
+                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_count"])
+                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["residual"])
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:

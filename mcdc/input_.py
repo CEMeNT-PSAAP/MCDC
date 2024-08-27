@@ -28,13 +28,13 @@ from mcdc.constant import (
     GYRATION_RADIUS_ONLY_X,
     GYRATION_RADIUS_ONLY_Y,
     GYRATION_RADIUS_ONLY_Z,
+    INF,
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
-    INF,
     PI,
-    SHIFT,
     REGION_ALL,
+    TINY,
 )
 from mcdc.print_ import print_error
 import mcdc.type_ as type_
@@ -51,8 +51,6 @@ def nuclide(
     chi_d=None,
     speed=None,
     decay=None,
-    sensitivity=False,
-    dsm_Np=1.0,
 ):
     """
     Create a nuclide
@@ -79,11 +77,6 @@ def nuclide(
         Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s].
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the nuclide.
-    dsm_Np : float
-        Average number of derivative particles produced at each
-        sensitivity nuclide collision.
 
     Returns
     -------
@@ -207,20 +200,6 @@ def nuclide(
             if np.sum(card.chi_d[dg, :]) > 0.0:
                 card.chi_d[dg, :] /= np.sum(card.chi_d[dg, :])
 
-    # Sensitivity setup
-    if sensitivity:
-        # Set flag
-        card.sensitivity = True
-        global_.input_deck.technique["sensitivity"] = True
-        global_.input_deck.technique["weighted_emission"] = False
-
-        # Set ID
-        global_.input_deck.setting["N_sensitivity"] += 1
-        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
-
-        # Set dsm_Np
-        card.dsm_Np = dsm_Np
-
     # Add to deck
     global_.input_deck.nuclides.append(card)
 
@@ -239,8 +218,6 @@ def material(
     chi_d=None,
     speed=None,
     decay=None,
-    sensitivity=False,
-    dsm_Np=1.0,
 ):
     """
     Create a material
@@ -272,12 +249,6 @@ def material(
         Energy group speed [cm/s].
     decay : numpy.ndarray (1D), optional
         Precursor group decay constant [/s].
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the material
-        (only relevant for single-nuclide material).
-    dsm_Np : float
-        Average number of derivative particles produced at each
-        sensitivity material collision (only relevant for single_nuclide material).
 
     Returns
     -------
@@ -302,8 +273,6 @@ def material(
             chi_d,
             speed,
             decay,
-            sensitivity,
-            dsm_Np,
         )
         nuclides = [[card_nuclide, 1.0]]
 
@@ -378,7 +347,7 @@ def material(
     # Set ID
     card.ID = len(global_.input_deck.materials)
 
-    # Calculate basic XS and determine sensitivity flag
+    # Calculate basic XS
     for i in range(N_nuclide):
         nuc = nuclides[i][0]
         density = nuclides[i][1]
@@ -389,8 +358,6 @@ def material(
         card.scatter += nuc.scatter * density
         card.fission += nuc.fission * density
         card.total += nuc.total * density
-        card.sensitivity += nuc.sensitivity * density
-    card.sensitivity = bool(card.sensitivity)
 
     # Calculate effective speed
     # Current approach: weighted by nuclide macroscopic total cross section
@@ -449,7 +416,7 @@ def material(
     return card
 
 
-def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
+def surface(type_, bc="interface", **kw):
     """
     Create a surface to define the region of a cell.
 
@@ -460,28 +427,15 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         Surface type.
     bc : {"interface", "vacuum", "reflective"}
         Surface boundary condition.
-    sensitivity : bool, optional
-        Set to `True` to calculate sensitivities to the surface position.
-    dsm_Np : int
-        Average number of derivative particles produced at each
-        sensitivity surface crossing.
 
     Other Parameters
     ----------------
     x : {float, array_like[float]}
         x-position [cm] for `"plane-x"`.
-        If a vector is passed, positions of the surface at the times specified by the
-        parameter `"t"`.
     y : {float, array_like[float]}
         y-position [cm] for `"plane-y"`.
-        If a vector is passed, positions of the surface at the times specified by the
-        parameter `t`.
     z : {float, array_like[float]}
         z-position [cm] for `"plane-z"`.
-        If a vector is passed, positions of the surface at the times specified by the
-        parameter `t`.
-    t : {array_like[float]}
-        Time to specify the position of `"plane-x"`, `"plane-y"`, or `"plane-z"`.
     center : array_like[float]
         Center point [cm] for `"cylinder-x"` (y,z), `"cylinder-y"` (x,z),
         `"cylinder-z"` (x,y), or `"sphere"` (x,y,z).
@@ -537,25 +491,10 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     )
     card.boundary_type = bc
 
-    # Sensitivity
-    if sensitivity:
-        # Set flag
-        card.sensitivity = True
-        global_.input_deck.technique["sensitivity"] = True
-        global_.input_deck.technique["weighted_emission"] = False
-
-        # Set ID
-        global_.input_deck.setting["N_sensitivity"] += 1
-        card.sensitivity_ID = global_.input_deck.setting["N_sensitivity"]
-
-        # Set dsm_Np
-        card.dsm_Np = dsm_Np
-
     # ==========================================================================
     # Surface attributes
     # ==========================================================================
-    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J(t) = 0
-    #   J(t) = J0_i + J1_i*t for t in [t_{i-1}, t_i), t_0 = 0
+    # Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
 
     card.type = type_
 
@@ -563,33 +502,24 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     if type_ == "plane-x":
         check_requirement("surface plane-x", kw, ["x"])
         card.G = 1.0
+        card.J = -kw.get("x")
         card.linear = True
-        if type(kw.get("x")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("x"), kw.get("t"), card)
-        else:
-            card.J[0, 0] = -kw.get("x")
     elif type_ == "plane-y":
         check_requirement("surface plane-y", kw, ["y"])
         card.H = 1.0
+        card.J = -kw.get("y")
         card.linear = True
-        if type(kw.get("y")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("y"), kw.get("t"), card)
-        else:
-            card.J[0, 0] = -kw.get("y")
     elif type_ == "plane-z":
         check_requirement("surface plane-z", kw, ["z"])
         card.I = 1.0
+        card.J = -kw.get("z")
         card.linear = True
-        if type(kw.get("z")) in [type([]), type(np.array([]))]:
-            set_J(kw.get("z"), kw.get("t"), card)
-        else:
-            card.J[0, 0] = -kw.get("z")
     elif type_ == "plane":
         check_requirement("surface plane", kw, ["A", "B", "C", "D"])
         card.G = kw.get("A")
         card.H = kw.get("B")
         card.I = kw.get("C")
-        card.J[0, 0] = kw.get("D")
+        card.J = kw.get("D")
         card.linear = True
     elif type_ == "cylinder-x":
         check_requirement("surface cylinder-x", kw, ["center", "radius"])
@@ -599,7 +529,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card.C = 1.0
         card.H = -2.0 * y
         card.I = -2.0 * z
-        card.J[0, 0] = y**2 + z**2 - r**2
+        card.J = y**2 + z**2 - r**2
     elif type_ == "cylinder-y":
         check_requirement("surface cylinder-y", kw, ["center", "radius"])
         x, z = kw.get("center")[:]
@@ -608,7 +538,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card.C = 1.0
         card.G = -2.0 * x
         card.I = -2.0 * z
-        card.J[0, 0] = x**2 + z**2 - r**2
+        card.J = x**2 + z**2 - r**2
     elif type_ == "cylinder-z":
         check_requirement("surface cylinder-z", kw, ["center", "radius"])
         x, y = kw.get("center")[:]
@@ -617,7 +547,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card.B = 1.0
         card.G = -2.0 * x
         card.H = -2.0 * y
-        card.J[0, 0] = x**2 + y**2 - r**2
+        card.J = x**2 + y**2 - r**2
     elif type_ == "sphere":
         check_requirement("surface sphere", kw, ["center", "radius"])
         x, y, z = kw.get("center")[:]
@@ -628,7 +558,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card.G = -2.0 * x
         card.H = -2.0 * y
         card.I = -2.0 * z
-        card.J[0, 0] = x**2 + y**2 + z**2 - r**2
+        card.J = x**2 + y**2 + z**2 - r**2
     elif type_ == "quadric":
         check_requirement(
             "surface quadric", kw, ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
@@ -642,7 +572,7 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
         card.G = kw.get("G")
         card.H = kw.get("H")
         card.I = kw.get("I")
-        card.J[0, 0] = kw.get("J")
+        card.J = kw.get("J")
 
     # Set normal vector if linear
     if card.linear:
@@ -659,35 +589,6 @@ def surface(type_, bc="interface", sensitivity=False, dsm_Np=1.0, **kw):
     global_.input_deck.surfaces.append(card)
 
     return card
-
-
-def set_J(x, t, card):
-    # Edit and add the edges
-    t[0] = -SHIFT
-    t = np.append(t, INF)
-    x = np.append(x, x[-1])
-
-    # Reset the constants
-    card.J = np.zeros([0, 2])
-    card.t = np.array([-SHIFT])
-
-    # Iterate over inputs
-    idx = 0
-    for i in range(len(t) - 1):
-        # Skip if step
-        if t[i] == t[i + 1]:
-            continue
-
-        # Calculate constants
-        J0 = x[i]
-        J1 = (x[i + 1] - x[i]) / (t[i + 1] - t[i])
-
-        # Append to surface
-        card.J = np.append(card.J, [[J0, J1]], axis=0)
-        card.t = np.append(card.t, t[i + 1])
-
-    card.J *= -1
-    card.N_slice = len(card.J)
 
 
 def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
@@ -812,11 +713,11 @@ def lattice(x=None, y=None, z=None, universes=None):
     Parameters
     ----------
     x : array_like[float], optional
-        x-coordinates that define the lattice mesh (default None).
+        x-coordinates that define the lattice grid (default None).
     y : array_like[float], optional
-        y-coordinates that define the lattice mesh (default None).
+        y-coordinates that define the lattice grid (default None).
     z : array_like[float], optional
-        z-coordinates that define the lattice mesh (default None).
+        z-coordinates that define the lattice grid (default None).
     universes : list of (list of dictionary), optional
         List of lists of universe cards that fill the lattice (default None).
 
@@ -829,19 +730,19 @@ def lattice(x=None, y=None, z=None, universes=None):
     card = LatticeCard()
     card.ID = len(global_.input_deck.lattices)
 
-    # Set mesh
+    # Set grid
     if x is not None:
-        card.mesh["x0"] = x[0]
-        card.mesh["dx"] = x[1]
-        card.mesh["Nx"] = x[2]
+        card.x0 = x[0]
+        card.dx = x[1]
+        card.Nx = x[2]
     if y is not None:
-        card.mesh["y0"] = y[0]
-        card.mesh["dy"] = y[1]
-        card.mesh["Ny"] = y[2]
+        card.y0 = y[0]
+        card.dy = y[1]
+        card.Ny = y[2]
     if z is not None:
-        card.mesh["z0"] = z[0]
-        card.mesh["dz"] = z[1]
-        card.mesh["Nz"] = z[2]
+        card.z0 = z[0]
+        card.dz = z[1]
+        card.Nz = z[2]
 
     # Set universe IDs
     get_ID = np.vectorize(lambda obj: obj.ID)
@@ -1053,8 +954,6 @@ def setting(**kw):
         Name of the output file MC/DC should save data in (default "output.h5").
     save_input_deck : bool
         Whether to save the input deck information to the output file (default False).
-    particle_tracker : bool
-        Whether to track paths of all individual particles histories, memory issues abound (default False).
     k_eff : str
         Whether to run a k-eigenvalue problem.
     source_file : str
@@ -1085,7 +984,6 @@ def setting(**kw):
                 "progress_bar",
                 "output_name",
                 "save_input_deck",
-                "particle_tracker",
                 "k_eff",
                 "source_file",
                 "IC_file",
@@ -1104,7 +1002,6 @@ def setting(**kw):
     progress_bar = kw.get("progress_bar")
     output = kw.get("output_name")
     save_input_deck = kw.get("save_input_deck")
-    particle_tracker = kw.get("particle_tracker")
     k_eff = kw.get("k_eff")
     source_file = kw.get("source_file")
     IC_file = kw.get("IC_file")
@@ -1155,12 +1052,6 @@ def setting(**kw):
     if caching is not None:
         card["caching"] = caching
 
-    # Particle tracker
-    if particle_tracker is not None:
-        card["track_particle"] = particle_tracker
-        if particle_tracker and mpi4py.MPI.COMM_WORLD.Get_size() > 1:
-            print_error("Particle tracker currently only runs on a single MPI rank")
-
     # Save input deck?
     if save_input_deck is not None:
         card["save_input_deck"] = save_input_deck
@@ -1208,7 +1099,7 @@ def eigenmode(
     gyration_radius : float, optional
         Specify a gyration radius (default None).
     save_particle : bool
-        Whether particle track outputs in a tally mesh (default False).
+        Whether final particle bank outputs (default False).
 
     Returns
     -------
@@ -1467,10 +1358,10 @@ def iQMC(
     fixed_source=None,
     maxit=25,
     tol=1e-6,
-    preconditioner_sweeps=5,
-    fixed_source_solver="source_iteration",
-    eigenmode_solver="power_iteration",
-    score=[],
+    fixed_source_solver="source iteration",
+    sample_method="halton",
+    mode="fixed",
+    scores=[],
 ):
     """
     Activate the iterative Quasi-Monte Carlo (iQMC) neutron transport method.
@@ -1495,29 +1386,30 @@ def iQMC(
     source0 : array_like[float], optional
         Initial particle source (default None).
     source_x0 : array_like[float], optional
-        Initial source for tilt-x (default None).
+        Initial source for source-x (default None).
     source_y0 : array_like[float], optional
-        Initial source for tilt-y (default None).
+        Initial source for source-y (default None).
     source_z0 : array_like[float], optional
-        Initial source for tilt-z (default None).
+        Initial source for source-z (default None).
     krylov_restart : int, optional
-        Max number of iterations for Krylov iteration (default same as maxitt).
+        Max number of iterations for Krylov iteration (default same as maxit).
     fixed_source : array_like[float], optional
         Fixed source (default same as phi0).
-    maxit : int, optional
+    iterations_max : int, optional
         Maximum number of iterations allowed before termination (default 25).
     tol : float, optional
         Convergence tolerance (default 1e-6).
-    preconditioner_sweeps : int, optional
-        Number of preconditioner sweeps (default 5).
-    fixed_source_solver : {'source_iteration', 'gmres'}
-        Deterministic solver for fixed-source problem (default "source_iteration").
-    eigenmode_solver : {'power_iteration'}
+    fixed_source_solver : {'source iteration', 'gmres'}
+        Deterministic solver for fixed-source problem (default "source iteration").
         Solver for k-eigenvalue problem (default "power_iteration").
-    score : list of str, optional
+    sample_method: {'halton', 'random'}
+        Method for generating particle samples.
+    mode: {'fixed', batched}
+        Set iQMC to run with a fixed-seed or batched iteration scheme.
+    scores : list of str, optional
         List of tallies to score in addition to the mandatory flux and
         source strength. Additional scores include
-        {'tilt-x', 'tilt-y', 'tilt-z', 'fission-power'} (default empty list).
+        {'source-x', 'source-y', 'source-z', 'fission-power'} (default empty list).
 
     Returns
     -------
@@ -1534,7 +1426,9 @@ def iQMC(
     card = global_.input_deck.technique
     card["iQMC"] = True
     card["iqmc"]["tol"] = tol
-    card["iqmc"]["maxitt"] = maxit
+    card["iqmc"]["iterations_max"] = maxit
+    card["iqmc"]["sample_method"] = sample_method
+    card["iqmc"]["mode"] = mode
 
     # Set mesh
     if g is not None:
@@ -1573,33 +1467,31 @@ def iQMC(
         source0 = np.zeros_like(phi0)
 
     score_list = card["iqmc"]["score_list"]
-    for name in score:
+    for name in scores:
         score_list[name] = True
 
-    if score_list["tilt-x"]:
+    if score_list["source-x"]:
         card["iqmc"]["krylov_vector_size"] += 1
         if source_x0 is None:
             source_x0 = np.zeros_like(phi0)
 
-    if score_list["tilt-y"]:
+    if score_list["source-y"]:
         card["iqmc"]["krylov_vector_size"] += 1
         if source_y0 is None:
             source_y0 = np.zeros_like(phi0)
 
-    if score_list["tilt-z"]:
+    if score_list["source-z"]:
         card["iqmc"]["krylov_vector_size"] += 1
         if source_z0 is None:
             source_z0 = np.zeros_like(phi0)
 
     card["iqmc"]["score"]["flux"] = phi0
-    card["iqmc"]["score"]["tilt-x"] = source_x0
-    card["iqmc"]["score"]["tilt-y"] = source_y0
-    card["iqmc"]["score"]["tilt-z"] = source_z0
+    card["iqmc"]["score"]["source-x"] = source_x0
+    card["iqmc"]["score"]["source-y"] = source_y0
+    card["iqmc"]["score"]["source-z"] = source_z0
     card["iqmc"]["source"] = source0
     card["iqmc"]["fixed_source"] = fixed_source
     card["iqmc"]["fixed_source_solver"] = fixed_source_solver
-    card["iqmc"]["eigenmode_solver"] = eigenmode_solver
-    card["iqmc"]["preconditioner_sweeps"] = preconditioner_sweeps
     card["iqmc"]["krylov_restart"] = krylov_restart
 
 
@@ -1705,22 +1597,6 @@ def IC_generator(
     card_setting["N_active"] = N_cycle
 
 
-def dsm(order=1):
-    """
-    Direct sensitivity method
-
-    Parameters
-    ----------
-    order : int, optional
-        order of the sensitivity to probe, by default 1
-    """
-
-    card = global_.input_deck.technique
-    if order > 2:
-        print_error("DSM currently only supports up to second-order sensitivities")
-    card["dsm_order"] = order
-
-
 def uq(**kw):
     """
     Activate uncertainty quantification.
@@ -1811,8 +1687,6 @@ def uq(**kw):
         delta_card = make_card_nuclide(parameter.G, parameter.J)
         delta_card["ID"] = parameter.ID
     append_card(delta_card, global_tag)
-    # elif parameter['tag'] is 'Surface':
-    # elif parameter['tag'] is 'Source':
 
 
 # ==============================================================================
@@ -1879,7 +1753,6 @@ def make_particle_bank(size):
         ("g", np.uint64),
         ("E", np.float64),
         ("w", np.float64),
-        ("sensitivity_ID", np.int64),
         ("rng_seed", np.uint64),
     ]
     iqmc_struct = [("w", np.float64, (1,))]
