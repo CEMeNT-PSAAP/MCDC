@@ -1697,7 +1697,7 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
 
     # Easily identified tally bin indices
     mu, azi = mesh_get_angular_index(P, mesh)
-    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc)
+    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc["setting"]["mode_MG"])
 
     # Get starting indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(P, mesh)
