@@ -55,7 +55,9 @@ source = mcdc.source(energy=energy)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=["flux"], t=np.insert(np.logspace(-8, 1, 100), 0, 0.0), g="all")
+mcdc.tally.mesh_tally(
+    scores=["flux"], t=np.insert(np.logspace(-8, 1, 100), 0, 0.0), g="all"
+)
 
 # Setting
 mcdc.setting(N_particle=8, active_bank_buff=1000, rng_seed=4)

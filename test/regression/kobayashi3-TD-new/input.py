@@ -56,7 +56,7 @@ mcdc.source(
 # =============================================================================
 
 # Tally: z-integrated flux (X-Y section view)
-mcdc.tally(
+mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 61),
     y=np.linspace(0.0, 100.0, 101),

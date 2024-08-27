@@ -41,8 +41,11 @@ mcdc.source(x=[0.0, 1.0], y=[0.0, 1.0], isotropic=True)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-# Tally: cell-average and cell-edge angular fluxes and currents
-mcdc.tally(scores=["flux"], x=np.linspace(0.0, 4.0, 40), y=np.linspace(0.0, 4.0, 40))
+mcdc.tally.mesh_tally(
+    scores=["flux"],
+    x=np.linspace(0.0, 4.0, 40),
+    y=np.linspace(0.0, 4.0, 40),
+)
 
 # Setting
 mcdc.setting(N_particle=50)

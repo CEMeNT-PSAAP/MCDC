@@ -88,7 +88,7 @@ def test_rn_basic():
         )
     )
 
-    mcdc = iqmc_dummy_mcdc_variable()
+    data, mcdc = iqmc_dummy_mcdc_variable()
 
     # run through the first five seeds (1-5)
     for i in range(5):
@@ -110,7 +110,7 @@ def test_AxV_linearity():
     """
     MCDC.reset()
 
-    mcdc = iqmc_dummy_mcdc_variable()
+    data, mcdc = iqmc_dummy_mcdc_variable()
 
     size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)

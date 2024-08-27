@@ -10,8 +10,6 @@ import h5py, math, mpi4py, os
 import numpy as np
 import scipy as sp
 
-import mcdc.type_ as type_
-
 from mcdc.card import (
     NuclideCard,
     MaterialCard,
@@ -39,6 +37,7 @@ from mcdc.constant import (
     TINY,
 )
 from mcdc.print_ import print_error
+import mcdc.type_ as type_
 
 
 def nuclide(
@@ -902,6 +901,16 @@ def source(**kw):
             G = global_.input_deck.materials[0].G
             group = np.ones(G)
             card.group = group / np.sum(group)
+        # Default for CE
+        if global_.input_deck.setting["mode_CE"]:
+            # Normalize pdf
+            card.energy[1, :] = card.energy[1, :] / np.trapz(
+                card.energy[1, :], x=card.energy[0, :]
+            )
+            # Make cdf
+            card.energy[1, :] = sp.integrate.cumulative_trapezoid(
+                card.energy[1], x=card.energy[0], initial=0.0
+            )
 
     # Set time
     if time is not None:
@@ -913,82 +922,6 @@ def source(**kw):
 
     # Push card
     global_.input_deck.sources.append(card)
-
-    return card
-
-
-def tally(
-    scores,
-    x=np.array([-INF, INF]),
-    y=np.array([-INF, INF]),
-    z=np.array([-INF, INF]),
-    t=np.array([-INF, INF]),
-    mu=np.array([-1.0, 1.0]),
-    azi=np.array([-PI, PI]),
-    g=np.array([-INF, INF]),
-    E=np.array([0.0, INF]),
-):
-    """
-    Create a tally card to collect MC solutions.
-
-    Parameters
-    ----------
-    scores : list of str
-        List of tally types (default ["tracklength"]).
-    x : array_like[float], optional
-        x-coordinates that demarcate tally bins (default numpy.ndarray([-INF, INF])).
-    y : array_like[float], optional
-        y-coordinates that demarcate tally bins (default numpy.ndarray([-INF, INF])).
-    z : array_like[float], optional
-        z-coordinates that demarcate tally bins (default numpy.ndarray([-INF, INF])).
-    t : array_like[float], optional
-        Times that demarcate tally bins (default numpy.ndarray([-INF, INF])).
-    mu : array_like[float], optional
-        Angles that demarcate axial angular tally bins (default numpy.ndarray([-1.0, 1.0])).
-    azi : array_like[float], optional
-        Angles that demarcate azimuthal angular tally bins (default numpy.ndarray([-1.0, 1.0])).
-    g : array_like[float], optional
-        Energies that demarcate energy tally bins (default numpy.ndarray([-INF, INF])).
-    E : array_like[float], optional
-        Continuous energy functionality, (default numpy.ndarray([0.0, INF])).
-
-    Returns
-    -------
-    dictionary
-        A tally card.
-    """
-
-    # Get tally card
-    card = global_.input_deck.tally
-
-    # Set mesh
-    card["mesh"]["x"] = x
-    card["mesh"]["y"] = y
-    card["mesh"]["z"] = z
-    card["mesh"]["t"] = t
-    card["mesh"]["mu"] = mu
-    card["mesh"]["azi"] = azi
-
-    # Set energy group grid
-    if type(g) == type("string") and g == "all":
-        G = global_.input_deck.materials[0].G
-        card["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
-    else:
-        card["mesh"]["g"] = g
-    if global_.input_deck.setting["mode_CE"]:
-        card["mesh"]["g"] = E
-
-    # Set score flags
-    for s in scores:
-        found = False
-        for score_name in type_.score_list:
-            if s.replace("-", "_") == score_name:
-                card["tracklength"] = True
-                card[score_name] = True
-                found = True
-                break
-        if not found:
-            print_error("Unknown tally score %s" % s)
 
     return card
 
@@ -1202,10 +1135,6 @@ def eigenmode(
             card["gyration_radius_type"] = GYRATION_RADIUS_ONLY_Z
         else:
             print_error("Unknown gyration radius type")
-
-    # Update tally card
-    card = global_.input_deck.tally
-    card["tracklength"] = True
 
 
 # ==============================================================================
