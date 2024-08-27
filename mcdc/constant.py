@@ -30,17 +30,21 @@ UNIVERSE_ROOT = 0
 
 # Events
 # The << operator represents a bitshift. Each event is assigned 1 << X, which is equal to 2 to the power of X.
-EVENT_COLLISION = 1 << 0
-EVENT_SURFACE = 1 << 1
-EVENT_CENSUS = 1 << 2
-EVENT_MESH = 1 << 3
-EVENT_SCATTERING = 1 << 4
-EVENT_FISSION = 1 << 5
-EVENT_CAPTURE = 1 << 6
-EVENT_TIME_BOUNDARY = 1 << 7
-EVENT_LATTICE = 1 << 8
-EVENT_SURFACE_MOVE = 1 << 9
-EVENT_DOMAIN = 1 << 10
+EVENT_NONE = 1 << 0
+# Geometry events
+EVENT_SURFACE_CROSSING = 1 << 1
+EVENT_LATTICE_CROSSING = 1 << 2
+EVENT_DOMAIN_CROSSING = 1 << 3
+EVENT_LOST = 1 << 4
+# Collision/reaction events
+EVENT_COLLISION = 1 << 5
+EVENT_SCATTERING = 1 << 6
+EVENT_FISSION = 1 << 7
+EVENT_CAPTURE = 1 << 8
+# Miscellanies
+EVENT_TIME_CENSUS = 1 << 9
+EVENT_TIME_BOUNDARY = 1 << 10
+EVENT_IQMC_MESH = 1 << 11
 
 # Gyration raius type
 GYRATION_RADIUS_ALL = 0
@@ -57,19 +61,20 @@ PCT_COMBING = 1
 PCT_COMBING_WEIGHT = 10
 
 # Misc.
+TINY = 1e-12
+COINCIDENCE_TOLERANCE = TINY
 INF = 1e10
 PI = math.acos(-1.0)
 PI_SQRT = math.sqrt(PI)
 PI_HALF = PI / 2.0
-SHIFT = 1e-10  # To ensure lattice, surface, and mesh crossings
-PREC = 1.0 + 1e-5  # Precision factor to determine if a distance is smaller
 BANKMAX = 100  # Default maximum active bank
 
-# Domain Decomp mesh crossing flags
+# Mesh crossing flags
 MESH_X = 0
 MESH_Y = 1
 MESH_Z = 2
 MESH_T = 3
+MESH_NONE = 0
 
 # RNG LCG parameters
 RNG_G = nb.uint64(2806196910506780709)

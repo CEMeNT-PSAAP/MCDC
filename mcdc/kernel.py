@@ -12,6 +12,7 @@ from numba import (
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
 import mcdc.local as local
+import mcdc.mesh as mesh_
 import mcdc.physics as physics
 import mcdc.type_ as type_
 
@@ -39,18 +40,25 @@ def domain_crossing(P, mcdc):
     if mcdc["technique"]["domain_decomposition"]:
         mesh = mcdc["technique"]["dd_mesh"]
         # Determine which dimension is crossed
-        x, y, z, t, directions = mesh_crossing_evaluate(P, mesh)
-        if len(directions) == 0:
-            return
-        elif len(directions) > 1:
-            for direction in directions[1:]:
-                if direction == MESH_X:
-                    P["x"] -= SHIFT * P["ux"] / np.abs(P["ux"])
-                if direction == MESH_Y:
-                    P["y"] -= SHIFT * P["uy"] / np.abs(P["uy"])
-                if direction == MESH_Z:
-                    P["z"] -= SHIFT * P["uz"] / np.abs(P["uz"])
-        flag = directions[0]
+        ix, iy, iz, it, outside = mesh_.structured.get_indices(P, mesh)
+
+        d_idx = mcdc["dd_idx"]
+        d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
+        d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
+        d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
+
+        d_iz = int(d_idx / (d_Nx * d_Ny))
+        d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
+        d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
+
+        flag = MESH_NONE
+        if d_ix != ix:
+            flag = MESH_X
+        elif d_iy != iy:
+            flag = MESH_Y
+        elif d_iz != iz:
+            flag = MESH_Z
+
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
             add_particle(P, mcdc["domain_decomp"]["bank_xp"])
@@ -407,9 +415,8 @@ def particle_in_domain(P, mcdc):
     d_iy = int((d_idx - d_Nx * d_Ny * d_iz) / d_Nx)
     d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
-    x_cell = binary_search(P["x"], mcdc["technique"]["dd_mesh"]["x"])
-    y_cell = binary_search(P["y"], mcdc["technique"]["dd_mesh"]["y"])
-    z_cell = binary_search(P["z"], mcdc["technique"]["dd_mesh"]["z"])
+    mesh = mcdc["technique"]["dd_mesh"]
+    x_cell, y_cell, z_cell, t_cell, outside = mesh_.structured.get_indices(P, mesh)
 
     if d_ix == x_cell:
         if d_iy == y_cell:
@@ -1550,68 +1557,6 @@ def move_particle(P, distance, mcdc):
 
 
 @njit
-def shift_particle(P, shift):
-    if P["ux"] > 0.0:
-        P["x"] += shift
-    else:
-        P["x"] -= shift
-    if P["uy"] > 0.0:
-        P["y"] += shift
-    else:
-        P["y"] -= shift
-    if P["uz"] > 0.0:
-        P["z"] += shift
-    else:
-        P["z"] -= shift
-    P["t"] += shift
-
-
-@njit
-def get_particle_material(P, mcdc):
-    # Top level cell
-    cell = mcdc["cells"][P["cell_ID"]]
-
-    geometry.reset_local_coordinate(P)
-
-    # Recursively check if cell is a lattice cell, until material cell is found
-    while True:
-        if cell["fill_type"] == FILL_MATERIAL:
-            # Material cell found, return material ID
-            break
-
-        else:
-            # Cell is filled with universe or lattice
-
-            # Apply translation
-            if cell["fill_translated"]:
-                P["translation"][0] += cell["translation"][0]
-                P["translation"][1] += cell["translation"][1]
-                P["translation"][2] += cell["translation"][2]
-                P["translated"] = True
-
-            if cell["fill_type"] == FILL_LATTICE:
-                # Get lattice
-                lattice = mcdc["lattices"][cell["fill_ID"]]
-
-                # Get universe
-                mesh = lattice["mesh"]
-                x, y, z = mesh_uniform_get_index(P, mesh)
-                universe_ID = lattice["universe_IDs"][x, y, z]
-
-                # Lattice-translate the particle
-                P["translation"][0] += mesh["x0"] + (x + 0.5) * mesh["dx"]
-                P["translation"][1] += mesh["y0"] + (y + 0.5) * mesh["dy"]
-                P["translation"][2] += mesh["z0"] + (z + 0.5) * mesh["dz"]
-                P["translated"] = True
-
-                # Get inner cell
-                cell_ID = geometry.get_cell(P, universe_ID, mcdc)
-                cell = mcdc["cells"][cell_ID]
-
-    return cell["fill_ID"]
-
-
-@njit
 def copy_recordlike(P_new, P):
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -1693,61 +1638,6 @@ def split_as_record(P):
 
 
 @njit
-def mesh_distance_search(value, direction, grid):
-    if direction == 0.0:
-        return INF
-    idx = binary_search(value, grid)
-    if direction > 0.0:
-        idx += 1
-    if idx == -1:
-        idx += 1
-    if idx == len(grid):
-        idx -= 1
-    dist = (grid[idx] - value) / direction
-    # Moving away from mesh?
-    if dist < 0.0:
-        dist = INF
-    return dist
-
-
-@njit
-def mesh_uniform_distance_search(value, direction, x0, dx):
-    if direction == 0.0:
-        return INF
-    idx = math.floor((value - x0) / dx)
-    if direction > 0.0:
-        idx += 1
-    ref = x0 + idx * dx
-    dist = (ref - value) / direction
-    return dist
-
-
-@njit
-def mesh_get_index(P, mesh):
-    # Check if outside grid
-    outside = False
-
-    if (
-        P["t"] < mesh["t"][0]
-        or P["t"] > mesh["t"][-1]
-        or P["x"] < mesh["x"][0]
-        or P["x"] > mesh["x"][-1]
-        or P["y"] < mesh["y"][0]
-        or P["y"] > mesh["y"][-1]
-        or P["z"] < mesh["z"][0]
-        or P["z"] > mesh["z"][-1]
-    ):
-        outside = True
-        return 0, 0, 0, 0, outside
-
-    t = binary_search(P["t"], mesh["t"])
-    x = binary_search(P["x"], mesh["x"])
-    y = binary_search(P["y"], mesh["y"])
-    z = binary_search(P["z"], mesh["z"])
-    return t, x, y, z, outside
-
-
-@njit
 def mesh_get_angular_index(P, mesh):
     ux = P["ux"]
     uy = P["uy"]
@@ -1778,41 +1668,6 @@ def mesh_get_energy_index(P, mesh, mcdc):
         return binary_search(P["E"], mesh["g"]), outside
 
 
-@njit
-def mesh_uniform_get_index(P, mesh):
-    Px, Py, Pz = geometry.get_local_coordinate(P)
-    x = int64(math.floor((Px - mesh["x0"]) / mesh["dx"]))
-    y = int64(math.floor((Py - mesh["y0"]) / mesh["dy"]))
-    z = int64(math.floor((Pz - mesh["z0"]) / mesh["dz"]))
-    return x, y, z
-
-
-@njit
-def mesh_crossing_evaluate(P, mesh):
-    # Shift backward
-    shift_particle(P, -2 * SHIFT)
-    t1, x1, y1, z1, outside1 = mesh_get_index(P, mesh)
-
-    # Double shift forward
-    shift_particle(P, 4 * SHIFT)
-    t2, x2, y2, z2, outside2 = mesh_get_index(P, mesh)
-
-    # Return particle to initial position
-    shift_particle(P, -2 * SHIFT)
-
-    # Determine dimension crossed
-    directions = []
-
-    if x1 != x2:
-        directions.append(MESH_X)
-    if y1 != y2:
-        directions.append(MESH_Y)
-    if z1 != z2:
-        directions.append(MESH_Z)
-
-    return x1, y1, z1, t1, directions
-
-
 # =============================================================================
 # Tally operations
 # =============================================================================
@@ -1822,33 +1677,140 @@ def mesh_crossing_evaluate(P, mesh):
 def score_tracklength(P, distance, mcdc):
     tally = mcdc["tally"]
     material = mcdc["materials"][P["material_ID"]]
+    mesh = tally["mesh"]
 
-    # Get indices
-    t, x, y, z, outside = mesh_get_index(P, tally["mesh"])
-    mu, azi = mesh_get_angular_index(P, tally["mesh"])
-    g, outside_energy = mesh_get_energy_index(P, tally["mesh"], mcdc)
+    # Particle 4D direction
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / physics.get_speed(P, mcdc)
+
+    # Particle initial and final coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    # Easily identified tally bin indices
+    mu, azi = mesh_get_angular_index(P, mesh)
+    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc)
+
+    # Get starting indices
+    ix, iy, iz, it, outside = mesh_.structured.get_indices(P, tally["mesh"])
 
     # Outside grid?
     if outside or outside_energy:
         return
 
-    # Score
-    flux = distance * P["w"]
-    if tally["flux"]:
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["flux"])
-    if tally["density"]:
-        flux /= physics.get_speed(P, mcdc)
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["density"])
-    if tally["fission"]:
-        flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["fission"])
-    if tally["total"]:
-        flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
-        score_flux(g, t, x, y, z, mu, azi, flux, tally["score"]["total"])
-    if tally["current"]:
-        score_current(g, t, x, y, z, flux, P, tally["score"]["current"])
-    if tally["eddington"]:
-        score_eddington(g, t, x, y, z, flux, P, tally["score"]["eddington"])
+    # Sweep through the distance
+    distance_swept = 0.0
+    while distance_swept < distance:
+        # Find distances to the mesh grids
+        if ux == 0.0:
+            dx = INF
+        else:
+            if ux > 0.0:
+                x_next = min(mesh["x"][ix + 1], x_final)
+            else:
+                x_next = max(mesh["x"][ix], x_final)
+            dx = (x_next - x) / ux
+        if uy == 0.0:
+            dy = INF
+        else:
+            if uy > 0.0:
+                y_next = min(mesh["y"][iy + 1], y_final)
+            else:
+                y_next = max(mesh["y"][iy], y_final)
+            dy = (y_next - y) / uy
+        if uz == 0.0:
+            dz = INF
+        else:
+            if uz > 0.0:
+                z_next = min(mesh["z"][iz + 1], z_final)
+            else:
+                z_next = max(mesh["z"][iz], z_final)
+            dz = (z_next - z) / uz
+        dt = (min(mesh["t"][it + 1], t_final) - t) / ut
+
+        # Get the grid crossed
+        distance_scored = INF
+        mesh_crossed = MESH_NONE
+        if dx <= distance_scored:
+            mesh_crossed = MESH_X
+            distance_scored = dx
+        if dy <= distance_scored:
+            mesh_crossed = MESH_Y
+            distance_scored = dy
+        if dz <= distance_scored:
+            mesh_crossed = MESH_Z
+            distance_scored = dz
+        if dt <= distance_scored:
+            mesh_crossed = MESH_T
+            distance_scored = dt
+
+        # Score
+        flux = distance_scored * P["w"]
+        if tally["flux"]:
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["flux"])
+        if tally["density"]:
+            flux /= physics.get_speed(P, mcdc)
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["density"])
+        if tally["fission"]:
+            flux *= get_MacroXS(XS_FISSION, material, P, mcdc)
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["fission"])
+        if tally["total"]:
+            flux *= get_MacroXS(XS_TOTAL, material, P, mcdc)
+            score_flux(g, it, ix, iy, iz, mu, azi, flux, tally["score"]["total"])
+        if tally["current"]:
+            score_current(g, it, ix, iy, iz, flux, P, tally["score"]["current"])
+        if tally["eddington"]:
+            score_eddington(g, it, ix, iy, iz, flux, P, tally["score"]["eddington"])
+
+        # Accumulate distance swept
+        distance_swept += distance_scored
+
+        # Move the 4D position
+        x += distance_scored * ux
+        y += distance_scored * uy
+        z += distance_scored * uz
+        t += distance_scored * ut
+
+        # Increment index and check if out of bound
+        if mesh_crossed == MESH_X:
+            if ux > 0.0:
+                ix += 1
+                if ix == len(mesh["x"]) - 1:
+                    break
+            else:
+                ix -= 1
+                if ix == -1:
+                    break
+        elif mesh_crossed == MESH_Y:
+            if uy > 0.0:
+                iy += 1
+                if iy == len(mesh["y"]) - 1:
+                    break
+            else:
+                iy -= 1
+                if iy == -1:
+                    break
+        elif mesh_crossed == MESH_Z:
+            if uz > 0.0:
+                iz += 1
+                if iz == len(mesh["z"]) - 1:
+                    break
+            else:
+                iz -= 1
+                if iz == -1:
+                    break
+        elif mesh_crossed == MESH_T:
+            it += 1
+            if it == len(mesh["t"]) - 1:
+                break
 
 
 @njit
@@ -2194,32 +2156,54 @@ def eigenvalue_tally_closeout(mcdc):
         mcdc["C_sdv"] = 0.0
 
 
-# =============================================================================
+# ======================================================================================
 # Move to event
-# =============================================================================
+# ======================================================================================
 
 
 @njit
 def move_to_event(P, mcdc):
-    # =========================================================================
-    # Get distances to events
-    # =========================================================================
+    # ==================================================================================
+    # Preparation (as needed)
+    # ==================================================================================
 
-    # Distance to nearest geometry boundary (surface or lattice)
-    # Also set particle material and speed
-    d_boundary, event = distance_to_boundary(P, mcdc)
+    # Multigroup preparation
+    #   In MG mode, particle speed is material-dependent.
+    if mcdc["setting"]["mode_MG"]:
+        # If material is not identified yet, locate the particle
+        if P["material_ID"] == -1:
+            if not geometry.locate_particle(P, mcdc):
+                # Particle is lost
+                P["event"] = EVENT_LOST
+                return
 
-    # Distance to tally mesh
-    d_mesh = INF
-    if mcdc["cycle_active"]:
-        d_mesh = distance_to_mesh(P, mcdc["tally"]["mesh"], mcdc)
+    # ==================================================================================
+    # Geometry inspection
+    # ==================================================================================
+    #   - Set particle top cell and material IDs (if not lost)
+    #   - Set surface ID (if surface hit)
+    #   - Set particle boundary event (surface or lattice crossing, or lost)
+    #   - Return distance to boundary (surface or lattice)
 
+    d_boundary = geometry.inspect_geometry(P, mcdc)
+
+    # Particle is lost?
+    if P["event"] == EVENT_LOST:
+        return
+
+    # ==================================================================================
+    # Get distances to other events
+    # ==================================================================================
+
+    # Distance to domain
+    speed = physics.get_speed(P, mcdc)
     d_domain = INF
-    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
-        d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
+    if mcdc["technique"]["domain_decomposition"]:
+        d_domain = mesh_.structured.get_crossing_distance(
+            P, speed, mcdc["technique"]["dd_mesh"]
+        )
 
     # Distance to time boundary
-    speed = physics.get_speed(P, mcdc)
     d_time_boundary = speed * (mcdc["setting"]["time_boundary"] - P["t"])
 
     # Distance to census time
@@ -2230,33 +2214,43 @@ def move_to_event(P, mcdc):
     d_collision = distance_to_collision(P, mcdc)
 
     # =========================================================================
-    # Determine event
-    #   Priority (in case of coincident events):
-    #     boundary > time_boundary > mesh > collision
+    # Determine event(s)
     # =========================================================================
+    # TODO: Make a function to better maintain the repeating operation
 
-    # Find the minimum
-    distance = min(
-        d_boundary, d_time_boundary, d_time_census, d_mesh, d_collision, d_domain
-    )
-    # Remove the boundary event if it is not the nearest
-    if d_boundary > distance * PREC:
-        event = 0
+    distance = d_boundary
 
-    # Add each event if it is within PREC of the nearest event
-    if d_time_boundary <= distance * PREC:
-        event += EVENT_TIME_BOUNDARY
-    if d_time_census <= distance * PREC:
-        event += EVENT_CENSUS
-    if d_mesh <= distance * PREC:
-        event += EVENT_MESH
-    if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN
-    if d_collision == distance:
-        event = EVENT_COLLISION
+    # Check distance to domain
+    if d_domain < distance - COINCIDENCE_TOLERANCE:
+        distance = d_domain
+        P["event"] = EVENT_DOMAIN_CROSSING
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_domain, distance):
+        P["event"] += EVENT_DOMAIN_CROSSING
 
-    # Assign event
-    P["event"] = event
+    # Check distance to collision
+    if d_collision < distance - COINCIDENCE_TOLERANCE:
+        distance = d_collision
+        P["event"] = EVENT_COLLISION
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_collision, distance):
+        P["event"] += EVENT_COLLISION
+
+    # Check distance to time boundary
+    if d_time_boundary < distance - COINCIDENCE_TOLERANCE:
+        distance = d_time_boundary
+        P["event"] = EVENT_TIME_BOUNDARY
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_time_boundary, distance):
+        P["event"] += EVENT_TIME_BOUNDARY
+
+    # Check distance to time census
+    if d_time_census < distance - COINCIDENCE_TOLERANCE:
+        distance = d_time_census
+        P["event"] = EVENT_TIME_CENSUS
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_time_census, distance):
+        P["event"] += EVENT_TIME_CENSUS
 
     # =========================================================================
     # Move particle
@@ -2288,143 +2282,6 @@ def distance_to_collision(P, mcdc):
     return distance
 
 
-@njit
-def distance_to_boundary(P, mcdc):
-    """
-    Find the nearest geometry boundary, which could be lattice or surface, and
-    return the event type (EVENT_SURFACE or EVENT_LATTICE) and the distance
-
-    We recursively check from the top level cell. If surface and lattice are
-    coincident, EVENT_SURFACE is prioritized.
-    """
-
-    distance = INF
-    event = 0
-
-    # Top level cell
-    cell = mcdc["cells"][P["cell_ID"]]
-
-    geometry.reset_local_coordinate(P)
-
-    # Recursively check if cell is a lattice cell, until material cell is found
-    while True:
-        # Distance to nearest surface
-        d_surface, surface_ID, surface_move = distance_to_nearest_surface(P, cell, mcdc)
-
-        # Check if smaller
-        if d_surface * PREC < distance:
-            distance = d_surface
-            event = EVENT_SURFACE
-            P["surface_ID"] = surface_ID
-
-            if surface_move:
-                event = EVENT_SURFACE_MOVE
-
-        if cell["fill_type"] == FILL_MATERIAL:
-            P["material_ID"] = cell["fill_ID"]
-            break
-
-        else:
-            # Cell is filled with universe or lattice
-
-            # Apply translation
-            if cell["fill_translated"]:
-                P["translation"][0] += cell["translation"][0]
-                P["translation"][1] += cell["translation"][1]
-                P["translation"][2] += cell["translation"][2]
-                P["translated"] = True
-
-            if cell["fill_type"] == FILL_LATTICE:
-                # Get lattice
-                lattice = mcdc["lattices"][cell["fill_ID"]]
-
-                # Distance to lattice
-                d_lattice = distance_to_lattice(P, lattice)
-
-                # Check if smaller
-                if d_lattice * PREC < distance:
-                    distance = d_lattice
-                    event = EVENT_LATTICE
-                    P["surface_ID"] = -1
-
-                # Get universe
-                mesh = lattice["mesh"]
-                x, y, z = mesh_uniform_get_index(P, mesh)
-                universe_ID = lattice["universe_IDs"][x, y, z]
-
-                # Lattice-translate the particle
-                P["translation"][0] += mesh["x0"] + (x + 0.5) * mesh["dx"]
-                P["translation"][1] += mesh["y0"] + (y + 0.5) * mesh["dy"]
-                P["translation"][2] += mesh["z0"] + (z + 0.5) * mesh["dz"]
-                P["translated"] = True
-
-                # Get inner cell
-                cell_ID = geometry.get_cell(P, universe_ID, mcdc)
-                cell = mcdc["cells"][cell_ID]
-
-    return distance, event
-
-
-@njit
-def distance_to_nearest_surface(P, cell, mcdc):
-    distance = INF
-    surface_ID = -1
-    surface_move = False
-
-    # Access cell surface data
-    idx = cell["surface_data_idx"]
-    N_surface = mcdc["cell_surface_data"][idx]
-
-    # Iterate over all surfaces
-    idx += 1
-    idx_end = idx + N_surface
-    while idx < idx_end:
-        candidate_surface_ID = mcdc["cell_surface_data"][idx]
-        surface = mcdc["surfaces"][candidate_surface_ID]
-        d, sm = geometry.surface_distance(P, surface, mcdc)
-        if d < distance:
-            distance = d
-            surface_ID = surface["ID"]
-            surface_move = sm
-        idx += 1
-    return distance, surface_ID, surface_move
-
-
-@njit
-def distance_to_lattice(P, lattice):
-    mesh = lattice["mesh"]
-
-    x, y, z = geometry.get_local_coordinate(P)
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-
-    d = INF
-    d = min(d, mesh_uniform_distance_search(x, ux, mesh["x0"], mesh["dx"]))
-    d = min(d, mesh_uniform_distance_search(y, uy, mesh["y0"], mesh["dy"]))
-    d = min(d, mesh_uniform_distance_search(z, uz, mesh["z0"], mesh["dz"]))
-    return d
-
-
-@njit
-def distance_to_mesh(P, mesh, mcdc):
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-    v = physics.get_speed(P, mcdc)
-
-    d = INF
-    d = min(d, mesh_distance_search(x, ux, mesh["x"]))
-    d = min(d, mesh_distance_search(y, uy, mesh["y"]))
-    d = min(d, mesh_distance_search(z, uz, mesh["z"]))
-    d = min(d, mesh_distance_search(t, 1.0 / v, mesh["t"]))
-    return d
-
-
 # =============================================================================
 # Surface crossing
 # =============================================================================
@@ -2437,10 +2294,7 @@ def surface_crossing(P, prog):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.apply_surface_bc(P, surface)
-
-    # Small shift to ensure crossing
-    geometry.surface_shift(P, surface, mcdc)
+    geometry.surface_bc(P, surface)
 
     # Tally particle exit
     if mcdc["tally"]["exit"] and not P["alive"]:
@@ -2451,12 +2305,9 @@ def surface_crossing(P, prog):
         # Score on tally
         score_exit(P, exit_idx, mcdc)
 
-    # Check new cell?
+    # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
-        cell = mcdc["cells"][P["cell_ID"]]
-        if not geometry.cell_check(P, cell, mcdc):
-            geometry.reset_local_coordinate(P)
-            P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
+        P["cell_ID"] = -1
 
 
 # =============================================================================
@@ -2483,32 +2334,13 @@ def collision(P, mcdc):
     xi = rng(P) * SigmaT
     tot = SigmaS
     if tot > xi:
-        event = EVENT_SCATTERING
+        P["event"] += EVENT_SCATTERING
     else:
         tot += SigmaF
         if tot > xi:
-            event = EVENT_FISSION
+            P["event"] += EVENT_FISSION
         else:
-            event = EVENT_CAPTURE
-    P["event"] = event
-
-    # =========================================================================
-    # Implement minor events
-    # =========================================================================
-
-    if event & EVENT_CAPTURE:
-        P["alive"] = False
-
-
-# =============================================================================
-# Capture
-# =============================================================================
-
-
-@njit
-def capture(P, mcdc):
-    # Kill the current particle
-    P["alive"] = False
+            P["event"] += EVENT_CAPTURE
 
 
 # =============================================================================
@@ -3084,10 +2916,12 @@ def weight_window(P, prog):
     mcdc = adapt.device(prog)
 
     # Get indices
-    t, x, y, z, outside = mesh_get_index(P, mcdc["technique"]["ww_mesh"])
+    ix, iy, iz, it, outside = mesh_.structured.get_indices(
+        P, mcdc["technique"]["ww_mesh"]
+    )
 
     # Target weight
-    w_target = mcdc["technique"]["ww"][t, x, y, z]
+    w_target = mcdc["technique"]["ww"][it, ix, iy, iz]
 
     # Population control factor
     w_target *= mcdc["technique"]["pc_factor"]
