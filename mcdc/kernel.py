@@ -962,6 +962,8 @@ def add_particle(P_arr, bank):
     if idx >= bank["particles"].shape[0]:
         full_bank_print(bank)
 
+    adapt.harm.print_formatted(8421248)
+
     # Set particle
     copy_recordlike(bank["particles"][idx:idx+1], P_arr)
 
@@ -991,6 +993,9 @@ def get_particle(P_arr, bank, mcdc):
     P["E"] = P_rec["E"]
     P["w"] = P_rec["w"]
     P["rng_seed"] = P_rec["rng_seed"]
+
+    for i in range(3):
+        P["translation"][i] = 0
 
     if mcdc["technique"]["iQMC"]:
         P["iqmc"]["w"] = P_rec["iqmc"]["w"]
@@ -1764,6 +1769,14 @@ def cell_check(P_arr, cell, trans, mcdc):
 @njit
 def surface_evaluate(P_arr, surface, trans):
     P = P_arr[0]
+
+    #adapt.harm.print_formatted(P["x"])
+    #adapt.harm.print_formatted(P["y"])
+    #adapt.harm.print_formatted(P["z"])
+    #adapt.harm.print_formatted(trans[0])
+    #adapt.harm.print_formatted(trans[1])
+    #adapt.harm.print_formatted(trans[2])
+
     x = P["x"] + trans[0]
     y = P["y"] + trans[1]
     z = P["z"] + trans[2]
@@ -2961,7 +2974,6 @@ def scattering(P_arr, prog):
         # Create new particle
         P_new_arr = adapt.local_array(1,type_.particle)
         P_new = P_new_arr[0]
-        P_new["rng_seed"] = 12345
         split_particle(P_new_arr,P_arr)
 
         # Set weight
@@ -2981,6 +2993,7 @@ def scattering(P_arr, prog):
             P["w"] = P_new["w"]
         else:
             adapt.add_active(P_new_arr, prog)
+            adapt.harm.print_formatted(19191919191)
 
 
 @njit
@@ -3276,6 +3289,7 @@ def fission(P_arr, prog):
                 P["w"] = P_new["w"]
             else:
                 adapt.add_active(P_new_arr, prog)
+                adapt.harm.print_formatted(19191919191)
 
 
 @njit
@@ -3520,6 +3534,7 @@ def branchless_collision(P_arr, prog):
                 P_new = P_new_arr[0]
                 split_particle(P_new_arr,P_arr)
                 adapt.add_active(P_new_arr, prog)
+                adapt.harm.print_formatted(19191919191)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
 
@@ -3561,6 +3576,7 @@ def weight_window(P_arr, prog):
             P_new = P_new_arr[0]
             split_particle(P_new_arr,P_arr)
             adapt.add_active(P_new_arr, prog)
+            adapt.harm.print_formatted(19191919191)
 
         # Russian roulette
         p -= n_split
@@ -3570,6 +3586,7 @@ def weight_window(P_arr, prog):
             P_new = P_new_arr[0]
             split_particle(P_new_arr,P_arr)
             adapt.add_active(P_new_arr, prog)
+            adapt.harm.print_formatted(19191919191)
 
     # Below target
     elif p < 1.0 / width:
@@ -4561,6 +4578,7 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
     P_rec = P_rec_arr[0]
     copy_record(P_rec_arr,P_arr)
     adapt.add_active(P_rec_arr, prog)
+    adapt.harm.print_formatted(19191919191)
 
     # Get sensitivity ID
     ID = surface["sensitivity_ID"]
@@ -4685,6 +4703,8 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
 
         # Put the current particle into the secondary bank
         adapt.add_active(P_new_arr, prog)
+        adapt.harm.print_formatted(19191919191)
+
 
     # Sample potential second-order sensitivity particles?
     if mcdc["technique"]["dsm_order"] < 2 or P["sensitivity_ID"] > 0:
@@ -4713,15 +4733,19 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
 
     source_obtained = False
 
+    P_newer_arr = adapt.local_array(1,type_.particle)
+    P_newer = P_newer_arr[0]
+
+
     # Sample source
     for n in range(Np):
         source_obtained = False
 
         # Create new particle
-        split_particle(P_new_arr,P_arr)
+        split_particle(P_newer_arr,P_arr)
 
         # Sample term
-        xi = rng(P_new_arr) * p_total
+        xi = rng(P_newer_arr) * p_total
         tot = 0.0
 
         source_type = -1
@@ -4795,15 +4819,19 @@ def sensitivity_surface(P_arr, surface, material_ID_old, material_ID_new, prog):
             P_new["sensitivity_ID"] = ID_source
         elif source_type == 1:
             # Scattering source
-            sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr)
+            sample_phasespace_scattering_nuclide(P_arr, nuclide, P_newer_arr)
             P_new["sensitivity_ID"] = ID_source
         elif source_type == 2:
             # Fission source
-            sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
+            sample_phasespace_fission_nuclide(P_arr, nuclide, P_newer_arr, mcdc)
             P_new["sensitivity_ID"] = ID_source
 
         if source_type != -1:
-            adapt.add_active(P_new_arr, prog)
+            adapt.add_active(P_newer_arr, prog)
+            #adapt.add_active(P_arr, prog)
+            adapt.harm.print_formatted(19191919191)
+
+
 
 
 
@@ -4907,6 +4935,7 @@ def sensitivity_material(P_arr, prog):
 
         # Put the current particle into the secondary bank
         adapt.add_active(P_new_arr, prog)
+        adapt.harm.print_formatted(19191919191)
 
 
 # ==============================================================================

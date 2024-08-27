@@ -127,6 +127,7 @@ def run():
     # Print banner, hardware configuration, and header
     print_banner(mcdc)
 
+    print("RUNNING!")
     set_cache(mcdc["setting"]["caching"])
 
     print_msg(" Now running TNT...")
