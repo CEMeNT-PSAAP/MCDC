@@ -456,6 +456,24 @@ def iqmc_continuous_weight_reduction(P, distance, mcdc):
 
 
 # =============================================================================
+# Surface crossing
+# =============================================================================
+
+
+@toggle("iQMC")
+def iqmc_surface_crossing(P, prog):
+    mcdc = adapt.device(prog)
+
+    # Implement BC
+    surface = mcdc["surfaces"][P["surface_ID"]]
+    geometry.surface_bc(P, surface)
+
+    # Need to check new cell later?
+    if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
+        P["cell_ID"] = -1
+
+
+# =============================================================================
 # iQMC Source Operations
 # =============================================================================
 

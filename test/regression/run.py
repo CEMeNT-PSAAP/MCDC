@@ -184,10 +184,9 @@ for i, name in enumerate(names):
     # iQMC flux
     if "iqmc" in output.keys():
         for score in [key for key in output["iqmc/tally/"].keys()]:
-            result_name_out = f"iqmc/tally/{score}/mean"
-            result_name_ans = f"iqmc/tally/{score}"
-            a = np.squeeze(output[result_name_out][:])
-            b = np.squeeze(answer[result_name_ans][:])
+            name = f"iqmc/tally/{score}/mean"
+            a = np.squeeze(output[name][()])
+            b = np.squeeze(answer[name][()])
             if np.isnan(b).all():
                 continue
             # Passed?
