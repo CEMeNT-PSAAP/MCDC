@@ -1,125 +1,111 @@
-import mcdc.kernel as kernel
-import mcdc.iqmc.iqmc_kernel as iqmc_kernel
-import mcdc.adapt as adapt
 import numpy as np
 
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode
-from mcdc.loop import caching
-from mcdc.constant import *
 
+import mcdc.adapt as adapt
+import mcdc.geometry as geometry
+import mcdc.iqmc.iqmc_kernel as iqmc_kernel
+import mcdc.kernel as kernel
+import mcdc.local as local
+
+from mcdc.constant import *
+from mcdc.loop import caching
 from mcdc.print_ import (
+    print_iqmc_eigenvalue_exit_code,
+    print_iqmc_eigenvalue_progress,
+    print_msg,
     print_progress,
     print_progress_iqmc,
-    print_iqmc_eigenvalue_progress,
-    print_iqmc_eigenvalue_exit_code,
-    print_msg,
 )
+from mcdc.type_ import iqmc_score_list
+
+
+# =========================================================================
+# Validate inputs
+# =========================================================================
+
+
+def iqmc_validate_inputs(input_deck):
+    iqmc = input_deck.technique["iqmc"]
+    eigenmode = input_deck.setting["mode_eigenvalue"]
+
+    # Batched mode has only been built for eigenvalue problems (so far)
+    if iqmc["mode"] == "batched" and not eigenmode:
+        print_error(
+            "Invalid run mode. iQMC batched mode has not been built for fixed source problems."
+        )
+
+    # Check fixed source solver
+    if iqmc["fixed_source_solver"] not in ["source iteration", "gmres"]:
+        print_error(
+            f"Invalid fixed source solver, '{iqmc['fixed_source_solver']}'. Available iteration solvers inlcude ['source iteration', 'gmres']"
+        )
+
+    # Check sample method
+    if iqmc["sample_method"] not in ["random", "halton"]:
+        print_error(
+            f"Unsupported sample method, '{iqmc['sample_method']}'. Available sample methods: ['halton', 'random']."
+        )
+
+    # Check run mode
+    if iqmc["mode"] not in ["fixed", "batched"]:
+        with objmode():
+            print_error(
+                f"Unsupported run mode, '{iqmc['mode']}'. Available iQMC modes are ['fixed', 'batched']"
+            )
+
+    # Check scores
+    for score in list(iqmc["score_list"].keys()):
+        if score not in iqmc_score_list:
+            print_error(
+                f"Unsupported score, '{score}'. Available iQMC scores are {iqmc_score_list}"
+            )
+
+    # Check N_inactive & N_active batches for batched mode
+    if eigenmode and iqmc["mode"] == "batched":
+        if (
+            input_deck.setting["N_inactive"] == 0
+            and input_deck.setting["N_active"] == 0
+        ):
+            print_error(
+                "Specify N_inactive and N_active batches for iQMC batched mode."
+            )
+
+
+# =============================================================================
+# iQMC Simulation
+# =============================================================================
 
 
 @njit(cache=caching)
 def iqmc_simulation(mcdc):
-    # function calls from specified solvers
+    # Preprocessing
     iqmc = mcdc["technique"]["iqmc"]
     iqmc_kernel.iqmc_preprocess(mcdc)
-    iqmc_kernel.lds_init(mcdc)
+    iqmc_kernel.samples_init(mcdc)
 
+    if iqmc["mode"] == "batched":
+        iqmc["iterations_max"] = (
+            mcdc["setting"]["N_active"] + mcdc["setting"]["N_inactive"] - 1
+        )
+
+    # Iterative Solve
     if mcdc["setting"]["mode_eigenvalue"]:
-        if iqmc["eigenmode_solver"] == "power_iteration":
-            power_iteration(mcdc)
+        power_iteration(mcdc)
     else:
-        if iqmc["fixed_source_solver"] == "source_iteration":
+        if iqmc["fixed_source_solver"] == "source iteration":
             source_iteration(mcdc)
         if iqmc["fixed_source_solver"] == "gmres":
             gmres(mcdc)
 
-
-@njit(cache=caching)
-def iqmc_loop_particle(P, prog):
-    mcdc = adapt.device(prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
-
-    while P["alive"]:
-        iqmc_step_particle(P, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P, mcdc)
+    # Post processing
+    iqmc_kernel.iqmc_tally_closeout(mcdc)
 
 
-@njit(cache=caching)
-def iqmc_step_particle(P, prog):
-    mcdc = adapt.device(prog)
-
-    # Find cell from root universe if unknown
-    if P["cell_ID"] == -1:
-        trans_struct = adapt.local_translate()
-        trans = trans_struct["values"]
-        P["cell_ID"] = kernel.get_particle_cell(P, 0, trans, mcdc)
-
-    # Determine and move to event
-    iqmc_kernel.iqmc_move_to_event(P, mcdc)
-    event = P["event"]
-
-    # The & operator here is a bitwise and.
-    # It is used to determine if an event type is part of the particle event.
-
-    # Surface crossing
-    if event & EVENT_SURFACE:
-        kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN:
-            if not (
-                mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
-                or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
-            ):
-                kernel.domain_crossing(P, mcdc)
-
-    # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
-        if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["t"] += SHIFT
-        P["cell_ID"] = -1
-
-    # Apply weight roulette
-    if P["alive"] and mcdc["technique"]["weight_roulette"]:
-        # check if weight has fallen below threshold
-        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
-            kernel.weight_roulette(P, mcdc)
-
-
-@njit(cache=caching)
-def iqmc_loop_source(mcdc):
-    mcdc["technique"]["iqmc"]["sweep_counter"] += 1
-    work_size = mcdc["bank_source"]["size"][0]
-    N_prog = 0
-    # loop over particles
-    for idx_work in range(work_size):
-        P = mcdc["bank_source"]["particles"][idx_work]
-        mcdc["bank_source"]["size"] -= 1
-        kernel.add_particle(P, mcdc["bank_active"])
-
-        # Loop until active bank is exhausted
-        while mcdc["bank_active"]["size"] > 0:
-            P = adapt.local_particle()
-            # Get particle from active bank
-            kernel.get_particle(P, mcdc["bank_active"], mcdc)
-            # Particle loop
-            iqmc_loop_particle(P, mcdc)
-
-        # Progress printout
-        percent = (idx_work + 1.0) / work_size
-        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
-            N_prog += 1
-            with objmode():
-                print_progress(percent, mcdc)
+# =============================================================================
+# Iterative Solvers
+# =============================================================================
 
 
 @njit(cache=caching)
@@ -129,25 +115,14 @@ def source_iteration(mcdc):
     total_source_old = iqmc["total_source"].copy()
 
     while not simulation_end:
-        # reset particle bank size
-        kernel.set_bank_size(mcdc["bank_source"], 0)
-        # initialize particles with LDS
-        iqmc_kernel.iqmc_prepare_particles(mcdc)
-        # reset tallies for next loop
-        iqmc_kernel.iqmc_reset_tallies(iqmc)
-        # sweep particles
-        iqmc_loop_source(mcdc)
-
-        # sum resultant flux on all processors
-        iqmc_kernel.iqmc_distribute_tallies(iqmc)
-        iqmc["itt"] += 1
-        iqmc_kernel.iqmc_update_source(mcdc)
-        # combine source tallies into one vector
-        iqmc_kernel.iqmc_consolidate_sources(mcdc)
+        iqmc_sweep(mcdc)
+        iqmc["iteration_count"] += 1
         # calculate norm of sources
-        iqmc["res"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
+        iqmc["residual"] = iqmc_kernel.iqmc_res(iqmc["total_source"], total_source_old)
         # iQMC convergence criteria
-        if (iqmc["itt"] == iqmc["maxitt"]) or (iqmc["res"] <= iqmc["tol"]):
+        if (iqmc["iteration_count"] == iqmc["iterations_max"]) or (
+            iqmc["residual"] <= iqmc["tol"]
+        ):
             simulation_end = True
 
         # Print progress
@@ -163,46 +138,55 @@ def source_iteration(mcdc):
 def power_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
-    # iteration tolerance
     tol = iqmc["tol"]
-    # maximum number of iterations
-    maxit = iqmc["maxitt"]
+    maxit = iqmc["iterations_max"]
     score_bin = iqmc["score"]
     k_old = mcdc["k_eff"]
-    solver = iqmc["fixed_source_solver"]
-
-    fission_source_old = score_bin["fission-source"].copy()
+    fission_source_old = score_bin["fission-source"]["bin"].copy()
 
     while not simulation_end:
-        # iterate over scattering source
-        if solver == "source_iteration":
-            iqmc["maxitt"] = 1
-            source_iteration(mcdc)
-            iqmc["maxitt"] = maxit
-        if solver == "gmres":
-            gmres(mcdc)
-        # reset counter for inner iteration
-        iqmc["itt"] = 0
-
-        # update k_eff
-        mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
-
-        # calculate diff in keff
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
+        # Scramble samples if in batched mode
+        if iqmc["mode"] == "batched":
+            iqmc_kernel.scramble_samples(mcdc)
+        # Run sweep
+        iqmc_sweep(mcdc)
+        # Reset counter for inner iteration
+        iqmc["iteration_count"] += 1
+        # Update k_eff
+        mcdc["k_eff"] *= score_bin["fission-source"]["bin"][0] / fission_source_old[0]
+        # Calculate diff in keff
+        iqmc["residual"] = abs(mcdc["k_eff"] - k_old) / k_old
         k_old = mcdc["k_eff"]
-        # store outter iteration values
-        score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
-        fission_source_old = score_bin["fission-source"].copy()
-        iqmc["itt_outter"] += 1
+        # Store outter iteration values
+        score_bin["effective-fission-outter"] = score_bin["effective-fission"][
+            "bin"
+        ].copy()
+        fission_source_old = score_bin["fission-source"]["bin"].copy()
 
+        # Batch mode
+        if iqmc["mode"] == "batched":
+            mcdc["idx_cycle"] += 1
+            iqmc_kernel.iqmc_eigenvalue_tally_closeout_history(mcdc)
+            if mcdc["cycle_active"]:
+                # Only accumulate statistics
+                iqmc_kernel.iqmc_tally_closeout_history(mcdc)
+            # Entering active cycle ?
+            if mcdc["idx_cycle"] >= mcdc["setting"]["N_inactive"]:
+                mcdc["cycle_active"] = True
+
+        # Print progress
         with objmode():
-            print_iqmc_eigenvalue_progress(mcdc)
+            if iqmc["mode"] == "fixed":
+                print_iqmc_eigenvalue_progress(mcdc)
+            else:
+                print_progress_eigenvalue(mcdc)
 
         # iQMC convergence criteria
-        if (iqmc["itt_outter"] == maxit) or (iqmc["res_outter"] <= tol):
+        if (iqmc["iteration_count"] == maxit) or (iqmc["residual"] <= tol):
             simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
+            if iqmc["mode"] == "fixed":
+                with objmode():
+                    print_iqmc_eigenvalue_exit_code(mcdc)
 
 
 @njit(cache=caching)
@@ -211,6 +195,8 @@ def gmres(mcdc):
     GMRES solver.
     ----------
     Linear Krylov solver. Solves problem of the form Ax = b.
+    This function is almost entirely linear algebra operations and does not
+    directly use any functions in mcdc/kernel.py or mcdc/loop.py
 
     References
     ----------
@@ -223,7 +209,7 @@ def gmres(mcdc):
 
     """
     iqmc = mcdc["technique"]["iqmc"]
-    max_iter = iqmc["maxitt"]
+    max_iter = iqmc["iterations_max"]
     R = iqmc["krylov_restart"]
     tol = iqmc["tol"]
 
@@ -332,16 +318,16 @@ def gmres(mcdc):
             if inner < max_inner - 1:
                 normr = abs(g[inner + 1])
                 rel_resid = normr / res_0
-                iqmc["res"] = rel_resid
+                iqmc["residual"] = rel_resid
 
-            iqmc["itt"] += 1
+            iqmc["iteration_count"] += 1
             if not mcdc["setting"]["mode_eigenvalue"]:
                 with objmode():
                     print_progress_iqmc(mcdc)
 
             if rel_resid < tol:
                 break
-            if iqmc["itt"] >= max_iter:
+            if iqmc["iteration_count"] >= max_iter:
                 break
 
         # end inner loop, back to outer loop
@@ -353,15 +339,108 @@ def gmres(mcdc):
         r = b - aux
         normr = np.linalg.norm(r)
         rel_resid = normr / res_0
-        iqmc["res"] = rel_resid
+        iqmc["residual"] = rel_resid
         if rel_resid < tol:
             break
-        if iqmc["itt"] >= max_iter:
+        if iqmc["iteration_count"] >= max_iter:
             return
 
 
 # =============================================================================
-# Linear operators
+# Lower Level loops
+# =============================================================================
+
+
+@njit(cache=caching)
+def iqmc_loop_particle(P, prog):
+    mcdc = adapt.device(prog)
+
+    while P["alive"]:
+        iqmc_step_particle(P, prog)
+
+
+@njit(cache=caching)
+def iqmc_step_particle(P, prog):
+    mcdc = adapt.device(prog)
+
+    # Determine and move to event
+    iqmc_kernel.iqmc_move_to_event(P, mcdc)
+    event = P["event"]
+
+    # The & operator here is a bitwise and.
+    # It is used to determine if an event type is part of the particle event.
+
+    # Surface crossing
+    if event & EVENT_SURFACE_CROSSING:
+        kernel.surface_crossing(P, prog)
+        if event & EVENT_DOMAIN_CROSSING:
+            if not (
+                mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
+                or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
+            ):
+                kernel.domain_crossing(P, mcdc)
+
+    # Lattice or mesh crossing (skipped if surface crossing)
+    elif event & EVENT_LATTICE_CROSSING or event & EVENT_IQMC_MESH:
+        if event & EVENT_DOMAIN_CROSSING:
+            kernel.domain_crossing(P, mcdc)
+
+    # Apply weight roulette
+    if P["alive"] and mcdc["technique"]["weight_roulette"]:
+        # check if weight has fallen below threshold
+        if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
+            kernel.weight_roulette(P, mcdc)
+
+
+@njit(cache=caching)
+def iqmc_loop_source(mcdc):
+    work_size = mcdc["bank_source"]["size"][0]
+    N_prog = 0
+    # loop over particles
+    for idx_work in range(work_size):
+        P = mcdc["bank_source"]["particles"][idx_work]
+        mcdc["bank_source"]["size"] -= 1
+        kernel.add_particle(P, mcdc["bank_active"])
+
+        # Loop until active bank is exhausted
+        while mcdc["bank_active"]["size"] > 0:
+            P = local.particle()
+            # Get particle from active bank
+            kernel.get_particle(P, mcdc["bank_active"], mcdc)
+            # Particle loop
+            iqmc_loop_particle(P, mcdc)
+
+        # Progress printout
+        percent = (idx_work + 1.0) / work_size
+        if mcdc["setting"]["progress_bar"] and int(percent * 100.0) > N_prog:
+            N_prog += 1
+            with objmode():
+                print_progress(percent, mcdc)
+
+
+@njit(cache=caching)
+def iqmc_sweep(mcdc):
+    iqmc = mcdc["technique"]["iqmc"]
+    # tally sweep count
+    iqmc["sweep_count"] += 1
+    # reset particle bank size
+    kernel.set_bank_size(mcdc["bank_source"], 0)
+    # initialize particles with LDS
+    iqmc_kernel.iqmc_prepare_particles(mcdc)
+    # reset tallies for next loop
+    iqmc_kernel.iqmc_reset_tallies(iqmc)
+    # sweep particles
+    iqmc_loop_source(mcdc)
+    # sum resultant flux on all processors
+    iqmc_kernel.iqmc_reduce_tallies(iqmc)
+    # update source = scattering + fission/keff + fixed
+    iqmc_kernel.iqmc_update_source(mcdc)
+    # combine source tallies into one vector
+    iqmc_kernel.iqmc_consolidate_sources(mcdc)
+
+
+# =============================================================================
+# GMRES Linear operator
 # =============================================================================
 
 
@@ -376,20 +455,7 @@ def AxV(V, b, mcdc):
     iqmc["total_source"] = V.copy()
     # distribute segments of V to appropriate sources
     iqmc_kernel.iqmc_distribute_sources(mcdc)
-    # reset bank size
-    kernel.set_bank_size(mcdc["bank_source"], 0)
-
-    # QMC Sweep
-    iqmc_kernel.iqmc_prepare_particles(mcdc)
-    iqmc_kernel.iqmc_reset_tallies(iqmc)
-    iqmc["sweep_counter"] += 1
-    iqmc_loop_source(mcdc)
-    # sum resultant flux on all processors
-    iqmc_kernel.iqmc_distribute_tallies(iqmc)
-    # update source adds effective scattering + fission + fixed-source
-    iqmc_kernel.iqmc_update_source(mcdc)
-    # combine all sources (constant and tilted) into one vector
-    iqmc_kernel.iqmc_consolidate_sources(mcdc)
+    iqmc_sweep(mcdc)
     v_out = iqmc["total_source"].copy()
     axv = V - (v_out - b)
 

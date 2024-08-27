@@ -1,3 +1,5 @@
+import importlib.metadata
+
 from mcdc.input_ import (
     nuclide,
     material,
@@ -17,7 +19,6 @@ from mcdc.input_ import (
     iQMC,
     weight_roulette,
     IC_generator,
-    dsm,
     uq,
     reset,
     domain_decomposition,
@@ -26,3 +27,5 @@ from mcdc.input_ import (
 )
 import mcdc.tally
 from mcdc.main import run, prepare
+
+__version__ = importlib.metadata.version("mcdc")

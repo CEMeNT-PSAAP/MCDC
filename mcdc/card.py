@@ -7,7 +7,6 @@ from mcdc.constant import (
     BOOL_NOT,
     INF,
     PI,
-    SHIFT,
 )
 
 # Get the global variable container
@@ -61,9 +60,6 @@ class NuclideCard(InputCard):
         self.chi_s = np.zeros([G, G])
         self.chi_p = np.zeros([G, G])
         self.chi_d = np.zeros([J, G])
-        self.sensitivity = False
-        self.sensitivity_ID = 0
-        self.dsm_Np = 1.0
         self.uq = False
         self.flags = []
         self.distribution = ""
@@ -92,7 +88,6 @@ class MaterialCard(InputCard):
         self.nu_f = np.zeros(G)
         self.chi_s = np.zeros([G, G])
         self.chi_p = np.zeros([G, G])
-        self.sensitivity = False
         self.uq = False
         self.flags = []
         self.distribution = ""
@@ -168,15 +163,10 @@ class SurfaceCard(InputCard):
         self.G = 0.0
         self.H = 0.0
         self.I = 0.0
-        self.J = np.array([[0.0, 0.0]])
-        self.t = np.array([-SHIFT, INF])
-        self.N_slice = 1
+        self.J = 0.0
         self.nx = 0.0
         self.ny = 0.0
         self.nz = 0.0
-        self.sensitivity = False
-        self.sensitivity_ID = 0
-        self.dsm_Np = 1.0
         self.N_tally = 0
         self.tally_IDs = []
 
@@ -315,17 +305,16 @@ class LatticeCard(InputCard):
         # Set card data
         self.ID = None
         self.universe_IDs = np.array([[[[0]]]])
-        self.mesh = {
-            "x0": -INF,
-            "dx": 2 * INF,
-            "Nx": 1,
-            "y0": -INF,
-            "dy": 2 * INF,
-            "Ny": 1,
-            "z0": -INF,
-            "dz": 2 * INF,
-            "Nz": 1,
-        }
+        self.x0 = -INF
+        self.x0 = -INF
+        self.dx = 2 * INF
+        self.Nx = 1
+        self.y0 = -INF
+        self.dy = 2 * INF
+        self.Ny = 1
+        self.z0 = -INF
+        self.dz = 2 * INF
+        self.Nz = 1
 
 
 class SourceCard(InputCard):

@@ -53,7 +53,7 @@ mcdc.iQMC(
     phi0=phi0,
     maxit=maxit,
     tol=tol,
-    score=["tilt-x", "tilt-y"],
+    scores=["source-x", "source-y"],
 )
 
 # =============================================================================
