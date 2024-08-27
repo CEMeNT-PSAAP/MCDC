@@ -363,11 +363,6 @@ def iqmc_loop_particle(P, prog):
 def iqmc_step_particle(P, prog):
     mcdc = adapt.device(prog)
 
-    # Find cell from root universe if unknown
-    if P["cell_ID"] == -1:
-        geometry.reset_local_coordinate(P)
-        P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
-
     # Determine and move to event
     iqmc_kernel.iqmc_move_to_event(P, mcdc)
     event = P["event"]
@@ -376,9 +371,9 @@ def iqmc_step_particle(P, prog):
     # It is used to determine if an event type is part of the particle event.
 
     # Surface crossing
-    if event & EVENT_SURFACE:
+    if event & EVENT_SURFACE_CROSSING:
         kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN:
+        if event & EVENT_DOMAIN_CROSSING:
             if not (
                 mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
                 or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
@@ -386,15 +381,9 @@ def iqmc_step_particle(P, prog):
                 kernel.domain_crossing(P, mcdc)
 
     # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
-        if event & EVENT_DOMAIN:
+    elif event & EVENT_LATTICE_CROSSING or event & EVENT_IQMC_MESH:
+        if event & EVENT_DOMAIN_CROSSING:
             kernel.domain_crossing(P, mcdc)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["t"] += SHIFT
-        P["cell_ID"] = -1
 
     # Apply weight roulette
     if P["alive"] and mcdc["technique"]["weight_roulette"]:

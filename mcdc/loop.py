@@ -438,20 +438,15 @@ def loop_particle(P, prog):
 def step_particle(P, prog):
     mcdc = adapt.device(prog)
 
-    # Find cell from root universe if unknown
-    if P["cell_ID"] == -1:
-        geometry.reset_local_coordinate(P)
-        P["cell_ID"] = geometry.get_cell(P, UNIVERSE_ROOT, mcdc)
-
     # Determine and move to event
     kernel.move_to_event(P, mcdc)
-    event = P["event"]
 
-    # The & operator here is a bitwise and.
-    # It is used to determine if an event type is part of the particle event.
+    # Execute events
+    if P["event"] == EVENT_LOST:
+        return
 
-    # Collision events
-    if event & EVENT_COLLISION:
+    # Collision
+    if P["event"] & EVENT_COLLISION:
         # Generate IC?
         if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
             kernel.bank_IC(P, prog)
@@ -464,40 +459,34 @@ def step_particle(P, prog):
         else:
             # Get collision type
             kernel.collision(P, mcdc)
-            event = P["event"]
 
             # Perform collision
-            if event == EVENT_SCATTERING:
+            if P["event"] & EVENT_CAPTURE:
+                P["alive"] = False
+
+            elif P["event"] & EVENT_SCATTERING:
                 kernel.scattering(P, prog)
-            elif event == EVENT_FISSION:
+
+            elif P["event"] & EVENT_FISSION:
                 kernel.fission(P, prog)
 
-    # Surface crossing
-    if event & EVENT_SURFACE:
+    # Surface and domain crossing
+    if P["event"] & EVENT_SURFACE_CROSSING:
         kernel.surface_crossing(P, prog)
-        if event & EVENT_DOMAIN:
+        if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)
 
-    # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        kernel.shift_particle(P, SHIFT)
-        if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P, mcdc)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        P["t"] += SHIFT
-        P["cell_ID"] = -1
+    elif P["event"] & EVENT_DOMAIN_CROSSING:
+        kernel.domain_crossing(P, mcdc)
 
     # Census time crossing
-    if event & EVENT_CENSUS:
-        P["t"] += SHIFT
+    if P["event"] & EVENT_TIME_CENSUS:
         adapt.add_census(P, prog)
         P["alive"] = False
 
     # Time boundary crossing
-    if event & EVENT_TIME_BOUNDARY:
+    if P["event"] & EVENT_TIME_BOUNDARY:
         P["alive"] = False
 
     # Apply weight window
@@ -537,9 +526,13 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    geometry.reset_local_coordinate(P_new)
-    P_new["cell_ID"] = geometry.get_cell(P_new, UNIVERSE_ROOT, mcdc)
-    material_ID = kernel.get_particle_material(P_new, mcdc)
+    _ = geometry.inspect_geometry(P_new, mcdc)
+    if P_new["cell_ID"] > -1:
+        material_ID = P_new["material_ID"]
+    # Skip if particle is lost
+    else:
+        return
+
     material = mcdc["materials"][material_ID]
     G = material["G"]
 

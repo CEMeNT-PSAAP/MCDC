@@ -5,17 +5,15 @@ from mpi4py import MPI
 from numba import objmode, literal_unroll
 
 import mcdc.adapt as adapt
-import mcdc.local as local
 import mcdc.geometry as geometry
+import mcdc.local as local
+import mcdc.mesh as mesh_
+import mcdc.physics as physics
 
 from mcdc.adapt import toggle
 from mcdc.constant import *
 from mcdc.kernel import (
     allreduce_array,
-    distance_to_boundary,
-    distance_to_mesh,
-    get_particle_material,
-    mesh_get_index,
     move_particle,
 )
 from mcdc.type_ import iqmc_score_list
@@ -150,9 +148,6 @@ def iqmc_generate_material_idx(mcdc):
     P_temp = local.particle()
     # set default attributes
     P_temp["alive"] = True
-    P_temp["material_ID"] = -1
-    P_temp["cell_ID"] = -1
-    geometry.reset_local_coordinate(P_temp)
 
     x_mid = 0.5 * (mesh["x"][1:] + mesh["x"][:-1])
     y_mid = 0.5 * (mesh["y"][1:] + mesh["y"][:-1])
@@ -172,15 +167,16 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["x"] = x
                     P_temp["y"] = y
                     P_temp["z"] = z
-
-                    # set cell_ID
-                    P_temp["cell_ID"] = geometry.get_cell(P_temp, 0, mcdc)
+                    P_temp["material_ID"] = -1
+                    P_temp["cell_ID"] = -1
 
                     # set material_ID
-                    material_ID = get_particle_material(P_temp, mcdc)
+                    P_temp["cell_ID"] = geometry.locate_particle(P_temp, mcdc)
 
                     # assign material index
-                    mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = material_ID
+                    mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = P_temp[
+                        "material_ID"
+                    ]
 
 
 @toggle("iQMC")
@@ -295,7 +291,7 @@ def iqmc_prepare_particles(mcdc):
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
             samples[n, 1], samples[n, 5]
         )
-        t, x, y, z, outside = mesh_get_index(P_new, mesh)
+        x, y, z, t, outside = mesh_.structured.get_indices(P_new, mesh)
         q = Q[:, t, x, y, z].copy()
         dV = iqmc_cell_volume(x, y, z, mesh)
         # Source tilt
@@ -363,43 +359,73 @@ def iqmc_sample_group(sample, G):
 
 @toggle("iQMC")
 def iqmc_move_to_event(P, mcdc):
-    # =========================================================================
-    # Get distances to events
-    # =========================================================================
+    # ==================================================================================
+    # Preparation (as needed)
+    # ==================================================================================
 
-    # Distance to nearest geometry boundary (surface or lattice)
-    # Also set particle material and speed
-    d_boundary, event = distance_to_boundary(P, mcdc)
+    # Multigroup preparation
+    #   In MG mode, particle speed is material-dependent.
+    if mcdc["setting"]["mode_MG"]:
+        # If material is not identified yet, locate the particle
+        if P["material_ID"] == -1:
+            if not geometry.locate_particle(P, mcdc):
+                # Particle is lost
+                P["event"] = EVENT_LOST
+                return
+
+    # ==================================================================================
+    # Geometry inspection
+    # ==================================================================================
+    #   - Set particle top cell and material IDs (if not lost)
+    #   - Set surface ID (if surface hit)
+    #   - Return distance to boundary (surface or lattice)
+    #   - Return geometry event type (surface or lattice crossing or particle lost)
+
+    d_boundary = geometry.inspect_geometry(P, mcdc)
+
+    # Particle is lost?
+    if P["event"] == EVENT_LOST:
+        return
+
+    # ==================================================================================
+    # Get distances to other events
+    # ==================================================================================
 
     # Distance to domain decomposition mesh
     d_domain = INF
-    if mcdc["cycle_active"] and mcdc["technique"]["domain_decomposition"]:
-        d_domain = distance_to_mesh(P, mcdc["technique"]["dd_mesh"], mcdc)
+    speed = physics.get_speed(P, mcdc)
+    if mcdc["technique"]["domain_decomposition"]:
+        d_domain = mesh_.structured.get_crossing_distance(
+            P, speed, mcdc["technique"]["dd_mesh"]
+        )
 
     # Distance to iqmc mesh
-    d_mesh = distance_to_mesh(P, mcdc["technique"]["iqmc"]["mesh"], mcdc)
+    d_mesh = mesh_.structured.get_crossing_distance(
+        P, speed, mcdc["technique"]["iqmc"]["mesh"]
+    )
 
     # =========================================================================
-    # Determine event
-    #   Priority (in case of coincident events):
-    #     boundary  > mesh
+    # Determine event(s)
     # =========================================================================
+    # TODO: Make a function to better maintain the repeating operation
 
-    # Find the minimum
-    distance = min(d_boundary, d_mesh, d_domain)
+    distance = d_boundary
 
-    # Remove the boundary event if it is not the nearest
-    if d_boundary > distance * PREC:
-        event = 0
+    # Check distance to domain
+    if d_domain < distance - COINCIDENCE_TOLERANCE:
+        distance = d_domain
+        P["event"] = EVENT_DOMAIN_CROSSING
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_domain, distance):
+        P["event"] += EVENT_DOMAIN_CROSSING
 
-    # Add each event if it is within PREC of the nearest event
-    if d_mesh <= distance * PREC:
-        event += EVENT_MESH
-    if d_domain <= distance * PREC:
-        event += EVENT_DOMAIN
-
-    # Assign event
-    P["event"] = event
+    # Check distance to mesh
+    if d_mesh < distance - COINCIDENCE_TOLERANCE:
+        distance = d_mesh
+        P["event"] = EVENT_IQMC_MESH
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_mesh, distance):
+        P["event"] += EVENT_IQMC_MESH
 
     # =========================================================================
     # Move particle
@@ -559,7 +585,7 @@ def iqmc_score_tallies(P, distance, mcdc):
     SigmaT = material["total"]
     mat_id = P["material_ID"]
 
-    t, x, y, z, outside = mesh_get_index(P, mesh)
+    x, y, z, t, outside = mesh_.structured.get_indices(P, mesh)
     if outside:
         return
 
