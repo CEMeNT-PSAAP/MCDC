@@ -372,7 +372,7 @@ def iqmc_step_particle(P, prog):
 
     # Surface crossing
     if event & EVENT_SURFACE_CROSSING:
-        kernel.surface_crossing(P, prog)
+        iqmc_kernel.iqmc_surface_crossing(P, prog)
         if event & EVENT_DOMAIN_CROSSING:
             if not (
                 mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE

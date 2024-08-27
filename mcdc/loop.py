@@ -68,7 +68,7 @@ def teardown_gpu(mcdc):
 
 
 @njit(cache=caching)
-def loop_fixed_source(mcdc):
+def loop_fixed_source(data, mcdc):
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
         mcdc["idx_batch"] = idx_batch
@@ -89,14 +89,14 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            loop_source(seed_source, mcdc)
+            loop_source(seed_source, data, mcdc)
 
             # Loop over source precursors
             if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
                 seed_source_precursor = kernel.split_seed(
                     seed_census, SEED_SPLIT_SOURCE_PRECURSOR
                 )
-                loop_source_precursor(seed_source_precursor, mcdc)
+                loop_source_precursor(seed_source_precursor, data, mcdc)
 
             # Time census closeout
             if idx_census < mcdc["setting"]["N_census"] - 1:
@@ -114,17 +114,16 @@ def loop_fixed_source(mcdc):
             kernel.set_bank_size(mcdc["bank_active"], 0)
 
             # Tally history closeout
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_reduce(data, mcdc)
+            kernel.tally_accumulate(data, mcdc)
             # Uq closeout
             if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(mcdc)
+                kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(mcdc)
-    else:
-        kernel.tally_closeout(mcdc)
+        kernel.uq_tally_closeout(data, mcdc)
+    kernel.tally_closeout(data, mcdc)
 
 
 # =========================================================================
@@ -133,20 +132,20 @@ def loop_fixed_source(mcdc):
 
 
 @njit(cache=caching)
-def loop_eigenvalue(mcdc):
+def loop_eigenvalue(data, mcdc):
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
         seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
 
         # Loop over source particles
         seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
-        loop_source(seed_source, mcdc)
+        loop_source(seed_source, data, mcdc)
 
         # Tally "history" closeout
         kernel.eigenvalue_tally_closeout_history(mcdc)
         if mcdc["cycle_active"]:
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_reduce(data, mcdc)
+            kernel.tally_accumulate(data, mcdc)
 
         # Print progress
         with objmode():
@@ -162,7 +161,7 @@ def loop_eigenvalue(mcdc):
             mcdc["cycle_active"] = True
 
     # Tally closeout
-    kernel.tally_closeout(mcdc)
+    kernel.tally_closeout(data, mcdc)
     kernel.eigenvalue_tally_closeout(mcdc)
 
 
@@ -221,7 +220,7 @@ def prep_particle(P, prog):
 
 
 @njit(cache=caching)
-def exhaust_active_bank(prog):
+def exhaust_active_bank(data, prog):
     mcdc = adapt.device(prog)
     P = local.particle()
     # Loop until active bank is exhausted
@@ -232,20 +231,20 @@ def exhaust_active_bank(prog):
         prep_particle(P, prog)
 
         # Particle loop
-        loop_particle(P, mcdc)
+        loop_particle(P, data, mcdc)
 
 
 @njit(cache=caching)
-def source_closeout(prog, idx_work, N_prog):
+def source_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.device(prog)
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        kernel.tally_closeout_history(mcdc)
+        kernel.tally_accumulate(data, mcdc)
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout_history(mcdc)
+        kernel.uq_tally_closeout_history(data, mcdc)
 
     # Progress printout
     percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
@@ -256,7 +255,7 @@ def source_closeout(prog, idx_work, N_prog):
 
 
 @njit(cache=caching)
-def source_dd_resolution(prog):
+def source_dd_resolution(data, prog):
     mcdc = adapt.device(prog)
 
     kernel.dd_particle_send(mcdc)
@@ -281,14 +280,14 @@ def source_dd_resolution(prog):
                     kernel.weight_window(P, mcdc)
 
                 # Particle loop
-                loop_particle(P, mcdc)
+                loop_particle(P, data, mcdc)
 
                 # Tally history closeout for one-batch fixed-source simulation
                 if (
                     not mcdc["setting"]["mode_eigenvalue"]
                     and mcdc["setting"]["N_batch"] == 1
                 ):
-                    kernel.tally_closeout_history(mcdc)
+                    kernel.tally_accumulate(data, mcdc)
 
         # Send all domain particle banks
         kernel.dd_particle_send(mcdc)
@@ -309,7 +308,7 @@ def source_dd_resolution(prog):
 
 
 @njit
-def loop_source(seed, mcdc):
+def loop_source(seed, data, mcdc):
     # Progress bar indicator
     N_prog = 0
 
@@ -333,16 +332,16 @@ def loop_source(seed, mcdc):
         # Run the source particle and its secondaries
         # =====================================================================
 
-        exhaust_active_bank(mcdc)
+        exhaust_active_bank(data, mcdc)
 
         # =====================================================================
         # Closeout
         # =====================================================================
 
-        source_closeout(mcdc, idx_work, N_prog)
+        source_closeout(mcdc, idx_work, N_prog, data)
 
     if mcdc["technique"]["domain_decomposition"]:
-        source_dd_resolution(mcdc)
+        source_dd_resolution(data, mcdc)
 
 
 def gpu_sources_spec():
@@ -373,7 +372,7 @@ def gpu_sources_spec():
         if P["fresh"]:
             prep_particle(P, prog)
         P["fresh"] = False
-        step_particle(P, prog)
+        step_particle(P, data, prog)
         if P["alive"]:
             adapt.step_async(prog, P)
 
@@ -415,10 +414,10 @@ def gpu_loop_source(seed, mcdc):
     # Closeout (Moved out of the typical particle loop)
     # =====================================================================
 
-    source_closeout(mcdc, 1, 1)
+    source_closeout(mcdc, 1, 1, data)
 
     if mcdc["technique"]["domain_decomposition"]:
-        source_dd_resolution(mcdc)
+        source_dd_resolution(data, mcdc)
 
 
 # =========================================================================
@@ -427,19 +426,19 @@ def gpu_loop_source(seed, mcdc):
 
 
 @njit(cache=caching)
-def loop_particle(P, prog):
+def loop_particle(P, data, prog):
     mcdc = adapt.device(prog)
 
     while P["alive"]:
-        step_particle(P, prog)
+        step_particle(P, data, prog)
 
 
 @njit(cache=caching)
-def step_particle(P, prog):
+def step_particle(P, data, prog):
     mcdc = adapt.device(prog)
 
     # Determine and move to event
-    kernel.move_to_event(P, mcdc)
+    kernel.move_to_event(P, data, mcdc)
 
     # Execute events
     if P["event"] == EVENT_LOST:
@@ -472,7 +471,7 @@ def step_particle(P, prog):
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:
-        kernel.surface_crossing(P, prog)
+        kernel.surface_crossing(P, data, prog)
         if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P, mcdc)
@@ -593,12 +592,12 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
 
 @njit(cache=caching)
-def source_precursor_closeout(prog, idx_work, N_prog):
+def source_precursor_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.device(prog)
 
     # Tally history closeout for fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"]:
-        kernel.tally_closeout_history(mcdc)
+        kernel.tally_accumulate(data, mcdc)
 
     # Progress printout
     percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
@@ -609,7 +608,7 @@ def source_precursor_closeout(prog, idx_work, N_prog):
 
 
 @njit
-def loop_source_precursor(seed, mcdc):
+def loop_source_precursor(seed, data, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
     # Progress bar indicator
@@ -649,13 +648,13 @@ def loop_source_precursor(seed, mcdc):
 
             generate_precursor_particle(DNP, particle_idx, seed_work, mcdc)
 
-            exhaust_active_bank(mcdc)
+            exhaust_active_bank(data, mcdc)
 
         # =====================================================================
         # Closeout
         # =====================================================================
 
-        source_precursor_closeout(mcdc, idx_work, N_prog)
+        source_precursor_closeout(mcdc, idx_work, N_prog, data)
 
 
 def gpu_precursor_spec():
@@ -704,7 +703,7 @@ def gpu_precursor_spec():
         if P["fresh"]:
             prep_particle(P, prog)
         P["fresh"] = False
-        step_particle(P, prog)
+        step_particle(P, data, prog)
         if P["alive"]:
             adapt.step_async(prog, P)
 
@@ -759,7 +758,7 @@ def gpu_loop_source_precursor(seed, mcdc):
     # Closeout (moved out of loop)
     # =====================================================================
 
-    source_precursor_closeout(mcdc, 1, 1)
+    source_precursor_closeout(mcdc, 1, 1, data)
 
 
 def build_gpu_progs():

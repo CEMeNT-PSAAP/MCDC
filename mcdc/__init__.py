@@ -8,7 +8,6 @@ from mcdc.input_ import (
     universe,
     lattice,
     source,
-    tally,
     setting,
     eigenmode,
     implicit_capture,
@@ -26,6 +25,7 @@ from mcdc.input_ import (
     make_particle_bank,
     save_particle_bank,
 )
+import mcdc.tally
 from mcdc.main import run, prepare
 
 __version__ = importlib.metadata.version("mcdc")
