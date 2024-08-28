@@ -85,7 +85,13 @@ def inspect_geometry(particle, mcdc):
                 particle["y"] -= cell["translation"][1]
                 particle["z"] -= cell["translation"][2]
 
-            if cell["fill_type"] == FILL_LATTICE:
+            # Universe cell?
+            if cell["fill_type"] == FILL_UNIVERSE:
+                # Get universe ID
+                universe_ID = cell["fill_ID"]
+
+            # Lattice cell?
+            elif cell["fill_type"] == FILL_LATTICE:
                 # Get lattice
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
@@ -116,12 +122,12 @@ def inspect_geometry(particle, mcdc):
                 particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
                 particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
-                # Get inner cell
-                cell_ID = get_cell(particle, universe_ID, mcdc)
-                if cell_ID > -1:
-                    cell = mcdc["cells"][cell_ID]
-                else:
-                    event = EVENT_LOST
+            # Get inner cell
+            cell_ID = get_cell(particle, universe_ID, mcdc)
+            if cell_ID > -1:
+                cell = mcdc["cells"][cell_ID]
+            else:
+                event = EVENT_LOST
 
     # Reassign the global coordinate
     particle["x"] = x_global
@@ -193,11 +199,17 @@ def locate_particle(particle, mcdc):
                 particle["y"] -= cell["translation"][1]
                 particle["z"] -= cell["translation"][2]
 
-            if cell["fill_type"] == FILL_LATTICE:
+            # Universe cell?
+            if cell["fill_type"] == FILL_UNIVERSE:
+                # Get universe ID
+                universe_ID = cell["fill_ID"]
+
+            # Lattice cell?
+            elif cell["fill_type"] == FILL_LATTICE:
                 # Get lattice
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
-                # Get universe
+                # Get universe ID
                 ix, iy, iz, it, outside = mesh.uniform.get_indices(particle, lattice)
                 if outside:
                     particle_is_lost = True
@@ -209,12 +221,12 @@ def locate_particle(particle, mcdc):
                 particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
                 particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
-                # Get inner cell
-                cell_ID = get_cell(particle, universe_ID, mcdc)
-                if cell_ID > -1:
-                    cell = mcdc["cells"][cell_ID]
-                else:
-                    particle_is_lost = True
+            # Get inner cell
+            cell_ID = get_cell(particle, universe_ID, mcdc)
+            if cell_ID > -1:
+                cell = mcdc["cells"][cell_ID]
+            else:
+                particle_is_lost = True
 
     # Reassign the global coordinate
     particle["x"] = x_global
