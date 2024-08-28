@@ -171,7 +171,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["cell_ID"] = -1
 
                     # set material_ID
-                    P_temp["cell_ID"] = geometry.locate_particle(P_temp, mcdc)
+                    _ = geometry.locate_particle(P_temp, mcdc)
 
                     # assign material index
                     mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = P_temp[
@@ -365,13 +365,12 @@ def iqmc_move_to_event(P, mcdc):
 
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
-    if mcdc["setting"]["mode_MG"]:
-        # If material is not identified yet, locate the particle
-        if P["material_ID"] == -1:
-            if not geometry.locate_particle(P, mcdc):
-                # Particle is lost
-                P["event"] = EVENT_LOST
-                return
+    #   If material is not identified yet, locate the particle.
+    if mcdc["setting"]["mode_MG"] and P["material_ID"] == -1:
+        if not geometry.locate_particle(P, mcdc):
+            # Particle is lost
+            P["event"] = EVENT_LOST
+            return
 
     # ==================================================================================
     # Geometry inspection

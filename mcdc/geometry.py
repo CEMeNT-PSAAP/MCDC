@@ -229,8 +229,7 @@ def locate_particle(particle, mcdc):
     if particle_is_lost:
         report_lost(particle)
 
-    particle_is_found = not particle_is_lost
-    return not particle_is_found
+    return not particle_is_lost
 
 
 # ======================================================================================
