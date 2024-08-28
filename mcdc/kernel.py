@@ -2143,13 +2143,12 @@ def move_to_event(P, data, mcdc):
 
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
-    if mcdc["setting"]["mode_MG"]:
-        # If material is not identified yet, locate the particle
-        if P["material_ID"] == -1:
-            if not geometry.locate_particle(P, mcdc):
-                # Particle is lost
-                P["event"] = EVENT_LOST
-                return
+    #   If material is not identified yet, locate the particle.
+    if mcdc["setting"]["mode_MG"] and P["material_ID"] == -1:
+        if not geometry.locate_particle(P, mcdc):
+            # Particle is lost
+            P["event"] = EVENT_LOST
+            return
 
     # ==================================================================================
     # Geometry inspection
