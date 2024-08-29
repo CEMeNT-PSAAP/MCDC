@@ -320,11 +320,18 @@ def get_cell(particle, universe_ID, mcdc):
     """
     universe = mcdc["universes"][universe_ID]
 
-    # Check all cells in the universe
-    for cell_ID in universe["cell_IDs"]:
+    # Access universe cell data
+    idx = universe["cell_data_idx"]
+    N_cell = universe["N_cell"]
+
+    # Check over all cells in the universe
+    idx_end = idx + N_cell
+    while idx < idx_end:
+        cell_ID = mcdc["universes_data_cell"][idx]
         cell = mcdc["cells"][cell_ID]
         if check_cell(particle, cell, mcdc):
             return cell["ID"]
+        idx += 1
 
     # Particle is not found
     return -1
@@ -408,9 +415,8 @@ def report_lost(particle):
 @njit
 def distance_to_nearest_surface(particle, cell, mcdc):
     """
-    The termine the nearest cell surface and the distance to it
+    Determine the nearest cell surface and the distance to it
     """
-    # TODO: docs
     distance = INF
     surface_ID = -1
 

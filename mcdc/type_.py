@@ -37,7 +37,6 @@ particle_record = None
 nuclide = None
 material = None
 
-universe = None
 lattice = None
 
 source = None
@@ -545,15 +544,14 @@ cell = into_dtype(
 # ==============================================================================
 
 
-def make_type_universe(input_deck):
-    global universe
-
-    # Maximum number of cells per universe
-    Nmax_cell = max([universe.N_cell for universe in input_deck.universes])
-
-    universe = into_dtype(
-        [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
-    )
+universe = into_dtype(
+    [
+        ("ID", int64),
+        # Cell IDs
+        ("N_cell", int64),
+        ("cell_data_idx", int64),
+    ]
+)
 
 
 # ==============================================================================
@@ -1227,11 +1225,11 @@ def make_type_global(input_deck):
     N_surface_tally = len(input_deck.surface_tallies)
 
     # Cell data sizes
-    N_cell_surface = 0
-    N_cell_region = 0
-    for cell_ in input_deck.cells:
-        N_cell_surface += len(cell_.surface_IDs)
-        N_cell_region += len(cell_._region_RPN)
+    N_cell_surface = sum([len(x.surface_IDs) for x in input_deck.cells])
+    N_cell_region = sum([len(x._region_RPN) for x in input_deck.cells])
+
+    # Universe data sizes
+    N_universe_cell = sum([len(x.cell_IDs) for x in input_deck.universes])
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1293,6 +1291,7 @@ def make_type_global(input_deck):
             ("cells_data_region", int64, (N_cell_region,)),
             # Universes
             ("universes", universe, (N_universe,)),
+            ("universes_data_cell", int64, (N_universe_cell,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
             ("mesh_tallies", mesh_tally, (N_mesh_tally,)),

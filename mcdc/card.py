@@ -304,13 +304,12 @@ class CellCard(InputCard):
 
 
 class UniverseCard(InputCard):
-    def __init__(self, N_cell):
+    def __init__(self):
         InputCard.__init__(self, "Universe")
 
         # Set card data
         self.ID = None
-        self.N_cell = N_cell
-        self.cell_IDs = np.zeros(N_cell, dtype=int)
+        self.cell_IDs = np.zeros(0, dtype=int)
 
 
 class LatticeCard(InputCard):
