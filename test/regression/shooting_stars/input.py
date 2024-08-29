@@ -67,7 +67,7 @@ max_z = mcdc.surface("plane-z", z=5.0, bc="vacuum")
 container_left = +min_y & -max_y & +min_z & -max_z & +min_x & -mid_x
 container_right = +min_y & -max_y & +min_z & -max_z & +mid_x & -max_x
 assembly_left = mcdc.cell(container_left, assembly, (-5, 0, 0))
-assembly_right = mcdc.cell(container_right, assembly, (+5, 0, 0), (0, 45, 0))
+assembly_right = mcdc.cell(container_right, assembly, (+5, 0, 0), (0, 10, 0))
 
 # Root universe
 mcdc.universe([assembly_left, assembly_right], root=True)

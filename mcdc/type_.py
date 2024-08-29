@@ -479,10 +479,12 @@ def make_type_material(input_deck):
 def make_type_surface(input_deck):
     global surface
 
-    # Maximum number tallies
+    # Maximum number of tallies and movements
     Nmax_tally = 0
+    Nmax_move = 0
     for surface in input_deck.surfaces:
-        Nmax_tally = max(Nmax_tally, len(surface.tally_IDs))
+        Nmax_tally = max(Nmax_tally, surface.N_tally)
+        Nmax_move = max(Nmax_move, surface.N_move)
 
     surface = into_dtype(
         [
@@ -504,6 +506,10 @@ def make_type_surface(input_deck):
             ("nz", float64),
             ("N_tally", int64),
             ("tally_IDs", int64, (Nmax_tally,)),
+            ("moving", bool_),
+            ("N_move", int64),
+            ("move_time_grid", float64, (Nmax_move + 1,)),
+            ("move_translations", float64, (Nmax_move + 1, 3)),
         ]
     )
 

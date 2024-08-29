@@ -169,6 +169,10 @@ class SurfaceCard(InputCard):
         self.nz = 0.0
         self.N_tally = 0
         self.tally_IDs = []
+        self.moving = False
+        self.N_move = 1
+        self.move_velocities = [(0.0, 0.0, 0.0)]
+        self.move_durations = [INF]
 
     def _create_halfspace(self, positive):
         region = RegionCard("halfspace")
@@ -197,6 +201,16 @@ class SurfaceCard(InputCard):
 
     def __neg__(self):
         return self._create_halfspace(False)
+
+    def move(self, velocities, durations):
+        self.moving = True
+        self.N_move = len(durations) + 1
+
+        self.move_velocities = velocities
+        self.move_velocities.append([0.0, 0.0, 0.0])
+
+        self.move_durations = durations
+        self.move_durations.append(INF)
 
 
 class CellCard(InputCard):

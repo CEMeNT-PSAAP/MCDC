@@ -558,7 +558,7 @@ def prepare():
     for i in range(N_surface):
         # Direct assignment
         for name in type_.surface.names:
-            if name not in ["BC", "tally_IDs"]:
+            if name not in ["BC", "tally_IDs", "move_translations", "move_time_grid"]:
                 copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
 
         # Boundary condition
@@ -573,6 +573,25 @@ def prepare():
         for name in ["tally_IDs"]:
             N = len(getattr(input_deck.surfaces[i], name))
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
+
+        # Moves
+        surface = mcdc["surfaces"][i]
+        surface_input = input_deck.surfaces[i]
+        if surface["moving"]:
+            surface["move_time_grid"][0] = 0.0
+            surface["move_translations"][0] = np.array([0.0, 0.0, 0.0])
+            for n in range(surface["N_move"]):
+                velocity = np.array(surface_input.move_velocities[n])
+                duration = surface_input.move_durations[n]
+
+                t_start = surface["move_time_grid"][n]
+                t_end = t_start + duration
+
+                position_start = surface["move_translations"][n]
+                position_end = position_start + velocity * duration
+
+                surface["move_time_grid"][n + 1] = t_end
+                surface["move_translations"][n + 1] = position_end
 
     # =========================================================================
     # Cells
@@ -600,6 +619,11 @@ def prepare():
         # Fill rotation flag
         if np.max(np.abs(mcdc["cells"][i]["rotation"])) > 0.0:
             mcdc["cells"][i]["fill_rotated"] = True
+
+            # Convert rotation
+            mcdc["cells"][i]["rotation"][0] *= PI / 180.0
+            mcdc["cells"][i]["rotation"][1] *= PI / 180.0
+            mcdc["cells"][i]["rotation"][2] *= PI / 180.0
 
         # Surface data
         mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
@@ -1555,7 +1579,16 @@ def closeout(mcdc):
 # ======================================================================================
 
 
-def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
+def visualize(
+    vis_type,
+    x=0.0,
+    y=0.0,
+    z=0.0,
+    pixel=(100, 100),
+    colors=None,
+    time=np.array([0.0]),
+    save_as=None,
+):
     """
     2D visualization of the created model
 
@@ -1569,6 +1602,8 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
         Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
     z : float or array_like
         Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
+    time : array_like
+        Times at which the geometry snapshots are taken
     pixel : array_like
         Number of respective pixel in the two axes in vis_plane
     colors : array_like
@@ -1637,26 +1672,34 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
     particle["g"] = 0
     particle["E"] = 1e6
 
-    # RGB color data for each pixel
-    data = np.zeros(pixel + (3,))
+    for t in time:
+        # Set time
+        particle["t"] = t
 
-    # Loop over the two axes
-    for i in range(pixel[0]):
-        particle[first_key] = first_midpoint[i]
-        for j in range(pixel[1]):
-            particle[second_key] = second_midpoint[j]
+        # RGB color data for each pixel
+        data = np.zeros(pixel + (3,))
 
-            # Get material
-            particle["cell_ID"] = -1
-            particle["material_ID"] = -1
-            if geometry.locate_particle(particle, mcdc):
-                data[i, j] = colors[particle["material_ID"]]
-            else:
-                data[i, j] = WHITE
+        # Loop over the two axes
+        for i in range(pixel[0]):
+            particle[first_key] = first_midpoint[i]
+            for j in range(pixel[1]):
+                particle[second_key] = second_midpoint[j]
 
-    data = np.transpose(data, (1, 0, 2))
-    plt.imshow(data, origin="lower", extent=first + second)
-    plt.xlabel(first_key + " [cm]")
-    plt.ylabel(second_key + " [cm]")
-    plt.title(reference_key + " = %.2f cm" % reference)
-    plt.show()
+                # Get material
+                particle["cell_ID"] = -1
+                particle["material_ID"] = -1
+                if geometry.locate_particle(particle, mcdc):
+                    data[i, j] = colors[particle["material_ID"]]
+                else:
+                    data[i, j] = WHITE
+
+        data = np.transpose(data, (1, 0, 2))
+        plt.imshow(data, origin="lower", extent=first + second)
+        plt.xlabel(first_key + " [cm]")
+        plt.ylabel(second_key + " [cm]")
+        plt.title(reference_key + " = %.2f cm" % reference + ", time = %.2f s" % t)
+        if save_as is not None:
+            plt.savefig(save_as + "_%.2f.png" % t)
+            plt.clf()
+        else:
+            plt.show()
