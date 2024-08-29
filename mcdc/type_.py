@@ -522,17 +522,20 @@ def make_type_surface(input_deck):
 cell = into_dtype(
     [
         ("ID", int64),
+        # Surface IDs
+        ("N_surface", int64),
+        ("surface_data_idx", int64),
+        # Region RPN tokens
+        ("N_region", int64),
+        ("region_data_idx", int64),
         # Fill status
         ("fill_type", int64),
         ("fill_ID", int64),
-        ("fill_translated", bool),
-        ("fill_rotated", bool),
+        ("fill_translated", bool_),
+        ("fill_rotated", bool_),
         # Local coordinate modifier
         ("translation", float64, (3,)),
         ("rotation", float64, (3,)),
-        # Data indices
-        ("surface_data_idx", int64),
-        ("region_data_idx", int64),
     ]
 )
 
@@ -1227,8 +1230,8 @@ def make_type_global(input_deck):
     N_cell_surface = 0
     N_cell_region = 0
     for cell_ in input_deck.cells:
-        N_cell_surface += 1 + len(cell_.surface_IDs)
-        N_cell_region += 1 + len(cell_._region_RPN)
+        N_cell_surface += len(cell_.surface_IDs)
+        N_cell_region += len(cell_._region_RPN)
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1284,9 +1287,11 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
+            # Cells
             ("cells", cell, (N_cell,)),
-            ("cell_surface_data", int64, (N_cell_surface,)),
-            ("cell_region_data", int64, (N_cell_region,)),
+            ("cells_data_surface", int64, (N_cell_surface,)),
+            ("cells_data_region", int64, (N_cell_region,)),
+            # Universes
             ("universes", universe, (N_universe,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),

@@ -335,9 +335,9 @@ def check_cell(particle, cell, mcdc):
     """
     Check if the particle is inside the cell
     """
-    # Access RPN data
+    # Access Region RPN data
     idx = cell["region_data_idx"]
-    N_token = mcdc["cell_region_data"][idx]
+    N_token = cell["N_region"]
 
     # Create local value array
     value_struct = local.RPN_array()
@@ -345,10 +345,9 @@ def check_cell(particle, cell, mcdc):
     N_value = 0
 
     # March forward through RPN tokens
-    idx += 1
     idx_end = idx + N_token
     while idx < idx_end:
-        token = mcdc["cell_region_data"][idx]
+        token = mcdc["cells_data_region"][idx]
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
@@ -417,13 +416,12 @@ def distance_to_nearest_surface(particle, cell, mcdc):
 
     # Access cell surface data
     idx = cell["surface_data_idx"]
-    N_surface = mcdc["cell_surface_data"][idx]
+    N_surface = cell["N_surface"]
 
     # Iterate over all surfaces
-    idx += 1
     idx_end = idx + N_surface
     while idx < idx_end:
-        candidate_surface_ID = mcdc["cell_surface_data"][idx]
+        candidate_surface_ID = mcdc["cells_data_surface"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
         d = surface_distance(particle, surface, mcdc)
         if d < distance:
