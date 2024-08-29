@@ -210,6 +210,7 @@ class CellCard(InputCard):
         self.fill_type = "material"
         self.fill_ID = None
         self.translation = np.array([0.0, 0.0, 0.0])
+        self.rotation = np.array([0.0, 0.0, 0.0])
         self.surface_IDs = np.zeros(0, dtype=int)
         self._region_RPN = []  # Reverse Polish Notation
 

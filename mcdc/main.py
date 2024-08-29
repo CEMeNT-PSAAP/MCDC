@@ -582,7 +582,7 @@ def prepare():
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
-        for name in ["ID", "fill_ID", "translation"]:
+        for name in ["ID", "fill_ID", "translation", "rotation"]:
             copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Fill type
@@ -596,6 +596,10 @@ def prepare():
         # Fill translation flag
         if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
             mcdc["cells"][i]["fill_translated"] = True
+
+        # Fill rotation flag
+        if np.max(np.abs(mcdc["cells"][i]["rotation"])) > 0.0:
+            mcdc["cells"][i]["fill_rotated"] = True
 
         # Surface data
         mcdc["cells"][i]["surface_data_idx"] = surface_data_idx

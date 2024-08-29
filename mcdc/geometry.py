@@ -85,6 +85,10 @@ def inspect_geometry(particle, mcdc):
                 particle["y"] -= cell["translation"][1]
                 particle["z"] -= cell["translation"][2]
 
+            # Apply rotation
+            if cell["fill_rotated"]:
+                _rotate_particle(particle, cell["rotation"])
+
             # Universe cell?
             if cell["fill_type"] == FILL_UNIVERSE:
                 # Get universe ID
@@ -199,6 +203,10 @@ def locate_particle(particle, mcdc):
                 particle["y"] -= cell["translation"][1]
                 particle["z"] -= cell["translation"][2]
 
+            # Apply rotation
+            if cell["fill_rotated"]:
+                _rotate_particle(particle, cell["rotation"])
+
             # Universe cell?
             if cell["fill_type"] == FILL_UNIVERSE:
                 # Get universe ID
@@ -242,6 +250,61 @@ def locate_particle(particle, mcdc):
         report_lost(particle)
 
     return not particle_is_lost
+
+
+@nb.njit
+def _rotate_particle(particle, rotation):
+    # Particle initial coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
+    # Rotation matrix
+    xx, xy, xz, yx, yy, yz, zx, zy, zz = _rotation_matrix(rotation)
+
+    # Rotate
+    x_rotated = x * xx + y * xy + z * xz
+    y_rotated = x * yx + y * yy + z * yz
+    z_rotated = x * zx + y * zy + z * zz
+    ux_rotated = ux * xx + uy * xy + uz * xz
+    uy_rotated = ux * yx + uy * yy + uz * yz
+    uz_rotated = ux * zx + uy * zy + uz * zz
+
+    # Assign the rotated coordinate
+    particle["x"] = x_rotated
+    particle["y"] = y_rotated
+    particle["z"] = z_rotated
+    particle["ux"] = ux_rotated
+    particle["uy"] = uy_rotated
+    particle["uz"] = uz_rotated
+
+
+@nb.njit
+def _rotation_matrix(rotation):
+    phi = rotation[0] * PI / 180.0
+    theta = rotation[1] * PI / 180.0
+    psi = rotation[2] * PI / 180.0
+
+    xx = math.cos(theta) * math.cos(psi)
+    xy = -math.cos(phi) * math.sin(psi) + math.sin(phi) * math.sin(theta) * math.cos(
+        psi
+    )
+    xz = math.sin(phi) * math.sin(psi) + math.cos(phi) * math.sin(theta) * math.cos(psi)
+
+    yx = math.cos(theta) * math.sin(psi)
+    yy = math.cos(phi) * math.cos(psi) + math.sin(phi) * math.sin(theta) * math.sin(psi)
+    yz = -math.sin(phi) * math.cos(psi) + math.cos(phi) * math.sin(theta) * math.sin(
+        psi
+    )
+
+    zx = -math.sin(theta)
+    zy = math.sin(phi) * math.cos(theta)
+    zz = math.cos(phi) * math.cos(theta)
+
+    return xx, xy, xz, yx, yy, yz, zx, zy, zz
 
 
 # ======================================================================================
