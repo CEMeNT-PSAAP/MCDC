@@ -594,54 +594,58 @@ def prepare():
                 surface["move_translations"][n + 1] = position_end
 
     # =========================================================================
-    # Cells
+    # Set cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
+        cell = mcdc["cells"][i]
+        cell_input = input_deck.cells[i]
+
+        # Directly transferables
         for name in ["ID", "fill_ID", "translation", "rotation"]:
-            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+            copy_field(cell, cell_input, name)
 
         # Fill type
-        if input_deck.cells[i].fill_type == "material":
-            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
-        elif input_deck.cells[i].fill_type == "universe":
-            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
-        elif input_deck.cells[i].fill_type == "lattice":
-            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+        if cell_input.fill_type == "material":
+            cell["fill_type"] = FILL_MATERIAL
+        elif cell_input.fill_type == "universe":
+            cell["fill_type"] = FILL_UNIVERSE
+        elif cell_input.fill_type == "lattice":
+            cell["fill_type"] = FILL_LATTICE
 
-        # Fill translation flag
-        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
-            mcdc["cells"][i]["fill_translated"] = True
+        # Fill translation
+        if np.max(np.abs(cell["translation"])) > 0.0:
+            cell["fill_translated"] = True
 
-        # Fill rotation flag
-        if np.max(np.abs(mcdc["cells"][i]["rotation"])) > 0.0:
-            mcdc["cells"][i]["fill_rotated"] = True
+        # Fill rotation
+        if np.max(np.abs(cell["rotation"])) > 0.0:
+            cell["fill_rotated"] = True
 
             # Convert rotation
-            mcdc["cells"][i]["rotation"][0] *= PI / 180.0
-            mcdc["cells"][i]["rotation"][1] *= PI / 180.0
-            mcdc["cells"][i]["rotation"][2] *= PI / 180.0
+            cell["rotation"][0] *= PI / 180.0
+            cell["rotation"][1] *= PI / 180.0
+            cell["rotation"][2] *= PI / 180.0
 
-        # Surface data
-        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
-        N_surface = len(input_deck.cells[i].surface_IDs)
-        mcdc["cell_surface_data"][surface_data_idx] = N_surface
-        mcdc["cell_surface_data"][
-            surface_data_idx + 1 : surface_data_idx + N_surface + 1
-        ] = input_deck.cells[i].surface_IDs
-        surface_data_idx += N_surface + 1
+        # Surface IDs
+        cell["surface_data_idx"] = surface_data_idx
+        cell["N_surface"] = len(cell_input.surface_IDs)
+        # Surface ID data
+        start = surface_data_idx
+        end = start + cell["N_surface"]
+        mcdc["cells_data_surface"][start:end] = cell_input.surface_IDs
+        surface_data_idx += cell["N_surface"]
 
-        # Region data
-        mcdc["cells"][i]["region_data_idx"] = region_data_idx
-        N_RPN = len(input_deck.cells[i]._region_RPN)
-        mcdc["cell_region_data"][region_data_idx] = N_RPN
-        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
-            input_deck.cells[i]._region_RPN
-        )
-        region_data_idx += N_RPN + 1
+        # Region RPN tokens
+        cell["region_data_idx"] = region_data_idx
+        cell["N_region"] = len(cell_input._region_RPN)
+        # Region RPN token data
+        start = region_data_idx
+        end = start + cell["N_region"]
+        mcdc["cells_data_region"][start:end] = cell_input._region_RPN
+        region_data_idx += cell["N_region"]
 
     # =========================================================================
     # Universes
