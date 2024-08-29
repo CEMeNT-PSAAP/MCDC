@@ -591,7 +591,7 @@ def surface(type_, bc="interface", **kw):
     return card
 
 
-def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
+def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0), rotation=(0.0, 0.0, 0.0)):
     """
     Create a cell as model building block.
 
@@ -603,6 +603,8 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
         Material/universe/lattice that fills the cell.
     translation : array_like[float], optional
         To translate the origin of the fill (if universe or lattice).
+    rotation : array_like[float], optional
+        To rotate the the fill (if universe or lattice).
 
     Returns
     -------
@@ -648,6 +650,9 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
 
     # Translation
     card.translation[:] = translation
+
+    # Rotation
+    card.rotation[:] = rotation
 
     # Get all surface IDs
     card.set_surface_IDs()

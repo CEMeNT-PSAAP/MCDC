@@ -520,8 +520,10 @@ cell = into_dtype(
         ("fill_type", int64),
         ("fill_ID", int64),
         ("fill_translated", bool),
+        ("fill_rotated", bool),
         # Local coordinate modifier
         ("translation", float64, (3,)),
+        ("rotation", float64, (3,)),
         # Data indices
         ("surface_data_idx", int64),
         ("region_data_idx", int64),
