@@ -369,10 +369,11 @@ def prepare():
     # Create root universe if not defined
     # =========================================================================
 
-    N_cell = len(input_deck.cells)
     if input_deck.universes[0] == None:
-        root_universe = UniverseCard(N_cell)
+        N_cell = len(input_deck.cells)
+        root_universe = UniverseCard()
         root_universe.ID = 0
+        root_universe.cell_IDs = np.zeros(N_cell, int)
         for i, cell in enumerate(input_deck.cells):
             root_universe.cell_IDs[i] = cell.ID
         input_deck.universes[0] = root_universe
@@ -410,7 +411,6 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
-    type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
     type_.make_type_mesh_tally(input_deck)
@@ -632,7 +632,7 @@ def prepare():
         # Surface IDs
         cell["surface_data_idx"] = surface_data_idx
         cell["N_surface"] = len(cell_input.surface_IDs)
-        # Surface ID data
+        # The data
         start = surface_data_idx
         end = start + cell["N_surface"]
         mcdc["cells_data_surface"][start:end] = cell_input.surface_IDs
@@ -641,26 +641,34 @@ def prepare():
         # Region RPN tokens
         cell["region_data_idx"] = region_data_idx
         cell["N_region"] = len(cell_input._region_RPN)
-        # Region RPN token data
+        # The data
         start = region_data_idx
         end = start + cell["N_region"]
         mcdc["cells_data_region"][start:end] = cell_input._region_RPN
         region_data_idx += cell["N_region"]
 
     # =========================================================================
-    # Universes
+    # Set universes
     # =========================================================================
 
     N_universe = len(input_deck.universes)
+    cell_data_idx = 0
     for i in range(N_universe):
-        for name in type_.universe.names:
-            if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = getattr(input_deck.universes[i], name)
+        universe = mcdc["universes"][i]
+        universe_input = input_deck.universes[i]
 
-        # Variables with possible different sizes
-        for name in ["cell_IDs"]:
-            N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = getattr(input_deck.universes[i], name)
+        # Directly transferables
+        for name in ["ID"]:
+            copy_field(universe, universe_input, name)
+
+        # Cells IDs
+        universe["cell_data_idx"] = cell_data_idx
+        universe["N_cell"] = len(universe_input.cell_IDs)
+        # Cell ID data
+        start = cell_data_idx
+        end = start + universe["N_cell"]
+        mcdc["universes_data_cell"][start:end] = universe_input.cell_IDs
+        cell_data_idx += universe["N_cell"]
 
     # =========================================================================
     # Lattices

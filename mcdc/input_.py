@@ -683,13 +683,12 @@ def universe(cells, root=False):
     --------
     mcdc.cell : Creates a cell that can be used to define a universe.
     """
-    N_cell = len(cells)
 
     # Edit root universe
     if root:
         # Create and replace placeholder if root is not yet created
         if global_.input_deck.universes[0] == None:
-            card = UniverseCard(N_cell)
+            card = UniverseCard()
             card.ID = 0
             global_.input_deck.universes[0] = card
         else:
@@ -697,10 +696,12 @@ def universe(cells, root=False):
 
     # Create new universe
     else:
-        card = UniverseCard(N_cell)
+        card = UniverseCard()
         card.ID = len(global_.input_deck.universes)
 
     # Cells
+    N_cell = len(cells)
+    card.cell_IDs = np.zeros(N_cell, dtype=int)
     for i in range(N_cell):
         card.cell_IDs[i] = cells[i].ID
 
