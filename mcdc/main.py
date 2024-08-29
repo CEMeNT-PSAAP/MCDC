@@ -1652,7 +1652,7 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
 
     data = np.transpose(data, (1, 0, 2))
     plt.imshow(data, origin="lower", extent=first + second)
-    plt.xlabel(first_key + " cm")
-    plt.ylabel(second_key + " cm")
+    plt.xlabel(first_key + " [cm]")
+    plt.ylabel(second_key + " [cm]")
     plt.title(reference_key + " = %.2f cm" % reference)
     plt.show()
