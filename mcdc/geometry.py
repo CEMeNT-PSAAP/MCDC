@@ -6,7 +6,7 @@ import mcdc.local as local
 import mcdc.mesh as mesh
 import mcdc.physics as physics
 
-from mcdc.algorithm import binary_search
+from mcdc.algorithm import binary_search_with_length
 from mcdc.constant import *
 
 
@@ -284,9 +284,9 @@ def _rotate_particle(particle, rotation):
 
 @nb.njit
 def _rotation_matrix(rotation):
-    phi = rotation[0] * PI / 180.0
-    theta = rotation[1] * PI / 180.0
-    psi = rotation[2] * PI / 180.0
+    phi = rotation[0]
+    theta = rotation[1]
+    psi = rotation[2]
 
     xx = math.cos(theta) * math.cos(psi)
     xy = -math.cos(phi) * math.sin(psi) + math.sin(phi) * math.sin(theta) * math.cos(
@@ -461,7 +461,33 @@ def surface_evaluate(particle, surface):
     # Linear surface evaluation
     result = G * x + H * y + I * z + J
     if surface["linear"]:
-        return result
+        if not surface["moving"]:
+            return result
+        else:
+            # Get move index
+            N_move = surface["N_move"]
+            time_grid = surface["move_time_grid"]
+            idx = binary_search_with_length(t, time_grid, N_move)
+            # Coinciding cases
+            if abs(time_grid[idx + 1] - t) < COINCIDENCE_TOLERANCE:
+                idx += 1
+
+            # Get translation points
+            translation_start = surface["move_translations"][idx]
+            translation_end = surface["move_translations"][idx + 1]
+
+            # Interpolate translation
+            dx = translation_end[0] - translation_start[0]
+            dy = translation_end[1] - translation_start[1]
+            dz = translation_end[2] - translation_start[2]
+            dt = time_grid[idx + 1] - time_grid[idx]
+            tt = t - time_grid[idx]
+
+            tr_x = translation_start[0] + dx / dt * tt
+            tr_y = translation_start[1] + dy / dt * tt
+            tr_z = translation_start[2] + dz / dt * tt
+
+            return result - (G * tr_x + H * tr_y + I * tr_z)
 
     # Surface coefficient
     A = surface["A"]
