@@ -409,8 +409,13 @@ def gpu_forward_declare():
 
     none_type = numba.from_dtype(np.dtype([]))
     mcdc_type = numba.from_dtype(type_.global_)
-    state_spec = (mcdc_type, none_type, none_type)
-    device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
+    state_spec = ({"constant" : mcdc_type}, none_type, none_type)
+    access_fns = harm.RuntimeSpec.access_fns(state_spec)
+    print(access_fns)
+    device_gpu = access_fns["device"]["constant"]
+    print("\n\n\n",device_gpu,"\n\n\n")
+    group_gpu  = access_fns["group"]
+    thread_gpu = access_fns["thread"]
     particle_gpu = numba.from_dtype(type_.particle)
     particle_record_gpu = numba.from_dtype(type_.particle_record)
 

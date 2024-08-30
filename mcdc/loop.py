@@ -1282,6 +1282,8 @@ def build_gpu_progs():
     src_fns = src_spec.event_functions()
     pre_fns = pre_spec.event_functions()
 
+    print(src_fns)
+
     global alloc_state, free_state
     alloc_state = src_fns["alloc_state"]
     free_state = src_fns["free_state"]
@@ -1290,8 +1292,8 @@ def build_gpu_progs():
     global src_init_program, src_exec_program, src_complete, src_clear_flags
     src_alloc_program = src_fns["alloc_program"]
     src_free_program = src_fns["free_program"]
-    src_load_state = src_fns["load_state"]
-    src_store_state = src_fns["store_state"]
+    src_load_state = src_fns["load_state_device_constant"]
+    src_store_state = src_fns["store_state_device_constant"]
     src_init_program = src_fns["init_program"]
     src_exec_program = src_fns["exec_program"]
     src_complete = src_fns["complete"]
@@ -1303,8 +1305,8 @@ def build_gpu_progs():
     pre_free_state = pre_fns["free_state"]
     pre_alloc_program = pre_fns["alloc_program"]
     pre_free_program = pre_fns["free_program"]
-    pre_load_state = pre_fns["load_state"]
-    pre_store_state = pre_fns["store_state"]
+    pre_load_state = pre_fns["load_state_device_constant"]
+    pre_store_state = pre_fns["store_state_device_constant"]
     pre_init_program = pre_fns["init_program"]
     pre_exec_program = pre_fns["exec_program"]
     pre_complete = pre_fns["complete"]
@@ -1313,6 +1315,7 @@ def build_gpu_progs():
 
     @njit
     def real_setup_gpu(mcdc):
+        print("Setting up GPU!")
         arena_size = 0x1000000
         block_count = 240
         mcdc["gpu_state"] = adapt.cast_voidptr_to_uintp(alloc_state())
@@ -1324,6 +1327,8 @@ def build_gpu_progs():
             pre_alloc_program(mcdc["gpu_state"], arena_size)
         )
         pre_init_program(mcdc["precursor_program"], 1) #4096)
+        print("Setup complete!")
+        return
 
     @njit
     def real_teardown_gpu(mcdc):
