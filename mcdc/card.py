@@ -203,6 +203,9 @@ class SurfaceCard(InputCard):
         return self._create_halfspace(False)
 
     def move(self, velocities, durations):
+        if self.type not in ["plane-x", "plane-y", "plane-z", "plane"]:
+            print_error("Moving quadric surfaces are not supported yet.")
+
         self.moving = True
         self.N_move = len(durations) + 1
 
