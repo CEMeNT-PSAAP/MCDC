@@ -11,10 +11,11 @@ from mcdc.constant import SQRT_E_TO_SPEED
 
 
 @njit
-def get_speed(particle, mcdc):
+def get_speed(particle_arr, mcdc):
     """
     Get particle speed
     """
+    particle = particle_arr[0]
     # Multigroup
     if mcdc["setting"]["mode_MG"]:
         material_ID = particle["material_ID"]

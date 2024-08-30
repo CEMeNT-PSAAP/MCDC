@@ -16,7 +16,7 @@ from mcdc.constant import *
 
 
 @njit
-def inspect_geometry(particle, mcdc):
+def inspect_geometry(particle_arr, mcdc):
     """
     Full geometry inspection of the particle:
         - Set particle top cell and material IDs (if not lost)
@@ -25,6 +25,8 @@ def inspect_geometry(particle, mcdc):
         - Return distance to boundary (surface or lattice)
     """
     # TODO: add universe cell (besides material and lattice cells)
+
+    particle = particle_arr[0]
 
     # Store particle global coordinate
     # (particle will be temporarily translated and rotated)
@@ -35,7 +37,7 @@ def inspect_geometry(particle, mcdc):
     ux_global = particle["ux"]
     uy_global = particle["uy"]
     uz_global = particle["uz"]
-    speed = physics.get_speed(particle, mcdc)
+    speed = physics.get_speed(particle_arr, mcdc)
 
     # Default returns
     distance = INF
@@ -43,7 +45,7 @@ def inspect_geometry(particle, mcdc):
 
     # Find top cell from root universe if unknown
     if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(particle, UNIVERSE_ROOT, mcdc)
+        particle["cell_ID"] = get_cell(particle_arr, UNIVERSE_ROOT, mcdc)
 
         # Particle is lost?
         if particle["cell_ID"] == -1:
@@ -55,7 +57,7 @@ def inspect_geometry(particle, mcdc):
     # Recursively check cells until material cell is found (or the particle is lost)
     while event != EVENT_LOST:
         # Distance to nearest surface
-        d_surface, surface_ID = distance_to_nearest_surface(particle, cell, mcdc)
+        d_surface, surface_ID = distance_to_nearest_surface(particle_arr, cell, mcdc)
 
         # Check if smaller
         if d_surface < distance - COINCIDENCE_TOLERANCE:
@@ -90,7 +92,7 @@ def inspect_geometry(particle, mcdc):
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
                 # Distance to lattice grid
-                d_lattice = mesh.uniform.get_crossing_distance(particle, speed, lattice)
+                d_lattice = mesh.uniform.get_crossing_distance(particle_arr, speed, lattice)
 
                 # Check if smaller
                 if d_lattice < distance - COINCIDENCE_TOLERANCE:
@@ -105,7 +107,7 @@ def inspect_geometry(particle, mcdc):
                         event += EVENT_LATTICE_CROSSING
 
                 # Get universe
-                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle, lattice)
+                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle_arr, lattice)
                 if outside:
                     event = EVENT_LOST
                     continue
@@ -117,7 +119,7 @@ def inspect_geometry(particle, mcdc):
                 particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
                 # Get inner cell
-                cell_ID = get_cell(particle, universe_ID, mcdc)
+                cell_ID = get_cell(particle_arr, universe_ID, mcdc)
                 if cell_ID > -1:
                     cell = mcdc["cells"][cell_ID]
                 else:
@@ -134,7 +136,7 @@ def inspect_geometry(particle, mcdc):
 
     # Report lost particle
     if event == EVENT_LOST:
-        report_lost(particle)
+        report_lost(particle_arr)
 
     # Assign particle event
     particle["event"] = event
@@ -143,7 +145,7 @@ def inspect_geometry(particle, mcdc):
 
 
 @njit
-def locate_particle(particle, mcdc):
+def locate_particle(particle_arr, mcdc):
     """
     Set particle cell and material IDs
     Return False if particle is lost
@@ -152,6 +154,8 @@ def locate_particle(particle, mcdc):
     or/and lattice grid and the respective boundary event are not determined.
     """
     # TODO: add universe cell (besides material and lattice cells)
+
+    particle = particle_arr[0]
 
     # Store particle global coordinate
     # (particle will be temporarily translated and rotated)
@@ -162,13 +166,13 @@ def locate_particle(particle, mcdc):
     ux_global = particle["ux"]
     uy_global = particle["uy"]
     uz_global = particle["uz"]
-    speed = physics.get_speed(particle, mcdc)
+    speed = physics.get_speed(particle_arr, mcdc)
 
     particle_is_lost = False
 
     # Find top cell from root universe if unknown
     if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(particle, UNIVERSE_ROOT, mcdc)
+        particle["cell_ID"] = get_cell(particle_arr, UNIVERSE_ROOT, mcdc)
 
         # Particle is lost?
         if particle["cell_ID"] == -1:
@@ -198,7 +202,7 @@ def locate_particle(particle, mcdc):
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
                 # Get universe
-                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle, lattice)
+                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle_arr, lattice)
                 if outside:
                     particle_is_lost = True
                     continue
@@ -210,7 +214,7 @@ def locate_particle(particle, mcdc):
                 particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
                 # Get inner cell
-                cell_ID = get_cell(particle, universe_ID, mcdc)
+                cell_ID = get_cell(particle_arr, universe_ID, mcdc)
                 if cell_ID > -1:
                     cell = mcdc["cells"][cell_ID]
                 else:
@@ -227,7 +231,7 @@ def locate_particle(particle, mcdc):
 
     # Report lost particle
     if particle_is_lost:
-        report_lost(particle)
+        report_lost(particle_arr)
 
     particle_is_found = not particle_is_lost
     return not particle_is_found
@@ -239,17 +243,18 @@ def locate_particle(particle, mcdc):
 
 
 @njit
-def get_cell(particle, universe_ID, mcdc):
+def get_cell(particle_arr, universe_ID, mcdc):
     """
     Find and return particle cell ID in the given universe
     Return -1 if particle is lost
     """
+    particle = particle_arr[0]
     universe = mcdc["universes"][universe_ID]
 
     # Check all cells in the universe
     for cell_ID in universe["cell_IDs"]:
         cell = mcdc["cells"][cell_ID]
-        if check_cell(particle, cell, mcdc):
+        if check_cell(particle_arr, cell, mcdc):
             return cell["ID"]
 
     # Particle is not found
@@ -257,10 +262,11 @@ def get_cell(particle, universe_ID, mcdc):
 
 
 @njit
-def check_cell(particle, cell, mcdc):
+def check_cell(particle_arr, cell, mcdc):
     """
     Check if the particle is inside the cell
     """
+    particle = particle_arr[0]
     # Access RPN data
     idx = cell["region_data_idx"]
     N_token = mcdc["cell_region_data"][idx]
@@ -278,7 +284,7 @@ def check_cell(particle, cell, mcdc):
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
-            value[N_value] = check_surface_sense(particle, surface)
+            value[N_value] = check_surface_sense(particle_arr, surface)
             N_value += 1
 
         elif token == BOOL_NOT:
@@ -298,28 +304,29 @@ def check_cell(particle, cell, mcdc):
 
 
 @njit
-def check_surface_sense(particle, surface):
+def check_surface_sense(particle_arr, surface):
     """
     Check on which side of the surface the particle is
         - Return True if positive side
         - Return False otherwise
     Particle direction is used if coincide within the tolerance
     """
-    result = surface_evaluate(particle, surface)
+    result = surface_evaluate(particle_arr, surface)
 
     # Check if coincident on the surface
     if abs(result) < COINCIDENCE_TOLERANCE:
         # Determine sense based on the direction
-        return surface_normal_component(particle, surface) > 0.0
+        return surface_normal_component(particle_arr, surface) > 0.0
 
     return result > 0.0
 
 
 @njit
-def report_lost(particle):
+def report_lost(particle_arr):
     """
     Report lost particle and terminate it
     """
+    particle = particle_arr[0]
     x = particle["x"]
     y = particle["y"]
     z = particle["z"]
@@ -333,11 +340,12 @@ def report_lost(particle):
 
 
 @njit
-def distance_to_nearest_surface(particle, cell, mcdc):
+def distance_to_nearest_surface(particle_arr, cell, mcdc):
     """
     The termine the nearest cell surface and the distance to it
     """
     # TODO: docs
+    particle = particle_arr[0]
     distance = INF
     surface_ID = -1
 
@@ -351,7 +359,7 @@ def distance_to_nearest_surface(particle, cell, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cell_surface_data"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d = surface_distance(particle, surface, mcdc)
+        d = surface_distance(particle_arr, surface, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]
@@ -367,11 +375,11 @@ def distance_to_nearest_surface(particle, cell, mcdc):
 
 
 @njit
-def surface_evaluate(particle, surface):
+def surface_evaluate(particle_arr, surface):
     """
     Evaluate the surface equation wrt the particle coordinate
     """
-
+    particle = particle_arr[0]
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -404,10 +412,11 @@ def surface_evaluate(particle, surface):
 
 
 @njit
-def surface_distance(particle, surface, mcdc):
+def surface_distance(particle_arr, surface, mcdc):
     """
     Return particle distance to surface
     """
+    particle = particle_arr[0]
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -418,13 +427,13 @@ def surface_distance(particle, surface, mcdc):
     uz = particle["uz"]
 
     # Check if coincident and leaving the surface
-    evaluation = surface_evaluate(particle, surface)
+    evaluation = surface_evaluate(particle_arr, surface)
     coincident = False
     if abs(evaluation) < COINCIDENCE_TOLERANCE:
         coincident = True
         if surface["linear"]:
             return INF
-        elif surface_normal_component(particle, surface) > 0.0:
+        elif surface_normal_component(particle_arr, surface) > 0.0:
             return INF
 
     # Surface coefficients
@@ -500,27 +509,29 @@ def surface_distance(particle, surface, mcdc):
 
 
 @njit
-def surface_bc(particle, surface):
+def surface_bc(particle_arr, surface):
     """
     Apply surface boundary condition to the particle
     """
+    particle = particle_arr[0]
     if surface["BC"] == BC_VACUUM:
         particle["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
-        surface_reflect(particle, surface)
+        surface_reflect(particle_arr, surface)
 
 
 @njit
-def surface_reflect(particle, surface):
+def surface_reflect(particle_arr, surface):
     """
     Surface-reflect the particle
     """
+    particle = particle_arr[0]
     # Particle coordinate
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
 
-    nx, ny, nz = surface_normal(particle, surface)
+    nx, ny, nz = surface_normal(particle_arr, surface)
 
     c = 2.0 * (nx * ux + ny * uy + nz * uz)
 
@@ -530,10 +541,11 @@ def surface_reflect(particle, surface):
 
 
 @njit
-def surface_normal(particle, surface):
+def surface_normal(particle_arr, surface):
     """
     Get the surface outward-normal vector at the particle coordinate
     """
+    particle = particle_arr[0]
     if surface["linear"]:
         return surface["nx"], surface["ny"], surface["nz"]
 
@@ -562,13 +574,14 @@ def surface_normal(particle, surface):
 
 
 @njit
-def surface_normal_component(particle, surface):
+def surface_normal_component(particle_arr, surface):
     """
     Get the surface outward-normal component of the particle
     (dot product of the two directional vectors)
     """
+    particle = particle_arr[0]
     # Surface outward-normal vector
-    nx, ny, nz = surface_normal(particle, surface)
+    nx, ny, nz = surface_normal(particle_arr, surface)
 
     # Particle direction vector
     ux = particle["ux"]

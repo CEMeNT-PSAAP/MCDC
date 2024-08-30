@@ -5,24 +5,25 @@ from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 
 
 @njit
-def get_indices(particle, mesh):
+def get_indices(P_arr, mesh):
     """
     Get mesh indices given the particle coordinate
     """
+    P = P_arr[0]
     # Particle coordinate
-    x = particle["x"]
-    y = particle["y"]
-    z = particle["z"]
-    t = particle["t"]
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
 
     # Check if particle is outside the mesh grid
     outside = False
     if (
         # Outside the mesh condition
-        x < mesh["x"][0] - COINCIDENCE_TOLERANCE
+           x < mesh["x"][0] - COINCIDENCE_TOLERANCE
         or x > mesh["x"][-1] + COINCIDENCE_TOLERANCE
         or y < mesh["y"][0] - COINCIDENCE_TOLERANCE
         or y > mesh["y"][-1] + COINCIDENCE_TOLERANCE
