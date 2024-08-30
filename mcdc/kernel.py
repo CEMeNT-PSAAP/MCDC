@@ -1839,7 +1839,7 @@ def score_surface_tally(P, surface, tally, data, mcdc):
     idx = stride["tally"]
 
     # Flux
-    mu = geometry.surface_normal_component(P, surface)
+    mu = geometry.surface_normal_component(P, surface, mcdc)
     flux = P["w"] / abs(mu)
 
     # Score
@@ -2144,7 +2144,7 @@ def move_to_event(P, data, mcdc):
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
     #   If material is not identified yet, locate the particle.
-    if mcdc["setting"]["mode_MG"] and P["material_ID"] == -1:
+    if mcdc["setting"]["mode_MG"] and P["cell_ID"] == -1:
         if not geometry.locate_particle(P, mcdc):
             # Particle is lost
             P["event"] = EVENT_LOST
