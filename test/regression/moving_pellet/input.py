@@ -9,14 +9,16 @@ import mcdc
 
 # Set materials
 fuel = mcdc.material(
-    capture=np.array([0.45]),
-    fission=np.array([0.55]),
+    capture=np.array([0.5]),
+    fission=np.array([0.5]),
     nu_p=np.array([2.5]),
+    speed=np.array([1000.0]),
 )
 
 air = mcdc.material(
     capture=np.array([0.02]),
     scatter=np.array([[0.08]]),
+    speed=np.array([1000.0]),
 )
 
 # =============================================================================
@@ -55,7 +57,7 @@ mcdc.cell(
 # =============================================================================
 # Uniform isotropic source throughout the domain
 
-mcdc.source(point=[7.5, 0.0, 0.0])
+mcdc.source(point=[7.5, 0.0, 0.0], time=[0.0, 9.0])
 
 # =============================================================================
 # Set tally, setting, and run mcdc
@@ -64,16 +66,17 @@ mcdc.source(point=[7.5, 0.0, 0.0])
 # Tally: cell-average and cell-edge angular fluxes and currents
 mcdc.tally.mesh_tally(
     x=np.linspace(-10, 10, 201),
-    z=np.linspace(-5, 5, 101),
+    z=np.linspace(-10, 10, 201),
+    t=np.linspace(0, 9, 46),
     scores=["fission"],
 )
 
 # Setting
-mcdc.setting(N_particle=100, active_bank_buff=1000)
+mcdc.setting(N_particle=10, active_bank_buff=1000)
 
 # Run
-# mcdc.run()
-# """
+mcdc.run()
+"""
 colors = {
     fuel: "red",
     air: "blue",
@@ -88,4 +91,4 @@ mcdc.visualize(
     time=np.linspace(0.0, 9.0, 19),
     save_as="figure",
 )
-# """
+"""

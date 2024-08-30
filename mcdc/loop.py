@@ -321,7 +321,6 @@ def loop_source(seed, data, mcdc):
     work_end = work_start + work_size
 
     for idx_work in range(work_size):
-
         # =====================================================================
         # Generate a source particle
         # =====================================================================

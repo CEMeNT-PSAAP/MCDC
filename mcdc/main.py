@@ -1688,6 +1688,11 @@ def visualize(
         # Set time
         particle["t"] = t
 
+        # Random direction
+        particle["ux"], particle["uy"], particle["uz"] = (
+            kernel.sample_isotropic_direction(particle)
+        )
+
         # RGB color data for each pixel
         data = np.zeros(pixel + (3,))
 
