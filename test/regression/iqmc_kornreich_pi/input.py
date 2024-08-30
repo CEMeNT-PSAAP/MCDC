@@ -29,8 +29,8 @@ s2 = mcdc.surface("plane-x", x=1.5)
 s3 = mcdc.surface("plane-x", x=2.5, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m1)
-mcdc.cell([+s2, -s3], m2)
+mcdc.cell(+s1 & -s2, m1)
+mcdc.cell(+s2 & -s3, m2)
 
 # =========================================================================
 # iQMC Parameters
@@ -40,8 +40,6 @@ maxit = 5
 tol = 1e-3
 x = np.arange(0.0, 2.6, 0.1)
 Nx = len(x) - 1
-generator = "halton"
-solver = "power_iteration"
 fixed_source = np.zeros(Nx)
 phi0 = np.ones((Nx))
 
@@ -53,11 +51,9 @@ mcdc.iQMC(
     x=x,
     fixed_source=fixed_source,
     phi0=phi0,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
-    generator=generator,
-    eigenmode_solver=solver,
-    score=["tilt-x"],
+    scores=["source-x"],
 )
 # Setting
 mcdc.setting(N_particle=N)

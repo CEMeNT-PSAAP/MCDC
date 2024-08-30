@@ -41,23 +41,23 @@ radius = 0.54
 cy = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=radius)
 
 # Cells
-uo2 = mcdc.cell([-cy], mat_uo2)
-mox4 = mcdc.cell([-cy], mat_mox43)
-mox7 = mcdc.cell([-cy], mat_mox7)
-mox8 = mcdc.cell([-cy], mat_mox87)
-gt = mcdc.cell([-cy], mat_gt)
-fc = mcdc.cell([-cy], mat_fc)
-mod = mcdc.cell([+cy], mat_mod)
-modi = mcdc.cell([-cy], mat_mod)  # For all-water lattice
+uo2 = mcdc.cell(-cy, mat_uo2)
+mox4 = mcdc.cell(-cy, mat_mox43)
+mox7 = mcdc.cell(-cy, mat_mox7)
+mox8 = mcdc.cell(-cy, mat_mox87)
+gt = mcdc.cell(-cy, mat_gt)
+fc = mcdc.cell(-cy, mat_fc)
+mod = mcdc.cell(+cy, mat_mod)
+modi = mcdc.cell(-cy, mat_mod)  # For all-water lattice
 
 # Universes
-u = mcdc.universe([uo2, mod])["ID"]
-l = mcdc.universe([mox4, mod])["ID"]
-m = mcdc.universe([mox7, mod])["ID"]
-n = mcdc.universe([mox8, mod])["ID"]
-g = mcdc.universe([gt, mod])["ID"]
-f = mcdc.universe([fc, mod])["ID"]
-w = mcdc.universe([modi, mod])["ID"]
+u = mcdc.universe(uo2, mod)["ID"]
+l = mcdc.universe(mox4, mod)["ID"]
+m = mcdc.universe(mox7, mod)["ID"]
+n = mcdc.universe(mox8, mod)["ID"]
+g = mcdc.universe(gt, mod)["ID"]
+f = mcdc.universe(fc, mod)["ID"]
+w = mcdc.universe(modi, mod)["ID"]
 
 # =============================================================================
 # Assemblies
@@ -125,9 +125,9 @@ x1 = mcdc.surface("plane-x", x=pitch * 17 / 2)
 y0 = mcdc.surface("plane-y", y=-pitch * 17 / 2)
 y1 = mcdc.surface("plane-y", y=pitch * 17 / 2)
 # Cells
-assembly_uo2 = mcdc.cell([+x0, -x1, +y0, -y1], lattice_uo2)
-assembly_mox = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mox)
-assembly_mod = mcdc.cell([+x0, -x1, +y0, -y1], lattice_mod)
+assembly_uo2 = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_uo2)
+assembly_mox = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_mox)
+assembly_mod = mcdc.cell(+x0 & -x1 & +y0 & -y1, lattice_mod)
 
 # Set assemblies in their respective universes
 u_ = mcdc.universe([assembly_uo2])["ID"]
@@ -153,7 +153,7 @@ y0_ = mcdc.surface("plane-y", y=-pitch * 17 * 3, bc="vacuum")
 y1_ = mcdc.surface("plane-y", y=0.0, bc="reflective")
 # Cell
 core = mcdc.cell(
-    [+x0_, -x1_, +y0_, -y1_],
+    +x0_ & -x1_ & +y0_ & -y1_,
     lattice_core,
     lattice_center=[pitch * 17 * 3 / 2, -pitch * 17 * 3 / 2, 0.0],
 )
@@ -165,30 +165,21 @@ mcdc.universe([core], root=True)
 # iQMC Parameters
 # =============================================================================
 N = 1e4
-maxit = 10
-tol = 1e-3
 Nx = 17 * 3 * 2
 Ny = 17 * 3 * 2
 G = 7
 x_grid = np.linspace(0.0, pitch * 17 * 3, Nx + 1)
 y_grid = np.linspace(-pitch * 17 * 3, 0.0, Ny + 1)
 
-generator = "halton"
-solver = "power_iteration"
-
 phi0 = np.ones((G, Nx, Ny))
-fixed_source = np.zeros_like(phi0)
 
 mcdc.iQMC(
     x=x_grid,
     y=y_grid,
     g=np.ones(G),
     phi0=phi0,
-    fixed_source=fixed_source,
-    eigenmode_solver=solver,
-    maxitt=maxit,
-    tol=tol,
-    generator=generator,
+    mode="batched",
+    scores=["source-x", "source-y"],
 )
 
 # =============================================================================
@@ -197,7 +188,7 @@ mcdc.iQMC(
 
 # Setting
 mcdc.setting(N_particle=N)
-mcdc.eigenmode()
+mcdc.eigenmode(N_inactive=40, N_active=10)
 
 # Run
 mcdc.run()

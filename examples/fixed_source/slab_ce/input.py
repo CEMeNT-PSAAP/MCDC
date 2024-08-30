@@ -61,9 +61,9 @@ s3 = mcdc.surface("plane-x", x=1.5)
 s4 = mcdc.surface("plane-x", x=2.0, bc="reflective")
 
 # Set cells
-mcdc.cell([+s1, -s2], uo2)
-mcdc.cell([+s2, -s3], h2o)
-mcdc.cell([+s3, -s4], b4c)
+mcdc.cell(+s1 & -s2, uo2)
+mcdc.cell(+s2 & -s3, h2o)
+mcdc.cell(+s3 & -s4, b4c)
 
 # =============================================================================
 # Set source

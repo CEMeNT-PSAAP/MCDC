@@ -1,4 +1,5 @@
 import argparse, os, sys
+import importlib.metadata
 import numba as nb
 
 # Parse command-line arguments
@@ -22,6 +23,7 @@ parser.add_argument("--progress_bar", default=True, action="store_true")
 parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
 args, unargs = parser.parse_known_args()
 
+from mcdc.card import UniverseCard
 from mcdc.print_ import (
     print_banner,
     print_msg,
@@ -81,19 +83,21 @@ import h5py
 import numpy as np
 
 from mpi4py import MPI
-from scipy.stats import qmc
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
+import mcdc.code_factory as code_factory
 
+import mcdc.adapt as adapt
 from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
     loop_eigenvalue,
-    loop_iqmc,
     set_cache,
     build_gpu_progs,
 )
+from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
+
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
 
@@ -101,8 +105,6 @@ from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eig
 import mcdc.global_ as mcdc_
 
 input_deck = mcdc_.input_deck
-
-import mcdc.adapt as adapt
 
 
 def run():
@@ -121,7 +123,9 @@ def run():
     #   Set up and get the global variable container `mcdc` based on
     #   input deck
     preparation_start = MPI.Wtime()
-    mcdc = prepare()
+    if input_deck.technique["iQMC"]:
+        iqmc_validate_inputs(input_deck)
+    data, mcdc = prepare()
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -137,16 +141,16 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        loop_iqmc(mcdc)
+        iqmc_simulation(mcdc)
     elif mcdc["setting"]["mode_eigenvalue"]:
-        loop_eigenvalue(mcdc)
+        loop_eigenvalue(data, mcdc)
     else:
-        loop_fixed_source(mcdc)
+        loop_fixed_source(data, mcdc)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
-    generate_hdf5(mcdc)
+    generate_hdf5(data, mcdc)
     mcdc["runtime_output"] = MPI.Wtime() - output_start
 
     # Stop timer
@@ -158,16 +162,22 @@ def run():
 
 
 # =============================================================================
-# utilities for handling discrepancies between input and state types
+# utilities for handling discrepancies between input and program types
 # =============================================================================
 
 
 def copy_field(dst, src, name):
     if "padding" in name:
         return
+
+    if isinstance(src, dict):
+        data = src[name]
+    else:
+        data = getattr(src, name)
+
     if isinstance(dst[name], np.ndarray):
-        if isinstance(src[name], np.ndarray) and dst[name].shape != src[name].shape:
-            for dim in src[name].shape:
+        if isinstance(data, np.ndarray) and dst[name].shape != data.shape:
+            for dim in data.shape:
                 if dim == 0:
                     return
             print(
@@ -176,7 +186,7 @@ def copy_field(dst, src, name):
             print(
                 f"State dimension {dst[name].shape} does not match input dimension {src[name].shape}"
             )
-        elif isinstance(src[name], list) and dst[name].shape[0] != len(src[name]):
+        elif isinstance(data, list) and dst[name].shape[0] != len(data):
             if len(src[name]) == 0:
                 return
             print(
@@ -185,7 +195,8 @@ def copy_field(dst, src, name):
             print(
                 f"State dimension {dst[name].shape} does not match input dimension {len(src[name])}"
             )
-    dst[name] = src[name]
+
+    dst[name] = data
 
 
 # =============================================================================
@@ -239,7 +250,6 @@ def dd_prepare():
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
-    input_deck.setting["bank_active_buff"] = 1000
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
 
@@ -309,6 +319,39 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
 
 
+def dd_mesh_bounds(idx):
+    """
+    Defining mesh tally boundaries for domain decomposition.
+    Used in prepare() when domain decomposition is active.
+    """
+    # find DD mesh index of subdomain
+    d_idx = input_deck.technique["dd_idx"]  # subdomain index
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+    zmesh_idx = d_idx // (d_Nx * d_Ny)
+    ymesh_idx = (d_idx % (d_Nx * d_Ny)) // d_Nx
+    xmesh_idx = d_idx % d_Nx
+
+    # find spatial boundaries of subdomain
+    xn = input_deck.technique["dd_mesh"]["x"][xmesh_idx]
+    xp = input_deck.technique["dd_mesh"]["x"][xmesh_idx + 1]
+    yn = input_deck.technique["dd_mesh"]["y"][ymesh_idx]
+    yp = input_deck.technique["dd_mesh"]["y"][ymesh_idx + 1]
+    zn = input_deck.technique["dd_mesh"]["z"][zmesh_idx]
+    zp = input_deck.technique["dd_mesh"]["z"][zmesh_idx + 1]
+
+    # find boundary indices in tally mesh
+    mesh_xn = int(np.where(input_deck.mesh_tallies[idx].x == xn)[0])
+    mesh_xp = int(np.where(input_deck.mesh_tallies[idx].x == xp)[0]) + 1
+    mesh_yn = int(np.where(input_deck.mesh_tallies[idx].y == yn)[0])
+    mesh_yp = int(np.where(input_deck.mesh_tallies[idx].y == yp)[0]) + 1
+    mesh_zn = int(np.where(input_deck.mesh_tallies[idx].z == zn)[0])
+    mesh_zp = int(np.where(input_deck.mesh_tallies[idx].z == zp)[0]) + 1
+
+    return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
+
+
 def prepare():
     """
     Preparing the MC transport simulation:
@@ -318,6 +361,36 @@ def prepare():
     """
 
     dd_prepare()
+
+    # =========================================================================
+    # Create root universe if not defined
+    # =========================================================================
+
+    N_cell = len(input_deck.cells)
+    if input_deck.universes[0] == None:
+        root_universe = UniverseCard(N_cell)
+        root_universe.ID = 0
+        for i, cell in enumerate(input_deck.cells):
+            root_universe.cell_IDs[i] = cell.ID
+        input_deck.universes[0] = root_universe
+
+    # =========================================================================
+    # Prepare cell region RPN (Reverse Polish Notation)
+    #   - Replace halfspace region ID with its surface and insert
+    #     complement operator if the sense is negative.
+    # =========================================================================
+
+    for cell in input_deck.cells:
+        i = 0
+        while i < len(cell._region_RPN):
+            token = cell._region_RPN[i]
+            if token >= 0:
+                surface_ID = input_deck.regions[token].A
+                sense = input_deck.regions[token].B
+                cell._region_RPN[i] = surface_ID
+                if sense < 0:
+                    cell._region_RPN.insert(i + 1, BOOL_NOT)
+            i += 1
 
     # =========================================================================
     # Adapt kernels
@@ -334,19 +407,21 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
-    type_.make_type_cell(input_deck)
     type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
-    type_.make_type_tally(input_deck)
+    type_.make_type_mesh_tally(input_deck)
+    type_.make_type_surface_tally(input_deck)
     type_.make_type_setting(input_deck)
-    type_.make_type_uq_tally(input_deck)
     type_.make_type_uq(input_deck)
     type_.make_type_domain_decomp(input_deck)
     type_.make_type_dd_turnstile_event(input_deck)
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
+
+    input_deck.setting["target"] = target
+    code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
@@ -374,7 +449,6 @@ def prepare():
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.set_toggle("particle_tracker", mcdc["setting"]["track_particle"])
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
@@ -388,7 +462,7 @@ def prepare():
     N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
         # General data
-        for name in ["ID", "fissionable", "sensitivity", "sensitivity_ID", "dsm_Np"]:
+        for name in ["ID", "fissionable"]:
             copy_field(mcdc["nuclides"][i], input_deck.nuclides[i], name)
 
         # MG data
@@ -415,7 +489,7 @@ def prepare():
         # CE data (load data from XS library)
         dir_name = os.getenv("MCDC_XSLIB")
         if mode_CE:
-            nuc_name = input_deck.nuclides[i]["name"]
+            nuc_name = input_deck.nuclides[i].name
             with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
                 # Atomic weight ratio
                 mcdc["nuclides"][i]["A"] = f["A"][()]
@@ -468,7 +542,7 @@ def prepare():
         for name in type_.material.names:
             if name in ["nuclide_IDs", "nuclide_densities"]:
                 mcdc["materials"][i][name][: mcdc["materials"][i]["N_nuclide"]] = (
-                    input_deck.materials[i][name]
+                    getattr(input_deck.materials[i], name)
                 )
             else:
                 copy_field(mcdc["materials"][i], input_deck.materials[i], name)
@@ -479,29 +553,64 @@ def prepare():
 
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
+        # Direct assignment
         for name in type_.surface.names:
-            if name not in ["J", "t"]:
+            if name not in ["BC", "tally_IDs"]:
                 copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
 
+        # Boundary condition
+        if input_deck.surfaces[i].boundary_type == "interface":
+            mcdc["surfaces"][i]["BC"] = BC_NONE
+        elif input_deck.surfaces[i].boundary_type == "vacuum":
+            mcdc["surfaces"][i]["BC"] = BC_VACUUM
+        elif input_deck.surfaces[i].boundary_type == "reflective":
+            mcdc["surfaces"][i]["BC"] = BC_REFLECTIVE
+
         # Variables with possible different sizes
-        for name in ["J", "t"]:
-            N = len(input_deck.surfaces[i][name])
-            mcdc["surfaces"][i][name][:N] = input_deck.surfaces[i][name]
+        for name in ["tally_IDs"]:
+            N = len(getattr(input_deck.surfaces[i], name))
+            mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
     # =========================================================================
     # Cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
+    surface_data_idx = 0
+    region_data_idx = 0
     for i in range(N_cell):
-        for name in type_.cell.names:
-            if name not in ["surface_IDs", "positive_flags"]:
-                copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+        for name in ["ID", "fill_ID", "translation"]:
+            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
-        # Variables with possible different sizes
-        for name in ["surface_IDs", "positive_flags"]:
-            N = len(input_deck.cells[i][name])
-            mcdc["cells"][i][name][:N] = input_deck.cells[i][name]
+        # Fill type
+        if input_deck.cells[i].fill_type == "material":
+            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
+        elif input_deck.cells[i].fill_type == "universe":
+            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
+        elif input_deck.cells[i].fill_type == "lattice":
+            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+
+        # Fill translation flag
+        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
+            mcdc["cells"][i]["fill_translated"] = True
+
+        # Surface data
+        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
+        N_surface = len(input_deck.cells[i].surface_IDs)
+        mcdc["cell_surface_data"][surface_data_idx] = N_surface
+        mcdc["cell_surface_data"][
+            surface_data_idx + 1 : surface_data_idx + N_surface + 1
+        ] = input_deck.cells[i].surface_IDs
+        surface_data_idx += N_surface + 1
+
+        # Region data
+        mcdc["cells"][i]["region_data_idx"] = region_data_idx
+        N_RPN = len(input_deck.cells[i]._region_RPN)
+        mcdc["cell_region_data"][region_data_idx] = N_RPN
+        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
+            input_deck.cells[i]._region_RPN
+        )
+        region_data_idx += N_RPN + 1
 
     # =========================================================================
     # Universes
@@ -511,12 +620,12 @@ def prepare():
     for i in range(N_universe):
         for name in type_.universe.names:
             if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = input_deck.universes[i][name]
+                mcdc["universes"][i][name] = getattr(input_deck.universes[i], name)
 
         # Variables with possible different sizes
         for name in ["cell_IDs"]:
             N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = input_deck.universes[i][name]
+            mcdc["universes"][i][name][:N] = getattr(input_deck.universes[i], name)
 
     # =========================================================================
     # Lattices
@@ -524,17 +633,22 @@ def prepare():
 
     N_lattice = len(input_deck.lattices)
     for i in range(N_lattice):
-        # Mesh
-        for name in type_.mesh_uniform.names:
-            mcdc["lattices"][i]["mesh"][name] = input_deck.lattices[i]["mesh"][name]
+        for name in type_.lattice.names:
+            if name not in ["universe_IDs", "t0", "dt", "Nt"]:
+                mcdc["lattices"][i][name] = getattr(input_deck.lattices[i], name)
 
         # Universe IDs
-        Nx = mcdc["lattices"][i]["mesh"]["Nx"]
-        Ny = mcdc["lattices"][i]["mesh"]["Ny"]
-        Nz = mcdc["lattices"][i]["mesh"]["Nz"]
-        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[i][
-            "universe_IDs"
-        ]
+        Nx = mcdc["lattices"][i]["Nx"]
+        Ny = mcdc["lattices"][i]["Ny"]
+        Nz = mcdc["lattices"][i]["Nz"]
+        mcdc["lattices"][i]["universe_IDs"][:Nx, :Ny, :Nz] = input_deck.lattices[
+            i
+        ].universe_IDs
+
+        # Default for time grid
+        mcdc["lattices"][i]["t0"] = 0.0
+        mcdc["lattices"][i]["dt"] = INF
+        mcdc["lattices"][i]["Nt"] = 1
 
     # =========================================================================
     # Source
@@ -546,7 +660,7 @@ def prepare():
             copy_field(mcdc["sources"][i], input_deck.sources[i], name)
 
     # Normalize source probabilities
-    tot = 0.0
+    tot = 1e-16
     for S in mcdc["sources"]:
         tot += S["prob"]
     for S in mcdc["sources"]:
@@ -556,12 +670,165 @@ def prepare():
     # Tally
     # =========================================================================
 
-    for name in type_.tally.names:
-        if name not in ["score", "mesh"]:
-            copy_field(mcdc["tally"], input_deck.tally, name)
-    # Set mesh
-    for name in type_.mesh_names:
-        copy_field(mcdc["tally"]["mesh"], input_deck.tally["mesh"], name)
+    N_mesh_tally = len(input_deck.mesh_tallies)
+    N_surface_tally = len(input_deck.surface_tallies)
+    tally_size = 0
+
+    # Mesh tallies
+    for i in range(N_mesh_tally):
+        # Direct assignment
+        copy_field(mcdc["mesh_tallies"][i], input_deck.mesh_tallies[i], "N_bin")
+
+        # Filters (variables with possible different sizes)
+        if not input_deck.technique["domain_decomposition"]:
+            for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.mesh_tallies[i], name))
+                mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.mesh_tallies[i], name
+                )
+
+        else:  # decomposed mesh filters
+            mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
+
+            # Filters
+            new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
+            new_y = input_deck.mesh_tallies[i].y[myn:myp]
+            new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
+            mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
+            mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
+            mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
+            for name in ["t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.mesh_tallies[i], name))
+                mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.mesh_tallies[i], name
+                )
+
+        # Set tally scores
+        N_score = len(input_deck.mesh_tallies[i].scores)
+        mcdc["mesh_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.mesh_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "total":
+                score_type = SCORE_TOTAL
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["mesh_tallies"][i]["scores"][j] = score_type
+
+        # Filter grid sizes
+        Nmu = len(input_deck.mesh_tallies[i].mu) - 1
+        N_azi = len(input_deck.mesh_tallies[i].azi) - 1
+        Ng = len(input_deck.mesh_tallies[i].g) - 1
+        Nx = len(input_deck.mesh_tallies[i].x) - 1
+        Ny = len(input_deck.mesh_tallies[i].y) - 1
+        Nz = len(input_deck.mesh_tallies[i].z) - 1
+        Nt = len(input_deck.mesh_tallies[i].t) - 1
+
+        # Decompose mesh tallies
+        if input_deck.technique["domain_decomposition"]:
+            Nmu = len(input_deck.mesh_tallies[i].mu) - 1
+            N_azi = len(input_deck.mesh_tallies[i].azi) - 1
+            Ng = len(input_deck.mesh_tallies[i].g) - 1
+            Nx = len(input_deck.mesh_tallies[i].x[mxn:mxp]) - 1
+            Ny = len(input_deck.mesh_tallies[i].y[myn:myp]) - 1
+            Nz = len(input_deck.mesh_tallies[i].z[mzn:mzp]) - 1
+            Nt = len(input_deck.mesh_tallies[i].t) - 1
+            mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
+
+        # Update N_bin
+        mcdc["mesh_tallies"][i]["N_bin"] *= N_score
+
+        # Filter strides
+        stride = N_score
+        if Nz > 1:
+            mcdc["mesh_tallies"][i]["stride"]["z"] = stride
+            stride *= Nz
+        if Ny > 1:
+            mcdc["mesh_tallies"][i]["stride"]["y"] = stride
+            stride *= Ny
+        if Nx > 1:
+            mcdc["mesh_tallies"][i]["stride"]["x"] = stride
+            stride *= Nx
+        if Nt > 1:
+            mcdc["mesh_tallies"][i]["stride"]["t"] = stride
+            stride *= Nt
+        if Ng > 1:
+            mcdc["mesh_tallies"][i]["stride"]["g"] = stride
+            stride *= Ng
+        if N_azi > 1:
+            mcdc["mesh_tallies"][i]["stride"]["azi"] = stride
+            stride *= N_azi
+        if Nmu > 1:
+            mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
+            stride *= Nmu
+
+        # Set tally stride and accumulate total tally size
+        mcdc["mesh_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["mesh_tallies"][i]["N_bin"]
+
+    # Surface tallies
+    for i in range(N_surface_tally):
+        # Direct assignment
+        copy_field(mcdc["surface_tallies"][i], input_deck.surface_tallies[i], "N_bin")
+
+        # Filters (variables with possible different sizes)
+        for name in ["t", "mu", "azi", "g"]:
+            N = len(getattr(input_deck.surface_tallies[i], name))
+            mcdc["surface_tallies"][i]["filter"][name][:N] = getattr(
+                input_deck.surface_tallies[i], name
+            )
+
+        # Set tally scores and their strides
+        N_score = len(input_deck.surface_tallies[i].scores)
+        mcdc["surface_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.surface_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["surface_tallies"][i]["scores"][j] = score_type
+
+        # Filter grid sizes
+        Nmu = len(input_deck.surface_tallies[i].mu) - 1
+        N_azi = len(input_deck.surface_tallies[i].azi) - 1
+        Ng = len(input_deck.surface_tallies[i].g) - 1
+        Nt = len(input_deck.surface_tallies[i].t) - 1
+
+        # Update N_bin
+        mcdc["surface_tallies"][i]["N_bin"] *= N_score
+
+        # Filter strides
+        stride = N_score
+        if Nt > 1:
+            mcdc["surface_tallies"][i]["stride"]["t"] = stride
+            stride *= Nt
+        if Ng > 1:
+            mcdc["surface_tallies"][i]["stride"]["g"] = stride
+            stride *= Ng
+        if N_azi > 1:
+            mcdc["surface_tallies"][i]["stride"]["azi"] = stride
+            stride *= N_azi
+        if Nmu > 1:
+            mcdc["surface_tallies"][i]["stride"]["mu"] = stride
+            stride *= Nmu
+
+        # Set tally stride and accumulate total tally size
+        mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["surface_tallies"][i]["N_bin"]
+
+    # Set tally data
+    if not input_deck.technique["uq"]:
+        tally = np.zeros((3, tally_size), dtype=type_.float64)
+    else:
+        tally = np.zeros((5, tally_size), dtype=type_.float64)
 
     # =========================================================================
     # Setting
@@ -570,9 +837,19 @@ def prepare():
     for name in type_.setting.names:
         copy_field(mcdc["setting"], input_deck.setting, name)
 
+    t_limit = max(
+        [
+            tally["filter"]["t"][-1]
+            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"])
+        ]
+    )
+
+    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) == 0:
+        t_limit = INF
+
     # Check if time boundary is above the final tally mesh time grid
-    if mcdc["setting"]["time_boundary"] > mcdc["tally"]["mesh"]["t"][-1]:
-        mcdc["setting"]["time_boundary"] = mcdc["tally"]["mesh"]["t"][-1]
+    if mcdc["setting"]["time_boundary"] > t_limit:
+        mcdc["setting"]["time_boundary"] = t_limit
 
     if input_deck.technique["iQMC"]:
         if len(mcdc["technique"]["iqmc"]["mesh"]["t"]) - 1 > 1:
@@ -583,6 +860,7 @@ def prepare():
                 mcdc["setting"]["time_boundary"] = input_deck.technique["iqmc"]["mesh"][
                     "t"
                 ][-1]
+
     # =========================================================================
     # Technique
     # =========================================================================
@@ -671,11 +949,11 @@ def prepare():
     for name in type_.technique["iqmc"].names:
         if name not in [
             "mesh",
-            "res",
-            "lds",
-            "generator",
-            "sweep_counter",
+            "residual",
+            "samples",
+            "sweep_count",
             "total_source",
+            "material_idx",
             "w_min",
             "score_list",
             "score",
@@ -689,73 +967,30 @@ def prepare():
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
-            iqmc["score_list"][name] = value
+            copy_field(
+                iqmc["score_list"], input_deck.technique["iqmc"]["score_list"], name
+            )
         # pass in initial tallies
         for name, value in input_deck.technique["iqmc"]["score"].items():
-            mcdc["technique"]["iqmc"]["score"][name] = value
-        # LDS generator
-        iqmc["generator"] = input_deck.technique["iqmc"]["generator"]
+            mcdc["technique"]["iqmc"]["score"][name]["bin"] = value
         # minimum particle weight
         iqmc["w_min"] = 1e-13
-        # variables to generate samples
-        scramble = iqmc["scramble"]
-        N_dim = iqmc["N_dim"]
-        seed = iqmc["seed"]
-        N_particle = mcdc["setting"]["N_particle"]
-
-        mcdc["mpi_size"] = MPI.COMM_WORLD.Get_size()
-        mcdc["mpi_rank"] = MPI.COMM_WORLD.Get_rank()
-        kernel.distribute_work(N_particle, mcdc)
-        N_work = int(mcdc["mpi_work_size"])
-        N_start = int(mcdc["mpi_work_start"])
-
-        # generate LDS
-        if input_deck.technique["iqmc"]["generator"] == "sobol":
-            sampler = qmc.Sobol(d=N_dim, scramble=scramble)
-            # skip the first entry in Sobol sequence because its 0.0
-            # skip the second because it maps to ux = 0.0
-            sampler.fast_forward(2)
-            sampler.fast_forward(N_start)
-            iqmc["lds"] = sampler.random(N_work)
-        if input_deck.technique["iqmc"]["generator"] == "halton":
-            sampler = qmc.Halton(d=N_dim, scramble=scramble, seed=seed)
-            # skip the first entry in Halton sequence because its 0.0
-            sampler.fast_forward(1)
-            sampler.fast_forward(N_start)
-            iqmc["lds"] = sampler.random(N_work)
-        if input_deck.technique["iqmc"]["generator"] == "random":
-            np.random.seed(seed)
-            seeds = np.random.randint(1e6, size=mcdc["mpi_size"])
-            np.random.seed(seeds[mcdc["mpi_rank"]])
-            iqmc["lds"] = np.random.random((N_work, N_dim))
-
-    # =========================================================================
-    # Derivative Source Method
-    # =========================================================================
-
-    # Threshold
-    mcdc["technique"]["dsm_order"] = input_deck.technique["dsm_order"]
 
     # =========================================================================
     # Variance Deconvolution - UQ
     # =========================================================================
     if mcdc["technique"]["uq"]:
-        # Assumes that all tallies will also be uq tallies
-        for name in type_.uq_tally.names:
-            if name != "score":
-                copy_field(mcdc["technique"]["uq_tally"], input_deck.tally, name)
-
         M = len(input_deck.uq_deltas["materials"])
         for i in range(M):
-            idm = input_deck.uq_deltas["materials"][i]["ID"]
+            idm = input_deck.uq_deltas["materials"][i].ID
             mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"] = idm
             mcdc["technique"]["uq_"]["materials"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["materials"][i]["distribution"]
+                input_deck.uq_deltas["materials"][i].distribution
             )
-            for name in input_deck.uq_deltas["materials"][i]["flags"]:
+            for name in input_deck.uq_deltas["materials"][i].flags:
                 mcdc["technique"]["uq_"]["materials"][i]["flags"][name] = True
-                mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = (
-                    input_deck.uq_deltas["materials"][i][name]
+                mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = getattr(
+                    input_deck.uq_deltas["materials"][i], name
                 )
             flags = mcdc["technique"]["uq_"]["materials"][i]["flags"]
             if flags["capture"] or flags["scatter"] or flags["fission"]:
@@ -772,17 +1007,30 @@ def prepare():
         N = len(input_deck.uq_deltas["nuclides"])
         for i in range(N):
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["distribution"] = (
-                input_deck.uq_deltas["nuclides"][i]["distribution"]
+                input_deck.uq_deltas["nuclides"][i].distribution
             )
-            idn = input_deck.uq_deltas["nuclides"][i]["ID"]
+            idn = input_deck.uq_deltas["nuclides"][i].ID
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
-                copy_field(
-                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
-                    input_deck.nuclides[idn],
-                    name,
-                )
-            for name in input_deck.uq_deltas["nuclides"][i]["flags"]:
+                if name == "scatter":
+                    G = input_deck.nuclides[idn].G
+                    chi_s = input_deck.nuclides[idn].chi_s
+                    scatter = input_deck.nuclides[idn].scatter
+                    scatter_matrix = np.zeros((G, G))
+                    for g in range(G):
+                        scatter_matrix[g, :] = chi_s[g, :] * scatter[g]
+
+                    mcdc["technique"]["uq_"]["nuclides"][i]["mean"][
+                        name
+                    ] = scatter_matrix
+                else:
+                    copy_field(
+                        mcdc["technique"]["uq_"]["nuclides"][i]["mean"],
+                        input_deck.nuclides[idn],
+                        name,
+                    )
+
+            for name in input_deck.uq_deltas["nuclides"][i].flags:
                 if "padding" in name:
                     continue
                 mcdc["technique"]["uq_"]["nuclides"][i]["flags"][name] = True
@@ -845,22 +1093,29 @@ def prepare():
 
     # =========================================================================
     # Source file
+    #   TODO: Use parallel h5py
     # =========================================================================
 
-    if mcdc["setting"]["source_file"]:
-        with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
-            # Get source particle size
-            N_particle = f["particles_size"][()]
+    # All ranks, take turn
+    for i in range(mcdc["mpi_size"]):
+        if mcdc["mpi_rank"] == i:
+            if mcdc["setting"]["source_file"]:
+                with h5py.File(mcdc["setting"]["source_file_name"], "r") as f:
+                    # Get source particle size
+                    N_particle = f["particles_size"][()]
 
-            # Redistribute work
-            kernel.distribute_work(N_particle, mcdc)
-            N_local = mcdc["mpi_work_size"]
-            start = mcdc["mpi_work_start"]
-            end = start + N_local
+                    # Redistribute work
+                    kernel.distribute_work(N_particle, mcdc)
+                    N_local = mcdc["mpi_work_size"]
+                    start = mcdc["mpi_work_start"]
+                    end = start + N_local
 
-            # Add particles to source bank
-            mcdc["bank_source"]["particles"][:N_local] = f["particles"][start:end]
-            mcdc["bank_source"]["size"] = N_local
+                    # Add particles to source bank
+                    mcdc["bank_source"]["particles"][:N_local] = f["particles"][
+                        start:end
+                    ]
+                    mcdc["bank_source"]["size"] = N_local
+        MPI.COMM_WORLD.Barrier()
 
     # =========================================================================
     # IC file
@@ -912,7 +1167,39 @@ def prepare():
 
     loop.setup_gpu(mcdc)
 
-    return mcdc
+    # =========================================================================
+    # Finalize data: wrapping into a tuple
+    # =========================================================================
+
+    data = (tally,)
+
+    return data, mcdc
+
+
+def cardlist_to_h5group(dictlist, input_group, name):
+    main_group = input_group.create_group(name + "s")
+    for item in dictlist:
+        group = main_group.create_group(name + "_%i" % getattr(item, "ID"))
+        card_to_h5group(item, group)
+
+
+def card_to_h5group(card, group):
+    for name in [
+        a
+        for a in dir(card)
+        if not a.startswith("__") and not callable(getattr(card, a)) and a != "tag"
+    ]:
+        value = getattr(card, name)
+        if type(value) == dict:
+            dict_to_h5group(value, group.create_group(name))
+        elif value is None:
+            next
+        else:
+            if name not in ["region"]:
+                group[name] = value
+
+            elif name == "region":
+                group[name] = str(value)
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
@@ -932,67 +1219,218 @@ def dict_to_h5group(dict_, group):
             group[k] = v
 
 
-def generate_hdf5(mcdc):
+def dd_mergetally(mcdc, data):
+    """
+    Performs tally recombination on domain-decomposed mesh tallies.
+    Gathers and re-organizes tally data into a single array as it
+      would appear in a non-decomposed simulation.
+    """
+
+    tally = data[TALLY]
+    # create bin for recomposed tallies
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+
+    # capture tally lengths for reorganizing later
+    xlen = len(mcdc["mesh_tallies"][0]["filter"]["x"]) - 1
+    ylen = len(mcdc["mesh_tallies"][0]["filter"]["y"]) - 1
+    zlen = len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1
+
+    dd_tally = np.zeros((tally.shape[0], tally.shape[1] * d_Nx * d_Ny * d_Nz))
+    # gather tallies
+    for i, t in enumerate(tally):
+        MPI.COMM_WORLD.Gather(tally[i], dd_tally[i], root=0)
+    if mcdc["mpi_master"]:
+        buff = np.zeros_like(dd_tally)
+        # reorganize tally data
+        # TODO: find/develop a more efficient algorithm for this
+        tally_idx = 0
+        for di in range(0, d_Nx * d_Ny * d_Nz):
+            dz = di // (d_Nx * d_Ny)
+            dy = (di % (d_Nx * d_Ny)) // d_Nx
+            dx = di % d_Nx
+            for xi in range(0, xlen):
+                for yi in range(0, ylen):
+                    for zi in range(0, zlen):
+                        # calculate reorganized index
+                        ind_x = xi * (ylen * d_Ny * zlen * d_Nz) + dx * (
+                            xlen * ylen * d_Ny * zlen * d_Nz
+                        )
+                        ind_y = yi * (xlen * d_Nx) + dy * (ylen * xlen * d_Nx)
+                        ind_z = zi + dz * zlen
+                        buff_idx = ind_x + ind_y + ind_z
+                        # place tally value in correct position
+                        buff[:, buff_idx] = dd_tally[:, tally_idx]
+                        tally_idx += 1
+        # replace old tally with reorganized tally
+        dd_tally = buff
+
+    return dd_tally
+
+
+def generate_hdf5(data, mcdc):
+
+    if mcdc["technique"]["domain_decomposition"]:
+        dd_tally = dd_mergetally(mcdc, data)
+
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
             print_msg("")
         print_msg(" Generating output HDF5 files...")
 
         with h5py.File(mcdc["setting"]["output_name"] + ".h5", "w") as f:
+            # Version
+            version = importlib.metadata.version("mcdc")
+            f["version"] = version
+
             # Input deck
             if mcdc["setting"]["save_input_deck"]:
                 input_group = f.create_group("input_deck")
-                dictlist_to_h5group(input_deck.nuclides, input_group, "nuclide")
-                dictlist_to_h5group(input_deck.materials, input_group, "material")
-                dictlist_to_h5group(input_deck.surfaces, input_group, "surface")
-                dictlist_to_h5group(input_deck.cells, input_group, "cell")
-                dictlist_to_h5group(input_deck.universes, input_group, "universe")
-                dictlist_to_h5group(input_deck.lattices, input_group, "lattice")
-                dictlist_to_h5group(input_deck.sources, input_group, "source")
-                dict_to_h5group(input_deck.tally, input_group.create_group("tally"))
+                cardlist_to_h5group(input_deck.nuclides, input_group, "nuclide")
+                cardlist_to_h5group(input_deck.materials, input_group, "material")
+                cardlist_to_h5group(input_deck.surfaces, input_group, "surface")
+                cardlist_to_h5group(input_deck.cells, input_group, "cell")
+                cardlist_to_h5group(input_deck.universes, input_group, "universe")
+                cardlist_to_h5group(input_deck.lattices, input_group, "lattice")
+                cardlist_to_h5group(input_deck.sources, input_group, "source")
+                cardlist_to_h5group(input_deck.mesh_tallies, input_group, "mesh_tallie")
+                cardlist_to_h5group(
+                    input_deck.surface_tallies, input_group, "surface_tally"
+                )
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
                 )
 
-            # Tally
-            T = mcdc["tally"]
-            f.create_dataset("tally/grid/t", data=T["mesh"]["t"])
-            f.create_dataset("tally/grid/x", data=T["mesh"]["x"])
-            f.create_dataset("tally/grid/y", data=T["mesh"]["y"])
-            f.create_dataset("tally/grid/z", data=T["mesh"]["z"])
-            f.create_dataset("tally/grid/mu", data=T["mesh"]["mu"])
-            f.create_dataset("tally/grid/azi", data=T["mesh"]["azi"])
-            f.create_dataset("tally/grid/g", data=T["mesh"]["g"])
+            # Mesh tallies
+            for ID, tally in enumerate(mcdc["mesh_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
 
-            # Scores
-            for name in T["score"].dtype.names:
-                if mcdc["tally"][name]:
-                    name_h5 = name.replace("_", "-")
-                    f.create_dataset(
-                        "tally/" + name_h5 + "/mean",
-                        data=np.squeeze(T["score"][name]["mean"]),
-                    )
-                    f.create_dataset(
-                        "tally/" + name_h5 + "/sdev",
-                        data=np.squeeze(T["score"][name]["sdev"]),
-                    )
-                    if mcdc["technique"]["uq_tally"][name]:
-                        mc_var = mcdc["technique"]["uq_tally"]["score"][name][
-                            "batch_var"
-                        ]
-                        tot_var = mcdc["technique"]["uq_tally"]["score"][name][
-                            "batch_bin"
-                        ]
-                        f.create_dataset(
-                            "tally/" + name_h5 + "/uq_var",
-                            data=np.squeeze(tot_var - mc_var),
-                        )
+                mesh = tally["filter"]
+                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"])
+                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"])
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"]
+                )
+                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
+
+                # Shape
+                Nmu = len(mesh["mu"]) - 1
+                N_azi = len(mesh["azi"]) - 1
+                Ng = len(mesh["g"]) - 1
+                Nx = len(mesh["x"]) - 1
+                Ny = len(mesh["y"]) - 1
+                Nz = len(mesh["z"]) - 1
+                Nt = len(mesh["t"]) - 1
+                N_score = tally["N_score"]
+
+                if mcdc["technique"]["domain_decomposition"]:
+                    Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
+                    Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
+                    Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+                else:
+                    shape = (5, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+
+                # Reshape tally
+                N_bin = tally["N_bin"]
+                if mcdc["technique"]["domain_decomposition"]:
+                    # use recomposed N_bin
+                    N_bin = 1
+                    for elem in shape:
+                        N_bin *= elem
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
+                if mcdc["technique"]["domain_decomposition"]:
+                    # substitute recomposed tally
+                    tally_bin = dd_tally[:, start : start + N_bin]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 8, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_TOTAL:
+                        score_name = "total"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
+
+                    mean = score_tally_bin[TALLY_SUM]
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            # Surface tallies
+            for ID, tally in enumerate(mcdc["surface_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+
+                # Shape
+                N_score = tally["N_score"]
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, N_score)
+                else:
+                    shape = (5, N_score)
+
+                # Reshape tally
+                N_bin = tally["N_bin"]
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 1, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    group_name = "tallies/surface_tally_%i/%s/" % (ID, score_name)
+
+                    mean = score_tally_bin[TALLY_SUM]
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
 
             # Eigenvalues
             if mcdc["setting"]["mode_eigenvalue"]:
                 if mcdc["technique"]["iQMC"]:
                     f.create_dataset("k_eff", data=mcdc["k_eff"])
+                    if mcdc["technique"]["iqmc"]["mode"] == "batched":
+                        N_cycle = mcdc["setting"]["N_cycle"]
+                        f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
+                        f.create_dataset("k_mean", data=mcdc["k_avg_running"])
+                        f.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
                 else:
                     N_cycle = mcdc["setting"]["N_cycle"]
                     f.create_dataset("k_cycle", data=mcdc["k_cycle"][:N_cycle])
@@ -1011,59 +1449,41 @@ def generate_hdf5(mcdc):
 
             # iQMC
             if mcdc["technique"]["iQMC"]:
-                # dump iQMC mesh
+                # iQMC mesh
                 T = mcdc["technique"]
                 f.create_dataset("iqmc/grid/t", data=T["iqmc"]["mesh"]["t"])
                 f.create_dataset("iqmc/grid/x", data=T["iqmc"]["mesh"]["x"])
                 f.create_dataset("iqmc/grid/y", data=T["iqmc"]["mesh"]["y"])
                 f.create_dataset("iqmc/grid/z", data=T["iqmc"]["mesh"]["z"])
-                # dump x,y,z scalar flux across all groups
+                # Scores
+                for name in [
+                    "flux",
+                    "source-x",
+                    "source-y",
+                    "source-z",
+                    "fission-power",
+                ]:
+                    if T["iqmc"]["score_list"][name]:
+                        name_h5 = name.replace("-", "_")
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/mean",
+                            data=np.squeeze(T["iqmc"]["score"][name]["mean"]),
+                        )
+                        f.create_dataset(
+                            f"iqmc/tally/{name_h5}/sdev",
+                            data=np.squeeze(T["iqmc"]["score"][name]["sdev"]),
+                        )
+                # iQMC source strength
                 f.create_dataset(
-                    "iqmc/tally/flux", data=np.squeeze(T["iqmc"]["score"]["flux"])
+                    "iqmc/tally/source_constant/mean",
+                    data=np.squeeze(T["iqmc"]["source"]),
                 )
+                # Iteration data
                 f.create_dataset(
-                    "iqmc/tally/fission_source",
-                    data=T["iqmc"]["score"]["fission-source"],
+                    "iqmc/iteration_count", data=T["iqmc"]["iteration_count"]
                 )
-                f.create_dataset(
-                    "iqmc/tally/fission_power", data=T["iqmc"]["score"]["fission-power"]
-                )
-                f.create_dataset("iqmc/tally/source_constant", data=T["iqmc"]["source"])
-                f.create_dataset(
-                    "iqmc/tally/source_x", data=T["iqmc"]["score"]["tilt-x"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_y", data=T["iqmc"]["score"]["tilt-y"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_z", data=T["iqmc"]["score"]["tilt-z"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_xy", data=T["iqmc"]["score"]["tilt-xy"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_xz", data=T["iqmc"]["score"]["tilt-xz"]
-                )
-                f.create_dataset(
-                    "iqmc/tally/source_yz", data=T["iqmc"]["score"]["tilt-yz"]
-                )
-                # iteration data
-                f.create_dataset("iqmc/itteration_count", data=T["iqmc"]["itt"])
-                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["res"])
-                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_counter"])
-                if mcdc["setting"]["mode_eigenvalue"]:
-                    f.create_dataset(
-                        "iqmc/outter_itteration_count", data=T["iqmc"]["itt_outter"]
-                    )
-                    f.create_dataset(
-                        "iqmc/outter_final_residual", data=T["iqmc"]["res_outter"]
-                    )
-
-            # Particle tracker
-            if mcdc["setting"]["track_particle"]:
-                with h5py.File(mcdc["setting"]["output"] + "_ptrack.h5", "w") as f:
-                    N_track = mcdc["particle_track_N"][0]
-                    f.create_dataset("tracks", data=mcdc["particle_track"][:N_track])
+                f.create_dataset("iqmc/sweep_count", data=T["iqmc"]["sweep_count"])
+                f.create_dataset("iqmc/final_residual", data=T["iqmc"]["residual"])
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:

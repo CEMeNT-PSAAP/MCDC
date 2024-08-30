@@ -38,7 +38,7 @@ s1 = mcdc.surface("plane-x", x=-1e10, bc="reflective")
 s2 = mcdc.surface("plane-x", x=1e10, bc="reflective")
 
 # Set cells
-c = mcdc.cell([+s1, -s2], m)
+c = mcdc.cell(+s1 & -s2, m)
 
 # =============================================================================
 # Set initial source
@@ -53,7 +53,7 @@ source = mcdc.source(energy=energy)
 # =============================================================================
 
 # Tally
-mcdc.tally(scores=["flux"], g="all")
+mcdc.tally.mesh_tally(scores=["flux"], g="all")
 
 # Setting
 mcdc.setting(N_particle=40, active_bank_buff=1000)

@@ -25,13 +25,13 @@ s7 = mcdc.surface("plane-x", x=5.0)
 s8 = mcdc.surface("plane-x", x=8.0, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m4)
-mcdc.cell([+s2, -s3], m3)
-mcdc.cell([+s3, -s4], m2)
-mcdc.cell([+s4, -s5], m1)
-mcdc.cell([+s5, -s6], m2)
-mcdc.cell([+s6, -s7], m3)
-mcdc.cell([+s7, -s8], m4)
+mcdc.cell(+s1 & -s2, m4)
+mcdc.cell(+s2 & -s3, m3)
+mcdc.cell(+s3 & -s4, m2)
+mcdc.cell(+s4 & -s5, m1)
+mcdc.cell(+s5 & -s6, m2)
+mcdc.cell(+s6 & -s7, m3)
+mcdc.cell(+s7 & -s8, m4)
 
 
 # =============================================================================
@@ -42,7 +42,6 @@ Nx = 64
 maxit = 20
 tol = 1e-4
 x = np.linspace(-8, 8, num=Nx + 1)
-generator = "halton"
 solver = "gmres"
 
 
@@ -82,11 +81,10 @@ mcdc.iQMC(
     x=x,
     fixed_source=fixed_source,
     phi0=phi0,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
-    generator=generator,
     fixed_source_solver=solver,
-    score=["tilt-x"],
+    scores=["source-x"],
 )
 
 # =============================================================================

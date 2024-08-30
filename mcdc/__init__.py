@@ -1,4 +1,5 @@
-# User interface
+import importlib.metadata
+
 from mcdc.input_ import (
     nuclide,
     material,
@@ -7,7 +8,6 @@ from mcdc.input_ import (
     universe,
     lattice,
     source,
-    tally,
     setting,
     eigenmode,
     implicit_capture,
@@ -19,11 +19,13 @@ from mcdc.input_ import (
     iQMC,
     weight_roulette,
     IC_generator,
-    dsm,
     uq,
-    print_card,
-    reset_cards,
+    reset,
     domain_decomposition,
+    make_particle_bank,
+    save_particle_bank,
 )
+import mcdc.tally
 from mcdc.main import run, prepare
-from mcdc.visualizer import visualize
+
+__version__ = importlib.metadata.version("mcdc")
