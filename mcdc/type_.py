@@ -473,23 +473,6 @@ def make_type_material(input_deck):
 
 
 
-    global material_g_size
-    global material_j_size
-
-    G_adjusted = max(1,G)
-    J_adjusted = max(1,J)
-
-    def g_size():
-        return G_adjusted
-
-    def j_size():
-        return J_adjusted
-
-
-    material_g_size = nb.njit(g_size)
-    material_j_size = nb.njit(j_size)
-
-
     # General data
     struct = [
         ("ID", int64),

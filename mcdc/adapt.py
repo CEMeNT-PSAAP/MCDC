@@ -389,9 +389,11 @@ def nopython_mode(is_on):
 SIMPLE_ASYNC = True
 
 none_type = None
-mcdc_type = None
+mcdc_constant_type = None
+mcdc_data_type = None
 state_spec = None
-device_gpu = None
+mcdc_constant_gpu = None
+mcdc_data_gpu = None
 group_gpu = None
 thread_gpu = None
 particle_gpu = None
@@ -434,12 +436,20 @@ def gpu_forward_declare():
 
 
 @for_cpu()
-def device(prog):
+def mcdc_constant(prog):
     return prog
 
+@for_gpu()
+def mcdc_constant(prog):
+    return mcdc_constant_gpu(prog)
+
+
+@for_cpu()
+def mcdc_data(prog):
+    return None
 
 @for_gpu()
-def device(prog):
+def mcdc_data(prog):
     return device_gpu(prog)
 
 
@@ -469,38 +479,14 @@ def add_active(particle,prog):
 
 
 @for_gpu()
-def add_active(particle,prog):
+def add_active(P_reclike,prog):
     P = local_array(1,type_.particle)
-    kernel.recordlike_to_particle(P,particle)
+    kernel.recordlike_to_particle(P,P_reclike)
     if SIMPLE_ASYNC:
         step_async(prog, P[0])
     else:
         find_cell_async(prog, P[0])
 
-
-
-#def add_active(particle, prog):
-#    pass
-#
-#@numba.extending.overload(add_active,target="cpu")
-#def cpu_add_active(particle, prog):
-#    def impl(particle,prog):
-#        harm.print_formatted(191919)
-#        kernel.add_particle(particle, prog["bank_active"])
-#    return impl
-#
-#
-#@numba.extending.overload(add_active,target="gpu")
-#def gpu_add_active(particle, prog):
-#    def impl(particle,prog):
-#        #harm.print_formatted(191919)
-#        P = local_array(1,type_.particle)
-#        kernel.recordlike_to_particle(P,particle)
-#        if SIMPLE_ASYNC:
-#            step_async(prog, P[0])
-#        else:
-#            find_cell_async(prog, P[0])
-#    return impl
 
 
 @for_cpu()
@@ -512,7 +498,7 @@ def add_source(particle, prog):
 @for_gpu()
 def add_source(particle, prog):
     harm.print_formatted(10000001)
-    mcdc = device(prog)
+    mcdc = mcdc_constant(prog)
     kernel.add_particle(particle, mcdc["bank_source"])
 
 
@@ -525,7 +511,7 @@ def add_census(particle, prog):
 @for_gpu()
 def add_census(particle, prog):
     harm.print_formatted(20000002)
-    mcdc = device(prog)
+    mcdc = mcdc_constant(prog)
     kernel.add_particle(particle, mcdc["bank_census"])
 
 
@@ -538,7 +524,7 @@ def add_IC(particle, prog):
 @for_gpu()
 def add_IC(particle, prog):
     harm.print_formatted(30000003)
-    mcdc = device(prog)
+    mcdc = mcdc_constant(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
 
 

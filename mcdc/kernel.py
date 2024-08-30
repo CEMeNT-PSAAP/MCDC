@@ -39,7 +39,7 @@ def domain_crossing(P_arr, mcdc):
     if mcdc["technique"]["domain_decomposition"]:
         mesh = mcdc["technique"]["dd_mesh"]
         # Determine which dimension is crossed
-        ix, iy, iz, it, outside = mesh_.structured.get_indices(P, mesh)
+        ix, iy, iz, it, outside = mesh_.structured.get_indices(P_arr, mesh)
 
         d_idx = mcdc["dd_idx"]
         d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
@@ -417,7 +417,7 @@ def particle_in_domain(P_arr, mcdc):
     d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     mesh = mcdc["technique"]["dd_mesh"]
-    x_cell, y_cell, z_cell, t_cell, outside = mesh_.structured.get_indices(P, mesh)
+    x_cell, y_cell, z_cell, t_cell, outside = mesh_.structured.get_indices(P_arr, mesh)
 
     if d_ix == x_cell:
         if d_iy == y_cell:
@@ -878,9 +878,6 @@ def rng_array(seed, shape, size):
 def source_particle(P_rec_arr, seed, mcdc):
     P_rec = P_rec_arr[0]
     P_rec["rng_seed"] = seed
-def source_particle(seed, mcdc):
-    P = local.particle_record()
-    P["rng_seed"] = seed
 
     # Sample source
     xi = rng(P_rec_arr)
@@ -924,18 +921,17 @@ def source_particle(seed, mcdc):
     t = sample_uniform(source["time"][0], source["time"][1], P_rec_arr)
 
     # Make and return particle
-    P["x"] = x
-    P["y"] = y
-    P["z"] = z
-    P["t"] = t
-    P["ux"] = ux
-    P["uy"] = uy
-    P["uz"] = uz
-    P["g"] = g
-    P["E"] = E
-    P["w"] = 1.0
+    P_rec["x"] = x
+    P_rec["y"] = y
+    P_rec["z"] = z
+    P_rec["t"] = t
+    P_rec["ux"] = ux
+    P_rec["uy"] = uy
+    P_rec["uz"] = uz
+    P_rec["g"] = g
+    P_rec["E"] = E
+    P_rec["w"] = 1.0
 
-    return P
 
 
 # =============================================================================
@@ -1010,9 +1006,6 @@ def get_particle(P_arr, bank, mcdc):
     P["E"] = P_rec["E"]
     P["w"] = P_rec["w"]
     P["rng_seed"] = P_rec["rng_seed"]
-
-    for i in range(3):
-        P["translation"][i] = 0
 
     if mcdc["technique"]["iQMC"]:
         P["iqmc"]["w"] = P_rec["iqmc"]["w"]
@@ -1374,7 +1367,7 @@ def pp_over_one():
 def bank_IC(P_arr, prog):
     P = P_arr[0]
 
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # TODO: Consider multi-nuclide material
     material = mcdc["nuclides"][P["material_ID"]]
@@ -1515,14 +1508,15 @@ def pct_combing(seed, mcdc):
     # Last hiting tooth
     tooth_end = math.floor((idx_end - offset) / td) + 1
 
+    P_rec_arr = adapt.local_array(1,type_.particle_record)
+    P_rec = P_rec_arr[0]
+
     # Locally sample particles from census bank
     set_bank_size(bank_source, 0)
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        P_rec_arr = adapt.local_array(1,type_.particle_record)
-        P_rec = P_rec_arr[0]
-        make_record(P_rec_arr,bank_census["particles"][idx:idx+1])
+        copy_recordlike(P_rec_arr,bank_census["particles"][idx:idx+1])
         # Set weight
         P_rec["w"] *= td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1554,15 +1548,16 @@ def pct_combing_weight(seed, mcdc):
     # Last hiting tooth
     tooth_end = math.floor((w_end - offset) / td) + 1
 
+    P_rec_arr = adapt.local_array(1,type_.particle_record)
+    P_rec = P_rec_arr[0]
+
     # Locally sample particles from census bank
     set_bank_size(bank_source, 0)
     idx = 0
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        P_rec_arr = adapt.local_array(1,type_.particle_record)
-        P_rec = P_rec_arr[0]
-        make_record(P_rec_arr,bank_census["particles"][idx:idx+1])
+        copy_recordlike(P_rec_arr,bank_census["particles"][idx:idx+1])
         # Set weight
         P_rec["w"] = td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1579,24 +1574,24 @@ def move_particle(P_arr, distance, mcdc):
     P["x"] += P["ux"] * distance
     P["y"] += P["uy"] * distance
     P["z"] += P["uz"] * distance
-    P["t"] += distance / physics.get_speed(P, mcdc)
+    P["t"] += distance / physics.get_speed(P_arr, mcdc)
 
 @njit
-def copy_recordlike(P_new_arr, P_arr):
+def copy_recordlike(P_new_arr, P_rec_arr):
     P_new = P_new_arr[0]
-    P = P_arr[0]
-    P_new["x"] = P["x"]
-    P_new["y"] = P["y"]
-    P_new["z"] = P["z"]
-    P_new["t"] = P["t"]
-    P_new["ux"] = P["ux"]
-    P_new["uy"] = P["uy"]
-    P_new["uz"] = P["uz"]
-    P_new["g"] = P["g"]
-    P_new["E"] = P["E"]
-    P_new["w"] = P["w"]
-    P_new["rng_seed"] = P["rng_seed"]
-    P_new["iqmc"]["w"] = P["iqmc"]["w"]
+    P_rec = P_rec_arr[0]
+    P_new["x"] = P_rec["x"]
+    P_new["y"] = P_rec["y"]
+    P_new["z"] = P_rec["z"]
+    P_new["t"] = P_rec["t"]
+    P_new["ux"] = P_rec["ux"]
+    P_new["uy"] = P_rec["uy"]
+    P_new["uz"] = P_rec["uz"]
+    P_new["g"] = P_rec["g"]
+    P_new["E"] = P_rec["E"]
+    P_new["w"] = P_rec["w"]
+    P_new["rng_seed"] = P_rec["rng_seed"]
+    P_new["iqmc"]["w"] = P_rec["iqmc"]["w"]
 
 
 @njit
@@ -1618,30 +1613,22 @@ def copy_particle(P_new_arr, P_arr):
     P_new["material_ID"] = P["material_ID"]
     P_new["cell_ID"] = P["cell_ID"]
     P_new["surface_ID"] = P["surface_ID"]
-    P_new["translation"] = P["translation"]
     P_new["event"] = P["event"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
 
 
 @njit
-def make_record(P):
-    P_new = local.particle_record()
-    copy_recordlike(P_new, P)
-    return P_new
-
-
-@njit
-def make_particle(P_rec):
-    P_new = local.particle()
-    copy_recordlike(P_new, P_rec)
+def recordlike_to_particle(P_new_arr,P_rec_arr):
+    P_new = P_new_arr[0]
+    P_rec = P_rec_arr[0]
+    copy_recordlike(P_new_arr, P_rec_arr)
     P_new["fresh"] = True
     P_new["alive"] = True
     P_new["material_ID"] = -1
     P_new["cell_ID"] = -1
     P_new["surface_ID"] = -1
     P_new["event"] = -1
-    return P_new
 
 
 @njit
@@ -1654,12 +1641,12 @@ def split_particle(P):
 
 
 @njit
-def split_as_record(P):
-    P_new = local.particle_record()
-    copy_recordlike(P_new, P)
-    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
-    rng(P)
-    return P_new
+def split_as_record(P_new_rec_arr,P_rec_arr):
+    P_rec = P_rec_arr[0]
+    P_new_rec = P_new_rec_arr[0]
+    copy_recordlike(P_new_rec_arr, P_rec_arr)
+    P_new_rec["rng_seed"] = split_seed(P_rec["rng_seed"], SEED_SPLIT_PARTICLE)
+    rng(P_rec_arr)
 
 
 # =============================================================================
@@ -1685,7 +1672,8 @@ def mesh_get_angular_index(P_arr, mesh):
 
 
 @njit
-def mesh_get_energy_index(P, mesh, mode_MG):
+def mesh_get_energy_index(P_arr, mesh, mode_MG):
+    P = P_arr[0]
     # Check if outside grid
     outside = False
 
@@ -1705,7 +1693,8 @@ def mesh_get_energy_index(P, mesh, mode_MG):
 
 
 @njit
-def score_mesh_tally(P, distance, tally, data, mcdc):
+def score_mesh_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     mesh = tally["filter"]
@@ -1715,7 +1704,7 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    ut = 1.0 / physics.get_speed(P, mcdc)
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
 
     # Particle initial and final coordinate
     x = P["x"]
@@ -1728,11 +1717,11 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
     t_final = t + ut * distance
 
     # Easily identified tally bin indices
-    mu, azi = mesh_get_angular_index(P, mesh)
-    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc["setting"]["mode_MG"])
+    mu, azi = mesh_get_angular_index(P_arr, mesh)
+    g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
 
     # Get starting indices
-    ix, iy, iz, it, outside = mesh_.structured.get_indices(P, mesh)
+    ix, iy, iz, it, outside = mesh_.structured.get_indices(P_arr, mesh)
 
     # Outside grid?
     if outside or outside_energy:
@@ -1803,10 +1792,10 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
             if score_type == SCORE_FLUX:
                 score = flux
             elif score_type == SCORE_TOTAL:
-                SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+                SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
                 score = flux * SigmaT
             elif score_type == SCORE_FISSION:
-                SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+                SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
             tally_bin[TALLY_SCORE, idx + i] += score
 
@@ -1861,8 +1850,9 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
 
 
 @njit
-def score_surface_tally(P, surface, tally, data, mcdc):
+def score_surface_tally(P_arr, surface, tally, data, mcdc):
     # TODO: currently not supporting filters
+    P = P_arr[0]
 
     tally_bin = data[TALLY]
     stride = tally["stride"]
@@ -1871,7 +1861,7 @@ def score_surface_tally(P, surface, tally, data, mcdc):
     idx = stride["tally"]
 
     # Flux
-    mu = geometry.surface_normal_component(P, surface)
+    mu = geometry.surface_normal_component(P_arr, surface)
     flux = P["w"] / abs(mu)
 
     # Score
@@ -1954,7 +1944,8 @@ def tally_closeout(data, mcdc):
 
 
 @njit
-def eigenvalue_tally(P, distance, mcdc):
+def eigenvalue_tally(P_arr, distance, mcdc):
+    P = P_arr[0]
     material = mcdc["materials"][P["material_ID"]]
     flux = distance * P["w"]
 
@@ -1967,7 +1958,7 @@ def eigenvalue_tally(P, distance, mcdc):
 
     if mcdc["cycle_active"]:
         # Neutron density
-        v = physics.get_speed(P, mcdc)
+        v = physics.get_speed(P_arr, mcdc)
         n_density = flux / v
         # mcdc["eigenvalue_tally_n"][0] += n_density
         adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
@@ -2168,17 +2159,18 @@ def eigenvalue_tally_closeout(mcdc):
 
 
 @njit
-def move_to_event(P, data, mcdc):
+def move_to_event(P_arr, data, mcdc):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
+    P = P_arr[0]
 
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
     if mcdc["setting"]["mode_MG"]:
         # If material is not identified yet, locate the particle
         if P["material_ID"] == -1:
-            if not geometry.locate_particle(P, mcdc):
+            if not geometry.locate_particle(P_arr, mcdc):
                 # Particle is lost
                 P["event"] = EVENT_LOST
                 return
@@ -2191,7 +2183,7 @@ def move_to_event(P, data, mcdc):
     #   - Set particle boundary event (surface or lattice crossing, or lost)
     #   - Return distance to boundary (surface or lattice)
 
-    d_boundary = geometry.inspect_geometry(P, mcdc)
+    d_boundary = geometry.inspect_geometry(P_arr, mcdc)
 
     # Particle is lost?
     if P["event"] == EVENT_LOST:
@@ -2202,7 +2194,7 @@ def move_to_event(P, data, mcdc):
     # ==================================================================================
 
     # Distance to domain
-    speed = physics.get_speed(P, mcdc)
+    speed = physics.get_speed(P_arr, mcdc)
     d_domain = INF
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
@@ -2218,7 +2210,7 @@ def move_to_event(P, data, mcdc):
     d_time_census = speed * (mcdc["setting"]["census_time"][idx] - P["t"])
 
     # Distance to next collision
-    d_collision = distance_to_collision(P, mcdc)
+    d_collision = distance_to_collision(P_arr, mcdc)
 
     # =========================================================================
     # Determine event(s)
@@ -2266,7 +2258,7 @@ def move_to_event(P, data, mcdc):
     # Score tracklength tallies
     if mcdc["cycle_active"]:
         for tally in mcdc["mesh_tallies"]:
-            score_mesh_tally(P, distance, tally, data, mcdc)
+            score_mesh_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
@@ -2298,18 +2290,19 @@ def distance_to_collision(P_arr, mcdc):
 
 
 @njit
-def surface_crossing(P, data, prog):
-    mcdc = adapt.device(prog)
+def surface_crossing(P_arr, data, prog):
+    P = P_arr[0]
+    mcdc = adapt.mcdc_constant(prog)
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.surface_bc(P, surface)
+    geometry.surface_bc(P_arr, surface)
 
     # Score tally
     for i in range(surface["N_tally"]):
         ID = surface["tally_IDs"][i]
         tally = mcdc["surface_tallies"][ID]
-        score_surface_tally(P, surface, tally, data, mcdc)
+        score_surface_tally(P_arr, surface, tally, data, mcdc)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
@@ -2358,7 +2351,7 @@ def collision(P_arr, mcdc):
 @njit
 def scattering(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
     # Kill the current particle
     P["alive"] = False
 
@@ -2379,9 +2372,12 @@ def scattering(P_arr, prog):
     else:
         N = 1
 
+    P_new_arr = adapt.local_array(1,type_.particle_record)
+    P_new = P_new_arr[0]
+
     for n in range(N):
         # Create new particle
-        P_new = split_as_record(P)
+        split_as_record(P_new_arr,P_arr)
 
         # Set weight
         P_new["w"] = weight_new
@@ -2500,7 +2496,7 @@ def scattering_CE(P_arr, material, P_new_arr, mcdc):
     # =========================================================================
 
     # Particle speed
-    P_speed = physics.get_speed(P, mcdc)
+    P_speed = physics.get_speed(P_arr, mcdc)
 
     # Neutron velocity - LAB
     vx = P_speed * P["ux"]
@@ -2559,7 +2555,7 @@ def scattering_CE(P_arr, material, P_new_arr, mcdc):
 def sample_nucleus_speed(A, P_arr, mcdc):
     P = P_arr[0]
     # Particle speed
-    P_speed = physics.get_speed(P, mcdc)
+    P_speed = physics.get_speed(P_arr, mcdc)
 
     # Maxwellian parameter
     beta = math.sqrt(2.0659834e-11 * A)
@@ -2629,7 +2625,7 @@ def scatter_direction(ux, uy, uz, mu0, azi):
 @njit
 def fission(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # Kill the current particle
     P["alive"] = False
@@ -2656,9 +2652,12 @@ def fission(P_arr, prog):
         nu = get_nu(NU_FISSION, nuclide, E)
     N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P_arr)))
 
+    P_new_arr = adapt.local_array(1,type_.particle_record)
+    P_new = P_new_arr[0]
+
     for n in range(N):
         # Create new particle
-        P_new = split_as_record(P)
+        split_as_record(P_new_arr,P_arr)
 
         # Set weight
         P_new["w"] = weight_new
@@ -2907,7 +2906,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
 @njit
 def branchless_collision(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     material = mcdc["materials"][P["material_ID"]]
 
@@ -2917,6 +2916,8 @@ def branchless_collision(P_arr, prog):
     n_fission = get_MacroXS(XS_NU_FISSION, material, P_arr, mcdc) / mcdc["k_eff"]
     n_total = n_fission + n_scatter
     P["w"] *= n_total / SigmaT
+
+    P_rec_arr = adapt.local_array(1,type_.particle_record)
 
     # Set spectrum and decay rate
     if rng(P_arr) < n_scatter / n_total:
@@ -2932,7 +2933,8 @@ def branchless_collision(P_arr, prog):
             idx_census = mcdc["idx_census"]
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
                 P["alive"] = False
-                adapt.add_active(split_as_record(P), prog)
+                split_as_record(P_rec_arr,P_arr)
+                adapt.add_active(P_rec_arr, prog)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
 
@@ -2945,11 +2947,11 @@ def branchless_collision(P_arr, prog):
 @njit
 def weight_window(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # Get indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(
-        P, mcdc["technique"]["ww_mesh"]
+        P_arr, mcdc["technique"]["ww_mesh"]
     )
 
     # Target weight
@@ -2964,6 +2966,8 @@ def weight_window(P_arr, prog):
     # Window width
     width = mcdc["technique"]["ww_width"]
 
+    P_new_arr = adapt.local_array(1,type_.particle_record)
+
     # If above target
     if p > width:
         # Set target weight
@@ -2972,13 +2976,15 @@ def weight_window(P_arr, prog):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            adapt.add_active(split_as_record(P), prog)
+            split_as_record(P_new_arr,P_arr)
+            adapt.add_active(P_new_arr, prog)
 
         # Russian roulette
         p -= n_split
         xi = rng(P_arr)
         if xi <= p:
-            adapt.add_active(split_as_record(P), prog)
+            split_as_record(P_new_arr,P_arr)
+            adapt.add_active(P_new_arr, prog)
 
     # Below target
     elif p < 1.0 / width:

@@ -172,7 +172,7 @@ def loop_eigenvalue(data, mcdc):
 
 @njit(cache=caching)
 def generate_source_particle(work_start, idx_work, seed, prog):
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     seed_work = kernel.split_seed(work_start + idx_work, seed)
 
@@ -205,25 +205,26 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         else:
             adapt.add_census(P_arr, prog)
     else:
-        P_new = adapt.local_array(1,type_.particle)
+        P_new_arr = adapt.local_array(1,type_.particle)
+        P_new = P_new_arr[0]
         # Add the source particle into the active bank
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
             if kernel.particle_in_domain(P_arr, mcdc):
-                kernel.recordlike_to_particle(P_new,P_arr)
-                adapt.add_active(P_new, prog)
+                kernel.recordlike_to_particle(P_new_arr,P_arr)
+                adapt.add_active(P_new_arr, prog)
                 adapt.harm.print_formatted(19191919191)
         else:
-            kernel.recordlike_to_particle(P_new,P_arr)
-            adapt.add_active(P_new, prog)
+            kernel.recordlike_to_particle(P_new_arr,P_arr)
+            adapt.add_active(P_new_arr, prog)
             adapt.harm.print_formatted(19191919191)
 
 
 @njit(cache=caching)
 def prep_particle(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # Apply weight window
     if mcdc["technique"]["weight_window"]:
@@ -232,12 +233,9 @@ def prep_particle(P_arr, prog):
 
 @njit()
 def exhaust_active_bank(data, prog):
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
     P_arr = adapt.local_array(1,type_.particle)
     P = P_arr[0]
-    #P2 = adapt.local_array(1,type_.particle)[0]
-
-
 
     # Loop until active bank is exhausted
     while kernel.get_bank_size(mcdc["bank_active"]) > 0:
@@ -252,7 +250,7 @@ def exhaust_active_bank(data, prog):
 
 @njit(cache=caching)
 def source_closeout(prog, idx_work, N_prog, data):
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
@@ -272,7 +270,7 @@ def source_closeout(prog, idx_work, N_prog, data):
 
 @njit(cache=caching)
 def source_dd_resolution(data, prog):
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     kernel.dd_particle_send(mcdc)
     terminated = False
@@ -366,7 +364,7 @@ def loop_source(seed, data, mcdc):
 def gpu_sources_spec():
 
     def make_work(prog: nb.uintp) -> nb.boolean:
-        mcdc = adapt.device(prog)
+        mcdc = adapt.mcdc_constant(prog)
 
         idx_work = adapt.global_add(mcdc["mpi_work_iter"], 0, 1)
 
@@ -388,7 +386,8 @@ def gpu_sources_spec():
     base_fns = (initialize, finalize, make_work)
 
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
-        mcdc = adapt.device(prog)
+        mcdc = adapt.mcdc_constant(prog)
+        data = adapt.mcdc_data(prog)
         P_arr = adapt.local_array(1,type_.particle)
         P_arr[0] = P_input
         P = P_arr[0]
@@ -466,36 +465,19 @@ def gpu_loop_source(seed, mcdc):
 @njit(cache=caching)
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
-
-    #P_test = adapt.local_array(1,type_.particle)[0]
-    #P_test["rng_seed"] = 12345
-    #if P_test["rng_seed"] == P["rng_seed"]:
-    #    print("BAD STUFF")
+    mcdc = adapt.mcdc_constant(prog)
 
     while P["alive"]:
-        step_particle(P,_arr data, prog)
+        step_particle(P_arr, data, prog)
 
 
 @njit(cache=caching)
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     adapt.harm.print_formatted(123454321)
     adapt.harm.print_formatted(P["rng_seed"])
-
-
-
-    # Find cell from root universe if unknown
-    adapt.harm.print_formatted(-12)
-    if P["cell_ID"] == -1:
-        trans = adapt.local_array(3,np.float64)
-        for i in range(3):
-            trans[i] = 0
-        adapt.harm.print_formatted(-23)
-        P["cell_ID"] = kernel.get_particle_cell(P_arr, 0, trans, mcdc)
-        adapt.harm.print_formatted(P["cell_ID"])
 
     # Determine and move to event
     adapt.harm.print_formatted(88888)
@@ -514,12 +496,10 @@ def step_particle(P_arr, data, prog):
 
         # Branchless collision?
         if mcdc["technique"]["branchless_collision"]:
-            pass # adapt.harm.print_formatted(2)
             kernel.branchless_collision(P_arr, prog)
 
         # Analog collision
         else:
-            pass # adapt.harm.print_formatted(3) #!
             # Get collision type
             kernel.collision(P_arr, mcdc)
 
@@ -528,10 +508,10 @@ def step_particle(P_arr, data, prog):
                 P["alive"] = False
 
             elif P["event"] & EVENT_SCATTERING:
-                kernel.scattering(P, prog)
+                kernel.scattering(P_arr, prog)
 
             elif P["event"] & EVENT_FISSION:
-                kernel.fission(P, prog)
+                kernel.fission(P_arr, prog)
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:
@@ -575,7 +555,7 @@ def step_particle(P_arr, data, prog):
 
 @njit(cache=caching)
 def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # Set groups
     j = DNP["g"]
@@ -595,7 +575,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    _ = geometry.inspect_geometry(P_new, mcdc)
+    _ = geometry.inspect_geometry(P_new_arr, mcdc)
     if P_new["cell_ID"] > -1:
         material_ID = P_new["material_ID"]
     # Skip if particle is lost
@@ -664,7 +644,7 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
 @njit(cache=caching)
 def source_precursor_closeout(prog, idx_work, N_prog, data):
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_constant(prog)
 
     # Tally history closeout for fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"]:
@@ -731,7 +711,7 @@ def loop_source_precursor(seed, data, mcdc):
 def gpu_precursor_spec():
 
     def make_work(prog: nb.uintp) -> nb.boolean:
-        mcdc = adapt.device(prog)
+        mcdc = adapt.mcdc_constant(prog)
 
         idx_work = adapt.global_add(mcdc["mpi_work_iter"], 0, 1)
 
@@ -770,7 +750,7 @@ def gpu_precursor_spec():
     base_fns = (initialize, finalize, make_work)
 
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
-        mcdc = adapt.device(prog)
+        mcdc = adapt.mcdc_constant(prog)
         P_arr = adapt.local_array(1,type_.particle)
         P_arr[0] = P_input
         P = P_arr[0]
