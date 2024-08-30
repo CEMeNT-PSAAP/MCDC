@@ -44,11 +44,18 @@ if "__pycache__" in names:
 # Skip domain decomp tests unless there are 4 MPI processes
 temp = names.copy()
 for name in names:
-    if name[:3] == "dd_" and not (mpiexec == 4 or srun == 4):
+    if name == "dd_slab_reed" and not (mpiexec == 4 or srun == 4):
         temp.remove(name)
         print(
             Fore.YELLOW
             + "Note: Skipping %s (require 4 MPI ranks)" % name
+            + Style.RESET_ALL
+        )
+    elif name == "dd_cooper" and not (mpiexec == 8 or srun == 8):
+        temp.remove(name)
+        print(
+            Fore.YELLOW
+            + "Note: Skipping %s (require 8 MPI ranks)" % name
             + Style.RESET_ALL
         )
 names = temp
@@ -129,56 +136,58 @@ for i, name in enumerate(names):
     runtimes[-1] = output["runtime/total"][()]
     print("  (%.2f seconds)" % runtimes[-1][0])
 
-    # Compare all scores
-    for score in [key for key in output["tally"].keys() if key != "grid"]:
-        # Compare mean, sdev, and uq_var (if available)
-        for result in [key for key in output["tally/" + score].keys()]:
-            result_name = "tally/" + score + "/" + result
-            a = output[result_name][:]
-            b = answer[result_name][:]
+    # Compare mean, sdev, and uq_var (if available)
+    if "iqmc" not in output.keys():
+        name_root = "tallies"
+        for tally in [key for key in answer[name_root].keys()]:
+            name_tally = name_root + "/" + tally
+            for score in [key for key in answer[name_tally].keys()]:
+                if score in ["grid"]:
+                    continue
+                name_score = name_tally + "/" + score
+                for result in [key for key in answer[name_score].keys()]:
+                    name = name_score + "/" + result
+                    a = output[name][()]
+                    b = answer[name][()]
+
+                    # Passed?
+                    if np.isclose(a, b).all():
+                        print(
+                            Fore.GREEN + "  {}: Passed".format(name) + Style.RESET_ALL
+                        )
+                    else:
+                        all_pass = False
+                        error_msgs[-1].append(
+                            "Differences in %s"
+                            % (name + "/" + result + "\n" + "{}".format(a - b))
+                        )
+                        print(Fore.RED + "  {}: Failed".format(name) + Style.RESET_ALL)
+
+        # Other quantities
+        for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:
+            if result_name not in output.keys():
+                continue
+
+            a = output[result_name][()]
+            b = answer[result_name][()]
 
             # Passed?
             if np.isclose(a, b).all():
-                print(
-                    Fore.GREEN
-                    + "  {}: Passed".format(score + "/" + result)
-                    + Style.RESET_ALL
-                )
+                print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
             else:
                 all_pass = False
                 error_msgs[-1].append(
-                    "Differences in %s"
-                    % (name + "/" + score + "/" + result + "\n" + "{}".format(a - b))
+                    "Differences in {}\n{}".format(result_name, a - b)
                 )
-                print(
-                    Fore.RED
-                    + "  {}: Failed".format(score + "/" + result)
-                    + Style.RESET_ALL
-                )
-
-    # Other quantities
-    for result_name in ["k_mean", "k_sdev", "k_cycle", "k_eff"]:
-        if result_name not in output.keys():
-            continue
-
-        a = output[result_name][()]
-        b = answer[result_name][()]
-
-        # Passed?
-        if np.isclose(a, b).all():
-            print(Fore.GREEN + "  {}: Passed".format(result_name) + Style.RESET_ALL)
-        else:
-            all_pass = False
-            error_msgs[-1].append("Differences in {}\n{}".format(result_name, a - b))
-            print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
+                print(Fore.RED + "  {}: Failed".format(result_name) + Style.RESET_ALL)
 
     # iQMC flux
     if "iqmc" in output.keys():
         for score in [key for key in output["iqmc/tally/"].keys()]:
-            result_name = "iqmc/tally/" + score
-            a = output[result_name][:]
-            b = answer[result_name][:]
-            if a.size == 0:
+            name = f"iqmc/tally/{score}/mean"
+            a = np.squeeze(output[name][()])
+            b = np.squeeze(answer[name][()])
+            if np.isnan(b).all():
                 continue
             # Passed?
             if np.isclose(a, b).all():

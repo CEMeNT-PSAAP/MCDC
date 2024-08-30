@@ -1,26 +1,22 @@
-import numpy as np
-from numpy import ascontiguousarray as cga
-from numba import njit, objmode, jit
-from scipy.linalg import eig
-
 from mpi4py import MPI
+from numba import njit, objmode
 
 import mcdc.adapt as adapt
+import mcdc.geometry as geometry
 import mcdc.kernel as kernel
-import mcdc.type_ as type_
-import pathlib
-
+import mcdc.local as local
 import mcdc.print_ as print_module
+import mcdc.type_ as type_
 
 from mcdc.constant import *
 from mcdc.print_ import (
     print_header_batch,
-    print_progress,
-    print_progress_eigenvalue,
-    print_progress_iqmc,
     print_iqmc_eigenvalue_progress,
     print_iqmc_eigenvalue_exit_code,
     print_msg,
+    print_progress,
+    print_progress_eigenvalue,
+    print_progress_iqmc,
 )
 
 caching = False
@@ -31,8 +27,6 @@ def set_cache(setting):
 
     if setting == False:
         print_msg(" Caching has been disabled")
-        # p.unlink() for p in pathlib.Path('.').rglob('*.py[co]')
-        # p.rmdir() for p in pathlib.Path('.').rglob('__pycache__')
 
 
 # =============================================================================
@@ -74,7 +68,7 @@ def teardown_gpu(mcdc):
 
 
 @njit(cache=caching)
-def loop_fixed_source(mcdc):
+def loop_fixed_source(data, mcdc):
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
         mcdc["idx_batch"] = idx_batch
@@ -95,14 +89,14 @@ def loop_fixed_source(mcdc):
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            loop_source(seed_source, mcdc)
+            loop_source(seed_source, data, mcdc)
 
             # Loop over source precursors
             if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
                 seed_source_precursor = kernel.split_seed(
                     seed_census, SEED_SPLIT_SOURCE_PRECURSOR
                 )
-                loop_source_precursor(seed_source_precursor, mcdc)
+                loop_source_precursor(seed_source_precursor, data, mcdc)
 
             # Time census closeout
             if idx_census < mcdc["setting"]["N_census"] - 1:
@@ -120,17 +114,16 @@ def loop_fixed_source(mcdc):
             kernel.set_bank_size(mcdc["bank_active"], 0)
 
             # Tally history closeout
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_reduce(data, mcdc)
+            kernel.tally_accumulate(data, mcdc)
             # Uq closeout
             if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(mcdc)
+                kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(mcdc)
-    else:
-        kernel.tally_closeout(mcdc)
+        kernel.uq_tally_closeout(data, mcdc)
+    kernel.tally_closeout(data, mcdc)
 
 
 # =========================================================================
@@ -139,20 +132,20 @@ def loop_fixed_source(mcdc):
 
 
 @njit(cache=caching)
-def loop_eigenvalue(mcdc):
+def loop_eigenvalue(data, mcdc):
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
         seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
 
         # Loop over source particles
         seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
-        loop_source(seed_source, mcdc)
+        loop_source(seed_source, data, mcdc)
 
         # Tally "history" closeout
         kernel.eigenvalue_tally_closeout_history(mcdc)
         if mcdc["cycle_active"]:
-            kernel.tally_reduce_bin(mcdc)
-            kernel.tally_closeout_history(mcdc)
+            kernel.tally_reduce(data, mcdc)
+            kernel.tally_accumulate(data, mcdc)
 
         # Print progress
         with objmode():
@@ -168,7 +161,7 @@ def loop_eigenvalue(mcdc):
             mcdc["cycle_active"] = True
 
     # Tally closeout
-    kernel.tally_closeout(mcdc)
+    kernel.tally_closeout(data, mcdc)
     kernel.eigenvalue_tally_closeout(mcdc)
 
 
@@ -200,10 +193,6 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     # Get from source bank
     else:
         P = mcdc["bank_source"]["particles"][idx_work]
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_hid(P_arr, mcdc)
 
     # Check if it is beyond current census index
     idx_census = mcdc["idx_census"]
@@ -240,13 +229,9 @@ def prep_particle(P_arr, prog):
     if mcdc["technique"]["weight_window"]:
         kernel.weight_window(P_arr, prog)
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.allocate_pid(P_arr, mcdc)
-
 
 @njit()
-def exhaust_active_bank(prog):
+def exhaust_active_bank(data, prog):
     mcdc = adapt.device(prog)
     P_arr = adapt.local_array(1,type_.particle)
     P = P_arr[0]
@@ -262,20 +247,20 @@ def exhaust_active_bank(prog):
         prep_particle(P_arr, prog)
 
         # Particle loop
-        loop_particle(P_arr, mcdc)
+        loop_particle(P_arr, data, mcdc)
 
 
 @njit(cache=caching)
-def source_closeout(prog, idx_work, N_prog):
+def source_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.device(prog)
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        kernel.tally_closeout_history(mcdc)
+        kernel.tally_accumulate(data, mcdc)
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout_history(mcdc)
+        kernel.uq_tally_closeout_history(data, mcdc)
 
     # Progress printout
     percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
@@ -286,7 +271,7 @@ def source_closeout(prog, idx_work, N_prog):
 
 
 @njit(cache=caching)
-def source_dd_resolution(prog):
+def source_dd_resolution(data, prog):
     mcdc = adapt.device(prog)
 
     kernel.dd_particle_send(mcdc)
@@ -312,19 +297,15 @@ def source_dd_resolution(prog):
                 if mcdc["technique"]["weight_window"]:
                     kernel.weight_window(P_arr, mcdc)
 
-                # Particle tracker
-                if mcdc["setting"]["track_particle"]:
-                    mcdc["particle_track_particle_ID"] += 1
-
                 # Particle loop
-                loop_particle(P_arr, mcdc)
+                loop_particle(P_arr, data, mcdc)
 
                 # Tally history closeout for one-batch fixed-source simulation
                 if (
                     not mcdc["setting"]["mode_eigenvalue"]
                     and mcdc["setting"]["N_batch"] == 1
                 ):
-                    kernel.tally_closeout_history(mcdc)
+                    kernel.tally_accumulate(data, mcdc)
 
         # Send all domain particle banks
         kernel.dd_particle_send(mcdc)
@@ -345,7 +326,7 @@ def source_dd_resolution(prog):
 
 
 @njit
-def loop_source(seed, mcdc):
+def loop_source(seed, data, mcdc):
     # Progress bar indicator
     N_prog = 0
 
@@ -369,16 +350,16 @@ def loop_source(seed, mcdc):
         # Run the source particle and its secondaries
         # =====================================================================
 
-        exhaust_active_bank(mcdc)
+        exhaust_active_bank(data, mcdc)
 
         # =====================================================================
         # Closeout
         # =====================================================================
 
-        source_closeout(mcdc, idx_work, N_prog)
+        source_closeout(mcdc, idx_work, N_prog, data)
 
     if mcdc["technique"]["domain_decomposition"]:
-        source_dd_resolution(mcdc)
+        source_dd_resolution(data, mcdc)
 
 
 
@@ -414,7 +395,7 @@ def gpu_sources_spec():
         if P["fresh"]:
             prep_particle(P_arr, prog)
         P["fresh"] = False
-        step_particle(P_arr, prog)
+        step_particle(P_arr, data, prog)
         if P["alive"]:
             adapt.step_async(prog, P)
 
@@ -471,10 +452,10 @@ def gpu_loop_source(seed, mcdc):
     # Closeout (Moved out of the typical particle loop)
     # =====================================================================
 
-    source_closeout(mcdc, 1, 1)
+    source_closeout(mcdc, 1, 1, data)
 
     if mcdc["technique"]["domain_decomposition"]:
-        source_dd_resolution(mcdc)
+        source_dd_resolution(data, mcdc)
 
 
 # =========================================================================
@@ -483,7 +464,7 @@ def gpu_loop_source(seed, mcdc):
 
 
 @njit(cache=caching)
-def loop_particle(P_arr, prog):
+def loop_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.device(prog)
 
@@ -492,20 +473,12 @@ def loop_particle(P_arr, prog):
     #if P_test["rng_seed"] == P["rng_seed"]:
     #    print("BAD STUFF")
 
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P_arr, mcdc)
-
     while P["alive"]:
-        step_particle(P_arr, prog)
-
-    # Particle tracker
-    if mcdc["setting"]["track_particle"]:
-        kernel.track_particle(P_arr, mcdc)
+        step_particle(P,_arr data, prog)
 
 
 @njit(cache=caching)
-def step_particle(P_arr, prog):
+def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.device(prog)
 
@@ -526,15 +499,15 @@ def step_particle(P_arr, prog):
 
     # Determine and move to event
     adapt.harm.print_formatted(88888)
-    kernel.move_to_event(P_arr, mcdc)
-    event = P["event"]
+    kernel.move_to_event(P_arr, data, mcdc)
     adapt.harm.print_formatted(P["event"])
 
-    # The & operator here is a bitwise and.
-    # It is used to determine if an event type is part of the particle event.
+    # Execute events
+    if P["event"] == EVENT_LOST:
+        return
 
-    # Collision events
-    if event & EVENT_COLLISION:
+    # Collision
+    if P["event"] & EVENT_COLLISION:
         # Generate IC?
         if mcdc["technique"]["IC_generator"] and mcdc["cycle_active"]:
             kernel.bank_IC(P_arr, prog)
@@ -549,63 +522,34 @@ def step_particle(P_arr, prog):
             pass # adapt.harm.print_formatted(3) #!
             # Get collision type
             kernel.collision(P_arr, mcdc)
-            event = P["event"]
 
             # Perform collision
-            if event == EVENT_SCATTERING:
-                adapt.harm.print_formatted(31) #!
-                kernel.scattering(P_arr, prog)
-            elif event == EVENT_FISSION:
-                kernel.fission(P_arr, prog)
-                adapt.harm.print_formatted(32) #!
-            else:
-                adapt.harm.print_formatted(33) #!
+            if P["event"] & EVENT_CAPTURE:
+                P["alive"] = False
 
-            # Sensitivity quantification for nuclide?
-            material = mcdc["materials"][P["material_ID"]]
-            if material["sensitivity"] and (
-                P["sensitivity_ID"] == 0
-                or mcdc["technique"]["dsm_order"] == 2
-                and P["sensitivity_ID"] <= mcdc["setting"]["N_sensitivity"]
-            ):
-                kernel.sensitivity_material(P_arr, prog)
-                adapt.harm.print_formatted(34) #!
+            elif P["event"] & EVENT_SCATTERING:
+                kernel.scattering(P, prog)
 
-    # Surface crossing
-    if event & EVENT_SURFACE:
-        pass # adapt.harm.print_formatted(4) #!
-        kernel.surface_crossing(P_arr, prog)
-        # adapt.harm.print_formatted(P["cell_ID"])
-        if event & EVENT_DOMAIN:
-            if not (
-                mcdc["surfaces"][P["surface_ID"]]["reflective"]
-                or mcdc["surfaces"][P["surface_ID"]]["vacuum"]
-            ):
+            elif P["event"] & EVENT_FISSION:
+                kernel.fission(P, prog)
+
+    # Surface and domain crossing
+    if P["event"] & EVENT_SURFACE_CROSSING:
+        kernel.surface_crossing(P_arr, data, prog)
+        if P["event"] & EVENT_DOMAIN_CROSSING:
+            if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P_arr, mcdc)
 
-    # Lattice or mesh crossing (skipped if surface crossing)
-    elif event & EVENT_LATTICE or event & EVENT_MESH:
-        pass # adapt.harm.print_formatted(5) #!
-        kernel.shift_particle(P_arr, SHIFT)
-        if event & EVENT_DOMAIN:
-            kernel.domain_crossing(P_arr, mcdc)
-
-    # Moving surface transition
-    if event & EVENT_SURFACE_MOVE:
-        pass # adapt.harm.print_formatted(6)
-        P["t"] += SHIFT
-        P["cell_ID"] = -1
+    elif P["event"] & EVENT_DOMAIN_CROSSING:
+        kernel.domain_crossing(P_arr, mcdc)
 
     # Census time crossing
-    if event & EVENT_CENSUS:
-        pass # adapt.harm.print_formatted(7)
-        P["t"] += SHIFT
+    if P["event"] & EVENT_TIME_CENSUS:
         adapt.add_census(P_arr, prog)
         P["alive"] = False
 
     # Time boundary crossing
-    if event & EVENT_TIME_BOUNDARY:
-        pass # adapt.harm.print_formatted(8) #!
+    if P["event"] & EVENT_TIME_BOUNDARY:
         P["alive"] = False
 
     # Apply weight window
@@ -622,372 +566,6 @@ def step_particle(P_arr, prog):
 
     if not P["alive"]:
         adapt.harm.print_formatted(8675309)
-
-
-# =============================================================================
-# iQMC Loops
-# =============================================================================
-
-
-@njit(cache=caching)
-def loop_iqmc(mcdc):
-    # function calls from specified solvers
-    iqmc = mcdc["technique"]["iqmc"]
-    kernel.iqmc_preprocess(mcdc)
-    if mcdc["setting"]["mode_eigenvalue"]:
-        if iqmc["eigenmode_solver"] == "davidson":
-            davidson(mcdc)
-        if iqmc["eigenmode_solver"] == "power_iteration":
-            power_iteration(mcdc)
-    else:
-        if iqmc["fixed_source_solver"] == "source_iteration":
-            source_iteration(mcdc)
-        if iqmc["fixed_source_solver"] == "gmres":
-            gmres(mcdc)
-
-
-@njit(cache=caching)
-def source_iteration(mcdc):
-    simulation_end = False
-    iqmc = mcdc["technique"]["iqmc"]
-    total_source_old = iqmc["total_source"].copy()
-
-    while not simulation_end:
-        # reset particle bank size
-        kernel.set_bank_size(mcdc["bank_source"], 0)
-        # initialize particles with LDS
-        kernel.iqmc_prepare_particles(mcdc)
-        # reset tallies for next loop
-        kernel.iqmc_reset_tallies(iqmc)
-        # sweep particles
-        iqmc["sweep_counter"] += 1
-        loop_source(0, mcdc)
-
-        # sum resultant flux on all processors
-        kernel.iqmc_distribute_tallies(iqmc)
-        iqmc["itt"] += 1
-        kernel.iqmc_update_source(mcdc)
-        # combine source tallies into one vector
-        kernel.iqmc_consolidate_sources(mcdc)
-        # calculate norm of sources
-        iqmc["res"] = kernel.iqmc_res(iqmc["total_source"], total_source_old)
-        # iQMC convergence criteria
-        if (iqmc["itt"] == iqmc["maxitt"]) or (iqmc["res"] <= iqmc["tol"]):
-            simulation_end = True
-
-        # Print progress
-        if not mcdc["setting"]["mode_eigenvalue"]:
-            with objmode():
-                print_progress_iqmc(mcdc)
-
-        # set  source_old = current source
-        total_source_old = iqmc["total_source"].copy()
-
-
-@njit(cache=caching)
-def gmres(mcdc):
-    """
-    GMRES solver.
-    ----------
-    Linear Krylov solver. Solves problem of the form Ax = b.
-
-    References
-    ----------
-    .. [1] Yousef Saad, "Iterative Methods for Sparse Linear Systems,
-        Second Edition", SIAM, pp. 151-172, pp. 272-275, 2003
-        http://www-users.cs.umn.edu/~saad/books.html
-    .. [2] C. T. Kelley, http://www4.ncsu.edu/~ctk/matlab_roots.html
-
-    code adapted from: https://github.com/pygbe/pygbe/blob/master/pygbe/gmres.py
-
-    """
-    iqmc = mcdc["technique"]["iqmc"]
-    max_iter = iqmc["maxitt"]
-    R = iqmc["krylov_restart"]
-    tol = iqmc["tol"]
-
-    fixed_source = iqmc["fixed_source"]
-    single_vector = iqmc["fixed_source"].size
-    b = np.zeros_like(iqmc["total_source"])
-    b[:single_vector] = np.reshape(fixed_source, fixed_source.size)
-    X = iqmc["total_source"].copy()
-    # initial residual
-    r = b - kernel.AxV(X, b, mcdc)
-    normr = np.linalg.norm(r)
-
-    # Defining dimension
-    dimen = X.size
-    # Set number of outer and inner iterations
-    if R > dimen:
-        # set number of outter iterations to max allowable (A.shape[0])
-        R = dimen
-    max_inner = R
-    xtype = np.float64
-
-    # max_outer should be max_iter/max_inner but this might not be an integer
-    # so we get the ceil of the division.
-    # In the inner loop there is a if statement to break in case max_iter is
-    # reached.
-    max_outer = int(np.ceil(max_iter / max_inner))
-
-    # Check initial guess ( scaling by b, if b != 0, must account for
-    # case when norm(b) is very small)
-    normb = np.linalg.norm(b)
-    if normb == 0.0:
-        normb = 1.0
-    if normr < tol * normb:
-        return X, 0
-
-    iteration = 0
-
-    # GMRES starts here
-    for outer in range(max_outer):
-        # Preallocate for Givens Rotations, Hessenberg matrix and Krylov Space
-        Q = []
-        H = np.zeros((max_inner + 1, max_inner + 1), dtype=xtype)
-        V = np.zeros((max_inner + 1, dimen), dtype=xtype)
-
-        # vs store the pointers to each column of V.
-        # This saves a considerable amount of time.
-        vs = []
-        V[0, :] = (1.0 / normr) * r
-        vs.append(V[0, :])
-
-        # Saving initial residual to be used to calculate the rel_resid
-        if iteration == 0:
-            res_0 = normb
-
-        # RHS vector in the Krylov space
-        g = np.zeros((dimen,), dtype=xtype)
-        g[0] = normr
-
-        for inner in range(max_inner):
-            # New search direction
-            v = V[inner + 1, :]
-            v[:] = kernel.AxV(vs[-1], b, mcdc)
-            vs.append(v)
-
-            # Modified Gram Schmidt
-            for k in range(inner + 1):
-                vk = vs[k]
-                alpha = np.dot(vk, v)
-                H[inner, k] = alpha
-                v[:] = vk * (-alpha) + v[:]
-
-            normv = np.linalg.norm(v)
-            H[inner, inner + 1] = normv
-
-            # Check for breakdown
-            if H[inner, inner + 1] != 0.0:
-                v[:] = (1.0 / H[inner, inner + 1]) * v
-
-            # Apply for Givens rotations to H
-            if inner > 0:
-                for j in range(inner):
-                    Qloc = Q[j]
-                    H[inner, :][j : j + 2] = np.dot(Qloc, H[inner, :][j : j + 2])
-
-            # Calculate and apply next complex-valued Givens rotations
-
-            # If max_inner = dimen, we don't need to calculate, this
-            # is unnecessary for the last inner iteration when inner = dimen -1
-            if inner != dimen - 1:
-                if H[inner, inner + 1] != 0:
-                    # Caclulate matrix rotations
-                    c, s, _ = kernel.lartg(H[inner, inner], H[inner, inner + 1])
-                    Qblock = np.array([[c, s], [-np.conjugate(s), c]], dtype=xtype)
-                    Q.append(Qblock)
-
-                    # Apply Givens Rotations to RHS for the linear system in
-                    # the krylov space.
-                    g[inner : inner + 2] = np.dot(Qblock, g[inner : inner + 2])
-
-                    # Apply Givens rotations to H
-                    H[inner, inner] = np.dot(Qblock[0, :], H[inner, inner : inner + 2])
-                    H[inner, inner + 1] = 0.0
-
-            iteration += 1
-
-            if inner < max_inner - 1:
-                normr = abs(g[inner + 1])
-                rel_resid = normr / res_0
-                iqmc["res"] = rel_resid
-
-            iqmc["itt"] += 1
-            if not mcdc["setting"]["mode_eigenvalue"]:
-                with objmode():
-                    print_progress_iqmc(mcdc)
-
-            if rel_resid < tol:
-                break
-            if iqmc["itt"] >= max_iter:
-                break
-
-        # end inner loop, back to outer loop
-        # Find best update to X in Krylov Space V.  Solve inner X inner system.
-        y = np.linalg.solve(H[0 : inner + 1, 0 : inner + 1].T, g[0 : inner + 1])
-        update = np.ravel(np.dot(cga(V[: inner + 1, :].T), y.reshape(-1, 1)))
-        X = X + update
-        aux = kernel.AxV(X, b, mcdc)
-        r = b - aux
-        normr = np.linalg.norm(r)
-        rel_resid = normr / res_0
-        iqmc["res"] = rel_resid
-        if rel_resid < tol:
-            break
-        if iqmc["itt"] >= max_iter:
-            return
-
-
-@njit(cache=caching)
-def power_iteration(mcdc):
-    simulation_end = False
-    iqmc = mcdc["technique"]["iqmc"]
-    # iteration tolerance
-    tol = iqmc["tol"]
-    # maximum number of iterations
-    maxit = iqmc["maxitt"]
-    score_bin = iqmc["score"]
-    k_old = mcdc["k_eff"]
-    solver = iqmc["fixed_source_solver"]
-
-    fission_source_old = score_bin["fission-source"].copy()
-
-    while not simulation_end:
-        # iterate over scattering source
-        if solver == "source_iteration":
-            iqmc["maxitt"] = 1
-            source_iteration(mcdc)
-            iqmc["maxitt"] = maxit
-        if solver == "gmres":
-            gmres(mcdc)
-        # reset counter for inner iteration
-        iqmc["itt"] = 0
-
-        # update k_eff
-        mcdc["k_eff"] *= score_bin["fission-source"][0] / fission_source_old[0]
-
-        # calculate diff in keff
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
-        k_old = mcdc["k_eff"]
-        # store outter iteration values
-        score_bin["effective-fission-outter"] = score_bin["effective-fission"].copy()
-        fission_source_old = score_bin["fission-source"].copy()
-        iqmc["itt_outter"] += 1
-
-        with objmode():
-            print_iqmc_eigenvalue_progress(mcdc)
-
-        # iQMC convergence criteria
-        if (iqmc["itt_outter"] == maxit) or (iqmc["res_outter"] <= tol):
-            simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
-
-
-@njit(cache=caching)
-def davidson(mcdc):
-    """
-    The generalized Davidson method is a Krylov subspace method for solving
-    the generalized eigenvalue problem. The algorithm here is based on the
-    outline in:
-
-        Subramanian, C., et al. "The Davidson method as an alternative to
-        power iterations for criticality calculations." Annals of nuclear
-        energy 38.12 (2011): 2818-2823.
-
-    """
-    # TODO: handle imaginary eigenvalues
-    iqmc = mcdc["technique"]["iqmc"]
-    # Davidson parameters
-    simulation_end = False
-    maxit = iqmc["maxitt"]
-    tol = iqmc["tol"]
-    # num_sweeps: number of preconditioner sweeps
-    num_sweeps = iqmc["preconditioner_sweeps"]
-    # m : restart parameter
-    m = iqmc["krylov_restart"]
-    k_old = mcdc["k_eff"]
-    # initial size of Krylov subspace
-    Vsize = 1
-    # l : number of eigenvalues to solve for
-    l = 1
-    # vector size
-    Nt = iqmc["total_source"].size
-    # allocate memory then use slice indexing in loop
-    V = np.zeros((Nt, m), dtype=np.float64)
-    HV = np.zeros((Nt, m), dtype=np.float64)
-    FV = np.zeros((Nt, m), dtype=np.float64)
-
-    V0 = iqmc["total_source"].copy()
-    V0 = kernel.preconditioner(V0, mcdc, num_sweeps=5)
-    # orthonormalize initial guess
-    V0 = V0 / np.linalg.norm(V0)
-    V[:, 0] = V0
-
-    if m is None:
-        # unless specified there is no restart parameter
-        m = maxit + 1
-
-    # Davidson Routine
-    while not simulation_end:
-        # Calculate V*H*V (HxV is scattering linear operator function)
-        HV[:, Vsize - 1] = kernel.HxV(V[:, :Vsize], mcdc)
-        VHV = np.dot(cga(V[:, :Vsize].T), cga(HV[:, :Vsize]))
-        # Calculate V*F*V (FxV is fission linear operator function)
-        FV[:, Vsize - 1] = kernel.FxV(V[:, :Vsize], mcdc)
-        VFV = np.dot(cga(V[:, :Vsize].T), cga(FV[:, :Vsize]))
-        # solve for eigenvalues and vectors
-        with objmode(Lambda="complex128[:]", w="complex128[:,:]"):
-            Lambda, w = eig(VFV, b=VHV)
-            Lambda = np.array(Lambda, dtype=np.complex128)
-            w = np.array(w, dtype=np.complex128)
-
-        assert Lambda.imag.all() == 0.0
-        Lambda = Lambda.real
-        w = w.real
-        # get indices of eigenvalues from largest to smallest
-        idx = np.flip(Lambda.argsort())
-        # sort eigenvalues from largest to smallest
-        Lambda = Lambda[idx]
-        # take the l largest eigenvalues
-        Lambda = Lambda[:l]
-        # sort corresponding eigenvector (oriented by column)
-        w = w[:, idx]
-        # take the l largest eigenvectors
-        w = w[:, :l]
-        # assign keff
-        mcdc["k_eff"] = Lambda[0]
-        # Ritz vector
-        u = np.dot(cga(V[:, :Vsize]), cga(w))
-        # residual
-        res = kernel.FxV(u, mcdc) - Lambda * kernel.HxV(u, mcdc)
-        iqmc["res_outter"] = abs(mcdc["k_eff"] - k_old) / k_old
-        k_old = mcdc["k_eff"]
-        iqmc["itt_outter"] += 1
-        with objmode():
-            print_iqmc_eigenvalue_progress(mcdc)
-
-        # check convergence criteria
-        if (iqmc["itt_outter"] >= maxit) or (iqmc["res_outter"] <= tol):
-            simulation_end = True
-            with objmode():
-                print_iqmc_eigenvalue_exit_code(mcdc)
-            # return
-        else:
-            # Precondition for next iteration
-            t = kernel.preconditioner(res, mcdc, num_sweeps)
-            # check restart condition
-            if Vsize <= m - l:
-                # appends new orthogonalization to V
-                V[:, : Vsize + 1] = kernel.modified_gram_schmidt(V[:, :Vsize], t)
-                Vsize += 1
-            else:
-                # "restarts" by appending to a new array
-                Vsize = l + 1
-                V[:, :Vsize] = kernel.modified_gram_schmidt(u, t)
-        # TODO: normalize and save final scalar flux
-        iqmc["score"]["flux"] /= iqmc["score"]["flux"].sum()
 
 
 # =============================================================================
@@ -1010,7 +588,6 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
     P_new["w"] = 1.0
-    P_new["sensitivity_ID"] = 0
 
     # Set position
     P_new["x"] = DNP["x"]
@@ -1018,10 +595,13 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
     P_new["z"] = DNP["z"]
 
     # Get material
-    trans = adapt.local_array(3,nb.types.float64)
-    adapt.harm.print_formatted(-90)
-    P_new["cell_ID"] = kernel.get_particle_cell(P_new_arr, 0, trans, mcdc)
-    material_ID = kernel.get_particle_material(P_new_arr, mcdc)
+    _ = geometry.inspect_geometry(P_new, mcdc)
+    if P_new["cell_ID"] > -1:
+        material_ID = P_new["material_ID"]
+    # Skip if particle is lost
+    else:
+        return
+
     material = mcdc["materials"][material_ID]
     G = material["G"]
 
@@ -1083,12 +663,12 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
 
 @njit(cache=caching)
-def source_precursor_closeout(prog, idx_work, N_prog):
+def source_precursor_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.device(prog)
 
     # Tally history closeout for fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"]:
-        kernel.tally_closeout_history(mcdc)
+        kernel.tally_accumulate(data, mcdc)
 
     # Progress printout
     percent = (idx_work + 1.0) / mcdc["mpi_work_size_precursor"]
@@ -1099,7 +679,7 @@ def source_precursor_closeout(prog, idx_work, N_prog):
 
 
 @njit
-def loop_source_precursor(seed, mcdc):
+def loop_source_precursor(seed, data, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
     # Progress bar indicator
@@ -1139,13 +719,13 @@ def loop_source_precursor(seed, mcdc):
 
             generate_precursor_particle(DNP, particle_idx, seed_work, mcdc)
 
-            exhaust_active_bank(mcdc)
+            exhaust_active_bank(data, mcdc)
 
         # =====================================================================
         # Closeout
         # =====================================================================
 
-        source_precursor_closeout(mcdc, idx_work, N_prog)
+        source_precursor_closeout(mcdc, idx_work, N_prog, data)
 
 
 def gpu_precursor_spec():
@@ -1197,7 +777,7 @@ def gpu_precursor_spec():
         if P["fresh"]:
             prep_particle(P_arr, prog)
         P["fresh"] = False
-        step_particle(P_arr, prog)
+        step_particle(P_arr, data, prog)
         if P["alive"]:
             adapt.step_async(prog, P)
 
@@ -1267,7 +847,7 @@ def gpu_loop_source_precursor(seed, mcdc):
     # Closeout (moved out of loop)
     # =====================================================================
 
-    source_precursor_closeout(mcdc, 1, 1)
+    source_precursor_closeout(mcdc, 1, 1, data)
 
 
 

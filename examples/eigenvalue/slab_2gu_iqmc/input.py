@@ -23,40 +23,24 @@ s1 = mcdc.surface("plane-x", x=0.0, bc="vacuum")
 s2 = mcdc.surface("plane-x", x=6.01275, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m1)
+mcdc.cell(+s1 & -s2, m1)
 
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
 Nx = 10
 N = 1000
-maxit = 5
-tol = 1e-3
-pre_sweeps = 3
 x = np.linspace(0.0, 6.01275, num=Nx + 1)
-generator = "halton"
-solver = "davidson"
-fixed_source = np.zeros((2, Nx))
 phi0 = np.ones((2, Nx))
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.iQMC(
-    x=x,
-    g=np.ones(2),
-    phi0=phi0,
-    fixed_source=fixed_source,
-    maxitt=maxit,
-    tol=tol,
-    generator=generator,
-    eigenmode_solver=solver,
-    preconditioner_sweeps=pre_sweeps,
-)
+mcdc.iQMC(x=x, g=np.ones(2), phi0=phi0, mode="batched")
 # Setting
 mcdc.setting(N_particle=N)
-mcdc.eigenmode()
+mcdc.eigenmode(N_inactive=10, N_active=5)
 
 # Run
 mcdc.run()

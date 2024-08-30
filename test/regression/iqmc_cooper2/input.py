@@ -25,10 +25,10 @@ sy2 = mcdc.surface("plane-y", y=2.0)
 sy3 = mcdc.surface("plane-y", y=4.0, bc="vacuum")
 
 # Set cells
-mcdc.cell([+sx1, -sx2, +sy1, -sy2], m_room)
-mcdc.cell([+sx1, -sx4, +sy2, -sy3], m_room)
-mcdc.cell([+sx3, -sx4, +sy1, -sy2], m_room)
-mcdc.cell([+sx2, -sx3, +sy1, -sy2], m_barrier)
+mcdc.cell(+sx1 & -sx2 & +sy1 & -sy2, m_room)
+mcdc.cell(+sx1 & -sx4 & +sy2 & -sy3, m_room)
+mcdc.cell(+sx3 & -sx4 & +sy1 & -sy2, m_room)
+mcdc.cell(+sx2 & -sx3 & +sy1 & -sy2, m_barrier)
 
 # =============================================================================
 # iQMC Parameters
@@ -39,7 +39,6 @@ maxit = 2
 tol = 1e-3
 x = np.linspace(0, 4, num=Nx + 1)
 y = np.linspace(0, 4, num=Ny + 1)
-generator = "halton"
 
 # fixed source in lower left corner
 fixed_source = np.zeros((Nx, Ny))
@@ -52,10 +51,9 @@ mcdc.iQMC(
     y=y,
     fixed_source=fixed_source,
     phi0=phi0,
-    maxitt=maxit,
+    maxit=maxit,
     tol=tol,
-    generator=generator,
-    score=["tilt-x", "tilt-y", "tilt-xy"],
+    scores=["source-x", "source-y"],
 )
 
 # =============================================================================
