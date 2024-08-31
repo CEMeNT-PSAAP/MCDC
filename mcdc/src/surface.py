@@ -11,11 +11,11 @@ from numba import njit
 import mcdc.physics as physics
 
 from mcdc.algorithm import binary_search_with_length
-from mcdc.constant import BC_VACUUM, BC_REFLECTIVE, COINCIDENCE_TOLERANCE, INF
+from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 
 
 @njit
-def surface_evaluate(particle, surface):
+def evaluate(particle, surface):
     """
     Evaluate the surface equation wrt the particle coordinate
     """
@@ -78,7 +78,7 @@ def surface_evaluate(particle, surface):
 
 
 @njit
-def surface_distance(particle, surface, mcdc):
+def get_distance(particle, surface, mcdc):
     """
     Return particle distance to surface
     """
@@ -93,13 +93,13 @@ def surface_distance(particle, surface, mcdc):
     speed = physics.get_speed(particle, mcdc)
 
     # Check if coincident and leaving the surface forever
-    evaluation = surface_evaluate(particle, surface)
+    evaluation = evaluate(particle, surface)
     coincident = abs(evaluation) < COINCIDENCE_TOLERANCE
     if coincident:
         if surface["linear"]:
             if not surface["moving"]:
                 return INF
-        elif surface_normal_component(particle, surface, mcdc) > 0.0:
+        elif get_normal_component(particle, surface, mcdc) > 0.0:
             return INF
 
     # Surface coefficients
@@ -181,7 +181,7 @@ def surface_distance(particle, surface, mcdc):
 
             # Check if particle and surface move in the same direction
             if relative_velocity != 0.0:
-                distance = -surface_evaluate(particle, surface) / relative_velocity
+                distance = -evaluate(particle, surface) / relative_velocity
                 # Check if not moving away
                 if distance > 0.0:
                     # Check if it is still within interval
@@ -270,18 +270,7 @@ def surface_distance(particle, surface, mcdc):
 
 
 @njit
-def surface_bc(particle, surface):
-    """
-    Apply surface boundary condition to the particle
-    """
-    if surface["BC"] == BC_VACUUM:
-        particle["alive"] = False
-    elif surface["BC"] == BC_REFLECTIVE:
-        surface_reflect(particle, surface)
-
-
-@njit
-def surface_reflect(particle, surface):
+def reflect(particle, surface):
     """
     Surface-reflect the particle
     """
@@ -332,7 +321,7 @@ def surface_normal(particle, surface):
 
 
 @njit
-def surface_normal_component(particle, surface, mcdc):
+def get_normal_component(particle, surface, mcdc):
     """
     Get the surface outward-normal component of the particle
     (dot product of the two directional vectors)

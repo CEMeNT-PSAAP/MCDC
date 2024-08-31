@@ -5,9 +5,9 @@ from numba import njit, int64
 import mcdc.local as local
 import mcdc.mesh as mesh
 import mcdc.physics as physics
+import mcdc.src.surface as surface_
 
 from mcdc.constant import *
-from mcdc.src.surface import *
 
 
 # ======================================================================================
@@ -385,12 +385,12 @@ def check_surface_sense(particle, surface, mcdc):
         - Return False otherwise
     Particle direction is used if coincide within the tolerance
     """
-    result = surface_evaluate(particle, surface)
+    result = surface_.evaluate(particle, surface)
 
     # Check if coincident on the surface
     if abs(result) < COINCIDENCE_TOLERANCE:
         # Determine sense based on the direction
-        return surface_normal_component(particle, surface, mcdc) > 0.0
+        return surface_.get_normal_component(particle, surface, mcdc) > 0.0
 
     return result > 0.0
 
@@ -429,7 +429,7 @@ def distance_to_nearest_surface(particle, cell, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cells_data_surface"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d = surface_distance(particle, surface, mcdc)
+        d = surface_.get_distance(particle, surface, mcdc)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]

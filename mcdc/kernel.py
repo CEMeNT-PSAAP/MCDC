@@ -14,6 +14,7 @@ import mcdc.geometry as geometry
 import mcdc.local as local
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
+import mcdc.src.surface as surface_
 import mcdc.type_ as type_
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
@@ -1839,7 +1840,7 @@ def score_surface_tally(P, surface, tally, data, mcdc):
     idx = stride["tally"]
 
     # Flux
-    mu = geometry.surface_normal_component(P, surface, mcdc)
+    mu = surface_.get_normal_component(P, surface, mcdc)
     flux = P["w"] / abs(mu)
 
     # Score
@@ -2265,9 +2266,12 @@ def distance_to_collision(P, mcdc):
 def surface_crossing(P, data, prog):
     mcdc = adapt.device(prog)
 
-    # Implement BC
+    # Apply BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.surface_bc(P, surface)
+    if surface["BC"] == BC_VACUUM:
+        P["alive"] = False
+    elif surface["BC"] == BC_REFLECTIVE:
+        surface_.reflect(P, surface)
 
     # Score tally
     for i in range(surface["N_tally"]):
