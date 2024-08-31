@@ -351,6 +351,9 @@ def check_cell(particle, cell, mcdc):
     value = value_struct["values"]
     N_value = 0
 
+    # Particle parameters
+    speed = physics.get_speed(particle, mcdc)
+
     # March forward through RPN tokens
     idx_end = idx + N_token
     while idx < idx_end:
@@ -358,7 +361,7 @@ def check_cell(particle, cell, mcdc):
 
         if token >= 0:
             surface = mcdc["surfaces"][token]
-            value[N_value] = check_surface_sense(particle, surface, mcdc)
+            value[N_value] = surface_.check_sense(particle, speed, surface)
             N_value += 1
 
         elif token == BOOL_NOT:
@@ -375,24 +378,6 @@ def check_cell(particle, cell, mcdc):
         idx += 1
 
     return value[0]
-
-
-@njit
-def check_surface_sense(particle, surface, mcdc):
-    """
-    Check on which side of the surface the particle is
-        - Return True if positive side
-        - Return False otherwise
-    Particle direction is used if coincide within the tolerance
-    """
-    result = surface_.evaluate(particle, surface)
-
-    # Check if coincident on the surface
-    if abs(result) < COINCIDENCE_TOLERANCE:
-        # Determine sense based on the direction
-        return surface_.get_normal_component(particle, surface, mcdc) > 0.0
-
-    return result > 0.0
 
 
 @njit
@@ -420,6 +405,9 @@ def distance_to_nearest_surface(particle, cell, mcdc):
     distance = INF
     surface_ID = -1
 
+    # Particle parameters
+    speed = physics.get_speed(particle, mcdc)
+
     # Access cell surface data
     idx = cell["surface_data_idx"]
     N_surface = cell["N_surface"]
@@ -429,7 +417,7 @@ def distance_to_nearest_surface(particle, cell, mcdc):
     while idx < idx_end:
         candidate_surface_ID = mcdc["cells_data_surface"][idx]
         surface = mcdc["surfaces"][candidate_surface_ID]
-        d = surface_.get_distance(particle, surface, mcdc)
+        d = surface_.get_distance(particle, speed, surface)
         if d < distance:
             distance = d
             surface_ID = surface["ID"]

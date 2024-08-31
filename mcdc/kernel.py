@@ -1840,7 +1840,8 @@ def score_surface_tally(P, surface, tally, data, mcdc):
     idx = stride["tally"]
 
     # Flux
-    mu = surface_.get_normal_component(P, surface, mcdc)
+    speed = physics.get_speed(P, mcdc)
+    mu = surface_.get_normal_component(P, speed, surface)
     flux = P["w"] / abs(mu)
 
     # Score
