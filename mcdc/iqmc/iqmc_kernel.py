@@ -9,6 +9,7 @@ import mcdc.geometry as geometry
 import mcdc.local as local
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
+import mcdc.src.surface as surface_
 
 from mcdc.adapt import toggle
 from mcdc.constant import *
@@ -465,7 +466,10 @@ def iqmc_surface_crossing(P, prog):
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.surface_bc(P, surface)
+    if surface["BC"] == BC_VACUUM:
+        P["alive"] = False
+    elif surface["BC"] == BC_REFLECTIVE:
+        surface_.reflect(P, surface)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
