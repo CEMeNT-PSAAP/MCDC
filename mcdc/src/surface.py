@@ -1,14 +1,11 @@
 """
-Surface operations
-
-Quadric surface: Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
+Surface operations based on the quadric equation:
+   f(x,y,z) = Axx + Byy + Czz + Dxy + Exz + Fyz + Gx + Hy + Iz + J
 """
 
 import math
 
 from numba import njit
-
-import mcdc.physics as physics
 
 from mcdc.algorithm import binary_search_with_length
 from mcdc.constant import COINCIDENCE_TOLERANCE, INF
@@ -19,7 +16,6 @@ def evaluate(particle, surface):
     """
     Evaluate the surface equation wrt the particle coordinate
     """
-
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -78,9 +74,118 @@ def evaluate(particle, surface):
 
 
 @njit
-def get_distance(particle, surface, mcdc):
+def check_sense(particle, speed, surface):
     """
-    Return particle distance to surface
+    Check on which side of the surface the particle is
+        - Return True if on positive side
+        - Return False otherwise
+    Particle direction and speed are used to tiebreak coincidence.
+    """
+    result = evaluate(particle, surface)
+
+    # Check if coincident on the surface
+    if abs(result) < COINCIDENCE_TOLERANCE:
+        # Determine sense based on the direction
+        return get_normal_component(particle, speed, surface) > 0.0
+
+    return result > 0.0
+
+
+@njit
+def reflect(particle, surface):
+    """
+    Reflect the particle off the surface
+    """
+    # Particle coordinate
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
+    nx, ny, nz = get_normal(particle, surface)
+
+    c = 2.0 * (nx * ux + ny * uy + nz * uz)
+
+    particle["ux"] = ux - c * nx
+    particle["uy"] = uy - c * ny
+    particle["uz"] = uz - c * nz
+
+
+@njit
+def get_normal(particle, surface):
+    """
+    Get the surface outward-normal vector at the particle coordinate
+    """
+    if surface["linear"]:
+        return surface["nx"], surface["ny"], surface["nz"]
+
+    # Particle coordinate
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+
+    # Surface coefficients
+    A = surface["A"]
+    B = surface["B"]
+    C = surface["C"]
+    D = surface["D"]
+    E = surface["E"]
+    F = surface["F"]
+    G = surface["G"]
+    H = surface["H"]
+    I = surface["I"]
+
+    dx = 2 * A * x + D * y + E * z + G
+    dy = 2 * B * y + D * x + F * z + H
+    dz = 2 * C * z + E * x + F * y + I
+
+    norm = (dx**2 + dy**2 + dz**2) ** 0.5
+    return dx / norm, dy / norm, dz / norm
+
+
+@njit
+def get_normal_component(particle, speed, surface):
+    """
+    Get the surface outward-normal component of the particle
+    (dot product of the two directional vectors)
+    """
+    # Surface outward-normal vector
+    nx, ny, nz = get_normal(particle, surface)
+
+    # Particle direction vector
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
+    # The dot product
+    if not surface["moving"]:
+        return nx * ux + ny * uy + nz * uz
+    else:
+        # Get move index
+        N_move = surface["N_move"]
+        time_grid = surface["move_time_grid"]
+        idx = binary_search_with_length(particle["t"], time_grid, N_move)
+        # Coinciding cases
+        if abs(time_grid[idx + 1] - particle["t"]) < COINCIDENCE_TOLERANCE:
+            idx += 1
+
+        # The relative velocity
+        translation_start = surface["move_translations"][idx]
+        translation_end = surface["move_translations"][idx + 1]
+        dx = translation_end[0] - translation_start[0]
+        dy = translation_end[1] - translation_start[1]
+        dz = translation_end[2] - translation_start[2]
+        dt = time_grid[idx + 1] - time_grid[idx]
+        relative_velocity = (nx * ux + ny * uy + nz * uz) - (
+            nx * dx + ny * dy + nz * dz
+        ) / dt / speed
+
+        return relative_velocity
+
+
+@njit
+def get_distance(particle, speed, surface):
+    """
+    Get particle distance to surface
     """
     # Particle coordinate
     x = particle["x"]
@@ -90,7 +195,6 @@ def get_distance(particle, surface, mcdc):
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
-    speed = physics.get_speed(particle, mcdc)
 
     # Check if coincident and leaving the surface forever
     evaluation = evaluate(particle, surface)
@@ -99,7 +203,7 @@ def get_distance(particle, surface, mcdc):
         if surface["linear"]:
             if not surface["moving"]:
                 return INF
-        elif get_normal_component(particle, surface, mcdc) > 0.0:
+        elif get_normal_component(particle, speed, surface) > 0.0:
             return INF
 
     # Surface coefficients
@@ -267,95 +371,3 @@ def get_distance(particle, surface, mcdc):
 
         # Return the smaller root
         return min(root_1, root_2)
-
-
-@njit
-def reflect(particle, surface):
-    """
-    Surface-reflect the particle
-    """
-    # Particle coordinate
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
-
-    nx, ny, nz = surface_normal(particle, surface)
-
-    c = 2.0 * (nx * ux + ny * uy + nz * uz)
-
-    particle["ux"] = ux - c * nx
-    particle["uy"] = uy - c * ny
-    particle["uz"] = uz - c * nz
-
-
-@njit
-def surface_normal(particle, surface):
-    """
-    Get the surface outward-normal vector at the particle coordinate
-    """
-    if surface["linear"]:
-        return surface["nx"], surface["ny"], surface["nz"]
-
-    # Particle coordinate
-    x = particle["x"]
-    y = particle["y"]
-    z = particle["z"]
-
-    # Surface coefficients
-    A = surface["A"]
-    B = surface["B"]
-    C = surface["C"]
-    D = surface["D"]
-    E = surface["E"]
-    F = surface["F"]
-    G = surface["G"]
-    H = surface["H"]
-    I = surface["I"]
-
-    dx = 2 * A * x + D * y + E * z + G
-    dy = 2 * B * y + D * x + F * z + H
-    dz = 2 * C * z + E * x + F * y + I
-
-    norm = (dx**2 + dy**2 + dz**2) ** 0.5
-    return dx / norm, dy / norm, dz / norm
-
-
-@njit
-def get_normal_component(particle, surface, mcdc):
-    """
-    Get the surface outward-normal component of the particle
-    (dot product of the two directional vectors)
-    """
-    # Surface outward-normal vector
-    nx, ny, nz = surface_normal(particle, surface)
-
-    # Particle direction vector
-    ux = particle["ux"]
-    uy = particle["uy"]
-    uz = particle["uz"]
-
-    # The dot product
-    if not surface["moving"]:
-        return nx * ux + ny * uy + nz * uz
-    else:
-        # Get move index
-        N_move = surface["N_move"]
-        time_grid = surface["move_time_grid"]
-        idx = binary_search_with_length(particle["t"], time_grid, N_move)
-        # Coinciding cases
-        if abs(time_grid[idx + 1] - particle["t"]) < COINCIDENCE_TOLERANCE:
-            idx += 1
-
-        # The relative velocity
-        speed = physics.get_speed(particle, mcdc)
-        translation_start = surface["move_translations"][idx]
-        translation_end = surface["move_translations"][idx + 1]
-        dx = translation_end[0] - translation_start[0]
-        dy = translation_end[1] - translation_start[1]
-        dz = translation_end[2] - translation_start[2]
-        dt = time_grid[idx + 1] - time_grid[idx]
-        relative_velocity = (nx * ux + ny * uy + nz * uz) - (
-            nx * dx + ny * dy + nz * dz
-        ) / dt / speed
-
-        return relative_velocity
