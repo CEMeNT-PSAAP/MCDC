@@ -556,10 +556,48 @@ def prepare():
 
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
+        surface = mcdc["surfaces"][i]
+        surface_input = input_deck.surfaces[i]
+
         # Direct assignment
         for name in type_.surface.names:
-            if name not in ["BC", "tally_IDs", "move_translations", "move_time_grid"]:
-                copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
+            if name not in [
+                "type",
+                "BC",
+                "tally_IDs",
+                "move_translations",
+                "move_time_grid",
+            ]:
+                copy_field(surface, surface_input, name)
+
+        # Type
+        if surface_input.type == "plane-x":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_X
+        elif surface_input.type == "plane-y":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Y
+        elif surface_input.type == "plane-z":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Z
+        elif surface_input.type == "plane":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE
+        elif surface_input.type == "cylinder-x":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_X
+        elif surface_input.type == "cylinder-y":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Y
+        elif surface_input.type == "cylinder-z":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Z
+        elif surface_input.type == "sphere":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
+        elif surface_input.type == "quadric":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
 
         # Boundary condition
         if input_deck.surfaces[i].boundary_type == "interface":
@@ -575,8 +613,6 @@ def prepare():
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
         # Moves
-        surface = mcdc["surfaces"][i]
-        surface_input = input_deck.surfaces[i]
         if surface["moving"]:
             surface["move_time_grid"][0] = 0.0
             surface["move_translations"][0] = np.array([0.0, 0.0, 0.0])

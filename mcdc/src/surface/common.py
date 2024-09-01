@@ -7,8 +7,32 @@ import math
 
 from numba import njit
 
+import mcdc.src.surface.plane_x as plane_x
+import mcdc.src.surface.plane_y as plane_y
+import mcdc.src.surface.plane_z as plane_z
+import mcdc.src.surface.plane as plane
+import mcdc.src.surface.cylinder_x as cylinder_x
+import mcdc.src.surface.cylinder_y as cylinder_y
+import mcdc.src.surface.cylinder_z as cylinder_z
+import mcdc.src.surface.sphere as sphere
+import mcdc.src.surface.quadric as quadric
+
 from mcdc.algorithm import binary_search_with_length
-from mcdc.constant import COINCIDENCE_TOLERANCE, INF
+from mcdc.constant import (
+    COINCIDENCE_TOLERANCE,
+    INF,
+    SURFACE_LINEAR,
+    SURFACE_QUADRIC,
+    SURFACE_PLANE_X,
+    SURFACE_PLANE_Y,
+    SURFACE_PLANE_Z,
+    SURFACE_PLANE,
+    SURFACE_CYLINDER_X,
+    SURFACE_CYLINDER_Y,
+    SURFACE_CYLINDER_Z,
+    SURFACE_SPHERE,
+    SURFACE_QUADRIC,
+)
 
 
 @njit
@@ -16,61 +40,26 @@ def evaluate(particle, surface):
     """
     Evaluate the surface equation wrt the particle coordinate
     """
-    # Particle coordinate
-    x = particle["x"]
-    y = particle["y"]
-    z = particle["z"]
-    t = particle["t"]
-
-    # Surface coefficient
-    G = surface["G"]
-    H = surface["H"]
-    I = surface["I"]
-    J = surface["J"]
-
-    # Linear surface evaluation
-    result = G * x + H * y + I * z + J
-    if surface["linear"]:
-        if not surface["moving"]:
-            return result
+    if surface["type"] & SURFACE_LINEAR:
+        if surface["type"] & SURFACE_PLANE_X:
+            return plane_x.evaluate(particle, surface)
+        elif surface["type"] & SURFACE_PLANE_Y:
+            return plane_y.evaluate(particle, surface)
+        elif surface["type"] & SURFACE_PLANE_Z:
+            return plane_z.evaluate(particle, surface)
+        elif surface["type"] & SURFACE_PLANE:
+            return plane.evaluate(particle, surface)
+    else:
+        if surface["type"] & SURFACE_CYLINDER_X:
+            return cylinder_x.evaluate(particle, surface)
+        elif surface["type"] & SURFACE_CYLINDER_Y:
+            return cylinder_y.evaluate(particle, surface)
+        elif surface["type"] & SURFACE_CYLINDER_Z:
+            return cylinder_z.evaluate(particle, surface)
+        elif surface["type"] & SURFACE_SPHERE:
+            return sphere.evaluate(particle, surface)
         else:
-            # Get move index
-            N_move = surface["N_move"]
-            time_grid = surface["move_time_grid"]
-            idx = binary_search_with_length(t, time_grid, N_move)
-            # Coinciding cases
-            if abs(time_grid[idx + 1] - t) < COINCIDENCE_TOLERANCE:
-                idx += 1
-
-            # Get translation points
-            translation_start = surface["move_translations"][idx]
-            translation_end = surface["move_translations"][idx + 1]
-
-            # Interpolate translation
-            dx = translation_end[0] - translation_start[0]
-            dy = translation_end[1] - translation_start[1]
-            dz = translation_end[2] - translation_start[2]
-            dt = time_grid[idx + 1] - time_grid[idx]
-            tt = t - time_grid[idx]
-
-            tr_x = translation_start[0] + dx / dt * tt
-            tr_y = translation_start[1] + dy / dt * tt
-            tr_z = translation_start[2] + dz / dt * tt
-
-            return result - (G * tr_x + H * tr_y + I * tr_z)
-
-    # Surface coefficient
-    A = surface["A"]
-    B = surface["B"]
-    C = surface["C"]
-    D = surface["D"]
-    E = surface["E"]
-    F = surface["F"]
-
-    # Quadric surface evaluation
-    return (
-        result + A * x * x + B * y * y + C * z * z + D * x * y + E * x * z + F * y * z
-    )
+            return quadric.evaluate(particle, surface)
 
 
 @njit
@@ -115,7 +104,7 @@ def get_normal(particle, surface):
     """
     Get the surface outward-normal vector at the particle coordinate
     """
-    if surface["linear"]:
+    if surface["type"] & SURFACE_LINEAR:
         return surface["nx"], surface["ny"], surface["nz"]
 
     # Particle coordinate
@@ -200,7 +189,7 @@ def get_distance(particle, speed, surface):
     evaluation = evaluate(particle, surface)
     coincident = abs(evaluation) < COINCIDENCE_TOLERANCE
     if coincident:
-        if surface["linear"]:
+        if surface["type"] & SURFACE_LINEAR:
             if not surface["moving"]:
                 return INF
         elif get_normal_component(particle, speed, surface) > 0.0:
@@ -213,7 +202,7 @@ def get_distance(particle, speed, surface):
     J = surface["J"]
 
     # Distance to linear surface
-    if surface["linear"]:
+    if surface["type"] & SURFACE_LINEAR:
         if not surface["moving"]:
             distance = -evaluation / (G * ux + H * uy + I * uz)
 
@@ -371,3 +360,21 @@ def get_distance(particle, speed, surface):
 
         # Return the smaller root
         return min(root_1, root_2)
+
+
+# ======================================================================================
+# Prrivate
+# ======================================================================================
+
+
+@njit
+def _get_move_idx(t, surface):
+    N_move = surface["N_move"]
+    time_grid = surface["move_time_grid"]
+    idx = binary_search_with_length(t, time_grid, N_move)
+
+    # Coinciding cases
+    if abs(time_grid[idx + 1] - t) < COINCIDENCE_TOLERANCE:
+        idx += 1
+
+    return idx

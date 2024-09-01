@@ -499,7 +499,7 @@ def make_type_surface(input_deck):
             ("H", float64),
             ("I", float64),
             ("J", float64),
-            ("linear", bool_),
+            ("type", int64),
             ("nx", float64),
             ("ny", float64),
             ("nz", float64),
