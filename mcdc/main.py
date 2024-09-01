@@ -418,10 +418,11 @@ def prepare():
     type_.make_type_dd_turnstile_event(input_deck)
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
+    type_.make_size_rpn(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     input_deck.setting["target"] = target
-    code_factory.make_locals(input_deck)
+    #code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
@@ -436,24 +437,6 @@ def prepare():
     mode_CE = input_deck.setting["mode_CE"]
     mode_MG = input_deck.setting["mode_MG"]
 
-    # =========================================================================
-    # Platform Targeting, Adapters, Toggles, etc
-    # =========================================================================
-
-    if target == "gpu":
-        if not adapt.HAS_HARMONIZE:
-            print_error(
-                "No module named 'harmonize' - GPU functionality not available. "
-            )
-        adapt.gpu_forward_declare()
-
-    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
-    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.eval_toggle()
-    adapt.target_for(target)
-    if target == "gpu":
-        build_gpu_progs()
-    adapt.nopython_mode(mode == "numba")
 
     # =========================================================================
     # Nuclides
@@ -824,11 +807,37 @@ def prepare():
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
-    # Set tally data
-    if not input_deck.technique["uq"]:
-        tally = np.zeros((3, tally_size), dtype=type_.float64)
-    else:
-        tally = np.zeros((5, tally_size), dtype=type_.float64)
+
+    # =========================================================================
+    # Establish Data Type from Tally Info and Construct Tallies
+    # =========================================================================
+
+    type_.make_type_data(input_deck,tally_size)
+    tally = np.zeros(1,dtype=type_.data)[0]
+
+    # =========================================================================
+    # Platform Targeting, Adapters, Toggles, etc
+    # =========================================================================
+
+    if target == "gpu":
+        if not adapt.HAS_HARMONIZE:
+            print_error(
+                "No module named 'harmonize' - GPU functionality not available. "
+            )
+        tally_width = None
+        if not input_deck.technique["uq"]:
+            tally_width = 3
+        else:
+            tally_width = 5
+        adapt.gpu_forward_declare(tally_width,tally_size)
+
+    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
+    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
+    adapt.eval_toggle()
+    adapt.target_for(target)
+    if target == "gpu":
+        build_gpu_progs()
+    adapt.nopython_mode( (mode == "numba") or (mode == "numba_debug") )
 
     # =========================================================================
     # Setting
@@ -1171,7 +1180,7 @@ def prepare():
     # Finalize data: wrapping into a tuple
     # =========================================================================
 
-    data = (tally,)
+    data = tally
 
     return data, mcdc
 

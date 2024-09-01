@@ -2838,8 +2838,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d_struct = local.precursor_group_array()
-    nu_d = nu_d_struct["values"]
+    nu_d = adapt.local_array(J,type_.float64)
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 

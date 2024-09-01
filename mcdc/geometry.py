@@ -5,7 +5,10 @@ from numba import njit, int64
 import mcdc.local as local
 import mcdc.mesh as mesh
 import mcdc.physics as physics
+import mcdc.adapt as adapt
+import mcdc.type_ as type_
 
+from mcdc.adapt import for_cpu, for_gpu
 from mcdc.algorithm import binary_search
 from mcdc.constant import *
 
@@ -272,8 +275,7 @@ def check_cell(particle_arr, cell, mcdc):
     N_token = mcdc["cell_region_data"][idx]
 
     # Create local value array
-    value_struct = local.RPN_array()
-    value = value_struct["values"]
+    value = adapt.local_array(type_.rpn_buffer_size(),type_.bool_)
     N_value = 0
 
     # March forward through RPN tokens
@@ -321,7 +323,7 @@ def check_surface_sense(particle_arr, surface):
     return result > 0.0
 
 
-@njit
+@for_cpu()
 def report_lost(particle_arr):
     """
     Report lost particle and terminate it
@@ -331,6 +333,11 @@ def report_lost(particle_arr):
     y = particle["y"]
     z = particle["z"]
     print("A particle is lost at (", x, y, z, ")")
+    particle["alive"] = False
+
+@for_gpu()
+def report_lost(particle_arr):
+    particle = particle_arr[0]
     particle["alive"] = False
 
 

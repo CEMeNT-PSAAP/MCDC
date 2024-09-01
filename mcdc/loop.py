@@ -37,10 +37,12 @@ def set_cache(setting):
 # manages GPU execution (if GPU execution is supported and selected)
 alloc_state, free_state = [None] * 2
 
-src_alloc_program, src_free_program, src_load_state, src_store_state = [None] * 4
+src_alloc_program, src_free_program = [None] * 2
+src_load_constant, src_load_constant, src_store_constant, src_store_data = [None] * 4
 src_init_program, src_exec_program, src_complete, src_clear_flags = [None] * 4
 
-pre_alloc_program, pre_free_program, pre_load_state, pre_store_state = [None] * 4
+pre_alloc_program, pre_free_program = [None] * 2
+pre_load_constant, pre_load_data, pre_store_constant, pre_store_data = [None] * 4
 pre_init_program, pre_exec_program, pre_complete, pre_clear_flags = [None] * 4
 
 
@@ -170,7 +172,8 @@ def loop_eigenvalue(data, mcdc):
 # =============================================================================
 
 
-@njit(cache=caching)
+
+@njit()
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.mcdc_constant(prog)
 
@@ -403,7 +406,7 @@ def gpu_sources_spec():
 
 
 @njit
-def gpu_loop_source(seed, mcdc):
+def gpu_loop_source(seed, data, mcdc):
     # Progress bar indicator
     N_prog = 0
 
@@ -423,27 +426,29 @@ def gpu_loop_source(seed, mcdc):
     mcdc["source_seed"] = seed
 
     # Store the global state to the GPU
-    src_store_state(mcdc["gpu_state"], mcdc)
+    src_store_constant(mcdc["gpu_state_pointer"], mcdc)
+    src_store_data    (mcdc["gpu_state_pointer"], data)
 
     ASYNC_EXECUTION = False
 
     print("About to execute gpu_loop_source\n\n")
     # Execute the program, and continue to do so until it is done
     if ASYNC_EXECUTION:
-        src_exec_program(mcdc["source_program"], block_count, iter_count)
-        while not src_complete(mcdc["source_program"]):
-            src_exec_program(mcdc["source_program"], block_count, iter_count)
+        src_exec_program(mcdc["source_program_pointer"], block_count, iter_count)
+        while not src_complete(mcdc["source_program_pointer"]):
+            src_exec_program(mcdc["source_program_pointer"], block_count, iter_count)
     else:
-        src_exec_program(mcdc["source_program"], block_count, batch_size)
+        src_exec_program(mcdc["source_program_pointer"], block_count, batch_size)
         step_count = 1
-        while (not src_complete(mcdc["source_program"])) and (step_count < 1000):
-            src_exec_program(mcdc["source_program"], block_count, batch_size)
+        while (not src_complete(mcdc["source_program_pointer"])) and (step_count < 1000):
+            src_exec_program(mcdc["source_program_pointer"], block_count, batch_size)
             step_count += 1
         print("\n\nstep count: ",step_count,"\n\n")
 
     # Recover the original program state
-    src_load_state(mcdc, mcdc["gpu_state"])
-    src_clear_flags(mcdc["source_program"])
+    src_load_constant(mcdc, mcdc["gpu_state_pointer"])
+    src_load_data    (data, mcdc["gpu_state_pointer"])
+    src_clear_flags(mcdc["source_program_pointer"])
 
     kernel.set_bank_size(mcdc["bank_active"], 0)
 
@@ -751,6 +756,7 @@ def gpu_precursor_spec():
 
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
         mcdc = adapt.mcdc_constant(prog)
+        data = adapt.mcdc_data(prog)
         P_arr = adapt.local_array(1,type_.particle)
         P_arr[0] = P_input
         P = P_arr[0]
@@ -770,7 +776,7 @@ def gpu_precursor_spec():
 
 
 @njit
-def gpu_loop_source_precursor(seed, mcdc):
+def gpu_loop_source_precursor(seed, data, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
     # Progress bar indicator
@@ -802,24 +808,26 @@ def gpu_loop_source_precursor(seed, mcdc):
     mcdc["source_seed"] = seed
 
     # Store the global state to the GPU
-    pre_store_state(mcdc["gpu_state"], mcdc)
+    pre_store_constant(mcdc["gpu_state_pointer"], mcdc)
+    pre_store_data    (mcdc["gpu_state_pointer"], data)
 
     # Execute the program, and continue to do so until it is done
     ASYNC_EXECUTION = False
 
     # Execute the program, and continue to do so until it is done
     if ASYNC_EXECUTION:
-        pre_exec_program(mcdc["source_program"], block_count, iter_count)
-        while not pre_complete(mcdc["source_program"]):
-            pre_exec_program(mcdc["source_program"], block_count, iter_count)
+        pre_exec_program(mcdc["source_program_pointer"], block_count, iter_count)
+        while not pre_complete(mcdc["source_program_pointer"]):
+            pre_exec_program(mcdc["source_program_pointer"], block_count, iter_count)
     else:
-        pre_exec_program(mcdc["source_program"], block_count, batch_size)
-        while not pre_complete(mcdc["source_program"]):
-            pre_exec_program(mcdc["source_program"], block_count, batch_size)
+        pre_exec_program(mcdc["source_program_pointer"], block_count, batch_size)
+        while not pre_complete(mcdc["source_program_pointer"]):
+            pre_exec_program(mcdc["source_program_pointer"], block_count, batch_size)
 
     # Recover the original program state
-    pre_load_state(mcdc, mcdc["gpu_state"])
-    pre_clear_flags(mcdc["source_program"])
+    pre_load_constant(mcdc, mcdc["gpu_state_pointer"])
+    pre_load_data    (data, mcdc["gpu_state_pointer"])
+    pre_clear_flags(mcdc["source_program_pointer"])
 
     kernel.set_bank_size(mcdc["bank_active"], 0)
 
@@ -848,25 +856,31 @@ def build_gpu_progs():
     alloc_state = src_fns["alloc_state"]
     free_state = src_fns["free_state"]
 
-    global src_alloc_program, src_free_program, src_load_state, src_store_state
+    global src_alloc_program, src_free_program
+    global src_load_constant, src_store_constant, src_load_data, src_store_data
     global src_init_program, src_exec_program, src_complete, src_clear_flags
     src_alloc_program = src_fns["alloc_program"]
     src_free_program = src_fns["free_program"]
-    src_load_state = src_fns["load_state_device_constant"]
-    src_store_state = src_fns["store_state_device_constant"]
+    src_load_constant = src_fns["load_state_device_constant"]
+    src_store_constant = src_fns["store_state_device_constant"]
+    src_load_data = src_fns["load_state_device_data"]
+    src_store_data = src_fns["store_state_device_data"]
     src_init_program = src_fns["init_program"]
     src_exec_program = src_fns["exec_program"]
     src_complete = src_fns["complete"]
     src_clear_flags = src_fns["clear_flags"]
 
-    global pre_alloc_program, pre_free_program, pre_load_state, pre_store_state
+    global pre_alloc_program, pre_free_program
+    global pre_load_constant, pre_store_constant, pre_load_data, pre_store_data
     global pre_init_program, pre_exec_program, pre_complete, pre_clear_flags
     pre_alloc_state = pre_fns["alloc_state"]
     pre_free_state = pre_fns["free_state"]
     pre_alloc_program = pre_fns["alloc_program"]
     pre_free_program = pre_fns["free_program"]
-    pre_load_state = pre_fns["load_state_device_constant"]
-    pre_store_state = pre_fns["store_state_device_constant"]
+    pre_load_constant = pre_fns["load_state_device_constant"]
+    pre_store_constant = pre_fns["store_state_device_constant"]
+    pre_load_data = pre_fns["load_state_device_data"]
+    pre_store_data = pre_fns["store_state_device_data"]
     pre_init_program = pre_fns["init_program"]
     pre_exec_program = pre_fns["exec_program"]
     pre_complete = pre_fns["complete"]
@@ -878,23 +892,23 @@ def build_gpu_progs():
         print("Setting up GPU!")
         arena_size = 0x1000000
         block_count = 240
-        mcdc["gpu_state"] = adapt.cast_voidptr_to_uintp(alloc_state())
-        mcdc["source_program"] = adapt.cast_voidptr_to_uintp(
-            src_alloc_program(mcdc["gpu_state"], arena_size)
+        mcdc["gpu_state_pointer"] = adapt.cast_voidptr_to_uintp(alloc_state())
+        mcdc["source_program_pointer"] = adapt.cast_voidptr_to_uintp(
+            src_alloc_program(mcdc["gpu_state_pointer"], arena_size)
         )
-        src_init_program(mcdc["source_program"], 1) #4096)
-        mcdc["precursor_program"] = adapt.cast_voidptr_to_uintp(
-            pre_alloc_program(mcdc["gpu_state"], arena_size)
+        src_init_program(mcdc["source_program_pointer"], 1) #4096)
+        mcdc["precursor_program_pointer"] = adapt.cast_voidptr_to_uintp(
+            pre_alloc_program(mcdc["gpu_state_pointer"], arena_size)
         )
-        pre_init_program(mcdc["precursor_program"], 1) #4096)
+        pre_init_program(mcdc["precursor_program_pointer"], 1) #4096)
         print("Setup complete!")
         return
 
     @njit
     def real_teardown_gpu(mcdc):
-        src_free_program(adapt.cast_uintp_to_voidptr(mcdc["source_program"]))
-        pre_free_program(adapt.cast_uintp_to_voidptr(mcdc["precursor_program"]))
-        free_state(adapt.cast_uintp_to_voidptr(mcdc["gpu_state"]))
+        src_free_program(adapt.cast_uintp_to_voidptr(mcdc["source_program_pointer"]))
+        pre_free_program(adapt.cast_uintp_to_voidptr(mcdc["precursor_program_pointer"]))
+        free_state(adapt.cast_uintp_to_voidptr(mcdc["gpu_state_pointer"]))
 
     global setup_gpu, teardown_gpu
     setup_gpu = real_setup_gpu
