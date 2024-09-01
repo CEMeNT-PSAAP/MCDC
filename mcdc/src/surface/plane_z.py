@@ -14,7 +14,7 @@ def evaluate(particle, surface):
     Evaluate the surface equation wrt the particle coordinate
     """
     if surface["moving"]:
-        evaluate_moving(particle, surface)
+        return evaluate_moving(particle, surface)
 
     # Particle and surface parameters
     z = particle["z"]
