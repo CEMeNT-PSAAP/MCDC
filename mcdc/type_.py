@@ -49,11 +49,20 @@ surface_tally = None
 technique = None
 
 global_ = None
+data = None
 
 
 # ==============================================================================
 # MC/DC Member Array Sizes
 # ==============================================================================
+
+
+
+def literalize(value):
+    jit_str = f"@njit\ndef impl():\n    return {value}\n"
+    exec(jit_str, globals(), locals())
+    return eval("impl")
+
 
 def material_g_size():
     pass
@@ -61,6 +70,17 @@ def material_g_size():
 
 def material_j_size():
     pass
+
+
+def rpn_buffer_size():
+    pass
+
+
+
+def make_size_rpn(input_deck):
+    global rpn_buffer_size
+    size = max([np.sum(np.array(x._region_RPN) >= 0.0) for x in input_deck.cells])
+    rpn_buffer_size = literalize(size)
 
 # ==============================================================================
 # Alignment Logic
@@ -455,21 +475,14 @@ def make_type_material(input_deck):
         J = input_deck.materials[0].J
 
 
-    global material_g_size
-    global material_j_size
 
     G_adjusted = max(1,G)
     J_adjusted = max(1,J)
 
-    def g_size():
-        return G_adjusted
-
-    def j_size():
-        return J_adjusted
-
-
-    material_g_size = nb.njit(g_size)
-    material_j_size = nb.njit(j_size)
+    global material_g_size
+    global material_j_size
+    material_g_size = literalize(G_adjusted)
+    material_j_size = literalize(J_adjusted)
 
 
 
@@ -1363,12 +1376,26 @@ def make_type_global(input_deck):
             ("runtime_bank_management", float64),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
-            ("gpu_state", uintp),
-            ("source_program", uintp),
-            ("precursor_program", uintp),
+            ("gpu_state_pointer", uintp),
+            ("source_program_pointer", uintp),
+            ("precursor_program_pointer", uintp),
             ("source_seed", uint64),
         ]
     )
+
+
+def make_type_data(input_deck,tally_size):
+    global data
+
+    if not input_deck.technique["uq"]:
+        width = 3
+    else:
+        width = 5
+
+    data = into_dtype([("tally", float64, (width, tally_size))])
+
+
+
 
 
 # ==============================================================================

@@ -4,7 +4,6 @@ from numba.extending import intrinsic
 import numba
 import mcdc.type_ as type_
 import mcdc.kernel as kernel
-import mcdc.loop as loop
 
 
 TARGET = "ROCM"
@@ -105,10 +104,19 @@ def type_local_array(context):
         def typer(shape, dtype):
             numba.np.arrayobj._check_const_str_dtype("empty", dtype)
 
-            # Only integer shapes, for now.
-            if not isinstance(shape,types.IntegerLiteral):
-                msg = f"Currently, only integer literal input shapes are supported."
-                raise numba.errors.TypingError(msg)
+            # Only integer literals and tuples of integer literals are valid
+            # shapes
+            if isinstance(shape, types.Integer):
+                if not isinstance(shape, types.IntegerLiteral):
+                    raise numba.core.errors.UnsupportedError(f"Integer shape type {shape} is not literal.")
+            elif isinstance(shape, (types.Tuple, types.UniTuple)):
+                if any([not isinstance(s, types.IntegerLiteral)
+                        for s in shape]):
+                    raise numba.core.errors.UnsupportedError(
+                        f"At least one element of shape tuple type{shape} is not an integer literal."
+                    )
+            else:
+                raise numba.core.errors.UnsupportedError(f"Shape is of unsupported type {shape}.")
 
             # No default arguments.
             nb_dtype = parse_dtype(dtype)
@@ -402,19 +410,30 @@ step_async = None
 find_cell_async = None
 
 
-def gpu_forward_declare():
+def gpu_forward_declare(tally_width,tally_size):
 
-    global none_type, mcdc_type, state_spec
-    global device_gpu, group_gpu, thread_gpu
+    global none_type, mcdc_constant_type, mcdc_data_type
+    global state_spec
+    global mcdc_constant_gpu, mcdc_data_gpu
+    global group_gpu, thread_gpu
     global particle_gpu, particle_record_gpu
     global step_async, find_cell_async
 
     none_type = numba.from_dtype(np.dtype([]))
-    mcdc_type = numba.from_dtype(type_.global_)
-    state_spec = ({"constant" : mcdc_type}, none_type, none_type)
+    mcdc_constant_type = numba.from_dtype(type_.global_)
+    mcdc_data_type = numba.from_dtype(type_.data)
+    state_spec = (
+        {
+            "constant" : mcdc_constant_type,
+            "data"     : mcdc_data_type,
+        },
+        none_type,
+        none_type,
+    )
     access_fns = harm.RuntimeSpec.access_fns(state_spec)
     print(access_fns)
-    device_gpu = access_fns["device"]["constant"]
+    mcdc_constant_gpu = access_fns["device"]["constant"]
+    mcdc_data_gpu = access_fns["device"]["data"]
     print("\n\n\n",device_gpu,"\n\n\n")
     group_gpu  = access_fns["group"]
     thread_gpu = access_fns["thread"]
@@ -434,6 +453,9 @@ def gpu_forward_declare():
 # Seperate GPU/CPU Functions to Target Different Platforms
 # =============================================================================
 
+def mcdc_constant(prog):
+    return prog
+
 
 @for_cpu()
 def mcdc_constant(prog):
@@ -450,7 +472,7 @@ def mcdc_data(prog):
 
 @for_gpu()
 def mcdc_data(prog):
-    return device_gpu(prog)
+    return mcdc_data_gpu(prog)
 
 
 @for_cpu()
