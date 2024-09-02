@@ -574,16 +574,19 @@ def surface(type_, bc="interface", **kw):
         card.I = kw.get("I")
         card.J = kw.get("J")
 
-    # Set normal vector if linear
+    # Normalize linear surfaces
     if card.linear:
-        nx = card.G
-        ny = card.H
-        nz = card.I
-        # Normalize
-        norm = (nx**2 + ny**2 + nz**2) ** 0.5
-        card.nx = nx / norm
-        card.ny = ny / norm
-        card.nz = nz / norm
+        G = card.G
+        H = card.H
+        I = card.I
+        norm = (G**2 + H**2 + I**2) ** 0.5
+        card.G /= norm
+        card.H /= norm
+        card.I /= norm
+        card.J /= norm
+        card.nx = card.G
+        card.ny = card.H
+        card.nz = card.I
 
     # Add to deck
     global_.input_deck.surfaces.append(card)
