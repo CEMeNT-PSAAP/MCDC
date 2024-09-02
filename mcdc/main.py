@@ -565,7 +565,7 @@ def prepare():
                 "type",
                 "BC",
                 "tally_IDs",
-                "move_translations",
+                "move_velocities",
                 "move_time_grid",
             ]:
                 copy_field(surface, surface_input, name)
@@ -615,19 +615,11 @@ def prepare():
         # Moves
         if surface["moving"]:
             surface["move_time_grid"][0] = 0.0
-            surface["move_translations"][0] = np.array([0.0, 0.0, 0.0])
             for n in range(surface["N_move"]):
-                velocity = np.array(surface_input.move_velocities[n])
-                duration = surface_input.move_durations[n]
-
+                surface["move_velocities"][n] = surface_input.move_velocities[n]
                 t_start = surface["move_time_grid"][n]
-                t_end = t_start + duration
-
-                position_start = surface["move_translations"][n]
-                position_end = position_start + velocity * duration
-
-                surface["move_time_grid"][n + 1] = t_end
-                surface["move_translations"][n + 1] = position_end
+                duration = surface_input.move_durations[n]
+                surface["move_time_grid"][n + 1] = t_start + duration
 
     # =========================================================================
     # Set cells

@@ -85,18 +85,18 @@ def get_normal_component(particle, speed, surface):
     """
     Get the surface outward-normal component of the particle
     This is the dot product of the particle and the surface outward-normal directions.
-    Particle speed is needed if the surface is moving to get the relative velocity.
+    Particle speed is needed if the surface is moving to get the relative direction.
     """
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
             return plane_x.get_normal_component(particle, speed, surface)
-    """
         elif surface["type"] & SURFACE_PLANE_Y:
             return plane_y.get_normal_component(particle, speed, surface)
         elif surface["type"] & SURFACE_PLANE_Z:
             return plane_z.get_normal_component(particle, speed, surface)
         elif surface["type"] & SURFACE_PLANE:
             return plane.get_normal_component(particle, speed, surface)
+    """
     else:
         if surface["type"] & SURFACE_CYLINDER_X:
             return cylinder_x.get_normal_component(particle, speed, surface)
@@ -129,18 +129,18 @@ def get_normal_component(particle, speed, surface):
         if abs(time_grid[idx + 1] - particle["t"]) < COINCIDENCE_TOLERANCE:
             idx += 1
 
-        # The relative velocity
+        # The relative direction
         translation_start = surface["move_translations"][idx]
         translation_end = surface["move_translations"][idx + 1]
         dx = translation_end[0] - translation_start[0]
         dy = translation_end[1] - translation_start[1]
         dz = translation_end[2] - translation_start[2]
         dt = time_grid[idx + 1] - time_grid[idx]
-        relative_velocity = (nx * ux + ny * uy + nz * uz) - (
+        relative_direction = (nx * ux + ny * uy + nz * uz) - (
             nx * dx + ny * dy + nz * dz
         ) / dt / speed
 
-        return relative_velocity
+        return relative_direction
 
 
 @njit
@@ -151,6 +151,12 @@ def reflect(particle, surface):
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
             return plane_x.reflect(particle, surface)
+        elif surface["type"] & SURFACE_PLANE_Y:
+            return plane_y.reflect(particle, surface)
+        elif surface["type"] & SURFACE_PLANE_Z:
+            return plane_z.reflect(particle, surface)
+        elif surface["type"] & SURFACE_PLANE:
+            return plane.reflect(particle, surface)
 
     # Particle coordinate
     ux = particle["ux"]
@@ -206,6 +212,12 @@ def get_distance(particle, speed, surface):
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
             return plane_x.get_distance(particle, speed, surface)
+        elif surface["type"] & SURFACE_PLANE_Y:
+            return plane_y.get_distance(particle, speed, surface)
+        elif surface["type"] & SURFACE_PLANE_Z:
+            return plane_z.get_distance(particle, speed, surface)
+        elif surface["type"] & SURFACE_PLANE:
+            return plane.get_distance(particle, speed, surface)
 
     # Particle coordinate
     x = particle["x"]
@@ -257,20 +269,20 @@ def get_distance(particle, speed, surface):
         # Evaluate starting interval if not coincident
 
         if not coincident:
-            # The relative velocity
+            # The relative direction
             translation_start = surface["move_translations"][idx]
             translation_end = surface["move_translations"][idx + 1]
             dx = translation_end[0] - translation_start[0]
             dy = translation_end[1] - translation_start[1]
             dz = translation_end[2] - translation_start[2]
             dt = time_grid[idx + 1] - time_grid[idx]
-            relative_velocity = (G * ux + H * uy + I * uz) - (
+            relative_direction = (G * ux + H * uy + I * uz) - (
                 G * dx + H * dy + I * dz
             ) / dt / speed
 
             # Check if particle and surface move in the same direction
-            if relative_velocity != 0.0:
-                distance = -evaluation / relative_velocity
+            if relative_direction != 0.0:
+                distance = -evaluation / relative_direction
                 # Check if not moving away
                 if distance > 0.0:
                     # Check if it is still within interval
@@ -292,20 +304,20 @@ def get_distance(particle, speed, surface):
         # Evaluate subsequent interval
 
         while idx < N_move:
-            # The relative velocity
+            # The relative direction
             translation_start = surface["move_translations"][idx]
             translation_end = surface["move_translations"][idx + 1]
             dx = translation_end[0] - translation_start[0]
             dy = translation_end[1] - translation_start[1]
             dz = translation_end[2] - translation_start[2]
             dt = time_grid[idx + 1] - time_grid[idx]
-            relative_velocity = (G * ux + H * uy + I * uz) - (
+            relative_direction = (G * ux + H * uy + I * uz) - (
                 G * dx + H * dy + I * dz
             ) / dt / speed
 
             # Check if particle and surface move in the same direction
-            if relative_velocity != 0.0:
-                distance = -evaluate(particle, surface) / relative_velocity
+            if relative_direction != 0.0:
+                distance = -evaluate(particle, surface) / relative_direction
                 # Check if not moving away
                 if distance > 0.0:
                     # Check if it is still within interval

@@ -508,7 +508,7 @@ def make_type_surface(input_deck):
             ("moving", bool_),
             ("N_move", int64),
             ("move_time_grid", float64, (Nmax_move + 1,)),
-            ("move_translations", float64, (Nmax_move + 1, 3)),
+            ("move_velocities", float64, (Nmax_move, 3)),
         ]
     )
 

@@ -22,11 +22,7 @@ def evaluate(particle, surface):
     if surface["moving"]:
         return evaluate_moving(particle, surface)
 
-    # Particle and surface parameters
-    x = particle["x"]
-    J = surface["J"]
-
-    return x + J
+    return particle["x"] + surface["J"]
 
 
 @njit
@@ -37,26 +33,17 @@ def evaluate_moving(particle, surface):
     f(x(t)) = x(t) + J, and x(t) = x0 - Vx * t,
     where Vx is the x-component of the move translation velocity.
     """
-    # Particle and surface parameters
-    x = particle["x"]
-    t = particle["t"]
-    J = surface["J"]
-
     # Move interval index
-    idx = common._get_move_idx(t, surface)
+    idx = common._get_move_idx(particle["t"], surface)
 
     # Translation velocity
-    x1 = surface["move_translations"][idx][0]
-    x2 = surface["move_translations"][idx + 1][0]
-    t1 = surface["move_time_grid"][idx]
-    t2 = surface["move_time_grid"][idx + 1]
-    Vx = (x2 - x1) / (t2 - t1)
+    Vx = surface["move_velocities"][idx][0]
 
-    # Translate the position
-    t_local = t - t1
-    x = x - Vx * t_local
+    # Translated position
+    t_local = particle["t"] - surface["move_time_grid"][idx]
+    x_translated = particle["x"] - Vx * t_local
 
-    return x + J
+    return x_translated + surface["J"]
 
 
 @njit
@@ -73,7 +60,7 @@ def get_normal_component(particle, speed, surface):
     Get the surface outward-normal component of the particle
 
     This is the dot product of the particle and the surface outward-normal directions.
-    Particle speed is needed if the surface is moving to get the relative velocity.
+    Particle speed is needed if the surface is moving to get the relative direction.
     """
     if surface["moving"]:
         return get_normal_component_moving(particle, speed, surface)
@@ -87,19 +74,15 @@ def get_normal_component_moving(particle, speed, surface):
     Get the surface outward-normal component of the particle [Moving version]
 
     This is the dot product of the particle and the surface outward-normal directions.
-    Particle speed is needed if the surface is moving to get the relative velocity.
+    Particle speed is needed if the surface is moving to get the relative direction.
     """
     # Move interval index
     idx = common._get_move_idx(particle["t"], surface)
 
     # Translation velocity
-    x1 = surface["move_translations"][idx][0]
-    x2 = surface["move_translations"][idx + 1][0]
-    t1 = surface["move_time_grid"][idx]
-    t2 = surface["move_time_grid"][idx + 1]
-    Vx = (x2 - x1) / (t2 - t1)
+    Vx = surface["move_velocities"][idx][0]
 
-    # Return relative velocity
+    # Return relative direction
     return particle["ux"] - Vx / speed
 
 
@@ -111,21 +94,18 @@ def get_distance(particle, speed, surface):
     if surface["moving"]:
         return get_distance_moving(particle, speed, surface)
 
-    # Particle and surface parameters
-    x = particle["x"]
-    ux = particle["ux"]
-    J = surface["J"]
-
     # Parallel?
-    if ux == 0.0:
+    normal_component = get_normal_component(particle, speed, surface)
+    if abs(normal_component) == 0.0:
         return INF
 
     # Coincident?
-    if abs(x + J) < COINCIDENCE_TOLERANCE:
+    f = evaluate(particle, surface)
+    if abs(f) < COINCIDENCE_TOLERANCE:
         return INF
 
     # Calculate distance
-    distance = -(x + J) / ux
+    distance = -f / normal_component
 
     # Moving away?
     if distance < 0.0:
@@ -139,88 +119,61 @@ def get_distance_moving(particle, speed, surface):
     """
     Get particle distance to surface [Moving version]
     """
-    # Particle and surface parameters
-    x = particle["x"]
-    ux = particle["ux"]
-    t = particle["t"]
-    J = surface["J"]
+    # Store particle coordinate (will be temporarily changed)
+    x_original = particle["x"]
+    ux_original = particle["ux"]
+    t_original = particle["t"]
+    surface["moving"] = False
 
     # Move interval index
     idx = common._get_move_idx(particle["t"], surface)
 
-    # Coincident?
-    coincident = abs(particle["x"] - J) < COINCIDENCE_TOLERANCE
+    # Distance accumulator
+    total_distance = 0.0
 
-    # ==============================================================================
-    # Evaluate starting interval if not coincident
+    # Evaluate the current and the subsequent intervals until intersecting
+    while idx < surface["N_move"]:
+        # Apply translation velocity
+        Vx = surface["move_velocities"][idx][0]
+        particle["ux"] -= Vx / speed
 
-    if not coincident:
-        # Translation velocity
-        x1 = surface["move_translations"][idx][0]
-        x2 = surface["move_translations"][idx + 1][0]
-        t1 = surface["move_time_grid"][idx]
-        t2 = surface["move_time_grid"][idx + 1]
-        Vx = (x2 - x1) / (t2 - t1)
+        # Get distance
+        distance = get_distance(particle, speed, surface)
 
-        # The relative velocity
-        relative_velocity = ux - Vx / speed
+        # Beyond the interval?
+        distance_time = distance / speed
+        dt = surface["move_time_grid"][idx + 1] - particle["t"]
+        if distance_time > dt:
+            distance = INF
 
-        # Check if particle and surface NOT move in the same velocity and never meet
-        if relative_velocity != 0.0:
-            distance = -(x + J) / relative_velocity
-            # Check if not moving away
-            if distance > 0.0:
-                # Check if it is still within the interval
-                distance_time = distance / speed
-                if distance_time <= time_grid[idx + 1] - t:
-                    return distance
+        # Intersecting?
+        if distance < INF:
+            # Restore particle coordinate
+            particle["x"] = x_original
+            particle["ux"] = ux_original
+            particle["t"] = t_original
+            surface["moving"] = False
 
-    # Not intersecting in the starting interval. Let's check the next ones
-    idx += 1
+            # Return the total distance
+            return total_distance + distance
 
-    # But first, we need to keep track of the total distance traveled and
-    # the particle position (which we temporarily change)
-    total_distance = (time_grid[idx] - t) * speed
-    particle["x"] += total_distance * ux
-
-    # ==============================================================================
-    # Evaluate subsequent interval
-
-    while idx < N_move:
-        # Translation velocity
-        x1 = surface["move_translations"][idx][0]
-        x2 = surface["move_translations"][idx + 1][0]
-        t1 = surface["move_time_grid"][idx]
-        t2 = surface["move_time_grid"][idx + 1]
-        dt = t2 - t1
-        Vx = (x2 - x1) / dt
-
-        # The relative velocity
-        relative_velocity = ux - Vx / speed
-
-        # Check if particle and surface NOT move in the same velocity and never meet
-        if relative_velocity != 0.0:
-            distance = -(x + J) / relative_velocity
-            # Check if not moving away
-            if distance > 0.0:
-                # Check if it is still within the interval
-                distance_time = distance / speed
-                if distance_time <= dt:
-                    # Restore particle coordinate
-                    particle["x"] = x
-                    return total_distance + distance
-
-        # Not intersecting within the current interval
+        # Accumulate distance
         additional_distance = dt * speed
         total_distance += additional_distance
-        particle["x"] += additional_distance * ux
 
+        # Modify the particle
+        particle["x"] += additional_distance * ux_original
+        particle["ux"] = ux_original
+        particle["t"] = surface["move_time_grid"][idx + 1]
+
+        # Check next interval
         idx += 1
 
-    # No intersection
-    distance = INF
-
     # Restore particle coordinate
-    particle["x"] = x
+    particle["x"] = x_original
+    particle["ux"] = ux_original
+    particle["t"] = t_original
+    surface["moving"] = False
 
+    # No intersection
     return INF
