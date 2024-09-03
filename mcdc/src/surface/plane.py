@@ -139,9 +139,9 @@ def get_normal_component_moving(particle, speed, surface):
     Vz = surface["move_velocities"][idx][2]
 
     # Relative direction
-    rV_x = particle["ux"] - Vx / speed
-    rV_y = particle["uy"] - Vy / speed
-    rV_z = particle["uz"] - Vz / speed
+    rVx = particle["ux"] - Vx / speed
+    rVy = particle["uy"] - Vy / speed
+    rVz = particle["uz"] - Vz / speed
 
     return nx * rVx + ny * rVy + nz * rVz
 

@@ -43,8 +43,8 @@ def reflect(particle, surface):
     uz = particle["uz"]
 
     # Surface normal
-    dx = 2 * x + surface["G"]
-    dz = 2 * z + surface["I"]
+    dx = 2 * particle["x"] + surface["G"]
+    dz = 2 * particle["z"] + surface["I"]
     norm = (dx**2 + dz**2) ** 0.5
     nx = dx / norm
     nz = dz / norm
