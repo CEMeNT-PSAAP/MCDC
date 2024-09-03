@@ -1,7 +1,7 @@
 """
 Plane: General linear surface
 
-f(x, y, z) = G * x + H * y + I * z + J
+f(x, y, z) = Gx + Hy + Iz + J
 """
 
 from numba import njit
@@ -76,6 +76,11 @@ def reflect(particle, surface):
     """
     Reflect the particle off the surface
     """
+    # Particle parameters
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
+
     # Surface normal
     nx = surface["G"]
     ny = surface["H"]
