@@ -37,7 +37,7 @@ def _evaluate_moving(particle, surface):
     idx = common._get_move_idx(particle["t"], surface)
 
     # Translation velocity
-    Vx = surface["move_velocities"][idx][0]
+    Vx = surface["move_velocities"][idx, 0]
 
     # Translated position
     t_local = particle["t"] - surface["move_time_grid"][idx]
@@ -80,7 +80,7 @@ def _get_normal_component_moving(particle, speed, surface):
     idx = common._get_move_idx(particle["t"], surface)
 
     # Translation velocity
-    Vx = surface["move_velocities"][idx][0]
+    Vx = surface["move_velocities"][idx, 0]
 
     # Return relative direction
     return particle["ux"] - Vx / speed
@@ -134,7 +134,7 @@ def _get_distance_moving(particle, speed, surface):
     # Evaluate the current and the subsequent intervals until intersecting
     while idx < surface["N_move"]:
         # Apply translation velocity
-        Vx = surface["move_velocities"][idx][0]
+        Vx = surface["move_velocities"][idx, 0]
         particle["ux"] -= Vx / speed
 
         # Get distance
