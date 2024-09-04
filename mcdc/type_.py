@@ -823,7 +823,6 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
-        ("caching", bool_),
         ("output_name", str_),
         ("save_input_deck", bool_),
         # Eigenvalue mode
