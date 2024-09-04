@@ -20,13 +20,13 @@ def evaluate(particle, surface):
     Evaluate the surface equation wrt the particle coordinate
     """
     if surface["moving"]:
-        return evaluate_moving(particle, surface)
+        return _evaluate_moving(particle, surface)
 
     return particle["x"] + surface["J"]
 
 
 @njit
-def evaluate_moving(particle, surface):
+def _evaluate_moving(particle, surface):
     """
     Evaluate the surface equation wrt the particle coordinate [Moving version]
 
@@ -63,13 +63,13 @@ def get_normal_component(particle, speed, surface):
     Particle speed is needed if the surface is moving to get the relative direction.
     """
     if surface["moving"]:
-        return get_normal_component_moving(particle, speed, surface)
+        return _get_normal_component_moving(particle, speed, surface)
 
     return particle["ux"]
 
 
 @njit
-def get_normal_component_moving(particle, speed, surface):
+def _get_normal_component_moving(particle, speed, surface):
     """
     Get the surface outward-normal component of the particle [Moving version]
 
@@ -92,7 +92,7 @@ def get_distance(particle, speed, surface):
     Get particle distance to surface
     """
     if surface["moving"]:
-        return get_distance_moving(particle, speed, surface)
+        return _get_distance_moving(particle, speed, surface)
 
     # Parallel?
     normal_component = get_normal_component(particle, speed, surface)
@@ -115,7 +115,7 @@ def get_distance(particle, speed, surface):
 
 
 @njit
-def get_distance_moving(particle, speed, surface):
+def _get_distance_moving(particle, speed, surface):
     """
     Get particle distance to surface [Moving version]
     """
