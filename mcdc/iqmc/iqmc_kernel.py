@@ -5,10 +5,10 @@ from mpi4py import MPI
 from numba import objmode, literal_unroll
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
 import mcdc.local as local
-import mcdc.mesh as mesh_
-import mcdc.physics as physics
+import mcdc.src.geometry as geometry
+import mcdc.src.mesh as mesh_
+import mcdc.src.physics as physics
 import mcdc.src.surface as surface_
 
 from mcdc.adapt import toggle

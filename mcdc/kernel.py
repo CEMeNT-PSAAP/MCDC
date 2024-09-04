@@ -10,17 +10,17 @@ from numba import (
 )
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
 import mcdc.local as local
-import mcdc.mesh as mesh_
-import mcdc.physics as physics
+import mcdc.src.geometry as geometry
+import mcdc.src.mesh as mesh_
+import mcdc.src.physics as physics
 import mcdc.src.surface as surface_
 import mcdc.type_ as type_
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
-from mcdc.algorithm import binary_search, binary_search_with_length
 from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
+from mcdc.src.algorithm import binary_search, binary_search_with_length
 
 # =============================================================================
 # Domain Decomposition

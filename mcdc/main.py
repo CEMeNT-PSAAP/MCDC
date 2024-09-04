@@ -97,8 +97,8 @@ from mcdc.loop import (
     loop_eigenvalue,
     build_gpu_progs,
 )
-import mcdc.geometry as geometry
 from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
+import mcdc.src.geometry as geometry
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
