@@ -10,7 +10,6 @@ import mcdc.kernel as kernel
 import mcdc.local as local
 
 from mcdc.constant import *
-from mcdc.loop import caching
 from mcdc.print_ import (
     print_iqmc_eigenvalue_exit_code,
     print_iqmc_eigenvalue_progress,
@@ -78,7 +77,7 @@ def iqmc_validate_inputs(input_deck):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def iqmc_simulation(mcdc):
     # Preprocessing
     iqmc = mcdc["technique"]["iqmc"]
@@ -108,7 +107,7 @@ def iqmc_simulation(mcdc):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def source_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
@@ -134,7 +133,7 @@ def source_iteration(mcdc):
         total_source_old = iqmc["total_source"].copy()
 
 
-@njit(cache=caching)
+@njit
 def power_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
@@ -189,7 +188,7 @@ def power_iteration(mcdc):
                     print_iqmc_eigenvalue_exit_code(mcdc)
 
 
-@njit(cache=caching)
+@njit
 def gmres(mcdc):
     """
     GMRES solver.
@@ -351,7 +350,7 @@ def gmres(mcdc):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def iqmc_loop_particle(P, prog):
     mcdc = adapt.device(prog)
 
@@ -359,7 +358,7 @@ def iqmc_loop_particle(P, prog):
         iqmc_step_particle(P, prog)
 
 
-@njit(cache=caching)
+@njit
 def iqmc_step_particle(P, prog):
     mcdc = adapt.device(prog)
 
@@ -392,7 +391,7 @@ def iqmc_step_particle(P, prog):
             kernel.weight_roulette(P, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def iqmc_loop_source(mcdc):
     work_size = mcdc["bank_source"]["size"][0]
     N_prog = 0
@@ -418,7 +417,7 @@ def iqmc_loop_source(mcdc):
                 print_progress(percent, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def iqmc_sweep(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     # tally sweep count
@@ -444,7 +443,7 @@ def iqmc_sweep(mcdc):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def AxV(V, b, mcdc):
     """
     Linear operator to be used with GMRES.

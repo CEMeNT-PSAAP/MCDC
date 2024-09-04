@@ -44,7 +44,6 @@ if mode == "python":
     nb.config.DISABLE_JIT = True
 elif mode == "numba":
     nb.config.DISABLE_JIT = False
-    nb.config.NUMBA_DEBUG_CACHE = 1
 elif mode == "numba_debug":
     msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
     print_warning(msg)
@@ -96,7 +95,6 @@ from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
     loop_eigenvalue,
-    set_cache,
     build_gpu_progs,
 )
 import mcdc.geometry as geometry
@@ -134,8 +132,6 @@ def run():
 
     # Print banner, hardware configuration, and header
     print_banner(mcdc)
-
-    set_cache(mcdc["setting"]["caching"])
 
     print_msg(" Now running TNT...")
     if mcdc["setting"]["mode_eigenvalue"]:
