@@ -5,7 +5,7 @@ from mcdc.constant import (
     INF,
 )
 
-from mcdc.mesh.structured import (
+from mcdc.src.mesh.structured import (
     get_indices,
     get_crossing_distance,
     _grid_index,

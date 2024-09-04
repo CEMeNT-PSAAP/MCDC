@@ -5,7 +5,7 @@ from mcdc.constant import (
     INF,
 )
 
-from mcdc.mesh.uniform import (
+from mcdc.src.mesh.uniform import (
     get_indices,
     get_crossing_distance,
     _grid_index,
