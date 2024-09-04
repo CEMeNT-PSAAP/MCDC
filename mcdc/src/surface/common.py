@@ -17,7 +17,6 @@ import mcdc.src.surface.cylinder_z as cylinder_z
 import mcdc.src.surface.sphere as sphere
 import mcdc.src.surface.quadric as quadric
 
-from mcdc.algorithm import binary_search_with_length
 from mcdc.constant import (
     COINCIDENCE_TOLERANCE,
     INF,
@@ -33,6 +32,7 @@ from mcdc.constant import (
     SURFACE_SPHERE,
     SURFACE_QUADRIC,
 )
+from mcdc.src.algorithm import binary_search_with_length
 
 
 @njit

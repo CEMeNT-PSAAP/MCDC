@@ -2,7 +2,7 @@ from mpi4py import MPI
 from numba import njit, objmode
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
+import mcdc.src.geometry as geometry
 import mcdc.kernel as kernel
 import mcdc.local as local
 import mcdc.print_ as print_module
