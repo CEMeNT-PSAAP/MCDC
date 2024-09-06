@@ -125,7 +125,10 @@ def run():
     preparation_start = MPI.Wtime()
     if input_deck.technique["iQMC"]:
         iqmc_validate_inputs(input_deck)
-    data, mcdc = prepare()
+
+    data_arr, mcdc_arr = prepare()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -141,11 +144,11 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        iqmc_simulation(mcdc)
+        iqmc_simulation(mcdc_arr)
     elif mcdc["setting"]["mode_eigenvalue"]:
-        loop_eigenvalue(data, mcdc)
+        loop_eigenvalue(data_arr, mcdc_arr)
     else:
-        loop_fixed_source(data, mcdc)
+        loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -429,7 +432,8 @@ def prepare():
     #   TODO: Better alternative?
     # =========================================================================
 
-    mcdc = np.zeros(1, dtype=type_.global_)[0]
+    mcdc_arr = np.zeros(1, dtype=type_.global_)
+    mcdc = mcdc_arr[0]
 
     # Now, set up the global variable container
 
@@ -813,7 +817,8 @@ def prepare():
     # =========================================================================
 
     type_.make_type_data(input_deck,tally_size)
-    tally = np.zeros(1,dtype=type_.data)[0]
+    data_arr = np.zeros(1,dtype=type_.data)
+
 
     # =========================================================================
     # Platform Targeting, Adapters, Toggles, etc
@@ -824,12 +829,7 @@ def prepare():
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
             )
-        tally_width = None
-        if not input_deck.technique["uq"]:
-            tally_width = 3
-        else:
-            tally_width = 5
-        adapt.gpu_forward_declare(tally_width,tally_size)
+        adapt.gpu_forward_declare()
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
@@ -1180,9 +1180,7 @@ def prepare():
     # Finalize data: wrapping into a tuple
     # =========================================================================
 
-    data = tally
-
-    return data, mcdc
+    return data_arr, mcdc_arr
 
 
 def cardlist_to_h5group(dictlist, input_group, name):

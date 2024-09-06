@@ -975,7 +975,6 @@ def add_particle(P_arr, bank):
     if idx >= bank["particles"].shape[0]:
         full_bank_print(bank)
 
-    adapt.harm.print_formatted(8421248)
 
     # Set particle
     copy_recordlike(bank["particles"][idx:idx+1], P_arr)
@@ -1797,7 +1796,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
-            tally_bin[TALLY_SCORE, idx + i] += score
+            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -1871,7 +1870,7 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
             score = flux
         elif score_type == SCORE_NET_CURRENT:
             score = flux * mu
-        tally_bin[TALLY_SCORE, idx + i] += score
+        adapt.global_add(tally_bin,(TALLY_SCORE, idx + i), score)
 
 
 @njit
@@ -1953,7 +1952,7 @@ def eigenvalue_tally(P_arr, distance, mcdc):
     nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P_arr, mcdc)
 
     # Fission production (needed even during inactive cycle)
-    # mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
+    #mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
     adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
 
     if mcdc["cycle_active"]:
@@ -2031,6 +2030,7 @@ def eigenvalue_tally_closeout_history(mcdc):
                 )
 
     # Update and store k_eff
+    print(mcdc["eigenvalue_tally_nuSigmaF"])
     mcdc["k_eff"] = buff_nuSigmaF[0] / N_particle
     mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
 
@@ -2206,7 +2206,6 @@ def move_to_event(P_arr, data, mcdc):
 
     # Distance to census time
     idx = mcdc["idx_census"]
-    adapt.harm.print_formatted(idx)
     d_time_census = speed * (mcdc["setting"]["census_time"][idx] - P["t"])
 
     # Distance to next collision
@@ -2270,7 +2269,6 @@ def move_to_event(P_arr, data, mcdc):
 def distance_to_collision(P_arr, mcdc):
     P = P_arr[0]
     # Get total cross-section
-    adapt.harm.print_formatted(P["material_ID"])
     material = mcdc["materials"][P["material_ID"]]
     SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
 
@@ -2396,7 +2394,6 @@ def scattering(P_arr, prog):
             P["w"] = P_new["w"]
         else:
             adapt.add_active(P_new_arr, prog)
-            adapt.harm.print_formatted(19191919191)
 
 
 @njit
@@ -2433,7 +2430,6 @@ def scattering_MG(P_arr, material, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
     # Sample scattering angle
-    #adapt.harm.print_formatted(777) #!
     mu0 = 2.0 * rng(P_new_arr) - 1.0
 
     # Scatter direction
@@ -2470,7 +2466,6 @@ def scattering_CE(P_arr, material, P_new_arr, mcdc):
       - Isotropic in COM
     """
     # Sample nuclide
-    adapt.harm.print_formatted(666) #!
     nuclide = sample_nuclide(material, P_arr, XS_SCATTER, mcdc)
     xi = rng(P_arr) * get_MacroXS(XS_SCATTER, material, P_arr, mcdc)
     tot = 0.0
@@ -2691,7 +2686,6 @@ def fission(P_arr, prog):
                 P["w"] = P_new["w"]
             else:
                 adapt.add_active(P_new_arr, prog)
-                adapt.harm.print_formatted(19191919191)
 
 
 @njit
