@@ -52,11 +52,12 @@ def get_indices(P_arr, mesh):
 
 
 @njit
-def get_crossing_distance(particle, speed, mesh):
+def get_crossing_distance(particle_arr, speed, mesh):
     """
     Get distance for the particle, moving with the given speed,
     to cross the nearest grid of the mesh
     """
+    particle = particle_arr[0]
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]

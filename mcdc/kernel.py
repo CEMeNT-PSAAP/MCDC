@@ -2030,7 +2030,6 @@ def eigenvalue_tally_closeout_history(mcdc):
                 )
 
     # Update and store k_eff
-    print(mcdc["eigenvalue_tally_nuSigmaF"])
     mcdc["k_eff"] = buff_nuSigmaF[0] / N_particle
     mcdc["k_cycle"][idx_cycle] = mcdc["k_eff"]
 
@@ -2198,7 +2197,7 @@ def move_to_event(P_arr, data, mcdc):
     d_domain = INF
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
-            P, speed, mcdc["technique"]["dd_mesh"]
+            P_arr, speed, mcdc["technique"]["dd_mesh"]
         )
 
     # Distance to time boundary
