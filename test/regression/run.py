@@ -64,7 +64,7 @@ names = temp
 if target == "gpu":
     temp = names.copy()
     for name in names:
-        if "iqmc" in name:
+        if ("iqmc" in name) or ("eigenvalue" in name):
             temp.remove(name)
             print(
                 Fore.YELLOW + "Note: Skipping %s (GPU target)" % name + Style.RESET_ALL

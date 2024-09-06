@@ -358,10 +358,12 @@ def iqmc_sample_group(sample, G):
 
 
 @toggle("iQMC")
-def iqmc_move_to_event(P, mcdc):
+def iqmc_move_to_event(P_arr, mcdc):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
+
+    P = P_arr[0]
 
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
@@ -396,12 +398,12 @@ def iqmc_move_to_event(P, mcdc):
     speed = physics.get_speed(P, mcdc)
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
-            P, speed, mcdc["technique"]["dd_mesh"]
+            P_arr, speed, mcdc["technique"]["dd_mesh"]
         )
 
     # Distance to iqmc mesh
     d_mesh = mesh_.structured.get_crossing_distance(
-        P, speed, mcdc["technique"]["iqmc"]["mesh"]
+        P_arr, speed, mcdc["technique"]["iqmc"]["mesh"]
     )
 
     # =========================================================================

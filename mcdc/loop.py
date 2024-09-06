@@ -114,7 +114,6 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
                 # Manage particle banks: population control and work rebalance
                 seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
-                kernel.manage_particle_banks(seed_bank, mcdc)
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
@@ -570,8 +569,9 @@ def step_particle(P_arr, data, prog):
 
 
 @njit(cache=caching)
-def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
+def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     mcdc = adapt.mcdc_constant(prog)
+    DNP = DNP_arr[0]
 
     # Set groups
     j = DNP["g"]
@@ -695,7 +695,8 @@ def loop_source_precursor(seed, data, mcdc):
 
     for idx_work in range(mcdc["mpi_work_size_precursor"]):
         # Get precursor
-        DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+        DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work:(idx_work+1)]
+        DNP = DNP_arr[0]
 
         # Determine number of particles to be generated
         w = DNP["w"]
@@ -712,7 +713,7 @@ def loop_source_precursor(seed, data, mcdc):
 
         for particle_idx in range(N):
 
-            generate_precursor_particle(DNP, particle_idx, seed_work, mcdc)
+            generate_precursor_particle(DNP_arr, particle_idx, seed_work, mcdc)
 
             exhaust_active_bank(data, mcdc)
 
@@ -736,7 +737,8 @@ def gpu_precursor_spec():
         seed = mcdc["source_seed"]
 
         # Get precursor
-        DNP = mcdc["bank_precursor"]["precursors"][idx_work]
+        DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work:(idx_work+1)]
+        DNP = DNP_arr[0]
 
         # Determine number of particles to be generated
         w = DNP["w"]
@@ -752,7 +754,7 @@ def gpu_precursor_spec():
         # =====================================================================
 
         for particle_idx in range(N):
-            generate_precursor_particle(DNP, particle_idx, seed_work, prog)
+            generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog)
 
         return True
 
