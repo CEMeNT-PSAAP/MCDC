@@ -29,7 +29,7 @@ from mcdc.print_ import print_error
 import mcdc.adapt as adapt
 
 
-harm.set_rocm_path('/opt/rocm-6.0.0')
+harm.config.set_rocm_path('/opt/rocm-6.0.0')
 
 
 # =============================================================================
@@ -83,6 +83,22 @@ def cast_voidptr_to_uintp(typingctx, src):
 
         return sig, codegen
 
+
+
+def leak(arg):
+    pass
+
+@intrinsic
+def leak_inner(typingctx, kind):
+    def codegen(context,builder,signature,args):
+        context.nrt.incref(builder, kind, args[0])
+    return numba.void(kind),codegen
+
+@numba.extending.overload(leak)
+def leak_overload(arg):
+    def impl(arg):
+        leak_inner(arg)
+    return impl
 
 # =============================================================================
 # Generic GPU/CPU Local Array Variable Constructors
@@ -410,7 +426,7 @@ step_async = None
 find_cell_async = None
 
 
-def gpu_forward_declare(tally_width,tally_size):
+def gpu_forward_declare():
 
     global none_type, mcdc_constant_type, mcdc_data_type
     global state_spec
@@ -513,39 +529,33 @@ def add_active(P_reclike,prog):
 
 @for_cpu()
 def add_source(particle, prog):
-    harm.print_formatted(10000001)
     kernel.add_particle(particle, prog["bank_source"])
 
 
 @for_gpu()
 def add_source(particle, prog):
-    harm.print_formatted(10000001)
     mcdc = mcdc_constant(prog)
     kernel.add_particle(particle, mcdc["bank_source"])
 
 
 @for_cpu()
 def add_census(particle, prog):
-    harm.print_formatted(20000002)
     kernel.add_particle(particle, prog["bank_census"])
 
 
 @for_gpu()
 def add_census(particle, prog):
-    harm.print_formatted(20000002)
     mcdc = mcdc_constant(prog)
     kernel.add_particle(particle, mcdc["bank_census"])
 
 
 @for_cpu()
 def add_IC(particle, prog):
-    harm.print_formatted(30000003)
     kernel.add_particle(particle, prog["technique"]["IC_bank_neutron_local"])
 
 
 @for_gpu()
 def add_IC(particle, prog):
-    harm.print_formatted(30000003)
     mcdc = mcdc_constant(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
 

@@ -70,7 +70,15 @@ def teardown_gpu(mcdc):
 
 
 @njit(cache=caching)
-def loop_fixed_source(data, mcdc):
+def loop_fixed_source(data_arr, mcdc_arr):
+
+    # Ensure `data` and `mcdc` exist for the lifetime of the program
+    # by intentionally leaking their memory
+    adapt.leak(data_arr)
+    data = data_arr[0]
+    adapt.leak(mcdc_arr)
+    mcdc = mcdc_arr[0]
+
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
         mcdc["idx_batch"] = idx_batch
@@ -134,7 +142,15 @@ def loop_fixed_source(data, mcdc):
 
 
 @njit(cache=caching)
-def loop_eigenvalue(data, mcdc):
+def loop_eigenvalue(data_arr, mcdc_arr):
+
+    # Ensure `data` and `mcdc` exist for the lifetime of the program
+    # by intentionally leaking their memory
+    adapt.leak(data_arr)
+    data = data_arr[0]
+    adapt.leak(mcdc_arr)
+    mcdc = mcdc_arr[0]
+
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
         seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
@@ -186,7 +202,6 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     P_arr = adapt.local_array(1,type_.particle_record)
     P = P_arr[0]
 
-    adapt.harm.print_formatted(987656789)
 
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
@@ -195,7 +210,8 @@ def generate_source_particle(work_start, idx_work, seed, prog):
 
     # Get from source bank
     else:
-        P = mcdc["bank_source"]["particles"][idx_work]
+        P_arr = mcdc["bank_source"]["particles"][idx_work:(idx_work+1)]
+        P = P_arr[0]
 
     # Check if it is beyond current census index
     idx_census = mcdc["idx_census"]
@@ -217,11 +233,9 @@ def generate_source_particle(work_start, idx_work, seed, prog):
             if kernel.particle_in_domain(P_arr, mcdc):
                 kernel.recordlike_to_particle(P_new_arr,P_arr)
                 adapt.add_active(P_new_arr, prog)
-                adapt.harm.print_formatted(19191919191)
         else:
             kernel.recordlike_to_particle(P_new_arr,P_arr)
             adapt.add_active(P_new_arr, prog)
-            adapt.harm.print_formatted(19191919191)
 
 
 @njit(cache=caching)
@@ -374,7 +388,6 @@ def gpu_sources_spec():
         if idx_work >= mcdc["mpi_work_size"]:
             return False
 
-        adapt.harm.print_formatted(1292129)
         generate_source_particle(
             mcdc["mpi_work_start"], nb.uint64(idx_work), mcdc["source_seed"], prog
         )
@@ -402,13 +415,16 @@ def gpu_sources_spec():
             adapt.step_async(prog, P)
 
     async_fns = [step]
-    return adapt.harm.RuntimeSpec("mcdc_source", adapt.state_spec, base_fns, async_fns,adapt.harm.GPUPlatform.ROCM)
+    return adapt.harm.RuntimeSpec("mcdc_source", adapt.state_spec, base_fns, async_fns,adapt.harm.config.GPUPlatform.ROCM)
 
 
 @njit
 def gpu_loop_source(seed, data, mcdc):
     # Progress bar indicator
     N_prog = 0
+
+    if mcdc["technique"]["domain_decomposition"]:
+        kernel.dd_check_in(mcdc)
 
     # =====================================================================
     # GPU Interop
@@ -440,7 +456,7 @@ def gpu_loop_source(seed, data, mcdc):
     else:
         src_exec_program(mcdc["source_program_pointer"], block_count, batch_size)
         step_count = 1
-        while (not src_complete(mcdc["source_program_pointer"])) and (step_count < 1000):
+        while not src_complete(mcdc["source_program_pointer"]):
             src_exec_program(mcdc["source_program_pointer"], block_count, batch_size)
             step_count += 1
         print("\n\nstep count: ",step_count,"\n\n")
@@ -481,13 +497,12 @@ def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_constant(prog)
 
-    adapt.harm.print_formatted(123454321)
-    adapt.harm.print_formatted(P["rng_seed"])
 
     # Determine and move to event
-    adapt.harm.print_formatted(88888)
     kernel.move_to_event(P_arr, data, mcdc)
-    adapt.harm.print_formatted(P["event"])
+
+    #adapt.harm.print_formatted(P["rng_seed"])
+    #adapt.harm.print_formatted(P["event"])
 
     # Execute events
     if P["event"] == EVENT_LOST:
@@ -539,18 +554,14 @@ def step_particle(P_arr, data, prog):
 
     # Apply weight window
     if P["alive"] and mcdc["technique"]["weight_window"]:
-        pass # adapt.harm.print_formatted(9)
         kernel.weight_window(P_arr, prog)
 
     # Apply weight roulette
     if P["alive"] and mcdc["technique"]["weight_roulette"]:
-        pass # adapt.harm.print_formatted(10)
         # check if weight has fallen below threshold
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
             kernel.weight_roulette(P_arr, mcdc)
 
-    if not P["alive"]:
-        adapt.harm.print_formatted(8675309)
 
 
 # =============================================================================
@@ -644,7 +655,6 @@ def generate_precursor_particle(DNP, particle_idx, seed_work, prog):
 
         # Push to active bank
         adapt.add_active(P_new_arr, prog)
-        adapt.harm.print_formatted(19191919191)
 
 
 @njit(cache=caching)
@@ -769,7 +779,7 @@ def gpu_precursor_spec():
 
     async_fns = [step]
     return adapt.harm.RuntimeSpec(
-        "mcdc_precursor", adapt.state_spec, base_fns, async_fns, adapt.harm.GPUPlatform.ROCM
+        "mcdc_precursor", adapt.state_spec, base_fns, async_fns, adapt.harm.config.GPUPlatform.ROCM
     )
 
 

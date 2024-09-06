@@ -79,7 +79,13 @@ def iqmc_validate_inputs(input_deck):
 
 
 @njit(cache=caching)
-def iqmc_simulation(mcdc):
+def iqmc_simulation(mcdc_arr):
+
+    # Ensure `mcdc` exists for the lifetime of the program
+    # by intentionally leaking their memory
+    adapt.leak(mcdc_arr)
+    mcdc = mcdc_arr[0]
+
     # Preprocessing
     iqmc = mcdc["technique"]["iqmc"]
     iqmc_kernel.iqmc_preprocess(mcdc)
