@@ -6,17 +6,10 @@ import mcdc.type_ as type_
 import mcdc.kernel as kernel
 
 
-TARGET = "ROCM"
-
-
 try:
     import harmonize as harm
     HAS_HARMONIZE = True
-    if   TARGET == "ROCM":
-        from numba import hip as cuda
-    elif TARGET == "CUDA":
-        from numba import cuda
-except RuntimeError:
+except ImportError:
     HAS_HARMONIZE = False
 
 
@@ -228,7 +221,7 @@ def builtin_local_array(context, builder, sig, args):
     elif isinstance(context,numba.cuda.target.CUDATargetContext):
         length = sig.args[0].literal_value
         dtype = parse_dtype(sig.args[1])
-        return numba.cuda.lowering._generic_array(
+        return numba.cuda.cudaimpl._generic_array(
             context,
             builder,
             shape=(length,),
@@ -287,7 +280,6 @@ def overwrite_func(func, revised_func):
     mod_name = func.__module__
     fn_name = func.__name__
     new_fn_name = revised_func.__name__
-    # print(f"Overwriting function {fn_name} in module {mod_name} with {new_fn_name}")
     module = __import__(mod_name, fromlist=[fn_name])
     setattr(module, fn_name, revised_func)
 
@@ -318,7 +310,6 @@ def eval_toggle():
             else:
                 global do_nothing_id
                 name = func.__name__
-                # print(f"do_nothing_{do_nothing_id} for {name}")
                 arg_count = len(inspect.signature(func).parameters)
                 overwrite_func(func, numba.njit(generate_do_nothing(arg_count)))
 
@@ -336,7 +327,6 @@ def blankout_fn(func):
     if id not in blankout_roster:
         global do_nothing_id
         name = func.__name__
-        # print(f"do_nothing_{do_nothing_id} for {name}")
         arg_count = len(inspect.signature(func).parameters)
         blankout_roster[id] = generate_do_nothing(
             arg_count, crash_on_call=f"blankout fn for {name} should never be called"
@@ -348,12 +338,10 @@ def blankout_fn(func):
 
 
 def for_(target, on_target=[]):
-    # print(f"{target}")
     def for_inner(func):
         global target_rosters
         mod_name = func.__module__
         fn_name = func.__name__
-        # print(f"{target} {mod_name} {fn_name}")
         params = inspect.signature(func).parameters
         if target not in target_rosters:
             target_rosters[target] = {}
@@ -361,7 +349,6 @@ def for_(target, on_target=[]):
         # blank = blankout_fn(func)
         param_str = ", ".join(p for p in params)
         jit_str = f"def jit_func({param_str}):\n    global target_rosters\n    return target_rosters['{target}'][('{mod_name}','{fn_name}')]"
-        # print(jit_str)
         exec(jit_str, globals(), locals())
         result = eval("jit_func")
         blank = blankout_fn(func)
@@ -447,10 +434,8 @@ def gpu_forward_declare():
         none_type,
     )
     access_fns = harm.RuntimeSpec.access_fns(state_spec)
-    print(access_fns)
     mcdc_constant_gpu = access_fns["device"]["constant"]
     mcdc_data_gpu = access_fns["device"]["data"]
-    print("\n\n\n",device_gpu,"\n\n\n")
     group_gpu  = access_fns["group"]
     thread_gpu = access_fns["thread"]
     particle_gpu = numba.from_dtype(type_.particle)
