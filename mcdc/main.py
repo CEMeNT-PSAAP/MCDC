@@ -17,6 +17,28 @@ parser.add_argument(
     "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
 )
 
+parser.add_argument(
+    "--gpu_strat",
+    type=str,
+    help="Strategy used in GPU execution (event or async)",
+    choices=["async", "event"],
+    default="event"
+)
+
+parser.add_argument(
+    "--gpu_block_count",
+    type=int,
+    help="Number of blocks used in GPU execution",
+    default=240
+)
+
+parser.add_argument(
+    "--gpu_arena_size",
+    type=int,
+    help="Capacity of each intermediate data buffer used, as a particle count",
+    default=0x100000
+)
+
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 parser.add_argument("--progress_bar", default=True, action="store_true")
@@ -836,7 +858,7 @@ def prepare():
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
-        build_gpu_progs()
+        build_gpu_progs(args)
     adapt.nopython_mode( (mode == "numba") or (mode == "numba_debug") )
 
     # =========================================================================
