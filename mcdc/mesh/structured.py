@@ -23,7 +23,7 @@ def get_indices(P_arr, mesh):
     outside = False
     if (
         # Outside the mesh condition
-           x < mesh["x"][0] - COINCIDENCE_TOLERANCE
+        x < mesh["x"][0] - COINCIDENCE_TOLERANCE
         or x > mesh["x"][-1] + COINCIDENCE_TOLERANCE
         or y < mesh["y"][0] - COINCIDENCE_TOLERANCE
         or y > mesh["y"][-1] + COINCIDENCE_TOLERANCE

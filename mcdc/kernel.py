@@ -337,7 +337,7 @@ def dd_recv_particles(mcdc):
 
     # Set source bank from buffer
     for i in range(size):
-        add_particle(buff[i:i+1], mcdc["bank_active"])
+        add_particle(buff[i : i + 1], mcdc["bank_active"])
 
     if (
         mcdc["domain_decomp"]["recv_count"] > 0
@@ -933,7 +933,6 @@ def source_particle(P_rec_arr, seed, mcdc):
     P_rec["w"] = 1.0
 
 
-
 # =============================================================================
 # Particle bank operations
 # =============================================================================
@@ -975,9 +974,8 @@ def add_particle(P_arr, bank):
     if idx >= bank["particles"].shape[0]:
         full_bank_print(bank)
 
-
     # Set particle
-    copy_recordlike(bank["particles"][idx:idx+1], P_arr)
+    copy_recordlike(bank["particles"][idx : idx + 1], P_arr)
 
 
 @njit
@@ -1398,9 +1396,9 @@ def bank_IC(P_arr, prog):
 
     # Sample particle
     if rng(P_arr) < Pn:
-        P_new_arr = adapt.local_array(1,type_.particle)
+        P_new_arr = adapt.local_array(1, type_.particle)
         P_new = P_new_arr[0]
-        split_as_record(P_new_arr,P_arr)
+        split_as_record(P_new_arr, P_arr)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
         adapt.add_IC(P_new_arr, prog)
@@ -1507,7 +1505,7 @@ def pct_combing(seed, mcdc):
     # Last hiting tooth
     tooth_end = math.floor((idx_end - offset) / td) + 1
 
-    P_rec_arr = adapt.local_array(1,type_.particle_record)
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
     P_rec = P_rec_arr[0]
 
     # Locally sample particles from census bank
@@ -1515,7 +1513,7 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        copy_recordlike(P_rec_arr,bank_census["particles"][idx:idx+1])
+        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] *= td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1547,7 +1545,7 @@ def pct_combing_weight(seed, mcdc):
     # Last hiting tooth
     tooth_end = math.floor((w_end - offset) / td) + 1
 
-    P_rec_arr = adapt.local_array(1,type_.particle_record)
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
     P_rec = P_rec_arr[0]
 
     # Locally sample particles from census bank
@@ -1556,7 +1554,7 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        copy_recordlike(P_rec_arr,bank_census["particles"][idx:idx+1])
+        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] = td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1574,6 +1572,7 @@ def move_particle(P_arr, distance, mcdc):
     P["y"] += P["uy"] * distance
     P["z"] += P["uz"] * distance
     P["t"] += distance / physics.get_speed(P_arr, mcdc)
+
 
 @njit
 def copy_recordlike(P_new_arr, P_rec_arr):
@@ -1618,7 +1617,7 @@ def copy_particle(P_new_arr, P_arr):
 
 
 @njit
-def recordlike_to_particle(P_new_arr,P_rec_arr):
+def recordlike_to_particle(P_new_arr, P_rec_arr):
     P_new = P_new_arr[0]
     P_rec = P_rec_arr[0]
     copy_recordlike(P_new_arr, P_rec_arr)
@@ -1640,7 +1639,7 @@ def split_particle(P):
 
 
 @njit
-def split_as_record(P_new_rec_arr,P_rec_arr):
+def split_as_record(P_new_rec_arr, P_rec_arr):
     P_rec = P_rec_arr[0]
     P_new_rec = P_new_rec_arr[0]
     copy_recordlike(P_new_rec_arr, P_rec_arr)
@@ -1870,7 +1869,7 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
             score = flux
         elif score_type == SCORE_NET_CURRENT:
             score = flux * mu
-        adapt.global_add(tally_bin,(TALLY_SCORE, idx + i), score)
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
 
 
 @njit
@@ -1952,7 +1951,7 @@ def eigenvalue_tally(P_arr, distance, mcdc):
     nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P_arr, mcdc)
 
     # Fission production (needed even during inactive cycle)
-    #mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
+    # mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
     adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
 
     if mcdc["cycle_active"]:
@@ -2369,12 +2368,12 @@ def scattering(P_arr, prog):
     else:
         N = 1
 
-    P_new_arr = adapt.local_array(1,type_.particle_record)
+    P_new_arr = adapt.local_array(1, type_.particle_record)
     P_new = P_new_arr[0]
 
     for n in range(N):
         # Create new particle
-        split_as_record(P_new_arr,P_arr)
+        split_as_record(P_new_arr, P_arr)
 
         # Set weight
         P_new["w"] = weight_new
@@ -2565,7 +2564,9 @@ def sample_nucleus_speed(A, P_arr, mcdc):
             x = math.sqrt(-math.log(rng(P_arr) * rng(P_arr)))
         else:
             cos_val = math.cos(PI_HALF * rng(P_arr))
-            x = math.sqrt(-math.log(rng(P_arr)) - math.log(rng(P_arr)) * cos_val * cos_val)
+            x = math.sqrt(
+                -math.log(rng(P_arr)) - math.log(rng(P_arr)) * cos_val * cos_val
+            )
         V_tilda = x / beta
         mu_tilda = 2.0 * rng(P_arr) - 1.0
 
@@ -2646,12 +2647,12 @@ def fission(P_arr, prog):
         nu = get_nu(NU_FISSION, nuclide, E)
     N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P_arr)))
 
-    P_new_arr = adapt.local_array(1,type_.particle_record)
+    P_new_arr = adapt.local_array(1, type_.particle_record)
     P_new = P_new_arr[0]
 
     for n in range(N):
         # Create new particle
-        split_as_record(P_new_arr,P_arr)
+        split_as_record(P_new_arr, P_arr)
 
         # Set weight
         P_new["w"] = weight_new
@@ -2831,7 +2832,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d = adapt.local_array(J,type_.float64)
+    nu_d = adapt.local_array(J, type_.float64)
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 
@@ -2861,27 +2862,45 @@ def fission_CE(P_arr, nuclide, P_new_arr):
     else:
         if delayed_group == 0:
             P_new["E"] = sample_Eout(
-                P_new_arr, nuclide["E_chi_d1"], nuclide["NE_chi_d1"], nuclide["ce_chi_d1"]
+                P_new_arr,
+                nuclide["E_chi_d1"],
+                nuclide["NE_chi_d1"],
+                nuclide["ce_chi_d1"],
             )
         elif delayed_group == 1:
             P_new["E"] = sample_Eout(
-                P_new_arr, nuclide["E_chi_d2"], nuclide["NE_chi_d2"], nuclide["ce_chi_d2"]
+                P_new_arr,
+                nuclide["E_chi_d2"],
+                nuclide["NE_chi_d2"],
+                nuclide["ce_chi_d2"],
             )
         elif delayed_group == 2:
             P_new["E"] = sample_Eout(
-                P_new_arr, nuclide["E_chi_d3"], nuclide["NE_chi_d3"], nuclide["ce_chi_d3"]
+                P_new_arr,
+                nuclide["E_chi_d3"],
+                nuclide["NE_chi_d3"],
+                nuclide["ce_chi_d3"],
             )
         elif delayed_group == 3:
             P_new["E"] = sample_Eout(
-                P_new_arr, nuclide["E_chi_d4"], nuclide["NE_chi_d4"], nuclide["ce_chi_d4"]
+                P_new_arr,
+                nuclide["E_chi_d4"],
+                nuclide["NE_chi_d4"],
+                nuclide["ce_chi_d4"],
             )
         elif delayed_group == 4:
             P_new["E"] = sample_Eout(
-                P_new_arr, nuclide["E_chi_d5"], nuclide["NE_chi_d5"], nuclide["ce_chi_d5"]
+                P_new_arr,
+                nuclide["E_chi_d5"],
+                nuclide["NE_chi_d5"],
+                nuclide["ce_chi_d5"],
             )
         else:
             P_new["E"] = sample_Eout(
-                P_new_arr, nuclide["E_chi_d6"], nuclide["NE_chi_d6"], nuclide["ce_chi_d6"]
+                P_new_arr,
+                nuclide["E_chi_d6"],
+                nuclide["NE_chi_d6"],
+                nuclide["ce_chi_d6"],
             )
 
     # Sample emission time
@@ -2909,7 +2928,7 @@ def branchless_collision(P_arr, prog):
     n_total = n_fission + n_scatter
     P["w"] *= n_total / SigmaT
 
-    P_rec_arr = adapt.local_array(1,type_.particle_record)
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
 
     # Set spectrum and decay rate
     if rng(P_arr) < n_scatter / n_total:
@@ -2925,7 +2944,7 @@ def branchless_collision(P_arr, prog):
             idx_census = mcdc["idx_census"]
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
                 P["alive"] = False
-                split_as_record(P_rec_arr,P_arr)
+                split_as_record(P_rec_arr, P_arr)
                 adapt.add_active(P_rec_arr, prog)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
@@ -2958,7 +2977,7 @@ def weight_window(P_arr, prog):
     # Window width
     width = mcdc["technique"]["ww_width"]
 
-    P_new_arr = adapt.local_array(1,type_.particle_record)
+    P_new_arr = adapt.local_array(1, type_.particle_record)
 
     # If above target
     if p > width:
@@ -2968,14 +2987,14 @@ def weight_window(P_arr, prog):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            split_as_record(P_new_arr,P_arr)
+            split_as_record(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
 
         # Russian roulette
         p -= n_split
         xi = rng(P_arr)
         if xi <= p:
-            split_as_record(P_new_arr,P_arr)
+            split_as_record(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
 
     # Below target

@@ -11,6 +11,7 @@ if importlib.util.find_spec("harmonize") is None:
     HAS_HARMONIZE = False
 else:
     import harmonize as harm
+
     HAS_HARMONIZE = True
 
 
@@ -20,8 +21,6 @@ import inspect
 from mcdc.print_ import print_error
 
 import mcdc.adapt as adapt
-
-
 
 
 # =============================================================================
@@ -76,37 +75,41 @@ def cast_voidptr_to_uintp(typingctx, src):
         return sig, codegen
 
 
-
 def leak(arg):
     pass
 
+
 @intrinsic
 def leak_inner(typingctx, kind):
-    def codegen(context,builder,signature,args):
+    def codegen(context, builder, signature, args):
         context.nrt.incref(builder, kind, args[0])
-    return numba.void(kind),codegen
+
+    return numba.void(kind), codegen
+
 
 @numba.extending.overload(leak)
 def leak_overload(arg):
     def impl(arg):
         leak_inner(arg)
+
     return impl
+
 
 # =============================================================================
 # Generic GPU/CPU Local Array Variable Constructors
 # =============================================================================
 
 
-def local_array(shape,dtype):
-    return np.zeros(shape,dtype=dtype)
+def local_array(shape, dtype):
+    return np.zeros(shape, dtype=dtype)
+
 
 @numba.extending.type_callable(local_array)
 def type_local_array(context):
 
     from numba.core.typing.npydecl import parse_dtype, parse_shape
 
-
-    if isinstance(context,numba.core.typing.context.Context):
+    if isinstance(context, numba.core.typing.context.Context):
 
         # Function repurposed from Numba's ol_np_empty.
         def typer(shape, dtype):
@@ -116,31 +119,35 @@ def type_local_array(context):
             # shapes
             if isinstance(shape, types.Integer):
                 if not isinstance(shape, types.IntegerLiteral):
-                    raise numba.core.errors.UnsupportedError(f"Integer shape type {shape} is not literal.")
+                    raise numba.core.errors.UnsupportedError(
+                        f"Integer shape type {shape} is not literal."
+                    )
             elif isinstance(shape, (types.Tuple, types.UniTuple)):
-                if any([not isinstance(s, types.IntegerLiteral)
-                        for s in shape]):
+                if any([not isinstance(s, types.IntegerLiteral) for s in shape]):
                     raise numba.core.errors.UnsupportedError(
                         f"At least one element of shape tuple type{shape} is not an integer literal."
                     )
             else:
-                raise numba.core.errors.UnsupportedError(f"Shape is of unsupported type {shape}.")
+                raise numba.core.errors.UnsupportedError(
+                    f"Shape is of unsupported type {shape}."
+                )
 
             # No default arguments.
             nb_dtype = parse_dtype(dtype)
             nb_shape = parse_shape(shape)
 
             if nb_dtype is not None and nb_shape is not None:
-                retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout='C')
+                retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout="C")
                 # Inlining the signature construction from numpy_empty_nd
                 sig = retty(shape, dtype)
                 return sig
             else:
                 msg = f"Cannot parse input types to function np.empty({shape}, {dtype})"
                 raise numba.errors.TypingError(msg)
+
         return typer
 
-    elif isinstance(context,numba.cuda.target.CUDATypingContext):
+    elif isinstance(context, numba.cuda.target.CUDATypingContext):
 
         # Function repurposed from Numba's Cuda_array_decl.
         def typer(shape, dtype):
@@ -151,8 +158,7 @@ def type_local_array(context):
                 if not isinstance(shape, types.IntegerLiteral):
                     return None
             elif isinstance(shape, (types.Tuple, types.UniTuple)):
-                if any([not isinstance(s, types.IntegerLiteral)
-                        for s in shape]):
+                if any([not isinstance(s, types.IntegerLiteral) for s in shape]):
                     return None
             else:
                 return None
@@ -160,11 +166,11 @@ def type_local_array(context):
             ndim = parse_shape(shape)
             nb_dtype = parse_dtype(dtype)
             if nb_dtype is not None and ndim is not None:
-                return types.Array(dtype=nb_dtype, ndim=ndim, layout='C')
+                return types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
 
         return typer
 
-    elif isinstance(context,numba.hip.target.HIPTypingContext):
+    elif isinstance(context, numba.hip.target.HIPTypingContext):
 
         def typer(shape, dtype):
             # Only integer literals and tuples of integer literals are valid
@@ -187,9 +193,9 @@ def type_local_array(context):
         return typer
 
     else:
-        raise numba.core.errors.UnsupportedError(f"Unsupported target context {context}.")
-
-
+        raise numba.core.errors.UnsupportedError(
+            f"Unsupported target context {context}."
+        )
 
 
 @numba.extending.lower_builtin(local_array, types.IntegerLiteral, types.Any)
@@ -200,13 +206,13 @@ def builtin_local_array(context, builder, sig, args):
     from numba.core.typing.npydecl import parse_dtype, parse_shape
     import numba.np.arrayobj as arrayobj
 
-    if isinstance(context,numba.core.cpu.CPUContext):
+    if isinstance(context, numba.core.cpu.CPUContext):
 
         # No default arguments.
         nb_dtype = parse_dtype(dtype)
         nb_shape = parse_shape(shape)
 
-        retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout='C')
+        retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout="C")
 
         # In ol_np_empty, the reference type of the array is fed into the
         # signatrue as a third argument. This third argument is not used by
@@ -217,7 +223,7 @@ def builtin_local_array(context, builder, sig, args):
         ary = arrayobj._empty_nd_impl(context, builder, arrtype, shapes)
 
         return ary._getvalue()
-    elif isinstance(context,numba.cuda.target.CUDATargetContext):
+    elif isinstance(context, numba.cuda.target.CUDATargetContext):
         length = sig.args[0].literal_value
         dtype = parse_dtype(sig.args[1])
         return numba.cuda.cudaimpl._generic_array(
@@ -225,11 +231,11 @@ def builtin_local_array(context, builder, sig, args):
             builder,
             shape=(length,),
             dtype=dtype,
-            symbol_name='_cudapy_harm_lmem',
+            symbol_name="_cudapy_harm_lmem",
             addrspace=numba.cuda.cudadrv.nvvm.ADDRSPACE_LOCAL,
-            can_dynsized=False
+            can_dynsized=False,
         )
-    elif isinstance(context,numba.hip.target.HIPTargetContext):
+    elif isinstance(context, numba.hip.target.HIPTargetContext):
         length = sig.args[0].literal_value
         dtype = parse_dtype(sig.args[1])
         result = numba.hip.typing_lowering.hip.lowering._generic_array(
@@ -243,8 +249,9 @@ def builtin_local_array(context, builder, sig, args):
         )
         return result
     else:
-        raise numba.core.errors.UnsupportedError(f"Unsupported target context {context}.")
-
+        raise numba.core.errors.UnsupportedError(
+            f"Unsupported target context {context}."
+        )
 
 
 # =============================================================================
@@ -351,7 +358,7 @@ def for_(target, on_target=[]):
         exec(jit_str, globals(), locals())
         result = eval("jit_func")
         blank = blankout_fn(func)
-        if target == 'gpu':
+        if target == "gpu":
             numba.core.extending.overload(blank, target=target)(result)
         else:
             numba.core.extending.overload(blank, target=target)(result)
@@ -388,7 +395,6 @@ def nopython_mode(is_on):
 
     for impl in target_rosters["cpu"].values():
         overwrite_func(impl, impl)
-
 
 
 # =============================================================================
@@ -432,8 +438,8 @@ def gpu_forward_declare(args):
     mcdc_data_type = numba.from_dtype(type_.data)
     state_spec = (
         {
-            "constant" : mcdc_constant_type,
-            "data"     : mcdc_data_type,
+            "constant": mcdc_constant_type,
+            "data": mcdc_data_type,
         },
         none_type,
         none_type,
@@ -441,7 +447,7 @@ def gpu_forward_declare(args):
     access_fns = harm.RuntimeSpec.access_fns(state_spec)
     mcdc_constant_gpu = access_fns["device"]["constant"]
     mcdc_data_gpu = access_fns["device"]["data"]
-    group_gpu  = access_fns["group"]
+    group_gpu = access_fns["group"]
     thread_gpu = access_fns["thread"]
     particle_gpu = numba.from_dtype(type_.particle)
     particle_record_gpu = numba.from_dtype(type_.particle_record)
@@ -459,6 +465,7 @@ def gpu_forward_declare(args):
 # Seperate GPU/CPU Functions to Target Different Platforms
 # =============================================================================
 
+
 def mcdc_constant(prog):
     return prog
 
@@ -466,6 +473,7 @@ def mcdc_constant(prog):
 @for_cpu()
 def mcdc_constant(prog):
     return prog
+
 
 @for_gpu()
 def mcdc_constant(prog):
@@ -475,6 +483,7 @@ def mcdc_constant(prog):
 @for_cpu()
 def mcdc_data(prog):
     return None
+
 
 @for_gpu()
 def mcdc_data(prog):
@@ -502,19 +511,18 @@ def thread(prog):
 
 
 @for_cpu()
-def add_active(particle,prog):
+def add_active(particle, prog):
     kernel.add_particle(particle, prog["bank_active"])
 
 
 @for_gpu()
-def add_active(P_reclike,prog):
-    P = local_array(1,type_.particle)
-    kernel.recordlike_to_particle(P,P_reclike)
+def add_active(P_reclike, prog):
+    P = local_array(1, type_.particle)
+    kernel.recordlike_to_particle(P, P_reclike)
     if SIMPLE_ASYNC:
         step_async(prog, P[0])
     else:
         find_cell_async(prog, P[0])
-
 
 
 @for_cpu()
