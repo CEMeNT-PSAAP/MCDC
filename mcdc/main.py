@@ -562,9 +562,9 @@ def prepare():
     for i in range(N_material):
         for name in type_.material.names:
             if name in ["nuclide_IDs", "nuclide_densities"]:
-                mcdc["materials"][i][name][
-                    : mcdc["materials"][i]["N_nuclide"]
-                ] = getattr(input_deck.materials[i], name)
+                mcdc["materials"][i][name][: mcdc["materials"][i]["N_nuclide"]] = (
+                    getattr(input_deck.materials[i], name)
+                )
             else:
                 copy_field(mcdc["materials"][i], input_deck.materials[i], name)
 
@@ -628,9 +628,9 @@ def prepare():
         mcdc["cells"][i]["region_data_idx"] = region_data_idx
         N_RPN = len(input_deck.cells[i]._region_RPN)
         mcdc["cell_region_data"][region_data_idx] = N_RPN
-        mcdc["cell_region_data"][
-            region_data_idx + 1 : region_data_idx + N_RPN + 1
-        ] = input_deck.cells[i]._region_RPN
+        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
+            input_deck.cells[i]._region_RPN
+        )
         region_data_idx += N_RPN + 1
 
     # =========================================================================
@@ -1025,9 +1025,9 @@ def prepare():
         for i in range(M):
             idm = input_deck.uq_deltas["materials"][i].ID
             mcdc["technique"]["uq_"]["materials"][i]["info"]["ID"] = idm
-            mcdc["technique"]["uq_"]["materials"][i]["info"][
-                "distribution"
-            ] = input_deck.uq_deltas["materials"][i].distribution
+            mcdc["technique"]["uq_"]["materials"][i]["info"]["distribution"] = (
+                input_deck.uq_deltas["materials"][i].distribution
+            )
             for name in input_deck.uq_deltas["materials"][i].flags:
                 mcdc["technique"]["uq_"]["materials"][i]["flags"][name] = True
                 mcdc["technique"]["uq_"]["materials"][i]["delta"][name] = getattr(
@@ -1041,15 +1041,15 @@ def prepare():
                 flags["nu_f"] = True
             if mcdc["materials"][idm]["N_nuclide"] > 1:
                 for name in type_.uq_mat.names:
-                    mcdc["technique"]["uq_"]["materials"][i]["mean"][
-                        name
-                    ] = input_deck.materials[idm][name]
+                    mcdc["technique"]["uq_"]["materials"][i]["mean"][name] = (
+                        input_deck.materials[idm][name]
+                    )
 
         N = len(input_deck.uq_deltas["nuclides"])
         for i in range(N):
-            mcdc["technique"]["uq_"]["nuclides"][i]["info"][
-                "distribution"
-            ] = input_deck.uq_deltas["nuclides"][i].distribution
+            mcdc["technique"]["uq_"]["nuclides"][i]["info"]["distribution"] = (
+                input_deck.uq_deltas["nuclides"][i].distribution
+            )
             idn = input_deck.uq_deltas["nuclides"][i].ID
             mcdc["technique"]["uq_"]["nuclides"][i]["info"]["ID"] = idn
             for name in type_.uq_nuc.names:
