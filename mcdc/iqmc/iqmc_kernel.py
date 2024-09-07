@@ -278,7 +278,7 @@ def iqmc_prepare_particles(mcdc):
     za = mesh["z"][0]
     zb = mesh["z"][-1]
 
-    for n in range(N_work):
+    for n in range(N_work[0]):
         # Create new particle
         P_new_arr = adapt.local_array(1, type_.particle_record)
         P_new = P_new_arr[0]
