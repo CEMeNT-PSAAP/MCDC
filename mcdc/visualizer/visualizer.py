@@ -161,9 +161,7 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
 
             # get radius from the surface card
             radius = float(
-                math.sqrt(
-                    abs(surface_list[surface_ID]["J"][0, 0] - x**2 - y**2 - z**2)
-                )
+                math.sqrt(abs(surface_list[surface_ID]["J"][0, 0] - x**2 - y**2 - z**2))
             )
 
             # Add or subtract the sphere based on the CSG input
@@ -224,7 +222,7 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
 
             # radius of the circle formed by a cross section parallel to the xy-plane
             radius = float(
-                math.sqrt(abs(surface_list[surface_ID]["J"][0, 0] - z**2 - y**2))
+                math.sqrt(abs(surface_list[surface_ID]["J"][0, 0] - x**2 - y**2 - z**2))
             )
 
             # Add or subtract the sphere based on the CSG input
