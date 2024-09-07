@@ -150,7 +150,9 @@ for i, name in enumerate(names):
                     a = output[name][()]
                     b = answer[name][()]
 
-                    if (("sdev" in result) or ("uq_var" in result)) and (args.target == "gpu"):
+                    if (("sdev" in result) or ("uq_var" in result)) and (
+                        args.target == "gpu"
+                    ):
                         continue
                     # Passed?
                     if np.isclose(a, b).all():

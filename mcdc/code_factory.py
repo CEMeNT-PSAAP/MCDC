@@ -44,7 +44,6 @@ def local_array(dtype, size, target):
 
 
 def local_object(dtype, target):
-
     @njit
     def cpu():
         return np.zeros(1, dtype=dtype)[0]

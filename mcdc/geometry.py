@@ -95,7 +95,9 @@ def inspect_geometry(particle_arr, mcdc):
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
                 # Distance to lattice grid
-                d_lattice = mesh.uniform.get_crossing_distance(particle_arr, speed, lattice)
+                d_lattice = mesh.uniform.get_crossing_distance(
+                    particle_arr, speed, lattice
+                )
 
                 # Check if smaller
                 if d_lattice < distance - COINCIDENCE_TOLERANCE:
@@ -110,7 +112,9 @@ def inspect_geometry(particle_arr, mcdc):
                         event += EVENT_LATTICE_CROSSING
 
                 # Get universe
-                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle_arr, lattice)
+                ix, iy, iz, it, outside = mesh.uniform.get_indices(
+                    particle_arr, lattice
+                )
                 if outside:
                     event = EVENT_LOST
                     continue
@@ -205,7 +209,9 @@ def locate_particle(particle_arr, mcdc):
                 lattice = mcdc["lattices"][cell["fill_ID"]]
 
                 # Get universe
-                ix, iy, iz, it, outside = mesh.uniform.get_indices(particle_arr, lattice)
+                ix, iy, iz, it, outside = mesh.uniform.get_indices(
+                    particle_arr, lattice
+                )
                 if outside:
                     particle_is_lost = True
                     continue
@@ -275,7 +281,7 @@ def check_cell(particle_arr, cell, mcdc):
     N_token = mcdc["cell_region_data"][idx]
 
     # Create local value array
-    value = adapt.local_array(type_.rpn_buffer_size(),type_.bool_)
+    value = adapt.local_array(type_.rpn_buffer_size(), type_.bool_)
     N_value = 0
 
     # March forward through RPN tokens
@@ -334,6 +340,7 @@ def report_lost(particle_arr):
     z = particle["z"]
     print("A particle is lost at (", x, y, z, ")")
     particle["alive"] = False
+
 
 @for_gpu()
 def report_lost(particle_arr):

@@ -25,7 +25,6 @@ uintp = np.uintp
 str_ = "U32"
 
 
-
 # ==============================================================================
 # MC/DC types
 # ==============================================================================
@@ -57,7 +56,6 @@ data = None
 # ==============================================================================
 
 
-
 def literalize(value):
     jit_str = f"@njit\ndef impl():\n    return {value}\n"
     exec(jit_str, globals(), locals())
@@ -76,11 +74,11 @@ def rpn_buffer_size():
     pass
 
 
-
 def make_size_rpn(input_deck):
     global rpn_buffer_size
     size = max([np.sum(np.array(x._region_RPN) >= 0.0) for x in input_deck.cells])
     rpn_buffer_size = literalize(size)
+
 
 # ==============================================================================
 # Alignment Logic
@@ -474,17 +472,13 @@ def make_type_material(input_deck):
         G = input_deck.materials[0].G
         J = input_deck.materials[0].J
 
-
-
-    G_adjusted = max(1,G)
-    J_adjusted = max(1,J)
+    G_adjusted = max(1, G)
+    J_adjusted = max(1, J)
 
     global material_g_size
     global material_j_size
     material_g_size = literalize(G_adjusted)
     material_j_size = literalize(J_adjusted)
-
-
 
     # General data
     struct = [
@@ -1384,7 +1378,7 @@ def make_type_global(input_deck):
     )
 
 
-def make_type_data(input_deck,tally_size):
+def make_type_data(input_deck, tally_size):
     global data
 
     if not input_deck.technique["uq"]:
@@ -1393,9 +1387,6 @@ def make_type_data(input_deck,tally_size):
         width = 5
 
     data = into_dtype([("tally", float64, (width, tally_size))])
-
-
-
 
 
 # ==============================================================================

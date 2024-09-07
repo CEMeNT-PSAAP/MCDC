@@ -187,7 +187,6 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 # =============================================================================
 
 
-
 @njit()
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.mcdc_constant(prog)
@@ -198,9 +197,8 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     # Get a source particle and put into active bank
     # =====================================================================
 
-    P_arr = adapt.local_array(1,type_.particle_record)
+    P_arr = adapt.local_array(1, type_.particle_record)
     P = P_arr[0]
-
 
     # Get from fixed-source?
     if kernel.get_bank_size(mcdc["bank_source"]) == 0:
@@ -209,7 +207,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
 
     # Get from source bank
     else:
-        P_arr = mcdc["bank_source"]["particles"][idx_work:(idx_work+1)]
+        P_arr = mcdc["bank_source"]["particles"][idx_work : (idx_work + 1)]
         P = P_arr[0]
 
     # Check if it is beyond current census index
@@ -223,17 +221,17 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         else:
             adapt.add_census(P_arr, prog)
     else:
-        P_new_arr = adapt.local_array(1,type_.particle)
+        P_new_arr = adapt.local_array(1, type_.particle)
         P_new = P_new_arr[0]
         # Add the source particle into the active bank
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
             if kernel.particle_in_domain(P_arr, mcdc):
-                kernel.recordlike_to_particle(P_new_arr,P_arr)
+                kernel.recordlike_to_particle(P_new_arr, P_arr)
                 adapt.add_active(P_new_arr, prog)
         else:
-            kernel.recordlike_to_particle(P_new_arr,P_arr)
+            kernel.recordlike_to_particle(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
 
 
@@ -250,7 +248,7 @@ def prep_particle(P_arr, prog):
 @njit()
 def exhaust_active_bank(data, prog):
     mcdc = adapt.mcdc_constant(prog)
-    P_arr = adapt.local_array(1,type_.particle)
+    P_arr = adapt.local_array(1, type_.particle)
     P = P_arr[0]
 
     # Loop until active bank is exhausted
@@ -295,7 +293,7 @@ def source_dd_resolution(data, prog):
     if mcdc["domain_decomp"]["work_done"]:
         terminated = True
 
-    P_arr = adapt.local_array(1,type_.particle)
+    P_arr = adapt.local_array(1, type_.particle)
     P = P_arr[0]
 
     while not terminated:
@@ -376,9 +374,7 @@ def loop_source(seed, data, mcdc):
         source_dd_resolution(data, mcdc)
 
 
-
 def gpu_sources_spec():
-
     def make_work(prog: nb.uintp) -> nb.boolean:
         mcdc = adapt.mcdc_constant(prog)
 
@@ -403,7 +399,7 @@ def gpu_sources_spec():
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
         mcdc = adapt.mcdc_constant(prog)
         data = adapt.mcdc_data(prog)
-        P_arr = adapt.local_array(1,type_.particle)
+        P_arr = adapt.local_array(1, type_.particle)
         P_arr[0] = P_input
         P = P_arr[0]
         if P["fresh"]:
@@ -416,11 +412,12 @@ def gpu_sources_spec():
     async_fns = [step]
     return adapt.harm.RuntimeSpec("mcdc_source", adapt.state_spec, base_fns, async_fns)
 
+
 def make_gpu_loop_source(args):
 
     BLOCK_COUNT = args.gpu_block_count
 
-    ASYNC_EXECUTION = (args.gpu_strat == "async")
+    ASYNC_EXECUTION = args.gpu_strat == "async"
 
     @njit
     def gpu_loop_source(seed, data, mcdc):
@@ -444,23 +441,27 @@ def make_gpu_loop_source(args):
 
         # Store the global state to the GPU
         src_store_constant(mcdc["gpu_state_pointer"], mcdc)
-        src_store_data    (mcdc["gpu_state_pointer"], data)
+        src_store_data(mcdc["gpu_state_pointer"], data)
 
         # Execute the program, and continue to do so until it is done
         if ASYNC_EXECUTION:
             src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
             while not src_complete(mcdc["source_program_pointer"]):
-                src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
+                src_exec_program(
+                    mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
+                )
         else:
             src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
             step_count = 1
             while not src_complete(mcdc["source_program_pointer"]):
-                src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
+                src_exec_program(
+                    mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
+                )
                 step_count += 1
 
         # Recover the original program state
         src_load_constant(mcdc, mcdc["gpu_state_pointer"])
-        src_load_data    (data, mcdc["gpu_state_pointer"])
+        src_load_data(data, mcdc["gpu_state_pointer"])
         src_clear_flags(mcdc["source_program_pointer"])
 
         kernel.set_bank_size(mcdc["bank_active"], 0)
@@ -495,7 +496,6 @@ def loop_particle(P_arr, data, prog):
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_constant(prog)
-
 
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
@@ -559,7 +559,6 @@ def step_particle(P_arr, data, prog):
             kernel.weight_roulette(P_arr, mcdc)
 
 
-
 # =============================================================================
 # Precursor source loop
 # =============================================================================
@@ -575,8 +574,8 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     g = DNP["n_g"]
 
     # Create new particle
-    P_new_arr = adapt.local_array(1,type_.particle)
-    P_new =  P_new_arr[0]
+    P_new_arr = adapt.local_array(1, type_.particle)
+    P_new = P_new_arr[0]
     part_seed = kernel.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
@@ -692,7 +691,7 @@ def loop_source_precursor(seed, data, mcdc):
 
     for idx_work in range(mcdc["mpi_work_size_precursor"]):
         # Get precursor
-        DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work:(idx_work+1)]
+        DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work : (idx_work + 1)]
         DNP = DNP_arr[0]
 
         # Determine number of particles to be generated
@@ -722,7 +721,6 @@ def loop_source_precursor(seed, data, mcdc):
 
 
 def gpu_precursor_spec():
-
     def make_work(prog: nb.uintp) -> nb.boolean:
         mcdc = adapt.mcdc_constant(prog)
 
@@ -734,7 +732,7 @@ def gpu_precursor_spec():
         seed = mcdc["source_seed"]
 
         # Get precursor
-        DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work:(idx_work+1)]
+        DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work : (idx_work + 1)]
         DNP = DNP_arr[0]
 
         # Determine number of particles to be generated
@@ -766,7 +764,7 @@ def gpu_precursor_spec():
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
         mcdc = adapt.mcdc_constant(prog)
         data = adapt.mcdc_data(prog)
-        P_arr = adapt.local_array(1,type_.particle)
+        P_arr = adapt.local_array(1, type_.particle)
         P_arr[0] = P_input
         P = P_arr[0]
         if P["fresh"]:
@@ -782,12 +780,11 @@ def gpu_precursor_spec():
     )
 
 
-
 def make_gpu_loop_source_precursor(args):
 
     BLOCK_COUNT = args.gpu_block_count
 
-    ASYNC_EXECUTION = (args.gpu_strat == "async")
+    ASYNC_EXECUTION = args.gpu_strat == "async"
 
     @njit
     def gpu_loop_source_precursor(seed, data, mcdc):
@@ -821,7 +818,7 @@ def make_gpu_loop_source_precursor(args):
 
         # Store the global state to the GPU
         pre_store_constant(mcdc["gpu_state_pointer"], mcdc)
-        pre_store_data    (mcdc["gpu_state_pointer"], data)
+        pre_store_data(mcdc["gpu_state_pointer"], data)
 
         # Execute the program, and continue to do so until it is done
 
@@ -829,15 +826,19 @@ def make_gpu_loop_source_precursor(args):
         if ASYNC_EXECUTION:
             pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
             while not pre_complete(mcdc["source_program_pointer"]):
-                pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
+                pre_exec_program(
+                    mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
+                )
         else:
             pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
             while not pre_complete(mcdc["source_program_pointer"]):
-                pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
+                pre_exec_program(
+                    mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
+                )
 
         # Recover the original program state
         pre_load_constant(mcdc, mcdc["gpu_state_pointer"])
-        pre_load_data    (data, mcdc["gpu_state_pointer"])
+        pre_load_data(data, mcdc["gpu_state_pointer"])
         pre_clear_flags(mcdc["source_program_pointer"])
 
         kernel.set_bank_size(mcdc["bank_active"], 0)
@@ -857,7 +858,6 @@ def build_gpu_progs(args):
 
     src_spec = gpu_sources_spec()
     pre_spec = gpu_precursor_spec()
-
 
     adapt.harm.RuntimeSpec.bind_and_load()
 
@@ -905,7 +905,6 @@ def build_gpu_progs(args):
     pre_exec_program = pre_fns["exec_program"]
     pre_complete = pre_fns["complete"]
     pre_clear_flags = pre_fns["clear_flags"]
-
 
     @njit
     def real_setup_gpu(mcdc):

@@ -161,7 +161,9 @@ def create_cell_geometry(cell, current_time, surface_list, start_time, end_time)
 
             # get radius from the surface card
             radius = float(
-                math.sqrt(abs(surface_list[surface_ID]["J"][0, 0] - x**2 - y**2 - z**2))
+                math.sqrt(
+                    abs(surface_list[surface_ID]["J"][0, 0] - x**2 - y**2 - z**2)
+                )
             )
 
             # Add or subtract the sphere based on the CSG input

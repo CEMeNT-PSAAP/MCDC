@@ -406,14 +406,14 @@ def iqmc_loop_source(mcdc):
     N_prog = 0
     # loop over particles
     for idx_work in range(work_size):
-        P_arr = mcdc["bank_source"]["particles"][idx_work:(idx_work+1)]
+        P_arr = mcdc["bank_source"]["particles"][idx_work : (idx_work + 1)]
         P = P_arr[0]
         mcdc["bank_source"]["size"] -= 1
         kernel.add_particle(P_arr, mcdc["bank_active"])
 
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
-            P_arr = adapt.local_array(1,type_.particle)
+            P_arr = adapt.local_array(1, type_.particle)
             P = P_arr[0]
             # Get particle from active bank
             kernel.get_particle(P_arr, mcdc["bank_active"], mcdc)

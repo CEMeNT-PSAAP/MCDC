@@ -146,7 +146,7 @@ def iqmc_generate_material_idx(mcdc):
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
     # create particle to utilize cell finding functions
-    P_temp_arr = adapt.local_array(1,type_.particle)
+    P_temp_arr = adapt.local_array(1, type_.particle)
     P_temp = P_temp_arr[0]
     # set default attributes
     P_temp["alive"] = True
@@ -280,7 +280,7 @@ def iqmc_prepare_particles(mcdc):
 
     for n in range(N_work):
         # Create new particle
-        P_new_arr = adapt.local_array(1,type_.particle_record)
+        P_new_arr = adapt.local_array(1, type_.particle_record)
         P_new = P_new_arr[0]
         # assign initial group, time, and rng_seed (not used)
         P_new["g"] = 0
