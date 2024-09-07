@@ -1,3 +1,4 @@
+import importlib
 import numpy as np
 from numba import njit, jit, objmode, literal_unroll, types
 from numba.extending import intrinsic
@@ -6,12 +7,11 @@ import mcdc.type_ as type_
 import mcdc.kernel as kernel
 
 
-try:
+if importlib.util.find_spec("harmonize") is None:
+    HAS_HARMONIZE = False
+else:
     import harmonize as harm
     HAS_HARMONIZE = True
-except ImportError:
-    HAS_HARMONIZE = False
-
 
 
 import math
@@ -22,7 +22,6 @@ from mcdc.print_ import print_error
 import mcdc.adapt as adapt
 
 
-harm.config.set_rocm_path('/opt/rocm-6.0.0')
 
 
 # =============================================================================
@@ -413,7 +412,13 @@ step_async = None
 find_cell_async = None
 
 
-def gpu_forward_declare():
+def gpu_forward_declare(args):
+
+    if args.gpu_rocm_path != None:
+        harm.config.set_rocm_path(args.gpu_rocm_path)
+
+    if args.gpu_cuda_path != None:
+        harm.config.set_cuda_path(args.gpu_cuda_path)
 
     global none_type, mcdc_constant_type, mcdc_data_type
     global state_spec

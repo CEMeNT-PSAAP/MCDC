@@ -39,6 +39,20 @@ parser.add_argument(
     default=0x100000
 )
 
+parser.add_argument(
+    "--gpu_rocm_path",
+    type=str,
+    help="Path to ROCm installation for use in GPU execution",
+    default=None
+)
+
+parser.add_argument(
+    "--gpu_cuda_path",
+    type=str,
+    help="Path to CUDA installation for use in GPU execution",
+    default=None
+)
+
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 parser.add_argument("--progress_bar", default=True, action="store_true")
@@ -156,7 +170,6 @@ def run():
     # Print banner, hardware configuration, and header
     print_banner(mcdc)
 
-    print("RUNNING!")
     set_cache(mcdc["setting"]["caching"])
 
     print_msg(" Now running TNT...")
@@ -851,7 +864,7 @@ def prepare():
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
             )
-        adapt.gpu_forward_declare()
+        adapt.gpu_forward_declare(args)
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
