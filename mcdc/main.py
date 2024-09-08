@@ -880,7 +880,7 @@ def prepare():
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
-        build_gpu_progs(input_deck,args)
+        build_gpu_progs(input_deck, args)
     adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
 
     # =========================================================================

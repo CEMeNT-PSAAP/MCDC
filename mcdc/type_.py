@@ -1189,7 +1189,7 @@ def make_type_domain_decomp(input_deck):
     global domain_decomp
     # Domain banks if needed
     if input_deck.technique["domain_decomposition"]:
-        bank_size  = input_deck.technique["dd_exchange_rate"]
+        bank_size = input_deck.technique["dd_exchange_rate"]
         bank_size += input_deck.technique["dd_exchange_rate_padding"]
         bank_domain_xp = particle_bank(bank_size)
         bank_domain_xn = particle_bank(bank_size)
