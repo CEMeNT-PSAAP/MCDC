@@ -78,6 +78,7 @@ if mode == "python":
 elif mode == "numba":
     nb.config.DISABLE_JIT = False
     nb.config.NUMBA_DEBUG_CACHE = 1
+    nb.config.THREADING_LAYER = "workqueue"
 elif mode == "numba_debug":
     msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
     print_warning(msg)
@@ -291,6 +292,13 @@ def dd_prepare():
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
 
+    if input_deck.technique["dd_exchange_rate_padding"] == None:
+        if args.target == "gpu":
+            padding = args.gpu_block_count * 64 * 16
+        else:
+            padding = 0
+        input_deck.technique["dd_exchange_rate_padding"] = padding
+
     if work_ratio is None:
         work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
         input_deck.technique["dd_work_ratio"] = work_ratio
@@ -355,6 +363,10 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = rank_info[zn]
     else:
         input_deck.technique["dd_zn_neigh"] = []
+
+    if args.target == "gpu":
+        if d_idx != 0:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
 
 
 def dd_mesh_bounds(idx):
@@ -868,7 +880,7 @@ def prepare():
     adapt.eval_toggle()
     adapt.target_for(target)
     if target == "gpu":
-        build_gpu_progs(args)
+        build_gpu_progs(input_deck,args)
     adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
 
     # =========================================================================

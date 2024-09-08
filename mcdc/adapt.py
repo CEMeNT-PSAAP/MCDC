@@ -415,6 +415,7 @@ thread_gpu = None
 particle_gpu = None
 prep_gpu = None
 step_async = None
+halt_early = None
 find_cell_async = None
 
 
@@ -431,7 +432,7 @@ def gpu_forward_declare(args):
     global mcdc_constant_gpu, mcdc_data_gpu
     global group_gpu, thread_gpu
     global particle_gpu, particle_record_gpu
-    global step_async, find_cell_async
+    global step_async, find_cell_async, halt_early
 
     none_type = numba.from_dtype(np.dtype([]))
     mcdc_constant_type = numba.from_dtype(type_.global_)
@@ -459,6 +460,8 @@ def gpu_forward_declare(args):
         pass
 
     step_async, find_cell_async = adapt.harm.RuntimeSpec.async_dispatch(step, find_cell)
+    interface = adapt.harm.RuntimeSpec.program_interface()
+    halt_early = interface["halt_early"]
 
 
 # =============================================================================
