@@ -945,6 +945,7 @@ def make_type_technique(input_deck):
     struct += [("dd_sent", int64)]
     struct += [("dd_work_ratio", int64, (len(card["dd_work_ratio"]),))]
     struct += [("dd_exchange_rate", int64)]
+    struct += [("dd_exchange_rate_padding", int64)]
     struct += [("dd_repro", bool_)]
     struct += [("dd_xp_neigh", int64, (len(card["dd_xp_neigh"]),))]
     struct += [("dd_xn_neigh", int64, (len(card["dd_xn_neigh"]),))]
@@ -1188,12 +1189,14 @@ def make_type_domain_decomp(input_deck):
     global domain_decomp
     # Domain banks if needed
     if input_deck.technique["domain_decomposition"]:
-        bank_domain_xp = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_xn = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_yp = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_yn = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_zp = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_zn = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_size  = input_deck.technique["dd_exchange_rate"]
+        bank_size += input_deck.technique["dd_exchange_rate_padding"]
+        bank_domain_xp = particle_bank(bank_size)
+        bank_domain_xn = particle_bank(bank_size)
+        bank_domain_yp = particle_bank(bank_size)
+        bank_domain_yn = particle_bank(bank_size)
+        bank_domain_zp = particle_bank(bank_size)
+        bank_domain_zn = particle_bank(bank_size)
     else:
         bank_domain_xp = particle_bank(0)
         bank_domain_xn = particle_bank(0)

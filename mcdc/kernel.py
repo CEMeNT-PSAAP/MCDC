@@ -31,7 +31,8 @@ from mcdc.print_ import print_error, print_msg
 
 
 @toggle("domain_decomp")
-def domain_crossing(P_arr, mcdc):
+def domain_crossing(P_arr, prog):
+    mcdc = adapt.mcdc_constant(prog)
     P = P_arr[0]
     # Domain mesh crossing
     seed = P["rng_seed"]
@@ -62,27 +63,27 @@ def domain_crossing(P_arr, mcdc):
         if flag == MESH_X and P["ux"] > 0:
             add_particle(P_arr, mcdc["domain_decomp"]["bank_xp"])
             if get_bank_size(mcdc["domain_decomp"]["bank_xp"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_X and P["ux"] < 0:
             add_particle(P_arr, mcdc["domain_decomp"]["bank_xn"])
             if get_bank_size(mcdc["domain_decomp"]["bank_xn"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Y and P["uy"] > 0:
             add_particle(P_arr, mcdc["domain_decomp"]["bank_yp"])
             if get_bank_size(mcdc["domain_decomp"]["bank_yp"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Y and P["uy"] < 0:
             add_particle(P_arr, mcdc["domain_decomp"]["bank_yn"])
             if get_bank_size(mcdc["domain_decomp"]["bank_yn"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Z and P["uz"] > 0:
             add_particle(P_arr, mcdc["domain_decomp"]["bank_zp"])
             if get_bank_size(mcdc["domain_decomp"]["bank_zp"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Z and P["uz"] < 0:
             add_particle(P_arr, mcdc["domain_decomp"]["bank_zn"])
             if get_bank_size(mcdc["domain_decomp"]["bank_zn"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         P["alive"] = False
 
 
@@ -281,8 +282,19 @@ def dd_distribute_bank(mcdc, bank, dest_list):
     set_bank_size(bank, 0)
 
 
+@for_gpu()
+def dd_initiate_particle_send(prog):
+    adapt.halt_early(prog)
+
+
+@for_cpu()
+def dd_initiate_particle_send(prog):
+    dd_particle_send(prog)
+
+
 @njit
-def dd_particle_send(mcdc):
+def dd_particle_send(prog):
+    mcdc = adapt.mcdc_constant(prog)
     dd_distribute_bank(
         mcdc, mcdc["domain_decomp"]["bank_xp"], mcdc["technique"]["dd_xp_neigh"]
     )

@@ -447,17 +447,17 @@ def make_gpu_loop_source(args):
         if ASYNC_EXECUTION:
             src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
             while not src_complete(mcdc["source_program_pointer"]):
+                kernel.dd_particle_send(mcdc)
                 src_exec_program(
                     mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
                 )
         else:
             src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
-            step_count = 1
             while not src_complete(mcdc["source_program_pointer"]):
+                kernel.dd_particle_send(mcdc)
                 src_exec_program(
                     mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
                 )
-                step_count += 1
 
         # Recover the original program state
         src_load_constant(mcdc, mcdc["gpu_state_pointer"])
@@ -465,6 +465,7 @@ def make_gpu_loop_source(args):
         src_clear_flags(mcdc["source_program_pointer"])
 
         kernel.set_bank_size(mcdc["bank_active"], 0)
+
 
         # =====================================================================
         # Closeout (Moved out of the typical particle loop)
@@ -534,10 +535,10 @@ def step_particle(P_arr, data, prog):
         kernel.surface_crossing(P_arr, data, prog)
         if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
-                kernel.domain_crossing(P_arr, mcdc)
+                kernel.domain_crossing(P_arr, prog)
 
     elif P["event"] & EVENT_DOMAIN_CROSSING:
-        kernel.domain_crossing(P_arr, mcdc)
+        kernel.domain_crossing(P_arr, prog)
 
     # Census time crossing
     if P["event"] & EVENT_TIME_CENSUS:
@@ -826,16 +827,17 @@ def make_gpu_loop_source_precursor(args):
         if ASYNC_EXECUTION:
             pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
             while not pre_complete(mcdc["source_program_pointer"]):
+                kernel.dd_particle_send(mcdc)
                 pre_exec_program(
                     mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
                 )
         else:
             pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
             while not pre_complete(mcdc["source_program_pointer"]):
+                kernel.dd_particle_send(mcdc)
                 pre_exec_program(
                     mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
                 )
-
         # Recover the original program state
         pre_load_constant(mcdc, mcdc["gpu_state_pointer"])
         pre_load_data(data, mcdc["gpu_state_pointer"])
@@ -852,14 +854,20 @@ def make_gpu_loop_source_precursor(args):
     return gpu_loop_source_precursor
 
 
-def build_gpu_progs(args):
+
+def build_gpu_progs(input_deck,args):
 
     STRAT = args.gpu_strat
 
     src_spec = gpu_sources_spec()
     pre_spec = gpu_precursor_spec()
 
-    adapt.harm.RuntimeSpec.bind_and_load()
+    adapt.harm.RuntimeSpec.bind_specs()
+
+    if input_deck.technique["domain_decomposition"]:
+        MPI.COMM_WORLD.Barrier()
+
+    adapt.harm.RuntimeSpec.load_specs()
 
     if STRAT == "async":
         args.gpu_arena_size = args.gpu_arena_size // 32

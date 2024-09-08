@@ -1289,6 +1289,7 @@ def domain_decomposition(
     y=None,
     z=None,
     exchange_rate=100000,
+    exchange_rate_padding=None,
     work_ratio=None,
     repro=True,
 ):
@@ -1316,6 +1317,7 @@ def domain_decomposition(
     card = global_.input_deck.technique
     card["domain_decomposition"] = True
     card["dd_exchange_rate"] = int(exchange_rate)
+    card["dd_exchange_rate_padding"] = exchange_rate_padding
     card["dd_repro"] = repro
     dom_num = 1
     # Set mesh
