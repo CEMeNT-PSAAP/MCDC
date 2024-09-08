@@ -466,7 +466,6 @@ def make_gpu_loop_source(args):
 
         kernel.set_bank_size(mcdc["bank_active"], 0)
 
-
         # =====================================================================
         # Closeout (Moved out of the typical particle loop)
         # =====================================================================
@@ -854,8 +853,7 @@ def make_gpu_loop_source_precursor(args):
     return gpu_loop_source_precursor
 
 
-
-def build_gpu_progs(input_deck,args):
+def build_gpu_progs(input_deck, args):
 
     STRAT = args.gpu_strat
 
