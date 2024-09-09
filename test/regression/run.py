@@ -84,7 +84,7 @@ for i, name in enumerate(names):
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
-    runtimes.append(-1)
+    runtimes.append([0])
 
     # Change directory
     os.chdir(name)
