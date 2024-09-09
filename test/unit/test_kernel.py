@@ -88,12 +88,14 @@ def test_rn_basic():
         )
     )
 
-    data, mcdc = iqmc_dummy_mcdc_variable()
+    data_arr, mcdc_arr = iqmc_dummy_mcdc_variable()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
 
     # run through the first five seeds (1-5)
     for i in range(5):
         assert mcdc["setting"]["rng_seed"] == ref_data[i]
-        rng(mcdc["setting"])
+        rng([mcdc["setting"]])
 
 
 def test_AxV_linearity():
@@ -110,7 +112,9 @@ def test_AxV_linearity():
     """
     MCDC.reset()
 
-    data, mcdc = iqmc_dummy_mcdc_variable()
+    data_arr, mcdc_arr = iqmc_dummy_mcdc_variable()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
 
     size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)
@@ -120,6 +124,7 @@ def test_AxV_linearity():
     y = np.random.random((size,))
     rhs = np.zeros((size,))
 
+    print(mcdc)
     F1 = AxV((a * x + b * y), rhs, mcdc)
     F2 = a * AxV(x, rhs, mcdc) + b * AxV(y, rhs, mcdc)
     assert np.allclose(F1, F2, rtol=1e-10)
