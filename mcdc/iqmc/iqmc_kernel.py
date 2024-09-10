@@ -468,7 +468,7 @@ def iqmc_continuous_weight_reduction(P_arr, distance, mcdc):
 
 @toggle("iQMC")
 def iqmc_surface_crossing(P_arr, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]

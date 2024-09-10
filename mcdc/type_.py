@@ -48,7 +48,7 @@ surface_tally = None
 technique = None
 
 global_ = None
-data = None
+tally = None
 
 
 # ==============================================================================
@@ -1381,15 +1381,15 @@ def make_type_global(input_deck):
     )
 
 
-def make_type_data(input_deck, tally_size):
-    global data
+def make_type_tally(input_deck, tally_size):
+    global tally
 
     if not input_deck.technique["uq"]:
         width = 3
     else:
         width = 5
 
-    data = into_dtype([("tally", float64, (width, tally_size))])
+    tally = into_dtype([("tally", float64, (width, tally_size))])
 
 
 # ==============================================================================

@@ -189,7 +189,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 
 @njit()
 def generate_source_particle(work_start, idx_work, seed, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     seed_work = kernel.split_seed(work_start + idx_work, seed)
 
@@ -238,7 +238,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
 @njit(cache=caching)
 def prep_particle(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Apply weight window
     if mcdc["technique"]["weight_window"]:
@@ -247,7 +247,7 @@ def prep_particle(P_arr, prog):
 
 @njit()
 def exhaust_active_bank(data, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
     P_arr = adapt.local_array(1, type_.particle)
     P = P_arr[0]
 
@@ -264,7 +264,7 @@ def exhaust_active_bank(data, prog):
 
 @njit(cache=caching)
 def source_closeout(prog, idx_work, N_prog, data):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
@@ -284,7 +284,7 @@ def source_closeout(prog, idx_work, N_prog, data):
 
 @njit(cache=caching)
 def source_dd_resolution(data, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     kernel.dd_particle_send(mcdc)
     terminated = False
@@ -376,7 +376,7 @@ def loop_source(seed, data, mcdc):
 
 def gpu_sources_spec():
     def make_work(prog: nb.uintp) -> nb.boolean:
-        mcdc = adapt.mcdc_constant(prog)
+        mcdc = adapt.mcdc_global(prog)
 
         idx_work = adapt.global_add(mcdc["mpi_work_iter"], 0, 1)
 
@@ -397,7 +397,7 @@ def gpu_sources_spec():
     base_fns = (initialize, finalize, make_work)
 
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
-        mcdc = adapt.mcdc_constant(prog)
+        mcdc = adapt.mcdc_global(prog)
         data = adapt.mcdc_data(prog)
         P_arr = adapt.local_array(1, type_.particle)
         P_arr[0] = P_input
@@ -486,7 +486,7 @@ def make_gpu_loop_source(args):
 @njit(cache=caching)
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     while P["alive"]:
         step_particle(P_arr, data, prog)
@@ -495,7 +495,7 @@ def loop_particle(P_arr, data, prog):
 @njit(cache=caching)
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
@@ -566,7 +566,7 @@ def step_particle(P_arr, data, prog):
 
 @njit(cache=caching)
 def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
     DNP = DNP_arr[0]
 
     # Set groups
@@ -655,7 +655,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
 
 @njit(cache=caching)
 def source_precursor_closeout(prog, idx_work, N_prog, data):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Tally history closeout for fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"]:
@@ -722,7 +722,7 @@ def loop_source_precursor(seed, data, mcdc):
 
 def gpu_precursor_spec():
     def make_work(prog: nb.uintp) -> nb.boolean:
-        mcdc = adapt.mcdc_constant(prog)
+        mcdc = adapt.mcdc_global(prog)
 
         idx_work = adapt.global_add(mcdc["mpi_work_iter"], 0, 1)
 
@@ -762,7 +762,7 @@ def gpu_precursor_spec():
     base_fns = (initialize, finalize, make_work)
 
     def step(prog: nb.uintp, P_input: adapt.particle_gpu):
-        mcdc = adapt.mcdc_constant(prog)
+        mcdc = adapt.mcdc_global(prog)
         data = adapt.mcdc_data(prog)
         P_arr = adapt.local_array(1, type_.particle)
         P_arr[0] = P_input
@@ -887,8 +887,8 @@ def build_gpu_progs(input_deck, args):
     global src_init_program, src_exec_program, src_complete, src_clear_flags
     src_alloc_program = src_fns["alloc_program"]
     src_free_program = src_fns["free_program"]
-    src_load_constant = src_fns["load_state_device_constant"]
-    src_store_constant = src_fns["store_state_device_constant"]
+    src_load_constant = src_fns["load_state_device_global"]
+    src_store_constant = src_fns["store_state_device_global"]
     src_load_data = src_fns["load_state_device_data"]
     src_store_data = src_fns["store_state_device_data"]
     src_init_program = src_fns["init_program"]
@@ -903,8 +903,8 @@ def build_gpu_progs(input_deck, args):
     pre_free_state = pre_fns["free_state"]
     pre_alloc_program = pre_fns["alloc_program"]
     pre_free_program = pre_fns["free_program"]
-    pre_load_constant = pre_fns["load_state_device_constant"]
-    pre_store_constant = pre_fns["store_state_device_constant"]
+    pre_load_constant = pre_fns["load_state_device_global"]
+    pre_store_constant = pre_fns["store_state_device_global"]
     pre_load_data = pre_fns["load_state_device_data"]
     pre_store_data = pre_fns["store_state_device_data"]
     pre_init_program = pre_fns["init_program"]

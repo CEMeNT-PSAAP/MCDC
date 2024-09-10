@@ -405,10 +405,10 @@ def nopython_mode(is_on):
 SIMPLE_ASYNC = True
 
 none_type = None
-mcdc_constant_type = None
+mcdc_global_type = None
 mcdc_data_type = None
 state_spec = None
-mcdc_constant_gpu = None
+mcdc_global_gpu = None
 mcdc_data_gpu = None
 group_gpu = None
 thread_gpu = None
@@ -427,26 +427,26 @@ def gpu_forward_declare(args):
     if args.gpu_cuda_path != None:
         harm.config.set_cuda_path(args.gpu_cuda_path)
 
-    global none_type, mcdc_constant_type, mcdc_data_type
+    global none_type, mcdc_global_type, mcdc_data_type
     global state_spec
-    global mcdc_constant_gpu, mcdc_data_gpu
+    global mcdc_global_gpu, mcdc_data_gpu
     global group_gpu, thread_gpu
     global particle_gpu, particle_record_gpu
     global step_async, find_cell_async, halt_early
 
     none_type = numba.from_dtype(np.dtype([]))
-    mcdc_constant_type = numba.from_dtype(type_.global_)
-    mcdc_data_type = numba.from_dtype(type_.data)
+    mcdc_global_type = numba.from_dtype(type_.global_)
+    mcdc_data_type = numba.from_dtype(type_.tally)
     state_spec = (
         {
-            "constant": mcdc_constant_type,
+            "global": mcdc_global_type,
             "data": mcdc_data_type,
         },
         none_type,
         none_type,
     )
     access_fns = harm.RuntimeSpec.access_fns(state_spec)
-    mcdc_constant_gpu = access_fns["device"]["constant"]
+    mcdc_global_gpu = access_fns["device"]["global"]
     mcdc_data_gpu = access_fns["device"]["data"]
     group_gpu = access_fns["group"]
     thread_gpu = access_fns["thread"]
@@ -469,18 +469,18 @@ def gpu_forward_declare(args):
 # =============================================================================
 
 
-def mcdc_constant(prog):
+def mcdc_global(prog):
     return prog
 
 
 @for_cpu()
-def mcdc_constant(prog):
+def mcdc_global(prog):
     return prog
 
 
 @for_gpu()
-def mcdc_constant(prog):
-    return mcdc_constant_gpu(prog)
+def mcdc_global(prog):
+    return mcdc_global_gpu(prog)
 
 
 @for_cpu()
@@ -535,7 +535,7 @@ def add_source(particle, prog):
 
 @for_gpu()
 def add_source(particle, prog):
-    mcdc = mcdc_constant(prog)
+    mcdc = mcdc_global(prog)
     kernel.add_particle(particle, mcdc["bank_source"])
 
 
@@ -546,7 +546,7 @@ def add_census(particle, prog):
 
 @for_gpu()
 def add_census(particle, prog):
-    mcdc = mcdc_constant(prog)
+    mcdc = mcdc_global(prog)
     kernel.add_particle(particle, mcdc["bank_census"])
 
 
@@ -557,7 +557,7 @@ def add_IC(particle, prog):
 
 @for_gpu()
 def add_IC(particle, prog):
-    mcdc = mcdc_constant(prog)
+    mcdc = mcdc_global(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
 
 
