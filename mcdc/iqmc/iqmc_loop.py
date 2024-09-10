@@ -360,7 +360,7 @@ def gmres(mcdc):
 
 @njit(cache=caching)
 def iqmc_loop_particle(P_arr, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
     while P["alive"]:
         iqmc_step_particle(P_arr, prog)
@@ -368,7 +368,7 @@ def iqmc_loop_particle(P_arr, prog):
 
 @njit(cache=caching)
 def iqmc_step_particle(P_arr, prog):
-    mcdc = adapt.mcdc_constant(prog)
+    mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
 
     # Determine and move to event

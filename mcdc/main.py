@@ -861,8 +861,8 @@ def prepare():
     # Establish Data Type from Tally Info and Construct Tallies
     # =========================================================================
 
-    type_.make_type_data(input_deck, tally_size)
-    data_arr = np.zeros(1, dtype=type_.data)
+    type_.make_type_tally(input_deck, tally_size)
+    data_arr = np.zeros(1, dtype=type_.tally)
 
     # =========================================================================
     # Platform Targeting, Adapters, Toggles, etc
