@@ -16,8 +16,8 @@ fuel = mcdc.material(
 )
 
 air = mcdc.material(
-    capture=np.array([0.02]),
-    scatter=np.array([[0.08]]),
+    capture=np.array([0.002]),
+    scatter=np.array([[0.008]]),
     speed=np.array([1000.0]),
 )
 
@@ -26,16 +26,14 @@ air = mcdc.material(
 # =============================================================================
 
 # Surfaces
-cylinder_z = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=1.0)
-top_z = mcdc.surface(
-    "plane-z",
-    z=9.0,
-)
-bot_z = mcdc.surface("plane-z", z=6.0)
+cylinder_z = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=5.0)
+top_z = mcdc.surface("plane-z", z=9.0)
+# bot_z = mcdc.surface("plane-z", z=6.0)
+bot_z = mcdc.surface("plane-z", z=-9.0)
 
 # Move
-top_z.move([[0.0, 0.0, -1.0], [0.0, 0.0, 2.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
-bot_z.move([[0.0, 0.0, -1.0], [0.0, 0.0, 2.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
+# top_z.move([[0.0, 0.0, -1.0], [0.0, 0.0, 2.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
+# bot_z.move([[0.0, 0.0, -1.0], [0.0, 0.0, 2.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
 
 # Set container cell surfaces
 min_x = mcdc.surface("plane-x", x=-10.0, bc="vacuum")

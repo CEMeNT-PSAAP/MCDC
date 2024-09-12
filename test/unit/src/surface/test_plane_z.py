@@ -5,7 +5,7 @@ from mcdc.constant import (
     INF,
 )
 
-from mcdc.src.surface.plane_x import (
+from mcdc.src.surface.plane_z import (
     evaluate,
     reflect,
     get_normal_component,
@@ -13,11 +13,11 @@ from mcdc.src.surface.plane_x import (
 )
 
 
-def particle(x, ux, t):
-    return {"x": x, "ux": ux, "t": t}
+def particle(x, y, z, t, ux, uy, uz):
+    return {"x": x, "y": y, "z": z, "t": t, "ux": ux, "uy": uy, "uz": uz}
 
 
-speed = 1.0
+speed = 2.0
 
 
 def surface(x):
