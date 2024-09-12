@@ -18,9 +18,6 @@ from mcdc.constant import (
 
 @njit
 def evaluate(particle, surface):
-    """
-    Evaluate the surface equation wrt the particle coordinate
-    """
     # Particle parameters
     x = particle["x"]
     y = particle["y"]
@@ -37,9 +34,6 @@ def evaluate(particle, surface):
 
 @njit
 def reflect(particle, surface):
-    """
-    Reflect the particle off the surface
-    """
     # Particle parameters
     ux = particle["ux"]
     uy = particle["uy"]
@@ -62,13 +56,7 @@ def reflect(particle, surface):
 
 
 @njit
-def get_normal_component(particle, speed, surface):
-    """
-    Get the surface outward-normal component of the particle
-
-    This is the dot product of the particle and the surface outward-normal directions.
-    Particle speed is needed if the surface is moving to get the relative direction.
-    """
+def get_normal_component(particle, surface):
     # Surface normal
     dx = 2 * particle["x"] + surface["G"]
     dy = 2 * particle["y"] + surface["H"]
@@ -87,10 +75,7 @@ def get_normal_component(particle, speed, surface):
 
 
 @njit
-def get_distance(particle, speed, surface):
-    """
-    Get particle distance to surface
-    """
+def get_distance(particle, surface):
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -109,10 +94,7 @@ def get_distance(particle, speed, surface):
     coincident = abs(f) < COINCIDENCE_TOLERANCE
     if coincident:
         # Moving away or tangent?
-        if (
-            get_normal_component(particle, speed, surface)
-            >= 0.0 - COINCIDENCE_TOLERANCE
-        ):
+        if get_normal_component(particle, surface) >= 0.0 - COINCIDENCE_TOLERANCE:
             return INF
 
     # Quadratic equation constants

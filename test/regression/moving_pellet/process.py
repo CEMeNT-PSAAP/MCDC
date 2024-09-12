@@ -22,6 +22,8 @@ with h5py.File("output.h5", "r") as f:
     phi = f["tallies/mesh_tally_0/fission/mean"][:]
     phi_sd = f["tallies/mesh_tally_0/fission/sdev"][:]
 
+print(np.max(phi))
+
 fig, ax = plt.subplots()
 cax = ax.pcolormesh(X, Y, phi[0])
 text = ax.text(0.02, 1.02, "", transform=ax.transAxes)
