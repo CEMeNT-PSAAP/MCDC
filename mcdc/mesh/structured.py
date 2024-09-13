@@ -5,19 +5,20 @@ from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 
 
 @njit
-def get_indices(P_arr, mesh):
+def get_indices(particle_container, mesh):
     """
     Get mesh indices given the particle coordinate
     """
-    P = P_arr[0]
+    particle = particle_container[0]
+
     # Particle coordinate
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
+    x = particle["x"]
+    y = particle["y"]
+    z = particle["z"]
+    t = particle["t"]
+    ux = particle["ux"]
+    uy = particle["uy"]
+    uz = particle["uz"]
 
     # Check if particle is outside the mesh grid
     outside = False
@@ -58,6 +59,7 @@ def get_crossing_distance(particle_arr, speed, mesh):
     to cross the nearest grid of the mesh
     """
     particle = particle_arr[0]
+
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]

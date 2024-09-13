@@ -8,7 +8,6 @@ import mcdc.adapt as adapt
 import mcdc.geometry as geometry
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.kernel as kernel
-import mcdc.local as local
 
 from mcdc.constant import *
 from mcdc.loop import caching
