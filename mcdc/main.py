@@ -364,9 +364,6 @@ def dd_prepare():
     else:
         input_deck.technique["dd_zn_neigh"] = []
 
-    if args.target == "gpu":
-        if d_idx != 0:
-            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
 
 
 def dd_mesh_bounds(idx):
@@ -869,6 +866,8 @@ def prepare():
     # =========================================================================
 
     if target == "gpu":
+        if MPI.COMM_WORLD.Get_rank() != 0:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
         if not adapt.HAS_HARMONIZE:
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
