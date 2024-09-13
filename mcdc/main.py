@@ -17,6 +17,42 @@ parser.add_argument(
     "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
 )
 
+parser.add_argument(
+    "--gpu_strat",
+    type=str,
+    help="Strategy used in GPU execution (event or async)",
+    choices=["async", "event"],
+    default="event",
+)
+
+parser.add_argument(
+    "--gpu_block_count",
+    type=int,
+    help="Number of blocks used in GPU execution",
+    default=240,
+)
+
+parser.add_argument(
+    "--gpu_arena_size",
+    type=int,
+    help="Capacity of each intermediate data buffer used, as a particle count",
+    default=0x100000,
+)
+
+parser.add_argument(
+    "--gpu_rocm_path",
+    type=str,
+    help="Path to ROCm installation for use in GPU execution",
+    default=None,
+)
+
+parser.add_argument(
+    "--gpu_cuda_path",
+    type=str,
+    help="Path to CUDA installation for use in GPU execution",
+    default=None,
+)
+
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 parser.add_argument("--progress_bar", default=True, action="store_true")
@@ -42,6 +78,7 @@ if mode == "python":
 elif mode == "numba":
     nb.config.DISABLE_JIT = False
     nb.config.NUMBA_DEBUG_CACHE = 1
+    nb.config.THREADING_LAYER = "workqueue"
 elif mode == "numba_debug":
     msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
     print_warning(msg)
@@ -86,7 +123,6 @@ from mpi4py import MPI
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
-import mcdc.code_factory as code_factory
 
 import mcdc.adapt as adapt
 from mcdc.constant import *
@@ -125,7 +161,10 @@ def run():
     preparation_start = MPI.Wtime()
     if input_deck.technique["iQMC"]:
         iqmc_validate_inputs(input_deck)
-    data, mcdc = prepare()
+
+    data_arr, mcdc_arr = prepare()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -140,11 +179,11 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        iqmc_simulation(mcdc)
+        iqmc_simulation(mcdc_arr)
     elif mcdc["setting"]["mode_eigenvalue"]:
-        loop_eigenvalue(data, mcdc)
+        loop_eigenvalue(data_arr, mcdc_arr)
     else:
-        loop_fixed_source(data, mcdc)
+        loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -252,6 +291,13 @@ def dd_prepare():
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
 
+    if input_deck.technique["dd_exchange_rate_padding"] == None:
+        if args.target == "gpu":
+            padding = args.gpu_block_count * 64 * 16
+        else:
+            padding = 0
+        input_deck.technique["dd_exchange_rate_padding"] = padding
+
     if work_ratio is None:
         work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
         input_deck.technique["dd_work_ratio"] = work_ratio
@@ -316,6 +362,10 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = rank_info[zn]
     else:
         input_deck.technique["dd_zn_neigh"] = []
+
+    if args.target == "gpu":
+        if d_idx != 0:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
 
 
 def dd_mesh_bounds(idx):
@@ -417,42 +467,24 @@ def prepare():
     type_.make_type_dd_turnstile_event(input_deck)
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
+    type_.make_size_rpn(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     input_deck.setting["target"] = target
-    code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
     #   TODO: Better alternative?
     # =========================================================================
 
-    mcdc = np.zeros(1, dtype=type_.global_)[0]
+    mcdc_arr = np.zeros(1, dtype=type_.global_)
+    mcdc = mcdc_arr[0]
 
     # Now, set up the global variable container
 
     # Get modes
     mode_CE = input_deck.setting["mode_CE"]
     mode_MG = input_deck.setting["mode_MG"]
-
-    # =========================================================================
-    # Platform Targeting, Adapters, Toggles, etc
-    # =========================================================================
-
-    if target == "gpu":
-        if not adapt.HAS_HARMONIZE:
-            print_error(
-                "No module named 'harmonize' - GPU functionality not available. "
-            )
-        adapt.gpu_forward_declare()
-
-    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
-    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.eval_toggle()
-    adapt.target_for(target)
-    if target == "gpu":
-        build_gpu_progs()
-    adapt.nopython_mode(mode == "numba")
 
     # =========================================================================
     # Nuclides
@@ -823,11 +855,31 @@ def prepare():
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
-    # Set tally data
-    if not input_deck.technique["uq"]:
-        tally = np.zeros((3, tally_size), dtype=type_.float64)
-    else:
-        tally = np.zeros((5, tally_size), dtype=type_.float64)
+    # =========================================================================
+    # Establish Data Type from Tally Info and Construct Tallies
+    # =========================================================================
+
+    type_.make_type_tally(input_deck, tally_size)
+    data_arr = np.zeros(1, dtype=type_.tally)
+
+    # =========================================================================
+    # Platform Targeting, Adapters, Toggles, etc
+    # =========================================================================
+
+    if target == "gpu":
+        if not adapt.HAS_HARMONIZE:
+            print_error(
+                "No module named 'harmonize' - GPU functionality not available. "
+            )
+        adapt.gpu_forward_declare(args)
+
+    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
+    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
+    adapt.eval_toggle()
+    adapt.target_for(target)
+    if target == "gpu":
+        build_gpu_progs(input_deck, args)
+    adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
 
     # =========================================================================
     # Setting
@@ -1170,9 +1222,7 @@ def prepare():
     # Finalize data: wrapping into a tuple
     # =========================================================================
 
-    data = (tally,)
-
-    return data, mcdc
+    return data_arr, mcdc_arr
 
 
 def cardlist_to_h5group(dictlist, input_group, name):
