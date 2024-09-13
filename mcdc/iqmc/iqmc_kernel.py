@@ -7,7 +7,6 @@ from numba import objmode, literal_unroll
 import mcdc.type_ as type_
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
-import mcdc.local as local
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
 
