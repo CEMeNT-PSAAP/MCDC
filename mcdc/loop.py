@@ -862,7 +862,7 @@ def build_gpu_progs(input_deck, args):
 
     adapt.harm.RuntimeSpec.bind_specs()
 
-    if input_deck.technique["domain_decomposition"]:
+    if MPI.COMM_WORLD.Get_size() > 1:
         MPI.COMM_WORLD.Barrier()
 
     adapt.harm.RuntimeSpec.load_specs()
