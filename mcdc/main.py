@@ -123,7 +123,6 @@ from mpi4py import MPI
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
-import mcdc.code_factory as code_factory
 
 import mcdc.adapt as adapt
 from mcdc.constant import *
@@ -469,7 +468,6 @@ def prepare():
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     input_deck.setting["target"] = target
-    # code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
