@@ -11,7 +11,6 @@ from numba import (
 
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
-import mcdc.local as local
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
 import mcdc.type_ as type_
@@ -1639,15 +1638,6 @@ def recordlike_to_particle(P_new_arr, P_rec_arr):
     P_new["cell_ID"] = -1
     P_new["surface_ID"] = -1
     P_new["event"] = -1
-
-
-@njit
-def split_particle(P):
-    P_new = local.particle()
-    copy_particle(P_new, P)
-    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
-    rng(P)
-    return P_new
 
 
 @njit

@@ -1,12 +1,11 @@
 import h5py
 import math
 import numpy as np
-import numba as nb
 import os
 
-from numba import njit
 from mpi4py import MPI
 from mpi4py.util.dtlib import from_numpy_dtype
+from numba import njit
 
 from mcdc.print_ import print_error
 
