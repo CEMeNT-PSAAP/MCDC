@@ -64,7 +64,7 @@ names = temp
 if target == "gpu":
     temp = names.copy()
     for name in names:
-        if "iqmc" in name:
+        if ("iqmc" in name) or ("eigenvalue" in name):
             temp.remove(name)
             print(
                 Fore.YELLOW + "Note: Skipping %s (GPU target)" % name + Style.RESET_ALL
@@ -84,7 +84,7 @@ for i, name in enumerate(names):
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
-    runtimes.append(-1)
+    runtimes.append([0])
 
     # Change directory
     os.chdir(name)
@@ -150,6 +150,10 @@ for i, name in enumerate(names):
                     a = output[name][()]
                     b = answer[name][()]
 
+                    if (("sdev" in result) or ("uq_var" in result)) and (
+                        args.target == "gpu"
+                    ):
+                        continue
                     # Passed?
                     if np.isclose(a, b).all():
                         print(

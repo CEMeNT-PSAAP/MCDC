@@ -4,9 +4,9 @@ import numpy as np
 from mpi4py import MPI
 from numba import objmode, literal_unroll
 
+import mcdc.type_ as type_
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
-import mcdc.local as local
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
 
@@ -145,7 +145,8 @@ def iqmc_generate_material_idx(mcdc):
     Ny = len(mesh["y"]) - 1
     Nz = len(mesh["z"]) - 1
     # create particle to utilize cell finding functions
-    P_temp = local.particle()
+    P_temp_arr = adapt.local_array(1, type_.particle)
+    P_temp = P_temp_arr[0]
     # set default attributes
     P_temp["alive"] = True
 
@@ -171,7 +172,7 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["cell_ID"] = -1
 
                     # set material_ID
-                    _ = geometry.locate_particle(P_temp, mcdc)
+                    P_temp["cell_ID"] = geometry.locate_particle(P_temp_arr, mcdc)
 
                     # assign material index
                     mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = P_temp[
@@ -278,7 +279,8 @@ def iqmc_prepare_particles(mcdc):
 
     for n in range(N_work):
         # Create new particle
-        P_new = local.particle_record()
+        P_new_arr = adapt.local_array(1, type_.particle_record)
+        P_new = P_new_arr[0]
         # assign initial group, time, and rng_seed (not used)
         P_new["g"] = 0
         P_new["t"] = 0
@@ -291,16 +293,16 @@ def iqmc_prepare_particles(mcdc):
         P_new["ux"], P_new["uy"], P_new["uz"] = iqmc_sample_isotropic_direction(
             samples[n, 1], samples[n, 5]
         )
-        x, y, z, t, outside = mesh_.structured.get_indices(P_new, mesh)
+        x, y, z, t, outside = mesh_.structured.get_indices(P_new_arr, mesh)
         q = Q[:, t, x, y, z].copy()
         dV = iqmc_cell_volume(x, y, z, mesh)
         # Source tilt
-        iqmc_tilt_source(t, x, y, z, P_new, q, mcdc)
+        iqmc_tilt_source(t, x, y, z, P_new_arr, q, mcdc)
         # set particle weight
         P_new["iqmc"]["w"] = q * dV * N_total / N_particle
         P_new["w"] = P_new["iqmc"]["w"].sum()
         # add to source bank
-        adapt.add_source(P_new, mcdc)
+        adapt.add_source(P_new_arr, mcdc)
 
 
 @toggle("iQMC")
@@ -358,19 +360,22 @@ def iqmc_sample_group(sample, G):
 
 
 @toggle("iQMC")
-def iqmc_move_to_event(P, mcdc):
+def iqmc_move_to_event(P_arr, mcdc):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
 
+    P = P_arr[0]
+
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
-    #   If material is not identified yet, locate the particle.
-    if mcdc["setting"]["mode_MG"] and P["material_ID"] == -1:
-        if not geometry.locate_particle(P, mcdc):
-            # Particle is lost
-            P["event"] = EVENT_LOST
-            return
+    if mcdc["setting"]["mode_MG"]:
+        # If material is not identified yet, locate the particle
+        if P["material_ID"] == -1:
+            if not geometry.locate_particle(P_arr, mcdc):
+                # Particle is lost
+                P["event"] = EVENT_LOST
+                return
 
     # ==================================================================================
     # Geometry inspection
@@ -380,7 +385,7 @@ def iqmc_move_to_event(P, mcdc):
     #   - Return distance to boundary (surface or lattice)
     #   - Return geometry event type (surface or lattice crossing or particle lost)
 
-    d_boundary = geometry.inspect_geometry(P, mcdc)
+    d_boundary = geometry.inspect_geometry(P_arr, mcdc)
 
     # Particle is lost?
     if P["event"] == EVENT_LOST:
@@ -392,15 +397,15 @@ def iqmc_move_to_event(P, mcdc):
 
     # Distance to domain decomposition mesh
     d_domain = INF
-    speed = physics.get_speed(P, mcdc)
+    speed = physics.get_speed(P_arr, mcdc)
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
-            P, speed, mcdc["technique"]["dd_mesh"]
+            P_arr, speed, mcdc["technique"]["dd_mesh"]
         )
 
     # Distance to iqmc mesh
     d_mesh = mesh_.structured.get_crossing_distance(
-        P, speed, mcdc["technique"]["iqmc"]["mesh"]
+        P_arr, speed, mcdc["technique"]["iqmc"]["mesh"]
     )
 
     # =========================================================================
@@ -431,22 +436,23 @@ def iqmc_move_to_event(P, mcdc):
     # =========================================================================
 
     # score iQMC tallies
-    iqmc_score_tallies(P, distance, mcdc)
+    iqmc_score_tallies(P_arr, distance, mcdc)
     # attenuate particle weight
-    iqmc_continuous_weight_reduction(P, distance, mcdc)
+    iqmc_continuous_weight_reduction(P_arr, distance, mcdc)
     # kill particle if it falls below weight threshold
     if abs(P["w"]) <= mcdc["technique"]["iqmc"]["w_min"]:
         P["alive"] = False
 
     # Move particle
-    move_particle(P, distance, mcdc)
+    move_particle(P_arr, distance, mcdc)
 
 
 @toggle("iQMC")
-def iqmc_continuous_weight_reduction(P, distance, mcdc):
+def iqmc_continuous_weight_reduction(P_arr, distance, mcdc):
     """
     Continuous weight reduction technique based on particle track-length.
     """
+    P = P_arr[0]
     material = mcdc["materials"][P["material_ID"]]
     SigmaT = material["total"][:]
     w = P["iqmc"]["w"]
@@ -460,12 +466,12 @@ def iqmc_continuous_weight_reduction(P, distance, mcdc):
 
 
 @toggle("iQMC")
-def iqmc_surface_crossing(P, prog):
-    mcdc = adapt.device(prog)
-
+def iqmc_surface_crossing(P_arr, prog):
+    mcdc = adapt.mcdc_global(prog)
+    P = P_arr[0]
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.surface_bc(P, surface)
+    geometry.surface_bc(P_arr, surface)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
@@ -491,7 +497,8 @@ def iqmc_update_source(mcdc):
 
 
 @toggle("iQMC")
-def iqmc_tilt_source(t, x, y, z, P, Q, mcdc):
+def iqmc_tilt_source(t, x, y, z, P_arr, Q, mcdc):
+    P = P_arr[0]
     iqmc = mcdc["technique"]["iqmc"]
     score_list = iqmc["score_list"]
     score_bin = iqmc["score"]
@@ -587,11 +594,12 @@ def iqmc_consolidate_sources(mcdc):
 
 
 @toggle("iQMC")
-def iqmc_score_tallies(P, distance, mcdc):
+def iqmc_score_tallies(P_arr, distance, mcdc):
     """
     Tally the scalar flux and linear source tilt.
 
     """
+    P = P_arr[0]
     iqmc = mcdc["technique"]["iqmc"]
     score_list = iqmc["score_list"]
     score_bin = iqmc["score"]
@@ -602,7 +610,7 @@ def iqmc_score_tallies(P, distance, mcdc):
     SigmaT = material["total"]
     mat_id = P["material_ID"]
 
-    x, y, z, t, outside = mesh_.structured.get_indices(P, mesh)
+    x, y, z, t, outside = mesh_.structured.get_indices(P_arr, mesh)
     if outside:
         return
 
