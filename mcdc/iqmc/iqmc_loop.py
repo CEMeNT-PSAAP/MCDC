@@ -3,11 +3,11 @@ import numpy as np
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode
 
+import mcdc.type_ as type_
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.kernel as kernel
-import mcdc.local as local
 
 from mcdc.constant import *
 from mcdc.loop import caching
@@ -79,7 +79,13 @@ def iqmc_validate_inputs(input_deck):
 
 
 @njit(cache=caching)
-def iqmc_simulation(mcdc):
+def iqmc_simulation(mcdc_arr):
+
+    # Ensure `mcdc` exists for the lifetime of the program
+    # by intentionally leaking their memory
+    adapt.leak(mcdc_arr)
+    mcdc = mcdc_arr[0]
+
     # Preprocessing
     iqmc = mcdc["technique"]["iqmc"]
     iqmc_kernel.iqmc_preprocess(mcdc)
@@ -352,19 +358,20 @@ def gmres(mcdc):
 
 
 @njit(cache=caching)
-def iqmc_loop_particle(P, prog):
-    mcdc = adapt.device(prog)
-
+def iqmc_loop_particle(P_arr, prog):
+    mcdc = adapt.mcdc_global(prog)
+    P = P_arr[0]
     while P["alive"]:
-        iqmc_step_particle(P, prog)
+        iqmc_step_particle(P_arr, prog)
 
 
 @njit(cache=caching)
-def iqmc_step_particle(P, prog):
-    mcdc = adapt.device(prog)
+def iqmc_step_particle(P_arr, prog):
+    mcdc = adapt.mcdc_global(prog)
+    P = P_arr[0]
 
     # Determine and move to event
-    iqmc_kernel.iqmc_move_to_event(P, mcdc)
+    iqmc_kernel.iqmc_move_to_event(P_arr, mcdc)
     event = P["event"]
 
     # The & operator here is a bitwise and.
@@ -372,24 +379,24 @@ def iqmc_step_particle(P, prog):
 
     # Surface crossing
     if event & EVENT_SURFACE_CROSSING:
-        iqmc_kernel.iqmc_surface_crossing(P, prog)
+        iqmc_kernel.iqmc_surface_crossing(P_arr, prog)
         if event & EVENT_DOMAIN_CROSSING:
             if not (
                 mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_REFLECTIVE
                 or mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_VACUUM
             ):
-                kernel.domain_crossing(P, mcdc)
+                kernel.domain_crossing(P_arr, mcdc)
 
     # Lattice or mesh crossing (skipped if surface crossing)
     elif event & EVENT_LATTICE_CROSSING or event & EVENT_IQMC_MESH:
         if event & EVENT_DOMAIN_CROSSING:
-            kernel.domain_crossing(P, mcdc)
+            kernel.domain_crossing(P_arr, mcdc)
 
     # Apply weight roulette
     if P["alive"] and mcdc["technique"]["weight_roulette"]:
         # check if weight has fallen below threshold
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
-            kernel.weight_roulette(P, mcdc)
+            kernel.weight_roulette(P_arr, mcdc)
 
 
 @njit(cache=caching)
@@ -398,17 +405,19 @@ def iqmc_loop_source(mcdc):
     N_prog = 0
     # loop over particles
     for idx_work in range(work_size):
-        P = mcdc["bank_source"]["particles"][idx_work]
+        P_arr = mcdc["bank_source"]["particles"][idx_work : (idx_work + 1)]
+        P = P_arr[0]
         mcdc["bank_source"]["size"] -= 1
-        kernel.add_particle(P, mcdc["bank_active"])
+        kernel.add_particle(P_arr, mcdc["bank_active"])
 
         # Loop until active bank is exhausted
         while mcdc["bank_active"]["size"] > 0:
-            P = local.particle()
+            P_arr = adapt.local_array(1, type_.particle)
+            P = P_arr[0]
             # Get particle from active bank
-            kernel.get_particle(P, mcdc["bank_active"], mcdc)
+            kernel.get_particle(P_arr, mcdc["bank_active"], mcdc)
             # Particle loop
-            iqmc_loop_particle(P, mcdc)
+            iqmc_loop_particle(P_arr, mcdc)
 
         # Progress printout
         percent = (idx_work + 1.0) / work_size

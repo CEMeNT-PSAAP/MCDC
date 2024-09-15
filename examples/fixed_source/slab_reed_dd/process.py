@@ -108,8 +108,8 @@ for i in range(len(x_mid)):
 # Load output
 with h5py.File("output.h5", "r") as f:
     # Note the spatial (dx) and source strength (100+1) normalization
-    phi = f["tally/flux/mean"][:] / dx * 101.0
-    phi_sd = f["tally/flux/sdev"][:] / dx * 101.0
+    phi = (f["tally/flux/mean"][:] / dx * 101.0).repeat(4)
+    phi_sd = (f["tally/flux/sdev"][:] / dx * 101.0).repeat(4)
 
 # Flux - spatial average
 plt.plot(x_mid, phi, "-b", label="MC")
