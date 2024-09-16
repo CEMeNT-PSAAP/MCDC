@@ -1490,9 +1490,10 @@ def population_control(seed, mcdc):
     elif mcdc["technique"]["pct"] == PCT_COMBING_WEIGHT:
         pct_combing_weight(seed, mcdc)
     elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE:
-        pct_splitting_roulette(seed,mcdc)
+        pct_splitting_roulette(seed, mcdc)
     elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE_WEIGHT:
-        pct_splitting_roulette_weight(seed,mcdc)
+        pct_splitting_roulette_weight(seed, mcdc)
+
 
 @njit
 def pct_combing(seed, mcdc):
@@ -1573,6 +1574,7 @@ def pct_combing_weight(seed, mcdc):
         P_rec["w"] = td
         adapt.add_source(P_rec_arr, mcdc)
 
+
 @njit
 def pct_splitting_roulette(seed, mcdc):
     bank_census = mcdc["bank_census"]
@@ -1611,7 +1613,6 @@ def pct_splitting_roulette(seed, mcdc):
             adapt.add_source(P_rec_arr, mcdc)
 
 
-
 @njit
 def pct_splitting_roulette_weight(seed, mcdc):
     bank_census = mcdc["bank_census"]
@@ -1638,10 +1639,9 @@ def pct_splitting_roulette_weight(seed, mcdc):
     set_bank_size(bank_source, 0)
     idx = 0
     for idx in range(N_local):
-        P_census_arr = bank_census["particles"][idx:(idx+1)]
+        P_census_arr = bank_census["particles"][idx : (idx + 1)]
         P_census = P_census_arr[0]
         residual_weight = P_census["w"] / ws
-
 
         while residual_weight >= 1:
             split_as_record(P_rec_arr, P_census_arr)
@@ -1655,8 +1655,6 @@ def pct_splitting_roulette_weight(seed, mcdc):
             # Set weight
             P_rec["w"] = ws
             adapt.add_source(P_rec_arr, mcdc)
-
-
 
 
 # =============================================================================
