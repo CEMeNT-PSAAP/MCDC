@@ -1,6 +1,9 @@
 import argparse, os, sys
 import importlib.metadata
+import matplotlib.pyplot as plt
 import numba as nb
+
+from matplotlib import colors as mpl_colors
 
 # Parse command-line arguments
 #   TODO: Will be inside run() once Python/Numba adapter is integrated
@@ -132,6 +135,7 @@ from mcdc.loop import (
     set_cache,
     build_gpu_progs,
 )
+import mcdc.geometry as geometry
 from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
 
 import mcdc.loop as loop
@@ -1590,3 +1594,115 @@ def closeout(mcdc):
 
     print_runtime(mcdc)
     input_deck.reset()
+
+
+# ======================================================================================
+# Visualize geometry
+# ======================================================================================
+
+
+def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
+    """
+    2D visualization of the created model
+
+    Parameters
+    ----------
+    vis_plane : {'xy', 'yz', 'xz', 'zx', 'yz', 'zy'}
+        Axis plane to visualize
+    x : float or array_like
+        Plane x-position (float) for 'yz' plot. Range of x-axis for 'xy' or 'xz' plot.
+    y : float or array_like
+        Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
+    z : float or array_like
+        Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
+    pixel : array_like
+        Number of respective pixel in the two axes in vis_plane
+    colors : array_like
+        List of pairs of material and its color
+    """
+    # TODO: add input error checkers
+
+    _, mcdc = prepare()
+
+    # Color assignment for materials (by material ID)
+    if colors is not None:
+        new_colors = {}
+        for item in colors.items():
+            new_colors[item[0].ID] = mpl_colors.to_rgb(item[1])
+        colors = new_colors
+    else:
+        colors = {}
+        for i in range(len(mcdc["materials"])):
+            colors[i] = plt.cm.Set1(i)[:-1]
+    WHITE = mpl_colors.to_rgb("white")
+
+    # Set reference axis
+    for axis in ["x", "y", "z"]:
+        if axis not in vis_type:
+            reference_key = axis
+
+    if reference_key == "x":
+        reference = x
+    elif reference_key == "y":
+        reference = y
+    elif reference_key == "z":
+        reference = z
+
+    # Set first and second axes
+    first_key = vis_type[0]
+    second_key = vis_type[1]
+
+    if first_key == "x":
+        first = x
+    elif first_key == "y":
+        first = y
+    elif first_key == "z":
+        first = z
+
+    if second_key == "x":
+        second = x
+    elif second_key == "y":
+        second = y
+    elif second_key == "z":
+        second = z
+
+    # Axis pixel sizes
+    d_first = (first[1] - first[0]) / pixel[0]
+    d_second = (second[1] - second[0]) / pixel[1]
+
+    # Axis pixel grids and midpoints
+    first_grid = np.linspace(first[0], first[1], pixel[0] + 1)
+    first_midpoint = 0.5 * (first_grid[1:] + first_grid[:-1])
+
+    second_grid = np.linspace(second[0], second[1], pixel[1] + 1)
+    second_midpoint = 0.5 * (second_grid[1:] + second_grid[:-1])
+
+    # Set dummy particle
+    particle = np.zeros(1, dtype=type_.particle)[0]
+    particle[reference_key] = reference
+    particle["g"] = 0
+    particle["E"] = 1e6
+
+    # RGB color data for each pixel
+    data = np.zeros(pixel + (3,))
+
+    # Loop over the two axes
+    for i in range(pixel[0]):
+        particle[first_key] = first_midpoint[i]
+        for j in range(pixel[1]):
+            particle[second_key] = second_midpoint[j]
+
+            # Get material
+            particle["cell_ID"] = -1
+            particle["material_ID"] = -1
+            if geometry.locate_particle(particle, mcdc):
+                data[i, j] = colors[particle["material_ID"]]
+            else:
+                data[i, j] = WHITE
+
+    data = np.transpose(data, (1, 0, 2))
+    plt.imshow(data, origin="lower", extent=first + second)
+    plt.xlabel(first_key + " cm")
+    plt.ylabel(second_key + " cm")
+    plt.title(reference_key + " = %.2f cm" % reference)
+    plt.show()
