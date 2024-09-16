@@ -852,6 +852,7 @@ def make_gpu_loop_source_precursor(args):
     return gpu_loop_source_precursor
 
 
+
 def build_gpu_progs(input_deck, args):
 
     STRAT = args.gpu_strat
