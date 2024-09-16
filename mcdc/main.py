@@ -364,7 +364,6 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
 
 
-
 def dd_mesh_bounds(idx):
     """
     Defining mesh tally boundaries for domain decomposition.
