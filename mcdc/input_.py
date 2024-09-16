@@ -32,6 +32,8 @@ from mcdc.constant import (
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
+    PCT_SPLITTING_ROULETTE,
+    PCT_SPLITTING_ROULETTE_WEIGHT,
     PI,
     REGION_ALL,
     TINY,
@@ -1182,6 +1184,10 @@ def population_control(pct="combing"):
         card["pct"] = PCT_COMBING
     elif pct == "combing-weight":
         card["pct"] = PCT_COMBING_WEIGHT
+    elif pct == "splitting-roulette":
+        card["pct"] = PCT_SPLITTING_ROULETTE
+    elif pct == "splitting-roulette-weight":
+        card["pct"] = PCT_SPLITTING_ROULETTE_WEIGHT
     else:
         print_error("Unknown PCT type " + pct)
 
