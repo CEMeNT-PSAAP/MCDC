@@ -1176,20 +1176,21 @@ def population_control(pct="splitting-roulette"):
     pct : str, optional
         Population control method (default "spliting-roulette").
     """
-
+    # Check if the selected technique is supported
+    pct = check_support(
+        "population control technique",
+        pct,
+        [
+            "combing",
+            "combing-weight",
+            "splitting-roulette",
+            "splitting-roulette-weight",
+        ],
+    )
     card = global_.input_deck.technique
+    card["pct"] = pct
     card["population_control"] = True
     card["weighted_emission"] = False
-    if pct == "combing":
-        card["pct"] = PCT_COMBING
-    elif pct == "combing-weight":
-        card["pct"] = PCT_COMBING_WEIGHT
-    elif pct == "splitting-roulette":
-        card["pct"] = PCT_SPLITTING_ROULETTE
-    elif pct == "splitting-roulette-weight":
-        card["pct"] = PCT_SPLITTING_ROULETTE_WEIGHT
-    else:
-        print_error("Unknown PCT type " + pct)
 
 
 def branchless_collision():
