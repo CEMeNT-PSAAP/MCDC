@@ -32,6 +32,8 @@ from mcdc.constant import (
     PCT_NONE,
     PCT_COMBING,
     PCT_COMBING_WEIGHT,
+    PCT_SPLITTING_ROULETTE,
+    PCT_SPLITTING_ROULETTE_WEIGHT,
     PI,
     REGION_ALL,
     TINY,
@@ -1165,25 +1167,30 @@ def weighted_emission(flag):
     card["weighted_emission"] = flag
 
 
-def population_control(pct="combing"):
+def population_control(pct="splitting-roulette"):
     """
     Set population control techniques.
 
     Parameters
     ----------
     pct : str, optional
-        Population control method (default "combing").
+        Population control method (default "spliting-roulette").
     """
-
+    # Check if the selected technique is supported
+    pct = check_support(
+        "population control technique",
+        pct,
+        [
+            "combing",
+            "combing-weight",
+            "splitting-roulette",
+            "splitting-roulette-weight",
+        ],
+    )
     card = global_.input_deck.technique
+    card["pct"] = pct
     card["population_control"] = True
     card["weighted_emission"] = False
-    if pct == "combing":
-        card["pct"] = PCT_COMBING
-    elif pct == "combing-weight":
-        card["pct"] = PCT_COMBING_WEIGHT
-    else:
-        print_error("Unknown PCT type " + pct)
 
 
 def branchless_collision():

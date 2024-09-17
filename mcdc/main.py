@@ -367,10 +367,6 @@ def dd_prepare():
     else:
         input_deck.technique["dd_zn_neigh"] = []
 
-    if args.target == "gpu":
-        if d_idx != 0:
-            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
-
 
 def dd_mesh_bounds(idx):
     """
@@ -871,6 +867,8 @@ def prepare():
     # =========================================================================
 
     if target == "gpu":
+        if MPI.COMM_WORLD.Get_rank() != 0:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
         if not adapt.HAS_HARMONIZE:
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
@@ -940,7 +938,15 @@ def prepare():
     # =========================================================================
 
     # Population control technique (PCT)
-    mcdc["technique"]["pct"] = input_deck.technique["pct"]
+    pct = input_deck.technique["pct"]
+    if pct == "combing":
+        mcdc["technique"]["pct"] = PCT_COMBING
+    elif pct == "combing-weight":
+        mcdc["technique"]["pct"] = PCT_COMBING_WEIGHT
+    elif pct == "splitting-roulette":
+        mcdc["technique"]["pct"] = PCT_SPLITTING_ROULETTE
+    elif pct == "splitting-roulette-weight":
+        mcdc["technique"]["pct"] = PCT_SPLITTING_ROULETTE_WEIGHT
     mcdc["technique"]["pc_factor"] = input_deck.technique["pc_factor"]
 
     # =========================================================================

@@ -1489,6 +1489,10 @@ def population_control(seed, mcdc):
         pct_combing(seed, mcdc)
     elif mcdc["technique"]["pct"] == PCT_COMBING_WEIGHT:
         pct_combing_weight(seed, mcdc)
+    elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE:
+        pct_splitting_roulette(seed, mcdc)
+    elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE_WEIGHT:
+        pct_splitting_roulette_weight(seed, mcdc)
 
 
 @njit
@@ -1524,7 +1528,7 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] *= td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1544,7 +1548,7 @@ def pct_combing_weight(seed, mcdc):
     td = W / M
 
     # Update population control factor
-    mcdc["technique"]["pc_factor"] *= td
+    mcdc["technique"]["pc_factor"] *= td  # This may be incorrect
 
     # Tooth offset
     xi = rng_from_seed(seed)
@@ -1565,10 +1569,98 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] = td
         adapt.add_source(P_rec_arr, mcdc)
+
+
+@njit
+def pct_splitting_roulette(seed, mcdc):
+    bank_census = mcdc["bank_census"]
+    M = mcdc["setting"]["N_particle"]
+    bank_source = mcdc["bank_source"]
+
+    # Scan the bank
+    idx_start, N_local, N = bank_scanning(bank_census, mcdc)
+    idx_end = idx_start + N_local
+
+    # Weight scaling
+    ws = float(N) / float(M)
+
+    # Splitting Number
+    sn = 1.0 / ws
+
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= ws
+
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+    P_rec = P_rec_arr[0]
+
+    # Perform split-roulette to all particles in local bank
+    set_bank_size(bank_source, 0)
+    for idx in range(N_local):
+        # Weight of the surviving particles
+        w = bank_census["particles"][idx]["w"]
+        w_survive = w * ws
+
+        # Determine number of guaranteed splits
+        N_split = math.floor(sn)
+
+        # Survive the russian roulette?
+        xi = rng(bank_census["particles"][idx : idx + 1])
+        if xi < sn - N_split:
+            N_split += 1
+
+        # Split the particle
+        for i in range(N_split):
+            split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
+            # Set weight
+            P_rec["w"] = w_survive
+            adapt.add_source(P_rec_arr, mcdc)
+
+
+@njit
+def pct_splitting_roulette_weight(seed, mcdc):
+    bank_census = mcdc["bank_census"]
+    M = mcdc["setting"]["N_particle"]
+    bank_source = mcdc["bank_source"]
+
+    # Scan the bank based on weight
+    N_local = get_bank_size(bank_census)
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Weight of the surviving particles
+    w_survive = W / M
+
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= w_survive  # This may be incorrect
+
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+    P_rec = P_rec_arr[0]
+
+    # Perform split-roulette to all particles in local bank
+    set_bank_size(bank_source, 0)
+    for idx in range(N_local):
+        # Splitting number
+        w = bank_census["particles"][idx]["w"]
+        sn = w / w_survive
+
+        # Determine number of guaranteed splits
+        N_split = math.floor(sn)
+
+        # Survive the russian roulette?
+        xi = rng(bank_census["particles"][idx : idx + 1])
+        if xi < sn - N_split:
+            N_split += 1
+
+        # Split the particle
+        for i in range(N_split):
+            split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
+            # Set weight
+            P_rec["w"] = w_survive
+            adapt.add_source(P_rec_arr, mcdc)
 
 
 # =============================================================================
