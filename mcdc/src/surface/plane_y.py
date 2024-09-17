@@ -6,8 +6,6 @@ f(y) = y + J
 
 from numba import njit
 
-import mcdc.src.surface.common as common
-
 from mcdc.constant import (
     COINCIDENCE_TOLERANCE,
     INF,

@@ -210,6 +210,9 @@ def _get_distance_static(particle, surface):
 
 @njit
 def _get_distance_moving(particle, speed, surface):
+    """
+    Get particle distance to moving surface
+    """
     # Store original particle and surface parameters (will be temporarily changed)
     x_original = particle["x"]
     y_original = particle["y"]
