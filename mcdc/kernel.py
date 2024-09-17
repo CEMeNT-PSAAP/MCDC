@@ -1528,7 +1528,7 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] *= td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1569,7 +1569,7 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] = td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1623,8 +1623,6 @@ def pct_splitting_roulette_weight(seed, mcdc):
     N_local = get_bank_size(bank_census)
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
-
-    print(N_local)
 
     # Weight scaling
     ws = W / M
