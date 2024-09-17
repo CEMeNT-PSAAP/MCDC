@@ -1167,14 +1167,14 @@ def weighted_emission(flag):
     card["weighted_emission"] = flag
 
 
-def population_control(pct="combing"):
+def population_control(pct="splitting-roulette"):
     """
     Set population control techniques.
 
     Parameters
     ----------
     pct : str, optional
-        Population control method (default "combing").
+        Population control method (default "spliting-roulette").
     """
 
     card = global_.input_deck.technique
