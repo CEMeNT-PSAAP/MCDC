@@ -1,6 +1,6 @@
 import numpy as np
 
-from mcdc.constant import INF, GYRATION_RADIUS_ALL, PCT_NONE, PI
+from mcdc.constant import INF, GYRATION_RADIUS_ALL, PI
 
 
 # ======================================================================================
@@ -75,7 +75,7 @@ class InputDeck:
             "weighted_emission": True,
             "implicit_capture": False,
             "population_control": False,
-            "pct": PCT_NONE,
+            "pct": "none",
             "pc_factor": 1.0,
             "weight_window": False,
             "ww": np.ones([1, 1, 1, 1]),
