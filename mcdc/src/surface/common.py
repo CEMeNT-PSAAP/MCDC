@@ -231,7 +231,7 @@ def _get_distance_moving(particle, speed, surface):
 
     # Evaluate the current and the subsequent intervals until intersecting
     while idx < surface["N_move"]:
-        # Translation particle position and direction
+        # Translate particle position and direction
         _translate_particle_position(particle, surface, idx)
         _translate_particle_direction(particle, speed, surface, idx)
 
