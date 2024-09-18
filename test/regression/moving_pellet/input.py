@@ -26,20 +26,20 @@ air = mcdc.material(
 # =============================================================================
 
 # Surfaces
-cylinder_z = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=5.0)
+cylinder_z = mcdc.surface("cylinder-z", center=[0.0, 0.0], radius=1.0)
 top_z = mcdc.surface("plane-z", z=9.0)
-# bot_z = mcdc.surface("plane-z", z=6.0)
-bot_z = mcdc.surface("plane-z", z=-9.0)
+bot_z = mcdc.surface("plane-z", z=6.0)
 
 # Move
-# top_z.move([[0.0, 0.0, -1.0], [0.0, 0.0, 2.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
-# bot_z.move([[0.0, 0.0, -1.0], [0.0, 0.0, 2.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
+# cylinder_z.move([[-0.5, 0.0, 0.0], [1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]], [2.0, 5.0, 1.0])
+top_z.move([[0.0, 0.0, -2.0], [0.0, 0.0, 4.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
+bot_z.move([[0.0, 0.0, -2.0], [0.0, 0.0, 4.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
 
 # Set container cell surfaces
-min_x = mcdc.surface("plane-x", x=-10.0, bc="vacuum")
-max_x = mcdc.surface("plane-x", x=10.0, bc="vacuum")
-min_y = mcdc.surface("plane-y", y=-10.0, bc="vacuum")
-max_y = mcdc.surface("plane-y", y=10.0, bc="vacuum")
+min_x = mcdc.surface("plane-x", x=-5.0, bc="vacuum")
+max_x = mcdc.surface("plane-x", x=5.0, bc="vacuum")
+min_y = mcdc.surface("plane-y", y=-5.0, bc="vacuum")
+max_y = mcdc.surface("plane-y", y=5.0, bc="vacuum")
 min_z = mcdc.surface("plane-z", z=-10.0, bc="vacuum")
 max_z = mcdc.surface("plane-z", z=10.0, bc="vacuum")
 
@@ -55,7 +55,7 @@ mcdc.cell(
 # =============================================================================
 # Uniform isotropic source throughout the domain
 
-mcdc.source(point=[7.5, 0.0, 0.0], time=[0.0, 9.0])
+mcdc.source(point=[2.5, 0.0, 0.0], time=[0.0, 9.0])
 
 # =============================================================================
 # Set tally, setting, and run mcdc
@@ -63,14 +63,14 @@ mcdc.source(point=[7.5, 0.0, 0.0], time=[0.0, 9.0])
 
 # Tally: cell-average and cell-edge angular fluxes and currents
 mcdc.tally.mesh_tally(
-    x=np.linspace(-10, 10, 201),
+    x=np.linspace(-5, 5, 201),
     z=np.linspace(-10, 10, 201),
     t=np.linspace(0, 9, 46),
     scores=["fission"],
 )
 
 # Setting
-mcdc.setting(N_particle=10, active_bank_buff=1000)
+mcdc.setting(N_particle=5, active_bank_buff=1000)
 
 # Run
 mcdc.run()
@@ -82,7 +82,7 @@ colors = {
 mcdc.visualize(
     "xz",
     y=0.0,
-    x=[-10.0, 10.0],
+    x=[-5.0, 5.0],
     z=[-10, 10],
     pixel=(100, 100),
     colors=colors,
