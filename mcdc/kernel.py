@@ -32,14 +32,16 @@ from mcdc.src.algorithm import binary_search, binary_search_with_length
 
 
 @toggle("domain_decomp")
-def domain_crossing(P, mcdc):
+def domain_crossing(P_arr, prog):
+    mcdc = adapt.mcdc_global(prog)
+    P = P_arr[0]
     # Domain mesh crossing
     seed = P["rng_seed"]
     max_size = mcdc["technique"]["dd_exchange_rate"]
     if mcdc["technique"]["domain_decomposition"]:
         mesh = mcdc["technique"]["dd_mesh"]
         # Determine which dimension is crossed
-        ix, iy, iz, it, outside = mesh_.structured.get_indices(P, mesh)
+        ix, iy, iz, it, outside = mesh_.structured.get_indices(P_arr, mesh)
 
         d_idx = mcdc["dd_idx"]
         d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
@@ -60,29 +62,29 @@ def domain_crossing(P, mcdc):
 
         # Score on tally
         if flag == MESH_X and P["ux"] > 0:
-            add_particle(P, mcdc["domain_decomp"]["bank_xp"])
+            add_particle(P_arr, mcdc["domain_decomp"]["bank_xp"])
             if get_bank_size(mcdc["domain_decomp"]["bank_xp"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_X and P["ux"] < 0:
-            add_particle(P, mcdc["domain_decomp"]["bank_xn"])
+            add_particle(P_arr, mcdc["domain_decomp"]["bank_xn"])
             if get_bank_size(mcdc["domain_decomp"]["bank_xn"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Y and P["uy"] > 0:
-            add_particle(P, mcdc["domain_decomp"]["bank_yp"])
+            add_particle(P_arr, mcdc["domain_decomp"]["bank_yp"])
             if get_bank_size(mcdc["domain_decomp"]["bank_yp"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Y and P["uy"] < 0:
-            add_particle(P, mcdc["domain_decomp"]["bank_yn"])
+            add_particle(P_arr, mcdc["domain_decomp"]["bank_yn"])
             if get_bank_size(mcdc["domain_decomp"]["bank_yn"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Z and P["uz"] > 0:
-            add_particle(P, mcdc["domain_decomp"]["bank_zp"])
+            add_particle(P_arr, mcdc["domain_decomp"]["bank_zp"])
             if get_bank_size(mcdc["domain_decomp"]["bank_zp"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         if flag == MESH_Z and P["uz"] < 0:
-            add_particle(P, mcdc["domain_decomp"]["bank_zn"])
+            add_particle(P_arr, mcdc["domain_decomp"]["bank_zn"])
             if get_bank_size(mcdc["domain_decomp"]["bank_zn"]) == max_size:
-                dd_particle_send(mcdc)
+                dd_initiate_particle_send(prog)
         P["alive"] = False
 
 
@@ -281,8 +283,19 @@ def dd_distribute_bank(mcdc, bank, dest_list):
     set_bank_size(bank, 0)
 
 
+@for_gpu()
+def dd_initiate_particle_send(prog):
+    adapt.halt_early(prog)
+
+
+@for_cpu()
+def dd_initiate_particle_send(prog):
+    dd_particle_send(prog)
+
+
 @njit
-def dd_particle_send(mcdc):
+def dd_particle_send(prog):
+    mcdc = adapt.mcdc_global(prog)
     dd_distribute_bank(
         mcdc, mcdc["domain_decomp"]["bank_xp"], mcdc["technique"]["dd_xp_neigh"]
     )
@@ -337,7 +350,7 @@ def dd_recv_particles(mcdc):
 
     # Set source bank from buffer
     for i in range(size):
-        add_particle(buff[i], mcdc["bank_active"])
+        add_particle(buff[i : i + 1], mcdc["bank_active"])
 
     if (
         mcdc["domain_decomp"]["recv_count"] > 0
@@ -405,7 +418,8 @@ def dd_recv(mcdc):
 
 # Check if particle is in domain
 @njit
-def particle_in_domain(P, mcdc):
+def particle_in_domain(P_arr, mcdc):
+    P = P_arr[0]
     d_idx = mcdc["dd_idx"]
     d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
     d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
@@ -416,7 +430,7 @@ def particle_in_domain(P, mcdc):
     d_ix = int(d_idx - d_Nx * d_Ny * d_iz - d_Nx * d_iy)
 
     mesh = mcdc["technique"]["dd_mesh"]
-    x_cell, y_cell, z_cell, t_cell, outside = mesh_.structured.get_indices(P, mesh)
+    x_cell, y_cell, z_cell, t_cell, outside = mesh_.structured.get_indices(P_arr, mesh)
 
     if d_ix == x_cell:
         if d_iy == y_cell:
@@ -615,11 +629,12 @@ def source_particle_dd(seed, mcdc):
     d_y = [domain_mesh["y"][d_iy], domain_mesh["y"][d_iy + 1]]
     d_z = [domain_mesh["z"][d_iz], domain_mesh["z"][d_iz + 1]]
 
-    P = np.zeros(1, dtype=type_.particle_record)[0]
+    P_arr = np.zeros(1, dtype=type_.particle_record)
+    P = P_arr[0]
 
     P["rng_seed"] = seed
     # Sample source
-    xi = rng(P)
+    xi = rng(P_arr)
     tot = 0.0
     for source in mcdc["sources"]:
         if source_in_domain(source, domain_mesh, d_idx):
@@ -646,7 +661,7 @@ def source_particle_dd(seed, mcdc):
 
     # Direction
     if source["isotropic"]:
-        ux, uy, uz = sample_isotropic_direction(P)
+        ux, uy, uz = sample_isotropic_direction(P_arr)
     elif source["white"]:
         ux, uy, uz = sample_white_direction(
             source["white_x"], source["white_y"], source["white_z"], P
@@ -657,8 +672,8 @@ def source_particle_dd(seed, mcdc):
         uz = source["uz"]
 
     # Energy and time
-    g = sample_discrete(source["group"], P)
-    t = sample_uniform(source["time"][0], source["time"][1], P)
+    g = sample_discrete(source["group"], P_arr)
+    t = sample_uniform(source["time"][0], source["time"][1], P_arr)
 
     # Make and return particle
     P["x"] = x
@@ -700,10 +715,11 @@ def distribute_work_dd(N, mcdc, precursor=False):
 
 
 @njit
-def sample_isotropic_direction(P):
+def sample_isotropic_direction(P_arr):
+    P = P_arr[0]
     # Sample polar cosine and azimuthal angle uniformly
-    mu = 2.0 * rng(P) - 1.0
-    azi = 2.0 * PI * rng(P)
+    mu = 2.0 * rng(P_arr) - 1.0
+    azi = 2.0 * PI * rng(P_arr)
 
     # Convert to Cartesian coordinates
     c = (1.0 - mu**2) ** 0.5
@@ -714,12 +730,13 @@ def sample_isotropic_direction(P):
 
 
 @njit
-def sample_white_direction(nx, ny, nz, P):
+def sample_white_direction(nx, ny, nz, P_arr):
+    P = P_arr[0]
     # Sample polar cosine
-    mu = math.sqrt(rng(P))
+    mu = math.sqrt(rng(P_arr))
 
     # Sample azimuthal direction
-    azi = 2.0 * PI * rng(P)
+    azi = 2.0 * PI * rng(P_arr)
     cos_azi = math.cos(azi)
     sin_azi = math.sin(azi)
     Ac = (1.0 - mu**2) ** 0.5
@@ -744,15 +761,17 @@ def sample_white_direction(nx, ny, nz, P):
 
 
 @njit
-def sample_uniform(a, b, P):
-    return a + rng(P) * (b - a)
+def sample_uniform(a, b, P_arr):
+    P = P_arr[0]
+    return a + rng(P_arr) * (b - a)
 
 
 # TODO: use cummulative density function and binary search
 @njit
-def sample_discrete(group, P):
+def sample_discrete(group, P_arr):
+    P = P_arr[0]
     tot = 0.0
-    xi = rng(P)
+    xi = rng(P_arr)
     for i in range(group.shape[0]):
         tot += group[i]
         if tot > xi:
@@ -760,8 +779,9 @@ def sample_discrete(group, P):
 
 
 @njit
-def sample_piecewise_linear(cdf, P):
-    xi = rng(P)
+def sample_piecewise_linear(cdf, P_arr):
+    P = P_arr[0]
+    xi = rng(P_arr)
 
     # Get bin
     idx = binary_search(xi, cdf[1])
@@ -841,7 +861,8 @@ def rng_(seed):
 
 
 @njit
-def rng(state):
+def rng(state_arr):
+    state = state_arr[0]
     state["rng_seed"] = rng_(state["rng_seed"])
     return state["rng_seed"] / RNG_MOD
 
@@ -867,12 +888,12 @@ def rng_array(seed, shape, size):
 
 
 @njit
-def source_particle(seed, mcdc):
-    P = local.particle_record()
-    P["rng_seed"] = seed
+def source_particle(P_rec_arr, seed, mcdc):
+    P_rec = P_rec_arr[0]
+    P_rec["rng_seed"] = seed
 
     # Sample source
-    xi = rng(P)
+    xi = rng(P_rec_arr)
     tot = 0.0
     for source in mcdc["sources"]:
         tot += source["prob"]
@@ -881,9 +902,9 @@ def source_particle(seed, mcdc):
 
     # Position
     if source["box"]:
-        x = sample_uniform(source["box_x"][0], source["box_x"][1], P)
-        y = sample_uniform(source["box_y"][0], source["box_y"][1], P)
-        z = sample_uniform(source["box_z"][0], source["box_z"][1], P)
+        x = sample_uniform(source["box_x"][0], source["box_x"][1], P_rec_arr)
+        y = sample_uniform(source["box_y"][0], source["box_y"][1], P_rec_arr)
+        z = sample_uniform(source["box_z"][0], source["box_z"][1], P_rec_arr)
     else:
         x = source["x"]
         y = source["y"]
@@ -891,10 +912,10 @@ def source_particle(seed, mcdc):
 
     # Direction
     if source["isotropic"]:
-        ux, uy, uz = sample_isotropic_direction(P)
+        ux, uy, uz = sample_isotropic_direction(P_rec_arr)
     elif source["white"]:
         ux, uy, uz = sample_white_direction(
-            source["white_x"], source["white_y"], source["white_z"], P
+            source["white_x"], source["white_y"], source["white_z"], P_rec_arr
         )
     else:
         ux = source["ux"]
@@ -903,28 +924,26 @@ def source_particle(seed, mcdc):
 
     # Energy and time
     if mcdc["setting"]["mode_MG"]:
-        g = sample_discrete(source["group"], P)
+        g = sample_discrete(source["group"], P_rec_arr)
         E = 0.0
     else:
         g = 0
-        E = sample_piecewise_linear(source["energy"], P)
+        E = sample_piecewise_linear(source["energy"], P_rec_arr)
 
     # Time
-    t = sample_uniform(source["time"][0], source["time"][1], P)
+    t = sample_uniform(source["time"][0], source["time"][1], P_rec_arr)
 
     # Make and return particle
-    P["x"] = x
-    P["y"] = y
-    P["z"] = z
-    P["t"] = t
-    P["ux"] = ux
-    P["uy"] = uy
-    P["uz"] = uz
-    P["g"] = g
-    P["E"] = E
-    P["w"] = 1.0
-
-    return P
+    P_rec["x"] = x
+    P_rec["y"] = y
+    P_rec["z"] = z
+    P_rec["t"] = t
+    P_rec["ux"] = ux
+    P_rec["uy"] = uy
+    P_rec["uz"] = uz
+    P_rec["g"] = g
+    P_rec["E"] = E
+    P_rec["w"] = 1.0
 
 
 # =============================================================================
@@ -959,7 +978,8 @@ def full_bank_print(bank):
 
 
 @njit
-def add_particle(P, bank):
+def add_particle(P_arr, bank):
+    P = P_arr[0]
 
     idx = add_bank_size(bank, 1)
 
@@ -968,11 +988,12 @@ def add_particle(P, bank):
         full_bank_print(bank)
 
     # Set particle
-    copy_recordlike(bank["particles"][idx], P)
+    copy_recordlike(bank["particles"][idx : idx + 1], P_arr)
 
 
 @njit
-def get_particle(P, bank, mcdc):
+def get_particle(P_arr, bank, mcdc):
+    P = P_arr[0]
 
     idx = add_bank_size(bank, -1) - 1
 
@@ -1353,9 +1374,10 @@ def pp_over_one():
 
 
 @njit
-def bank_IC(P, prog):
+def bank_IC(P_arr, prog):
+    P = P_arr[0]
 
-    mcdc = adapt.device(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # TODO: Consider multi-nuclide material
     material = mcdc["nuclides"][P["material_ID"]]
@@ -1386,11 +1408,13 @@ def bank_IC(P, prog):
         pn_over_one()
 
     # Sample particle
-    if rng(P) < Pn:
-        P_new = split_as_record(P)
+    if rng(P_arr) < Pn:
+        P_new_arr = adapt.local_array(1, type_.particle)
+        P_new = P_new_arr[0]
+        split_as_record(P_new_arr, P_arr)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
-        adapt.add_IC(P_new, prog)
+        adapt.add_IC(P_new_arr, prog)
 
         # Accumulate fission
         SigmaF = material["fission"][g]
@@ -1432,7 +1456,7 @@ def bank_IC(P, prog):
         pp_over_one()
 
     # Sample precursor
-    if rng(P) < Pp:
+    if rng(P_arr) < Pp:
         idx = add_bank_size(mcdc["technique"]["IC_bank_precursor_local"], 1)
         precursor = mcdc["technique"]["IC_bank_precursor_local"]["precursors"][idx]
         precursor["x"] = P["x"]
@@ -1441,7 +1465,7 @@ def bank_IC(P, prog):
         precursor["w"] = wp_prime / wn_prime
 
         # Sample group
-        xi = rng(P) * total
+        xi = rng(P_arr) * total
         total = 0.0
         for j in range(J):
             total += nu_d[j] / decay[j]
@@ -1467,6 +1491,10 @@ def population_control(seed, mcdc):
         pct_combing(seed, mcdc)
     elif mcdc["technique"]["pct"] == PCT_COMBING_WEIGHT:
         pct_combing_weight(seed, mcdc)
+    elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE:
+        pct_splitting_roulette(seed, mcdc)
+    elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE_WEIGHT:
+        pct_splitting_roulette_weight(seed, mcdc)
 
 
 @njit
@@ -1494,15 +1522,18 @@ def pct_combing(seed, mcdc):
     # Last hiting tooth
     tooth_end = math.floor((idx_end - offset) / td) + 1
 
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+    P_rec = P_rec_arr[0]
+
     # Locally sample particles from census bank
     set_bank_size(bank_source, 0)
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        P = make_record(bank_census["particles"][idx])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
-        P["w"] *= td
-        adapt.add_source(P, mcdc)
+        P_rec["w"] *= td
+        adapt.add_source(P_rec_arr, mcdc)
 
 
 @njit
@@ -1519,7 +1550,7 @@ def pct_combing_weight(seed, mcdc):
     td = W / M
 
     # Update population control factor
-    mcdc["technique"]["pc_factor"] *= td
+    mcdc["technique"]["pc_factor"] *= td  # This may be incorrect
 
     # Tooth offset
     xi = rng_from_seed(seed)
@@ -1531,16 +1562,107 @@ def pct_combing_weight(seed, mcdc):
     # Last hiting tooth
     tooth_end = math.floor((w_end - offset) / td) + 1
 
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+    P_rec = P_rec_arr[0]
+
     # Locally sample particles from census bank
     set_bank_size(bank_source, 0)
     idx = 0
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        P = make_record(bank_census["particles"][idx])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
-        P["w"] = td
-        adapt.add_source(P, mcdc)
+        P_rec["w"] = td
+        adapt.add_source(P_rec_arr, mcdc)
+
+
+@njit
+def pct_splitting_roulette(seed, mcdc):
+    bank_census = mcdc["bank_census"]
+    M = mcdc["setting"]["N_particle"]
+    bank_source = mcdc["bank_source"]
+
+    # Scan the bank
+    idx_start, N_local, N = bank_scanning(bank_census, mcdc)
+    idx_end = idx_start + N_local
+
+    # Weight scaling
+    ws = float(N) / float(M)
+
+    # Splitting Number
+    sn = 1.0 / ws
+
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= ws
+
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+    P_rec = P_rec_arr[0]
+
+    # Perform split-roulette to all particles in local bank
+    set_bank_size(bank_source, 0)
+    for idx in range(N_local):
+        # Weight of the surviving particles
+        w = bank_census["particles"][idx]["w"]
+        w_survive = w * ws
+
+        # Determine number of guaranteed splits
+        N_split = math.floor(sn)
+
+        # Survive the russian roulette?
+        xi = rng(bank_census["particles"][idx : idx + 1])
+        if xi < sn - N_split:
+            N_split += 1
+
+        # Split the particle
+        for i in range(N_split):
+            split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
+            # Set weight
+            P_rec["w"] = w_survive
+            adapt.add_source(P_rec_arr, mcdc)
+
+
+@njit
+def pct_splitting_roulette_weight(seed, mcdc):
+    bank_census = mcdc["bank_census"]
+    M = mcdc["setting"]["N_particle"]
+    bank_source = mcdc["bank_source"]
+
+    # Scan the bank based on weight
+    N_local = get_bank_size(bank_census)
+    w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
+    w_end = w_cdf[-1]
+
+    # Weight of the surviving particles
+    w_survive = W / M
+
+    # Update population control factor
+    mcdc["technique"]["pc_factor"] *= w_survive  # This may be incorrect
+
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+    P_rec = P_rec_arr[0]
+
+    # Perform split-roulette to all particles in local bank
+    set_bank_size(bank_source, 0)
+    for idx in range(N_local):
+        # Splitting number
+        w = bank_census["particles"][idx]["w"]
+        sn = w / w_survive
+
+        # Determine number of guaranteed splits
+        N_split = math.floor(sn)
+
+        # Survive the russian roulette?
+        xi = rng(bank_census["particles"][idx : idx + 1])
+        if xi < sn - N_split:
+            N_split += 1
+
+        # Split the particle
+        for i in range(N_split):
+            split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
+            # Set weight
+            P_rec["w"] = w_survive
+            adapt.add_source(P_rec_arr, mcdc)
 
 
 # =============================================================================
@@ -1549,31 +1671,37 @@ def pct_combing_weight(seed, mcdc):
 
 
 @njit
-def move_particle(P, distance, mcdc):
+def move_particle(P_arr, distance, mcdc):
+    P = P_arr[0]
     P["x"] += P["ux"] * distance
     P["y"] += P["uy"] * distance
     P["z"] += P["uz"] * distance
-    P["t"] += distance / physics.get_speed(P, mcdc)
+    P["t"] += distance / physics.get_speed(P_arr, mcdc)
 
 
 @njit
-def copy_recordlike(P_new, P):
-    P_new["x"] = P["x"]
-    P_new["y"] = P["y"]
-    P_new["z"] = P["z"]
-    P_new["t"] = P["t"]
-    P_new["ux"] = P["ux"]
-    P_new["uy"] = P["uy"]
-    P_new["uz"] = P["uz"]
-    P_new["g"] = P["g"]
-    P_new["E"] = P["E"]
-    P_new["w"] = P["w"]
-    P_new["rng_seed"] = P["rng_seed"]
-    P_new["iqmc"]["w"] = P["iqmc"]["w"]
+def copy_recordlike(P_new_arr, P_rec_arr):
+    P_new = P_new_arr[0]
+    P_rec = P_rec_arr[0]
+    P_new["x"] = P_rec["x"]
+    P_new["y"] = P_rec["y"]
+    P_new["z"] = P_rec["z"]
+    P_new["t"] = P_rec["t"]
+    P_new["ux"] = P_rec["ux"]
+    P_new["uy"] = P_rec["uy"]
+    P_new["uz"] = P_rec["uz"]
+    P_new["g"] = P_rec["g"]
+    P_new["E"] = P_rec["E"]
+    P_new["w"] = P_rec["w"]
+    P_new["rng_seed"] = P_rec["rng_seed"]
+    P_new["iqmc"]["w"] = P_rec["iqmc"]["w"]
 
 
 @njit
-def copy_particle(P_new, P):
+def copy_particle(P_new_arr, P_arr):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
+    P_new = P_new_arr[0]
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
@@ -1588,48 +1716,31 @@ def copy_particle(P_new, P):
     P_new["material_ID"] = P["material_ID"]
     P_new["cell_ID"] = P["cell_ID"]
     P_new["surface_ID"] = P["surface_ID"]
-    P_new["translation"] = P["translation"]
     P_new["event"] = P["event"]
     P_new["rng_seed"] = P["rng_seed"]
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
 
 
 @njit
-def make_record(P):
-    P_new = local.particle_record()
-    copy_recordlike(P_new, P)
-    return P_new
-
-
-@njit
-def make_particle(P_rec):
-    P_new = local.particle()
-    copy_recordlike(P_new, P_rec)
+def recordlike_to_particle(P_new_arr, P_rec_arr):
+    P_new = P_new_arr[0]
+    P_rec = P_rec_arr[0]
+    copy_recordlike(P_new_arr, P_rec_arr)
     P_new["fresh"] = True
     P_new["alive"] = True
     P_new["material_ID"] = -1
     P_new["cell_ID"] = -1
     P_new["surface_ID"] = -1
     P_new["event"] = -1
-    return P_new
 
 
 @njit
-def split_particle(P):
-    P_new = local.particle()
-    copy_particle(P_new, P)
-    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
-    rng(P)
-    return P_new
-
-
-@njit
-def split_as_record(P):
-    P_new = local.particle_record()
-    copy_recordlike(P_new, P)
-    P_new["rng_seed"] = split_seed(P["rng_seed"], SEED_SPLIT_PARTICLE)
-    rng(P)
-    return P_new
+def split_as_record(P_new_rec_arr, P_rec_arr):
+    P_rec = P_rec_arr[0]
+    P_new_rec = P_new_rec_arr[0]
+    copy_recordlike(P_new_rec_arr, P_rec_arr)
+    P_new_rec["rng_seed"] = split_seed(P_rec["rng_seed"], SEED_SPLIT_PARTICLE)
+    rng(P_rec_arr)
 
 
 # =============================================================================
@@ -1638,7 +1749,8 @@ def split_as_record(P):
 
 
 @njit
-def mesh_get_angular_index(P, mesh):
+def mesh_get_angular_index(P_arr, mesh):
+    P = P_arr[0]
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
@@ -1654,7 +1766,8 @@ def mesh_get_angular_index(P, mesh):
 
 
 @njit
-def mesh_get_energy_index(P, mesh, mode_MG):
+def mesh_get_energy_index(P_arr, mesh, mode_MG):
+    P = P_arr[0]
     # Check if outside grid
     outside = False
 
@@ -1674,7 +1787,8 @@ def mesh_get_energy_index(P, mesh, mode_MG):
 
 
 @njit
-def score_mesh_tally(P, distance, tally, data, mcdc):
+def score_mesh_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     mesh = tally["filter"]
@@ -1684,7 +1798,7 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    ut = 1.0 / physics.get_speed(P, mcdc)
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
 
     # Particle initial and final coordinate
     x = P["x"]
@@ -1697,11 +1811,11 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
     t_final = t + ut * distance
 
     # Easily identified tally bin indices
-    mu, azi = mesh_get_angular_index(P, mesh)
-    g, outside_energy = mesh_get_energy_index(P, mesh, mcdc["setting"]["mode_MG"])
+    mu, azi = mesh_get_angular_index(P_arr, mesh)
+    g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
 
     # Get starting indices
-    ix, iy, iz, it, outside = mesh_.structured.get_indices(P, mesh)
+    ix, iy, iz, it, outside = mesh_.structured.get_indices(P_arr, mesh)
 
     # Outside grid?
     if outside or outside_energy:
@@ -1772,12 +1886,12 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
             if score_type == SCORE_FLUX:
                 score = flux
             elif score_type == SCORE_TOTAL:
-                SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+                SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
                 score = flux * SigmaT
             elif score_type == SCORE_FISSION:
-                SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+                SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
-            tally_bin[TALLY_SCORE, idx + i] += score
+            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -1830,8 +1944,9 @@ def score_mesh_tally(P, distance, tally, data, mcdc):
 
 
 @njit
-def score_surface_tally(P, surface, tally, data, mcdc):
+def score_surface_tally(P_arr, surface, tally, data, mcdc):
     # TODO: currently not supporting filters
+    P = P_arr[0]
 
     tally_bin = data[TALLY]
     stride = tally["stride"]
@@ -1840,8 +1955,8 @@ def score_surface_tally(P, surface, tally, data, mcdc):
     idx = stride["tally"]
 
     # Flux
-    speed = physics.get_speed(P, mcdc)
-    mu = surface_.get_normal_component(P, speed, surface)
+    speed = physics.get_speed(P_arr, mcdc)
+    mu = surface_.get_normal_component(P_arr, speed, surface)
     flux = P["w"] / abs(mu)
 
     # Score
@@ -1851,7 +1966,7 @@ def score_surface_tally(P, surface, tally, data, mcdc):
             score = flux
         elif score_type == SCORE_NET_CURRENT:
             score = flux * mu
-        tally_bin[TALLY_SCORE, idx + i] += score
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
 
 
 @njit
@@ -1924,12 +2039,13 @@ def tally_closeout(data, mcdc):
 
 
 @njit
-def eigenvalue_tally(P, distance, mcdc):
+def eigenvalue_tally(P_arr, distance, mcdc):
+    P = P_arr[0]
     material = mcdc["materials"][P["material_ID"]]
     flux = distance * P["w"]
 
     # Get nu-fission
-    nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P, mcdc)
+    nuSigmaF = get_MacroXS(XS_NU_FISSION, material, P_arr, mcdc)
 
     # Fission production (needed even during inactive cycle)
     # mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
@@ -1937,7 +2053,7 @@ def eigenvalue_tally(P, distance, mcdc):
 
     if mcdc["cycle_active"]:
         # Neutron density
-        v = physics.get_speed(P, mcdc)
+        v = physics.get_speed(P_arr, mcdc)
         n_density = flux / v
         # mcdc["eigenvalue_tally_n"][0] += n_density
         adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
@@ -1947,7 +2063,7 @@ def eigenvalue_tally(P, distance, mcdc):
 
         # Precursor density
         J = material["J"]
-        SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+        SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
         # Get the decay-wighted multiplicity
         total = 0.0
         if mcdc["setting"]["mode_MG"]:
@@ -2138,19 +2254,21 @@ def eigenvalue_tally_closeout(mcdc):
 
 
 @njit
-def move_to_event(P, data, mcdc):
+def move_to_event(P_arr, data, mcdc):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
+    P = P_arr[0]
 
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
-    #   If material is not identified yet, locate the particle.
-    if mcdc["setting"]["mode_MG"] and P["cell_ID"] == -1:
-        if not geometry.locate_particle(P, mcdc):
-            # Particle is lost
-            P["event"] = EVENT_LOST
-            return
+    if mcdc["setting"]["mode_MG"]:
+        # If material is not identified yet, locate the particle
+        if P["material_ID"] == -1:
+            if not geometry.locate_particle(P_arr, mcdc):
+                # Particle is lost
+                P["event"] = EVENT_LOST
+                return
 
     # ==================================================================================
     # Geometry inspection
@@ -2160,7 +2278,7 @@ def move_to_event(P, data, mcdc):
     #   - Set particle boundary event (surface or lattice crossing, or lost)
     #   - Return distance to boundary (surface or lattice)
 
-    d_boundary = geometry.inspect_geometry(P, mcdc)
+    d_boundary = geometry.inspect_geometry(P_arr, mcdc)
 
     # Particle is lost?
     if P["event"] == EVENT_LOST:
@@ -2171,11 +2289,11 @@ def move_to_event(P, data, mcdc):
     # ==================================================================================
 
     # Distance to domain
-    speed = physics.get_speed(P, mcdc)
+    speed = physics.get_speed(P_arr, mcdc)
     d_domain = INF
     if mcdc["technique"]["domain_decomposition"]:
         d_domain = mesh_.structured.get_crossing_distance(
-            P, speed, mcdc["technique"]["dd_mesh"]
+            P_arr, speed, mcdc["technique"]["dd_mesh"]
         )
 
     # Distance to time boundary
@@ -2186,7 +2304,7 @@ def move_to_event(P, data, mcdc):
     d_time_census = speed * (mcdc["setting"]["census_time"][idx] - P["t"])
 
     # Distance to next collision
-    d_collision = distance_to_collision(P, mcdc)
+    d_collision = distance_to_collision(P_arr, mcdc)
 
     # =========================================================================
     # Determine event(s)
@@ -2234,26 +2352,27 @@ def move_to_event(P, data, mcdc):
     # Score tracklength tallies
     if mcdc["cycle_active"]:
         for tally in mcdc["mesh_tallies"]:
-            score_mesh_tally(P, distance, tally, data, mcdc)
+            score_mesh_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
-        eigenvalue_tally(P, distance, mcdc)
+        eigenvalue_tally(P_arr, distance, mcdc)
 
     # Move particle
-    move_particle(P, distance, mcdc)
+    move_particle(P_arr, distance, mcdc)
 
 
 @njit
-def distance_to_collision(P, mcdc):
+def distance_to_collision(P_arr, mcdc):
+    P = P_arr[0]
     # Get total cross-section
     material = mcdc["materials"][P["material_ID"]]
-    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
 
     # Vacuum material?
     if SigmaT == 0.0:
         return INF
 
     # Sample collision distance
-    xi = rng(P)
+    xi = rng(P_arr)
     distance = -math.log(xi) / SigmaT
     return distance
 
@@ -2264,8 +2383,9 @@ def distance_to_collision(P, mcdc):
 
 
 @njit
-def surface_crossing(P, data, prog):
-    mcdc = adapt.device(prog)
+def surface_crossing(P_arr, data, prog):
+    P = P_arr[0]
+    mcdc = adapt.mcdc_global(prog)
 
     # Apply BC
     surface = mcdc["surfaces"][P["surface_ID"]]
@@ -2278,7 +2398,7 @@ def surface_crossing(P, data, prog):
     for i in range(surface["N_tally"]):
         ID = surface["tally_IDs"][i]
         tally = mcdc["surface_tallies"][ID]
-        score_surface_tally(P, surface, tally, data, mcdc)
+        score_surface_tally(P_arr, surface, tally, data, mcdc)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
@@ -2291,14 +2411,15 @@ def surface_crossing(P, data, prog):
 
 
 @njit
-def collision(P, mcdc):
+def collision(P_arr, mcdc):
+    P = P_arr[0]
     # Get the reaction cross-sections
     material = mcdc["materials"][P["material_ID"]]
     g = P["g"]
-    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
-    SigmaS = get_MacroXS(XS_SCATTER, material, P, mcdc)
-    SigmaC = get_MacroXS(XS_CAPTURE, material, P, mcdc)
-    SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+    SigmaS = get_MacroXS(XS_SCATTER, material, P_arr, mcdc)
+    SigmaC = get_MacroXS(XS_CAPTURE, material, P_arr, mcdc)
+    SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
 
     # Implicit capture
     if mcdc["technique"]["implicit_capture"]:
@@ -2306,7 +2427,7 @@ def collision(P, mcdc):
         SigmaT -= SigmaC
 
     # Sample collision type
-    xi = rng(P) * SigmaT
+    xi = rng(P_arr) * SigmaT
     tot = SigmaS
     if tot > xi:
         P["event"] += EVENT_SCATTERING
@@ -2324,8 +2445,9 @@ def collision(P, mcdc):
 
 
 @njit
-def scattering(P, prog):
-    mcdc = adapt.device(prog)
+def scattering(P_arr, prog):
+    P = P_arr[0]
+    mcdc = adapt.mcdc_global(prog)
     # Kill the current particle
     P["alive"] = False
 
@@ -2342,19 +2464,22 @@ def scattering(P, prog):
     g = P["g"]
     if mcdc["setting"]["mode_MG"]:
         nu_s = material["nu_s"][g]
-        N = int(math.floor(weight_eff * nu_s + rng(P)))
+        N = int(math.floor(weight_eff * nu_s + rng(P_arr)))
     else:
         N = 1
 
+    P_new_arr = adapt.local_array(1, type_.particle_record)
+    P_new = P_new_arr[0]
+
     for n in range(N):
         # Create new particle
-        P_new = split_as_record(P)
+        split_as_record(P_new_arr, P_arr)
 
         # Set weight
         P_new["w"] = weight_new
 
         # Sample scattering phase space
-        sample_phasespace_scattering(P, material, P_new, mcdc)
+        sample_phasespace_scattering(P_arr, material, P_new_arr, mcdc)
 
         # Bank, but keep it if it is the last particle
         if n == N - 1:
@@ -2366,11 +2491,13 @@ def scattering(P, prog):
             P["E"] = P_new["E"]
             P["w"] = P_new["w"]
         else:
-            adapt.add_active(P_new, prog)
+            adapt.add_active(P_new_arr, prog)
 
 
 @njit
-def sample_phasespace_scattering(P, material, P_new, mcdc):
+def sample_phasespace_scattering(P_arr, material, P_new_arr, mcdc):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Copy relevant attributes
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -2378,29 +2505,33 @@ def sample_phasespace_scattering(P, material, P_new, mcdc):
     P_new["t"] = P["t"]
 
     if mcdc["setting"]["mode_MG"]:
-        scattering_MG(P, material, P_new)
+        scattering_MG(P_arr, material, P_new_arr)
     else:
-        scattering_CE(P, material, P_new, mcdc)
+        scattering_CE(P_arr, material, P_new_arr, mcdc)
 
 
 @njit
-def sample_phasespace_scattering_nuclide(P, nuclide, P_new, mcdc):
+def sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Copy relevant attributes
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
     P_new["z"] = P["z"]
     P_new["t"] = P["t"]
 
-    scattering_MG(P, nuclide, P_new)
+    scattering_MG(P_arr, nuclide, P_new_arr)
 
 
 @njit
-def scattering_MG(P, material, P_new):
+def scattering_MG(P_arr, material, P_new_arr):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Sample scattering angle
-    mu0 = 2.0 * rng(P_new) - 1.0
+    mu0 = 2.0 * rng(P_new_arr) - 1.0
 
     # Scatter direction
-    azi = 2.0 * PI * rng(P_new)
+    azi = 2.0 * PI * rng(P_new_arr)
     P_new["ux"], P_new["uy"], P_new["uz"] = scatter_direction(
         P["ux"], P["uy"], P["uz"], mu0, azi
     )
@@ -2411,7 +2542,7 @@ def scattering_MG(P, material, P_new):
     chi_s = material["chi_s"][g]
 
     # Sample outgoing energy
-    xi = rng(P_new)
+    xi = rng(P_new_arr)
     tot = 0.0
     for g_out in range(G):
         tot += chi_s[g_out]
@@ -2421,7 +2552,9 @@ def scattering_MG(P, material, P_new):
 
 
 @njit
-def scattering_CE(P, material, P_new, mcdc):
+def scattering_CE(P_arr, material, P_new_arr, mcdc):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     """
     Scatter with sampled scattering angle mu0, with nucleus mass A
     Scattering is treated in Center of mass (COM) frame
@@ -2431,8 +2564,8 @@ def scattering_CE(P, material, P_new, mcdc):
       - Isotropic in COM
     """
     # Sample nuclide
-    nuclide = sample_nuclide(material, P, XS_SCATTER, mcdc)
-    xi = rng(P) * get_MacroXS(XS_SCATTER, material, P, mcdc)
+    nuclide = sample_nuclide(material, P_arr, XS_SCATTER, mcdc)
+    xi = rng(P_arr) * get_MacroXS(XS_SCATTER, material, P_arr, mcdc)
     tot = 0.0
     for i in range(material["N_nuclide"]):
         ID_nuclide = material["nuclide_IDs"][i]
@@ -2449,14 +2582,14 @@ def scattering_CE(P, material, P_new, mcdc):
         Vy = 0.0
         Vz = 0.0
     else:
-        Vx, Vy, Vz = sample_nucleus_speed(A, P, mcdc)
+        Vx, Vy, Vz = sample_nucleus_speed(A, P_arr, mcdc)
 
     # =========================================================================
     # COM kinematics
     # =========================================================================
 
     # Particle speed
-    P_speed = physics.get_speed(P, mcdc)
+    P_speed = physics.get_speed(P_arr, mcdc)
 
     # Neutron velocity - LAB
     vx = P_speed * P["ux"]
@@ -2482,8 +2615,8 @@ def scattering_CE(P, material, P_new, mcdc):
     uz = vz / P_speed
 
     # Scatter the direction in COM
-    mu0 = 2.0 * rng(P) - 1.0
-    azi = 2.0 * PI * rng(P)
+    mu0 = 2.0 * rng(P_arr) - 1.0
+    azi = 2.0 * PI * rng(P_arr)
     ux_new, uy_new, uz_new = scatter_direction(ux, uy, uz, mu0, azi)
 
     # Neutron final velocity - COM
@@ -2512,9 +2645,10 @@ def scattering_CE(P, material, P_new, mcdc):
 
 
 @njit
-def sample_nucleus_speed(A, P, mcdc):
+def sample_nucleus_speed(A, P_arr, mcdc):
+    P = P_arr[0]
     # Particle speed
-    P_speed = physics.get_speed(P, mcdc)
+    P_speed = physics.get_speed(P_arr, mcdc)
 
     # Maxwellian parameter
     beta = math.sqrt(2.0659834e-11 * A)
@@ -2526,22 +2660,24 @@ def sample_nucleus_speed(A, P, mcdc):
     #   rejection sampling
     y = beta * P_speed
     while True:
-        if rng(P) < 2.0 / (2.0 + PI_SQRT * y):
-            x = math.sqrt(-math.log(rng(P) * rng(P)))
+        if rng(P_arr) < 2.0 / (2.0 + PI_SQRT * y):
+            x = math.sqrt(-math.log(rng(P_arr) * rng(P_arr)))
         else:
-            cos_val = math.cos(PI_HALF * rng(P))
-            x = math.sqrt(-math.log(rng(P)) - math.log(rng(P)) * cos_val * cos_val)
+            cos_val = math.cos(PI_HALF * rng(P_arr))
+            x = math.sqrt(
+                -math.log(rng(P_arr)) - math.log(rng(P_arr)) * cos_val * cos_val
+            )
         V_tilda = x / beta
-        mu_tilda = 2.0 * rng(P) - 1.0
+        mu_tilda = 2.0 * rng(P_arr) - 1.0
 
         # Accept candidate V_tilda and mu_tilda?
-        if rng(P) > math.sqrt(
+        if rng(P_arr) > math.sqrt(
             P_speed * P_speed + V_tilda * V_tilda - 2.0 * P_speed * V_tilda * mu_tilda
         ) / (P_speed + V_tilda):
             break
 
     # Set nuclide velocity - LAB
-    azi = 2.0 * PI * rng(P)
+    azi = 2.0 * PI * rng(P_arr)
     ux, uy, uz = scatter_direction(P["ux"], P["uy"], P["uz"], mu_tilda, azi)
     Vx = ux * V_tilda
     Vy = uy * V_tilda
@@ -2582,8 +2718,9 @@ def scatter_direction(ux, uy, uz, mu0, azi):
 
 
 @njit
-def fission(P, prog):
-    mcdc = adapt.device(prog)
+def fission(P_arr, prog):
+    P = P_arr[0]
+    mcdc = adapt.mcdc_global(prog)
 
     # Kill the current particle
     P["alive"] = False
@@ -2605,23 +2742,26 @@ def fission(P, prog):
         g = P["g"]
         nu = material["nu_f"][g]
     else:
-        nuclide = sample_nuclide(material, P, XS_FISSION, mcdc)
+        nuclide = sample_nuclide(material, P_arr, XS_FISSION, mcdc)
         E = P["E"]
         nu = get_nu(NU_FISSION, nuclide, E)
-    N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P)))
+    N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P_arr)))
+
+    P_new_arr = adapt.local_array(1, type_.particle_record)
+    P_new = P_new_arr[0]
 
     for n in range(N):
         # Create new particle
-        P_new = split_as_record(P)
+        split_as_record(P_new_arr, P_arr)
 
         # Set weight
         P_new["w"] = weight_new
 
         # Sample fission neutron phase space
         if mcdc["setting"]["mode_MG"]:
-            sample_phasespace_fission(P, material, P_new, mcdc)
+            sample_phasespace_fission(P_arr, material, P_new_arr, mcdc)
         else:
-            sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc)
+            sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
 
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
@@ -2630,9 +2770,9 @@ def fission(P, prog):
         # Bank
         idx_census = mcdc["idx_census"]
         if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
-            adapt.add_census(P_new, prog)
+            adapt.add_census(P_new_arr, prog)
         elif mcdc["setting"]["mode_eigenvalue"]:
-            adapt.add_census(P_new, prog)
+            adapt.add_census(P_new_arr, prog)
         else:
             # Keep it if it is the last particle
             if n == N - 1:
@@ -2645,11 +2785,13 @@ def fission(P, prog):
                 P["E"] = P_new["E"]
                 P["w"] = P_new["w"]
             else:
-                adapt.add_active(P_new, prog)
+                adapt.add_active(P_new_arr, prog)
 
 
 @njit
-def sample_phasespace_fission(P, material, P_new, mcdc):
+def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Get constants
     G = material["G"]
     J = material["J"]
@@ -2666,10 +2808,10 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
     P_new["t"] = P["t"]
 
     # Sample isotropic direction
-    P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(P_new)
+    P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(P_new_arr)
 
     # Prompt or delayed?
-    xi = rng(P_new) * nu
+    xi = rng(P_new_arr) * nu
     tot = nu_p
     if xi < tot:
         prompt = True
@@ -2688,8 +2830,8 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
                     spectrum = nuclide["chi_d"][j]
                     decay = nuclide["decay"][j]
                     break
-                SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
-                xi = rng(P_new) * nu_d[j] * SigmaF
+                SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+                xi = rng(P_new_arr) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
                     nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -2703,7 +2845,7 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
                 break
 
     # Sample outgoing energy
-    xi = rng(P_new)
+    xi = rng(P_new_arr)
     tot = 0.0
     for g_out in range(G):
         tot += spectrum[g_out]
@@ -2713,12 +2855,14 @@ def sample_phasespace_fission(P, material, P_new, mcdc):
 
     # Sample emission time
     if not prompt:
-        xi = rng(P_new)
+        xi = rng(P_new_arr)
         P_new["t"] -= math.log(xi) / decay
 
 
 @njit
-def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
+def sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Copy relevant attributes
     P_new["x"] = P["x"]
     P_new["y"] = P["y"]
@@ -2726,16 +2870,18 @@ def sample_phasespace_fission_nuclide(P, nuclide, P_new, mcdc):
     P_new["t"] = P["t"]
 
     # Sample isotropic direction
-    P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(P_new)
+    P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(P_new_arr)
 
     if mcdc["setting"]["mode_MG"]:
-        fission_MG(P, nuclide, P_new)
+        fission_MG(P_arr, nuclide, P_new_arr)
     else:
-        fission_CE(P, nuclide, P_new)
+        fission_CE(P_arr, nuclide, P_new_arr)
 
 
 @njit
-def fission_MG(P, nuclide, P_new):
+def fission_MG(P_arr, nuclide, P_new_arr):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Get constants
     G = nuclide["G"]
     J = nuclide["J"]
@@ -2746,7 +2892,7 @@ def fission_MG(P, nuclide, P_new):
         nu_d = nuclide["nu_d"][g]
 
     # Prompt or delayed?
-    xi = rng(P_new) * nu
+    xi = rng(P_new_arr) * nu
     tot = nu_p
     if xi < tot:
         prompt = True
@@ -2763,7 +2909,7 @@ def fission_MG(P, nuclide, P_new):
                 break
 
     # Sample outgoing energy
-    xi = rng(P_new)
+    xi = rng(P_new_arr)
     tot = 0.0
     for g_out in range(G):
         tot += spectrum[g_out]
@@ -2773,26 +2919,27 @@ def fission_MG(P, nuclide, P_new):
 
     # Sample emission time
     if not prompt:
-        xi = rng(P_new)
+        xi = rng(P_new_arr)
         P_new["t"] -= math.log(xi) / decay
 
 
 @njit
-def fission_CE(P, nuclide, P_new):
+def fission_CE(P_arr, nuclide, P_new_arr):
+    P_new = P_new_arr[0]
+    P = P_arr[0]
     # Get constants
     E = P["E"]
     J = 6
     nu = get_nu(NU_FISSION, nuclide, E)
     nu_p = get_nu(NU_FISSION_PROMPT, nuclide, E)
-    nu_d_struct = local.precursor_group_array()
-    nu_d = nu_d_struct["values"]
+    nu_d = adapt.local_array(J, type_.float64)
     for j in range(J):
         nu_d[j] = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
 
     # Delayed?
     prompt = True
     delayed_group = -1
-    xi = rng(P_new) * nu
+    xi = rng(P_new_arr) * nu
     tot = nu_p
     if xi > tot:
         prompt = False
@@ -2810,37 +2957,55 @@ def fission_CE(P, nuclide, P_new):
         NE_chi = nuclide["NE_chi_p"]
         chi = nuclide["ce_chi_p"]
         P_new["E"] = sample_Eout(
-            P_new, nuclide["E_chi_p"], nuclide["NE_chi_p"], nuclide["ce_chi_p"]
+            P_new_arr, nuclide["E_chi_p"], nuclide["NE_chi_p"], nuclide["ce_chi_p"]
         )
     else:
         if delayed_group == 0:
             P_new["E"] = sample_Eout(
-                P_new, nuclide["E_chi_d1"], nuclide["NE_chi_d1"], nuclide["ce_chi_d1"]
+                P_new_arr,
+                nuclide["E_chi_d1"],
+                nuclide["NE_chi_d1"],
+                nuclide["ce_chi_d1"],
             )
         elif delayed_group == 1:
             P_new["E"] = sample_Eout(
-                P_new, nuclide["E_chi_d2"], nuclide["NE_chi_d2"], nuclide["ce_chi_d2"]
+                P_new_arr,
+                nuclide["E_chi_d2"],
+                nuclide["NE_chi_d2"],
+                nuclide["ce_chi_d2"],
             )
         elif delayed_group == 2:
             P_new["E"] = sample_Eout(
-                P_new, nuclide["E_chi_d3"], nuclide["NE_chi_d3"], nuclide["ce_chi_d3"]
+                P_new_arr,
+                nuclide["E_chi_d3"],
+                nuclide["NE_chi_d3"],
+                nuclide["ce_chi_d3"],
             )
         elif delayed_group == 3:
             P_new["E"] = sample_Eout(
-                P_new, nuclide["E_chi_d4"], nuclide["NE_chi_d4"], nuclide["ce_chi_d4"]
+                P_new_arr,
+                nuclide["E_chi_d4"],
+                nuclide["NE_chi_d4"],
+                nuclide["ce_chi_d4"],
             )
         elif delayed_group == 4:
             P_new["E"] = sample_Eout(
-                P_new, nuclide["E_chi_d5"], nuclide["NE_chi_d5"], nuclide["ce_chi_d5"]
+                P_new_arr,
+                nuclide["E_chi_d5"],
+                nuclide["NE_chi_d5"],
+                nuclide["ce_chi_d5"],
             )
         else:
             P_new["E"] = sample_Eout(
-                P_new, nuclide["E_chi_d6"], nuclide["NE_chi_d6"], nuclide["ce_chi_d6"]
+                P_new_arr,
+                nuclide["E_chi_d6"],
+                nuclide["NE_chi_d6"],
+                nuclide["ce_chi_d6"],
             )
 
     # Sample emission time
     if not prompt:
-        xi = rng(P_new)
+        xi = rng(P_new_arr)
         P_new["t"] -= math.log(xi) / nuclide["ce_decay"][delayed_group]
 
 
@@ -2850,33 +3015,37 @@ def fission_CE(P, nuclide, P_new):
 
 
 @njit
-def branchless_collision(P, prog):
-    mcdc = adapt.device(prog)
+def branchless_collision(P_arr, prog):
+    P = P_arr[0]
+    mcdc = adapt.mcdc_global(prog)
 
     material = mcdc["materials"][P["material_ID"]]
 
     # Adjust weight
-    SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
-    n_scatter = get_MacroXS(XS_NU_SCATTER, material, P, mcdc)
-    n_fission = get_MacroXS(XS_NU_FISSION, material, P, mcdc) / mcdc["k_eff"]
+    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+    n_scatter = get_MacroXS(XS_NU_SCATTER, material, P_arr, mcdc)
+    n_fission = get_MacroXS(XS_NU_FISSION, material, P_arr, mcdc) / mcdc["k_eff"]
     n_total = n_fission + n_scatter
     P["w"] *= n_total / SigmaT
 
+    P_rec_arr = adapt.local_array(1, type_.particle_record)
+
     # Set spectrum and decay rate
-    if rng(P) < n_scatter / n_total:
-        sample_phasespace_scattering(P, material, P, mcdc)
+    if rng(P_arr) < n_scatter / n_total:
+        sample_phasespace_scattering(P_arr, material, P_arr, mcdc)
     else:
         if mcdc["setting"]["mode_MG"]:
-            sample_phasespace_fission(P, material, P, mcdc)
+            sample_phasespace_fission(P_arr, material, P_arr, mcdc)
         else:
-            nuclide = sample_nuclide(material, P, XS_NU_FISSION, mcdc)
-            sample_phasespace_fission_nuclide(P, nuclide, P, mcdc)
+            nuclide = sample_nuclide(material, P_arr, XS_NU_FISSION, mcdc)
+            sample_phasespace_fission_nuclide(P_arr, nuclide, P_arr, mcdc)
 
             # Beyond time census or time boundary?
             idx_census = mcdc["idx_census"]
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
                 P["alive"] = False
-                adapt.add_active(split_as_record(P), prog)
+                split_as_record(P_rec_arr, P_arr)
+                adapt.add_active(P_rec_arr, prog)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
 
@@ -2887,12 +3056,13 @@ def branchless_collision(P, prog):
 
 
 @njit
-def weight_window(P, prog):
-    mcdc = adapt.device(prog)
+def weight_window(P_arr, prog):
+    P = P_arr[0]
+    mcdc = adapt.mcdc_global(prog)
 
     # Get indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(
-        P, mcdc["technique"]["ww_mesh"]
+        P_arr, mcdc["technique"]["ww_mesh"]
     )
 
     # Target weight
@@ -2907,6 +3077,8 @@ def weight_window(P, prog):
     # Window width
     width = mcdc["technique"]["ww_width"]
 
+    P_new_arr = adapt.local_array(1, type_.particle_record)
+
     # If above target
     if p > width:
         # Set target weight
@@ -2915,18 +3087,20 @@ def weight_window(P, prog):
         # Splitting (keep the original particle)
         n_split = math.floor(p)
         for i in range(n_split - 1):
-            adapt.add_active(split_as_record(P), prog)
+            split_as_record(P_new_arr, P_arr)
+            adapt.add_active(P_new_arr, prog)
 
         # Russian roulette
         p -= n_split
-        xi = rng(P)
+        xi = rng(P_arr)
         if xi <= p:
-            adapt.add_active(split_as_record(P), prog)
+            split_as_record(P_new_arr, P_arr)
+            adapt.add_active(P_new_arr, prog)
 
     # Below target
     elif p < 1.0 / width:
         # Russian roulette
-        xi = rng(P)
+        xi = rng(P_arr)
         if xi > p:
             P["alive"] = False
         else:
@@ -2939,10 +3113,11 @@ def weight_window(P, prog):
 
 
 @njit
-def weight_roulette(P, mcdc):
+def weight_roulette(P_arr, mcdc):
+    P = P_arr[0]
     w_survive = mcdc["technique"]["wr_survive"]
     prob_survive = P["w"] / w_survive
-    if rng(P) <= prob_survive:
+    if rng(P_arr) <= prob_survive:
         P["w"] = w_survive
         if mcdc["technique"]["iQMC"]:
             P["iqmc"]["w"][:] = w_survive
@@ -2956,7 +3131,8 @@ def weight_roulette(P, mcdc):
 
 
 @njit
-def get_MacroXS(type_, material, P, mcdc):
+def get_MacroXS(type_, material, P_arr, mcdc):
+    P = P_arr[0]
     # Multigroup XS
     g = P["g"]
     if mcdc["setting"]["mode_MG"]:
@@ -3111,8 +3287,9 @@ def get_nu(type_, nuclide, E):
 
 
 @njit
-def sample_nuclide(material, P, type_, mcdc):
-    xi = rng(P) * get_MacroXS(type_, material, P, mcdc)
+def sample_nuclide(material, P_arr, type_, mcdc):
+    P = P_arr[0]
+    xi = rng(P_arr) * get_MacroXS(type_, material, P_arr, mcdc)
     tot = 0.0
     for i in range(material["N_nuclide"]):
         ID_nuclide = material["nuclide_IDs"][i]
@@ -3127,8 +3304,9 @@ def sample_nuclide(material, P, type_, mcdc):
 
 
 @njit
-def sample_Eout(P_new, E_grid, NE, chi):
-    xi = rng(P_new)
+def sample_Eout(P_new_arr, E_grid, NE, chi):
+    P_new = P_new_arr[0]
+    xi = rng(P_new_arr)
 
     # Determine bin index
     idx = binary_search_with_length(xi, chi, NE)
