@@ -418,8 +418,9 @@ def make_gpu_loop_source(args):
 
     ASYNC_EXECUTION = args.gpu_strat == "async"
 
-    @njit
+    @njit(cache=caching)
     def gpu_loop_source(seed, data, mcdc):
+        # TAP_TOKEN_2154434
         # Progress bar indicator
         N_prog = 0
 
@@ -431,37 +432,53 @@ def make_gpu_loop_source(args):
         # =====================================================================
 
         # For async execution
-        iter_count = 65536
+        iter_count = 6553600
         # For event-based execution
         batch_size = 1
 
-        mcdc["mpi_work_iter"][0] = 0
-        mcdc["source_seed"] = seed
 
-        # Store the global state to the GPU
-        src_store_constant(mcdc["gpu_state_pointer"], mcdc)
-        src_store_data(mcdc["gpu_state_pointer"], data)
-
-        # Execute the program, and continue to do so until it is done
+        full_work_size = mcdc["mpi_work_size"]
         if ASYNC_EXECUTION:
-            src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
-            while not src_complete(mcdc["source_program_pointer"]):
-                kernel.dd_particle_send(mcdc)
-                src_exec_program(
-                    mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
-                )
+            phase_size = 1000000000
         else:
-            src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
-            while not src_complete(mcdc["source_program_pointer"]):
-                kernel.dd_particle_send(mcdc)
-                src_exec_program(
-                    mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
-                )
+            phase_size = 1000000
+        phase_count = (full_work_size+phase_size-1) // phase_size
 
-        # Recover the original program state
-        src_load_constant(mcdc, mcdc["gpu_state_pointer"])
-        src_load_data(data, mcdc["gpu_state_pointer"])
-        src_clear_flags(mcdc["source_program_pointer"])
+
+
+        for phase in range(phase_count):
+
+            mcdc["mpi_work_iter"][0] = phase_size*phase
+            mcdc["mpi_work_size"] = min(phase_size*(phase+1),full_work_size)
+            mcdc["source_seed"] = seed
+
+            # Store the global state to the GPU
+            src_store_constant(mcdc["gpu_state_pointer"], mcdc)
+            src_store_data(mcdc["gpu_state_pointer"], data)
+
+            # Execute the program, and continue to do so until it is done
+            if ASYNC_EXECUTION:
+                src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
+                while not src_complete(mcdc["source_program_pointer"]):
+                    kernel.dd_particle_send(mcdc)
+                    src_exec_program(
+                        mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
+                    )
+            else:
+                src_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
+                while not src_complete(mcdc["source_program_pointer"]):
+                    kernel.dd_particle_send(mcdc)
+                    src_exec_program(
+                        mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
+                    )
+
+            # Recover the original program state
+            src_load_constant(mcdc, mcdc["gpu_state_pointer"])
+            src_load_data(data, mcdc["gpu_state_pointer"])
+            src_clear_flags(mcdc["source_program_pointer"])
+
+        mcdc["mpi_work_size"] = full_work_size
+
 
         kernel.set_bank_size(mcdc["bank_active"], 0)
 
@@ -785,10 +802,10 @@ def make_gpu_loop_source_precursor(args):
 
     ASYNC_EXECUTION = args.gpu_strat == "async"
 
-    @njit
+    @njit(cache=caching)
     def gpu_loop_source_precursor(seed, data, mcdc):
         # TODO: censussed neutrons seeding is still not reproducible
-
+        # TAP_TOKEN_2154434
         # Progress bar indicator
         N_prog = 0
 
@@ -808,7 +825,7 @@ def make_gpu_loop_source_precursor(args):
         # Number of blocks to launch and number of iterations to run
 
         # For async execution
-        iter_count = 65536
+        iter_count = 6553600
         # For event-based execution
         batch_size = 1
 
@@ -843,6 +860,7 @@ def make_gpu_loop_source_precursor(args):
 
         kernel.set_bank_size(mcdc["bank_active"], 0)
 
+        print(kernel.get_bank_size(mcdc["bank_census"]))
         # =====================================================================
         # Closeout (moved out of loop)
         # =====================================================================
