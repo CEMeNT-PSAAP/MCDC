@@ -1490,9 +1490,10 @@ def population_control(seed, mcdc):
     elif mcdc["technique"]["pct"] == PCT_COMBING_WEIGHT:
         pct_combing_weight(seed, mcdc)
     elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE:
-        pct_splitting_roulette(seed,mcdc)
+        pct_splitting_roulette(seed, mcdc)
     elif mcdc["technique"]["pct"] == PCT_SPLITTING_ROULETTE_WEIGHT:
-        pct_splitting_roulette_weight(seed,mcdc)
+        pct_splitting_roulette_weight(seed, mcdc)
+
 
 @njit
 def pct_combing(seed, mcdc):
@@ -1527,7 +1528,7 @@ def pct_combing(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx = math.floor(tooth) - idx_start
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] *= td
         adapt.add_source(P_rec_arr, mcdc)
@@ -1547,7 +1548,7 @@ def pct_combing_weight(seed, mcdc):
     td = W / M
 
     # Update population control factor
-    mcdc["technique"]["pc_factor"] *= td
+    mcdc["technique"]["pc_factor"] *= td  # This may be incorrect
 
     # Tooth offset
     xi = rng_from_seed(seed)
@@ -1568,10 +1569,11 @@ def pct_combing_weight(seed, mcdc):
     for i in range(tooth_start, tooth_end):
         tooth = i * td + offset
         idx += binary_search(tooth, w_cdf[idx:])
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
+        split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] = td
         adapt.add_source(P_rec_arr, mcdc)
+
 
 @njit
 def pct_splitting_roulette(seed, mcdc):
@@ -1584,10 +1586,10 @@ def pct_splitting_roulette(seed, mcdc):
     idx_end = idx_start + N_local
 
     # Weight scaling
-    ws = N / M
+    ws = float(N) / float(M)
 
     # Splitting Number
-    sn = M / N
+    sn = 1.0 / ws
 
     # Update population control factor
     mcdc["technique"]["pc_factor"] *= ws
@@ -1595,21 +1597,27 @@ def pct_splitting_roulette(seed, mcdc):
     P_rec_arr = adapt.local_array(1, type_.particle_record)
     P_rec = P_rec_arr[0]
 
-    # Locally sample particles from census bank
+    # Perform split-roulette to all particles in local bank
     set_bank_size(bank_source, 0)
     for idx in range(N_local):
-        copy_recordlike(P_rec_arr, bank_census["particles"][idx : idx + 1])
-        # Set weight
-        P_rec["w"] = ws
+        # Weight of the surviving particles
+        w = bank_census["particles"][idx]["w"]
+        w_survive = w * ws
 
-        residual_weight = sn
-        while residual_weight > 1:
+        # Determine number of guaranteed splits
+        N_split = math.floor(sn)
+
+        # Survive the russian roulette?
+        xi = rng(bank_census["particles"][idx : idx + 1])
+        if xi < sn - N_split:
+            N_split += 1
+
+        # Split the particle
+        for i in range(N_split):
+            split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
+            # Set weight
+            P_rec["w"] = w_survive
             adapt.add_source(P_rec_arr, mcdc)
-            residual_weight -= 1
-
-        if rng_from_seed(P_rec["rng_seed"]) <= residual_weight:
-            adapt.add_source(P_rec_arr, mcdc)
-
 
 
 @njit
@@ -1623,40 +1631,36 @@ def pct_splitting_roulette_weight(seed, mcdc):
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
 
-    print(N_local)
-
-    # Weight scaling
-    ws = W / M
+    # Weight of the surviving particles
+    w_survive = W / M
 
     # Update population control factor
-    mcdc["technique"]["pc_factor"] *= ws
+    mcdc["technique"]["pc_factor"] *= w_survive  # This may be incorrect
 
     P_rec_arr = adapt.local_array(1, type_.particle_record)
     P_rec = P_rec_arr[0]
 
-    # Locally sample particles from census bank
+    # Perform split-roulette to all particles in local bank
     set_bank_size(bank_source, 0)
-    idx = 0
     for idx in range(N_local):
-        P_census_arr = bank_census["particles"][idx:(idx+1)]
-        P_census = P_census_arr[0]
-        residual_weight = P_census["w"] / ws
+        # Splitting number
+        w = bank_census["particles"][idx]["w"]
+        sn = w / w_survive
 
+        # Determine number of guaranteed splits
+        N_split = math.floor(sn)
 
-        while residual_weight >= 1:
-            split_as_record(P_rec_arr, P_census_arr)
+        # Survive the russian roulette?
+        xi = rng(bank_census["particles"][idx : idx + 1])
+        if xi < sn - N_split:
+            N_split += 1
+
+        # Split the particle
+        for i in range(N_split):
+            split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
             # Set weight
-            P_rec["w"] = ws
+            P_rec["w"] = w_survive
             adapt.add_source(P_rec_arr, mcdc)
-            residual_weight -= 1
-
-        if rng(P_rec_arr) <= residual_weight:
-            split_as_record(P_rec_arr, P_census_arr)
-            # Set weight
-            P_rec["w"] = ws
-            adapt.add_source(P_rec_arr, mcdc)
-
-
 
 
 # =============================================================================
