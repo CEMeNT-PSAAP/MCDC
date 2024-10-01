@@ -364,7 +364,6 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
 
 
-
 def dd_mesh_bounds(idx):
     """
     Defining mesh tally boundaries for domain decomposition.
@@ -935,7 +934,15 @@ def prepare():
     # =========================================================================
 
     # Population control technique (PCT)
-    mcdc["technique"]["pct"] = input_deck.technique["pct"]
+    pct = input_deck.technique["pct"]
+    if pct == "combing":
+        mcdc["technique"]["pct"] = PCT_COMBING
+    elif pct == "combing-weight":
+        mcdc["technique"]["pct"] = PCT_COMBING_WEIGHT
+    elif pct == "splitting-roulette":
+        mcdc["technique"]["pct"] = PCT_SPLITTING_ROULETTE
+    elif pct == "splitting-roulette-weight":
+        mcdc["technique"]["pct"] = PCT_SPLITTING_ROULETTE_WEIGHT
     mcdc["technique"]["pc_factor"] = input_deck.technique["pc_factor"]
 
     # =========================================================================
