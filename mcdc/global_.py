@@ -35,6 +35,7 @@ class InputDeck:
         self.sources = []
         self.mesh_tallies = []
         self.surface_tallies = []
+        self.cell_tallies = []
 
         self.setting = {
             "tag": "Setting",

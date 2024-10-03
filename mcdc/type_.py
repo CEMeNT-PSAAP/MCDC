@@ -44,6 +44,7 @@ source = None
 setting = None
 mesh_tally = None
 surface_tally = None
+cell_tally = None
 technique = None
 
 global_ = None
@@ -513,20 +514,30 @@ def make_type_surface(input_deck):
 # ==============================================================================
 
 
-cell = into_dtype(
-    [
-        ("ID", int64),
-        # Fill status
-        ("fill_type", int64),
-        ("fill_ID", int64),
-        ("fill_translated", bool),
-        # Local coordinate modifier
-        ("translation", float64, (3,)),
-        # Data indices
-        ("surface_data_idx", int64),
-        ("region_data_idx", int64),
-    ]
-)
+def make_type_cell(input_deck):
+    global cell
+
+    # Maximum number tallies
+    Nmax_tally = 0
+    for cell in input_deck.cells:
+        Nmax_tally = max(Nmax_tally, len(cell.tally_IDs))
+
+    cell = into_dtype(
+        [
+            ("ID", int64),
+            # Fill status
+            ("fill_type", int64),
+            ("fill_ID", int64),
+            ("fill_translated", bool),
+            # Local coordinate modifier
+            ("translation", float64, (3,)),
+            # Data indices
+            ("surface_data_idx", int64),
+            ("region_data_idx", int64),
+            ("N_tally", int64),
+            ("tally_IDs", int64, (Nmax_tally,)),
+        ]
+    )
 
 
 # ==============================================================================
@@ -756,7 +767,9 @@ def make_type_surface_tally(input_deck):
     Nmax_azi = 2
     Nmax_g = 2
     Nmax_score = 1
-    for card in input_deck.mesh_tallies:
+
+    # IDK if this is right, but I changed this to input_deck.surface_tallies
+    for card in input_deck.surface_tallies:
         Nmax_t = max(Nmax_t, len(card.t))
         Nmax_mu = max(Nmax_mu, len(card.mu))
         Nmax_azi = max(Nmax_azi, len(card.azi))
@@ -793,6 +806,54 @@ def make_type_surface_tally(input_deck):
     # Make tally structure
     surface_tally = into_dtype(struct)
 
+
+def make_type_cell_tally(input_deck):
+    global cell_tally
+    struct = []
+
+    # Maximum number of grid for each mesh coordinate and filter
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+
+    for card in input_deck.cell_tallies:
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
+
+    # Set the filter
+    filter_ = [
+        ("cell_ID", int64),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
+    ]
+    struct = [("filter", filter_)]
+
+    # Tally strides
+    stride = [
+        ("tally", int64),
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+    ]
+    struct += [("stride", stride)]
+
+    # Total number of bins
+    struct += [("N_bin", int64)]
+
+    # Scores
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
+
+    # Make tally structure
+    cell_tally = into_dtype(struct)
 
 # ==============================================================================
 # Setting
@@ -1214,6 +1275,7 @@ def make_type_global(input_deck):
     N_lattice = len(input_deck.lattices)
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
+    N_cell_tally = len(input_deck.cell_tallies)
 
     # Cell data sizes
     N_cell_surface = 0
@@ -1284,6 +1346,7 @@ def make_type_global(input_deck):
             ("sources", source, (N_source,)),
             ("mesh_tallies", mesh_tally, (N_mesh_tally,)),
             ("surface_tallies", surface_tally, (N_surface_tally,)),
+            ("cell_tallies", cell_tally, (N_cell_tally,)),
             ("setting", setting),
             ("technique", technique),
             ("domain_decomp", domain_decomp),

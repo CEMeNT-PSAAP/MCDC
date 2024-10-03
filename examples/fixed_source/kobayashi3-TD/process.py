@@ -11,16 +11,23 @@ import matplotlib.animation as animation
 
 # Results
 with h5py.File("output.h5", "r") as f:
-    x = f["tally/grid/x"][:]
+    tallies = f["tallies/mesh_tally_0"]
+    flux = tallies["flux"]
+    grid = tallies["grid"]
+    x = grid["x"][:]
     x_mid = 0.5 * (x[:-1] + x[1:])
-    y = f["tally/grid/y"][:]
+    y = grid["y"][:]
     y_mid = 0.5 * (y[:-1] + y[1:])
-    t = f["tally/grid/t"][:]
+    t = grid["t"][:]
     t_mid = 0.5 * (t[:-1] + t[1:])
     X, Y = np.meshgrid(y, x)
 
-    phi = f["tally/flux/mean"][:]
-    phi_sd = f["tally/flux/sdev"][:]
+    phi = flux["mean"][:]
+    phi_sd = flux["sdev"][:]
+
+    cell = f["tallies/cell_tally_0/flux"]
+    print(f'cell mean = {cell["mean"][()]}')
+    print(f'cell sdev = {cell["sdev"][()]}')
 
 fig, ax = plt.subplots()
 cax = ax.pcolormesh(X, Y, phi[0], vmin=phi[0].min(), vmax=phi[0].max())

@@ -406,11 +406,13 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
+    type_.make_type_cell(input_deck)
     type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
     type_.make_type_mesh_tally(input_deck)
     type_.make_type_surface_tally(input_deck)
+    type_.make_type_cell_tally(input_deck)
     type_.make_type_setting(input_deck)
     type_.make_type_uq(input_deck)
     type_.make_type_domain_decomp(input_deck)
@@ -578,7 +580,7 @@ def prepare():
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
-        for name in ["ID", "fill_ID", "translation"]:
+        for name in ["ID", "fill_ID", "translation", "N_tally"]:
             copy_field(mcdc["cells"][i], input_deck.cells[i], name)
 
         # Fill type
@@ -671,6 +673,7 @@ def prepare():
 
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
+    N_cell_tally = len(input_deck.cell_tallies)
     tally_size = 0
 
     # Mesh tallies
@@ -823,6 +826,61 @@ def prepare():
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
+
+    # Cell tallies
+    for i in range(N_cell_tally):
+        copy_field(mcdc["cell_tallies"][i], input_deck.cell_tallies[i], "N_bin")
+
+        # Filters (variables with possible different sizes)
+        for name in ["t", "mu", "azi", "g"]:
+            N = len(getattr(input_deck.cell_tallies[i], name))
+            mcdc["cell_tallies"][i]["filter"][name][:N] = getattr(
+                input_deck.cell_tallies[i], name
+            )
+
+        # Set tally scores and their strides
+        N_score = len(input_deck.cell_tallies[i].scores)
+        mcdc["cell_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.cell_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["cell_tallies"][i]["scores"][j] = score_type 
+
+        # Filter grid sizes
+        Nmu = len(input_deck.cell_tallies[i].mu) - 1
+        N_azi = len(input_deck.cell_tallies[i].azi) - 1
+        Ng = len(input_deck.cell_tallies[i].g) - 1
+        Nt = len(input_deck.cell_tallies[i].t) - 1
+
+        # Update N_bin
+        mcdc["cell_tallies"][i]["N_bin"] *= N_score
+
+        # Filter strides
+        stride = N_score
+        if Nt > 1:
+            mcdc["mesh_tallies"][i]["stride"]["t"] = stride
+            stride *= Nt
+        if Ng > 1:
+            mcdc["mesh_tallies"][i]["stride"]["g"] = stride
+            stride *= Ng
+        if N_azi > 1:
+            mcdc["mesh_tallies"][i]["stride"]["azi"] = stride
+            stride *= N_azi  
+        if Nmu > 1:
+            mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
+            stride *= Nmu
+
+        # Set tally stride and accumulate total tally size
+        mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["cell_tallies"][i]["N_bin"]
+
+
     # Set tally data
     if not input_deck.technique["uq"]:
         tally = np.zeros((3, tally_size), dtype=type_.float64)
@@ -839,11 +897,11 @@ def prepare():
     t_limit = max(
         [
             tally["filter"]["t"][-1]
-            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"])
+            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"]) + list(mcdc["cell_tallies"])
         ]
     )
 
-    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) == 0:
+    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) + len(input_deck.cell_tallies) == 0:
         t_limit = INF
 
     # Check if time boundary is above the final tally mesh time grid
@@ -1297,6 +1355,7 @@ def generate_hdf5(data, mcdc):
                 cardlist_to_h5group(
                     input_deck.surface_tallies, input_group, "surface_tally"
                 )
+                cardlist_to_h5group(input_deck.cell_tallies, input_group, "cell_tallie")
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
@@ -1349,7 +1408,7 @@ def generate_hdf5(data, mcdc):
                 tally_bin = data[TALLY][:, start : start + N_bin]
                 if mcdc["technique"]["domain_decomposition"]:
                     # substitute recomposed tally
-                    tally_bin = dd_tally[:, start : start + N_bin]
+                    tally_bin = dd_tally[:, start : start + N_bin]                
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -1409,6 +1468,50 @@ def generate_hdf5(data, mcdc):
                     elif score_type == SCORE_NET_CURRENT:
                         score_name = "net-current"
                     group_name = "tallies/surface_tally_%i/%s/" % (ID, score_name)
+
+                    mean = score_tally_bin[TALLY_SUM]
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            for ID, tally in enumerate(mcdc["cell_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+
+                # Shape
+                N_score = tally["N_score"]
+                
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, N_score)
+                else:
+                    shape = (5, N_score)
+
+                # Reshape tally
+                N_bin = tally["N_bin"]
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 1, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/cell_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
