@@ -70,7 +70,7 @@ mcdc.tally.cell_tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1000)
+mcdc.setting(N_particle=10)
 mcdc.implicit_capture()
 
 # Run
