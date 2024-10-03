@@ -1966,7 +1966,8 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
         adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
 
 
-def score_cell_tally(P, distance, tally, data, mcdc):
+def score_cell_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     stride = tally["stride"]
@@ -1975,7 +1976,7 @@ def score_cell_tally(P, distance, tally, data, mcdc):
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    ut = 1.0 / physics.get_speed(P, mcdc)
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
 
     # Particle initial and final coordinate
     x = P["x"]
@@ -1996,10 +1997,10 @@ def score_cell_tally(P, distance, tally, data, mcdc):
         if score_type == SCORE_FLUX:
             score = flux
         elif score_type == SCORE_TOTAL:
-            SigmaT = get_MacroXS(XS_TOTAL, material, P, mcdc)
+            SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
             score = flux * SigmaT
         elif score_type == SCORE_FISSION:
-            SigmaF = get_MacroXS(XS_FISSION, material, P, mcdc)
+            SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
             score = flux * SigmaF
 
         tally_bin[TALLY_SCORE, cell_idx + i] += score
@@ -2393,7 +2394,7 @@ def move_to_event(P_arr, data, mcdc):
         cell = mcdc["cells"][P["cell_ID"]]
         if cell["N_tally"] != 0:
             for tally in mcdc["cell_tallies"]:
-                score_cell_tally(P, distance, tally, data, mcdc)
+                score_cell_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
