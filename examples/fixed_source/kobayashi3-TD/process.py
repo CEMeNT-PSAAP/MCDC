@@ -24,10 +24,13 @@ with h5py.File("output.h5", "r") as f:
 
     phi = flux["mean"][:]
     phi_sd = flux["sdev"][:]
+<<<<<<< HEAD
 
     cell = f["tallies/cell_tally_0/flux"]
     print(f'cell mean = {cell["mean"][()]}')
     print(f'cell sdev = {cell["sdev"][()]}')
+=======
+>>>>>>> 9777b9aefec5863c2c21781ba9ce98cf1e5c94ee
 
 fig, ax = plt.subplots()
 cax = ax.pcolormesh(X, Y, phi[0], vmin=phi[0].min(), vmax=phi[0].max())

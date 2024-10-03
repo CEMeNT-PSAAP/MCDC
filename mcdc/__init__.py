@@ -26,6 +26,10 @@ from mcdc.input_ import (
     save_particle_bank,
 )
 import mcdc.tally
-from mcdc.main import run, prepare
+from mcdc.main import (
+    prepare,
+    run,
+    visualize,
+)
 
 __version__ = importlib.metadata.version("mcdc")
