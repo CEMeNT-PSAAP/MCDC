@@ -1,6 +1,9 @@
 import argparse, os, sys
 import importlib.metadata
+import matplotlib.pyplot as plt
 import numba as nb
+
+from matplotlib import colors as mpl_colors
 
 # Parse command-line arguments
 #   TODO: Will be inside run() once Python/Numba adapter is integrated
@@ -15,6 +18,42 @@ parser.add_argument(
 
 parser.add_argument(
     "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
+)
+
+parser.add_argument(
+    "--gpu_strat",
+    type=str,
+    help="Strategy used in GPU execution (event or async)",
+    choices=["async", "event"],
+    default="event",
+)
+
+parser.add_argument(
+    "--gpu_block_count",
+    type=int,
+    help="Number of blocks used in GPU execution",
+    default=240,
+)
+
+parser.add_argument(
+    "--gpu_arena_size",
+    type=int,
+    help="Capacity of each intermediate data buffer used, as a particle count",
+    default=0x100000,
+)
+
+parser.add_argument(
+    "--gpu_rocm_path",
+    type=str,
+    help="Path to ROCm installation for use in GPU execution",
+    default=None,
+)
+
+parser.add_argument(
+    "--gpu_cuda_path",
+    type=str,
+    help="Path to CUDA installation for use in GPU execution",
+    default=None,
 )
 
 parser.add_argument("--N_particle", type=int, help="Number of particles")
@@ -42,6 +81,7 @@ if mode == "python":
 elif mode == "numba":
     nb.config.DISABLE_JIT = False
     nb.config.NUMBA_DEBUG_CACHE = 1
+    nb.config.THREADING_LAYER = "workqueue"
 elif mode == "numba_debug":
     msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
     print_warning(msg)
@@ -86,7 +126,6 @@ from mpi4py import MPI
 
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
-import mcdc.code_factory as code_factory
 
 import mcdc.adapt as adapt
 from mcdc.constant import *
@@ -96,6 +135,7 @@ from mcdc.loop import (
     set_cache,
     build_gpu_progs,
 )
+import mcdc.geometry as geometry
 from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
 
 import mcdc.loop as loop
@@ -125,7 +165,10 @@ def run():
     preparation_start = MPI.Wtime()
     if input_deck.technique["iQMC"]:
         iqmc_validate_inputs(input_deck)
-    data, mcdc = prepare()
+
+    data_arr, mcdc_arr = prepare()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
     # Print banner, hardware configuration, and header
@@ -140,11 +183,11 @@ def run():
     # Run simulation
     simulation_start = MPI.Wtime()
     if mcdc["technique"]["iQMC"]:
-        iqmc_simulation(mcdc)
+        iqmc_simulation(mcdc_arr)
     elif mcdc["setting"]["mode_eigenvalue"]:
-        loop_eigenvalue(data, mcdc)
+        loop_eigenvalue(data_arr, mcdc_arr)
     else:
-        loop_fixed_source(data, mcdc)
+        loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Output: generate hdf5 output files
@@ -251,6 +294,13 @@ def dd_prepare():
 
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
+
+    if input_deck.technique["dd_exchange_rate_padding"] == None:
+        if args.target == "gpu":
+            padding = args.gpu_block_count * 64 * 16
+        else:
+            padding = 0
+        input_deck.technique["dd_exchange_rate_padding"] = padding
 
     if work_ratio is None:
         work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
@@ -419,42 +469,24 @@ def prepare():
     type_.make_type_dd_turnstile_event(input_deck)
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
+    type_.make_size_rpn(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
     input_deck.setting["target"] = target
-    code_factory.make_locals(input_deck)
 
     # =========================================================================
     # Create the global variable container
     #   TODO: Better alternative?
     # =========================================================================
 
-    mcdc = np.zeros(1, dtype=type_.global_)[0]
+    mcdc_arr = np.zeros(1, dtype=type_.global_)
+    mcdc = mcdc_arr[0]
 
     # Now, set up the global variable container
 
     # Get modes
     mode_CE = input_deck.setting["mode_CE"]
     mode_MG = input_deck.setting["mode_MG"]
-
-    # =========================================================================
-    # Platform Targeting, Adapters, Toggles, etc
-    # =========================================================================
-
-    if target == "gpu":
-        if not adapt.HAS_HARMONIZE:
-            print_error(
-                "No module named 'harmonize' - GPU functionality not available. "
-            )
-        adapt.gpu_forward_declare()
-
-    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
-    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
-    adapt.eval_toggle()
-    adapt.target_for(target)
-    if target == "gpu":
-        build_gpu_progs()
-    adapt.nopython_mode(mode == "numba")
 
     # =========================================================================
     # Nuclides
@@ -887,6 +919,35 @@ def prepare():
     else:
         tally = np.zeros((5, tally_size), dtype=type_.float64)
 
+        
+    # =========================================================================
+    # Establish Data Type from Tally Info and Construct Tallies
+    # =========================================================================
+
+    type_.make_type_tally(input_deck, tally_size)
+    data_arr = np.zeros(1, dtype=type_.tally)
+
+    # =========================================================================
+    # Platform Targeting, Adapters, Toggles, etc
+    # =========================================================================
+
+    if target == "gpu":
+        if MPI.COMM_WORLD.Get_rank() != 0:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
+        if not adapt.HAS_HARMONIZE:
+            print_error(
+                "No module named 'harmonize' - GPU functionality not available. "
+            )
+        adapt.gpu_forward_declare(args)
+
+    adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
+    adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
+    adapt.eval_toggle()
+    adapt.target_for(target)
+    if target == "gpu":
+        build_gpu_progs(input_deck, args)
+    adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
+
     # =========================================================================
     # Setting
     # =========================================================================
@@ -942,7 +1003,15 @@ def prepare():
     # =========================================================================
 
     # Population control technique (PCT)
-    mcdc["technique"]["pct"] = input_deck.technique["pct"]
+    pct = input_deck.technique["pct"]
+    if pct == "combing":
+        mcdc["technique"]["pct"] = PCT_COMBING
+    elif pct == "combing-weight":
+        mcdc["technique"]["pct"] = PCT_COMBING_WEIGHT
+    elif pct == "splitting-roulette":
+        mcdc["technique"]["pct"] = PCT_SPLITTING_ROULETTE
+    elif pct == "splitting-roulette-weight":
+        mcdc["technique"]["pct"] = PCT_SPLITTING_ROULETTE_WEIGHT
     mcdc["technique"]["pc_factor"] = input_deck.technique["pc_factor"]
 
     # =========================================================================
@@ -1228,9 +1297,7 @@ def prepare():
     # Finalize data: wrapping into a tuple
     # =========================================================================
 
-    data = (tally,)
-
-    return data, mcdc
+    return data_arr, mcdc_arr
 
 
 def cardlist_to_h5group(dictlist, input_group, name):
@@ -1643,3 +1710,115 @@ def closeout(mcdc):
 
     print_runtime(mcdc)
     input_deck.reset()
+
+
+# ======================================================================================
+# Visualize geometry
+# ======================================================================================
+
+
+def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
+    """
+    2D visualization of the created model
+
+    Parameters
+    ----------
+    vis_plane : {'xy', 'yz', 'xz', 'zx', 'yz', 'zy'}
+        Axis plane to visualize
+    x : float or array_like
+        Plane x-position (float) for 'yz' plot. Range of x-axis for 'xy' or 'xz' plot.
+    y : float or array_like
+        Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
+    z : float or array_like
+        Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
+    pixel : array_like
+        Number of respective pixel in the two axes in vis_plane
+    colors : array_like
+        List of pairs of material and its color
+    """
+    # TODO: add input error checkers
+
+    _, mcdc = prepare()
+
+    # Color assignment for materials (by material ID)
+    if colors is not None:
+        new_colors = {}
+        for item in colors.items():
+            new_colors[item[0].ID] = mpl_colors.to_rgb(item[1])
+        colors = new_colors
+    else:
+        colors = {}
+        for i in range(len(mcdc["materials"])):
+            colors[i] = plt.cm.Set1(i)[:-1]
+    WHITE = mpl_colors.to_rgb("white")
+
+    # Set reference axis
+    for axis in ["x", "y", "z"]:
+        if axis not in vis_type:
+            reference_key = axis
+
+    if reference_key == "x":
+        reference = x
+    elif reference_key == "y":
+        reference = y
+    elif reference_key == "z":
+        reference = z
+
+    # Set first and second axes
+    first_key = vis_type[0]
+    second_key = vis_type[1]
+
+    if first_key == "x":
+        first = x
+    elif first_key == "y":
+        first = y
+    elif first_key == "z":
+        first = z
+
+    if second_key == "x":
+        second = x
+    elif second_key == "y":
+        second = y
+    elif second_key == "z":
+        second = z
+
+    # Axis pixel sizes
+    d_first = (first[1] - first[0]) / pixel[0]
+    d_second = (second[1] - second[0]) / pixel[1]
+
+    # Axis pixel grids and midpoints
+    first_grid = np.linspace(first[0], first[1], pixel[0] + 1)
+    first_midpoint = 0.5 * (first_grid[1:] + first_grid[:-1])
+
+    second_grid = np.linspace(second[0], second[1], pixel[1] + 1)
+    second_midpoint = 0.5 * (second_grid[1:] + second_grid[:-1])
+
+    # Set dummy particle
+    particle = np.zeros(1, dtype=type_.particle)[0]
+    particle[reference_key] = reference
+    particle["g"] = 0
+    particle["E"] = 1e6
+
+    # RGB color data for each pixel
+    data = np.zeros(pixel + (3,))
+
+    # Loop over the two axes
+    for i in range(pixel[0]):
+        particle[first_key] = first_midpoint[i]
+        for j in range(pixel[1]):
+            particle[second_key] = second_midpoint[j]
+
+            # Get material
+            particle["cell_ID"] = -1
+            particle["material_ID"] = -1
+            if geometry.locate_particle(particle, mcdc):
+                data[i, j] = colors[particle["material_ID"]]
+            else:
+                data[i, j] = WHITE
+
+    data = np.transpose(data, (1, 0, 2))
+    plt.imshow(data, origin="lower", extent=first + second)
+    plt.xlabel(first_key + " cm")
+    plt.ylabel(second_key + " cm")
+    plt.title(reference_key + " = %.2f cm" % reference)
+    plt.show()

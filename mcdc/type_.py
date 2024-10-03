@@ -3,9 +3,9 @@ import math
 import numpy as np
 import os
 
-from numba import njit
 from mpi4py import MPI
 from mpi4py.util.dtlib import from_numpy_dtype
+from numba import njit
 
 from mcdc.print_ import print_error
 
@@ -48,6 +48,36 @@ cell_tally = None
 technique = None
 
 global_ = None
+tally = None
+
+
+# ==============================================================================
+# MC/DC Member Array Sizes
+# ==============================================================================
+
+
+def literalize(value):
+    jit_str = f"@njit\ndef impl():\n    return {value}\n"
+    exec(jit_str, globals(), locals())
+    return eval("impl")
+
+
+def material_g_size():
+    pass
+
+
+def material_j_size():
+    pass
+
+
+def rpn_buffer_size():
+    pass
+
+
+def make_size_rpn(input_deck):
+    global rpn_buffer_size
+    size = max([np.sum(np.array(x._region_RPN) >= 0.0) for x in input_deck.cells])
+    rpn_buffer_size = literalize(size)
 
 
 # ==============================================================================
@@ -441,6 +471,14 @@ def make_type_material(input_deck):
     if mode_MG:
         G = input_deck.materials[0].G
         J = input_deck.materials[0].J
+
+    G_adjusted = max(1, G)
+    J_adjusted = max(1, J)
+
+    global material_g_size
+    global material_j_size
+    material_g_size = literalize(G_adjusted)
+    material_j_size = literalize(J_adjusted)
 
     # General data
     struct = [
@@ -967,6 +1005,7 @@ def make_type_technique(input_deck):
     struct += [("dd_sent", int64)]
     struct += [("dd_work_ratio", int64, (len(card["dd_work_ratio"]),))]
     struct += [("dd_exchange_rate", int64)]
+    struct += [("dd_exchange_rate_padding", int64)]
     struct += [("dd_repro", bool_)]
     struct += [("dd_xp_neigh", int64, (len(card["dd_xp_neigh"]),))]
     struct += [("dd_xn_neigh", int64, (len(card["dd_xn_neigh"]),))]
@@ -1210,12 +1249,14 @@ def make_type_domain_decomp(input_deck):
     global domain_decomp
     # Domain banks if needed
     if input_deck.technique["domain_decomposition"]:
-        bank_domain_xp = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_xn = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_yp = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_yn = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_zp = particle_bank(input_deck.technique["dd_exchange_rate"])
-        bank_domain_zn = particle_bank(input_deck.technique["dd_exchange_rate"])
+        bank_size = input_deck.technique["dd_exchange_rate"]
+        bank_size += input_deck.technique["dd_exchange_rate_padding"]
+        bank_domain_xp = particle_bank(bank_size)
+        bank_domain_xn = particle_bank(bank_size)
+        bank_domain_yp = particle_bank(bank_size)
+        bank_domain_yn = particle_bank(bank_size)
+        bank_domain_zp = particle_bank(bank_size)
+        bank_domain_zn = particle_bank(bank_size)
     else:
         bank_domain_xp = particle_bank(0)
         bank_domain_xn = particle_bank(0)
@@ -1394,12 +1435,23 @@ def make_type_global(input_deck):
             ("runtime_bank_management", float64),
             ("precursor_strength", float64),
             ("mpi_work_iter", int64, (1,)),
-            ("gpu_state", uintp),
-            ("source_program", uintp),
-            ("precursor_program", uintp),
+            ("gpu_state_pointer", uintp),
+            ("source_program_pointer", uintp),
+            ("precursor_program_pointer", uintp),
             ("source_seed", uint64),
         ]
     )
+
+
+def make_type_tally(input_deck, tally_size):
+    global tally
+
+    if not input_deck.technique["uq"]:
+        width = 3
+    else:
+        width = 5
+
+    tally = into_dtype([("tally", float64, (width, tally_size))])
 
 
 # ==============================================================================

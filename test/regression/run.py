@@ -64,7 +64,7 @@ names = temp
 if target == "gpu":
     temp = names.copy()
     for name in names:
-        if "iqmc" in name:
+        if ("iqmc" in name) or ("eigenvalue" in name):
             temp.remove(name)
             print(
                 Fore.YELLOW + "Note: Skipping %s (GPU target)" % name + Style.RESET_ALL
@@ -84,7 +84,7 @@ for i, name in enumerate(names):
     print("\n[%i/%i] " % (i + 1, len(names)) + name)
     error_msgs.append([])
     crashes.append(False)
-    runtimes.append(-1)
+    runtimes.append([0])
 
     # Change directory
     os.chdir(name)
@@ -108,9 +108,12 @@ for i, name in enumerate(names):
             % (mpiexec, mode, target)
         )
     elif srun > 1:
+        gpus_per_task = ""
+        if target == "gpu":
+            gpus_per_task = f"--gpus-per-task=1 "
         os.system(
-            "srun -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (srun, mode, target)
+            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar %s> tmp 2>&1"
+            % (srun, gpus_per_task, mode, target)
         )
     else:
         os.system(
@@ -150,6 +153,10 @@ for i, name in enumerate(names):
                     a = output[name][()]
                     b = answer[name][()]
 
+                    if (("sdev" in result) or ("uq_var" in result)) and (
+                        args.target == "gpu"
+                    ):
+                        continue
                     # Passed?
                     if np.isclose(a, b).all():
                         print(

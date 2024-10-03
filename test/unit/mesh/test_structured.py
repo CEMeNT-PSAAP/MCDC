@@ -14,7 +14,7 @@ from mcdc.mesh.structured import (
 
 
 def particle(x, y, z, t, ux, uy, uz):
-    return {"x": x, "y": y, "z": z, "t": t, "ux": ux, "uy": uy, "uz": uz}
+    return [{"x": x, "y": y, "z": z, "t": t, "ux": ux, "uy": uy, "uz": uz}]
 
 
 grid = np.array([-6.0, -3.0, -1.0, 0.0, 1.0, 3.0, 6.0])
