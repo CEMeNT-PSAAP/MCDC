@@ -13,29 +13,33 @@ from mcdc.constant import (
 
 
 @njit
-def evaluate(particle, surface):
+def evaluate(particle_container, surface):
+    particle = particle_container[0]
     return particle["y"] + surface["J"]
 
 
 @njit
-def reflect(particle, surface):
+def reflect(particle_container, surface):
+    particle = particle_container[0]
     particle["uy"] = -particle["uy"]
 
 
 @njit
-def get_normal_component(particle, surface):
+def get_normal_component(particle_container, surface):
+    particle = particle_container[0]
     return particle["uy"]
 
 
 @njit
-def get_distance(particle, surface):
+def get_distance(particle_container, surface):
+    particle = particle_container[0]
     # Parallel?
-    normal_component = get_normal_component(particle, surface)
+    normal_component = get_normal_component(particle_container, surface)
     if abs(normal_component) == 0.0:
         return INF
 
     # Coincident?
-    f = evaluate(particle, surface)
+    f = evaluate(particle_container, surface)
     if abs(f) < COINCIDENCE_TOLERANCE:
         return INF
 

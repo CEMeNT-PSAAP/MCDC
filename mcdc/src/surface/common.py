@@ -36,56 +36,58 @@ from mcdc.src.algorithm import binary_search_with_length
 
 
 @njit
-def check_sense(particle, speed, surface):
+def check_sense(particle_container, speed, surface):
     """
     Check on which side of the surface the particle is
         - Return True if on positive side
         - Return False otherwise
     Particle direction and speed are used to tiebreak coincidence.
     """
-    result = evaluate(particle, surface)
+    particle = particle_container[0]
+    result = evaluate(particle_container, surface)
 
     # Check if coincident on the surface
     if abs(result) < COINCIDENCE_TOLERANCE:
         # Determine sense based on the direction
-        return get_normal_component(particle, speed, surface) > 0.0
+        return get_normal_component(particle_container, speed, surface) > 0.0
 
     return result > 0.0
 
 
 @njit
-def evaluate(particle, surface):
+def evaluate(particle_container, surface):
     """
     Evaluate the surface equation wrt the particle coordinate
     """
+    particle = particle_container[0]
     if surface["moving"]:
         # Temporarily translate particle position
         x_original = particle["x"]
         y_original = particle["y"]
         z_original = particle["z"]
         idx = _get_move_idx(particle["t"], surface)
-        _translate_particle_position(particle, surface, idx)
+        _translate_particle_position(particle_container, surface, idx)
 
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
-            result = plane_x.evaluate(particle, surface)
+            result = plane_x.evaluate(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Y:
-            result = plane_y.evaluate(particle, surface)
+            result = plane_y.evaluate(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Z:
-            result = plane_z.evaluate(particle, surface)
+            result = plane_z.evaluate(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE:
-            result = plane.evaluate(particle, surface)
+            result = plane.evaluate(particle_container, surface)
     else:
         if surface["type"] & SURFACE_CYLINDER_X:
-            result = cylinder_x.evaluate(particle, surface)
+            result = cylinder_x.evaluate(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Y:
-            result = cylinder_y.evaluate(particle, surface)
+            result = cylinder_y.evaluate(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Z:
-            result = cylinder_z.evaluate(particle, surface)
+            result = cylinder_z.evaluate(particle_container, surface)
         elif surface["type"] & SURFACE_SPHERE:
-            result = sphere.evaluate(particle, surface)
+            result = sphere.evaluate(particle_container, surface)
         else:
-            result = quadric.evaluate(particle, surface)
+            result = quadric.evaluate(particle_container, surface)
 
     if surface["moving"]:
         # Restore particle position
@@ -97,40 +99,41 @@ def evaluate(particle, surface):
 
 
 @njit
-def get_normal_component(particle, speed, surface):
+def get_normal_component(particle_container, speed, surface):
     """
     Get the surface outward-normal component of the particle
     This is the dot product of the particle and the surface outward-normal directions.
     Particle speed is needed if the surface is moving to get the relative direction.
     """
+    particle = particle_container[0]
     if surface["moving"]:
         # Temporarily translate particle direction
         ux_original = particle["ux"]
         uy_original = particle["uy"]
         uz_original = particle["uz"]
         idx = _get_move_idx(particle["t"], surface)
-        _translate_particle_direction(particle, speed, surface, idx)
+        _translate_particle_direction(particle_container, speed, surface, idx)
 
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
-            result = plane_x.get_normal_component(particle, surface)
+            result = plane_x.get_normal_component(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Y:
-            result = plane_y.get_normal_component(particle, surface)
+            result = plane_y.get_normal_component(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Z:
-            result = plane_z.get_normal_component(particle, surface)
+            result = plane_z.get_normal_component(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE:
-            result = plane.get_normal_component(particle, surface)
+            result = plane.get_normal_component(particle_container, surface)
     else:
         if surface["type"] & SURFACE_CYLINDER_X:
-            result = cylinder_x.get_normal_component(particle, surface)
+            result = cylinder_x.get_normal_component(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Y:
-            result = cylinder_y.get_normal_component(particle, surface)
+            result = cylinder_y.get_normal_component(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Z:
-            result = cylinder_z.get_normal_component(particle, surface)
+            result = cylinder_z.get_normal_component(particle_container, surface)
         elif surface["type"] & SURFACE_SPHERE:
-            result = sphere.get_normal_component(particle, surface)
+            result = sphere.get_normal_component(particle_container, surface)
         else:
-            result = quadric.get_normal_component(particle, surface)
+            result = quadric.get_normal_component(particle_container, surface)
 
     if surface["moving"]:
         # Restore particle direction
@@ -142,77 +145,81 @@ def get_normal_component(particle, speed, surface):
 
 
 @njit
-def reflect(particle, surface):
+def reflect(particle_container, surface):
     """
     Reflect the particle off the surface
     """
+    particle = particle_container[0]
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
-            return plane_x.reflect(particle, surface)
+            return plane_x.reflect(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Y:
-            return plane_y.reflect(particle, surface)
+            return plane_y.reflect(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Z:
-            return plane_z.reflect(particle, surface)
+            return plane_z.reflect(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE:
-            return plane.reflect(particle, surface)
+            return plane.reflect(particle_container, surface)
     else:
         if surface["type"] & SURFACE_CYLINDER_X:
-            return cylinder_x.reflect(particle, surface)
+            return cylinder_x.reflect(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Y:
-            return cylinder_y.reflect(particle, surface)
+            return cylinder_y.reflect(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Z:
-            return cylinder_z.reflect(particle, surface)
+            return cylinder_z.reflect(particle_container, surface)
         elif surface["type"] & SURFACE_SPHERE:
-            return sphere.reflect(particle, surface)
+            return sphere.reflect(particle_container, surface)
         else:
-            return quadric.reflect(particle, surface)
+            return quadric.reflect(particle_container, surface)
 
 
 @njit
-def get_distance(particle, speed, surface):
+def get_distance(particle_container, speed, surface):
     """
     Get particle distance to surface
 
     Particle speed is needed if the surface is moving.
     """
+    particle = particle_container[0]
     if surface["moving"]:
-        return _get_distance_moving(particle, speed, surface)
+        return _get_distance_moving(particle_container, speed, surface)
     else:
-        return _get_distance_static(particle, surface)
+        return _get_distance_static(particle_container, surface)
 
 
 @njit
-def _get_distance_static(particle, surface):
+def _get_distance_static(particle_container, surface):
     """
     Get particle distance to static surface
     """
+    particle = particle_container[0]
     if surface["type"] & SURFACE_LINEAR:
         if surface["type"] & SURFACE_PLANE_X:
-            return plane_x.get_distance(particle, surface)
+            return plane_x.get_distance(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Y:
-            return plane_y.get_distance(particle, surface)
+            return plane_y.get_distance(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE_Z:
-            return plane_z.get_distance(particle, surface)
+            return plane_z.get_distance(particle_container, surface)
         elif surface["type"] & SURFACE_PLANE:
-            return plane.get_distance(particle, surface)
+            return plane.get_distance(particle_container, surface)
     else:
         if surface["type"] & SURFACE_CYLINDER_X:
-            return cylinder_x.get_distance(particle, surface)
+            return cylinder_x.get_distance(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Y:
-            return cylinder_y.get_distance(particle, surface)
+            return cylinder_y.get_distance(particle_container, surface)
         elif surface["type"] & SURFACE_CYLINDER_Z:
-            return cylinder_z.get_distance(particle, surface)
+            return cylinder_z.get_distance(particle_container, surface)
         elif surface["type"] & SURFACE_SPHERE:
-            return sphere.get_distance(particle, surface)
+            return sphere.get_distance(particle_container, surface)
         else:
-            return quadric.get_distance(particle, surface)
+            return quadric.get_distance(particle_container, surface)
 
 
 @njit
-def _get_distance_moving(particle, speed, surface):
+def _get_distance_moving(particle_container, speed, surface):
     """
     Get particle distance to moving surface
     """
+    particle = particle_container[0]
     # Store original particle and surface parameters (will be temporarily changed)
     x_original = particle["x"]
     y_original = particle["y"]
@@ -232,11 +239,11 @@ def _get_distance_moving(particle, speed, surface):
     # Evaluate the current and the subsequent intervals until intersecting
     while idx < surface["N_move"]:
         # Translate particle position and direction
-        _translate_particle_position(particle, surface, idx)
-        _translate_particle_direction(particle, speed, surface, idx)
+        _translate_particle_position(particle_container, surface, idx)
+        _translate_particle_direction(particle_container, speed, surface, idx)
 
         # Get distance
-        distance = _get_distance_static(particle, surface)
+        distance = _get_distance_static(particle_container, surface)
 
         # Beyond the interval?
         distance_time = distance / speed
@@ -311,10 +318,11 @@ def _get_move_idx(t, surface):
 
 
 @njit
-def _translate_particle_position(particle, surface, idx):
+def _translate_particle_position(particle_container, surface, idx):
     """
     Translate particle position wrt the given surface moving interval index
     """
+    particle = particle_container[0]
 
     # Surface move translations, velocities, and time grid
     trans_0 = surface["move_translations"][idx]
@@ -329,10 +337,11 @@ def _translate_particle_position(particle, surface, idx):
 
 
 @njit
-def _translate_particle_direction(particle, speed, surface, idx):
+def _translate_particle_direction(particle_container, speed, surface, idx):
     """
     Translate particle direction wrt the given surface moving interval index
     """
+    particle = particle_container[0]
 
     # Surface move translations, velocities, and time grid
     V = surface["move_velocities"][idx]
