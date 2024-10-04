@@ -221,7 +221,6 @@ def generate_source_particle(work_start, idx_work, seed, prog):
 
 @njit
 def prep_particle(P_arr, prog):
-    mcdc = adapt.device(prog)
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 

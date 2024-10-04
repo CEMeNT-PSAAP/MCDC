@@ -10,7 +10,6 @@ from numba import (
 )
 
 import mcdc.adapt as adapt
-import mcdc.local as local
 import mcdc.src.geometry as geometry
 import mcdc.src.mesh as mesh_
 import mcdc.src.physics as physics
@@ -2392,7 +2391,7 @@ def surface_crossing(P_arr, data, prog):
     if surface["BC"] == BC_VACUUM:
         P["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
-        surface_.reflect(P, surface)
+        surface_.reflect(P_arr, surface)
 
     # Score tally
     for i in range(surface["N_tally"]):

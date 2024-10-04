@@ -15,7 +15,8 @@ from mcdc.constant import (
 
 
 @njit
-def evaluate(particle, surface):
+def evaluate(particle_container, surface):
+    particle = particle_container[0]
     # Particle parameters
     x = particle["x"]
     y = particle["y"]
@@ -48,7 +49,8 @@ def evaluate(particle, surface):
 
 
 @njit
-def reflect(particle, surface):
+def reflect(particle_container, surface):
+    particle = particle_container[0]
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -85,7 +87,8 @@ def reflect(particle, surface):
 
 
 @njit
-def get_normal_component(particle, surface):
+def get_normal_component(particle_container, surface):
+    particle = particle_container[0]
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -118,7 +121,8 @@ def get_normal_component(particle, surface):
 
 
 @njit
-def get_distance(particle, surface):
+def get_distance(particle_container, surface):
+    particle = particle_container[0]
     # Particle coordinate
     x = particle["x"]
     y = particle["y"]
@@ -139,11 +143,14 @@ def get_distance(particle, surface):
     I = surface["I"]
 
     # Coincident?
-    f = evaluate(particle, surface)
+    f = evaluate(particle_container, surface)
     coincident = abs(f) < COINCIDENCE_TOLERANCE
     if coincident:
         # Moving away or tangent?
-        if get_normal_component(particle, surface) >= 0.0 - COINCIDENCE_TOLERANCE:
+        if (
+            get_normal_component(particle_container, surface)
+            >= 0.0 - COINCIDENCE_TOLERANCE
+        ):
             return INF
 
     # Quadratic equation constants

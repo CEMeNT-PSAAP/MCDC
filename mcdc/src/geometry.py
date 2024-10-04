@@ -3,7 +3,6 @@ import math
 from numba import njit, int64
 
 import mcdc.adapt as adapt
-import mcdc.local as local
 import mcdc.src.mesh as mesh
 import mcdc.src.physics as physics
 import mcdc.src.surface as surface_
@@ -365,7 +364,7 @@ def check_cell(particle_container, cell, mcdc):
     N_value = 0
 
     # Particle parameters
-    speed = physics.get_speed(particle, mcdc)
+    speed = physics.get_speed(particle_container, mcdc)
 
     # March forward through RPN tokens
     idx_end = idx + N_token
@@ -429,7 +428,7 @@ def distance_to_nearest_surface(particle_container, cell, mcdc):
     surface_ID = -1
 
     # Particle parameters
-    speed = physics.get_speed(particle, mcdc)
+    speed = physics.get_speed(particle_container, mcdc)
 
     # Access cell surface data
     idx = cell["surface_data_idx"]
