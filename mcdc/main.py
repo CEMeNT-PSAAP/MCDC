@@ -858,7 +858,6 @@ def prepare():
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
-
     # Cell tallies
     for i in range(N_cell_tally):
         copy_field(mcdc["cell_tallies"][i], input_deck.cell_tallies[i], "N_bin")
@@ -882,7 +881,7 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
-            mcdc["cell_tallies"][i]["scores"][j] = score_type 
+            mcdc["cell_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
         Nmu = len(input_deck.cell_tallies[i].mu) - 1
@@ -903,7 +902,7 @@ def prepare():
             stride *= Ng
         if N_azi > 1:
             mcdc["mesh_tallies"][i]["stride"]["azi"] = stride
-            stride *= N_azi  
+            stride *= N_azi
         if Nmu > 1:
             mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
             stride *= Nmu
@@ -912,14 +911,12 @@ def prepare():
         mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["cell_tallies"][i]["N_bin"]
 
-
     # Set tally data
     if not input_deck.technique["uq"]:
         tally = np.zeros((3, tally_size), dtype=type_.float64)
     else:
         tally = np.zeros((5, tally_size), dtype=type_.float64)
 
-        
     # =========================================================================
     # Establish Data Type from Tally Info and Construct Tallies
     # =========================================================================
@@ -958,11 +955,18 @@ def prepare():
     t_limit = max(
         [
             tally["filter"]["t"][-1]
-            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"]) + list(mcdc["cell_tallies"])
+            for tally in list(mcdc["mesh_tallies"])
+            + list(mcdc["surface_tallies"])
+            + list(mcdc["cell_tallies"])
         ]
     )
 
-    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) + len(input_deck.cell_tallies) == 0:
+    if (
+        len(input_deck.mesh_tallies)
+        + len(input_deck.surface_tallies)
+        + len(input_deck.cell_tallies)
+        == 0
+    ):
         t_limit = INF
 
     # Check if time boundary is above the final tally mesh time grid
@@ -1475,7 +1479,7 @@ def generate_hdf5(data, mcdc):
                 tally_bin = data[TALLY][:, start : start + N_bin]
                 if mcdc["technique"]["domain_decomposition"]:
                     # substitute recomposed tally
-                    tally_bin = dd_tally[:, start : start + N_bin]                
+                    tally_bin = dd_tally[:, start : start + N_bin]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -1553,7 +1557,7 @@ def generate_hdf5(data, mcdc):
 
                 # Shape
                 N_score = tally["N_score"]
-                
+
                 if not mcdc["technique"]["uq"]:
                     shape = (3, N_score)
                 else:

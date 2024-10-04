@@ -2385,7 +2385,7 @@ def move_to_event(P_arr, data, mcdc):
     # =========================================================================
     # Move particle
     # =========================================================================
-    
+
     # Score tracklength tallies
     if mcdc["cycle_active"]:
         for tally in mcdc["mesh_tallies"]:
