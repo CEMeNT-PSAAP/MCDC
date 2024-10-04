@@ -63,7 +63,7 @@ def test_translate_particle_position():
     t = 6.0
     P = particle(5.0, 3.0, 8.0, t, u, -u, u)
     idx = _get_move_idx(t, surface)
-    _translate_particle_position(P, surface, idx)
+    _translate_particle_position([P], surface, idx)
     x = 5.0 - move_translations[3][0]
     y = 3.0 - move_translations[3][1]
     z = 8.0 - move_translations[3][2]
@@ -79,7 +79,7 @@ def test_translate_particle_position():
     t = 6.5
     P = particle(5.0, 3.0, 8.0, t, u, -u, u)
     idx = _get_move_idx(t, surface)
-    _translate_particle_position(P, surface, idx)
+    _translate_particle_position([P], surface, idx)
     x = 5.0 - move_translations[3][0] - move_velocities[3][0] * (t - time_grid[3])
     y = 3.0 - move_translations[3][1] - move_velocities[3][1] * (t - time_grid[3])
     z = 8.0 - move_translations[3][2] - move_velocities[3][2] * (t - time_grid[3])
@@ -100,7 +100,7 @@ def test_translate_particle_direction():
     t = 6.0
     P = particle(5.0, 3.0, 8.0, t, u, -u, u)
     idx = _get_move_idx(t, surface)
-    _translate_particle_direction(P, speed, surface, idx)
+    _translate_particle_direction([P], speed, surface, idx)
     ux = u - move_velocities[3][0] / speed
     uy = -u - move_velocities[3][1] / speed
     uz = u - move_velocities[3][2] / speed
@@ -116,7 +116,7 @@ def test_translate_particle_direction():
     t = 6.5
     P = particle(5.0, 3.0, 8.0, t, u, -u, u)
     idx = _get_move_idx(t, surface)
-    _translate_particle_direction(P, speed, surface, idx)
+    _translate_particle_direction([P], speed, surface, idx)
     ux = u - move_velocities[3][0] / speed
     uy = -u - move_velocities[3][1] / speed
     uz = u - move_velocities[3][2] / speed
