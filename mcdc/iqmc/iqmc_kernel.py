@@ -474,7 +474,7 @@ def iqmc_surface_crossing(P_arr, prog):
     if surface["BC"] == BC_VACUUM:
         P["alive"] = False
     elif surface["BC"] == BC_REFLECTIVE:
-        surface_.reflect(P, surface)
+        surface_.reflect(P_arr, surface)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
