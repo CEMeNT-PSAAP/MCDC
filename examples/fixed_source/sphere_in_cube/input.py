@@ -33,9 +33,7 @@ sphere_cell = mcdc.cell(inside_sphere, pure_f)
 # =============================================================================
 # The source pulses in t=[0,5]
 
-mcdc.source(
-    x=[0.0, 4.0], y=[0.0, 4.0], z=[0.0, 4.0], time=[0.0, 50.0], isotropic=True
-)
+mcdc.source(x=[0.0, 4.0], y=[0.0, 4.0], z=[0.0, 4.0], time=[0.0, 50.0], isotropic=True)
 
 # =============================================================================
 # Set tally, setting, and run mcdc
@@ -49,10 +47,7 @@ mcdc.tally.mesh_tally(
 )
 
 
-mcdc.tally.cell_tally(
-    sphere_cell,
-    scores = ["fission"]
-)
+mcdc.tally.cell_tally(sphere_cell, scores=["fission"])
 
 # Setting
 mcdc.setting(N_particle=1000)

@@ -64,10 +64,7 @@ mcdc.tally.mesh_tally(
     t=np.linspace(0.0, 200.0, 21),
 )
 
-mcdc.tally.cell_tally(
-    void_cell,
-    scores = ["flux"]
-)
+mcdc.tally.cell_tally(void_cell, scores=["flux"])
 
 # Setting
 mcdc.setting(N_particle=10)

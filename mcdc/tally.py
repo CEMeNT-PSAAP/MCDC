@@ -157,11 +157,9 @@ def surface_tally(
 
     return card
 
-def cell_tally(
-        cell,
-        scores=["flux"]
-):
-    
+
+def cell_tally(cell, scores=["flux"]):
+
     # Make tally card
     card = CellTallyCard(cell.ID)
 
