@@ -5,27 +5,29 @@ import sys
 import matplotlib.animation as animation
 
 # Load results
-with np.load("SHEM-361.npz") as data:
-    E = data["E"]
-    G = data["G"]
-    speed = data["v"]
-    E_mid = 0.5 * (E[1:] + E[:-1])
-    dE = E[1:] - E[:-1]
+E = np.loadtxt("energy_grid.txt")
+G = len(E) - 1
+E_mid = 0.5 * (E[1:] + E[:-1])
+dE = E[1:] - E[:-1]
+
 with h5py.File("output.h5", "r") as f:
-    t = f["tally/grid/t"][:]
+    t = f["tallies/mesh_tally_0/grid/t"][:]
     dt = t[1:] - t[:-1]
     t_mid = 0.5 * (t[1:] + t[:-1])
     K = len(t) - 1
 
-    phi = f["tally/flux/mean"][:]
-    phi_sd = f["tally/flux/sdev"][:]
+    phi = f["tallies/mesh_tally_0/flux/mean"][:]
+    phi_sd = f["tallies/mesh_tally_0/flux/sdev"][:]
+
+    density = f["tallies/mesh_tally_0/density/mean"][:]
+    density_sd = f["tallies/mesh_tally_0/density/sdev"][:]
 
 # Neutron density
 n = np.zeros(K)
 n_sd = np.zeros(K)
 for k in range(K):
-    n[k] = np.sum(phi[:, k] / speed) / dt[k]
-    n_sd[k] = np.linalg.norm(phi_sd[:, k] / speed) / dt[k]
+    n[k] = np.sum(density[:, k]) / dt[k]
+    n_sd[k] = np.linalg.norm(density_sd[:, k]) / dt[k]
 
 # Normalize
 for k in range(K):

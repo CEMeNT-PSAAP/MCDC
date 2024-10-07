@@ -186,7 +186,7 @@ def power_iteration(mcdc):
             if iqmc["mode"] == "fixed":
                 print_iqmc_eigenvalue_progress(mcdc)
             else:
-                print_progress_eigenvalue(mcdc)
+                print_iqmc_eigenvalue_progress(mcdc)
 
         # iQMC convergence criteria
         if (iqmc["iteration_count"] == maxit) or (iqmc["residual"] <= tol):

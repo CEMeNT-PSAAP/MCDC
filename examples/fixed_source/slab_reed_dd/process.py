@@ -87,10 +87,9 @@ def f_phi_x(x):
     return phi5(x)
 
 
-with h5py.File("output.h5", "r") as f:
-    x = f["tally/grid/z"][:]
-    dx = x[1] - x[0]
-    x_mid = 0.5 * (x[:-1] + x[1:])
+x = np.linspace(0.0, 8.0, 81)
+dx = x[1] - x[0]
+x_mid = 0.5 * (x[:-1] + x[1:])
 
 phi_ref = np.zeros_like(x_mid)
 phi_x_ref = np.zeros_like(x)
@@ -108,8 +107,8 @@ for i in range(len(x_mid)):
 # Load output
 with h5py.File("output.h5", "r") as f:
     # Note the spatial (dx) and source strength (100+1) normalization
-    phi = (f["tally/flux/mean"][:] / dx * 101.0).repeat(4)
-    phi_sd = (f["tally/flux/sdev"][:] / dx * 101.0).repeat(4)
+    phi = f["tallies/mesh_tally_0/flux/mean"][:] / dx * 101.0
+    phi_sd = f["tallies/mesh_tally_0/flux/sdev"][:] / dx * 101.0
 
 # Flux - spatial average
 plt.plot(x_mid, phi, "-b", label="MC")
