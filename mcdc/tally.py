@@ -49,7 +49,7 @@ def mesh_tally(
     E : array_like[float], optional
         Energies that demarcate energy tally bins. This overrides `g` in
         continuous-energy mode.
-    scores : list of str {"flux", "total", "fission"}
+    scores : list of str {"flux", "total", "fission", "density"}
         List of physical quantities to be scored.
 
     Returns
@@ -98,7 +98,7 @@ def mesh_tally(
         score_checked = check_support(
             "score type",
             s,
-            ["flux", "total", "fission"],
+            ["flux", "total", "fission", "density"],
         )
         card.scores.append(score_checked)
 
