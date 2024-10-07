@@ -12,6 +12,7 @@ import mcdc.kernel as kernel
 from mcdc.constant import *
 from mcdc.loop import caching
 from mcdc.print_ import (
+    print_error,
     print_iqmc_eigenvalue_exit_code,
     print_iqmc_eigenvalue_progress,
     print_msg,
