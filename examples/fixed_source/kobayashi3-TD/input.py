@@ -64,8 +64,7 @@ mcdc.tally.mesh_tally(
 )
 
 # Setting
-mcdc.setting(N_particle=1e6)
-mcdc.implicit_capture()
+mcdc.setting(N_particle=1e2)
 
 # Run
 mcdc.run()
