@@ -206,6 +206,10 @@ class SurfaceCard(InputCard):
         self.moving = True
         self.N_move = len(durations) + 1
 
+        if isinstance(velocities, np.ndarray):
+            velocities = velocities.tolist()
+            durations = durations.tolist()
+
         self.move_velocities = velocities
         self.move_velocities.append([0.0, 0.0, 0.0])
         self.move_velocities = np.array(self.move_velocities)
