@@ -35,7 +35,7 @@ mcdc.cell(+s2 & -s3, m2)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 5000
+N = 500
 x = np.linspace(0.0, 2.6, 52)
 Nx = len(x) - 1
 phi0 = np.ones((Nx))
@@ -47,8 +47,7 @@ phi0 = np.ones((Nx))
 mcdc.iQMC(x=x, phi0=phi0, scores=["source-x"], mode="batched", sample_method="halton")
 # Setting
 mcdc.setting(N_particle=N)
-# mcdc.eigenmode(N_inactive=20, N_active=5)
-mcdc.eigenmode()
+mcdc.eigenmode(N_inactive=20, N_active=5)
 
 # Run
 mcdc.run()

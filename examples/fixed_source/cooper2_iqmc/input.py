@@ -33,10 +33,9 @@ mcdc.cell(+sx2 & -sx3 & +sy1 & -sy2, m_barrier)
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 1e4
+N = 1e2
 Nx = Ny = 40
-maxit = 30
-tol = 1e-6
+tol = 1e1
 x = np.linspace(0, 4, num=Nx + 1)
 y = np.linspace(0, 4, num=Ny + 1)
 solver = "gmres"
@@ -52,10 +51,9 @@ mcdc.iQMC(
     y=y,
     fixed_source=fixed_source,
     phi0=phi0,
-    maxitt=maxit,
     tol=tol,
     fixed_source_solver=solver,
-    scores=["souce-x", "source-y"],
+    scores=["source-x", "source-y"],
 )
 
 # =============================================================================

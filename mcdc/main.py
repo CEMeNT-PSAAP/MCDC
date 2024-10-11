@@ -813,6 +813,8 @@ def prepare():
             score_type = None
             if score_name == "flux":
                 score_type = SCORE_FLUX
+            elif score_name == "density":
+                score_type = SCORE_DENSITY
             elif score_name == "total":
                 score_type = SCORE_TOTAL
             elif score_name == "fission":
@@ -889,14 +891,7 @@ def prepare():
         mcdc["surface_tallies"][i]["N_score"] = N_score
         for j in range(N_score):
             score_name = input_deck.surface_tallies[i].scores[j]
-            score_type = None
-            if score_name == "flux":
-                score_type = SCORE_FLUX
-            elif score_name == "fission":
-                score_type = SCORE_FISSION
-            elif score_name == "net-current":
-                score_type = SCORE_NET_CURRENT
-            mcdc["surface_tallies"][i]["scores"][j] = score_type
+            mcdc["surface_tallies"][i]["scores"][j] = SCORE_NET_CURRENT
 
         # Filter grid sizes
         Nmu = len(input_deck.surface_tallies[i].mu) - 1
@@ -1492,6 +1487,8 @@ def generate_hdf5(data, mcdc):
                     score_tally_bin = np.squeeze(tally_bin[i])
                     if score_type == SCORE_FLUX:
                         score_name = "flux"
+                    elif score_type == SCORE_DENSITY:
+                        score_name = "density"
                     elif score_type == SCORE_TOTAL:
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
@@ -1535,10 +1532,7 @@ def generate_hdf5(data, mcdc):
                 for i in range(N_score):
                     score_type = tally["scores"][i]
                     score_tally_bin = np.squeeze(tally_bin[i])
-                    if score_type == SCORE_FLUX:
-                        score_name = "flux"
-                    elif score_type == SCORE_NET_CURRENT:
-                        score_name = "net-current"
+                    score_name = "net-current"
                     group_name = "tallies/surface_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
