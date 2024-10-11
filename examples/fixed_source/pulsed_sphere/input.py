@@ -35,8 +35,8 @@ s0 = mcdc.surface("sphere", center=[0.0, 0.0, 0.0], radius=4.46)
 sout = mcdc.surface("sphere", center=[0.0, 0.0, 0.0], radius=1000, bc="vacuum")
 
 # Cells
-cr1 = mcdc.cell([-s0], mat_iron)
-void1 = mcdc.cell([+s0, -sout], mat_air)
+cr1 = mcdc.cell(-s0, mat_iron)
+void1 = mcdc.cell(+s0 & -sout, mat_air)
 
 
 # =============================================================================
@@ -52,7 +52,7 @@ mcdc.source(
 # =============================================================================
 # Tallies
 # =============================================================================
-PStally = mcdc.tally(
+PStally = mcdc.tally.mesh_tally(
     scores=["flux"],
     x=[740.0, 760.0],
     y=[-10.0, 10.0],
@@ -64,8 +64,7 @@ PStally = mcdc.tally(
 # Settings
 # =============================================================================
 
-
-mcdc.setting(N_particle=1e9)
-
+mcdc.setting(N_particle=1e4)
+mcdc.implicit_capture()
 
 mcdc.run()

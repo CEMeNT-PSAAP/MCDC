@@ -39,8 +39,8 @@ y1 = mcdc.surface("plane-y", y=-pitch / 2, bc="reflective")
 y2 = mcdc.surface("plane-y", y=pitch / 2, bc="reflective")
 
 # Set cells
-mcdc.cell([-cy, +x1, -x2, +y1, -y2], fuel)
-mcdc.cell([+cy, +x1, -x2, +y1, -y2], water)
+mcdc.cell(-cy & +x1 & -x2 & +y1 & -y2, fuel)
+mcdc.cell(+cy & +x1 & -x2 & +y1 & -y2, water)
 
 # =============================================================================
 # Set source
@@ -57,9 +57,10 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-with np.load("SHEM-361.npz") as data:
-    E = data["E"]
-
-mcdc.tally(scores=["flux"], E=E, t=np.insert(np.logspace(-8, 2, 50), 0, 0.0))
-mcdc.setting(N_particle=1e6, active_bank_buff=1000)
+mcdc.tally.mesh_tally(
+    scores=["flux", "density"],
+    E=np.loadtxt("energy_grid.txt"),
+    t=np.insert(np.logspace(-8, 2, 50), 0, 0.0),
+)
+mcdc.setting(N_particle=1e2, active_bank_buff=1000)
 mcdc.run()
