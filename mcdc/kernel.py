@@ -1966,6 +1966,7 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
         adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
 
 
+@njit
 def score_cell_tally(P_arr, distance, tally, data, mcdc):
     P = P_arr[0]
     tally_bin = data[TALLY]
