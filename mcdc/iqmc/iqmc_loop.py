@@ -3,14 +3,13 @@ import numpy as np
 from numpy import ascontiguousarray as cga
 from numba import njit, objmode
 
-import mcdc.type_ as type_
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
 import mcdc.iqmc.iqmc_kernel as iqmc_kernel
 import mcdc.kernel as kernel
+import mcdc.src.geometry as geometry
+import mcdc.type_ as type_
 
 from mcdc.constant import *
-from mcdc.loop import caching
 from mcdc.print_ import (
     print_error,
     print_iqmc_eigenvalue_exit_code,
@@ -79,9 +78,8 @@ def iqmc_validate_inputs(input_deck):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def iqmc_simulation(mcdc_arr):
-
     # Ensure `mcdc` exists for the lifetime of the program
     # by intentionally leaking their memory
     adapt.leak(mcdc_arr)
@@ -115,7 +113,7 @@ def iqmc_simulation(mcdc_arr):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def source_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
@@ -141,7 +139,7 @@ def source_iteration(mcdc):
         total_source_old = iqmc["total_source"].copy()
 
 
-@njit(cache=caching)
+@njit
 def power_iteration(mcdc):
     simulation_end = False
     iqmc = mcdc["technique"]["iqmc"]
@@ -196,7 +194,7 @@ def power_iteration(mcdc):
                     print_iqmc_eigenvalue_exit_code(mcdc)
 
 
-@njit(cache=caching)
+@njit
 def gmres(mcdc):
     """
     GMRES solver.
@@ -358,7 +356,7 @@ def gmres(mcdc):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def iqmc_loop_particle(P_arr, prog):
     mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
@@ -366,7 +364,7 @@ def iqmc_loop_particle(P_arr, prog):
         iqmc_step_particle(P_arr, prog)
 
 
-@njit(cache=caching)
+@njit
 def iqmc_step_particle(P_arr, prog):
     mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
@@ -400,7 +398,7 @@ def iqmc_step_particle(P_arr, prog):
             kernel.weight_roulette(P_arr, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def iqmc_loop_source(mcdc):
     work_size = mcdc["bank_source"]["size"][0]
     N_prog = 0
@@ -428,7 +426,7 @@ def iqmc_loop_source(mcdc):
                 print_progress(percent, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def iqmc_sweep(mcdc):
     iqmc = mcdc["technique"]["iqmc"]
     # tally sweep count
@@ -454,7 +452,7 @@ def iqmc_sweep(mcdc):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def AxV(V, b, mcdc):
     """
     Linear operator to be used with GMRES.

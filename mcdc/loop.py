@@ -2,7 +2,7 @@ from mpi4py import MPI
 from numba import njit, objmode
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
+import mcdc.src.geometry as geometry
 import mcdc.kernel as kernel
 import mcdc.print_ as print_module
 import mcdc.type_ as type_
@@ -17,15 +17,6 @@ from mcdc.print_ import (
     print_progress_eigenvalue,
     print_progress_iqmc,
 )
-
-caching = False
-
-
-def set_cache(setting):
-    caching = setting
-
-    if setting == False:
-        print_msg(" Caching has been disabled")
 
 
 # =============================================================================
@@ -62,13 +53,8 @@ def teardown_gpu(mcdc):
 # Fixed-source loop
 # =========================================================================
 
-# about caching:
-#     it is enabled as a default at the jit call level
-#     to effectivly disable cache, delete the cache folder (often located in /MCDC/mcdc/__pycache__)
-#     see more about cacheing here https://numba.readthedocs.io/en/stable/developer/caching.html
 
-
-@njit(cache=caching)
+@njit
 def loop_fixed_source(data_arr, mcdc_arr):
 
     # Ensure `data` and `mcdc` exist for the lifetime of the program
@@ -139,9 +125,8 @@ def loop_fixed_source(data_arr, mcdc_arr):
 # =========================================================================
 
 
-@njit(cache=caching)
+@njit
 def loop_eigenvalue(data_arr, mcdc_arr):
-
     # Ensure `data` and `mcdc` exist for the lifetime of the program
     # by intentionally leaking their memory
     adapt.leak(data_arr)
@@ -186,7 +171,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 # =============================================================================
 
 
-@njit()
+@njit
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.mcdc_global(prog)
 
@@ -234,7 +219,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
             adapt.add_active(P_new_arr, prog)
 
 
-@njit(cache=caching)
+@njit
 def prep_particle(P_arr, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -244,7 +229,7 @@ def prep_particle(P_arr, prog):
         kernel.weight_window(P_arr, prog)
 
 
-@njit()
+@njit
 def exhaust_active_bank(data, prog):
     mcdc = adapt.mcdc_global(prog)
     P_arr = adapt.local_array(1, type_.particle)
@@ -261,7 +246,7 @@ def exhaust_active_bank(data, prog):
         loop_particle(P_arr, data, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def source_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.mcdc_global(prog)
 
@@ -281,7 +266,7 @@ def source_closeout(prog, idx_work, N_prog, data):
             print_progress(percent, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def source_dd_resolution(data, prog):
     mcdc = adapt.mcdc_global(prog)
 
@@ -350,7 +335,6 @@ def loop_source(seed, data, mcdc):
     work_end = work_start + work_size
 
     for idx_work in range(work_size):
-
         # =====================================================================
         # Generate a source particle
         # =====================================================================
@@ -482,7 +466,7 @@ def make_gpu_loop_source(args):
 # =========================================================================
 
 
-@njit(cache=caching)
+@njit
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -491,7 +475,7 @@ def loop_particle(P_arr, data, prog):
         step_particle(P_arr, data, prog)
 
 
-@njit(cache=caching)
+@njit
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -563,7 +547,7 @@ def step_particle(P_arr, data, prog):
 # =============================================================================
 
 
-@njit(cache=caching)
+@njit
 def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     mcdc = adapt.mcdc_global(prog)
     DNP = DNP_arr[0]
@@ -652,7 +636,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
         adapt.add_active(P_new_arr, prog)
 
 
-@njit(cache=caching)
+@njit
 def source_precursor_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.mcdc_global(prog)
 

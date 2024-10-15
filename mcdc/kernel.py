@@ -10,15 +10,16 @@ from numba import (
 )
 
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
-import mcdc.mesh as mesh_
-import mcdc.physics as physics
+import mcdc.src.geometry as geometry
+import mcdc.src.mesh as mesh_
+import mcdc.src.physics as physics
+import mcdc.src.surface as surface_
 import mcdc.type_ as type_
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
-from mcdc.algorithm import binary_search, binary_search_with_length
 from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
+from mcdc.src.algorithm import binary_search, binary_search_with_length
 
 # =============================================================================
 # Domain Decomposition
@@ -1955,7 +1956,8 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
     idx = stride["tally"]
 
     # Flux
-    mu = geometry.surface_normal_component(P_arr, surface)
+    speed = physics.get_speed(P_arr, mcdc)
+    mu = surface_.get_normal_component(P_arr, speed, surface)
     flux = P["w"] / abs(mu)
 
     # Score
@@ -2386,9 +2388,12 @@ def surface_crossing(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 
-    # Implement BC
+    # Apply BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.surface_bc(P_arr, surface)
+    if surface["BC"] == BC_VACUUM:
+        P["alive"] = False
+    elif surface["BC"] == BC_REFLECTIVE:
+        surface_.reflect(P_arr, surface)
 
     # Score tally
     for i in range(surface["N_tally"]):
