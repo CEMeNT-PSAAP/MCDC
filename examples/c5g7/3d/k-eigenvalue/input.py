@@ -8,7 +8,7 @@ import mcdc
 # =============================================================================
 
 # Load material data
-lib = h5py.File("../../c5g7_xs.h5", "r")
+lib = h5py.File("../../MGXS-C5G7-TD.h5", "r")
 
 
 # Setter
@@ -67,34 +67,34 @@ z4 = mcdc.surface("plane-z", z=cr4)
 zf = mcdc.surface("plane-z", z=core_height / 2)
 
 # Fission chamber
-fc = mcdc.cell([-cy], mat_fc)
-mod = mcdc.cell([+cy], mat_mod)
-fission_chamber = mcdc.universe([fc, mod])["ID"]
+fc = mcdc.cell(-cy, mat_fc)
+mod = mcdc.cell(+cy, mat_mod)
+fission_chamber = mcdc.universe([fc, mod])
 
 # Fuel rods
-uo2 = mcdc.cell([-cy, -zf], mat_uo2)
-mox4 = mcdc.cell([-cy, -zf], mat_mox43)
-mox7 = mcdc.cell([-cy, -zf], mat_mox7)
-mox8 = mcdc.cell([-cy, -zf], mat_mox87)
-moda = mcdc.cell([-cy, +zf], mat_mod)  # Water above pin
-fuel_uo2 = mcdc.universe([uo2, mod, moda])["ID"]
-fuel_mox43 = mcdc.universe([mox4, mod, moda])["ID"]
-fuel_mox7 = mcdc.universe([mox7, mod, moda])["ID"]
-fuel_mox87 = mcdc.universe([mox8, mod, moda])["ID"]
+uo2 = mcdc.cell(-cy & -zf, mat_uo2)
+mox4 = mcdc.cell(-cy & -zf, mat_mox43)
+mox7 = mcdc.cell(-cy & -zf, mat_mox7)
+mox8 = mcdc.cell(-cy & -zf, mat_mox87)
+moda = mcdc.cell(-cy & +zf, mat_mod)  # Water above pin
+fuel_uo2 = mcdc.universe([uo2, mod, moda])
+fuel_mox43 = mcdc.universe([mox4, mod, moda])
+fuel_mox7 = mcdc.universe([mox7, mod, moda])
+fuel_mox87 = mcdc.universe([mox8, mod, moda])
 
 # Control rods and guide tubes
-cr1 = mcdc.cell([-cy, +z1], mat_cr)
-cr2 = mcdc.cell([-cy, +z2], mat_cr)
-cr3 = mcdc.cell([-cy, +z3], mat_cr)
-cr4 = mcdc.cell([-cy, +z4], mat_cr)
-gt1 = mcdc.cell([-cy, -z1], mat_gt)
-gt2 = mcdc.cell([-cy, -z2], mat_gt)
-gt3 = mcdc.cell([-cy, -z3], mat_gt)
-gt4 = mcdc.cell([-cy, -z4], mat_gt)
-control_rod1 = mcdc.universe([cr1, gt1, mod])["ID"]
-control_rod2 = mcdc.universe([cr2, gt2, mod])["ID"]
-control_rod3 = mcdc.universe([cr3, gt3, mod])["ID"]
-control_rod4 = mcdc.universe([cr4, gt4, mod])["ID"]
+cr1 = mcdc.cell(-cy & +z1, mat_cr)
+cr2 = mcdc.cell(-cy & +z2, mat_cr)
+cr3 = mcdc.cell(-cy & +z3, mat_cr)
+cr4 = mcdc.cell(-cy & +z4, mat_cr)
+gt1 = mcdc.cell(-cy & -z1, mat_gt)
+gt2 = mcdc.cell(-cy & -z2, mat_gt)
+gt3 = mcdc.cell(-cy & -z3, mat_gt)
+gt4 = mcdc.cell(-cy & -z4, mat_gt)
+control_rod1 = mcdc.universe([cr1, gt1, mod])
+control_rod2 = mcdc.universe([cr2, gt2, mod])
+control_rod3 = mcdc.universe([cr3, gt3, mod])
+control_rod4 = mcdc.universe([cr4, gt4, mod])
 
 # =============================================================================
 # Fuel lattices
@@ -237,23 +237,23 @@ z2 = mcdc.surface("plane-z", z=(core_height / 2 + refl_thick), bc="vacuum")
 
 # Assembly cells
 center = np.array([pitch * 17 / 2, -pitch * 17 / 2, 0.0])
-assembly_1 = mcdc.cell([+x0, -x1, +y2, -y3, +z1, -z2], lattice_1, lattice_center=center)
+assembly_1 = mcdc.cell(+x0 & -x1 & +y2 & -y3 & +z1 & -z2, lattice_1, translation=center)
 
 center += np.array([pitch * 17, 0.0, 0.0])
-assembly_2 = mcdc.cell([+x1, -x2, +y2, -y3, +z1, -z2], lattice_2, lattice_center=center)
+assembly_2 = mcdc.cell(+x1 & -x2 & +y2 & -y3 & +z1 & -z2, lattice_2, translation=center)
 
 center += np.array([-pitch * 17, -pitch * 17, 0.0])
-assembly_3 = mcdc.cell([+x0, -x1, +y1, -y2, +z1, -z2], lattice_3, lattice_center=center)
+assembly_3 = mcdc.cell(+x0 & -x1 & +y1 & -y2 & +z1 & -z2, lattice_3, translation=center)
 
 center += np.array([pitch * 17, 0.0, 0.0])
-assembly_4 = mcdc.cell([+x1, -x2, +y1, -y2, +z1, -z2], lattice_4, lattice_center=center)
+assembly_4 = mcdc.cell(+x1 & -x2 & +y1 & -y2 & +z1 & -z2, lattice_4, translation=center)
 
 # Bottom reflector cell
-reflector_bottom = mcdc.cell([+x0, -x3, +y0, -y3, +z0, -z1], mat_mod)
+reflector_bottom = mcdc.cell(+x0 & -x3 & +y0 & -y3 & +z0 & -z1, mat_mod)
 
 # Side reflectors
-reflector_south = mcdc.cell([+x0, -x3, +y0, -y1, +z1, -z2], mat_mod)
-reflector_east = mcdc.cell([+x2, -x3, +y1, -y3, +z1, -z2], mat_mod)
+reflector_south = mcdc.cell(+x0 & -x3 & +y0 & -y1 & +z1 & -z2, mat_mod)
+reflector_east = mcdc.cell(+x2 & -x3 & +y1 & -y3 & +z1 & -z2, mat_mod)
 
 # Root universe
 mcdc.universe(
@@ -293,13 +293,13 @@ z_grid = np.linspace(
 )
 g_grid = np.array([-0.5, 3.5, 6.5])  # Collapsing to fast (1-4) and slow (5-7)
 
-mcdc.tally(scores=["flux"], x=x_grid, y=y_grid, z=z_grid, g=g_grid)
+mcdc.tally.mesh_tally(scores=["flux"], x=x_grid, y=y_grid, z=z_grid, g=g_grid)
 
 # Setting
-mcdc.setting(N_particle=1e3)
+mcdc.setting(N_particle=1e4, census_bank_buff=4)
 
 mcdc.eigenmode(N_inactive=50, N_active=150, gyration_radius="all")
-mcdc.population_control()
+mcdc.population_control("splitting-roulette-weight")
 
 # Run
 mcdc.run()

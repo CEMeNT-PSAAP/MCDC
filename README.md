@@ -17,34 +17,27 @@ Our documentation on installation, contribution, and a brief user guide is on [R
 
 ## Installation
 
-We recommend using [`conda`](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) or some other environment manager to manage the MC/DC installation.
+We recommend using [Python virtual environments (venv)](https://docs.python.org/3/library/venv.html) or some other environment manager (e.g. conda) to manage the MC/DC installation.
 This avoids the need for admin access when installing MC/DC's dependencies and allows greater configurability for developers.
-For most users working on a single machine of which they are administrators, MC/DC can be installed via pip:
+For most users working in a venv, MC/DC can be installed via pip:
 ```bash
 pip install mcdc
 ```
-For developers or users on HPC machines, we recommend that you *not* use the pip distribution and instead install MC/DC and its dependencies via the included [install script](https://mcdc.readthedocs.io/en/latest/install.html), which builds `mpi4py` from source and uses conda to manage your environment. *This is the most reliable way to install and configure MC/DC*. It also takes care of the [Numba patch]() and can configure the [continuous energy data library](), if you have access.
+For developers or users on HPC machines, mpi4py is often distributed as part of an HPC machines given venv.
 
 ### Common issues with `mpi4py`
 
 The `pip mpi4py` distribution commonly has errors when building due to incompatible local MPI dependencies it builds off of. While pip does have some remedy for this, we recommend the following:
 * **Mac users:** we recommend `openmpi` is [installed via homebrew](https://formulae.brew.sh/formula/open-mpi) (note that more reliable mpi4py distribution can also be [found on homebrew](https://formulae.brew.sh/formula/mpi4py)), alternatively you can use `conda` if you don't have admin privileges;
 * **Linux users:** we recommend `openmpi` is installed via a root package manager if possible (e.g. `sudo apt install openmpi`) or a conda distribution (e.g. `conda install openmpi`)
-* **HPC users and developers on any system:** On HPC systems in particular, `mpi4py` must be built using the system's existing `mpi` installation. Installing MC/DC using the [install script](https://mcdc.readthedocs.io/en/latest/install.html) we've included will handle that for you by installing dependencies using conda rather than pip. It also takes care of the [Numba patch]() and can configure the [continuous energy data library](), if you have access.
+* **HPC users and developers on any system:** On HPC systems that do not supply a suitable venv, `mpi4py` may need to be built using the system's existing `mpi` installation. Installing MC/DC using the [install script](https://mcdc.readthedocs.io/en/latest/install.html) we've included will handle that for you by installing dependencies using conda rather than pip. It also takes care of the [Numba patch](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/patch_numba.sh) and can configure the [continuous energy data library](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/config_cont_energy.sh), if you have access.
 
 ### Numba Config
 
 Running MC/DC performantly in [Numba mode](#numba-mode) requires a patch to a single Numba file. If you installed MC/DC with the [install script](https://mcdc.readthedocs.io/en/latest/install.html), this patch has already been taken care of. If you installed via pip, we have a patch script will make the necessary changes for you:
-1. Download the `patch.sh` file [here]() (If you've cloned MC/DC's GitHub repository, you already have this file in your MCDC/ directory).
+1. Download the `patch.sh` file [here](https://github.com/CEMeNT-PSAAP/MCDC/blob/main/patch_numba.sh) (If you've cloned MC/DC's GitHub repository, you already have this file in your MCDC/ directory).
 2. In your active conda environment, run `bash patch_numba.sh`.
 *If you manage your environment with conda, you will not need admin privileges*.
-
-### `visualizer` Config
-
-MC/DC has a visualizer built from the [netgen package](https://ngsolve.org/). This is not included in the base install of MC/DC due to the size of the dependencies (~300MB). To install these dependencies use
-```bash
-pip install mcdc['viz']
-```
 
 ## Running
 

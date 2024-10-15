@@ -10,15 +10,18 @@ phi_ref = data["phi"]
 
 # Get results
 with h5py.File("output.h5", "r") as f:
-    x = f["tally/grid/x"][:]
+    tallies = f["tallies/mesh_tally_0"]
+    flux = tallies["flux"]
+    grid = tallies["grid"]
+    x = grid["x"][:]
     dx = x[1:] - x[:-1]
     x_mid = 0.5 * (x[:-1] + x[1:])
-    t = f["tally/grid/t"][:]
+    t = grid["t"][:]
     dt = t[1:] - t[:-1]
     K = len(t) - 1
 
-    phi = f["tally/flux/mean"][:]
-    phi_sd = f["tally/flux/sdev"][:]
+    phi = flux["mean"][:]
+    phi_sd = flux["sdev"][:]
 
     # Normalize
     for k in range(K):

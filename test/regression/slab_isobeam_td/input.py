@@ -1,5 +1,4 @@
 import numpy as np
-import sys
 
 import mcdc
 
@@ -17,7 +16,7 @@ s1 = mcdc.surface("plane-x", x=0.0, bc="vacuum")
 s2 = mcdc.surface("plane-x", x=5.0, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m)
+mcdc.cell(+s1 & -s2, m)
 
 # =============================================================================
 # Set source
@@ -31,7 +30,7 @@ mcdc.source(point=[1e-10, 0.0, 0.0], time=[0.0, 5.0], white_direction=[1.0, 0.0,
 # =============================================================================
 
 # Tally
-mcdc.tally(
+mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 5.0, 51),
     t=np.linspace(0.0, 5.0, 51),

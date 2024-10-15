@@ -1,7 +1,5 @@
 import numpy as np
 import mcdc as MCDC
-from mcdc import type_
-from mcdc.main import closeout
 from mcdc.iqmc.iqmc_loop import AxV
 from mcdc.kernel import rng
 import mcdc.global_ as mcdc_
@@ -35,8 +33,8 @@ def iqmc_dummy_mcdc_variable():
     s3 = MCDC.surface("plane-x", x=2.5, bc="vacuum")
 
     # Set cells
-    MCDC.cell([+s1, -s2], m1)
-    MCDC.cell([+s2, -s3], m2)
+    MCDC.cell(+s1 & -s2, m1)
+    MCDC.cell(+s2 & -s3, m2)
 
     # =============================================================================
     # iQMC Parameters
@@ -46,7 +44,6 @@ def iqmc_dummy_mcdc_variable():
     tol = 1e-3
     x = np.arange(0.0, 2.6, 0.1)
     Nx = len(x) - 1
-    solver = "power_iteration"
     fixed_source = np.zeros(Nx)
     phi0 = np.ones((Nx))
 
@@ -60,7 +57,6 @@ def iqmc_dummy_mcdc_variable():
         phi0=phi0,
         maxit=maxit,
         tol=tol,
-        eigenmode_solver=solver,
     )
     # Setting
     MCDC.setting(N_particle=N)
@@ -80,7 +76,7 @@ def test_rn_basic():
         Trans. Am. Nucl. Soc, 71, 202 (1994)
 
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
     ref_data = np.array(
         (
@@ -92,12 +88,14 @@ def test_rn_basic():
         )
     )
 
-    mcdc = iqmc_dummy_mcdc_variable()
+    data_arr, mcdc_arr = iqmc_dummy_mcdc_variable()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
 
     # run through the first five seeds (1-5)
     for i in range(5):
         assert mcdc["setting"]["rng_seed"] == ref_data[i]
-        rng(mcdc["setting"])
+        rng([mcdc["setting"]])
 
 
 def test_AxV_linearity():
@@ -112,9 +110,11 @@ def test_AxV_linearity():
     We can test both properties with:
             - f(a*x + b*y) = a*f(x) + b*f(y)
     """
-    MCDC.reset_cards()
+    MCDC.reset()
 
-    mcdc = iqmc_dummy_mcdc_variable()
+    data_arr, mcdc_arr = iqmc_dummy_mcdc_variable()
+    data = data_arr[0]
+    mcdc = mcdc_arr[0]
 
     size = mcdc["technique"]["iqmc"]["total_source"].size
     np.random.seed(123456)
@@ -124,6 +124,7 @@ def test_AxV_linearity():
     y = np.random.random((size,))
     rhs = np.zeros((size,))
 
+    print(mcdc)
     F1 = AxV((a * x + b * y), rhs, mcdc)
     F2 = a * AxV(x, rhs, mcdc) + b * AxV(y, rhs, mcdc)
     assert np.allclose(F1, F2, rtol=1e-10)

@@ -61,9 +61,9 @@ s3 = mcdc.surface("plane-x", x=1.5)
 s4 = mcdc.surface("plane-x", x=2.0, bc="reflective")
 
 # Set cells
-mcdc.cell([+s1, -s2], uo2)
-mcdc.cell([+s2, -s3], h2o)
-mcdc.cell([+s3, -s4], b4c)
+mcdc.cell(+s1 & -s2, uo2)
+mcdc.cell(+s2 & -s3, h2o)
+mcdc.cell(+s3 & -s4, b4c)
 
 # =============================================================================
 # Set source
@@ -77,6 +77,8 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=["flux"], x=np.linspace(0.0, 2.0, 21), E=np.array([0.0, 1.0, 20e6]))
+mcdc.tally.mesh_tally(
+    scores=["flux"], x=np.linspace(0.0, 2.0, 21), E=np.array([0.0, 1.0, 20e6])
+)
 mcdc.setting(N_particle=1e3)
 mcdc.run()

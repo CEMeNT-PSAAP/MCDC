@@ -1,342 +1,385 @@
 import numpy as np
+import sympy
 
-from mcdc.constant import INF, GYRATION_RADIUS_ALL, PCT_NONE, PI, SHIFT
+from mcdc.constant import (
+    BOOL_AND,
+    BOOL_OR,
+    BOOL_NOT,
+    INF,
+    PI,
+)
+
+# Get the global variable container
+import mcdc.global_ as global_
 
 
-class InputDeck:
+class InputCard:
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __str__(self):
+        text = "%s card\n" % self.tag
+
+        for name in [
+            a
+            for a in dir(self)
+            if not a.startswith("__")
+            and not callable(getattr(self, a))
+            and a != "tag"
+            and not a.startswith("_")
+        ]:
+            text += "  %s : %s\n" % (name, str(getattr(self, name)))
+        return text
+
+
+class NuclideCard(InputCard):
+    def __init__(self, G=1, J=0, name=None):
+        InputCard.__init__(self, "Nuclide")
+
+        # Continuous energy?
+        if name is not None:
+            G = 0
+            J = 0
+
+        # Set card data
+        self.ID = None
+        self.name = name
+        self.G = G
+        self.J = J
+        self.fissionable = False
+        self.speed = np.ones(G)
+        self.decay = np.ones(J) * INF
+        self.capture = np.zeros(G)
+        self.scatter = np.zeros(G)
+        self.fission = np.zeros(G)
+        self.total = np.zeros(G)
+        self.nu_s = np.ones(G)
+        self.nu_p = np.zeros(G)
+        self.nu_d = np.zeros([G, J])
+        self.nu_f = np.zeros(G)
+        self.chi_s = np.zeros([G, G])
+        self.chi_p = np.zeros([G, G])
+        self.chi_d = np.zeros([J, G])
+        self.uq = False
+        self.flags = []
+        self.distribution = ""
+        self.name = ""
+
+
+class MaterialCard(InputCard):
+    def __init__(self, N_nuclide, G=1, J=0):
+        InputCard.__init__(self, "Material")
+
+        # Set card data
+        self.ID = None
+        self.N_nuclide = N_nuclide
+        self.nuclide_IDs = np.zeros(N_nuclide, dtype=int)
+        self.nuclide_densities = np.zeros(N_nuclide, dtype=float)
+        self.G = G
+        self.J = J
+        self.speed = np.zeros(G)
+        self.capture = np.zeros(G)
+        self.scatter = np.zeros(G)
+        self.fission = np.zeros(G)
+        self.total = np.zeros(G)
+        self.nu_s = np.ones(G)
+        self.nu_p = np.zeros(G)
+        self.nu_d = np.zeros([G, J])
+        self.nu_f = np.zeros(G)
+        self.chi_s = np.zeros([G, G])
+        self.chi_p = np.zeros([G, G])
+        self.uq = False
+        self.flags = []
+        self.distribution = ""
+
+
+class RegionCard(InputCard):
+    def __init__(self, type_):
+        InputCard.__init__(self, "Region")
+
+        # Set card data
+        self.ID = None
+        self.type = type_
+        self.A = None
+        self.B = None
+
+    def __and__(self, other):
+        region = RegionCard("intersection")
+        region.A = self.ID
+        region.B = other.ID
+        # Set ID and push to deck
+        region.ID = len(global_.input_deck.regions)
+        global_.input_deck.regions.append(region)
+        return region
+
+    def __or__(self, other):
+        region = RegionCard("union")
+        region.A = self.ID
+        region.B = other.ID
+        # Set ID and push to deck
+        region.ID = len(global_.input_deck.regions)
+        global_.input_deck.regions.append(region)
+        return region
+
+    def __invert__(self):
+        region = RegionCard("complement")
+        region.A = self.ID
+        # Set ID and push to deck
+        region.ID = len(global_.input_deck.regions)
+        global_.input_deck.regions.append(region)
+        return region
+
+    def __str__(self):
+        if self.type == "halfspace":
+            if self.B > 0:
+                return "+s%i" % self.A
+            else:
+                return "-s%i" % self.A
+        elif self.type == "intersection":
+            return "r%i & r%i" % (self.A, self.B)
+        elif self.type == "union":
+            return "r%i | r%i" % (self.A, self.B)
+        elif self.type == "complement":
+            return "~r%i" % (self.A)
+        elif self.type == "all":
+            return "all"
+
+
+class SurfaceCard(InputCard):
     def __init__(self):
-        self.reset()
+        InputCard.__init__(self, "Surface")
 
-    def reset(self):
-        self.nuclides = []
-        self.materials = []
-        self.surfaces = []
-        self.cells = []
-        self.universes = [{}]
-        self.lattices = []
-        self.sources = []
-        self.meshes = []
-        # Default cards are set by functions make_card_*
+        # Set card data
+        self.ID = None
+        self.type = ""
+        self.boundary_type = "interface"
+        self.linear = False
+        self.A = 0.0
+        self.B = 0.0
+        self.C = 0.0
+        self.D = 0.0
+        self.E = 0.0
+        self.F = 0.0
+        self.G = 0.0
+        self.H = 0.0
+        self.I = 0.0
+        self.J = 0.0
+        self.nx = 0.0
+        self.ny = 0.0
+        self.nz = 0.0
+        self.N_tally = 0
+        self.tally_IDs = []
 
-        # Root universe
-        self.universes[0] = make_card_universe(0)
-        self.universes[0]["ID"] = 0
+    def _create_halfspace(self, positive):
+        region = RegionCard("halfspace")
+        region.A = self.ID
+        if positive:
+            region.B = 1
+        else:
+            region.B = -1
 
-        self.tally = {
-            "tag": "Tally",
-            "tracklength": True,
-            "flux": False,
-            "density": False,
-            "fission": False,
-            "total": False,
-            "current": False,
-            "eddington": False,
-            "exit": False,
-            "mesh": make_card_mesh(),
-        }
+        # Check if an identical halfspace region already existed
+        for idx, existing_region in enumerate(global_.input_deck.regions):
+            if (
+                existing_region.type == "halfspace"
+                and region.A == existing_region.A
+                and region.B == existing_region.B
+            ):
+                return global_.input_deck.regions[idx]
 
-        self.setting = {
-            "tag": "Setting",
-            "mode_MG": True,
-            "mode_CE": False,
-            "N_particle": 0,
-            "N_batch": 1,
-            "rng_seed": 1,
-            "time_boundary": INF,
-            "progress_bar": True,
-            "output_name": "output",
-            "save_input_deck": True,
-            "track_particle": False,
-            "mode_eigenvalue": False,
-            "k_init": 1.0,
-            "N_inactive": 0,
-            "N_active": 0,
-            "N_cycle": 0,
-            "caching": True,
-            "save_particle": False,
-            "gyration_radius": False,
-            "gyration_radius_type": GYRATION_RADIUS_ALL,
-            "N_census": 1,
-            "census_time": np.array([INF]),
-            "source_file": False,
-            "source_file_name": "",
-            "IC_file": False,
-            "IC_file_name": "",
-            "N_precursor": 0,
-            # Below are parameters not copied to mcdc.setting
-            "bank_active_buff": 100,
-            "bank_census_buff": 1.0,
-            # TODO: Move to technique
-            "N_sensitivity": 0,
-        }
-
-        self.technique = {
-            "tag": "Technique",
-            "weighted_emission": True,
-            "implicit_capture": False,
-            "population_control": False,
-            "pct": PCT_NONE,
-            "pc_factor": 1.0,
-            "weight_window": False,
-            "ww": np.ones([1, 1, 1, 1]),
-            "ww_width": 2.5,
-            "ww_mesh": make_card_mesh(),
-            "domain_decomposition": False,
-            "dd_idx": 0,
-            "dd_mesh": make_card_mesh(),
-            "dd_exchange_rate": 0,
-            "dd_repro": False,
-            "dd_work_ratio": np.array([1]),
-            "weight_roulette": False,
-            "wr_threshold": 0.0,
-            "wr_survive": 1.0,
-            "iQMC": False,
-            "iqmc": {
-                "fixed_source_solver": "source_iteration",
-                "eigenmode_solver": "power_iteration",
-                "preconditioner_sweeps": 5,
-                "krylov_restart": 5,
-                "krylov_vector_size": 1,
-                "tol": 1e-6,
-                "res": 1.0,
-                "res_outter": 1.0,
-                "itt": 0,
-                "itt_outter": 0,
-                "maxitt": 5,
-                "fixed_source": np.ones([1, 1, 1, 1]),
-                "source": np.ones([1, 1, 1, 1]),
-                "score": {
-                    "flux": np.ones([1, 1, 1, 1]),
-                    "tilt-x": np.zeros([1, 1, 1, 1]),
-                    "tilt-y": np.zeros([1, 1, 1, 1]),
-                    "tilt-z": np.zeros([1, 1, 1, 1]),
-                    "fission-source": np.zeros([1, 1, 1, 1]),
-                },
-                "score_list": {
-                    "flux": True,
-                    "effective-scattering": True,
-                    "effective-fission": True,
-                    "tilt-x": False,
-                    "tilt-y": False,
-                    "tilt-z": False,
-                    "fission-power": False,
-                    "fission-source": False,
-                },
-                "mesh": {
-                    "g": np.array([-INF, INF]),
-                    "t": np.array([-INF, INF]),
-                    "x": np.array([-INF, INF]),
-                    "y": np.array([-INF, INF]),
-                    "z": np.array([-INF, INF]),
-                    "mu": np.array([-1.0, 1.0]),
-                    "azi": np.array([-PI, PI]),
-                },
-            },
-            "IC_generator": False,
-            "IC_N_neutron": 0,
-            "IC_N_precursor": 0,
-            "IC_neutron_density": 0.0,
-            "IC_precursor_density": 0.0,
-            "IC_neutron_density_max": 0.0,
-            "IC_precursor_density_max": 0.0,
-            "IC_cycle_stretch": 1.0,
-            "branchless_collision": False,
-            "dsm_order": 1,
-            "uq": False,
-        }
-
-        self.uq_deltas = {
-            "tag": "Uq",
-            "nuclides": [],
-            "materials": [],
-            "surfaces": [],
-        }
-
-
-class SurfaceHandle:
-    def __init__(self, card):
-        self.card = card
+        # Set ID and push to deck
+        region.ID = len(global_.input_deck.regions)
+        global_.input_deck.regions.append(region)
+        return region
 
     def __pos__(self):
-        return [self.card, True]
+        return self._create_halfspace(True)
 
     def __neg__(self):
-        return [self.card, False]
+        return self._create_halfspace(False)
 
 
-def make_card_nuclide(G=1, J=0):
-    card = {}
-    card["tag"] = "Nuclide"
-    card["name"] = ""
-    card["ID"] = -1
-    card["fissionable"] = False
-    card["G"] = G
-    card["J"] = J
-    card["speed"] = np.ones(G)
-    card["decay"] = np.ones(J) * INF
-    card["capture"] = np.zeros(G)
-    card["scatter"] = np.zeros(G)
-    card["fission"] = np.zeros(G)
-    card["total"] = np.zeros(G)
-    card["nu_s"] = np.ones(G)
-    card["nu_p"] = np.zeros(G)
-    card["nu_d"] = np.zeros([G, J])
-    card["nu_f"] = np.zeros(G)
-    card["chi_s"] = np.zeros([G, G])
-    card["chi_p"] = np.zeros([G, G])
-    card["chi_d"] = np.zeros([J, G])
-    card["sensitivity"] = False
-    card["sensitivity_ID"] = 0
-    card["dsm_Np"] = 1.0
-    card["uq"] = False
-    return card
+class CellCard(InputCard):
+    def __init__(self):
+        InputCard.__init__(self, "Cell")
+
+        # Set card data
+        self.ID = None
+        self.region_ID = None
+        self.region = "all"
+        self.fill_type = "material"
+        self.fill_ID = None
+        self.translation = np.array([0.0, 0.0, 0.0])
+        self.surface_IDs = np.zeros(0, dtype=int)
+        self._region_RPN = []  # Reverse Polish Notation
+
+    def set_region_RPN(self):
+        # Make alias and reset
+        rpn = self._region_RPN
+        rpn.clear()
+
+        # Build RPN based on the assigned region
+        region = global_.input_deck.regions[self.region_ID]
+        stack = [region]
+        while len(stack) > 0:
+            token = stack.pop()
+            if isinstance(token, RegionCard):
+                if token.type == "halfspace":
+                    rpn.append(token.ID)
+                elif token.type == "intersection":
+                    region_A = global_.input_deck.regions[token.A]
+                    region_B = global_.input_deck.regions[token.B]
+                    stack += ["&", region_A, region_B]
+                elif token.type == "union":
+                    region_A = global_.input_deck.regions[token.A]
+                    region_B = global_.input_deck.regions[token.B]
+                    stack += ["|", region_A, region_B]
+                elif token.type == "complement":
+                    region = global_.input_deck.regions[token.A]
+                    stack += ["~", region]
+            else:
+                if token == "&":
+                    rpn.append(BOOL_AND)
+                elif token == "|":
+                    rpn.append(BOOL_OR)
+                elif token == "~":
+                    rpn.append(BOOL_NOT)
+                else:
+                    print_error("Something is wrong with cell RPN creation.")
+
+    def set_region(self):
+        stack = []
+
+        for token in self._region_RPN:
+            if token >= 0:
+                stack.append(token)
+            else:
+                if token == BOOL_AND or token == BOOL_OR:
+                    item_1 = stack.pop()
+                    if isinstance(item_1, int):
+                        item_1 = sympy.symbols(str(global_.input_deck.regions[item_1]))
+
+                    item_2 = stack.pop()
+                    if isinstance(item_2, int):
+                        item_2 = sympy.symbols(str(global_.input_deck.regions[item_2]))
+
+                    if token == BOOL_AND:
+                        stack.append(item_1 & item_2)
+                    else:
+                        stack.append(item_1 | item_2)
+
+                elif token == BOOL_NOT:
+                    item = stack.pop()
+                    if isinstance(item, int):
+                        item = sympy.symbols(str(global_.input_deck.regions[item]))
+                    stack.append(~item)
+
+        self.region = sympy.logic.boolalg.simplify_logic(stack[0])
+
+    def set_surface_IDs(self):
+        surface_IDs = []
+
+        for token in self._region_RPN:
+            if token >= 0:
+                ID = global_.input_deck.regions[token].A
+                if not ID in surface_IDs:
+                    surface_IDs.append(ID)
+
+        self.surface_IDs = np.sort(np.array(surface_IDs))
 
 
-def make_card_material(N_nuclide, G=1, J=0):
-    card = {}
-    card["tag"] = "Material"
-    card["ID"] = -1
-    card["N_nuclide"] = N_nuclide
-    card["nuclide_IDs"] = np.zeros(N_nuclide, dtype=int)
-    card["nuclide_densities"] = np.zeros(N_nuclide, dtype=float)
-    card["G"] = G
-    card["J"] = J
-    card["speed"] = np.zeros(G)
-    card["capture"] = np.zeros(G)
-    card["scatter"] = np.zeros(G)
-    card["fission"] = np.zeros(G)
-    card["total"] = np.zeros(G)
-    card["nu_s"] = np.ones(G)
-    card["nu_p"] = np.zeros(G)
-    card["nu_d"] = np.zeros([G, J])
-    card["nu_f"] = np.zeros(G)
-    card["chi_s"] = np.zeros([G, G])
-    card["chi_p"] = np.zeros([G, G])
-    card["name"] = None
-    card["sensitivity"] = False
-    card["uq"] = False
-    return card
+class UniverseCard(InputCard):
+    def __init__(self, N_cell):
+        InputCard.__init__(self, "Universe")
+
+        # Set card data
+        self.ID = None
+        self.N_cell = N_cell
+        self.cell_IDs = np.zeros(N_cell, dtype=int)
 
 
-def make_card_surface():
-    card = {}
-    card["tag"] = "Surface"
-    card["ID"] = -1
-    card["vacuum"] = False
-    card["reflective"] = False
-    card["A"] = 0.0
-    card["B"] = 0.0
-    card["C"] = 0.0
-    card["D"] = 0.0
-    card["E"] = 0.0
-    card["F"] = 0.0
-    card["G"] = 0.0
-    card["H"] = 0.0
-    card["I"] = 0.0
-    card["J"] = np.array([[0.0, 0.0]])
-    card["t"] = np.array([-SHIFT, INF])
-    card["N_slice"] = 1
-    card["linear"] = False
-    card["nx"] = 0.0
-    card["ny"] = 0.0
-    card["nz"] = 0.0
-    card["sensitivity"] = False
-    card["sensitivity_ID"] = 0
-    card["type"] = " "
-    card["dsm_Np"] = 1.0
-    return card
+class LatticeCard(InputCard):
+    def __init__(self):
+        InputCard.__init__(self, "Lattice")
+
+        # Set card data
+        self.ID = None
+        self.universe_IDs = np.array([[[[0]]]])
+        self.x0 = -INF
+        self.x0 = -INF
+        self.dx = 2 * INF
+        self.Nx = 1
+        self.y0 = -INF
+        self.dy = 2 * INF
+        self.Ny = 1
+        self.z0 = -INF
+        self.dz = 2 * INF
+        self.Nz = 1
 
 
-def make_card_cell(N_surface):
-    card = {}
-    card["tag"] = "Cell"
-    card["ID"] = -1
-    card["N_surface"] = N_surface
-    card["surface_IDs"] = np.zeros(N_surface, dtype=int)
-    card["positive_flags"] = np.zeros(N_surface, dtype=bool)
-    card["material_ID"] = 0
-    card["material_name"] = None
-    card["lattice"] = False
-    card["lattice_ID"] = 0
-    card["lattice_center"] = np.array([0.0, 0.0, 0.0])
-    return card
+class SourceCard(InputCard):
+    def __init__(self):
+        InputCard.__init__(self, "Source")
+
+        # Set card data
+        self.ID = None
+        self.box = False
+        self.isotropic = True
+        self.white = False
+        self.x = 0.0
+        self.y = 0.0
+        self.z = 0.0
+        self.box_x = np.array([0.0, 0.0])
+        self.box_y = np.array([0.0, 0.0])
+        self.box_z = np.array([0.0, 0.0])
+        self.ux = 0.0
+        self.uy = 0.0
+        self.uz = 0.0
+        self.white_x = 0.0
+        self.white_y = 0.0
+        self.white_z = 0.0
+        self.group = np.array([1.0])
+        self.energy = np.array([[1e6 - 1.0, 1e6 + 1.0], [1.0, 1.0]])
+        self.time = np.array([0.0, 0.0])
+        self.prob = 1.0
 
 
-def make_card_universe(N_cell):
-    card = {}
-    card["tag"] = "Universe"
-    card["ID"] = -1
-    card["N_cell"] = N_cell
-    card["cell_IDs"] = np.zeros(N_cell, dtype=int)
-    return card
+# ======================================================================================
+# Tally cards
+# ======================================================================================
 
 
-def make_card_lattice():
-    card = {}
-    card["tag"] = "Lattice"
-    card["ID"] = -1
-    card["mesh"] = {
-        "x0": -INF,
-        "dx": 2 * INF,
-        "Nx": 1,
-        "y0": -INF,
-        "dy": 2 * INF,
-        "Ny": 1,
-        "z0": -INF,
-        "dz": 2 * INF,
-        "Nz": 1,
-    }
-    card["universe_IDs"] = np.array([[[[0]]]])
-    return card
+class TallyCard(InputCard):
+    def __init__(self, type_):
+        InputCard.__init__(self, type_)
+
+        # Set card data
+        self.ID = None
+        self.scores = []
+        self.N_bin = 0
+
+        # Filters
+        self.t = np.array([-INF, INF])
+        self.mu = np.array([-1.0, 1.0])
+        self.azi = np.array([-PI, PI])
+        self.g = np.array([-INF, INF])
 
 
-def make_card_source():
-    card = {}
-    card["tag"] = "Source"
-    card["ID"] = -1
-    card["box"] = False
-    card["isotropic"] = True
-    card["white"] = False
-    card["x"] = 0.0
-    card["y"] = 0.0
-    card["z"] = 0.0
-    card["box_x"] = np.array([0.0, 0.0])
-    card["box_y"] = np.array([0.0, 0.0])
-    card["box_z"] = np.array([0.0, 0.0])
-    card["ux"] = 0.0
-    card["uy"] = 0.0
-    card["uz"] = 0.0
-    card["white_x"] = 0.0
-    card["white_y"] = 0.0
-    card["white_z"] = 0.0
-    card["group"] = np.array([1.0])
-    card["energy"] = np.array([[14e6, 14e6], [1.0, 1.0]])
-    card["time"] = np.array([0.0, 0.0])
-    card["prob"] = 1.0
-    return card
+class MeshTallyCard(TallyCard):
+    def __init__(self):
+        TallyCard.__init__(self, "Mesh tally")
+
+        # Set card data
+        self.x = np.array([-INF, INF])
+        self.y = np.array([-INF, INF])
+        self.z = np.array([-INF, INF])
+        self.N_bin = 1
 
 
-def make_card_mesh():
-    return {
-        "x": np.array([-INF, INF]),
-        "y": np.array([-INF, INF]),
-        "z": np.array([-INF, INF]),
-        "t": np.array([-INF, INF]),
-        "mu": np.array([-1.0, 1.0]),
-        "azi": np.array([-PI, PI]),
-        "g": np.array([-INF, INF]),
-    }
+class SurfaceTallyCard(TallyCard):
+    def __init__(self, surface_ID):
+        TallyCard.__init__(self, "Surface tally")
 
-
-def make_card_uq():
-    return {
-        "tag": "t",
-        "ID": -1,
-        "key": "k",
-        "mean": 0.0,
-        "delta": 0.0,
-        "distribution": "d",
-        "rng_seed": 0,
-        "group": False,
-        "group_group": False,
-    }
+        # Set card data
+        self.surface_ID = surface_ID
+        self.N_bin = 1

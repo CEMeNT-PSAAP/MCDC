@@ -8,7 +8,7 @@ from scipy.integrate import quad
 # =============================================================================
 
 with h5py.File("output.h5", "r") as f:
-    phi = f["iqmc/tally/flux"][:]
+    phi = f["iqmc/tally/flux/mean"][:]
     x = f["iqmc/grid/x"][:]
     mesh = f["iqmc/grid/x"][:]
     dx = x[1] - x[0]
@@ -125,7 +125,6 @@ phi_ref = reeds_sol(Nx=x_mid.size, LB=-8.0, RB=8.0)
 # =============================================================================
 
 # Flux - spatial average
-plt.figure(dpi=300, figsize=(8, 5))
 plt.plot(x_mid, phi_ref, label="Sol")
 plt.plot(x_mid, phi, label="iQMC")
 plt.ylabel(r"$\phi(x)$")
