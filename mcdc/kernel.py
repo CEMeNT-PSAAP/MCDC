@@ -1969,6 +1969,47 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
 
 
 @njit
+def score_cell_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
+    tally_bin = data[TALLY]
+    material = mcdc["materials"][P["material_ID"]]
+    stride = tally["stride"]
+
+    # Particle 4D direction
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
+
+    # Particle initial and final coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    cell_idx = stride["tally"]
+
+    # Score
+    flux = distance * P["w"]
+    for i in range(tally["N_score"]):
+        score_type = tally["scores"][i]
+        if score_type == SCORE_FLUX:
+            score = flux
+        elif score_type == SCORE_TOTAL:
+            SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+            score = flux * SigmaT
+        elif score_type == SCORE_FISSION:
+            SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+            score = flux * SigmaF
+
+        tally_bin[TALLY_SCORE, cell_idx + i] += score
+
+
+@njit
 def tally_reduce(data, mcdc):
     tally_bin = data[TALLY]
     N_bin = tally_bin.shape[1]
@@ -2352,6 +2393,11 @@ def move_to_event(P_arr, data, mcdc):
     if mcdc["cycle_active"]:
         for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
+
+        cell = mcdc["cells"][P["cell_ID"]]
+        if cell["N_tally"] != 0:
+            for tally in mcdc["cell_tallies"]:
+                score_cell_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
@@ -2391,6 +2437,7 @@ def surface_crossing(P_arr, data, prog):
     geometry.surface_bc(P_arr, surface)
 
     # Score tally
+    # N_tally is an int64, tally_IDs is a numpy.ndarray
     for i in range(surface["N_tally"]):
         ID = surface["tally_IDs"][i]
         tally = mcdc["surface_tallies"][ID]

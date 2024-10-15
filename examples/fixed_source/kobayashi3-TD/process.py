@@ -25,6 +25,10 @@ with h5py.File("output.h5", "r") as f:
     phi = flux["mean"][:]
     phi_sd = flux["sdev"][:]
 
+    cell = f["tallies/cell_tally_0/flux"]
+    print(f'cell mean = {cell["mean"][()]}')
+    print(f'cell sdev = {cell["sdev"][()]}')
+
 fig, ax = plt.subplots()
 cax = ax.pcolormesh(X, Y, phi[0], vmin=phi[0].min(), vmax=phi[0].max())
 text = ax.text(0.02, 1.02, "", transform=ax.transAxes)
