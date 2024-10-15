@@ -25,41 +25,29 @@ m2 = mcdc.material(
 # Set surfaces
 s1 = mcdc.surface("plane-x", x=0.0, bc="vacuum")
 s2 = mcdc.surface("plane-x", x=1.5)
-s3 = mcdc.surface("plane-x", x=2.5, bc="vacuum")
+s3 = mcdc.surface("plane-x", x=2.6, bc="vacuum")
 
 # Set cells
-mcdc.cell([+s1, -s2], m1)
-mcdc.cell([+s2, -s3], m2)
+mcdc.cell(+s1 & -s2, m1)
+mcdc.cell(+s2 & -s3, m2)
 
 
 # =============================================================================
 # iQMC Parameters
 # =============================================================================
-N = 5000
-maxit = 25
-tol = 1e-3
-x = np.arange(0.0, 2.6, 0.1)
+N = 500
+x = np.linspace(0.0, 2.6, 52)
 Nx = len(x) - 1
-solver = "power_iteration"
-fixed_source = np.zeros(Nx)
 phi0 = np.ones((Nx))
 
 # =============================================================================
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.iQMC(
-    x=x,
-    fixed_source=fixed_source,
-    phi0=phi0,
-    maxit=maxit,
-    tol=tol,
-    eigenmode_solver=solver,
-    score=["tilt-x"],
-)
+mcdc.iQMC(x=x, phi0=phi0, scores=["source-x"], mode="batched", sample_method="halton")
 # Setting
 mcdc.setting(N_particle=N)
-mcdc.eigenmode()
+mcdc.eigenmode(N_inactive=20, N_active=5)
 
 # Run
 mcdc.run()

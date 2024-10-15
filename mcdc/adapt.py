@@ -1,17 +1,19 @@
+import importlib
 import numpy as np
-from numba import njit, jit, objmode, literal_unroll, cuda, types
+from numba import njit, jit, objmode, literal_unroll, types
 from numba.extending import intrinsic
 import numba
 import mcdc.type_ as type_
 import mcdc.kernel as kernel
-import mcdc.loop as loop
 
-try:
+
+if importlib.util.find_spec("harmonize") is None:
+    HAS_HARMONIZE = False
+else:
     import harmonize as harm
 
     HAS_HARMONIZE = True
-except:
-    HAS_HARMONIZE = False
+
 
 import math
 import inspect
@@ -73,6 +75,185 @@ def cast_voidptr_to_uintp(typingctx, src):
         return sig, codegen
 
 
+def leak(arg):
+    pass
+
+
+@intrinsic
+def leak_inner(typingctx, kind):
+    def codegen(context, builder, signature, args):
+        context.nrt.incref(builder, kind, args[0])
+
+    return numba.void(kind), codegen
+
+
+@numba.extending.overload(leak)
+def leak_overload(arg):
+    def impl(arg):
+        leak_inner(arg)
+
+    return impl
+
+
+# =============================================================================
+# Generic GPU/CPU Local Array Variable Constructors
+# =============================================================================
+
+
+def local_array(shape, dtype):
+    return np.zeros(shape, dtype=dtype)
+
+
+@numba.extending.type_callable(local_array)
+def type_local_array(context):
+
+    from numba.core.typing.npydecl import parse_dtype, parse_shape
+
+    if isinstance(context, numba.core.typing.context.Context):
+
+        # Function repurposed from Numba's ol_np_empty.
+        def typer(shape, dtype):
+            numba.np.arrayobj._check_const_str_dtype("empty", dtype)
+
+            # Only integer literals and tuples of integer literals are valid
+            # shapes
+            if isinstance(shape, types.Integer):
+                if not isinstance(shape, types.IntegerLiteral):
+                    raise numba.core.errors.UnsupportedError(
+                        f"Integer shape type {shape} is not literal."
+                    )
+            elif isinstance(shape, (types.Tuple, types.UniTuple)):
+                if any([not isinstance(s, types.IntegerLiteral) for s in shape]):
+                    raise numba.core.errors.UnsupportedError(
+                        f"At least one element of shape tuple type{shape} is not an integer literal."
+                    )
+            else:
+                raise numba.core.errors.UnsupportedError(
+                    f"Shape is of unsupported type {shape}."
+                )
+
+            # No default arguments.
+            nb_dtype = parse_dtype(dtype)
+            nb_shape = parse_shape(shape)
+
+            if nb_dtype is not None and nb_shape is not None:
+                retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout="C")
+                # Inlining the signature construction from numpy_empty_nd
+                sig = retty(shape, dtype)
+                return sig
+            else:
+                msg = f"Cannot parse input types to function np.empty({shape}, {dtype})"
+                raise numba.errors.TypingError(msg)
+
+        return typer
+
+    elif isinstance(context, numba.cuda.target.CUDATypingContext):
+
+        # Function repurposed from Numba's Cuda_array_decl.
+        def typer(shape, dtype):
+
+            # Only integer literals and tuples of integer literals are valid
+            # shapes
+            if isinstance(shape, types.Integer):
+                if not isinstance(shape, types.IntegerLiteral):
+                    return None
+            elif isinstance(shape, (types.Tuple, types.UniTuple)):
+                if any([not isinstance(s, types.IntegerLiteral) for s in shape]):
+                    return None
+            else:
+                return None
+
+            ndim = parse_shape(shape)
+            nb_dtype = parse_dtype(dtype)
+            if nb_dtype is not None and ndim is not None:
+                return types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
+
+        return typer
+
+    elif isinstance(context, numba.hip.target.HIPTypingContext):
+
+        def typer(shape, dtype):
+            # Only integer literals and tuples of integer literals are valid
+            # shapes
+            if isinstance(shape, types.Integer):
+                if not isinstance(shape, types.IntegerLiteral):
+                    return None
+            elif isinstance(shape, (types.Tuple, types.UniTuple)):
+                if any([not isinstance(s, types.IntegerLiteral) for s in shape]):
+                    return None
+            else:
+                return None
+
+            ndim = parse_shape(shape)
+            nb_dtype = parse_dtype(dtype)
+            if nb_dtype is not None and ndim is not None:
+                result = types.Array(dtype=nb_dtype, ndim=ndim, layout="C")
+                return result
+
+        return typer
+
+    else:
+        raise numba.core.errors.UnsupportedError(
+            f"Unsupported target context {context}."
+        )
+
+
+@numba.extending.lower_builtin(local_array, types.IntegerLiteral, types.Any)
+def builtin_local_array(context, builder, sig, args):
+
+    shape, dtype = sig.args
+
+    from numba.core.typing.npydecl import parse_dtype, parse_shape
+    import numba.np.arrayobj as arrayobj
+
+    if isinstance(context, numba.core.cpu.CPUContext):
+
+        # No default arguments.
+        nb_dtype = parse_dtype(dtype)
+        nb_shape = parse_shape(shape)
+
+        retty = types.Array(dtype=nb_dtype, ndim=nb_shape, layout="C")
+
+        # In ol_np_empty, the reference type of the array is fed into the
+        # signatrue as a third argument. This third argument is not used by
+        # _parse_empty_args.
+        sig = retty(shape, dtype)
+
+        arrtype, shapes = arrayobj._parse_empty_args(context, builder, sig, args)
+        ary = arrayobj._empty_nd_impl(context, builder, arrtype, shapes)
+
+        return ary._getvalue()
+    elif isinstance(context, numba.cuda.target.CUDATargetContext):
+        length = sig.args[0].literal_value
+        dtype = parse_dtype(sig.args[1])
+        return numba.cuda.cudaimpl._generic_array(
+            context,
+            builder,
+            shape=(length,),
+            dtype=dtype,
+            symbol_name="_cudapy_harm_lmem",
+            addrspace=numba.cuda.cudadrv.nvvm.ADDRSPACE_LOCAL,
+            can_dynsized=False,
+        )
+    elif isinstance(context, numba.hip.target.HIPTargetContext):
+        length = sig.args[0].literal_value
+        dtype = parse_dtype(sig.args[1])
+        result = numba.hip.typing_lowering.hip.lowering._generic_array(
+            context,
+            builder,
+            shape=(length,),
+            dtype=dtype,
+            symbol_name="_HIPpy_lmem",
+            addrspace=numba.hip.amdgcn.ADDRSPACE_LOCAL,
+            can_dynsized=False,
+        )
+        return result
+    else:
+        raise numba.core.errors.UnsupportedError(
+            f"Unsupported target context {context}."
+        )
+
+
 # =============================================================================
 # Decorators
 # =============================================================================
@@ -105,7 +286,6 @@ def overwrite_func(func, revised_func):
     mod_name = func.__module__
     fn_name = func.__name__
     new_fn_name = revised_func.__name__
-    # print(f"Overwriting function {fn_name} in module {mod_name} with {new_fn_name}")
     module = __import__(mod_name, fromlist=[fn_name])
     setattr(module, fn_name, revised_func)
 
@@ -136,7 +316,6 @@ def eval_toggle():
             else:
                 global do_nothing_id
                 name = func.__name__
-                # print(f"do_nothing_{do_nothing_id} for {name}")
                 arg_count = len(inspect.signature(func).parameters)
                 overwrite_func(func, numba.njit(generate_do_nothing(arg_count)))
 
@@ -154,7 +333,6 @@ def blankout_fn(func):
     if id not in blankout_roster:
         global do_nothing_id
         name = func.__name__
-        # print(f"do_nothing_{do_nothing_id} for {name}")
         arg_count = len(inspect.signature(func).parameters)
         blankout_roster[id] = generate_do_nothing(
             arg_count, crash_on_call=f"blankout fn for {name} should never be called"
@@ -166,12 +344,10 @@ def blankout_fn(func):
 
 
 def for_(target, on_target=[]):
-    # print(f"{target}")
     def for_inner(func):
         global target_rosters
         mod_name = func.__module__
         fn_name = func.__name__
-        # print(f"{target} {mod_name} {fn_name}")
         params = inspect.signature(func).parameters
         if target not in target_rosters:
             target_rosters[target] = {}
@@ -179,11 +355,13 @@ def for_(target, on_target=[]):
         # blank = blankout_fn(func)
         param_str = ", ".join(p for p in params)
         jit_str = f"def jit_func({param_str}):\n    global target_rosters\n    return target_rosters['{target}'][('{mod_name}','{fn_name}')]"
-        # print(jit_str)
         exec(jit_str, globals(), locals())
         result = eval("jit_func")
         blank = blankout_fn(func)
-        numba.core.extending.overload(blank, target=target)(result)
+        if target == "gpu":
+            numba.core.extending.overload(blank, target=target)(result)
+        else:
+            numba.core.extending.overload(blank, target=target)(result)
         return blank
 
     return for_inner
@@ -199,24 +377,6 @@ def for_gpu(on_target=[]):
 
 def target_for(target):
     pass
-
-
-#
-#    for func in late_jit_roster:
-#        if target == 'cpu':
-#            overwrite_func(func,numba.njit)
-#        elif target == 'gpu':
-#            overwrite_func(func,numba.cuda.jit)
-#        else:
-#            unknown_target(target)
-#
-#    for func, on_target in target_rosters[target].items():
-#        transformed = func
-#        for transformer in on_target:
-#            transformed = transformer(transformed)
-#        name = func.__name__
-#        print(f"Overwriting func {name} for target {target}")
-#        overwrite_func(func, transformed)
 
 
 def jit_on_target():
@@ -237,28 +397,6 @@ def nopython_mode(is_on):
         overwrite_func(impl, impl)
 
 
-# Function adapted from Phillip Eller's `myjit` solution to the GPU/CPU array
-# problem brought up in https://github.com/numba/numba/issues/2571
-def universal_arrays(target):
-    def universal_arrays_inner(func):
-        if target == "gpu":
-            source = inspect.getsource(func).splitlines()
-            for idx, line in enumerate(source):
-                if "@universal_arrays" in line:
-                    source = "\n".join(source[idx + 1 :]) + "\n"
-                    break
-            source = source.replace("np.empty", "cuda.local.array")
-            # print(source)
-            exec(source)
-            revised_func = eval(func.__name__)
-            overwrite_func(func, revised_func)
-            # module = __import__(func.__module__,fromlist=[func.__name__])
-            # print(inspect.getsource(getattr(module,func.__name__)))
-        return revised_func
-
-    return universal_arrays_inner
-
-
 # =============================================================================
 # GPU Type / Extern Functions Forward Declarations
 # =============================================================================
@@ -267,28 +405,51 @@ def universal_arrays(target):
 SIMPLE_ASYNC = True
 
 none_type = None
-mcdc_type = None
+mcdc_global_type = None
+mcdc_data_type = None
 state_spec = None
-device_gpu = None
+mcdc_global_gpu = None
+mcdc_data_gpu = None
 group_gpu = None
 thread_gpu = None
 particle_gpu = None
 prep_gpu = None
 step_async = None
+halt_early = None
 find_cell_async = None
 
 
-def gpu_forward_declare():
+def gpu_forward_declare(args):
 
-    global none_type, mcdc_type, state_spec
-    global device_gpu, group_gpu, thread_gpu
+    if args.gpu_rocm_path != None:
+        harm.config.set_rocm_path(args.gpu_rocm_path)
+
+    if args.gpu_cuda_path != None:
+        harm.config.set_cuda_path(args.gpu_cuda_path)
+
+    global none_type, mcdc_global_type, mcdc_data_type
+    global state_spec
+    global mcdc_global_gpu, mcdc_data_gpu
+    global group_gpu, thread_gpu
     global particle_gpu, particle_record_gpu
-    global step_async, find_cell_async
+    global step_async, find_cell_async, halt_early
 
     none_type = numba.from_dtype(np.dtype([]))
-    mcdc_type = numba.from_dtype(type_.global_)
-    state_spec = (mcdc_type, none_type, none_type)
-    device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
+    mcdc_global_type = numba.from_dtype(type_.global_)
+    mcdc_data_type = numba.from_dtype(type_.tally)
+    state_spec = (
+        {
+            "global": mcdc_global_type,
+            "data": mcdc_data_type,
+        },
+        none_type,
+        none_type,
+    )
+    access_fns = harm.RuntimeSpec.access_fns(state_spec)
+    mcdc_global_gpu = access_fns["device"]["global"]
+    mcdc_data_gpu = access_fns["device"]["data"]
+    group_gpu = access_fns["group"]
+    thread_gpu = access_fns["thread"]
     particle_gpu = numba.from_dtype(type_.particle)
     particle_record_gpu = numba.from_dtype(type_.particle_record)
 
@@ -299,6 +460,8 @@ def gpu_forward_declare():
         pass
 
     step_async, find_cell_async = adapt.harm.RuntimeSpec.async_dispatch(step, find_cell)
+    interface = adapt.harm.RuntimeSpec.program_interface()
+    halt_early = interface["halt_early"]
 
 
 # =============================================================================
@@ -306,14 +469,28 @@ def gpu_forward_declare():
 # =============================================================================
 
 
+def mcdc_global(prog):
+    return prog
+
+
 @for_cpu()
-def device(prog):
+def mcdc_global(prog):
     return prog
 
 
 @for_gpu()
-def device(prog):
-    return device_gpu(prog)
+def mcdc_global(prog):
+    return mcdc_global_gpu(prog)
+
+
+@for_cpu()
+def mcdc_data(prog):
+    return None
+
+
+@for_gpu()
+def mcdc_data(prog):
+    return mcdc_data_gpu(prog)
 
 
 @for_cpu()
@@ -342,12 +519,13 @@ def add_active(particle, prog):
 
 
 @for_gpu()
-def add_active(particle, prog):
-    P = kernel.recordlike_to_particle(particle)
+def add_active(P_reclike, prog):
+    P = local_array(1, type_.particle)
+    kernel.recordlike_to_particle(P, P_reclike)
     if SIMPLE_ASYNC:
-        step_async(prog, P)
+        step_async(prog, P[0])
     else:
-        find_cell_async(prog, P)
+        find_cell_async(prog, P[0])
 
 
 @for_cpu()
@@ -357,7 +535,7 @@ def add_source(particle, prog):
 
 @for_gpu()
 def add_source(particle, prog):
-    mcdc = device(prog)
+    mcdc = mcdc_global(prog)
     kernel.add_particle(particle, mcdc["bank_source"])
 
 
@@ -368,7 +546,7 @@ def add_census(particle, prog):
 
 @for_gpu()
 def add_census(particle, prog):
-    mcdc = device(prog)
+    mcdc = mcdc_global(prog)
     kernel.add_particle(particle, mcdc["bank_census"])
 
 
@@ -379,61 +557,8 @@ def add_IC(particle, prog):
 
 @for_gpu()
 def add_IC(particle, prog):
-    mcdc = device(prog)
+    mcdc = mcdc_global(prog)
     kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
-
-
-@for_cpu()
-def local_translate():
-    return np.zeros(1, dtype=type_.translate)[0]
-
-
-@for_gpu()
-def local_translate():
-    trans = cuda.local.array(1, type_.translate)[0]
-    for i in range(3):
-        trans["values"][i] = 0
-    return trans
-
-
-@for_cpu()
-def local_group_array():
-    return np.zeros(1, dtype=type_.group_array)[0]
-
-
-@for_gpu()
-def local_group_array():
-    return cuda.local.array(1, type_.group_array)[0]
-
-
-@for_cpu()
-def local_j_array():
-    return np.zeros(1, dtype=type_.j_array)[0]
-
-
-@for_gpu()
-def local_j_array():
-    return cuda.local.array(1, type_.j_array)[0]
-
-
-@for_cpu()
-def local_particle():
-    return np.zeros(1, dtype=type_.particle)[0]
-
-
-@for_gpu()
-def local_particle():
-    return cuda.local.array(1, dtype=type_.particle)[0]
-
-
-@for_cpu()
-def local_particle_record():
-    return np.zeros(1, dtype=type_.particle_record)[0]
-
-
-@for_gpu()
-def local_particle_record():
-    return cuda.local.array(1, dtype=type_.particle_record)[0]
 
 
 @for_cpu()
@@ -445,7 +570,7 @@ def global_add(ary, idx, val):
 
 @for_gpu()
 def global_add(ary, idx, val):
-    return cuda.atomic.add(ary, idx, val)
+    return harm.array_atomic_add(ary, idx, val)
 
 
 @for_cpu()
@@ -458,7 +583,7 @@ def global_max(ary, idx, val):
 
 @for_gpu()
 def global_max(ary, idx, val):
-    return cuda.atomic.max(ary, idx, val)
+    return harm.array_atomic_max(ary, idx, val)
 
 
 # =========================================================================
