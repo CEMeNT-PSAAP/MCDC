@@ -1293,17 +1293,19 @@ def dd_mergetally(mcdc, data):
 
     # MPI gather
     if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
-        sendcounts = np.array(MPI.COMM_WORLD.gather(len(tally[0]),root=0))
-        #print(MPI.COMM_WORLD.Get_rank(), tally)
+        sendcounts = np.array(MPI.COMM_WORLD.gather(len(tally[0]), root=0))
+        # print(MPI.COMM_WORLD.Get_rank(), tally)
         if mcdc["mpi_master"]:
             dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
         else:
-            dd_tally = np.empty(tally.shape[0]) # dummy tally
+            dd_tally = np.empty(tally.shape[0])  # dummy tally
         # gather tallies
         for i, t in enumerate(tally):
-            MPI.COMM_WORLD.Gatherv(sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0)
-        #print(dd_tally)
-    
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
+            )
+        # print(dd_tally)
+
     # MPI gather for multiprocessor subdomains
     else:
         i = 0
@@ -1315,11 +1317,10 @@ def dd_mergetally(mcdc, data):
         # create MPI comm group for nonzero tallies
         dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
         dd_comm = MPI.COMM_WORLD.Create(dd_group)
-        dd_tally = np.empty(tally.shape[0]) # dummy tally
+        dd_tally = np.empty(tally.shape[0])  # dummy tally
 
         if MPI.COMM_NULL != dd_comm:
-            sendcounts = np.array(dd_comm.gather(len(tally[0]),root=0))
-            #print(MPI.COMM_WORLD.Get_rank(), tally)
+            sendcounts = np.array(dd_comm.gather(len(tally[0]), root=0))
             if mcdc["mpi_master"]:
                 dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
             # gather tallies
@@ -1328,8 +1329,7 @@ def dd_mergetally(mcdc, data):
         dd_group.Free()
         if MPI.COMM_NULL != dd_comm:
             dd_comm.Free()
-        #print(dd_tally)
-            
+
     if mcdc["mpi_master"]:
         buff = np.zeros_like(dd_tally)
         # reorganize tally data
