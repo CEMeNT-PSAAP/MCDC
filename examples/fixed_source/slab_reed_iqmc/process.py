@@ -125,7 +125,6 @@ phi_ref = reeds_sol(Nx=x_mid.size, LB=-8.0, RB=8.0)
 # =============================================================================
 
 # Flux - spatial average
-plt.figure(dpi=300, figsize=(8, 5))
 plt.plot(x_mid, phi_ref, label="Sol")
 plt.plot(x_mid, phi, label="iQMC")
 plt.ylabel(r"$\phi(x)$")

@@ -7,18 +7,18 @@ from reference import reference
 
 # Load results
 with h5py.File("output.h5", "r") as f:
-    z = f["tally/grid/z"][:]
+    z = f["tallies/mesh_tally_0/grid/z"][:]
     dz = z[1:] - z[:-1]
     z_mid = 0.5 * (z[:-1] + z[1:])
 
-    mu = f["tally/grid/mu"][:]
+    mu = f["tallies/mesh_tally_0/grid/mu"][:]
     dmu = mu[1:] - mu[:-1]
     mu_mid = 0.5 * (mu[:-1] + mu[1:])
 
-    psi = f["tally/flux/mean"][:]
-    psi_sd = f["tally/flux/sdev"][:]
-    J = f["tally/current/mean"][:, 2]
-    J_sd = f["tally/current/sdev"][:, 2]
+    psi = f["tallies/mesh_tally_0/flux/mean"][:]
+    psi_sd = f["tallies/mesh_tally_0/flux/sdev"][:]
+    psi = np.transpose(psi)
+    psi_sd = np.transpose(psi_sd)
 
 I = len(z) - 1
 N = len(mu) - 1
@@ -33,14 +33,12 @@ for i in range(I):
 # Normalize
 phi /= dz
 phi_sd /= dz
-J /= dz
-J_sd /= dz
 for n in range(N):
     psi[:, n] = psi[:, n] / dz / dmu[n]
     psi_sd[:, n] = psi_sd[:, n] / dz / dmu[n]
 
 # Reference solution
-phi_ref, J_ref, psi_ref = reference(z, mu)
+phi_ref, _, psi_ref = reference(z, mu)
 
 # Flux - spatial average
 plt.plot(z_mid, phi, "-b", label="MC")
@@ -52,18 +50,6 @@ plt.ylim([0.06, 0.16])
 plt.grid()
 plt.legend()
 plt.title(r"$\bar{\phi}_i$")
-plt.show()
-
-# Current - spatial average
-plt.plot(z_mid, J, "-b", label="MC")
-plt.fill_between(z_mid, J - J_sd, J + J_sd, alpha=0.2, color="b")
-plt.plot(z_mid, J_ref, "--r", label="Ref.")
-plt.xlabel(r"$z$, cm")
-plt.ylabel("Current")
-plt.ylim([-0.03, 0.045])
-plt.grid()
-plt.legend()
-plt.title(r"$\bar{J}_i$")
 plt.show()
 
 # Angular flux - spatial average

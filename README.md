@@ -39,13 +39,6 @@ Running MC/DC performantly in [Numba mode](#numba-mode) requires a patch to a si
 2. In your active conda environment, run `bash patch_numba.sh`.
 *If you manage your environment with conda, you will not need admin privileges*.
 
-### `visualizer` Config
-
-MC/DC has a visualizer built from the [netgen package](https://ngsolve.org/). This is not included in the base install of MC/DC due to the size of the dependencies (~300MB). To install these dependencies use
-```bash
-pip install mcdc['viz']
-```
-
 ## Running
 
 MC/DC can be executed in different modes: via pure python or via a `jit` compiled version (Numba mode). 
