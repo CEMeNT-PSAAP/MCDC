@@ -1998,7 +1998,7 @@ def dd_reduce(data, mcdc):
         dd_group.Free()
         if MPI.COMM_NULL != dd_comm:
             dd_comm.Free()
-            
+
 
 @njit
 def tally_reduce(data, mcdc):
@@ -2020,10 +2020,11 @@ def tally_reduce(data, mcdc):
     else:
         # find number of subdomains
         N_dd = 1
-        for name in ["x", "y", "z", "t", "mu", "azi"]:
-            N_dd *= mcdc["technique"]["dd_mesh"][name].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["x"].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["y"].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["z"].size - 1
         # DD Reduce if multiple processors per subdomain
-        if N_dd != MPI.COMM_WORLD.Get_size():
+        if N_dd != mcdc["mpi_size"]:
             dd_reduce(data, mcdc)
 
 
@@ -2040,6 +2041,7 @@ def tally_accumulate(data, mcdc):
 
         # Reset score bin
         tally_bin[TALLY_SCORE, i] = 0.0
+
 
 @njit
 def dd_closeout(data, mcdc):
@@ -2070,11 +2072,12 @@ def dd_closeout(data, mcdc):
         if mcdc["dd_idx"] == n:
             tally_bin[TALLY_SUM] = buff
             tally_bin[TALLY_SUM_SQ] = buff_sq * len(dd_ranks)
-            
+
         # free comm group
         dd_group.Free()
         if MPI.COMM_NULL != dd_comm:
             dd_comm.Free()
+
 
 @njit
 def tally_closeout(data, mcdc):
