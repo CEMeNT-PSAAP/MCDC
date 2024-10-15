@@ -2069,14 +2069,14 @@ def dd_closeout(data, mcdc):
             if MPI.COMM_NULL != dd_comm:
                 dd_comm.Reduce(tally_bin[TALLY_SUM], buff, MPI.SUM, 0)
                 dd_comm.Reduce(tally_bin[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
-        if mcdc["dd_idx"] == n:
-            tally_bin[TALLY_SUM] = buff
-            tally_bin[TALLY_SUM_SQ] = buff_sq * len(dd_ranks)
-            
-        # free comm group
-        dd_group.Free()
-        if MPI.COMM_NULL != dd_comm:
-            dd_comm.Free()
+            if mcdc["dd_idx"] == n:
+                tally_bin[TALLY_SUM] = buff
+                tally_bin[TALLY_SUM_SQ] = buff_sq * len(dd_ranks)
+
+            # free comm group
+            dd_group.Free()
+            if MPI.COMM_NULL != dd_comm:
+                dd_comm.Free()
 
 
 @njit
