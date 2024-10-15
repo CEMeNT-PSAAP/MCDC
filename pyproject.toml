@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcdc"
-version = "0.10.0"
+version = "0.11.0"
 authors = [
   { name="Ilham Variansyah", email="variansi@oregonstate.edu" },
   { name="Sam Pasmann", email="spasmann@nd.edu" },
@@ -27,6 +27,7 @@ authors = [
 
 maintainers = [
     { name="Ilham Variansyah", email = "variansi@oregonstate.edu"},
+    { name="Braxton Cuneo", email="bcuneo@seattleu.edu" },
     { name="Kayla Clements", email = "clemekay@oregonstate.edu"},
     { name="Joanna Piper Morgan", email = "morgajoa@oregonstate.edu"},
     { name="Kyle E. Niemeyer", email = "kyle.niemeyer@oregonstate.edu"},
