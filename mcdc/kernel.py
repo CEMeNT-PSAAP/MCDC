@@ -1977,28 +1977,28 @@ def dd_reduce(data, mcdc):
     d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
     d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
 
-    # assign processors to their subdomain group
-    i = 0
-    for n in range(d_Nx * d_Ny * d_Nz):
-        dd_group = []
-        for r in range(int(mcdc["technique"]["dd_work_ratio"][n])):
-            dd_group.append(i)
-            i += 1
-        # create MPI Comm group out of subdomain processors
-        dd_group = MPI.COMM_WORLD.group.Incl(dd_group)
-        dd_comm = MPI.COMM_WORLD.Create(dd_group)
-        # MPI Reduce on subdomain processors
-        buff = np.zeros_like(tally_bin[TALLY_SCORE])
-        if MPI.COMM_NULL != dd_comm:
-            with objmode():
+    with objmode():
+        # assign processors to their subdomain group
+        i = 0
+        for n in range(d_Nx * d_Ny * d_Nz):
+            dd_group = []
+            for r in range(int(mcdc["technique"]["dd_work_ratio"][n])):
+                dd_group.append(i)
+                i += 1
+            # create MPI Comm group out of subdomain processors
+            dd_group = MPI.COMM_WORLD.group.Incl(dd_group)
+            dd_comm = MPI.COMM_WORLD.Create(dd_group)
+            # MPI Reduce on subdomain processors
+            buff = np.zeros_like(tally_bin[TALLY_SCORE])
+            if MPI.COMM_NULL != dd_comm:
                 dd_comm.Reduce(tally_bin[TALLY_SCORE], buff, MPI.SUM, 0)
-        if mcdc["dd_idx"] == n:
-            tally_bin[TALLY_SCORE][:] = buff
-        # free comm group
-        dd_group.Free()
-        if MPI.COMM_NULL != dd_comm:
-            dd_comm.Free()
-            
+            if mcdc["dd_idx"] == n:
+                tally_bin[TALLY_SCORE][:] = buff
+            # free comm group
+            dd_group.Free()
+            if MPI.COMM_NULL != dd_comm:
+                dd_comm.Free()
+
 
 @njit
 def tally_reduce(data, mcdc):
@@ -2020,10 +2020,11 @@ def tally_reduce(data, mcdc):
     else:
         # find number of subdomains
         N_dd = 1
-        for name in ["x", "y", "z", "t", "mu", "azi"]:
-            N_dd *= mcdc["technique"]["dd_mesh"][name].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["x"].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["y"].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["z"].size - 1
         # DD Reduce if multiple processors per subdomain
-        if N_dd != MPI.COMM_WORLD.Get_size():
+        if N_dd != mcdc["mpi_size"]:
             dd_reduce(data, mcdc)
 
 
@@ -2041,6 +2042,7 @@ def tally_accumulate(data, mcdc):
         # Reset score bin
         tally_bin[TALLY_SCORE, i] = 0.0
 
+
 @njit
 def dd_closeout(data, mcdc):
     tally_bin = data[TALLY]
@@ -2050,31 +2052,32 @@ def dd_closeout(data, mcdc):
     d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
     d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
 
-    # assign processors to their subdomain group
-    i = 0
-    for n in range(d_Nx * d_Ny * d_Nz):
-        dd_ranks = []
-        for r in range(int(mcdc["technique"]["dd_work_ratio"][n])):
-            dd_ranks.append(i)
-            i += 1
-        # create MPI Comm group out of subdomain processors
-        dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
-        dd_comm = MPI.COMM_WORLD.Create(dd_group)
-        # MPI Reduce on subdomain processors
-        buff = np.zeros_like(tally_bin[TALLY_SUM])
-        buff_sq = np.zeros_like(tally_bin[TALLY_SUM_SQ])
-        if MPI.COMM_NULL != dd_comm:
-            with objmode():
+    with objmode():
+        # assign processors to their subdomain group
+        i = 0
+        for n in range(d_Nx * d_Ny * d_Nz):
+            dd_ranks = []
+            for r in range(int(mcdc["technique"]["dd_work_ratio"][n])):
+                dd_ranks.append(i)
+                i += 1
+            # create MPI Comm group out of subdomain processors
+            dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
+            dd_comm = MPI.COMM_WORLD.Create(dd_group)
+            # MPI Reduce on subdomain processors
+            buff = np.zeros_like(tally_bin[TALLY_SUM])
+            buff_sq = np.zeros_like(tally_bin[TALLY_SUM_SQ])
+            if MPI.COMM_NULL != dd_comm:
                 dd_comm.Reduce(tally_bin[TALLY_SUM], buff, MPI.SUM, 0)
                 dd_comm.Reduce(tally_bin[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
-        if mcdc["dd_idx"] == n:
-            tally_bin[TALLY_SUM] = buff
-            tally_bin[TALLY_SUM_SQ] = buff_sq * len(dd_ranks)
-            
-        # free comm group
-        dd_group.Free()
-        if MPI.COMM_NULL != dd_comm:
-            dd_comm.Free()
+            if mcdc["dd_idx"] == n:
+                tally_bin[TALLY_SUM] = buff
+                tally_bin[TALLY_SUM_SQ] = buff_sq * len(dd_ranks)
+
+            # free comm group
+            dd_group.Free()
+            if MPI.COMM_NULL != dd_comm:
+                dd_comm.Free()
+
 
 @njit
 def tally_closeout(data, mcdc):
@@ -2100,10 +2103,11 @@ def tally_closeout(data, mcdc):
     else:
         # find number of subdomains
         N_dd = 1
-        for name in ["x", "y", "z", "t", "mu", "azi"]:
-            N_dd *= mcdc["technique"]["dd_mesh"][name].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["x"].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["y"].size - 1
+        N_dd *= mcdc["technique"]["dd_mesh"]["z"].size - 1
         # DD Reduce if multiple processors per subdomain
-        if N_dd != MPI.COMM_WORLD.Get_size():
+        if N_dd != mcdc["mpi_size"]:
             dd_closeout(data, mcdc)
 
     # Calculate and store statistics
