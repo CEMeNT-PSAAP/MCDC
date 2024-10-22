@@ -5,13 +5,12 @@ import numpy as np
 
 # Load result
 with h5py.File("output.h5", "r") as f:
-    tally = f["tallies/mesh_tally_0"]
-    x = tally["grid/x"][:]
+    x = f["tallies/mesh_tally_0/grid/x"][:]
     dx = [x[1:] - x[:-1]][-1]
     x_mid = 0.5 * (x[:-1] + x[1:])
 
-    phi = tally["flux/mean"][:]
-    phi_sd = tally["flux/sdev"][:]
+    phi = f["tallies/mesh_tally_0/flux/mean"][:]
+    phi_sd = f["tallies/mesh_tally_0/flux/sdev"][:]
 
 
 # Plot result
