@@ -60,15 +60,11 @@ mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 61),
     y=np.linspace(0.0, 100.0, 101),
-    # z=np.linspace(0.0, 60.0, 61),
     t=np.linspace(0.0, 200.0, 21),
 )
 
-mcdc.tally.cell_tally(void_cell, scores=["flux"])
-
 # Setting
-mcdc.setting(N_particle=10)
-mcdc.implicit_capture()
+mcdc.setting(N_particle=1e2)
 
 # Run
 mcdc.run()
