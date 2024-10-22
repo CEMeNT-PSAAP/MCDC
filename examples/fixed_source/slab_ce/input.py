@@ -77,6 +77,8 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally(scores=["flux"], x=np.linspace(0.0, 2.0, 21), E=np.array([0.0, 1.0, 20e6]))
+mcdc.tally.mesh_tally(
+    scores=["flux"], x=np.linspace(0.0, 2.0, 21), E=np.array([0.0, 1.0, 20e6])
+)
 mcdc.setting(N_particle=1e3)
 mcdc.run()
