@@ -20,6 +20,20 @@ from mcdc.algorithm import binary_search, binary_search_with_length
 from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
 
+
+
+@njit
+def round(float_val):
+    return float_val
+    #int_val = np.float64(float_val).view(np.uint64)
+    #if (int_val & 0x10) != 0:
+    #    int_val += 0x10
+    #int_val = int_val & ~0x0F
+    #return np.uint64(int_val).view(np.float64)
+
+
+
+
 # =============================================================================
 # Domain Decomposition
 # =============================================================================
@@ -1417,7 +1431,7 @@ def bank_IC(P_arr, prog):
         # Accumulate fission
         SigmaF = material["fission"][g]
         # mcdc["technique"]["IC_fission_score"][0] += v * SigmaF
-        adapt.global_add(mcdc["technique"]["IC_fission_score"], 0, v * SigmaF)
+        adapt.global_add(mcdc["technique"]["IC_fission_score"], 0, round(v * SigmaF))
 
     # =========================================================================
     # Precursor
@@ -1881,6 +1895,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
         flux = distance_scored * P["w"]
         for i in range(tally["N_score"]):
             score_type = tally["scores"][i]
+            score = 0
             if score_type == SCORE_FLUX:
                 score = flux
             elif score_type == SCORE_TOTAL:
@@ -1889,7 +1904,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
-            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
+            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -1963,7 +1978,7 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
             score = flux
         elif score_type == SCORE_NET_CURRENT:
             score = flux * mu
-        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
 
 @njit
@@ -2046,14 +2061,14 @@ def eigenvalue_tally(P_arr, distance, mcdc):
 
     # Fission production (needed even during inactive cycle)
     # mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
-    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
+    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, round(flux * nuSigmaF))
 
     if mcdc["cycle_active"]:
         # Neutron density
         v = physics.get_speed(P_arr, mcdc)
         n_density = flux / v
         # mcdc["eigenvalue_tally_n"][0] += n_density
-        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
+        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, round(n_density))
         # Maximum neutron density
         if mcdc["n_max"] < n_density:
             mcdc["n_max"] = n_density
@@ -2083,7 +2098,7 @@ def eigenvalue_tally(P_arr, distance, mcdc):
                     total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
         # mcdc["eigenvalue_tally_C"][0] += C_density
-        adapt.global_add(mcdc["eigenvalue_tally_C"], 0, C_density)
+        adapt.global_add(mcdc["eigenvalue_tally_C"], 0, round(C_density))
         # Maximum precursor density
         if mcdc["C_max"] < C_density:
             mcdc["C_max"] = C_density

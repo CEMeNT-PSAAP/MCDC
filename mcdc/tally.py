@@ -1,7 +1,9 @@
 # Get input_deck
+import mcdc.config as config
 import mcdc.global_ as global_
 
 import numpy as np
+from numba import njit
 
 from mcdc.card import (
     MeshTallyCard,
