@@ -31,7 +31,7 @@ import re
 # - 'first'  : Set up cached info with an initial run before
 #              launching real jobs (reccomended)
 # - 'never'  : Never used cached info
-cache="first"
+cache = "first"
 
 # Valid values:
 # - 'python' : Python-mode CPU execution
@@ -42,36 +42,36 @@ cache="first"
 #              (Semi-slow. Okay to run with smaller problems.)
 # - 'event'  : Event-based GPU execution
 # - 'async'  : Async GPU execution
-strat_list=[
-#    "python",
-#    "numba",
+strat_list = [
+    #    "python",
+    #    "numba",
     "event",
-#    "async",
+    #    "async",
 ]
 
 
 # List of node counts to run jobs on.
-node_count_list=[ 1 ]
+node_count_list = [1]
 
 # Number of samples to take for each configuration
-sample_count=3
+sample_count = 3
 
 # List of particle counts to run jobs for.
 # This list uses the smallest particle count first so
 # that cache-generating runs go quickly. After this, the
 # counts goes in descending order to front-load long running
 # jobs and allow short jobs to fill in the gaps.
-particle_count_list=[
+particle_count_list = [
     100000,
-#    464158880000,
-#    166810050000,
-#    59948420000,
-#    21544340000,
-#    7742630000,
-#    2782550000,
-#    1000000000,
-#    359381366,
-#    129154966,
+    #    464158880000,
+    #    166810050000,
+    #    59948420000,
+    #    21544340000,
+    #    7742630000,
+    #    2782550000,
+    #    1000000000,
+    #    359381366,
+    #    129154966,
     46415888,
     16681005,
     5994842,
@@ -85,9 +85,9 @@ particle_count_list=[
 # the script. The order of iteration nesting is from the bottom up,
 # with later entries acting like inner for loops.
 param_space = {
-    "TIME_SPLITS" : [ 101 ], #[ 2, 3, 5, 9, 17, 33, 65, 129, 257, 513, 1025 ],
-    "X_SECT" : [ 1.25, 2.5, 5, 10, 20 ],
-    "PARTICLE_COUNT" : particle_count_list,
+    "TIME_SPLITS": [101],  # [ 2, 3, 5, 9, 17, 33, 65, 129, 257, 513, 1025 ],
+    "X_SECT": [1.25, 2.5, 5, 10, 20],
+    "PARTICLE_COUNT": particle_count_list,
 }
 # Feel free to add additional parameters, but make sure there are
 # corresponding strings in your `input_template.py` file, otherwise
@@ -102,15 +102,12 @@ param_space = {
 # A list of parameters which should force a cache reset whenever
 # they change. ( The node count and strat both automatically
 # force cache rests. ) Force-resets are disabled when cache="always".
-reset_cache_on = [ "TIME_SPLITS" ]
-
+reset_cache_on = ["TIME_SPLITS"]
 
 
 # Set the email variable to your email if you want to be
 # emailed when the program has completed.
-email = None#"bcuneo@seattleu.edu"
-
-
+email = None  # "bcuneo@seattleu.edu"
 
 
 ###############################################################################
@@ -121,31 +118,31 @@ email = None#"bcuneo@seattleu.edu"
 mode_set = {
     "run": None,
     "dry_run": None,
-    "collect":None,
+    "collect": None,
 }
 
 if len(sys.argv) < 3:
     print(
-        "A mode and batch name is required to run this script.\n"\
+        "A mode and batch name is required to run this script.\n"
         + "Example: 'scraper.py mode_here batch_name_here'"
     )
     exit(1)
 
-mode=sys.argv[1]
-batch_name=sys.argv[2]
+mode = sys.argv[1]
+batch_name = sys.argv[2]
 
 if not mode in mode_set:
-    mode_list = ", ".join([ f"'{name}'" for name in mode_set])
+    mode_list = ", ".join([f"'{name}'" for name in mode_set])
     print(f"Mode '{mode}' not recognized.\nValid modes: {mode_list}")
     exit(1)
 
 if (mode != "collect") and len(sys.argv) > 3:
-    extra_args = ", ".join([ f"'{arg}'" for arg in sys.argv[3:]])
+    extra_args = ", ".join([f"'{arg}'" for arg in sys.argv[3:]])
     print(f"Unrecognized argument(s): {extra_args}")
     exit(1)
 
 
-stat_types = [ "avg", "min", "max", "each" ]
+stat_types = ["avg", "min", "max", "each"]
 
 stats = {}
 
@@ -158,7 +155,7 @@ if mode == "collect":
             stats[extra_arg] = None
 
     if len(bad) > 0:
-        bad_args = ", ".join([ f"'{arg}'" for arg in bad])
+        bad_args = ", ".join([f"'{arg}'" for arg in bad])
         print(f"Unrecognized argument(s): {bad_args}")
         exit(1)
 
@@ -169,11 +166,12 @@ if len(stats) == 0:
 # Function for making sure a directory exists
 ###############################################################################
 
+
 def ensure_dir(dir_path):
 
     global mode
 
-    if mode in ["run","dry_run"]:
+    if mode in ["run", "dry_run"]:
         print(f"Ensuring directory exists at '{dir_path}'")
 
     if mode != "run":
@@ -186,17 +184,17 @@ def ensure_dir(dir_path):
         exit(1)
 
 
-
 ###############################################################################
 # Convenience function for running commands without arguments containing
 # any whitespace
 ###############################################################################
 
-def go_run(cmd_text,cwd=None,always=False,quiet=False):
+
+def go_run(cmd_text, cwd=None, always=False, quiet=False):
 
     global mode
 
-    if mode in ["run","dry_run"]:
+    if mode in ["run", "dry_run"]:
         print(cmd_text)
 
     if (not always) and (mode != "run"):
@@ -213,10 +211,9 @@ def go_run(cmd_text,cwd=None,always=False,quiet=False):
             "ERROR: Child process exited with non-zero status code ",
             exc.returncode,
             "\nOUTPUT:\n",
-            exc.output.decode()
+            exc.output.decode(),
         )
         raise exc
-
 
 
 ###############################################################################
@@ -227,25 +224,24 @@ def go_run(cmd_text,cwd=None,always=False,quiet=False):
 machine = "mystery_machine"
 base_path = os.getcwd()
 base_job_path = base_path
-username = go_run("id -u -n",always=True,quiet=True).strip()
-hostname = go_run("hostname",always=True,quiet=True).strip()
+username = go_run("id -u -n", always=True, quiet=True).strip()
+hostname = go_run("hostname", always=True, quiet=True).strip()
 
 
-if   "tioga"  in hostname:
+if "tioga" in hostname:
     machine = "tioga"
     base_job_path = f"/p/lustre1/{username}/{batch_name}"
-    machine_arena_size_opt="--gpu_arena_size=100000000"
+    machine_arena_size_opt = "--gpu_arena_size=100000000"
 elif "lassen" in hostname:
     machine = "lassen"
     base_job_path = f"/p/gpfs1/{username}/{batch_name}"
-    machine_arena_size_opt="--gpu_arena_size=20000000"
+    machine_arena_size_opt = "--gpu_arena_size=20000000"
 else:
     print(
-        "Zoinks, Scoob -- Looks like we're on a Mystery Machine!\n"\
-        +"Edit the script if you want it to run on this host!"
+        "Zoinks, Scoob -- Looks like we're on a Mystery Machine!\n"
+        + "Edit the script if you want it to run on this host!"
     )
     exit(1)
-
 
 
 base_out_path = f"{base_path}/{batch_name}"
@@ -253,12 +249,12 @@ ensure_dir(base_out_path)
 ensure_dir(base_job_path)
 
 
-
 ###############################################################################
 # Function for replacing strings in a file
 ###############################################################################
 
-def specialize_template(template_path,repl_list,output_path):
+
+def specialize_template(template_path, repl_list, output_path):
 
     template_file = open(template_path)
     text = template_file.read()
@@ -267,18 +263,17 @@ def specialize_template(template_path,repl_list,output_path):
     for key, val in repl_list.items():
         key = str(key)
         val = str(val)
-        text = re.sub(key,val,text)
+        text = re.sub(key, val, text)
 
-    output_file = open(output_path,'w')
+    output_file = open(output_path, "w")
     output_file.write(text)
     output_file.close()
-
-
 
 
 ###############################################################################
 # Function for iterating through parameter space
 ###############################################################################
+
 
 def unroll_param_space(param_space):
     result = [{}]
@@ -288,18 +283,18 @@ def unroll_param_space(param_space):
         result = []
         for value in param_space[param]:
             for sub_config in sub_result:
-                entry = { param : value }
-                for p,v in sub_config.items():
+                entry = {param: value}
+                for p, v in sub_config.items():
                     entry[p] = v
                 result.append(entry)
 
     return result
 
 
-
 ###############################################################################
 # Per-job logic
 ###############################################################################
+
 
 # Fetch the latest Total time in the file called 'out' in the directory at
 # the provided path. If no such time exists, return None
@@ -309,11 +304,11 @@ def get_result(out_path):
         file = open(f"{out_path}/out")
         text = file.read()
         file.close()
-        total_matches = re.findall(r'Total.*\(',text)
+        total_matches = re.findall(r"Total.*\(", text)
         total_match = total_matches[-1]
-        total_text = re.search(r' [0-9]+\.[0-9]+ ',total_match)
+        total_text = re.search(r" [0-9]+\.[0-9]+ ", total_match)
         total = float(total_text.group(0).strip())
-        if 'minutes' in total_match:
+        if "minutes" in total_match:
             total *= 60
         result = str(total)
     except Exception as e:
@@ -323,17 +318,17 @@ def get_result(out_path):
 
 # Returns the text to put at the start of a command to launch it on the
 # job system used by the current machine
-def launch_preamble(out_path,immediate=True):
+def launch_preamble(out_path, immediate=True):
     # Figure out the launch command that should receive our python command
     if machine == "tioga":
-        rank_count=node_count*8
+        rank_count = node_count * 8
         if immediate:
             directive = "submit"
         else:
             directive = "run"
         return f"flux {directive} -N {node_count} -n {rank_count} -g 1 --output={out_path}/out --error={out_path}/err --flags=waitable"
     elif machine == "lassen":
-        rank_count=node_count*4
+        rank_count = node_count * 4
         if immediate:
             immediate_opt = "-i"
         else:
@@ -344,8 +339,7 @@ def launch_preamble(out_path,immediate=True):
         return None
 
 
-
-def handle_job(strat,node_count,sample_index,config):
+def handle_job(strat, node_count, sample_index, config):
 
     global cache_needs_refresh
     global last_cache
@@ -373,54 +367,54 @@ def handle_job(strat,node_count,sample_index,config):
     # If in collection mode, just print the result
     if mode == "collect":
         if result == None:
-            return { dir_name : None }
+            return {dir_name: None}
         else:
-            return { dir_name : float(result) }
+            return {dir_name: float(result)}
     # If NOT in collection mode, skip run if a result is already present
     elif result != None:
-        return { dir_name : float(result) }
+        return {dir_name: float(result)}
 
     # Script files don't need to be generated for dry runs
     if mode == "run":
         # Perform find/replace on `input_template.py`, saving the
         # modified text to the path the job should run in
-        specialize_template("./input_template.py",config,script_path)
+        specialize_template("./input_template.py", config, script_path)
 
-    target_opt=""
-    arena_size_opt=""
-    mode_opt=""
-    strat_opt=""
-    caching_opt=""
+    target_opt = ""
+    arena_size_opt = ""
+    mode_opt = ""
+    strat_opt = ""
+    caching_opt = ""
 
     # Disable caching if the settings indicate so
     if cache != "never":
-        caching_opt="--caching"
+        caching_opt = "--caching"
 
     # Handle options that should be supplied for each strat
-    if   strat == "python":
-        target_opt="--target=cpu"
-        mode_opt="--mode=python"
+    if strat == "python":
+        target_opt = "--target=cpu"
+        mode_opt = "--mode=python"
     elif strat == "numba":
-        target_opt="--target=cpu"
-        mode_opt="--mode=numba"
+        target_opt = "--target=cpu"
+        mode_opt = "--mode=numba"
     elif strat == "event":
-        target_opt="--target=gpu"
-        strat_opt="--gpu_strat=event"
-        mode_opt="--mode=numba"
+        target_opt = "--target=gpu"
+        strat_opt = "--gpu_strat=event"
+        mode_opt = "--mode=numba"
     elif strat == "async":
-        target_opt="--target=gpu"
-        strat_opt="--gpu_strat=async"
-        mode_opt="--mode=numba"
+        target_opt = "--target=gpu"
+        strat_opt = "--gpu_strat=async"
+        mode_opt = "--mode=numba"
     else:
         print(f"Unrecognized strat '{strat}'")
 
     # The actual python command we care about running
-    base_cmd=f"python3 {script_path} {mode_opt} {target_opt} {arena_size_opt} {strat_opt} {caching_opt}"
+    base_cmd = f"python3 {script_path} {mode_opt} {target_opt} {arena_size_opt} {strat_opt} {caching_opt}"
 
     launch_cmd = launch_preamble(out_path)
 
     # Print the command for diagnostic purposes, then run it
-    cmd=f"{launch_cmd} {base_cmd}"
+    cmd = f"{launch_cmd} {base_cmd}"
 
     # If we need to prep the cache, perform a prior foreground run with caching off
     if cache_needs_refresh:
@@ -433,9 +427,9 @@ def handle_job(strat,node_count,sample_index,config):
 
         # Run the command in the foreground
         print("Refreshing cache.")
-        cache_launch_cmd = launch_preamble(out_path,immediate=False)
-        cache_cmd=f"{cache_launch_cmd} {base_cmd} --clear_cache"
-        go_run(cache_cmd,cwd=job_path)
+        cache_launch_cmd = launch_preamble(out_path, immediate=False)
+        cache_cmd = f"{cache_launch_cmd} {base_cmd} --clear_cache"
+        go_run(cache_cmd, cwd=job_path)
 
         cache_needs_refresh = False
         last_cache = cache_path
@@ -448,12 +442,13 @@ def handle_job(strat,node_count,sample_index,config):
         if os.path.exists(cache_path):
             shutil.rmtree(cache_path)
         if os.path.exists(last_cache) and (cache != "never"):
-            shutil.copytree(last_cache,cache_path)
+            shutil.copytree(last_cache, cache_path)
 
     # Run the actual command
-    go_run(cmd,cwd=job_path)
+    go_run(cmd, cwd=job_path)
 
     return {}
+
 
 ###############################################################################
 # Waiting logic
@@ -480,15 +475,16 @@ def wait_all(quiet=False):
     if not quiet:
         try:
             if wait_success and (email != None):
-                subject=f"{batch_name} finished"
-                message=f"All jobs finished for scraper batch {batch_name}"
+                subject = f"{batch_name} finished"
+                message = f"All jobs finished for scraper batch {batch_name}"
                 subprocess.check_output(
-                    ["mail","-s",subject,email],
+                    ["mail", "-s", subject, email],
                     stderr=subprocess.STDOUT,
-                    input=str.encode(message)
+                    input=str.encode(message),
                 ).decode()
         except subprocess.CalledProcessError as exc:
             pass
+
 
 ###############################################################################
 # Logic for printing stats
@@ -513,18 +509,18 @@ def print_stats(result_set):
         if val == None:
             minim = None
             maxim = None
-            avg   = None
+            avg = None
             break
 
         if minim == None:
             minim = val
         else:
-            minim = min(minim,val)
+            minim = min(minim, val)
 
         if maxim == None:
             maxim = val
         else:
-            maxim = max(maxim,val)
+            maxim = max(maxim, val)
 
         if avg == None:
             avg = val
@@ -551,8 +547,10 @@ def print_stats(result_set):
 # Logic for re-caching as variables change
 ###############################################################################
 last_config = None
-last_cache  = None
-def param_broke_cache(last_config,config):
+last_cache = None
+
+
+def param_broke_cache(last_config, config):
     if last_config == None:
         return True
 
@@ -563,19 +561,20 @@ def param_broke_cache(last_config,config):
     return False
 
 
-
 ###############################################################################
 # Diagnostic info
 ###############################################################################
 
-print(f"""
+print(
+    f"""
 SCRAPER
 
 running on  : '{machine}'
 username    : '{username}'
 working dir : '{base_path}'
 job dir     : '{base_job_path}'
-""")
+"""
+)
 
 
 ###############################################################################
@@ -591,12 +590,12 @@ for strat in strat_list:
 
         for config in unroll_param_space(param_space):
 
-            if param_broke_cache(last_config,config):
+            if param_broke_cache(last_config, config):
                 cache_needs_refresh = True
 
             result_set = {}
             for sample_index in range(sample_count):
-                result = handle_job(strat,node_count,sample_index,config)
+                result = handle_job(strat, node_count, sample_index, config)
                 last_config = config
 
                 for key, val in result.items():
@@ -607,5 +606,3 @@ for strat in strat_list:
 
 if mode == "run":
     wait_all()
-
-

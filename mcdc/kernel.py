@@ -21,17 +21,14 @@ from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
 
 
-
 @njit
 def round(float_val):
     return float_val
-    #int_val = np.float64(float_val).view(np.uint64)
-    #if (int_val & 0x10) != 0:
+    # int_val = np.float64(float_val).view(np.uint64)
+    # if (int_val & 0x10) != 0:
     #    int_val += 0x10
-    #int_val = int_val & ~0x0F
-    #return np.uint64(int_val).view(np.float64)
-
-
+    # int_val = int_val & ~0x0F
+    # return np.uint64(int_val).view(np.float64)
 
 
 # =============================================================================

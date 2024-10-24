@@ -10,11 +10,15 @@ import mcdc
 # (PNE 2001, https://doi.org/10.1016/S0149-1970(01)00007-5)
 
 
-x_sect=X_SECT
+x_sect = X_SECT
 
 # Set materials
-m = mcdc.material(capture=np.array([0.01*x_sect]), scatter=np.array([[0.01*x_sect]]))
-m_void = mcdc.material(capture=np.array([5e-5*x_sect]), scatter=np.array([[5e-5*x_sect]]))
+m = mcdc.material(
+    capture=np.array([0.01 * x_sect]), scatter=np.array([[0.01 * x_sect]])
+)
+m_void = mcdc.material(
+    capture=np.array([5e-5 * x_sect]), scatter=np.array([[5e-5 * x_sect]])
+)
 
 # Set surfaces
 sx1 = mcdc.surface("plane-x", x=0.0, bc="reflective")
@@ -75,9 +79,7 @@ mcdc.tally.mesh_tally(
 
 # Setting
 mcdc.setting(N_particle=PARTICLE_COUNT)
-#mcdc.implicit_capture()
+# mcdc.implicit_capture()
 
 # Run
 mcdc.run()
-
-

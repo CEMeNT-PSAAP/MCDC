@@ -59,17 +59,15 @@ parser.add_argument(
 )
 
 
-
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 parser.add_argument("--progress_bar", default=True, action="store_true")
 parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
-parser.add_argument("--clear_cache",action="store_true")
-parser.add_argument("--caching",action="store_true")
-parser.add_argument("--no_caching",dest="caching",action="store_false")
+parser.add_argument("--clear_cache", action="store_true")
+parser.add_argument("--caching", action="store_true")
+parser.add_argument("--no_caching", dest="caching", action="store_false")
 parser.set_defaults(caching=False)
 args, unargs = parser.parse_known_args()
-
 
 
 mode = args.mode
@@ -79,10 +77,11 @@ clear_cache = args.clear_cache
 
 from mpi4py import MPI
 import shutil
+
 src_path = os.path.dirname(os.path.abspath(__file__))
 cache_path = f"{src_path}/__pycache__"
 
-if ( (caching == False) or (clear_cache == True) ) and (MPI.COMM_WORLD.Get_rank() == 0):
+if ((caching == False) or (clear_cache == True)) and (MPI.COMM_WORLD.Get_rank() == 0):
     if os.path.exists(cache_path):
         shutil.rmtree(cache_path)
     if os.path.exists("__harmonize_cache__"):
@@ -133,5 +132,3 @@ elif mode == "numba_debug":
     nb.config.NUMBA_EXTEND_VARIABLE_LIFETIMES = (
         1  # allows for inspection of numba variables after end of compilation
     )
-
-
