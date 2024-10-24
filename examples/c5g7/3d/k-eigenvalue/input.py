@@ -8,7 +8,7 @@ import mcdc
 # =============================================================================
 
 # Load material data
-lib = h5py.File("../../c5g7_xs.h5", "r")
+lib = h5py.File("../../MGXS-C5G7-TD.h5", "r")
 
 
 # Setter

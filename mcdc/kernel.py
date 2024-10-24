@@ -1895,6 +1895,8 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             score = 0
             if score_type == SCORE_FLUX:
                 score = flux
+            elif score_type == SCORE_DENSITY:
+                score = flux * ut
             elif score_type == SCORE_TOTAL:
                 SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
                 score = flux * SigmaT
