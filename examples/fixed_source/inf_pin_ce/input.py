@@ -57,9 +57,10 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-with np.load("SHEM-361.npz") as data:
-    E = data["E"]
-
-mcdc.tally.mesh_tally(scores=["flux"], E=E, t=np.insert(np.logspace(-8, 2, 50), 0, 0.0))
-mcdc.setting(N_particle=1e7, active_bank_buff=1000)
+mcdc.tally.mesh_tally(
+    scores=["flux", "density"],
+    E=np.loadtxt("energy_grid.txt"),
+    t=np.insert(np.logspace(-8, 2, 50), 0, 0.0),
+)
+mcdc.setting(N_particle=1e2, active_bank_buff=1000)
 mcdc.run()
