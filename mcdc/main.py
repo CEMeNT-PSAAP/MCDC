@@ -47,12 +47,12 @@ input_deck = mcdc_.input_deck
 
 def run():
     # Override input deck with command-line argument, if given
-    if args.N_particle is not None:
-        input_deck.setting["N_particle"] = args.N_particle
-    if args.output is not None:
-        input_deck.setting["output_name"] = args.output
-    if args.progress_bar is not None:
-        input_deck.setting["progress_bar"] = args.progress_bar
+    if config.args.N_particle is not None:
+        input_deck.setting["N_particle"] = config.args.N_particle
+    if config.args.output is not None:
+        input_deck.setting["output_name"] = config.args.output
+    if config.args.progress_bar is not None:
+        input_deck.setting["progress_bar"] = config.args.progress_bar
 
     # Start timer
     total_start = MPI.Wtime()
@@ -192,8 +192,8 @@ def dd_prepare():
         input_deck.technique["dd_exchange_rate"] = 100
 
     if input_deck.technique["dd_exchange_rate_padding"] == None:
-        if args.target == "gpu":
-            padding = args.gpu_block_count * 64 * 16
+        if config.args.target == "gpu":
+            padding = config.args.gpu_block_count * 64 * 16
         else:
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
@@ -766,14 +766,14 @@ def prepare():
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
             )
-        adapt.gpu_forward_declare(args)
+        adapt.gpu_forward_declare(config.args)
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
     adapt.eval_toggle()
     adapt.target_for(config.target)
     if config.target == "gpu":
-        build_gpu_progs(input_deck, args)
+        build_gpu_progs(input_deck, config.args)
     adapt.nopython_mode((config.mode == "numba") or (config.mode == "numba_debug"))
 
     # =========================================================================
