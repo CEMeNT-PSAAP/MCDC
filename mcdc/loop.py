@@ -1,6 +1,9 @@
 from mpi4py import MPI
 from numba import njit, objmode
 
+import shutil
+
+import mcdc.config as config
 import mcdc.adapt as adapt
 import mcdc.geometry as geometry
 import mcdc.kernel as kernel
@@ -18,14 +21,7 @@ from mcdc.print_ import (
     print_progress_iqmc,
 )
 
-caching = False
-
-
-def set_cache(setting):
-    caching = setting
-
-    if setting == False:
-        print_msg(" Caching has been disabled")
+caching = config.caching
 
 
 # =============================================================================
@@ -412,30 +408,40 @@ def gpu_sources_spec():
     return adapt.harm.RuntimeSpec("mcdc_source", adapt.state_spec, base_fns, async_fns)
 
 
-def make_gpu_loop_source(args):
+BLOCK_COUNT = config.args.gpu_block_count
 
-    BLOCK_COUNT = args.gpu_block_count
+ASYNC_EXECUTION = config.args.gpu_strat == "async"
 
-    ASYNC_EXECUTION = args.gpu_strat == "async"
 
-    @njit
-    def gpu_loop_source(seed, data, mcdc):
-        # Progress bar indicator
-        N_prog = 0
+@njit(cache=caching)
+def gpu_loop_source(seed, data, mcdc):
 
-        if mcdc["technique"]["domain_decomposition"]:
-            kernel.dd_check_in(mcdc)
+    # Progress bar indicator
+    N_prog = 0
 
-        # =====================================================================
-        # GPU Interop
-        # =====================================================================
+    if mcdc["technique"]["domain_decomposition"]:
+        kernel.dd_check_in(mcdc)
 
-        # For async execution
-        iter_count = 65536
-        # For event-based execution
-        batch_size = 1
+    # =====================================================================
+    # GPU Interop
+    # =====================================================================
 
-        mcdc["mpi_work_iter"][0] = 0
+    # For async execution
+    iter_count = 655360000
+    # For event-based execution
+    batch_size = 1
+
+    full_work_size = mcdc["mpi_work_size"]
+    if ASYNC_EXECUTION:
+        phase_size = 1000000000
+    else:
+        phase_size = 1000000
+    phase_count = (full_work_size + phase_size - 1) // phase_size
+
+    for phase in range(phase_count):
+
+        mcdc["mpi_work_iter"][0] = phase_size * phase
+        mcdc["mpi_work_size"] = min(phase_size * (phase + 1), full_work_size)
         mcdc["source_seed"] = seed
 
         # Store the global state to the GPU
@@ -463,18 +469,18 @@ def make_gpu_loop_source(args):
         src_load_data(data, mcdc["gpu_state_pointer"])
         src_clear_flags(mcdc["source_program_pointer"])
 
-        kernel.set_bank_size(mcdc["bank_active"], 0)
+    mcdc["mpi_work_size"] = full_work_size
 
-        # =====================================================================
-        # Closeout (Moved out of the typical particle loop)
-        # =====================================================================
+    kernel.set_bank_size(mcdc["bank_active"], 0)
 
-        source_closeout(mcdc, 1, 1, data)
+    # =====================================================================
+    # Closeout (Moved out of the typical particle loop)
+    # =====================================================================
 
-        if mcdc["technique"]["domain_decomposition"]:
-            source_dd_resolution(data, mcdc)
+    source_closeout(mcdc, 1, 1, data)
 
-    return gpu_loop_source
+    if mcdc["technique"]["domain_decomposition"]:
+        source_dd_resolution(data, mcdc)
 
 
 # =========================================================================
@@ -779,77 +785,65 @@ def gpu_precursor_spec():
     )
 
 
-def make_gpu_loop_source_precursor(args):
+@njit(cache=caching)
+def gpu_loop_source_precursor(seed, data, mcdc):
 
-    BLOCK_COUNT = args.gpu_block_count
+    # Progress bar indicator
+    N_prog = 0
 
-    ASYNC_EXECUTION = args.gpu_strat == "async"
+    # =========================================================================
+    # Sync. RNG skip ahead for reproducibility
+    # =========================================================================
 
-    @njit
-    def gpu_loop_source_precursor(seed, data, mcdc):
-        # TODO: censussed neutrons seeding is still not reproducible
+    # Exscan upper estimate of number of particles generated locally
+    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
+        mcdc["bank_precursor"], mcdc
+    )
 
-        # Progress bar indicator
-        N_prog = 0
+    # =====================================================================
+    # GPU Interop
+    # =====================================================================
 
-        # =========================================================================
-        # Sync. RNG skip ahead for reproducibility
-        # =========================================================================
+    # Number of blocks to launch and number of iterations to run
 
-        # Exscan upper estimate of number of particles generated locally
-        idx_start, N_local, N_global = kernel.bank_scanning_DNP(
-            mcdc["bank_precursor"], mcdc
-        )
+    # For async execution
+    iter_count = 655360000
+    # For event-based execution
+    batch_size = 1
 
-        # =====================================================================
-        # GPU Interop
-        # =====================================================================
+    mcdc["mpi_work_iter"][0] = 0
+    mcdc["source_seed"] = seed
 
-        # Number of blocks to launch and number of iterations to run
+    # Store the global state to the GPU
+    pre_store_constant(mcdc["gpu_state_pointer"], mcdc)
+    pre_store_data(mcdc["gpu_state_pointer"], data)
 
-        # For async execution
-        iter_count = 65536
-        # For event-based execution
-        batch_size = 1
+    # Execute the program, and continue to do so until it is done
 
-        mcdc["mpi_work_iter"][0] = 0
-        mcdc["source_seed"] = seed
-
-        # Store the global state to the GPU
-        pre_store_constant(mcdc["gpu_state_pointer"], mcdc)
-        pre_store_data(mcdc["gpu_state_pointer"], data)
-
-        # Execute the program, and continue to do so until it is done
-
-        # Execute the program, and continue to do so until it is done
-        if ASYNC_EXECUTION:
+    # Execute the program, and continue to do so until it is done
+    if ASYNC_EXECUTION:
+        pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
+        while not pre_complete(mcdc["source_program_pointer"]):
+            kernel.dd_particle_send(mcdc)
             pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, iter_count)
-            while not pre_complete(mcdc["source_program_pointer"]):
-                kernel.dd_particle_send(mcdc)
-                pre_exec_program(
-                    mcdc["source_program_pointer"], BLOCK_COUNT, iter_count
-                )
-        else:
+    else:
+        pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
+        while not pre_complete(mcdc["source_program_pointer"]):
+            kernel.dd_particle_send(mcdc)
             pre_exec_program(mcdc["source_program_pointer"], BLOCK_COUNT, batch_size)
-            while not pre_complete(mcdc["source_program_pointer"]):
-                kernel.dd_particle_send(mcdc)
-                pre_exec_program(
-                    mcdc["source_program_pointer"], BLOCK_COUNT, batch_size
-                )
-        # Recover the original program state
-        pre_load_constant(mcdc, mcdc["gpu_state_pointer"])
-        pre_load_data(data, mcdc["gpu_state_pointer"])
-        pre_clear_flags(mcdc["source_program_pointer"])
+    # Recover the original program state
+    pre_load_constant(mcdc, mcdc["gpu_state_pointer"])
+    pre_load_data(data, mcdc["gpu_state_pointer"])
+    pre_clear_flags(mcdc["source_program_pointer"])
 
-        kernel.set_bank_size(mcdc["bank_active"], 0)
+    kernel.set_bank_size(mcdc["bank_active"], 0)
 
-        # =====================================================================
-        # Closeout (moved out of loop)
-        # =====================================================================
+    print(kernel.get_bank_size(mcdc["bank_census"]))
+    # =====================================================================
+    # Closeout (moved out of loop)
+    # =====================================================================
 
-        source_precursor_closeout(mcdc, 1, 1, data)
-
-    return gpu_loop_source_precursor
+    source_precursor_closeout(mcdc, 1, 1, data)
 
 
 def build_gpu_progs(input_deck, args):
@@ -860,6 +854,9 @@ def build_gpu_progs(input_deck, args):
     pre_spec = gpu_precursor_spec()
 
     adapt.harm.RuntimeSpec.bind_specs()
+
+    rank = MPI.COMM_WORLD.Get_rank()
+    device_id = rank % args.gpu_share_stride
 
     if MPI.COMM_WORLD.Get_size() > 1:
         MPI.COMM_WORLD.Barrier()
@@ -894,6 +891,7 @@ def build_gpu_progs(input_deck, args):
     src_exec_program = src_fns["exec_program"]
     src_complete = src_fns["complete"]
     src_clear_flags = src_fns["clear_flags"]
+    src_set_device = src_fns["set_device"]
 
     global pre_alloc_program, pre_free_program
     global pre_load_constant, pre_store_constant, pre_load_data, pre_store_data
@@ -913,6 +911,7 @@ def build_gpu_progs(input_deck, args):
 
     @njit
     def real_setup_gpu(mcdc):
+        src_set_device(device_id)
         arena_size = ARENA_SIZE
         mcdc["gpu_state_pointer"] = adapt.cast_voidptr_to_uintp(alloc_state())
         mcdc["source_program_pointer"] = adapt.cast_voidptr_to_uintp(
@@ -936,5 +935,5 @@ def build_gpu_progs(input_deck, args):
     teardown_gpu = real_teardown_gpu
 
     global loop_source, loop_source_precursor
-    loop_source = make_gpu_loop_source(args)
-    loop_source_precursor = make_gpu_loop_source_precursor(args)
+    loop_source = gpu_loop_source
+    loop_source_precursor = gpu_loop_source_precursor
