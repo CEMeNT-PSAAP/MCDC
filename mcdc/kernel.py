@@ -1974,24 +1974,24 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     stride = tally["stride"]
-
-    # Particle 4D direction
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
-    ut = 1.0 / physics.get_speed(P_arr, mcdc)
-
-    # Particle initial and final coordinate
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    x_final = x + ux * distance
-    y_final = y + uy * distance
-    z_final = z + uz * distance
-    t_final = t + ut * distance
-
     cell_idx = stride["tally"]
+    score = 0
+
+    # # Particle 4D direction
+    # ux = P["ux"]
+    # uy = P["uy"]
+    # uz = P["uz"]
+    # ut = 1.0 / physics.get_speed(P_arr, mcdc)
+
+    # # Particle initial and final coordinate
+    # x = P["x"]
+    # y = P["y"]
+    # z = P["z"]
+    # t = P["t"]
+    # x_final = x + ux * distance
+    # y_final = y + uy * distance
+    # z_final = z + uz * distance
+    # t_final = t + ut * distance
 
     # Score
     flux = distance * P["w"]
@@ -2006,7 +2006,8 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
             SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
             score = flux * SigmaF
 
-        tally_bin[TALLY_SCORE, cell_idx + i] += score
+        # print(f'cell_idx = {cell_idx}, score = {score}')
+        tally_bin[TALLY_SCORE, cell_idx] += score
 
 
 @njit
@@ -2029,12 +2030,20 @@ def tally_reduce(data, mcdc):
 
 @njit
 def tally_accumulate(data, mcdc):
+
+    # print(f'fixed_source_data = {data[TALLY][TALLY_SCORE][-1]}')
+
     tally_bin = data[TALLY]
+    # print(data[0][0, 30000], data[0][0, 30001])
     N_bin = tally_bin.shape[1]
+
+    # print(f'N_bin = {N_bin}')
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq
         score = tally_bin[TALLY_SCORE, i]
+        # if (score != 0 and i > 29999):
+        #     print(f'score = {score}, i = {i}')
         tally_bin[TALLY_SUM, i] += score
         tally_bin[TALLY_SUM_SQ, i] += score * score
 
@@ -2395,8 +2404,8 @@ def move_to_event(P_arr, data, mcdc):
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
 
         cell = mcdc["cells"][P["cell_ID"]]
-        if cell["N_tally"] != 0:
-            for tally in mcdc["cell_tallies"]:
+        for tally in mcdc["cell_tallies"]:
+            if tally["filter"]["cell_ID"] == P["cell_ID"] and cell["N_tally"] != 0:
                 score_cell_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
