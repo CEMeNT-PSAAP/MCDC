@@ -864,6 +864,11 @@ def prepare():
                 input_deck.cell_tallies[i], name
             )
 
+        # Differentiating the tallies by cell_ID
+        mcdc["cell_tallies"][i]["filter"]["cell_ID"] = getattr(
+            input_deck.cell_tallies[i], "cell_ID"
+        )
+
         # Set tally scores and their strides
         N_score = len(input_deck.cell_tallies[i].scores)
         mcdc["cell_tallies"][i]["N_score"] = N_score
@@ -1545,6 +1550,7 @@ def generate_hdf5(data, mcdc):
                         uq_var = tot_var - mc_var
                         f.create_dataset(group_name + "uq_var", data=uq_var)
 
+            # Cell tallies
             for ID, tally in enumerate(mcdc["cell_tallies"]):
                 if mcdc["technique"]["iQMC"]:
                     break
@@ -1561,6 +1567,14 @@ def generate_hdf5(data, mcdc):
                 N_bin = tally["N_bin"]
                 start = tally["stride"]["tally"]
                 tally_bin = data[TALLY][:, start : start + N_bin]
+
+                # print(f'data = {data[TALLY][2]}')
+                # if data[TALLY][1].all() == data[TALLY][2].all:
+                #     print('hell yeah')
+                # print(f'data keys = {data[TALLY].dtype.names}')
+
+                # print(f'tally_bin = {tally_bin}')
+
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -1570,6 +1584,7 @@ def generate_hdf5(data, mcdc):
                 for i in range(N_score):
                     score_type = tally["scores"][i]
                     score_tally_bin = np.squeeze(tally_bin[i])
+                    # print(f'score_tally_bin = {score_tally_bin}')
                     if score_type == SCORE_FLUX:
                         score_name = "flux"
                     elif score_type == SCORE_NET_CURRENT:
@@ -1579,6 +1594,7 @@ def generate_hdf5(data, mcdc):
                     group_name = "tallies/cell_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
+                    # print(f'ID = {ID}, score_name = {score_name}, mean = {mean}')
                     sdev = score_tally_bin[TALLY_SUM_SQ]
 
                     f.create_dataset(group_name + "mean", data=mean)
