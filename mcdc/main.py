@@ -1,66 +1,12 @@
 import argparse, os, sys
 import importlib.metadata
-import matplotlib.pyplot as plt
-import numba as nb
+import mcdc.config as config
 
+import matplotlib.pyplot as plt
 from matplotlib import colors as mpl_colors
 
-# Parse command-line arguments
-#   TODO: Will be inside run() once Python/Numba adapter is integrated
-parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
-parser.add_argument(
-    "--mode",
-    type=str,
-    help="Run mode",
-    choices=["python", "numba", "numba_debug"],
-    default="python",
-)
+import numba as nb
 
-parser.add_argument(
-    "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
-)
-
-parser.add_argument(
-    "--gpu_strat",
-    type=str,
-    help="Strategy used in GPU execution (event or async)",
-    choices=["async", "event"],
-    default="event",
-)
-
-parser.add_argument(
-    "--gpu_block_count",
-    type=int,
-    help="Number of blocks used in GPU execution",
-    default=240,
-)
-
-parser.add_argument(
-    "--gpu_arena_size",
-    type=int,
-    help="Capacity of each intermediate data buffer used, as a particle count",
-    default=0x100000,
-)
-
-parser.add_argument(
-    "--gpu_rocm_path",
-    type=str,
-    help="Path to ROCm installation for use in GPU execution",
-    default=None,
-)
-
-parser.add_argument(
-    "--gpu_cuda_path",
-    type=str,
-    help="Path to CUDA installation for use in GPU execution",
-    default=None,
-)
-
-parser.add_argument("--N_particle", type=int, help="Number of particles")
-parser.add_argument("--output", type=str, help="Output file name")
-parser.add_argument("--progress_bar", default=True, action="store_true")
-parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
-args, unargs = parser.parse_known_args()
 
 from mcdc.card import UniverseCard
 from mcdc.print_ import (
@@ -71,53 +17,6 @@ from mcdc.print_ import (
     print_warning,
     print_error,
 )
-
-# Set mode
-#   TODO: Will be inside run() once Python/Numba adapter is integrated
-mode = args.mode
-target = args.target
-if mode == "python":
-    nb.config.DISABLE_JIT = True
-elif mode == "numba":
-    nb.config.DISABLE_JIT = False
-    nb.config.NUMBA_DEBUG_CACHE = 1
-    nb.config.THREADING_LAYER = "workqueue"
-elif mode == "numba_debug":
-    msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
-    print_warning(msg)
-
-    nb.config.DISABLE_JIT = False  # turns on the jitter
-    nb.config.DEBUG = False  # turns on debugging options
-    nb.config.NUMBA_FULL_TRACEBACKS = (
-        1  # enables errors from sub-packages to be printed
-    )
-    nb.config.NUMBA_BOUNDSCHECK = 1  # checks bounds errors of vectors
-    nb.config.NUMBA_COLOR_SCHEME = (
-        "dark_bg"  # prints error messages for dark background terminals
-    )
-    nb.config.NUMBA_DEBUG_NRT = 1  # Numba run time (NRT) statistics counter
-    nb.config.NUMBA_DEBUG_TYPEINFER = (
-        1  # print out debugging information about type inference.
-    )
-    nb.config.NUMBA_ENABLE_PROFILING = 1  # enables profiler use
-    nb.config.NUMBA_DUMP_CFG = 1  # prints out a control flow diagram
-    nb.config.NUMBA_OPT = 0  # forums un optimized code from compilers
-    nb.config.NUMBA_DEBUGINFO = 1  #
-    nb.config.NUMBA_EXTEND_VARIABLE_LIFETIMES = (
-        1  # allows for inspection of numba variables after end of compilation
-    )
-
-    # file="str.txt";file1="list.txt"
-    # out=sys.stdout
-    # sys.stdout=open('debug_numba_config.txt','w')
-    # help(nb.config)
-    # sys.stdout.close
-
-    # print_msg('>> Numba config exported to debug_numba_config.txt')
-
-# elif mode == "numba x86":
-#    nb.config.NUMBA_OPT = 3
-#    NUMBA_DISABLE_INTEL_SVML
 
 import h5py
 import numpy as np
@@ -132,7 +31,6 @@ from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
     loop_eigenvalue,
-    set_cache,
     build_gpu_progs,
 )
 import mcdc.geometry as geometry
@@ -149,12 +47,12 @@ input_deck = mcdc_.input_deck
 
 def run():
     # Override input deck with command-line argument, if given
-    if args.N_particle is not None:
-        input_deck.setting["N_particle"] = args.N_particle
-    if args.output is not None:
-        input_deck.setting["output_name"] = args.output
-    if args.progress_bar is not None:
-        input_deck.setting["progress_bar"] = args.progress_bar
+    if config.args.N_particle is not None:
+        input_deck.setting["N_particle"] = config.args.N_particle
+    if config.args.output is not None:
+        input_deck.setting["output_name"] = config.args.output
+    if config.args.progress_bar is not None:
+        input_deck.setting["progress_bar"] = config.args.progress_bar
 
     # Start timer
     total_start = MPI.Wtime()
@@ -173,8 +71,6 @@ def run():
 
     # Print banner, hardware configuration, and header
     print_banner(mcdc)
-
-    set_cache(mcdc["setting"]["caching"])
 
     print_msg(" Now running TNT...")
     if mcdc["setting"]["mode_eigenvalue"]:
@@ -296,8 +192,8 @@ def dd_prepare():
         input_deck.technique["dd_exchange_rate"] = 100
 
     if input_deck.technique["dd_exchange_rate_padding"] == None:
-        if args.target == "gpu":
-            padding = args.gpu_block_count * 64 * 16
+        if config.args.target == "gpu":
+            padding = config.args.gpu_block_count * 64 * 16
         else:
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
@@ -470,7 +366,7 @@ def prepare():
     type_.make_size_rpn(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    input_deck.setting["target"] = target
+    input_deck.setting["target"] = config.target
 
     # =========================================================================
     # Create the global variable container
@@ -861,22 +757,24 @@ def prepare():
     # Platform Targeting, Adapters, Toggles, etc
     # =========================================================================
 
-    if target == "gpu":
+    if config.target == "gpu":
         if MPI.COMM_WORLD.Get_rank() != 0:
             adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
+        elif config.caching == False:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.ALWAYS)
         if not adapt.HAS_HARMONIZE:
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
             )
-        adapt.gpu_forward_declare(args)
+        adapt.gpu_forward_declare(config.args)
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
     adapt.eval_toggle()
-    adapt.target_for(target)
-    if target == "gpu":
-        build_gpu_progs(input_deck, args)
-    adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
+    adapt.target_for(config.target)
+    if config.target == "gpu":
+        build_gpu_progs(input_deck, config.args)
+    adapt.nopython_mode((config.mode == "numba") or (config.mode == "numba_debug"))
 
     # =========================================================================
     # Setting
