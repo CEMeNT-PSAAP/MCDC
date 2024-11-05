@@ -21,6 +21,17 @@ from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
 from mcdc.src.algorithm import binary_search, binary_search_with_length
 
+
+@njit
+def round(float_val):
+    return float_val
+    # int_val = np.float64(float_val).view(np.uint64)
+    # if (int_val & 0x10) != 0:
+    #    int_val += 0x10
+    # int_val = int_val & ~0x0F
+    # return np.uint64(int_val).view(np.float64)
+
+
 # =============================================================================
 # Domain Decomposition
 # =============================================================================
@@ -1418,7 +1429,7 @@ def bank_IC(P_arr, prog):
         # Accumulate fission
         SigmaF = material["fission"][g]
         # mcdc["technique"]["IC_fission_score"][0] += v * SigmaF
-        adapt.global_add(mcdc["technique"]["IC_fission_score"], 0, v * SigmaF)
+        adapt.global_add(mcdc["technique"]["IC_fission_score"], 0, round(v * SigmaF))
 
     # =========================================================================
     # Precursor
@@ -1882,6 +1893,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
         flux = distance_scored * P["w"]
         for i in range(tally["N_score"]):
             score_type = tally["scores"][i]
+            score = 0
             if score_type == SCORE_FLUX:
                 score = flux
             elif score_type == SCORE_DENSITY:
@@ -1892,7 +1904,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
-            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
+            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -1967,7 +1979,32 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
             score = flux
         elif score_type == SCORE_NET_CURRENT:
             score = flux * mu
-        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), score)
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+
+
+@njit
+def score_cell_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
+    tally_bin = data[TALLY]
+    material = mcdc["materials"][P["material_ID"]]
+    stride = tally["stride"]
+    cell_idx = stride["tally"]
+    score = 0
+
+    # Score
+    flux = distance * P["w"]
+    for i in range(tally["N_score"]):
+        score_type = tally["scores"][i]
+        if score_type == SCORE_FLUX:
+            score = flux
+        elif score_type == SCORE_TOTAL:
+            SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+            score = flux * SigmaT
+        elif score_type == SCORE_FISSION:
+            SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+            score = flux * SigmaF
+
+        tally_bin[TALLY_SCORE, cell_idx] += score
 
 
 @njit
@@ -1990,12 +2027,20 @@ def tally_reduce(data, mcdc):
 
 @njit
 def tally_accumulate(data, mcdc):
+
+    # print(f'fixed_source_data = {data[TALLY][TALLY_SCORE][-1]}')
+
     tally_bin = data[TALLY]
+    # print(data[0][0, 30000], data[0][0, 30001])
     N_bin = tally_bin.shape[1]
+
+    # print(f'N_bin = {N_bin}')
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq
         score = tally_bin[TALLY_SCORE, i]
+        # if (score != 0 and i > 29999):
+        #     print(f'score = {score}, i = {i}')
         tally_bin[TALLY_SUM, i] += score
         tally_bin[TALLY_SUM_SQ, i] += score * score
 
@@ -2050,14 +2095,14 @@ def eigenvalue_tally(P_arr, distance, mcdc):
 
     # Fission production (needed even during inactive cycle)
     # mcdc["eigenvalue_tally_nuSigmaF"][0] += flux * nuSigmaF
-    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, flux * nuSigmaF)
+    adapt.global_add(mcdc["eigenvalue_tally_nuSigmaF"], 0, round(flux * nuSigmaF))
 
     if mcdc["cycle_active"]:
         # Neutron density
         v = physics.get_speed(P_arr, mcdc)
         n_density = flux / v
         # mcdc["eigenvalue_tally_n"][0] += n_density
-        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, n_density)
+        adapt.global_add(mcdc["eigenvalue_tally_n"], 0, round(n_density))
         # Maximum neutron density
         if mcdc["n_max"] < n_density:
             mcdc["n_max"] = n_density
@@ -2087,7 +2132,7 @@ def eigenvalue_tally(P_arr, distance, mcdc):
                     total += nu_d / decay
         C_density = flux * total * SigmaF / mcdc["k_eff"]
         # mcdc["eigenvalue_tally_C"][0] += C_density
-        adapt.global_add(mcdc["eigenvalue_tally_C"], 0, C_density)
+        adapt.global_add(mcdc["eigenvalue_tally_C"], 0, round(C_density))
         # Maximum precursor density
         if mcdc["C_max"] < C_density:
             mcdc["C_max"] = C_density
@@ -2352,8 +2397,16 @@ def move_to_event(P_arr, data, mcdc):
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
+        # Mesh tallies
         for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
+
+        # Cell tallies
+        cell = mcdc["cells"][P["cell_ID"]]
+        for i in range(cell["N_tally"]):
+            ID = cell["tally_IDs"][i]
+            tally = mcdc["cell_tallies"][ID]
+            score_cell_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
@@ -2396,6 +2449,7 @@ def surface_crossing(P_arr, data, prog):
         surface_.reflect(P_arr, surface)
 
     # Score tally
+    # N_tally is an int64, tally_IDs is a numpy.ndarray
     for i in range(surface["N_tally"]):
         ID = surface["tally_IDs"][i]
         tally = mcdc["surface_tallies"][ID]
