@@ -1422,11 +1422,15 @@ def generate_hdf5(data, mcdc):
                 cardlist_to_h5group(input_deck.universes, input_group, "universe")
                 cardlist_to_h5group(input_deck.lattices, input_group, "lattice")
                 cardlist_to_h5group(input_deck.sources, input_group, "source")
-                cardlist_to_h5group(input_deck.mesh_tallies, input_group, "mesh_tallie")
+                cardlist_to_h5group(
+                    input_deck.mesh_tallies, input_group, "mesh_tallies"
+                )
                 cardlist_to_h5group(
                     input_deck.surface_tallies, input_group, "surface_tally"
                 )
-                cardlist_to_h5group(input_deck.cell_tallies, input_group, "cell_tallie")
+                cardlist_to_h5group(
+                    input_deck.cell_tallies, input_group, "cell_tallies"
+                )
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
