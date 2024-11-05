@@ -2510,17 +2510,16 @@ def move_to_event(P_arr, data, mcdc):
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
+        # Mesh tallies
         for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
 
-        for tally in mcdc["cs_tallies"]:
-            # print(f'kernel.py cs_tally = {tally}')
-            score_cs_tally(P_arr, distance, tally, data, mcdc)
-
+        # Cell tallies
         cell = mcdc["cells"][P["cell_ID"]]
-        for tally in mcdc["cell_tallies"]:
-            if tally["filter"]["cell_ID"] == P["cell_ID"] and cell["N_tally"] != 0:
-                score_cell_tally(P_arr, distance, tally, data, mcdc)
+        for i in range(cell["N_tally"]):
+            ID = cell["tally_IDs"][i]
+            tally = mcdc["cell_tallies"][ID]
+            score_cell_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
