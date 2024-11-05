@@ -394,3 +394,16 @@ class CellTallyCard(TallyCard):
         # Set card data
         self.cell_ID = cell_ID
         self.N_bin = 1
+
+
+class CSTallyCard(TallyCard):
+    def __init__(self):
+        TallyCard.__init__(self, "CS tally")
+
+        # Set card data
+        self.x = np.array([-INF, INF])
+        self.y = np.array([-INF, INF])
+        self.z = np.array([-INF, INF])
+        self.N_bin = 1
+        self.N_cs_bins = 1
+        self.size = 1

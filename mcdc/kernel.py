@@ -1977,22 +1977,6 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
     cell_idx = stride["tally"]
     score = 0
 
-    # # Particle 4D direction
-    # ux = P["ux"]
-    # uy = P["uy"]
-    # uz = P["uz"]
-    # ut = 1.0 / physics.get_speed(P_arr, mcdc)
-
-    # # Particle initial and final coordinate
-    # x = P["x"]
-    # y = P["y"]
-    # z = P["z"]
-    # t = P["t"]
-    # x_final = x + ux * distance
-    # y_final = y + uy * distance
-    # z_final = z + uz * distance
-    # t_final = t + ut * distance
-
     # Score
     flux = distance * P["w"]
     for i in range(tally["N_score"]):
@@ -2006,8 +1990,134 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
             SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
             score = flux * SigmaF
 
-        # print(f'cell_idx = {cell_idx}, score = {score}')
         tally_bin[TALLY_SCORE, cell_idx] += score
+
+
+@njit
+def score_cs_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
+    tally_bin = data[TALLY]
+    material = mcdc["materials"][P["material_ID"]]
+    N_cs_bins = tally["filter"]["N_cs_bins"]
+    cs_bin_size = tally["filter"]["cs_bin_size"]
+    cs_centers = tally["filter"]["cs_centers"]
+    stride = tally["stride"]
+
+    # Particle 4D direction
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
+
+    # Particle initial and final coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    # Check each coarse bin
+    for bin_idx in range(N_cs_bins):
+        center = cs_centers[bin_idx]
+
+        # Bin edges
+        x_min, x_max = center[0] - cs_bin_size / 2, center[0] + cs_bin_size / 2
+        y_min, y_max = center[1] - cs_bin_size / 2, center[1] + cs_bin_size / 2
+        z_min, z_max = center[2] - cs_bin_size / 2, center[2] + cs_bin_size / 2
+
+        # Check for intersection with coarse bin
+        # If particle starts or ends inside the bin, it should score into the bin
+
+        # TODO: handle case where particle crosses a corner, but doesn't start or end in the bin
+
+        if (
+            (x_min <= x <= x_max or x_min <= x_final <= x_max)
+            and (y_min <= y <= y_max or y_min <= y_final <= y_max)
+            and (z_min <= z <= z_max or z_min <= z_final <= z_max)
+        ):
+
+            distance_in_bin = min(
+                distance,
+                calculate_distance_in_coarse_bin(
+                    P_arr, distance, center, cs_bin_size, mcdc
+                ),
+            )
+
+            # Calculate flux and other scores
+            flux = distance_in_bin * P["w"]
+            for i in range(tally["N_score"]):
+                score_type = tally["scores"][i]
+                if score_type == SCORE_FLUX:
+                    score = flux
+                elif score_type == SCORE_DENSITY:
+                    score = flux / physics.get_speed(P_arr, mcdc)
+                elif score_type == SCORE_TOTAL:
+                    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+                    score = flux * SigmaT
+                elif score_type == SCORE_FISSION:
+                    SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+                    score = flux * SigmaF
+                adapt.global_add(
+                    tally_bin, (TALLY_SCORE, bin_idx + i), score
+                )  # TODO: fix this score indexing, this is wrong
+
+
+@njit
+def calculate_distance_in_coarse_bin(P_arr, distance, center, cs_bin_size, mcdc):
+    def intersect_plane(p0, p1, min_val, max_val, axis):
+        if p1[axis] != p0[axis]:  # Avoid division by zero if line is parallel to plane
+            t_min = (min_val - p0[axis]) / (p1[axis] - p0[axis])
+            t_max = (max_val - p0[axis]) / (p1[axis] - p0[axis])
+            return [t_min, t_max] if t_min <= t_max else [t_max, t_min]
+        return [float("-inf"), float("inf")]  # No intersection if parallel
+
+    P = P_arr[0]
+    # Particle 4D direction
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
+
+    # Particle initial and final coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    start = np.array([x, y, z])
+    end = np.array([x_final, y_final, z_final])
+
+    # Bin edges
+    x_min, x_max = center[0] - cs_bin_size / 2, center[0] + cs_bin_size / 2
+    y_min, y_max = center[1] - cs_bin_size / 2, center[1] + cs_bin_size / 2
+    z_min, z_max = center[2] - cs_bin_size / 2, center[2] + cs_bin_size / 2
+
+    # Calculate intersection parameters for each axis
+    tx_min, tx_max = intersect_plane(start, end, x_min, x_max, 0)
+    ty_min, ty_max = intersect_plane(start, end, y_min, y_max, 1)
+    tz_min, tz_max = intersect_plane(start, end, z_min, z_max, 2)
+
+    # Determine the entry and exit parameters
+    t_entry = max(tx_min, ty_min, tz_min)
+    t_exit = min(tx_max, ty_max, tz_max)
+
+    # Check if there's a valid intersection
+    if t_entry > t_exit or t_exit < 0 or t_entry > 1:
+        return 0.0
+
+    # Calculate entry and exit points in 3D space
+    entry_point = start + t_entry * (end - start)
+    exit_point = start + t_exit * (end - start)
+
+    # Return the distance between entry and exit points
+    return np.linalg.norm(exit_point - entry_point)
 
 
 @njit
@@ -2402,6 +2512,10 @@ def move_to_event(P_arr, data, mcdc):
     if mcdc["cycle_active"]:
         for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
+
+        for tally in mcdc["cs_tallies"]:
+            # print(f'kernel.py cs_tally = {tally}')
+            score_cs_tally(P_arr, distance, tally, data, mcdc)
 
         cell = mcdc["cells"][P["cell_ID"]]
         for tally in mcdc["cell_tallies"]:
