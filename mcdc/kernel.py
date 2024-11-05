@@ -1977,22 +1977,6 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
     cell_idx = stride["tally"]
     score = 0
 
-    # # Particle 4D direction
-    # ux = P["ux"]
-    # uy = P["uy"]
-    # uz = P["uz"]
-    # ut = 1.0 / physics.get_speed(P_arr, mcdc)
-
-    # # Particle initial and final coordinate
-    # x = P["x"]
-    # y = P["y"]
-    # z = P["z"]
-    # t = P["t"]
-    # x_final = x + ux * distance
-    # y_final = y + uy * distance
-    # z_final = z + uz * distance
-    # t_final = t + ut * distance
-
     # Score
     flux = distance * P["w"]
     for i in range(tally["N_score"]):
@@ -2006,7 +1990,6 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
             SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
             score = flux * SigmaF
 
-        # print(f'cell_idx = {cell_idx}, score = {score}')
         tally_bin[TALLY_SCORE, cell_idx] += score
 
 
@@ -2400,13 +2383,16 @@ def move_to_event(P_arr, data, mcdc):
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
+        # Mesh tallies
         for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
 
+        # Cell tallies
         cell = mcdc["cells"][P["cell_ID"]]
-        for tally in mcdc["cell_tallies"]:
-            if tally["filter"]["cell_ID"] == P["cell_ID"] and cell["N_tally"] != 0:
-                score_cell_tally(P_arr, distance, tally, data, mcdc)
+        for i in range(cell["N_tally"]):
+            ID = cell["tally_IDs"][i]
+            tally = mcdc["cell_tallies"][ID]
+            score_cell_tally(P_arr, distance, tally, data, mcdc)
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
