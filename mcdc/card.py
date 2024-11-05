@@ -232,6 +232,8 @@ class CellCard(InputCard):
         self.translation = np.array([0.0, 0.0, 0.0])
         self.rotation = np.array([0.0, 0.0, 0.0])
         self.surface_IDs = np.zeros(0, dtype=int)
+        self.N_tally = 0
+        self.tally_IDs = []
         self._region_RPN = []  # Reverse Polish Notation
 
     def set_region_RPN(self):
@@ -402,4 +404,13 @@ class SurfaceTallyCard(TallyCard):
 
         # Set card data
         self.surface_ID = surface_ID
+        self.N_bin = 1
+
+
+class CellTallyCard(TallyCard):
+    def __init__(self, cell_ID):
+        TallyCard.__init__(self, "Cell tally")
+
+        # Set card data
+        self.cell_ID = cell_ID
         self.N_bin = 1

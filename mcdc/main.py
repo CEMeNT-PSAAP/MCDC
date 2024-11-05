@@ -1,66 +1,12 @@
 import argparse, os, sys
 import importlib.metadata
-import matplotlib.pyplot as plt
-import numba as nb
+import mcdc.config as config
 
+import matplotlib.pyplot as plt
 from matplotlib import colors as mpl_colors
 
-# Parse command-line arguments
-#   TODO: Will be inside run() once Python/Numba adapter is integrated
-parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
-parser.add_argument(
-    "--mode",
-    type=str,
-    help="Run mode",
-    choices=["python", "numba", "numba_debug"],
-    default="python",
-)
+import numba as nb
 
-parser.add_argument(
-    "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
-)
-
-parser.add_argument(
-    "--gpu_strat",
-    type=str,
-    help="Strategy used in GPU execution (event or async)",
-    choices=["async", "event"],
-    default="event",
-)
-
-parser.add_argument(
-    "--gpu_block_count",
-    type=int,
-    help="Number of blocks used in GPU execution",
-    default=240,
-)
-
-parser.add_argument(
-    "--gpu_arena_size",
-    type=int,
-    help="Capacity of each intermediate data buffer used, as a particle count",
-    default=0x100000,
-)
-
-parser.add_argument(
-    "--gpu_rocm_path",
-    type=str,
-    help="Path to ROCm installation for use in GPU execution",
-    default=None,
-)
-
-parser.add_argument(
-    "--gpu_cuda_path",
-    type=str,
-    help="Path to CUDA installation for use in GPU execution",
-    default=None,
-)
-
-parser.add_argument("--N_particle", type=int, help="Number of particles")
-parser.add_argument("--output", type=str, help="Output file name")
-parser.add_argument("--progress_bar", default=True, action="store_true")
-parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
-args, unargs = parser.parse_known_args()
 
 from mcdc.card import UniverseCard
 from mcdc.print_ import (
@@ -71,53 +17,6 @@ from mcdc.print_ import (
     print_warning,
     print_error,
 )
-
-# Set mode
-#   TODO: Will be inside run() once Python/Numba adapter is integrated
-mode = args.mode
-target = args.target
-if mode == "python":
-    nb.config.DISABLE_JIT = True
-elif mode == "numba":
-    nb.config.DISABLE_JIT = False
-    nb.config.NUMBA_DEBUG_CACHE = 1
-    nb.config.THREADING_LAYER = "workqueue"
-elif mode == "numba_debug":
-    msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
-    print_warning(msg)
-
-    nb.config.DISABLE_JIT = False  # turns on the jitter
-    nb.config.DEBUG = False  # turns on debugging options
-    nb.config.NUMBA_FULL_TRACEBACKS = (
-        1  # enables errors from sub-packages to be printed
-    )
-    nb.config.NUMBA_BOUNDSCHECK = 1  # checks bounds errors of vectors
-    nb.config.NUMBA_COLOR_SCHEME = (
-        "dark_bg"  # prints error messages for dark background terminals
-    )
-    nb.config.NUMBA_DEBUG_NRT = 1  # Numba run time (NRT) statistics counter
-    nb.config.NUMBA_DEBUG_TYPEINFER = (
-        1  # print out debugging information about type inference.
-    )
-    nb.config.NUMBA_ENABLE_PROFILING = 1  # enables profiler use
-    nb.config.NUMBA_DUMP_CFG = 1  # prints out a control flow diagram
-    nb.config.NUMBA_OPT = 0  # forums un optimized code from compilers
-    nb.config.NUMBA_DEBUGINFO = 1  #
-    nb.config.NUMBA_EXTEND_VARIABLE_LIFETIMES = (
-        1  # allows for inspection of numba variables after end of compilation
-    )
-
-    # file="str.txt";file1="list.txt"
-    # out=sys.stdout
-    # sys.stdout=open('debug_numba_config.txt','w')
-    # help(nb.config)
-    # sys.stdout.close
-
-    # print_msg('>> Numba config exported to debug_numba_config.txt')
-
-# elif mode == "numba x86":
-#    nb.config.NUMBA_OPT = 3
-#    NUMBA_DISABLE_INTEL_SVML
 
 import h5py
 import numpy as np
@@ -148,12 +47,12 @@ input_deck = mcdc_.input_deck
 
 def run():
     # Override input deck with command-line argument, if given
-    if args.N_particle is not None:
-        input_deck.setting["N_particle"] = args.N_particle
-    if args.output is not None:
-        input_deck.setting["output_name"] = args.output
-    if args.progress_bar is not None:
-        input_deck.setting["progress_bar"] = args.progress_bar
+    if config.args.N_particle is not None:
+        input_deck.setting["N_particle"] = config.args.N_particle
+    if config.args.output is not None:
+        input_deck.setting["output_name"] = config.args.output
+    if config.args.progress_bar is not None:
+        input_deck.setting["progress_bar"] = config.args.progress_bar
 
     # Start timer
     total_start = MPI.Wtime()
@@ -293,8 +192,8 @@ def dd_prepare():
         input_deck.technique["dd_exchange_rate"] = 100
 
     if input_deck.technique["dd_exchange_rate_padding"] == None:
-        if args.target == "gpu":
-            padding = args.gpu_block_count * 64 * 16
+        if config.args.target == "gpu":
+            padding = config.args.gpu_block_count * 64 * 16
         else:
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
@@ -454,10 +353,12 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
+    type_.make_type_cell(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
     type_.make_type_mesh_tally(input_deck)
     type_.make_type_surface_tally(input_deck)
+    type_.make_type_cell_tally(input_deck)
     type_.make_type_setting(input_deck)
     type_.make_type_uq(input_deck)
     type_.make_type_domain_decomp(input_deck)
@@ -467,7 +368,7 @@ def prepare():
     type_.make_size_rpn(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    input_deck.setting["target"] = target
+    input_deck.setting["target"] = config.target
 
     # =========================================================================
     # Create the global variable container
@@ -664,7 +565,7 @@ def prepare():
         cell_input = input_deck.cells[i]
 
         # Directly transferables
-        for name in ["ID", "fill_ID", "translation", "rotation"]:
+        for name in ["ID", "fill_ID", "translation", "rotation", "N_tally"]:
             copy_field(cell, cell_input, name)
 
         # Fill type
@@ -705,6 +606,11 @@ def prepare():
         end = start + cell["N_region"]
         mcdc["cells_data_region"][start:end] = cell_input._region_RPN
         region_data_idx += cell["N_region"]
+
+        # Variables with possible different sizes
+        for name in ["tally_IDs"]:
+            N = len(getattr(input_deck.cells[i], name))
+            mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
 
     # =========================================================================
     # Set universes
@@ -774,6 +680,7 @@ def prepare():
 
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
+    N_cell_tally = len(input_deck.cell_tallies)
     tally_size = 0
 
     # Mesh tallies
@@ -921,6 +828,70 @@ def prepare():
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
+    # Cell tallies
+    for i in range(N_cell_tally):
+        copy_field(mcdc["cell_tallies"][i], input_deck.cell_tallies[i], "N_bin")
+
+        # Filters (variables with possible different sizes)
+        for name in ["t", "mu", "azi", "g"]:
+            N = len(getattr(input_deck.cell_tallies[i], name))
+            mcdc["cell_tallies"][i]["filter"][name][:N] = getattr(
+                input_deck.cell_tallies[i], name
+            )
+
+        # Differentiating the tallies by cell_ID
+        mcdc["cell_tallies"][i]["filter"]["cell_ID"] = getattr(
+            input_deck.cell_tallies[i], "cell_ID"
+        )
+
+        # Set tally scores and their strides
+        N_score = len(input_deck.cell_tallies[i].scores)
+        mcdc["cell_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.cell_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["cell_tallies"][i]["scores"][j] = score_type
+
+        # Filter grid sizes
+        Nmu = len(input_deck.cell_tallies[i].mu) - 1
+        N_azi = len(input_deck.cell_tallies[i].azi) - 1
+        Ng = len(input_deck.cell_tallies[i].g) - 1
+        Nt = len(input_deck.cell_tallies[i].t) - 1
+
+        # Update N_bin
+        mcdc["cell_tallies"][i]["N_bin"] *= N_score
+
+        # Filter strides
+        stride = N_score
+        if Nt > 1:
+            mcdc["mesh_tallies"][i]["stride"]["t"] = stride
+            stride *= Nt
+        if Ng > 1:
+            mcdc["mesh_tallies"][i]["stride"]["g"] = stride
+            stride *= Ng
+        if N_azi > 1:
+            mcdc["mesh_tallies"][i]["stride"]["azi"] = stride
+            stride *= N_azi
+        if Nmu > 1:
+            mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
+            stride *= Nmu
+
+        # Set tally stride and accumulate total tally size
+        mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["cell_tallies"][i]["N_bin"]
+
+    # Set tally data
+    if not input_deck.technique["uq"]:
+        tally = np.zeros((3, tally_size), dtype=type_.float64)
+    else:
+        tally = np.zeros((5, tally_size), dtype=type_.float64)
+
     # =========================================================================
     # Establish Data Type from Tally Info and Construct Tallies
     # =========================================================================
@@ -932,22 +903,24 @@ def prepare():
     # Platform Targeting, Adapters, Toggles, etc
     # =========================================================================
 
-    if target == "gpu":
+    if config.target == "gpu":
         if MPI.COMM_WORLD.Get_rank() != 0:
             adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
+        elif config.caching == False:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.ALWAYS)
         if not adapt.HAS_HARMONIZE:
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
             )
-        adapt.gpu_forward_declare(args)
+        adapt.gpu_forward_declare(config.args)
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
     adapt.eval_toggle()
-    adapt.target_for(target)
-    if target == "gpu":
-        build_gpu_progs(input_deck, args)
-    adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
+    adapt.target_for(config.target)
+    if config.target == "gpu":
+        build_gpu_progs(input_deck, config.args)
+    adapt.nopython_mode((config.mode == "numba") or (config.mode == "numba_debug"))
 
     # =========================================================================
     # Setting
@@ -959,11 +932,18 @@ def prepare():
     t_limit = max(
         [
             tally["filter"]["t"][-1]
-            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"])
+            for tally in list(mcdc["mesh_tallies"])
+            + list(mcdc["surface_tallies"])
+            + list(mcdc["cell_tallies"])
         ]
     )
 
-    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) == 0:
+    if (
+        len(input_deck.mesh_tallies)
+        + len(input_deck.surface_tallies)
+        + len(input_deck.cell_tallies)
+        == 0
+    ):
         t_limit = INF
 
     # Check if time boundary is above the final tally mesh time grid
@@ -1419,9 +1399,14 @@ def generate_hdf5(data, mcdc):
                 cardlist_to_h5group(input_deck.universes, input_group, "universe")
                 cardlist_to_h5group(input_deck.lattices, input_group, "lattice")
                 cardlist_to_h5group(input_deck.sources, input_group, "source")
-                cardlist_to_h5group(input_deck.mesh_tallies, input_group, "mesh_tallie")
+                cardlist_to_h5group(
+                    input_deck.mesh_tallies, input_group, "mesh_tallies"
+                )
                 cardlist_to_h5group(
                     input_deck.surface_tallies, input_group, "surface_tally"
+                )
+                cardlist_to_h5group(
+                    input_deck.cell_tallies, input_group, "cell_tallies"
                 )
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
@@ -1536,6 +1521,61 @@ def generate_hdf5(data, mcdc):
                     group_name = "tallies/surface_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            # Cell tallies
+            for ID, tally in enumerate(mcdc["cell_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+
+                # Shape
+                N_score = tally["N_score"]
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, N_score)
+                else:
+                    shape = (5, N_score)
+
+                # Reshape tally
+                N_bin = tally["N_bin"]
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
+
+                # print(f'data = {data[TALLY][2]}')
+                # if data[TALLY][1].all() == data[TALLY][2].all:
+                #     print('hell yeah')
+                # print(f'data keys = {data[TALLY].dtype.names}')
+
+                # print(f'tally_bin = {tally_bin}')
+
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 1, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    # print(f'score_tally_bin = {score_tally_bin}')
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/cell_tally_%i/%s/" % (ID, score_name)
+
+                    mean = score_tally_bin[TALLY_SUM]
+                    # print(f'ID = {ID}, score_name = {score_name}, mean = {mean}')
                     sdev = score_tally_bin[TALLY_SUM_SQ]
 
                     f.create_dataset(group_name + "mean", data=mean)
