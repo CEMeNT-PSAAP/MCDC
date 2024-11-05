@@ -645,6 +645,11 @@ def prepare():
         )
         region_data_idx += N_RPN + 1
 
+        # Variables with possible different sizes
+        for name in ["tally_IDs"]:
+            N = len(getattr(input_deck.cells[i], name))
+            mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
+
     # =========================================================================
     # Universes
     # =========================================================================
