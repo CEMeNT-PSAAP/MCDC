@@ -30,17 +30,17 @@ sz5 = mcdc.surface("plane-z", z=60.0, bc="vacuum")
 
 # Set cells
 # Source
-mcdc.cell(+sx1 & -sx2 & +sy1 & -sy2 & +sz1 & -sz2, m)
+source_cell = mcdc.cell(+sx1 & -sx2 & +sy1 & -sy2 & +sz1 & -sz2, m)
 # Voids
 channel_1 = +sx1 & -sx2 & +sy2 & -sy3 & +sz1 & -sz2
 channel_2 = +sx1 & -sx3 & +sy3 & -sy4 & +sz1 & -sz2
 channel_3 = +sx3 & -sx4 & +sy3 & -sy4 & +sz1 & -sz3
 channel_4 = +sx3 & -sx4 & +sy3 & -sy5 & +sz3 & -sz4
 void_channel = channel_1 | channel_2 | channel_3 | channel_4
-mcdc.cell(void_channel, m_void)
+void_cell = mcdc.cell(void_channel, m_void)
 # Shield
 box = +sx1 & -sx5 & +sy1 & -sy5 & +sz1 & -sz5
-mcdc.cell(box & ~void_channel, m)
+shield_cell = mcdc.cell(box & ~void_channel, m)
 
 # =============================================================================
 # Set source
@@ -58,13 +58,17 @@ mcdc.source(
 # Tally: z-integrated flux (X-Y section view)
 mcdc.tally.mesh_tally(
     scores=["flux"],
-    x=np.linspace(0.0, 60.0, 61),
-    y=np.linspace(0.0, 100.0, 101),
+    x=np.linspace(0.0, 60.0, 31),
+    y=np.linspace(0.0, 100.0, 51),
     t=np.linspace(0.0, 200.0, 21),
 )
 
+mcdc.tally.cell_tally(source_cell, scores=["flux"])
+mcdc.tally.cell_tally(void_cell, scores=["flux"])
+mcdc.tally.cell_tally(shield_cell, scores=["flux"])
+
 # Setting
-mcdc.setting(N_particle=1e2)
+mcdc.setting(N_particle=80)
 
 # Run
 mcdc.run()

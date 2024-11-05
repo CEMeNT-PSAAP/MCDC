@@ -8,6 +8,7 @@ from numba import njit
 from mcdc.card import (
     MeshTallyCard,
     SurfaceTallyCard,
+    CellTallyCard,
 )
 from mcdc.constant import (
     INF,
@@ -155,5 +156,36 @@ def surface_tally(
 
     # Add to deck
     global_.input_deck.surface_tallies.append(card)
+
+    return card
+
+
+def cell_tally(cell, scores=["flux"]):
+
+    # Make tally card
+    card = CellTallyCard(cell.ID)
+
+    # Set ID
+    card.ID = len(global_.input_deck.cell_tallies)
+
+    # Set cell
+    card.cell_ID = cell.ID
+    cell.tally_IDs.append(card.ID)
+    cell.N_tally += 1
+
+    # Calculate total number bins
+    card.N_bin = 1
+
+    # Scores
+    for s in scores:
+        score_checked = check_support(
+            "score type",
+            s,
+            ["flux", "net-current", "fission"],
+        )
+        card.scores.append(score_checked)
+
+    # Add to deck
+    global_.input_deck.cell_tallies.append(card)
 
     return card
