@@ -217,6 +217,11 @@ def copy_field(dst, src, name):
     else:
         data = getattr(src, name)
 
+    # print(f'dst, src, name = {dst, src, name}')
+    # print(f'dst = {dst.dtype.names}')
+    # print(f'name = {name}')
+    # print(f'dst[name] = {dst[name]}')
+
     if isinstance(dst[name], np.ndarray):
         if isinstance(data, np.ndarray) and dst[name].shape != data.shape:
             for dim in data.shape:
@@ -463,6 +468,7 @@ def prepare():
     type_.make_type_mesh_tally(input_deck)
     type_.make_type_surface_tally(input_deck)
     type_.make_type_cell_tally(input_deck)
+    type_.make_type_cs_tally(input_deck)
     type_.make_type_setting(input_deck)
     type_.make_type_uq(input_deck)
     type_.make_type_domain_decomp(input_deck)
@@ -706,6 +712,7 @@ def prepare():
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
     N_cell_tally = len(input_deck.cell_tallies)
+    N_cs_tally = len(input_deck.cs_tallies)
     tally_size = 0
 
     # Mesh tallies
@@ -895,21 +902,108 @@ def prepare():
         # Filter strides
         stride = N_score
         if Nt > 1:
-            mcdc["mesh_tallies"][i]["stride"]["t"] = stride
+            mcdc["cell_tallies"][i]["stride"]["t"] = stride
             stride *= Nt
         if Ng > 1:
-            mcdc["mesh_tallies"][i]["stride"]["g"] = stride
+            mcdc["cell_tallies"][i]["stride"]["g"] = stride
             stride *= Ng
         if N_azi > 1:
-            mcdc["mesh_tallies"][i]["stride"]["azi"] = stride
+            mcdc["cell_tallies"][i]["stride"]["azi"] = stride
             stride *= N_azi
         if Nmu > 1:
-            mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
+            mcdc["cell_tallies"][i]["stride"]["mu"] = stride
             stride *= Nmu
 
         # Set tally stride and accumulate total tally size
         mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["cell_tallies"][i]["N_bin"]
+
+    # CS tallies
+    for i in range(N_cs_tally):
+        # Direct assignment
+        copy_field(mcdc["cs_tallies"][i], input_deck.cs_tallies[i], "N_bin")
+
+        # Filters (variables with possible different sizes)
+        if not input_deck.technique["domain_decomposition"]:
+            for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.cs_tallies[i], name))
+                mcdc["cs_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.cs_tallies[i], name
+                )
+
+        # else:  # decomposed mesh filters
+        #     mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
+
+        #     # Filters
+        #     new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
+        #     new_y = input_deck.mesh_tallies[i].y[myn:myp]
+        #     new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
+        #     mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
+        #     mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
+        #     mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
+        #     for name in ["t", "mu", "azi", "g"]:
+        #         N = len(getattr(input_deck.mesh_tallies[i], name))
+        #         mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
+        #             input_deck.mesh_tallies[i], name
+        #         )
+
+        # Set tally scores
+        N_score = len(input_deck.cs_tallies[i].scores)
+        mcdc["cs_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.cs_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "density":
+                score_type = SCORE_DENSITY
+            elif score_name == "total":
+                score_type = SCORE_TOTAL
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["cs_tallies"][i]["scores"][j] = score_type
+
+        # Filter grid sizes
+        Nmu = len(input_deck.cs_tallies[i].mu) - 1
+        N_azi = len(input_deck.cs_tallies[i].azi) - 1
+        Ng = len(input_deck.cs_tallies[i].g) - 1
+        Nx = len(input_deck.cs_tallies[i].x) - 1
+        Ny = len(input_deck.cs_tallies[i].y) - 1
+        Nz = len(input_deck.cs_tallies[i].z) - 1
+        Nt = len(input_deck.cs_tallies[i].t) - 1
+
+        # Update N_bin
+        mcdc["cs_tallies"][i]["N_bin"] *= N_score
+
+        # Filter strides
+        stride = N_score
+        if Nz > 1:
+            mcdc["cs_tallies"][i]["stride"]["z"] = stride
+            stride *= Nz
+        if Ny > 1:
+            mcdc["cs_tallies"][i]["stride"]["y"] = stride
+            stride *= Ny
+        if Nx > 1:
+            mcdc["cs_tallies"][i]["stride"]["x"] = stride
+            stride *= Nx
+        if Nt > 1:
+            mcdc["cs_tallies"][i]["stride"]["t"] = stride
+            stride *= Nt
+        if Ng > 1:
+            mcdc["cs_tallies"][i]["stride"]["g"] = stride
+            stride *= Ng
+        if N_azi > 1:
+            mcdc["cs_tallies"][i]["stride"]["azi"] = stride
+            stride *= N_azi
+        if Nmu > 1:
+            mcdc["cs_tallies"][i]["stride"]["mu"] = stride
+            stride *= Nmu
+
+        # Set tally stride and accumulate total tally size
+        mcdc["cs_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["cs_tallies"][i]["N_bin"]
 
     # Set tally data
     if not input_deck.technique["uq"]:
