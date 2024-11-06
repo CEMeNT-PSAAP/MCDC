@@ -5,7 +5,7 @@
 Running MC/DC on CPUs
 =====================
 
-Executing MC/DC in something like a jupyter note book is possible but not recommended,
+Executing MC/DC in something like a jupyter notebook is possible but not recommended,
 especially when using MPI and/or Numba.
 The instructions below assume you have an existing MC/DC installation.
 MPI can be quite tricky to configure if on an HPC; if you're having trouble,
@@ -28,9 +28,9 @@ Numba Mode
     python input.py --mode=numba
 
 When running in Numba mode a significant amount of time is taken compiling Python functions to performant binaries.
-Only functions used in a specific simulation will be compiled.
-These binaries will be cached meaning that in subsequent runs of the same simulation the compilation step can be avoided.
-The cache can be used as an effective ahead of time compilation scheme where binaries can be compiled once and shared between machines.
+Only the functions used in a specific simulation will be compiled.
+These binaries will be cached, meaning that in subsequent runs of the same simulation the compilation step can be avoided.
+The cache can be used as an effective ahead-of-time compilation scheme where binaries can be compiled once and shared between machines.
 For more information on caching see :ref:`Caching` and `Numba Caching <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
 
 MC/DC also has the ability to run Numba in a debugging mode.
