@@ -21,6 +21,7 @@ from unittest.mock import MagicMock
 MOCK_MODULES = ["mpi4py", "colorama", "mpi4py.util.dtlib", "sympy", "matplotlib.pyplot"]
 sys.modules.update((mod_name, MagicMock()) for mod_name in MOCK_MODULES)
 from mpi4py import MPI
+
 MPI.COMM_WORLD.Get_size.return_value = 1
 
 # -- Project information -----------------------------------------------------
