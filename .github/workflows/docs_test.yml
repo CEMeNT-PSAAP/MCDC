@@ -1,4 +1,4 @@
-name: Deploy
+name: Test Build the Docs
 
 on: [push, pull_request]
 
@@ -27,6 +27,7 @@ jobs:
     - name: Patch Numba
       run : |
         bash .github/workflows/patch.sh
-    - name: Regression Test - Numba and MPI
+    - name: Build the Docs
       run: |
-          cd doc && make html
+        cd docs
+        make html
