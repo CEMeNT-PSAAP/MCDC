@@ -5,7 +5,7 @@
 Running MC/DC on GPUs
 =====================
 
-MC/DC supports most of it's Numba enabled features for GPU compilation.
+MC/DC supports most of its Numba enabled features for GPU compilation.
 When targeting GPUs execution MC/DC uses the Harmonize library to schedule events.
 Harmonize acts as the GPU runtime for MC/DC and has two major scheduling schemes including a novel asynchronous event scheduler.
 For more information on Harmonize and how we compile MC/DC with it see our publications in M&C 2025.
@@ -19,21 +19,21 @@ For example,
 
     python input.py --mode=numba --target=gpu
 
-A cache folder will be generated in the same directory as the input deck titled ``__harmonize_cache__`` which contains the intermediate compiler representations and copmiled biniaries.
+A cache folder will be generated in the same directory as the input deck titled ``__harmonize_cache__`` which contains the intermediate compiler representations and compiled biniaries.
 
 MC/DC Harmonize Runtime Options
 -------------------------------
 
-At runtime the user can interface with the Harmonize scheduler that MC/DC uses as it's GPU runtime.
+At runtime the user can interface with the Harmonize scheduler that MC/DC uses as its GPU runtime.
 Configurable options include:
 
 #. Specifying scheduling modes with ``--gpu_strat=`` either ``event`` (default) or ``async`` (only enabled for Nvidia GPUs) 
 #. Declaring the GPU arena size (size of memory allocated on the GPU measured in particles) ``--gpu_arena_size= [int_value]`` 
-#. Clears the previous cache (and forces recompilation) ``--clear_cache``
-#. Requesting Harmonize to cache it's results: ``--caching``
-#. Clear the previous cache but make a new one: ``--clear_cache  --caching``
+#. Clearing the previous cache (and forcing recompilation) ``--clear_cache``
+#. Requesting Harmonize to cache its results: ``--caching``
+#. Clearing the previous cache and making a new one: ``--clear_cache  --caching``
 
-Other configurable compile time options are available in ` ``harmonize/python/config.py`` <https://github.com/CEMeNT-PSAAP/harmonize/tree/main>`_ starting on line 15.
+Other configurable compile-time options are available in ` ``harmonize/python/config.py`` <https://github.com/CEMeNT-PSAAP/harmonize/tree/main>`_ starting on line 15.
 
 #. Verbose compiler operations: ``VERBOSE = False/True``
 #. Harmonize debug mode: ``DEBUG  = False/True``
