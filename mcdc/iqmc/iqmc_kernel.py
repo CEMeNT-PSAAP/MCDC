@@ -171,9 +171,10 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
                     P_temp["material_ID"] = -1
                     P_temp["cell_ID"] = -1
+                    P_temp["g"] = 0
 
                     # set material_ID
-                    P_temp["cell_ID"] = geometry.locate_particle(P_temp_arr, mcdc)
+                    geometry.locate_particle(P_temp_arr, mcdc)
 
                     # assign material index
                     mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = P_temp[
