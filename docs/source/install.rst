@@ -12,40 +12,67 @@ Most other users can install using pip.
 -------------------
 Installing with pip
 -------------------
-Users who:
-
-#. are unix based (macOS, linux, etc.),
-#. have a working version of openMPI (from conda, brew, or apt),
-#. are using an environment manager like conda or have administrator privileges, and
-#. plan to *use* MC/DC, not develop features for MC/DC
-
-can install using pip. 
-We recommend doing so within an active conda (or other environment manager) environment, 
+Assuming you have a working Python environment and do not need to develope in MC/DC can install using pip. 
+We recommend doing so within an active venv or conda (or other environment manager) environment, 
 which avoids the need for any admin access and keeps dependencies clean. 
 
 .. code-block:: sh
 
     pip install mcdc
 
-Now you're ready to run in pure Python mode!
+
+-------------------------
+Installing MC/DC via venv
+-------------------------
+
+Python `virtual environments <https://docs.python.org/3.11/library/venv.html>`_ are the easiest and recommended way to get MC/DC operating on personal machines as well as HPCs.
+Usually this can be done by
+
+.. code-block:: sh
+
+    python -m venv <name_of_venv>
+
+This assumes you have a working Python version with appropriate venv packages installed on your system.
+Often HPC's have these in a module system.
+Use module load ``python/<version_number>`` then launch this command.
+This will give you a non-admin way of install Python projects like MC/DC and its pre-recs.
+Once you have created a venv activate it with
+
+.. code-block:: sh
+
+    source <name_of_venv>/bin/activate
+
+Activating the venv will need to be done every time a new terminal instance is launched.
+from there MC/DC can be installed from PyPI (``pip install mcdc``) or
+
+Installing from source (venv)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To install MC/DC from source in a Python virtual environment 
+
+#. clone MC/DC repo: ``git clone https://github.com/CEMeNT-PSAAP/MCDC.git``
+#. Go to MC/DC directory ``cd MC/DC``
+#. Install as an editable file ``pip install -e .``
+
+which should install all needed dependencies without a hitch.
 
 .. _creating-a-conda-environment:
 
------------------------------------
-Creating an MC/DC Conda environment
------------------------------------
+--------------------------
+Installing MC/DC via conda
+--------------------------
 
+Conda is the most robust (works even on bespoke systems) option to install MC/DC.
 `Conda <https://conda.io/en/latest/>`_ is an open source package and environment management system 
 that runs on Windows, macOS, and Linux. It allows for easy installing and switching between multiple
 versions of software packages and their dependencies. 
-We can't force you to use it, but we do *highly* recommend it, particularly
-if you plan on running MC/DC in `numba mode <https://numba.pydata.org/>`_.
-**The included installation script will fail if executed outside of a conda environment.**
+Conda is really useful on systems with non-standard hardware (e.g. not x86 CPUs) like Lassen.
+mpi4py is often the most troublesome dependency 
 
 First, ``conda`` should be installed with `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_
 or `Anaconda <https://www.anaconda.com/>`_. HPC instructions: 
 
-`Quartz <https://hpc.llnl.gov/hardware/compute-platforms/quartz>`_ (LLNL, x86_64), 
+`Dane <https://hpc.llnl.gov/hardware/compute-platforms/dane>`_ (LLNL, x86_64), 
 
 .. code-block:: sh
 
@@ -67,16 +94,13 @@ installed.
 
 .. code-block:: sh
 
-    conda create -n mcdc-env python=3.11
+    conda create -n mcdc-env python=3.12
     conda activate mcdc-env
 
--------------------------------------------
-Installing from Source on Linux or Mac OS X
--------------------------------------------
+Installing from Source (conda)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All MC/DC source code is hosted on `Github <https://github.com/CEMeNT-PSAAP/MCDC>`_.
-If you have `git <https://git-scm.com>`_, you can download MC/DC by entering the
-following commands in a terminal:
+MC/DC can be installed by entering the following commands in a terminal:
 
 .. code-block:: sh
 
@@ -86,7 +110,7 @@ following commands in a terminal:
 
 The MC/DC repository includes the script ``install.sh``, which will 
 build MC/DC and all of its dependencies and execute any necessary patches.
-This has been tested on Quartz, Lassen, and Apple M2 (as of 11/01/2023). 
+This has been tested on Quartz, Dane, Tioga, Lassen, and Apple M2. 
 The ``install.sh`` script **will fail outside of a conda environment**.
 
 On HPC machines, the script will install mpi4py 
@@ -94,7 +118,7 @@ On HPC machines, the script will install mpi4py
 This means that all appropriate modules must be loaded prior to executing.
 
 On Quartz, the default modules are sufficient (``intel-classic`` and ``mvapich2``). 
-On Lassen, ``module load gcc/8 cuda/11.3``. Then, 
+On Lassen, ``module load gcc/8 cuda/11.8``. Then, 
 
 .. code-block:: sh
 
@@ -106,7 +130,6 @@ On local machines, mpi4py will be installed using conda,
 .. code-block:: sh
 
     bash install.sh 
-
 
 To confirm that everything is properly installed, execute ``pytest`` from the MCDC directory. 
 
@@ -132,3 +155,41 @@ or run the script after instillation as a stand alone operation with
 
 Both these operations will clone the internal directory to your MCDC directory, untar the compressed folder, then set an environment variable in your bash script.
 NOTE: this does assume you are using bash shell.
+
+
+---------------------------------
+GPU Operability (MC/DC+Harmonize)
+---------------------------------
+
+MC/DC supports most of it's Numba enabled features for GPU compilation and execution.
+When targeting GPUs MC/DC uses the `Harmonize <https://github.com/CEMeNT-PSAAP/harmonize>`_ library as it's GPU runtime (the thing that actually executes MC/DC functions).
+How this works gets a little involved but breifly Harmonize acts as the GPU runtime for MC/DC and has two major scheduling schemes incluing a novel and an event scheduler.
+The event scheduler is similar to thoes implmented in OpenMC and Shift.
+For more information on Harmonize and how we compile MC/DC with it see a `TOMACs article descibring the async scheduler <https://doi.org/10.1145/3626957>`_ or our publications in American Nuclear Society: Math and Comp Meeting in 2025.
+
+Please file `Github issues promptly <https://github.com/CEMeNT-PSAAP/MCDC/issues>`_ when encountering configuration problems espically when on supported super copmuters (LLNL's `Tioga <https://hpc.llnl.gov/hardware/compute-platforms/tioga>`_, `El Capitan <https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems>`_, and `Lassen <https://hpc.llnl.gov/hardware/compute-platforms/lassen>`_)
+
+Nvidia GPUs
+^^^^^^^^^^^
+
+To compile and execute MC/DC on Nvidia GPUs first ensure you have the `Harmonize prerecs <https://github.com/CEMeNT-PSAAP/harmonize/blob/main/install.sh>`_ (CUDA=11.8, Numba>=0.58.0) and a working MC/DC version >=0.10.0. Then,
+
+#. clone the harmonize repo ``https://github.com/CEMeNT-PSAAP/harmonize.git``
+#. install into proper Python env with ``pip install -e .``
+
+Operability should now be enabled. 
+
+AMD GPUs
+^^^^^^^^
+
+The prerequisites for AMD operability are slightly more complex.
+Require a patch to Numba to allow for AMD target triple LLVM-IR.
+It is recommended that this is done within a Python venv virtual environment.
+
+To compile and execute MC/DC on AMD GPUs first ensure you have the `Harmonize prerecs <https://github.com/CEMeNT-PSAAP/harmonize/blob/main/install.sh>`_ (ROCm=6.0.0, Numba>=0.58.0) and a working MC/DC version >=0.11.0. Then,
+
+#. Patch Numba to enable HIP (`instructions here <https://github.com/ROCm/numba-hip>`_)
+#. Clone harmonize and `switch to the AMD <https://github.com/CEMeNT-PSAAP/harmonize/tree/amd_event_interop_revamp>`_ branch with ``git switch amd_event_interop_revamp`
+#. Install Harmonize with ``pip install -e .`` or using `Harmonize's install script <https://github.com/CEMeNT-PSAAP/harmonize/tree/main>`_
+
+Operability should now be enabled.
