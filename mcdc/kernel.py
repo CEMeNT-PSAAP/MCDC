@@ -3135,7 +3135,7 @@ def weight_window(P_arr, prog):
         P["w"] = w_target
 
         # Splitting (keep the original particle)
-        n_split = math.floor(p)
+        n_split = min(math.floor(p), 5)
         for i in range(n_split - 1):
             split_as_record(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
@@ -3155,6 +3155,84 @@ def weight_window(P_arr, prog):
             P["alive"] = False
         else:
             P["w"] = w_target
+
+
+# =============================================================================
+# Weight widow
+# =============================================================================
+
+
+def get_flux(idx, data, mcdc):
+    # Determine the correct tally list based on tally_type
+    tallies = mcdc["mesh_tallies"]
+
+    # Loop over the tallies to find the requested score
+    for ID, tally in enumerate(tallies):
+        if mcdc["technique"]["iQMC"]:
+            break
+
+        mesh = tally["filter"]
+
+        # Shape based on technique and tally type
+        N_sensitivity = 0
+        Ns = 1 + N_sensitivity
+
+        Nmu = len(mesh["mu"]) - 1
+        N_azi = len(mesh["azi"]) - 1
+        Ng = len(mesh["g"]) - 1
+        Nt = len(mesh["t"]) - 1
+
+        Nx = len(mesh["x"]) - 1
+        Ny = len(mesh["y"]) - 1
+        Nz = len(mesh["z"]) - 1
+
+        N_score = tally["N_score"]
+
+        if not mcdc["technique"]["uq"]:
+            shape = (3, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+        else:
+            shape = (5, Ns, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+
+        # Reshape tally
+        N_bin = tally["N_bin"]
+        start = tally["stride"]["tally"]
+        tally_bin = np.ascontiguousarray(data[TALLY][:, start : start + N_bin])
+        tally_bin = tally_bin.reshape(shape)
+
+        # Roll tally so that score is in the front
+        tally_bin = np.rollaxis(tally_bin, 9, 0)
+
+        # Iterate over scores to find the requested score
+        for i in range(N_score):
+            score_type = tally["scores"][i]
+            if score_type == SCORE_FLUX:
+                score_tally_bin = np.squeeze(tally_bin[i])
+                mean = score_tally_bin[TALLY_SUM]
+                sdev = score_tally_bin[TALLY_SUM_SQ]
+                old_flux = mean[idx][:]
+                if Nx == 1 and old_flux.ndim < 3:
+                    old_flux = np.expand_dims(old_flux, axis=0)
+                if Ny == 1 and old_flux.ndim < 3:
+                    old_flux = np.expand_dims(old_flux, axis=1)
+                if Nz == 1 and old_flux.ndim < 3:
+                    old_flux = np.expand_dims(old_flux, axis=2)
+                return old_flux
+
+
+@njit
+def update_weight_window(census_timestep, data, mcdc):
+    # Target weight
+    if census_timestep > 0:
+        window_centers = mcdc["technique"]["ww"]
+        with objmode(old_flux="float64[:,:,:]"):
+            old_flux = get_flux(census_timestep, data, mcdc)
+            if np.max(old_flux) > 0:
+                min_flux = np.min(old_flux[old_flux != 0])
+                old_flux[old_flux == 0] = min_flux / 2
+            else:
+                old_flux = np.ones_like(old_flux)
+        window_centers[census_timestep] = old_flux
+        window_centers[census_timestep] /= np.max(window_centers[census_timestep])
 
 
 # =============================================================================

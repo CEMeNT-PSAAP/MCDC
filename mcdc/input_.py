@@ -1217,7 +1217,7 @@ def time_census(t):
     """
 
     # Remove census beyond the final tally time grid point
-    while True:
+    while False:
         if t[-1] >= global_.input_deck.tally["mesh"]["t"][-1]:
             t = t[:-1]
         else:
@@ -1274,6 +1274,19 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
         card["ww_mesh"]["t"] = t
 
     # Set window
+    if window is None:
+        card["ww_auto"] = True
+        window_ax = []
+        if t is not None:
+            window_ax.append(len(t) - 1)
+        if x is not None:
+            window_ax.append(len(x) - 1)
+        if y is not None:
+            window_ax.append(len(y) - 1)
+        if z is not None:
+            window_ax.append(len(z) - 1)
+        window = np.ones(window_ax)
+
     ax_expand = []
     if t is None:
         ax_expand.append(0)
