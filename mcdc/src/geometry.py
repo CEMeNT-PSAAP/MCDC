@@ -359,6 +359,10 @@ def check_cell(particle_container, cell, mcdc):
     idx = cell["region_data_idx"]
     N_token = cell["N_region"]
 
+    # No region description
+    if N_token == 0:
+        return True
+
     # Create local value array
     value = adapt.local_array(type_.rpn_buffer_size(), type_.bool_)
     N_value = 0
