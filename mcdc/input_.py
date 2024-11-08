@@ -10,6 +10,8 @@ import h5py, math, mpi4py, os
 import numpy as np
 import scipy as sp
 
+from pathlib import Path
+
 from mcdc.card import (
     NuclideCard,
     MaterialCard,
@@ -321,7 +323,10 @@ def material(
                     )
 
                 # Fissionable flag
-                with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
+                lib_file_name = dir_name + "/" + nuc_name + ".h5"
+                if not Path(lib_file_name).is_file():
+                    print_error(f"Nuclide data not found: {nuc_name}")
+                with h5py.File(lib_file_name, "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card.fissionable = True
                         card.fissionable = True
@@ -334,9 +339,26 @@ def material(
             card.nuclide_IDs[i] = nuc_card.ID
             card.nuclide_densities[i] = density
 
+        # Check if there is a material with identical composition already
+        if global_.input_deck.setting["mode_CE"]:
+            for card_registered in global_.input_deck.materials:
+                identical = True
+                for i in range(len(card_registered.nuclide_IDs)):
+                    if not card_registered.nuclide_IDs[i] == card.nuclide_IDs[i]:
+                        identical = False
+                        break
+                    if (
+                        not card_registered.nuclide_densities[i]
+                        == card.nuclide_densities[i]
+                    ):
+                        identical = False
+                        break
+
+                if identical:
+                    return card_registered
+
         # Add to deck
         global_.input_deck.materials.append(card)
-
         return card
 
     # Nuclide and group sizes

@@ -1717,7 +1717,7 @@ def visualize(
     x=0.0,
     y=0.0,
     z=0.0,
-    pixel=(100, 100),
+    pixels=(100, 100),
     colors=None,
     time=np.array([0.0]),
     save_as=None,
@@ -1737,14 +1737,15 @@ def visualize(
         Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
     time : array_like
         Times at which the geometry snapshots are taken
-    pixel : array_like
-        Number of respective pixel in the two axes in vis_plane
+    pixels : array_like
+        Number of respective pixels in the two axes in vis_plane
     colors : array_like
         List of pairs of material and its color
     """
     # TODO: add input error checkers
 
-    _, mcdc = prepare()
+    _, mcdc_container = prepare()
+    mcdc = mcdc_container[0]
 
     # Color assignment for materials (by material ID)
     if colors is not None:
@@ -1788,19 +1789,20 @@ def visualize(
     elif second_key == "z":
         second = z
 
-    # Axis pixel sizes
-    d_first = (first[1] - first[0]) / pixel[0]
-    d_second = (second[1] - second[0]) / pixel[1]
+    # Axis pixels sizes
+    d_first = (first[1] - first[0]) / pixels[0]
+    d_second = (second[1] - second[0]) / pixels[1]
 
-    # Axis pixel grids and midpoints
-    first_grid = np.linspace(first[0], first[1], pixel[0] + 1)
+    # Axis pixels grids and midpoints
+    first_grid = np.linspace(first[0], first[1], pixels[0] + 1)
     first_midpoint = 0.5 * (first_grid[1:] + first_grid[:-1])
 
-    second_grid = np.linspace(second[0], second[1], pixel[1] + 1)
+    second_grid = np.linspace(second[0], second[1], pixels[1] + 1)
     second_midpoint = 0.5 * (second_grid[1:] + second_grid[:-1])
 
     # Set dummy particle
-    particle = np.zeros(1, dtype=type_.particle)[0]
+    particle_container = adapt.local_array(1, type_.particle)
+    particle = particle_container[0]
     particle[reference_key] = reference
     particle["g"] = 0
     particle["E"] = 1e6
@@ -1811,22 +1813,22 @@ def visualize(
 
         # Random direction
         particle["ux"], particle["uy"], particle["uz"] = (
-            kernel.sample_isotropic_direction(particle)
+            kernel.sample_isotropic_direction(particle_container)
         )
 
-        # RGB color data for each pixel
-        data = np.zeros(pixel + (3,))
+        # RGB color data for each pixels
+        data = np.zeros(pixels + (3,))
 
         # Loop over the two axes
-        for i in range(pixel[0]):
+        for i in range(pixels[0]):
             particle[first_key] = first_midpoint[i]
-            for j in range(pixel[1]):
+            for j in range(pixels[1]):
                 particle[second_key] = second_midpoint[j]
 
                 # Get material
                 particle["cell_ID"] = -1
                 particle["material_ID"] = -1
-                if geometry.locate_particle(particle, mcdc):
+                if geometry.locate_particle(particle_container, mcdc):
                     data[i, j] = colors[particle["material_ID"]]
                 else:
                     data[i, j] = WHITE
