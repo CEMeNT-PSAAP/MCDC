@@ -1023,6 +1023,7 @@ def make_type_technique(input_deck):
     mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww_mesh"])
     struct += [("ww_mesh", mesh)]
     struct += [("ww_width", float64)]
+    struct += [("ww_epsilon", float64)]
     struct += [("ww_auto", bool_)]
 
     # Window

@@ -3135,7 +3135,7 @@ def weight_window(P_arr, prog):
         P["w"] = w_target
 
         # Splitting (keep the original particle)
-        n_split = min(math.floor(p), 5)
+        n_split = math.floor(p)
         for i in range(n_split - 1):
             split_as_record(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
@@ -3225,14 +3225,17 @@ def update_weight_window(census_timestep, data, mcdc):
     if census_timestep > 0:
         window_centers = mcdc["technique"]["ww"]
         with objmode(old_flux="float64[:,:,:]"):
-            old_flux = get_flux(census_timestep, data, mcdc)
+            old_flux = get_flux(census_timestep - 1, data, mcdc)
             if np.max(old_flux) > 0:
                 min_flux = np.min(old_flux[old_flux != 0])
                 old_flux[old_flux == 0] = min_flux / 2
-            else:
-                old_flux = np.ones_like(old_flux)
         window_centers[census_timestep] = old_flux
-        window_centers[census_timestep] /= np.max(window_centers[census_timestep])
+        if np.max(window_centers[census_timestep]) > 0:
+            window_centers[census_timestep] /= np.max(window_centers[census_timestep])
+        eps = mcdc["technique"]["ww_epsilon"]
+        window_centers[census_timestep] = (1 - eps) * window_centers[
+            census_timestep
+        ] + eps
 
 
 # =============================================================================

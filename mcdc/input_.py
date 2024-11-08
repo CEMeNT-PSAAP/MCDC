@@ -1222,7 +1222,7 @@ def time_census(t):
             t = t[:-1]
         else:
             break
-
+    t = t[:-1]
     # Add the default, final census-at-infinity
     t = np.append(t, INF)
 
@@ -1232,7 +1232,9 @@ def time_census(t):
     card["N_census"] = len(t)
 
 
-def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
+def weight_window(
+    x=None, y=None, z=None, t=None, window=None, width=None, epsilon=1e-4
+):
     """
     Activate weight window variance reduction technique.
 
@@ -1300,7 +1302,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     for ax in ax_expand:
         window = np.expand_dims(window, axis=ax)
     card["ww"] = window
-
+    card["ww_epsilon"] = epsilon
     return card
 
 

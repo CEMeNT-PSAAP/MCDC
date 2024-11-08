@@ -945,6 +945,7 @@ def prepare():
 
     # WW windows
     mcdc["technique"]["ww"] = input_deck.technique["ww"]
+    mcdc["technique"]["ww_epsilon"] = input_deck.technique["ww_epsilon"]
     mcdc["technique"]["ww_auto"] = input_deck.technique["ww_auto"]
     mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
 
@@ -1348,6 +1349,7 @@ def generate_hdf5(data, mcdc):
                 f.create_dataset("ww/grid/z", data=T["ww_mesh"]["z"])
                 f.create_dataset("ww/center", data=np.squeeze(T["ww"]))
                 f.create_dataset("ww/width", data=T["ww_width"])
+                f.create_dataset("ww/epsilon", data=T["ww_epsilon"])
 
             # Mesh tallies
             for ID, tally in enumerate(mcdc["mesh_tallies"]):
