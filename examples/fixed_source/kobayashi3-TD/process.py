@@ -25,11 +25,6 @@ with h5py.File("output.h5", "r") as f:
     phi = flux["mean"][:]
     phi_sd = flux["sdev"][:]
 
-    for i in range(len(f["input_deck"]["cell_tallies"])):
-        flux_score = f[f"tallies/cell_tally_{i}/flux"]
-        print(
-            f'cell {i+1} mean = {flux_score["mean"][()]}, sdev = {flux_score["sdev"][()]}'
-        )
 
 fig, ax = plt.subplots()
 cax = ax.pcolormesh(X, Y, phi[0], vmin=phi[0].min(), vmax=phi[0].max())
