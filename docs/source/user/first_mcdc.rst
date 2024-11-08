@@ -1,8 +1,9 @@
-.. _user:
+.. _first_mcdc:
 
-============
-User's Guide
-============
+
+======================
+First MC/DC Simulation
+======================
 
 This guide presupposes you are familiar with modeling nuclear systems using a Monte Carlo method.
 If you are completely new, we suggest checking out `OpenMC's theory guide <https://docs.openmc.org/en/stable/methods/introduction.htmll>`_ as most the basic underlying algorithms and core concepts are the same.
@@ -181,59 +182,17 @@ Now that we have a script to run, how do we actually run it?
 Running a Simulation
 --------------------
 
-Executing MC/DC in something like a jupyter note book is possible but not recommended,
-especially when using MPI and/or Numba.
-The instructions below assume you have an existing MC/DC installation.
-MPI can be quite tricky to configure if on an HPC; if you're having trouble,
-consult our :ref:`install`, your HPC admin, or our `GitHub issues page <https://github.com/CEMeNT-PSAAP/MCDC/issues>`_.
-
-Pure Python Mode
-^^^^^^^^^^^^^^^^
-
-To run in pure Python mode (slower, no acceleration)
+MC/DC supports execution purely in the Python interpreter, compiled to CPUs (x86, ARM64 and Power9-64),
+and GPUs (AMD and Nvidia) and supports threading with MPI (Python or compiled modes).
+Other guides are included to execute in these modes but for the sake of this first
+MC/DC simulation we will simply execute in Python mode (slower, no acceleration) simply with
 
 .. code-block:: python3
 
     python input.py
 
-Numba Mode
-^^^^^^^^^^
-
-.. code-block:: python3
-
-    python input.py --mode=numba
-
-When running in Numba mode a significant amount of time is taken compiling Python functions to performant binaries.
-Only functions used in a specific simulation will be compiled.
-These binaries will be cached meaning that in subsequent runs of the same simulation the compilation step can be avoided.
-The cache can be used as an effective ahead of time compilation scheme where binaries can be compiled once and shared between machines.
-For more information on caching see :ref:`Caching` and `Numba Caching <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
-
-MC/DC also has the ability to run Numba in a debugging mode.
-This will result in less performant code and longer compile times but will allow for better error messages from Numba and other packages.
-
-.. code-block:: python3
-
-    python input.py --mode=numba_debug
-
-
-For more information on the exact behavior of this option see :ref:`Debugging`
-
-
-Using MPI
-^^^^^^^^^
-
-MC/DC can be executed using MPI with or without Numba acceleration.
-If ``numba-mode`` is enabled the ``jit`` compilation, which is executed on all threads, can take between 30s-2min.
-For smaller problems, Numba compilation time could exceed runtime, and pure python mode could be preferable.
-Below, ``--mode`` can equal python or numba. MC/DC gets MPI functionality via `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`_. 
-As an example, to run on 36 processes in Numba mode with `SLURM <https://slurm.schedmd.com/documentation.html>`_:
-
-.. code-block:: python3
-
-    srun -n 36 python input.py --mode=<python/numba>
-
-For systems that do not use SLURM (i.e., a local system) try ``mpiexec`` or ``mpirun`` in its stead.
+from a command line.
+For more performance see how to execute MC/DC on CPUs and GPUs
 
 Postprocessing Results
 ----------------------
