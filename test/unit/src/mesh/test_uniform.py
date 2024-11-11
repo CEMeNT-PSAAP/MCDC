@@ -2,6 +2,7 @@ import numpy as np
 
 from mcdc.constant import (
     COINCIDENCE_TOLERANCE,
+    COINCIDENCE_TOLERANCE_TIME,
     INF,
 )
 
@@ -34,6 +35,7 @@ mesh["Nz"] = 6
 mesh["Nt"] = 6
 
 tiny = COINCIDENCE_TOLERANCE * 0.8
+tiny_time = COINCIDENCE_TOLERANCE_TIME * 0.8
 
 
 def test_get_indices():
@@ -81,60 +83,76 @@ def test_get_indices():
 
     # At internal grid (within tolerance)
     ix, iy, iz, it, outside = get_indices(
-        particle(-4.0 + tiny, -2.0 + tiny, 0.0 + tiny, 2.0 + tiny, 1.0, 1.0, 1.0), mesh
+        particle(-4.0 + tiny, -2.0 + tiny, 0.0 + tiny, 2.0 + tiny_time, 1.0, 1.0, 1.0),
+        mesh,
     )
     assert ix == 1 and iy == 2 and iz == 3 and it == 4 and not outside
     ix, iy, iz, it, outside = get_indices(
-        particle(-4.0 - tiny, -2.0 - tiny, 0.0 - tiny, 2.0 - tiny, 1.0, 1.0, 1.0), mesh
+        particle(-4.0 - tiny, -2.0 - tiny, 0.0 - tiny, 2.0 - tiny_time, 1.0, 1.0, 1.0),
+        mesh,
     )
     assert ix == 1 and iy == 2 and iz == 3 and it == 4 and not outside
 
     ix, iy, iz, it, outside = get_indices(
-        particle(-4.0 + tiny, -2.0 + tiny, 0.0 + tiny, 2.0 + tiny, -1.0, -1.0, -1.0),
+        particle(
+            -4.0 + tiny, -2.0 + tiny, 0.0 + tiny, 2.0 + tiny_time, -1.0, -1.0, -1.0
+        ),
         mesh,
     )
     assert ix == 0 and iy == 1 and iz == 2 and it == 4 and not outside
     ix, iy, iz, it, outside = get_indices(
-        particle(-4.0 - tiny, -2.0 - tiny, 0.0 - tiny, 2.0 - tiny, -1.0, -1.0, -1.0),
+        particle(
+            -4.0 - tiny, -2.0 - tiny, 0.0 - tiny, 2.0 - tiny_time, -1.0, -1.0, -1.0
+        ),
         mesh,
     )
     assert ix == 0 and iy == 1 and iz == 2 and it == 4 and not outside
 
     # At left-most grid (within tolerance)
     ix, iy, iz, it, outside = get_indices(
-        particle(-6.0 + tiny, -6.0 + tiny, -6.0 + tiny, 0.0 + tiny, 1.0, 1.0, 1.0), mesh
+        particle(-6.0 + tiny, -6.0 + tiny, -6.0 + tiny, 0.0 + tiny_time, 1.0, 1.0, 1.0),
+        mesh,
     )
     assert ix == 0 and iy == 0 and iz == 0 and it == 3 and not outside
     ix, iy, iz, it, outside = get_indices(
-        particle(-6.0 - tiny, -6.0 - tiny, -6.0 - tiny, 0.0 - tiny, 1.0, 1.0, 1.0), mesh
+        particle(-6.0 - tiny, -6.0 - tiny, -6.0 - tiny, 0.0 - tiny_time, 1.0, 1.0, 1.0),
+        mesh,
     )
     assert ix == 0 and iy == 0 and iz == 0 and it == 3 and not outside
     ix, iy, iz, it, outside = get_indices(
-        particle(-6.0 + tiny, -6.0 + tiny, -6.0 + tiny, 0.0 + tiny, -1.0, -1.0, -1.0),
+        particle(
+            -6.0 + tiny, -6.0 + tiny, -6.0 + tiny, 0.0 + tiny_time, -1.0, -1.0, -1.0
+        ),
         mesh,
     )
     assert ix == -1 and iy == -1 and iz == -1 and it == -1 and outside
     ix, iy, iz, it, outside = get_indices(
-        particle(-6.0 - tiny, -6.0 - tiny, -6.0 - tiny, 0.0 - tiny, -1.0, -1.0, -1.0),
+        particle(
+            -6.0 - tiny, -6.0 - tiny, -6.0 - tiny, 0.0 - tiny_time, -1.0, -1.0, -1.0
+        ),
         mesh,
     )
     assert ix == -1 and iy == -1 and iz == -1 and it == -1 and outside
 
     # At right-most grid (within tolerance)
     ix, iy, iz, it, outside = get_indices(
-        particle(6.0 + tiny, 6.0 + tiny, 6.0 + tiny, 0.0 + tiny, 1.0, 1.0, 1.0), mesh
+        particle(6.0 + tiny, 6.0 + tiny, 6.0 + tiny, 0.0 + tiny_time, 1.0, 1.0, 1.0),
+        mesh,
     )
     assert ix == -1 and iy == -1 and iz == -1 and it == -1 and outside
     ix, iy, iz, it, outside = get_indices(
-        particle(6.0 - tiny, 6.0 - tiny, 6.0 - tiny, 0.0 - tiny, 1.0, 1.0, 1.0), mesh
+        particle(6.0 - tiny, 6.0 - tiny, 6.0 - tiny, 0.0 - tiny_time, 1.0, 1.0, 1.0),
+        mesh,
     )
     assert ix == -1 and iy == -1 and iz == -1 and it == -1 and outside
     ix, iy, iz, it, outside = get_indices(
-        particle(6.0 + tiny, 6.0 + tiny, 6.0 + tiny, 0.0 + tiny, -1.0, -1.0, -1.0), mesh
+        particle(6.0 + tiny, 6.0 + tiny, 6.0 + tiny, 0.0 + tiny_time, -1.0, -1.0, -1.0),
+        mesh,
     )
     assert ix == 5 and iy == 5 and iz == 5 and it == 3 and not outside
     ix, iy, iz, it, outside = get_indices(
-        particle(6.0 - tiny, 6.0 - tiny, 6.0 - tiny, 0.0 - tiny, -1.0, -1.0, -1.0), mesh
+        particle(6.0 - tiny, 6.0 - tiny, 6.0 - tiny, 0.0 - tiny_time, -1.0, -1.0, -1.0),
+        mesh,
     )
     assert ix == 5 and iy == 5 and iz == 5 and it == 3 and not outside
 
