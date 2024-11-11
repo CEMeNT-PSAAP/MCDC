@@ -2,7 +2,7 @@ import math
 
 from numba import int64, njit
 
-from mcdc.constant import COINCIDENCE_TOLERANCE, INF
+from mcdc.constant import COINCIDENCE_TOLERANCE, COINCIDENCE_TOLERANCE_TIME, INF
 
 
 @njit
@@ -49,8 +49,8 @@ def get_indices(particle_container, mesh):
         or y > y_last + COINCIDENCE_TOLERANCE
         or z < z0 - COINCIDENCE_TOLERANCE
         or z > z_last + COINCIDENCE_TOLERANCE
-        or t < t0 - COINCIDENCE_TOLERANCE
-        or t > t_last + COINCIDENCE_TOLERANCE
+        or t < t0 - COINCIDENCE_TOLERANCE_TIME
+        or t > t_last + COINCIDENCE_TOLERANCE_TIME
         # At the outermost-grid but moving away
         or (abs(x - x0) < COINCIDENCE_TOLERANCE and ux < 0.0)
         or (abs(x - x_last) < COINCIDENCE_TOLERANCE and ux > 0.0)
@@ -58,7 +58,7 @@ def get_indices(particle_container, mesh):
         or (abs(y - y_last) < COINCIDENCE_TOLERANCE and uy > 0.0)
         or (abs(z - z0) < COINCIDENCE_TOLERANCE and uz < 0.0)
         or (abs(z - z_last) < COINCIDENCE_TOLERANCE and uz > 0.0)
-        or (abs(t - t_last) < COINCIDENCE_TOLERANCE)
+        or (abs(t - t_last) < COINCIDENCE_TOLERANCE_TIME)
     ):
         outside = True
         return -1, -1, -1, -1, outside
@@ -109,7 +109,7 @@ def get_crossing_distance(particle_container, speed, mesh):
     # Check if particle is outside the mesh grid and moving away
     outside = False
     if (
-        (t > t_last - COINCIDENCE_TOLERANCE)
+        (t > t_last - COINCIDENCE_TOLERANCE_TIME)
         or (x < x0 + COINCIDENCE_TOLERANCE and ux < 0.0)
         or (x > x_last - COINCIDENCE_TOLERANCE and ux > 0.0)
         or (y < y0 + COINCIDENCE_TOLERANCE and uy < 0.0)
@@ -123,12 +123,12 @@ def get_crossing_distance(particle_container, speed, mesh):
     d = min(d, _grid_distance(x, ux, x0, dx))
     d = min(d, _grid_distance(y, uy, y0, dy))
     d = min(d, _grid_distance(z, uz, z0, dz))
-    d = min(d, _grid_distance(t, 1.0 / speed, t0, dt))
+    d = min(d, _grid_distance(t, 1.0 / speed, t0, dt, COINCIDENCE_TOLERANCE_TIME))
     return d
 
 
 @njit
-def _grid_index(value, direction, start, width):
+def _grid_index(value, direction, start, width, tolerance=COINCIDENCE_TOLERANCE):
     """
     Get grid index given the value and the direction
 
@@ -136,10 +136,10 @@ def _grid_index(value, direction, start, width):
     (within tolerance).
     Note: It assumes the value is inside the grid.
     """
-    idx = int64(math.floor((value + COINCIDENCE_TOLERANCE - start) / width))
+    idx = int64(math.floor((value + tolerance - start) / width))
 
     # Coinciding cases
-    if abs(start + width * idx - value) < COINCIDENCE_TOLERANCE:
+    if abs(start + width * idx - value) < tolerance:
         if direction < 0.0:
             idx -= 1
 
@@ -147,7 +147,7 @@ def _grid_index(value, direction, start, width):
 
 
 @njit
-def _grid_distance(value, direction, start, width):
+def _grid_distance(value, direction, start, width, tolerance=COINCIDENCE_TOLERANCE):
     """
     Get distance to nearest grid given a value and direction
 
@@ -158,10 +158,10 @@ def _grid_distance(value, direction, start, width):
     if direction == 0.0:
         return INF
 
-    idx = int64(math.floor((value + COINCIDENCE_TOLERANCE - start) / width))
+    idx = int64(math.floor((value + tolerance - start) / width))
 
     # Coinciding cases
-    if abs(start + width * idx - value) < COINCIDENCE_TOLERANCE:
+    if abs(start + width * idx - value) < tolerance:
         if direction < 0.0:
             idx -= 1
 
