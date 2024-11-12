@@ -93,7 +93,6 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 mcdc["technique"]["ww_auto"]
                 and idx_census < mcdc["setting"]["N_census"]
             ):
-                print("updating")
                 kernel.update_weight_window(idx_census, data, mcdc)
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
