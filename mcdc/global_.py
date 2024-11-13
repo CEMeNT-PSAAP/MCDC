@@ -53,7 +53,6 @@ class InputDeck:
             "N_inactive": 0,
             "N_active": 0,
             "N_cycle": 0,
-            "caching": True,
             "save_particle": False,
             "gyration_radius": False,
             "gyration_radius_type": GYRATION_RADIUS_ALL,

@@ -33,8 +33,8 @@ from mcdc.loop import (
     loop_eigenvalue,
     build_gpu_progs,
 )
-import mcdc.geometry as geometry
 from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
+import mcdc.src.geometry as geometry
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
@@ -311,10 +311,11 @@ def prepare():
     # Create root universe if not defined
     # =========================================================================
 
-    N_cell = len(input_deck.cells)
     if input_deck.universes[0] == None:
-        root_universe = UniverseCard(N_cell)
+        N_cell = len(input_deck.cells)
+        root_universe = UniverseCard()
         root_universe.ID = 0
+        root_universe.cell_IDs = np.zeros(N_cell, int)
         for i, cell in enumerate(input_deck.cells):
             root_universe.cell_IDs[i] = cell.ID
         input_deck.universes[0] = root_universe
@@ -353,7 +354,6 @@ def prepare():
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
     type_.make_type_cell(input_deck)
-    type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
     type_.make_type_mesh_tally(input_deck)
@@ -482,10 +482,49 @@ def prepare():
 
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
+        surface = mcdc["surfaces"][i]
+        surface_input = input_deck.surfaces[i]
+
         # Direct assignment
         for name in type_.surface.names:
-            if name not in ["BC", "tally_IDs"]:
-                copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
+            if name not in [
+                "type",
+                "BC",
+                "tally_IDs",
+                "move_velocities",
+                "move_translations",
+                "move_time_grid",
+            ]:
+                copy_field(surface, surface_input, name)
+
+        # Type
+        if surface_input.type == "plane-x":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_X
+        elif surface_input.type == "plane-y":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Y
+        elif surface_input.type == "plane-z":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Z
+        elif surface_input.type == "plane":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE
+        elif surface_input.type == "cylinder-x":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_X
+        elif surface_input.type == "cylinder-y":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Y
+        elif surface_input.type == "cylinder-z":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Z
+        elif surface_input.type == "sphere":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
+        elif surface_input.type == "quadric":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
 
         # Boundary condition
         if input_deck.surfaces[i].boundary_type == "interface":
@@ -500,46 +539,73 @@ def prepare():
             N = len(getattr(input_deck.surfaces[i], name))
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
+        # Moves
+        if surface["moving"]:
+            for n in range(surface["N_move"]):
+                duration = surface_input.move_durations[n]
+                velocity = surface_input.move_velocities[n]
+
+                surface["move_velocities"][n] = velocity
+
+                t_start = surface["move_time_grid"][n]
+                surface["move_time_grid"][n + 1] = t_start + duration
+
+                trans_start = surface["move_translations"][n]
+                surface["move_translations"][n + 1] = trans_start + velocity * duration
+
     # =========================================================================
-    # Cells
+    # Set cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
-        for name in ["ID", "fill_ID", "translation", "N_tally"]:
-            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+        cell = mcdc["cells"][i]
+        cell_input = input_deck.cells[i]
+
+        # Directly transferables
+        for name in ["ID", "fill_ID", "translation", "rotation", "N_tally"]:
+            copy_field(cell, cell_input, name)
 
         # Fill type
-        if input_deck.cells[i].fill_type == "material":
-            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
-        elif input_deck.cells[i].fill_type == "universe":
-            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
-        elif input_deck.cells[i].fill_type == "lattice":
-            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+        if cell_input.fill_type == "material":
+            cell["fill_type"] = FILL_MATERIAL
+        elif cell_input.fill_type == "universe":
+            cell["fill_type"] = FILL_UNIVERSE
+        elif cell_input.fill_type == "lattice":
+            cell["fill_type"] = FILL_LATTICE
 
-        # Fill translation flag
-        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
-            mcdc["cells"][i]["fill_translated"] = True
+        # Fill translation
+        if np.max(np.abs(cell["translation"])) > 0.0:
+            cell["fill_translated"] = True
 
-        # Surface data
-        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
-        N_surface = len(input_deck.cells[i].surface_IDs)
-        mcdc["cell_surface_data"][surface_data_idx] = N_surface
-        mcdc["cell_surface_data"][
-            surface_data_idx + 1 : surface_data_idx + N_surface + 1
-        ] = input_deck.cells[i].surface_IDs
-        surface_data_idx += N_surface + 1
+        # Fill rotation
+        if np.max(np.abs(cell["rotation"])) > 0.0:
+            cell["fill_rotated"] = True
 
-        # Region data
-        mcdc["cells"][i]["region_data_idx"] = region_data_idx
-        N_RPN = len(input_deck.cells[i]._region_RPN)
-        mcdc["cell_region_data"][region_data_idx] = N_RPN
-        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
-            input_deck.cells[i]._region_RPN
-        )
-        region_data_idx += N_RPN + 1
+            # Convert rotation
+            cell["rotation"][0] *= PI / 180.0
+            cell["rotation"][1] *= PI / 180.0
+            cell["rotation"][2] *= PI / 180.0
+
+        # Surface IDs
+        cell["surface_data_idx"] = surface_data_idx
+        cell["N_surface"] = len(cell_input.surface_IDs)
+        # The data
+        start = surface_data_idx
+        end = start + cell["N_surface"]
+        mcdc["cells_data_surface"][start:end] = cell_input.surface_IDs
+        surface_data_idx += cell["N_surface"]
+
+        # Region RPN tokens
+        cell["region_data_idx"] = region_data_idx
+        cell["N_region"] = len(cell_input._region_RPN)
+        # The data
+        start = region_data_idx
+        end = start + cell["N_region"]
+        mcdc["cells_data_region"][start:end] = cell_input._region_RPN
+        region_data_idx += cell["N_region"]
 
         # Variables with possible different sizes
         for name in ["tally_IDs"]:
@@ -547,19 +613,27 @@ def prepare():
             mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
 
     # =========================================================================
-    # Universes
+    # Set universes
     # =========================================================================
 
     N_universe = len(input_deck.universes)
+    cell_data_idx = 0
     for i in range(N_universe):
-        for name in type_.universe.names:
-            if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = getattr(input_deck.universes[i], name)
+        universe = mcdc["universes"][i]
+        universe_input = input_deck.universes[i]
 
-        # Variables with possible different sizes
-        for name in ["cell_IDs"]:
-            N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = getattr(input_deck.universes[i], name)
+        # Directly transferables
+        for name in ["ID"]:
+            copy_field(universe, universe_input, name)
+
+        # Cells IDs
+        universe["cell_data_idx"] = cell_data_idx
+        universe["N_cell"] = len(universe_input.cell_IDs)
+        # Cell ID data
+        start = cell_data_idx
+        end = start + universe["N_cell"]
+        mcdc["universes_data_cell"][start:end] = universe_input.cell_IDs
+        cell_data_idx += universe["N_cell"]
 
     # =========================================================================
     # Lattices
@@ -1638,7 +1712,16 @@ def closeout(mcdc):
 # ======================================================================================
 
 
-def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
+def visualize(
+    vis_type,
+    x=0.0,
+    y=0.0,
+    z=0.0,
+    pixels=(100, 100),
+    colors=None,
+    time=np.array([0.0]),
+    save_as=None,
+):
     """
     2D visualization of the created model
 
@@ -1652,14 +1735,17 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
         Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
     z : float or array_like
         Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
-    pixel : array_like
-        Number of respective pixel in the two axes in vis_plane
+    time : array_like
+        Times at which the geometry snapshots are taken
+    pixels : array_like
+        Number of respective pixels in the two axes in vis_plane
     colors : array_like
         List of pairs of material and its color
     """
     # TODO: add input error checkers
 
-    _, mcdc = prepare()
+    _, mcdc_container = prepare()
+    mcdc = mcdc_container[0]
 
     # Color assignment for materials (by material ID)
     if colors is not None:
@@ -1703,43 +1789,57 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
     elif second_key == "z":
         second = z
 
-    # Axis pixel sizes
-    d_first = (first[1] - first[0]) / pixel[0]
-    d_second = (second[1] - second[0]) / pixel[1]
+    # Axis pixels sizes
+    d_first = (first[1] - first[0]) / pixels[0]
+    d_second = (second[1] - second[0]) / pixels[1]
 
-    # Axis pixel grids and midpoints
-    first_grid = np.linspace(first[0], first[1], pixel[0] + 1)
+    # Axis pixels grids and midpoints
+    first_grid = np.linspace(first[0], first[1], pixels[0] + 1)
     first_midpoint = 0.5 * (first_grid[1:] + first_grid[:-1])
 
-    second_grid = np.linspace(second[0], second[1], pixel[1] + 1)
+    second_grid = np.linspace(second[0], second[1], pixels[1] + 1)
     second_midpoint = 0.5 * (second_grid[1:] + second_grid[:-1])
 
     # Set dummy particle
-    particle = np.zeros(1, dtype=type_.particle)[0]
+    particle_container = adapt.local_array(1, type_.particle)
+    particle = particle_container[0]
     particle[reference_key] = reference
     particle["g"] = 0
     particle["E"] = 1e6
 
-    # RGB color data for each pixel
-    data = np.zeros(pixel + (3,))
+    for t in time:
+        # Set time
+        particle["t"] = t
 
-    # Loop over the two axes
-    for i in range(pixel[0]):
-        particle[first_key] = first_midpoint[i]
-        for j in range(pixel[1]):
-            particle[second_key] = second_midpoint[j]
+        # Random direction
+        particle["ux"], particle["uy"], particle["uz"] = (
+            kernel.sample_isotropic_direction(particle_container)
+        )
 
-            # Get material
-            particle["cell_ID"] = -1
-            particle["material_ID"] = -1
-            if geometry.locate_particle(particle, mcdc):
-                data[i, j] = colors[particle["material_ID"]]
-            else:
-                data[i, j] = WHITE
+        # RGB color data for each pixels
+        data = np.zeros(pixels + (3,))
 
-    data = np.transpose(data, (1, 0, 2))
-    plt.imshow(data, origin="lower", extent=first + second)
-    plt.xlabel(first_key + " cm")
-    plt.ylabel(second_key + " cm")
-    plt.title(reference_key + " = %.2f cm" % reference)
-    plt.show()
+        # Loop over the two axes
+        for i in range(pixels[0]):
+            particle[first_key] = first_midpoint[i]
+            for j in range(pixels[1]):
+                particle[second_key] = second_midpoint[j]
+
+                # Get material
+                particle["cell_ID"] = -1
+                particle["material_ID"] = -1
+                if geometry.locate_particle(particle_container, mcdc):
+                    data[i, j] = colors[particle["material_ID"]]
+                else:
+                    data[i, j] = WHITE
+
+        data = np.transpose(data, (1, 0, 2))
+        plt.imshow(data, origin="lower", extent=first + second)
+        plt.xlabel(first_key + " [cm]")
+        plt.ylabel(second_key + " [cm]")
+        plt.title(reference_key + " = %.2f cm" % reference + ", time = %.2f s" % t)
+        if save_as is not None:
+            plt.savefig(save_as + "_%.2f.png" % t)
+            plt.clf()
+        else:
+            plt.show()
