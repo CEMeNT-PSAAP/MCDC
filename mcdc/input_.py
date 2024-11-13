@@ -10,6 +10,8 @@ import h5py, math, mpi4py, os
 import numpy as np
 import scipy as sp
 
+from pathlib import Path
+
 from mcdc.card import (
     NuclideCard,
     MaterialCard,
@@ -321,7 +323,10 @@ def material(
                     )
 
                 # Fissionable flag
-                with h5py.File(dir_name + "/" + nuc_name + ".h5", "r") as f:
+                lib_file_name = dir_name + "/" + nuc_name + ".h5"
+                if not Path(lib_file_name).is_file():
+                    print_error(f"Nuclide data not found: {nuc_name}")
+                with h5py.File(lib_file_name, "r") as f:
                     if max(f["fission"][:]) > 0.0:
                         nuc_card.fissionable = True
                         card.fissionable = True
@@ -334,9 +339,26 @@ def material(
             card.nuclide_IDs[i] = nuc_card.ID
             card.nuclide_densities[i] = density
 
+        # Check if there is a material with identical composition already
+        if global_.input_deck.setting["mode_CE"]:
+            for card_registered in global_.input_deck.materials:
+                identical = True
+                for i in range(len(card_registered.nuclide_IDs)):
+                    if not card_registered.nuclide_IDs[i] == card.nuclide_IDs[i]:
+                        identical = False
+                        break
+                    if (
+                        not card_registered.nuclide_densities[i]
+                        == card.nuclide_densities[i]
+                    ):
+                        identical = False
+                        break
+
+                if identical:
+                    return card_registered
+
         # Add to deck
         global_.input_deck.materials.append(card)
-
         return card
 
     # Nuclide and group sizes
@@ -576,16 +598,19 @@ def surface(type_, bc="interface", **kw):
         card.I = kw.get("I")
         card.J = kw.get("J")
 
-    # Set normal vector if linear
+    # Normalize linear surfaces
     if card.linear:
-        nx = card.G
-        ny = card.H
-        nz = card.I
-        # Normalize
-        norm = (nx**2 + ny**2 + nz**2) ** 0.5
-        card.nx = nx / norm
-        card.ny = ny / norm
-        card.nz = nz / norm
+        G = card.G
+        H = card.H
+        I = card.I
+        norm = (G**2 + H**2 + I**2) ** 0.5
+        card.G /= norm
+        card.H /= norm
+        card.I /= norm
+        card.J /= norm
+        card.nx = card.G
+        card.ny = card.H
+        card.nz = card.I
 
     # Add to deck
     global_.input_deck.surfaces.append(card)
@@ -593,7 +618,7 @@ def surface(type_, bc="interface", **kw):
     return card
 
 
-def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
+def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0), rotation=(0.0, 0.0, 0.0)):
     """
     Create a cell as model building block.
 
@@ -605,6 +630,8 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
         Material/universe/lattice that fills the cell.
     translation : array_like[float], optional
         To translate the origin of the fill (if universe or lattice).
+    rotation : array_like[float], optional
+        To rotate the the fill (if universe or lattice).
 
     Returns
     -------
@@ -651,6 +678,9 @@ def cell(region=None, fill=None, translation=(0.0, 0.0, 0.0)):
     # Translation
     card.translation[:] = translation
 
+    # Rotation
+    card.rotation[:] = rotation
+
     # Get all surface IDs
     card.set_surface_IDs()
 
@@ -680,13 +710,12 @@ def universe(cells, root=False):
     --------
     mcdc.cell : Creates a cell that can be used to define a universe.
     """
-    N_cell = len(cells)
 
     # Edit root universe
     if root:
         # Create and replace placeholder if root is not yet created
         if global_.input_deck.universes[0] == None:
-            card = UniverseCard(N_cell)
+            card = UniverseCard()
             card.ID = 0
             global_.input_deck.universes[0] = card
         else:
@@ -694,10 +723,12 @@ def universe(cells, root=False):
 
     # Create new universe
     else:
-        card = UniverseCard(N_cell)
+        card = UniverseCard()
         card.ID = len(global_.input_deck.universes)
 
     # Cells
+    N_cell = len(cells)
+    card.cell_IDs = np.zeros(N_cell, dtype=int)
     for i in range(N_cell):
         card.cell_IDs[i] = cells[i].ID
 
@@ -949,9 +980,6 @@ def setting(**kw):
         The time edge of the problem, after which all particles will be killed.
     progress_bar : bool
         Whether to display the progress bar (default True; disable when running MC/DC in a loop).
-    caching : bool
-        Whether to store or delete compiled Numba kernels (default True will store; False will delete existing __pycache__ folder).
-        see :ref:`Caching`.
     output_name : str
         Name of the output file MC/DC should save data in (default "output.h5").
     save_input_deck : bool
@@ -991,7 +1019,6 @@ def setting(**kw):
                 "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
-                "caching",
             ],
             False,
         )
@@ -1009,7 +1036,6 @@ def setting(**kw):
     IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
-    caching = kw.get("caching")
 
     # Check if setting card has been initialized
     card = global_.input_deck.setting
@@ -1049,10 +1075,6 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
-
-    # caching is normally enabled
-    if caching is not None:
-        card["caching"] = caching
 
     # Save input deck?
     if save_input_deck is not None:
