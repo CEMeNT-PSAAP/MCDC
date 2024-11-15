@@ -1224,13 +1224,13 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def time_census(t=None):
+def time_census(time_grid):
     """
     Set time-census boundaries.
 
     Parameters
     ----------
-    t : array_like[float], optional
+    time_grid : array_like[float]
         The time-census boundaries.
 
     Returns
@@ -1238,19 +1238,10 @@ def time_census(t=None):
         None (in-place card alterations).
     """
 
-    # Remove census beyond the final tally time grid point
-    if t is None:
-        t = global_.input_deck.mesh_tallies[0].t[1:-1]
-    else:
-        if t[-1] >= global_.input_deck.mesh_tallies[0].t[-1]:
-            t = t[:-1]
-    # Add the default, final census-at-infinity
-    t = np.append(t, INF)
-
     # Set the time census parameters
     card = global_.input_deck.setting
-    card["census_time"] = t
-    card["N_census"] = len(t)
+    card["census_time"] = time_grid
+    card["N_census"] = len(time_grid)
 
 
 def weight_window(

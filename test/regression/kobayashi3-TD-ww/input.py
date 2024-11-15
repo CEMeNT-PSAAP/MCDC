@@ -55,24 +55,26 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
+time_grid = np.linspace(0.0, 200.0, 6)
+
 # Tally: z-integrated flux (X-Y section view)
 mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 31),
     y=np.linspace(0.0, 100.0, 51),
-    t=np.linspace(0.0, 200.0, 6),
+    t=time_grid,
 )
 
 mcdc.tally.cell_tally(source_cell, scores=["flux"])
 mcdc.tally.cell_tally(void_cell, scores=["flux"])
 mcdc.tally.cell_tally(shield_cell, scores=["flux"])
 
-mcdc.time_census()
+mcdc.time_census(time_grid)
 mcdc.setting(census_bank_buff=1e2, active_bank_buff=1e3)
 mcdc.weight_window(
     x=np.linspace(0.0, 60.0, 31),
     y=np.linspace(0.0, 100.0, 51),
-    t=np.linspace(0.0, 200.0, 6),
+    t=time_grid,
     width=2.5,
     epsilon=2e-2,
 )
