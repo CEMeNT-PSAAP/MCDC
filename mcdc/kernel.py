@@ -3227,22 +3227,39 @@ def get_flux(idx, data, mcdc):
 
 
 @njit
-def update_weight_window(census_timestep, data, mcdc):
-    # Target weight
-    if census_timestep > 0:
-        window_centers = mcdc["technique"]["ww"]
-        with objmode(old_flux="float64[:,:,:]"):
-            old_flux = get_flux(census_timestep - 1, data, mcdc)
-            if np.max(old_flux) > 0:
-                min_flux = np.min(old_flux[old_flux != 0])
-                old_flux[old_flux == 0] = min_flux / 2
-        window_centers[census_timestep] = old_flux
-        if np.max(window_centers[census_timestep]) > 0:
-            window_centers[census_timestep] /= np.max(window_centers[census_timestep])
-        eps = mcdc["technique"]["ww_epsilon"]
-        window_centers[census_timestep] = (1 - eps) * window_centers[
-            census_timestep
-        ] + eps
+def update_weight_window(data, mcdc):
+    # Get current global census index
+    idx_census = mcdc["idx_census"]
+
+    # Get the weight window
+    window_centers = mcdc["technique"]["ww"]
+
+    # Get the flux from the previous time census
+    with objmode(old_flux="float64[:,:,:]"):
+        old_flux = get_flux(idx_census - 1, data, mcdc)
+
+    # Next, we ensure that we don't have a zero old flux
+
+    # If the old flux is all-zero, assign the small value epsilon
+    eps = mcdc["technique"]["ww_epsilon"]
+    if np.max(old_flux) == 0:
+        old_flux += eps
+        # Assign as the current weight window
+        window_centers[idx_census] = old_flux
+        return
+
+    # Replace zeros with a small value that is the half of the minimum
+    min_flux = np.min(old_flux[old_flux != 0])
+    old_flux[old_flux == 0] = min_flux / 2
+
+    # Normalize the old flux
+    old_flux /= np.max(old_flux)
+
+    # Ensure that the flux is not smaller than the epsilon
+    old_flux = (1 - eps) * old_flux + eps
+
+    # Assign as the current weight window
+    window_centers[idx_census] = old_flux
 
 
 # =============================================================================

@@ -61,7 +61,6 @@ def teardown_gpu(mcdc):
 
 @njit
 def loop_fixed_source(data_arr, mcdc_arr):
-
     # Ensure `data` and `mcdc` exist for the lifetime of the program
     # by intentionally leaking their memory
     adapt.leak(data_arr)
@@ -71,6 +70,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
+        # Update global batch index and generate batch seed
         mcdc["idx_batch"] = idx_batch
         seed_batch = kernel.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
 
@@ -84,11 +84,13 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
         # Loop over time censuses
         for idx_census in range(mcdc["setting"]["N_census"]):
+            # Update global census index and generate census seed
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
-            if mcdc["technique"]["ww_auto"]:
-                kernel.update_weight_window(idx_census, data, mcdc)
+            # Update automated weight window
+            if mcdc["technique"]["ww_auto"] and idx_census > 0:
+                kernel.update_weight_window(data, mcdc)
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
