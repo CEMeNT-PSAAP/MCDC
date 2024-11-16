@@ -84,13 +84,11 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
         # Loop over time censuses
         for idx_census in range(mcdc["setting"]["N_census"]):
-            if (
-                mcdc["technique"]["ww_auto"]
-                and idx_census < mcdc["setting"]["N_census"]
-            ):
-                kernel.update_weight_window(idx_census, data, mcdc)
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
+
+            if mcdc["technique"]["ww_auto"]:
+                kernel.update_weight_window(idx_census, data, mcdc)
 
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
