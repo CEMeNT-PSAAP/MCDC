@@ -3235,31 +3235,45 @@ def update_weight_window(data, mcdc):
     window_centers = mcdc["technique"]["ww"]
 
     # Get the flux from the previous time census
-    with objmode(old_flux="float64[:,:,:]"):
-        old_flux = get_flux(idx_census - 1, data, mcdc)
+    with objmode(flux_old="float64[:,:,:]"):
+        flux_old = get_flux(idx_census - 1, data, mcdc)
 
     # Next, we ensure that we don't have a zero old flux
 
     # If the old flux is all-zero, assign the small value epsilon
     eps = mcdc["technique"]["ww_epsilon"]
-    if np.max(old_flux) == 0:
-        old_flux += eps
+    if np.max(flux_old) == 0:
+        flux_old += eps
         # Assign as the current weight window
-        window_centers[idx_census] = old_flux
+        window_centers[idx_census] = flux_old
         return
 
-    # Replace zeros with a small value that is the half of the minimum
-    min_flux = np.min(old_flux[old_flux != 0])
-    old_flux[old_flux == 0] = min_flux / 2
+    # Get minimum, non-zero flux
+    flux_min = INF
+    Nx, Ny, Nz = flux_old.shape
+    for ix in range(Nx):
+        for iy in range(Ny):
+            for iz in range(Nz):
+                value = flux_old[ix, iy, iz]
+                if 0.0 < value and value < flux_min:
+                    flux_min = value
+
+    # Replace zeros with the half of the minimum
+    flux_min *= 0.5
+    for ix in range(Nx):
+        for iy in range(Ny):
+            for iz in range(Nz):
+                if flux_old[ix, iy, iz] == 0.0:
+                    flux_old[ix, iy, iz] = flux_min
 
     # Normalize the old flux
-    old_flux /= np.max(old_flux)
+    flux_old /= np.max(flux_old)
 
     # Ensure that the flux is not smaller than the epsilon
-    old_flux = (1 - eps) * old_flux + eps
+    flux_old = (1 - eps) * flux_old + eps
 
     # Assign as the current weight window
-    window_centers[idx_census] = old_flux
+    window_centers[idx_census] = flux_old
 
 
 # =============================================================================
