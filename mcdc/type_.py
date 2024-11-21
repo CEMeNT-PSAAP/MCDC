@@ -779,6 +779,13 @@ def make_type_mesh_tally(input_deck):
         ("mu", float64, (Nmax_mu,)),
         ("azi", float64, (Nmax_azi,)),
         ("g", float64, (Nmax_g,)),
+        ("Nx", int64),
+        ("Ny", int64),
+        ("Nz", int64),
+        ("Nt", int64),
+        ("Nmu", int64),
+        ("N_azi", int64),
+        ("Ng", int64),
     ]
     struct += [("filter", filter_)]
 
@@ -797,7 +804,9 @@ def make_type_mesh_tally(input_deck):
     struct += [("stride", stride)]
 
     # Total number of bins
-    struct += [("N_bin", int64)]
+    struct += [
+        ("N_bin", int64),
+    ]
 
     # Scores
     struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
@@ -1514,6 +1523,13 @@ def make_type_mesh(card):
                 ("mu", float64, (Nmu + 1,)),
                 ("azi", float64, (N_azi + 1,)),
                 ("g", float64, (Ng + 1,)),
+                ("Nx", int64),
+                ("Ny", int64),
+                ("Nz", int64),
+                ("Nt", int64),
+                ("Nmu", int64),
+                ("N_azi", int64),
+                ("Ng", int64),
             ]
         ),
         Nx,
@@ -1542,6 +1558,12 @@ def make_type_mesh_(card):
                 ("t", float64, (Nt + 1,)),
                 ("mu", float64, (Nmu + 1,)),
                 ("azi", float64, (N_azi + 1,)),
+                ("Nx", int64),
+                ("Ny", int64),
+                ("Nz", int64),
+                ("Nt", int64),
+                ("Nmu", int64),
+                ("N_azi", int64),
             ]
         ),
         Nx,

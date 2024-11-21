@@ -19,12 +19,17 @@ def particle(x, y, z, t, ux, uy, uz):
 
 
 grid = np.array([-6.0, -3.0, -1.0, 0.0, 1.0, 3.0, 6.0])
+Ngrid = len(grid) - 1
 
 mesh = {}
 mesh["x"] = grid
 mesh["y"] = grid
 mesh["z"] = grid
 mesh["t"] = grid
+mesh["Nx"] = Ngrid
+mesh["Ny"] = Ngrid
+mesh["Nz"] = Ngrid
+mesh["Nt"] = Ngrid
 
 tiny = COINCIDENCE_TOLERANCE * 0.8
 tiny_time = COINCIDENCE_TOLERANCE_TIME * 0.8
@@ -266,91 +271,91 @@ def test_get_corssing_distance():
 
 def test__grid_index():
     # Inside bin, going right
-    assert np.isclose(_grid_index(-3.2, 0.4, grid), 0)
-    assert np.isclose(_grid_index(3.2, 0.4, grid), 5)
+    assert np.isclose(_grid_index(-3.2, 0.4, grid, Ngrid + 1), 0)
+    assert np.isclose(_grid_index(3.2, 0.4, grid, Ngrid + 1), 5)
 
     # Inside bin, going left
-    assert np.isclose(_grid_index(-3.2, -0.4, grid), 0)
-    assert np.isclose(_grid_index(3.2, -0.4, grid), 5)
+    assert np.isclose(_grid_index(-3.2, -0.4, grid, Ngrid + 1), 0)
+    assert np.isclose(_grid_index(3.2, -0.4, grid, Ngrid + 1), 5)
 
     # At internal grid, going right
-    assert np.isclose(_grid_index(3.0, 0.4, grid), 5)
-    assert np.isclose(_grid_index(-3.0, 0.4, grid), 1)
+    assert np.isclose(_grid_index(3.0, 0.4, grid, Ngrid + 1), 5)
+    assert np.isclose(_grid_index(-3.0, 0.4, grid, Ngrid + 1), 1)
 
     # At internal grid, going left
-    assert np.isclose(_grid_index(3.0, -0.4, grid), 4)
-    assert np.isclose(_grid_index(-3.0, -0.4, grid), 0)
+    assert np.isclose(_grid_index(3.0, -0.4, grid, Ngrid + 1), 4)
+    assert np.isclose(_grid_index(-3.0, -0.4, grid, Ngrid + 1), 0)
 
     # At left-most grid, going right
-    assert np.isclose(_grid_index(-6.0, 0.4, grid), 0)
+    assert np.isclose(_grid_index(-6.0, 0.4, grid, Ngrid + 1), 0)
 
     # At right-most grid, going left
-    assert np.isclose(_grid_index(6.0, -0.4, grid), 5)
+    assert np.isclose(_grid_index(6.0, -0.4, grid, Ngrid + 1), 5)
 
     # At internal grid (within tolerance), going right
-    assert np.isclose(_grid_index(3.0 + tiny, 0.4, grid), 5)
-    assert np.isclose(_grid_index(3.0 - tiny, 0.4, grid), 5)
-    assert np.isclose(_grid_index(-3.0 + tiny, 0.4, grid), 1)
-    assert np.isclose(_grid_index(-3.0 - tiny, 0.4, grid), 1)
+    assert np.isclose(_grid_index(3.0 + tiny, 0.4, grid, Ngrid + 1), 5)
+    assert np.isclose(_grid_index(3.0 - tiny, 0.4, grid, Ngrid + 1), 5)
+    assert np.isclose(_grid_index(-3.0 + tiny, 0.4, grid, Ngrid + 1), 1)
+    assert np.isclose(_grid_index(-3.0 - tiny, 0.4, grid, Ngrid + 1), 1)
 
     # At internal grid (within tolerance), going left
-    assert np.isclose(_grid_index(3.0 + tiny, -0.4, grid), 4)
-    assert np.isclose(_grid_index(3.0 - tiny, -0.4, grid), 4)
-    assert np.isclose(_grid_index(-3.0 + tiny, -0.4, grid), 0)
-    assert np.isclose(_grid_index(-3.0 - tiny, -0.4, grid), 0)
+    assert np.isclose(_grid_index(3.0 + tiny, -0.4, grid, Ngrid + 1), 4)
+    assert np.isclose(_grid_index(3.0 - tiny, -0.4, grid, Ngrid + 1), 4)
+    assert np.isclose(_grid_index(-3.0 + tiny, -0.4, grid, Ngrid + 1), 0)
+    assert np.isclose(_grid_index(-3.0 - tiny, -0.4, grid, Ngrid + 1), 0)
 
     # At left-most grid (within tolerance), going right
-    assert np.isclose(_grid_index(-6.0 + tiny, 0.4, grid), 0)
-    assert np.isclose(_grid_index(-6.0 - tiny, 0.4, grid), 0)
+    assert np.isclose(_grid_index(-6.0 + tiny, 0.4, grid, Ngrid + 1), 0)
+    assert np.isclose(_grid_index(-6.0 - tiny, 0.4, grid, Ngrid + 1), 0)
 
     # At right-most grid (within tolerance), going left
-    assert np.isclose(_grid_index(6.0 + tiny, -0.4, grid), 5)
-    assert np.isclose(_grid_index(6.0 - tiny, -0.4, grid), 5)
+    assert np.isclose(_grid_index(6.0 + tiny, -0.4, grid, Ngrid + 1), 5)
+    assert np.isclose(_grid_index(6.0 - tiny, -0.4, grid, Ngrid + 1), 5)
 
 
 def test__grid_distance():
     # Inside bin, going right
-    assert np.isclose(_grid_distance(-3.2, 0.4, grid), 0.2 / 0.4)
-    assert np.isclose(_grid_distance(3.2, 0.4, grid), 2.8 / 0.4)
+    assert np.isclose(_grid_distance(-3.2, 0.4, grid, Ngrid + 1), 0.2 / 0.4)
+    assert np.isclose(_grid_distance(3.2, 0.4, grid, Ngrid + 1), 2.8 / 0.4)
 
     # Inside bin, going left
-    assert np.isclose(_grid_distance(-3.2, -0.4, grid), 2.8 / 0.4)
-    assert np.isclose(_grid_distance(3.2, -0.4, grid), 0.2 / 0.4)
+    assert np.isclose(_grid_distance(-3.2, -0.4, grid, Ngrid + 1), 2.8 / 0.4)
+    assert np.isclose(_grid_distance(3.2, -0.4, grid, Ngrid + 1), 0.2 / 0.4)
 
     # Outside, moving closer
-    assert np.isclose(_grid_distance(8.0, -0.4, grid), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-8.0, 0.4, grid), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(8.0, -0.4, grid, Ngrid + 1), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-8.0, 0.4, grid, Ngrid + 1), 2.0 / 0.4)
 
     # At internal grid, going right
-    assert np.isclose(_grid_distance(3.0, 0.4, grid), 3.0 / 0.4)
-    assert np.isclose(_grid_distance(-3.0, 0.4, grid), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(3.0, 0.4, grid, Ngrid + 1), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(-3.0, 0.4, grid, Ngrid + 1), 2.0 / 0.4)
 
     # At internal grid, going left
-    assert np.isclose(_grid_distance(3.0, -0.4, grid), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-3.0, -0.4, grid), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(3.0, -0.4, grid, Ngrid + 1), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-3.0, -0.4, grid, Ngrid + 1), 3.0 / 0.4)
 
     # At left-most grid, going right
-    assert np.isclose(_grid_distance(-6.0, 0.4, grid), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(-6.0, 0.4, grid, Ngrid + 1), 3.0 / 0.4)
 
     # At right-most grid, going left
-    assert np.isclose(_grid_distance(6.0, -0.4, grid), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(6.0, -0.4, grid, Ngrid + 1), 3.0 / 0.4)
 
     # At internal grid (within tolerance), going right
-    assert np.isclose(_grid_distance(3.0 + tiny, 0.4, grid), 3.0 / 0.4)
-    assert np.isclose(_grid_distance(3.0 - tiny, 0.4, grid), 3.0 / 0.4)
-    assert np.isclose(_grid_distance(-3.0 + tiny, 0.4, grid), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-3.0 - tiny, 0.4, grid), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(3.0 + tiny, 0.4, grid, Ngrid + 1), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(3.0 - tiny, 0.4, grid, Ngrid + 1), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(-3.0 + tiny, 0.4, grid, Ngrid + 1), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-3.0 - tiny, 0.4, grid, Ngrid + 1), 2.0 / 0.4)
 
     # At internal grid (within tolerance), going left
-    assert np.isclose(_grid_distance(3.0 + tiny, -0.4, grid), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(3.0 - tiny, -0.4, grid), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-3.0 + tiny, -0.4, grid), 3.0 / 0.4)
-    assert np.isclose(_grid_distance(-3.0 - tiny, -0.4, grid), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(3.0 + tiny, -0.4, grid, Ngrid + 1), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(3.0 - tiny, -0.4, grid, Ngrid + 1), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-3.0 + tiny, -0.4, grid, Ngrid + 1), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(-3.0 - tiny, -0.4, grid, Ngrid + 1), 3.0 / 0.4)
 
     # At left-most grid (within tolerance), going right
-    assert np.isclose(_grid_distance(-6.0 + tiny, 0.4, grid), 3.0 / 0.4)
-    assert np.isclose(_grid_distance(-6.0 - tiny, 0.4, grid), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(-6.0 + tiny, 0.4, grid, Ngrid + 1), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(-6.0 - tiny, 0.4, grid, Ngrid + 1), 3.0 / 0.4)
 
     # At right-most grid (within tolerance), going left
-    assert np.isclose(_grid_distance(6.0 + tiny, -0.4, grid), 3.0 / 0.4)
-    assert np.isclose(_grid_distance(6.0 - tiny, -0.4, grid), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(6.0 + tiny, -0.4, grid, Ngrid + 1), 3.0 / 0.4)
+    assert np.isclose(_grid_distance(6.0 - tiny, -0.4, grid, Ngrid + 1), 3.0 / 0.4)

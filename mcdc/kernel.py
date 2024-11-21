@@ -1845,7 +1845,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
 
     # Sweep through the distance
     distance_swept = 0.0
-    while distance_swept < distance - COINCIDENCE_TOLERANCE:
+    while distance_swept < distance - COINCIDENCE_TOLERANCE_MESH:
         # Find distances to the mesh grids
         if ux == 0.0:
             dx = INF
@@ -1888,6 +1888,10 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
         if dt <= distance_scored:
             mesh_crossed = MESH_T
             distance_scored = dt
+        if distance_scored < 0.0:
+            print(tally["N_bin"])
+            print(distance_swept, distance)
+            print(distance_scored, dx, dy, dz, dt)
 
         # Score
         flux = distance_scored * P["w"]
