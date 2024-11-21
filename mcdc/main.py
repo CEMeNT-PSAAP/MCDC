@@ -1101,6 +1101,14 @@ def prepare():
         iqmc = mcdc["technique"]["iqmc"]
         for name in ["x", "y", "z", "t"]:
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
+        Nx = len(input_deck.technique["iqmc"]["mesh"]["x"]) - 1
+        Ny = len(input_deck.technique["iqmc"]["mesh"]["y"]) - 1
+        Nz = len(input_deck.technique["iqmc"]["mesh"]["z"]) - 1
+        Nt = len(input_deck.technique["iqmc"]["mesh"]["t"]) - 1
+        iqmc["mesh"]["Nx"] = Nx
+        iqmc["mesh"]["Ny"] = Ny
+        iqmc["mesh"]["Nz"] = Nz
+        iqmc["mesh"]["Nt"] = Nt
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
             copy_field(
