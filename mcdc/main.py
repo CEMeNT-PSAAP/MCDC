@@ -1692,8 +1692,8 @@ def generate_hdf5(data, mcdc):
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:
-                Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
-                Np = mcdc["technique"]["IC_bank_precursor"]["size"]
+                Nn = mcdc["technique"]["IC_bank_neutron"]["size"][0]
+                Np = mcdc["technique"]["IC_bank_precursor"]["size"][0]
                 f.create_dataset(
                     "IC/neutrons",
                     data=mcdc["technique"]["IC_bank_neutron"]["particles"][:Nn],
@@ -1712,7 +1712,7 @@ def generate_hdf5(data, mcdc):
     if mcdc["setting"]["save_particle"]:
         # Gather source bank
         # TODO: Parallel HDF5 and mitigation of large data passing
-        N = mcdc["bank_source"]["size"]
+        N = mcdc["bank_source"]["size"][0]
         neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
 
         # Master saves the particle
