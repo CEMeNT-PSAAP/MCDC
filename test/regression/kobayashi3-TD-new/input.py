@@ -55,12 +55,16 @@ mcdc.source(
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-# Tally: z-integrated flux (X-Y section view)
+time_grid = np.linspace(0.0, 200.0, 21)
 mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 61),
     y=np.linspace(0.0, 100.0, 101),
-    t=np.linspace(0.0, 200.0, 21),
+    t=time_grid,
+)
+mcdc.tally.mesh_tally(
+    scores=["density"],
+    t=time_grid,
 )
 
 # Setting

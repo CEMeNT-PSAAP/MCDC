@@ -738,6 +738,13 @@ def prepare():
         Ny = len(input_deck.mesh_tallies[i].y) - 1
         Nz = len(input_deck.mesh_tallies[i].z) - 1
         Nt = len(input_deck.mesh_tallies[i].t) - 1
+        mcdc["mesh_tallies"][i]["filter"]["Nmu"] = Nmu
+        mcdc["mesh_tallies"][i]["filter"]["N_azi"] = N_azi
+        mcdc["mesh_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+        mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+        mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
+        mcdc["mesh_tallies"][i]["filter"]["Nt"] = Nt
 
         # Decompose mesh tallies
         if input_deck.technique["domain_decomposition"]:
@@ -749,6 +756,9 @@ def prepare():
             Nz = len(input_deck.mesh_tallies[i].z[mzn:mzp]) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
             mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
+            mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+            mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+            mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
 
         # Update N_bin
         mcdc["mesh_tallies"][i]["N_bin"] *= N_score
@@ -1016,6 +1026,10 @@ def prepare():
     # WW mesh
     for name in type_.mesh_names[:-1]:
         copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
+    mcdc["technique"]["ww_mesh"]["Nx"] = len(input_deck.technique["ww_mesh"]["x"]) - 1
+    mcdc["technique"]["ww_mesh"]["Ny"] = len(input_deck.technique["ww_mesh"]["y"]) - 1
+    mcdc["technique"]["ww_mesh"]["Nz"] = len(input_deck.technique["ww_mesh"]["z"]) - 1
+    mcdc["technique"]["ww_mesh"]["Nt"] = len(input_deck.technique["ww_mesh"]["t"]) - 1
 
     # WW windows
     mcdc["technique"]["ww"] = input_deck.technique["ww"]
@@ -1030,6 +1044,7 @@ def prepare():
 
     # Survival probability
     mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
+
     # =========================================================================
     # Domain Decomposition
     # =========================================================================
@@ -1040,6 +1055,24 @@ def prepare():
             copy_field(
                 mcdc["technique"]["dd_mesh"], input_deck.technique["dd_mesh"], name
             )
+        mcdc["technique"]["dd_mesh"]["Nx"] = (
+            input_deck.technique["dd_mesh"]["x"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Ny"] = (
+            input_deck.technique["dd_mesh"]["y"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nz"] = (
+            input_deck.technique["dd_mesh"]["z"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nt"] = (
+            input_deck.technique["dd_mesh"]["t"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nmu"] = (
+            input_deck.technique["dd_mesh"]["mu"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["N_azi"] = (
+            input_deck.technique["dd_mesh"]["azi"].size - 1
+        )
         # Set exchange rate
         for name in ["dd_exchange_rate", "dd_repro"]:
             copy_field(mcdc["technique"], input_deck.technique, name)
@@ -1072,6 +1105,14 @@ def prepare():
         iqmc = mcdc["technique"]["iqmc"]
         for name in ["x", "y", "z", "t"]:
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
+        Nx = len(input_deck.technique["iqmc"]["mesh"]["x"]) - 1
+        Ny = len(input_deck.technique["iqmc"]["mesh"]["y"]) - 1
+        Nz = len(input_deck.technique["iqmc"]["mesh"]["z"]) - 1
+        Nt = len(input_deck.technique["iqmc"]["mesh"]["t"]) - 1
+        iqmc["mesh"]["Nx"] = Nx
+        iqmc["mesh"]["Ny"] = Ny
+        iqmc["mesh"]["Nz"] = Nz
+        iqmc["mesh"]["Nt"] = Nt
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
             copy_field(
@@ -1430,13 +1471,13 @@ def generate_hdf5(data, mcdc):
                 f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
 
                 # Shape
-                Nmu = len(mesh["mu"]) - 1
-                N_azi = len(mesh["azi"]) - 1
-                Ng = len(mesh["g"]) - 1
-                Nx = len(mesh["x"]) - 1
-                Ny = len(mesh["y"]) - 1
-                Nz = len(mesh["z"]) - 1
-                Nt = len(mesh["t"]) - 1
+                Nmu = tally["filter"]["Nmu"]
+                N_azi = tally["filter"]["N_azi"]
+                Ng = tally["filter"]["Ng"]
+                Nx = tally["filter"]["Nx"]
+                Ny = tally["filter"]["Ny"]
+                Nz = tally["filter"]["Nz"]
+                Nt = tally["filter"]["Nt"]
                 N_score = tally["N_score"]
 
                 if mcdc["technique"]["domain_decomposition"]:
