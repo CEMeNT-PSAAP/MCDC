@@ -745,16 +745,6 @@ def prepare():
         mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
         mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
         mcdc["mesh_tallies"][i]["filter"]["Nt"] = Nt
-        if input_deck.technique["domain_decomposition"]:
-            mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
-
-            # Filters
-            new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
-            new_y = input_deck.mesh_tallies[i].y[myn:myp]
-            new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
-            mcdc["mesh_tallies"][i]["filter"]["Nx"] = len(new_x)
-            mcdc["mesh_tallies"][i]["filter"]["Ny"] = len(new_y)
-            mcdc["mesh_tallies"][i]["filter"]["Nz"] = len(new_z)
 
         # Decompose mesh tallies
         if input_deck.technique["domain_decomposition"]:
@@ -766,6 +756,9 @@ def prepare():
             Nz = len(input_deck.mesh_tallies[i].z[mzn:mzp]) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
             mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
+            mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+            mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+            mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
 
         # Update N_bin
         mcdc["mesh_tallies"][i]["N_bin"] *= N_score
