@@ -745,6 +745,16 @@ def prepare():
         mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
         mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
         mcdc["mesh_tallies"][i]["filter"]["Nt"] = Nt
+        if input_deck.technique["domain_decomposition"]:
+            mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
+
+            # Filters
+            new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
+            new_y = input_deck.mesh_tallies[i].y[myn:myp]
+            new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
+            mcdc["mesh_tallies"][i]["filter"]["Nx"] = len(new_x)
+            mcdc["mesh_tallies"][i]["filter"]["Ny"] = len(new_y)
+            mcdc["mesh_tallies"][i]["filter"]["Nz"] = len(new_z)
 
         # Decompose mesh tallies
         if input_deck.technique["domain_decomposition"]:
@@ -1041,6 +1051,7 @@ def prepare():
 
     # Survival probability
     mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
+
     # =========================================================================
     # Domain Decomposition
     # =========================================================================
@@ -1052,22 +1063,22 @@ def prepare():
                 mcdc["technique"]["dd_mesh"], input_deck.technique["dd_mesh"], name
             )
         mcdc["technique"]["dd_mesh"]["Nx"] = (
-            len(input_deck.technique["dd_mesh"]["x"]) - 1
+            input_deck.technique["dd_mesh"]["x"].size - 1
         )
         mcdc["technique"]["dd_mesh"]["Ny"] = (
-            len(input_deck.technique["dd_mesh"]["y"]) - 1
+            input_deck.technique["dd_mesh"]["y"].size - 1
         )
         mcdc["technique"]["dd_mesh"]["Nz"] = (
-            len(input_deck.technique["dd_mesh"]["z"]) - 1
+            input_deck.technique["dd_mesh"]["z"].size - 1
         )
         mcdc["technique"]["dd_mesh"]["Nt"] = (
-            len(input_deck.technique["dd_mesh"]["t"]) - 1
+            input_deck.technique["dd_mesh"]["t"].size - 1
         )
         mcdc["technique"]["dd_mesh"]["Nmu"] = (
-            len(input_deck.technique["dd_mesh"]["mu"]) - 1
+            input_deck.technique["dd_mesh"]["mu"].size - 1
         )
         mcdc["technique"]["dd_mesh"]["N_azi"] = (
-            len(input_deck.technique["dd_mesh"]["azi"]) - 1
+            input_deck.technique["dd_mesh"]["azi"].size - 1
         )
         # Set exchange rate
         for name in ["dd_exchange_rate", "dd_repro"]:
