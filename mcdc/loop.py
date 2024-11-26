@@ -340,21 +340,10 @@ def loop_source(seed, data, mcdc):
     work_end = work_start + work_size
 
     for idx_work in range(work_size):
-        # =====================================================================
-        # Generate a source particle
-        # =====================================================================
-
         generate_source_particle(work_start, idx_work, seed, mcdc)
 
-        # =====================================================================
         # Run the source particle and its secondaries
-        # =====================================================================
-
         exhaust_active_bank(data, mcdc)
-
-        # =====================================================================
-        # Closeout
-        # =====================================================================
 
         source_closeout(mcdc, idx_work, N_prog, data)
 
@@ -563,7 +552,7 @@ def step_particle(P_arr, data, prog):
 
 
 @njit
-def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
+def generate_precursor_particle(DNP_arr, particle_idx, seed, prog):
     mcdc = adapt.mcdc_global(prog)
     DNP = DNP_arr[0]
 
@@ -574,7 +563,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     # Create new particle
     P_new_arr = adapt.local_array(1, type_.particle)
     P_new = P_new_arr[0]
-    part_seed = kernel.split_seed(particle_idx, seed_work)
+    part_seed = kernel.split_seed(particle_idx, seed)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
     P_new["w"] = 1.0
@@ -583,15 +572,21 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     P_new["x"] = DNP["x"]
     P_new["y"] = DNP["y"]
     P_new["z"] = DNP["z"]
+    P_new["t"] = 0.0
 
-    # Get material
-    _ = geometry.inspect_geometry(P_new_arr, mcdc)
-    if P_new["cell_ID"] > -1:
-        material_ID = P_new["material_ID"]
+    # Sample direction
+    P_new["ux"], P_new["uy"], P_new["uz"] = kernel.sample_isotropic_direction(P_new_arr)
+
+    # Get cell and material
+    P_new["cell_ID"] = -1
+    P_new["material_ID"] = -1
+    _ = geometry.locate_particle(P_new_arr, mcdc)
+
     # Skip if particle is lost
-    else:
+    if P_new["material_ID"] == -1:
         return
 
+    material_ID = P_new["material_ID"]
     material = mcdc["materials"][material_ID]
     G = material["G"]
 
@@ -624,9 +619,6 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
 
     # Accept if it is inside current census index
     if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
-        # Reduce precursor weight
-        DNP["w"] -= 1.0
-
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
             return
@@ -639,13 +631,6 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
             if tot > xi:
                 break
         P_new["g"] = g_out
-
-        # Sample direction
-        (
-            P_new["ux"],
-            P_new["uy"],
-            P_new["uz"],
-        ) = kernel.sample_isotropic_direction(P_new_arr)
 
         # Push to active bank
         adapt.add_active(P_new_arr, prog)
@@ -669,51 +654,32 @@ def source_precursor_closeout(prog, idx_work, N_prog, data):
 
 @njit
 def loop_source_precursor(seed, data, mcdc):
-    # TODO: censussed neutrons seeding is still not reproducible
-
     # Progress bar indicator
     N_prog = 0
 
-    # =========================================================================
-    # Sync. RNG skip ahead for reproducibility
-    # =========================================================================
+    # TODO: Domain decomposition (see loop_source)
 
-    # Exscan upper estimate of number of particles generated locally
-    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
-        mcdc["bank_precursor"], mcdc
-    )
-
-    # =========================================================================
     # Loop over precursor sources
-    # =========================================================================
+    work_start = mcdc["mpi_work_start_precursor"]
+    work_size = mcdc["mpi_work_size_precursor"]
+    work_end = work_start + work_size
 
-    for idx_work in range(mcdc["mpi_work_size_precursor"]):
+    for idx_work in range(work_size):
         # Get precursor
         DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work : (idx_work + 1)]
         DNP = DNP_arr[0]
+        seed_precursor = kernel.split_seed(work_start + idx_work, seed)
+        # Note the seed is only used once
 
         # Determine number of particles to be generated
-        w = DNP["w"]
-        N = math.floor(w)
-        # "Roulette" the last particle
-        seed_work = kernel.split_seed(idx_work, seed)
-        if kernel.rng_from_seed(seed_work) < w - N:
-            N += 1
-        DNP["w"] = N
+        nu = DNP["w"]
+        xi = kernel.rng_from_seed(seed_precursor)
+        N = int(math.floor(nu + xi))
 
-        # =====================================================================
         # Loop over source particles from the source precursor
-        # =====================================================================
-
         for particle_idx in range(N):
-
-            generate_precursor_particle(DNP_arr, particle_idx, seed_work, mcdc)
-
+            generate_precursor_particle(DNP_arr, particle_idx, seed_precursor, mcdc)
             exhaust_active_bank(data, mcdc)
-
-        # =====================================================================
-        # Closeout
-        # =====================================================================
 
         source_precursor_closeout(mcdc, idx_work, N_prog, data)
 
