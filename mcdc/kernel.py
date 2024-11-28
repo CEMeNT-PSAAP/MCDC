@@ -1783,12 +1783,14 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
 
     if mode_MG:
         return binary_search(P["g"], mesh["g"]), outside
+
     else:
         E = P["E"]
-        if E < mesh["g"][0] or E > mesh["g"][-1]:
+        Ng = mesh["Ng"]
+        if E < mesh["g"][0] or E > mesh["g"][Ng]:
             outside = True
             return 0, outside
-        return binary_search(P["E"], mesh["g"]), outside
+        return binary_search_with_length(P["E"], mesh["g"], Ng), outside
 
 
 # =============================================================================
