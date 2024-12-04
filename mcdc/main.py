@@ -1460,25 +1460,38 @@ def generate_hdf5(data, mcdc):
                     break
 
                 mesh = tally["filter"]
-                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"])
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"]
-                )
-                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
 
-                # Shape
-                Nmu = tally["filter"]["Nmu"]
-                N_azi = tally["filter"]["N_azi"]
-                Ng = tally["filter"]["Ng"]
-                Nx = tally["filter"]["Nx"]
-                Ny = tally["filter"]["Ny"]
-                Nz = tally["filter"]["Nz"]
-                Nt = tally["filter"]["Nt"]
+                # Filter
+                Nmu = mesh["Nmu"]
+                N_azi = mesh["N_azi"]
+                Ng = mesh["Ng"]
+                Nx = mesh["Nx"]
+                Ny = mesh["Ny"]
+                Nz = mesh["Nz"]
+                Nt = mesh["Nt"]
                 N_score = tally["N_score"]
+                #
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"][: Nt + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"][: Nx + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"][:Ny] + 1
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"][: Nz + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"][: Nmu + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"][: N_azi + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"][: Ng + 1]
+                )
 
                 if mcdc["technique"]["domain_decomposition"]:
                     Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
