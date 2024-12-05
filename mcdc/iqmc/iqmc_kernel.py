@@ -6,9 +6,10 @@ from numba import objmode, literal_unroll
 
 import mcdc.type_ as type_
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
-import mcdc.mesh as mesh_
-import mcdc.physics as physics
+import mcdc.src.geometry as geometry
+import mcdc.src.mesh as mesh_
+import mcdc.src.physics as physics
+import mcdc.src.surface as surface_
 
 from mcdc.adapt import toggle
 from mcdc.constant import *
@@ -170,9 +171,10 @@ def iqmc_generate_material_idx(mcdc):
                     P_temp["z"] = z
                     P_temp["material_ID"] = -1
                     P_temp["cell_ID"] = -1
+                    P_temp["g"] = 0
 
                     # set material_ID
-                    P_temp["cell_ID"] = geometry.locate_particle(P_temp_arr, mcdc)
+                    geometry.locate_particle(P_temp_arr, mcdc)
 
                     # assign material index
                     mcdc["technique"]["iqmc"]["material_idx"][t, i, j, k] = P_temp[
@@ -469,9 +471,11 @@ def iqmc_continuous_weight_reduction(P_arr, distance, mcdc):
 def iqmc_surface_crossing(P_arr, prog):
     mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
-    # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
-    geometry.surface_bc(P_arr, surface)
+    if surface["BC"] == BC_VACUUM:
+        P["alive"] = False
+    elif surface["BC"] == BC_REFLECTIVE:
+        surface_.reflect(P_arr, surface)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:

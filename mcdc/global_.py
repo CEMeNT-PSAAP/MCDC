@@ -35,6 +35,7 @@ class InputDeck:
         self.sources = []
         self.mesh_tallies = []
         self.surface_tallies = []
+        self.cell_tallies = []
 
         self.setting = {
             "tag": "Setting",
@@ -52,7 +53,6 @@ class InputDeck:
             "N_inactive": 0,
             "N_active": 0,
             "N_cycle": 0,
-            "caching": True,
             "save_particle": False,
             "gyration_radius": False,
             "gyration_radius_type": GYRATION_RADIUS_ALL,

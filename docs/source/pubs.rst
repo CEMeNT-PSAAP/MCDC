@@ -45,6 +45,10 @@ Conference on Physics of Reactors. Pittsburgh, Pennsylvania, USA (2022).
 Software Engineering in MC/DC Publications
 -------------------------------------------
 
+J. P. Morgan, I. Variansyah, B. Cuneo, T. S. Palmer and K. E. Niemeyer. 2024. UNDER REVIEW. Performance Portable Monte Carlo Neutron Transport in MCDC via Numba. Preprint DOI 10.48550/arXiv.2306.07847.
+
+B. Cuneo and I. Variansyah. “An Alternative to Stride-Based RNG for Monte Carlo Transport.” In Transactions of The American Nuclear Society, volume 130 (1), pp. 423–426 (2024). DOI 10.13182/T130-44927
+
 J. P. Morgan, I. Variansyah, S. Pasmann, K. B. Clements, B. Cuneo, A. Mote, 
 C. Goodman, C. Shaw, J. Northrop, R. Pankaj, E. Lame, B. Whewell, 
 R. McClarren, T. S. Palmer, L. Chen, D. Anistratov, C. T. Kelley, 

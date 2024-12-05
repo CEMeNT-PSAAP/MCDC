@@ -37,13 +37,13 @@ particle_record = None
 nuclide = None
 material = None
 
-universe = None
 lattice = None
 
 source = None
 setting = None
 mesh_tally = None
 surface_tally = None
+cell_tally = None
 technique = None
 
 global_ = None
@@ -517,10 +517,12 @@ def make_type_material(input_deck):
 def make_type_surface(input_deck):
     global surface
 
-    # Maximum number tallies
+    # Maximum number of tallies and movements
     Nmax_tally = 0
+    Nmax_move = 0
     for surface in input_deck.surfaces:
-        Nmax_tally = max(Nmax_tally, len(surface.tally_IDs))
+        Nmax_tally = max(Nmax_tally, surface.N_tally)
+        Nmax_move = max(Nmax_move, surface.N_move)
 
     surface = into_dtype(
         [
@@ -536,12 +538,17 @@ def make_type_surface(input_deck):
             ("H", float64),
             ("I", float64),
             ("J", float64),
-            ("linear", bool_),
+            ("type", int64),
             ("nx", float64),
             ("ny", float64),
             ("nz", float64),
             ("N_tally", int64),
             ("tally_IDs", int64, (Nmax_tally,)),
+            ("moving", bool_),
+            ("N_move", int64),
+            ("move_time_grid", float64, (Nmax_move + 1,)),
+            ("move_translations", float64, (Nmax_move + 1, 3)),
+            ("move_velocities", float64, (Nmax_move, 3)),
         ]
     )
 
@@ -551,20 +558,36 @@ def make_type_surface(input_deck):
 # ==============================================================================
 
 
-cell = into_dtype(
-    [
-        ("ID", int64),
-        # Fill status
-        ("fill_type", int64),
-        ("fill_ID", int64),
-        ("fill_translated", bool),
-        # Local coordinate modifier
-        ("translation", float64, (3,)),
-        # Data indices
-        ("surface_data_idx", int64),
-        ("region_data_idx", int64),
-    ]
-)
+def make_type_cell(input_deck):
+    global cell
+
+    # Maximum number tallies
+    Nmax_tally = 0
+    for cell in input_deck.cells:
+        Nmax_tally = max(Nmax_tally, len(cell.tally_IDs))
+
+    cell = into_dtype(
+        [
+            ("ID", int64),
+            # Surface IDs
+            ("N_surface", int64),
+            ("surface_data_idx", int64),
+            # Region RPN tokens
+            ("N_region", int64),
+            ("region_data_idx", int64),
+            # Fill status
+            ("fill_type", int64),
+            ("fill_ID", int64),
+            ("fill_translated", bool_),
+            ("fill_rotated", bool_),
+            # Cell tally
+            ("N_tally", int64),
+            ("tally_IDs", int64, (Nmax_tally,)),
+            # Local coordinate modifier
+            ("translation", float64, (3,)),
+            ("rotation", float64, (3,)),
+        ]
+    )
 
 
 # ==============================================================================
@@ -572,15 +595,14 @@ cell = into_dtype(
 # ==============================================================================
 
 
-def make_type_universe(input_deck):
-    global universe
-
-    # Maximum number of cells per universe
-    Nmax_cell = max([universe.N_cell for universe in input_deck.universes])
-
-    universe = into_dtype(
-        [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
-    )
+universe = into_dtype(
+    [
+        ("ID", int64),
+        # Cell IDs
+        ("N_cell", int64),
+        ("cell_data_idx", int64),
+    ]
+)
 
 
 # ==============================================================================
@@ -757,6 +779,13 @@ def make_type_mesh_tally(input_deck):
         ("mu", float64, (Nmax_mu,)),
         ("azi", float64, (Nmax_azi,)),
         ("g", float64, (Nmax_g,)),
+        ("Nx", int64),
+        ("Ny", int64),
+        ("Nz", int64),
+        ("Nt", int64),
+        ("Nmu", int64),
+        ("N_azi", int64),
+        ("Ng", int64),
     ]
     struct += [("filter", filter_)]
 
@@ -794,7 +823,9 @@ def make_type_surface_tally(input_deck):
     Nmax_azi = 2
     Nmax_g = 2
     Nmax_score = 1
-    for card in input_deck.mesh_tallies:
+
+    # IDK if this is right, but I changed this to input_deck.surface_tallies
+    for card in input_deck.surface_tallies:
         Nmax_t = max(Nmax_t, len(card.t))
         Nmax_mu = max(Nmax_mu, len(card.mu))
         Nmax_azi = max(Nmax_azi, len(card.azi))
@@ -832,6 +863,55 @@ def make_type_surface_tally(input_deck):
     surface_tally = into_dtype(struct)
 
 
+def make_type_cell_tally(input_deck):
+    global cell_tally
+    struct = []
+
+    # Maximum number of grid for each mesh coordinate and filter
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+
+    for card in input_deck.cell_tallies:
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
+
+    # Set the filter
+    filter_ = [
+        ("cell_ID", int64),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
+    ]
+    struct = [("filter", filter_)]
+
+    # Tally strides
+    stride = [
+        ("tally", int64),
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+    ]
+    struct += [("stride", stride)]
+
+    # Total number of bins
+    struct += [("N_bin", int64)]
+
+    # Scores
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
+
+    # Make tally structure
+    cell_tally = into_dtype(struct)
+
+
 # ==============================================================================
 # Setting
 # ==============================================================================
@@ -852,7 +932,6 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
-        ("caching", bool_),
         ("output_name", str_),
         ("save_input_deck", bool_),
         # Eigenvalue mode
@@ -1255,13 +1334,14 @@ def make_type_global(input_deck):
     N_lattice = len(input_deck.lattices)
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
+    N_cell_tally = len(input_deck.cell_tallies)
 
     # Cell data sizes
-    N_cell_surface = 0
-    N_cell_region = 0
-    for cell_ in input_deck.cells:
-        N_cell_surface += 1 + len(cell_.surface_IDs)
-        N_cell_region += 1 + len(cell_._region_RPN)
+    N_cell_surface = sum([len(x.surface_IDs) for x in input_deck.cells])
+    N_cell_region = sum([len(x._region_RPN) for x in input_deck.cells])
+
+    # Universe data sizes
+    N_universe_cell = sum([len(x.cell_IDs) for x in input_deck.universes])
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1317,14 +1397,18 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
+            # Cells
             ("cells", cell, (N_cell,)),
-            ("cell_surface_data", int64, (N_cell_surface,)),
-            ("cell_region_data", int64, (N_cell_region,)),
+            ("cells_data_surface", int64, (N_cell_surface,)),
+            ("cells_data_region", int64, (N_cell_region,)),
+            # Universes
             ("universes", universe, (N_universe,)),
+            ("universes_data_cell", int64, (N_universe_cell,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
             ("mesh_tallies", mesh_tally, (N_mesh_tally,)),
             ("surface_tallies", surface_tally, (N_surface_tally,)),
+            ("cell_tallies", cell_tally, (N_cell_tally,)),
             ("setting", setting),
             ("technique", technique),
             ("domain_decomp", domain_decomp),
@@ -1437,6 +1521,13 @@ def make_type_mesh(card):
                 ("mu", float64, (Nmu + 1,)),
                 ("azi", float64, (N_azi + 1,)),
                 ("g", float64, (Ng + 1,)),
+                ("Nx", int64),
+                ("Ny", int64),
+                ("Nz", int64),
+                ("Nt", int64),
+                ("Nmu", int64),
+                ("N_azi", int64),
+                ("Ng", int64),
             ]
         ),
         Nx,
@@ -1465,6 +1556,12 @@ def make_type_mesh_(card):
                 ("t", float64, (Nt + 1,)),
                 ("mu", float64, (Nmu + 1,)),
                 ("azi", float64, (N_azi + 1,)),
+                ("Nx", int64),
+                ("Ny", int64),
+                ("Nz", int64),
+                ("Nt", int64),
+                ("Nmu", int64),
+                ("N_azi", int64),
             ]
         ),
         Nx,
