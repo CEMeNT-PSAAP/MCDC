@@ -339,6 +339,34 @@ def prepare():
             i += 1
 
     # =========================================================================
+    # Evaluate time boundary
+    #   It should be not larger than the QoI maximum time.
+    # =========================================================================
+
+    t_max = INF
+    if len(input_deck.mesh_tallies) > 0:
+        t_max = max([tally.t[-1] for tally in input_deck.mesh_tallies])
+
+    if input_deck.setting["time_boundary"] > t_max:
+        input_deck.setting["time_boundary"] = t_max
+
+    # =========================================================================
+    # Evaluate time census grid, fix it if necessary. It should
+    #   - starts at > 0
+    #   - ends at INF
+    # =========================================================================
+
+    # Ensure starting from > 0
+    census_time = input_deck.setting["census_time"]
+    census_time = census_time[census_time > 0.0]
+
+    # Ensure ending at INF
+    if census_time[-1] < INF:
+        census_time[-1] = INF
+    input_deck.setting["census_time"] = census_time
+    input_deck.setting["N_census"] = len(census_time)
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -939,37 +967,6 @@ def prepare():
     for name in type_.setting.names:
         copy_field(mcdc["setting"], input_deck.setting, name)
 
-    t_limit = max(
-        [
-            tally["filter"]["t"][-1]
-            for tally in list(mcdc["mesh_tallies"])
-            + list(mcdc["surface_tallies"])
-            + list(mcdc["cell_tallies"])
-        ]
-    )
-
-    if (
-        len(input_deck.mesh_tallies)
-        + len(input_deck.surface_tallies)
-        + len(input_deck.cell_tallies)
-        == 0
-    ):
-        t_limit = INF
-
-    # Check if time boundary is above the final tally mesh time grid
-    if mcdc["setting"]["time_boundary"] > t_limit:
-        mcdc["setting"]["time_boundary"] = t_limit
-
-    if input_deck.technique["iQMC"]:
-        if len(mcdc["technique"]["iqmc"]["mesh"]["t"]) - 1 > 1:
-            if (
-                mcdc["setting"]["time_boundary"]
-                > input_deck.technique["iqmc"]["mesh"]["t"][-1]
-            ):
-                mcdc["setting"]["time_boundary"] = input_deck.technique["iqmc"]["mesh"][
-                    "t"
-                ][-1]
-
     # =========================================================================
     # Technique
     # =========================================================================
@@ -1033,6 +1030,8 @@ def prepare():
 
     # WW windows
     mcdc["technique"]["ww"] = input_deck.technique["ww"]
+    mcdc["technique"]["ww_epsilon"] = input_deck.technique["ww_epsilon"]
+    mcdc["technique"]["ww_auto"] = input_deck.technique["ww_auto"]
     mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
 
     # =========================================================================
@@ -1453,6 +1452,16 @@ def generate_hdf5(data, mcdc):
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
                 )
+
+            if mcdc["technique"]["weight_window"]:
+                T = mcdc["technique"]
+                f.create_dataset("ww/grid/t", data=T["ww_mesh"]["t"])
+                f.create_dataset("ww/grid/x", data=T["ww_mesh"]["x"])
+                f.create_dataset("ww/grid/y", data=T["ww_mesh"]["y"])
+                f.create_dataset("ww/grid/z", data=T["ww_mesh"]["z"])
+                f.create_dataset("ww/center", data=np.squeeze(T["ww"]))
+                f.create_dataset("ww/width", data=T["ww_width"])
+                f.create_dataset("ww/epsilon", data=T["ww_epsilon"])
 
             # Mesh tallies
             for ID, tally in enumerate(mcdc["mesh_tallies"]):

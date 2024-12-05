@@ -1224,13 +1224,13 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def time_census(t):
+def time_census(time_grid):
     """
     Set time-census boundaries.
 
     Parameters
     ----------
-    t : array_like[float]
+    time_grid : array_like[float]
         The time-census boundaries.
 
     Returns
@@ -1238,23 +1238,15 @@ def time_census(t):
         None (in-place card alterations).
     """
 
-    # Remove census beyond the final tally time grid point
-    while True:
-        if t[-1] >= global_.input_deck.tally["mesh"]["t"][-1]:
-            t = t[:-1]
-        else:
-            break
-
-    # Add the default, final census-at-infinity
-    t = np.append(t, INF)
-
     # Set the time census parameters
     card = global_.input_deck.setting
-    card["census_time"] = t
-    card["N_census"] = len(t)
+    card["census_time"] = time_grid
+    card["N_census"] = len(time_grid)
 
 
-def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
+def weight_window(
+    x=None, y=None, z=None, t=None, window=None, width=None, epsilon=1e-4
+):
     """
     Activate weight window variance reduction technique.
 
@@ -1296,6 +1288,19 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
         card["ww_mesh"]["t"] = t
 
     # Set window
+    if window is None:
+        card["ww_auto"] = True
+        window_ax = []
+        if t is not None:
+            window_ax.append(len(t) - 1)
+        if x is not None:
+            window_ax.append(len(x) - 1)
+        if y is not None:
+            window_ax.append(len(y) - 1)
+        if z is not None:
+            window_ax.append(len(z) - 1)
+        window = np.ones(window_ax)
+
     ax_expand = []
     if t is None:
         ax_expand.append(0)
@@ -1309,7 +1314,7 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     for ax in ax_expand:
         window = np.expand_dims(window, axis=ax)
     card["ww"] = window
-
+    card["ww_epsilon"] = epsilon
     return card
 
 

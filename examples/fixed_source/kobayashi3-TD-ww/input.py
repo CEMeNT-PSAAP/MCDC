@@ -67,6 +67,17 @@ mcdc.tally.cell_tally(source_cell, scores=["flux"])
 mcdc.tally.cell_tally(void_cell, scores=["flux"])
 mcdc.tally.cell_tally(shield_cell, scores=["flux"])
 
+mcdc.time_census(t=np.linspace(0.0, 200.0, 21, endpoint=True)[1:])
+mcdc.setting(census_bank_buff=1e2, active_bank_buff=1e2)
+
+mcdc.weight_window(
+    x=np.linspace(0.0, 60.0, 31),
+    y=np.linspace(0.0, 100.0, 51),
+    t=np.linspace(0.0, 200.0, 21),
+    width=2.5,
+    epsilon=2e-2,
+)
+
 # Setting
 mcdc.setting(N_particle=1e4)
 

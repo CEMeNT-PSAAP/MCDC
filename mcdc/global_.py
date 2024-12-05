@@ -81,6 +81,8 @@ class InputDeck:
             "ww": np.ones([1, 1, 1, 1]),
             "ww_width": 2.5,
             "ww_mesh": make_card_mesh(),
+            "ww_auto": False,
+            "ww_epsilon": 1e-4,
             "domain_decomposition": False,
             "dd_idx": 0,
             "dd_mesh": make_card_mesh(),
