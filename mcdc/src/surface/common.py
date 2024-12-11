@@ -244,14 +244,10 @@ def _get_distance_moving(particle_container, speed, surface):
         # Get distance
         distance = _get_distance_static(particle_container, surface)
 
-        # Beyond the interval?
+        # Intersection within the interval?
         distance_time = distance / speed
         dt = surface["move_time_grid"][idx + 1] - particle["t"]
-        if distance_time > dt:
-            distance = INF
-
-        # Intersecting?
-        if distance < INF:
+        if distance_time < dt:
             # Restore particle parameters
             particle["x"] = x_original
             particle["y"] = y_original
