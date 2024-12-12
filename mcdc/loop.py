@@ -797,7 +797,6 @@ def gpu_loop_source_precursor(seed, data, mcdc):
 
     kernel.set_bank_size(mcdc["bank_active"], 0)
 
-    print(kernel.get_bank_size(mcdc["bank_census"]))
     # =====================================================================
     # Closeout (moved out of loop)
     # =====================================================================
