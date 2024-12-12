@@ -51,7 +51,7 @@ def check_sense(particle_container, speed, surface):
         # Determine sense based on the direction
         return (
             get_normal_component(particle_container, speed, surface)
-            > 0.0 - COINCIDENCE_TOLERANCE
+            > 0.0  # TODO: Do we need to include COINCIDENCE TOLERANCE here?
         )
 
     return result > 0.0
