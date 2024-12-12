@@ -49,7 +49,10 @@ def check_sense(particle_container, speed, surface):
     # Check if coincident on the surface
     if abs(result) < COINCIDENCE_TOLERANCE:
         # Determine sense based on the direction
-        return get_normal_component(particle_container, speed, surface) > 0.0
+        return (
+            get_normal_component(particle_container, speed, surface)
+            > 0.0 - COINCIDENCE_TOLERANCE
+        )
 
     return result > 0.0
 
@@ -107,11 +110,15 @@ def get_normal_component(particle_container, speed, surface):
     """
     particle = particle_container[0]
     if surface["moving"]:
-        # Temporarily translate particle direction
+        # Temporarily translate particle parameters
+        x_original = particle["x"]
+        y_original = particle["y"]
+        z_original = particle["z"]
         ux_original = particle["ux"]
         uy_original = particle["uy"]
         uz_original = particle["uz"]
         idx = _get_move_idx(particle["t"], surface)
+        _translate_particle_position(particle_container, surface, idx)
         _translate_particle_direction(particle_container, speed, surface, idx)
 
     if surface["type"] & SURFACE_LINEAR:
@@ -136,7 +143,10 @@ def get_normal_component(particle_container, speed, surface):
             result = quadric.get_normal_component(particle_container, surface)
 
     if surface["moving"]:
-        # Restore particle direction
+        # Restore particle parameters
+        particle["x"] = x_original
+        particle["y"] = y_original
+        particle["z"] = z_original
         particle["ux"] = ux_original
         particle["uy"] = uy_original
         particle["uz"] = uz_original

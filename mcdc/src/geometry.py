@@ -180,7 +180,6 @@ def locate_particle(particle_container, mcdc):
     ux_global = particle["ux"]
     uy_global = particle["uy"]
     uz_global = particle["uz"]
-    speed = physics.get_speed(particle_container, mcdc)
 
     particle_is_lost = False
 
