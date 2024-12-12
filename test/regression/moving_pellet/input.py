@@ -12,13 +12,13 @@ fuel = mcdc.material(
     capture=np.array([0.5]),
     fission=np.array([0.5]),
     nu_p=np.array([2.5]),
-    speed=np.array([1000.0]),
+    speed=np.array([200000.0]),
 )
 
 air = mcdc.material(
     capture=np.array([0.002]),
     scatter=np.array([[0.008]]),
-    speed=np.array([1000.0]),
+    speed=np.array([200000.0]),
 )
 
 # =============================================================================
@@ -31,7 +31,7 @@ top_z = mcdc.surface("plane-z", z=9.0)
 bot_z = mcdc.surface("plane-z", z=6.0)
 
 # Move
-# cylinder_z.move([[-0.5, 0.0, 0.0], [1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]], [2.0, 5.0, 1.0])
+cylinder_z.move([[-0.5, 0.0, 0.0], [1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]], [2.0, 5.0, 1.0])
 top_z.move([[0.0, 0.0, -2.0], [0.0, 0.0, 4.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
 bot_z.move([[0.0, 0.0, -2.0], [0.0, 0.0, 4.0], [0.0, 0.0, -10.0]], [5.0, 2.0, 1.0])
 
@@ -55,7 +55,7 @@ mcdc.cell(
 # =============================================================================
 # Uniform isotropic source throughout the domain
 
-mcdc.source(point=[2.5, 0.0, 0.0], time=[0.0, 9.0])
+mcdc.source(x=[2.0, 3.0], y=[-0.5, 0.5], z=[-0.5, 0.5], time=[0.0, 9.0])
 
 # =============================================================================
 # Set tally, setting, and run mcdc
