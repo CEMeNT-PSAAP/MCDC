@@ -1,71 +1,19 @@
 import argparse, os, sys
 import importlib.metadata
+import mcdc.config as config
 import matplotlib.pyplot as plt
 import numba as nb
 from scipy.stats.qmc import Halton
 import cvxpy as cp
 
+import matplotlib.pyplot as plt
 from matplotlib import colors as mpl_colors
 from matplotlib.patches import Rectangle
 from shapely.geometry import Polygon, box
 import scipy.fft as spfft
 
-# Parse command-line arguments
-#   TODO: Will be inside run() once Python/Numba adapter is integrated
-parser = argparse.ArgumentParser(description="MC/DC: Monte Carlo Dynamic Code")
-parser.add_argument(
-    "--mode",
-    type=str,
-    help="Run mode",
-    choices=["python", "numba", "numba_debug"],
-    default="python",
-)
+import numba as nb
 
-parser.add_argument(
-    "--target", type=str, help="Target", choices=["cpu", "gpu"], default="cpu"
-)
-
-parser.add_argument(
-    "--gpu_strat",
-    type=str,
-    help="Strategy used in GPU execution (event or async)",
-    choices=["async", "event"],
-    default="event",
-)
-
-parser.add_argument(
-    "--gpu_block_count",
-    type=int,
-    help="Number of blocks used in GPU execution",
-    default=240,
-)
-
-parser.add_argument(
-    "--gpu_arena_size",
-    type=int,
-    help="Capacity of each intermediate data buffer used, as a particle count",
-    default=0x100000,
-)
-
-parser.add_argument(
-    "--gpu_rocm_path",
-    type=str,
-    help="Path to ROCm installation for use in GPU execution",
-    default=None,
-)
-
-parser.add_argument(
-    "--gpu_cuda_path",
-    type=str,
-    help="Path to CUDA installation for use in GPU execution",
-    default=None,
-)
-
-parser.add_argument("--N_particle", type=int, help="Number of particles")
-parser.add_argument("--output", type=str, help="Output file name")
-parser.add_argument("--progress_bar", default=True, action="store_true")
-parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
-args, unargs = parser.parse_known_args()
 
 from mcdc.card import UniverseCard
 from mcdc.print_ import (
@@ -76,53 +24,6 @@ from mcdc.print_ import (
     print_warning,
     print_error,
 )
-
-# Set mode
-#   TODO: Will be inside run() once Python/Numba adapter is integrated
-mode = args.mode
-target = args.target
-if mode == "python":
-    nb.config.DISABLE_JIT = True
-elif mode == "numba":
-    nb.config.DISABLE_JIT = False
-    nb.config.NUMBA_DEBUG_CACHE = 1
-    nb.config.THREADING_LAYER = "workqueue"
-elif mode == "numba_debug":
-    msg = "\n >> Entering numba debug mode\n >> will result in slower code and longer compile times\n >> to configure debug options see main.py"
-    print_warning(msg)
-
-    nb.config.DISABLE_JIT = False  # turns on the jitter
-    nb.config.DEBUG = False  # turns on debugging options
-    nb.config.NUMBA_FULL_TRACEBACKS = (
-        1  # enables errors from sub-packages to be printed
-    )
-    nb.config.NUMBA_BOUNDSCHECK = 1  # checks bounds errors of vectors
-    nb.config.NUMBA_COLOR_SCHEME = (
-        "dark_bg"  # prints error messages for dark background terminals
-    )
-    nb.config.NUMBA_DEBUG_NRT = 1  # Numba run time (NRT) statistics counter
-    nb.config.NUMBA_DEBUG_TYPEINFER = (
-        1  # print out debugging information about type inference.
-    )
-    nb.config.NUMBA_ENABLE_PROFILING = 1  # enables profiler use
-    nb.config.NUMBA_DUMP_CFG = 1  # prints out a control flow diagram
-    nb.config.NUMBA_OPT = 0  # forums un optimized code from compilers
-    nb.config.NUMBA_DEBUGINFO = 1  #
-    nb.config.NUMBA_EXTEND_VARIABLE_LIFETIMES = (
-        1  # allows for inspection of numba variables after end of compilation
-    )
-
-    # file="str.txt";file1="list.txt"
-    # out=sys.stdout
-    # sys.stdout=open('debug_numba_config.txt','w')
-    # help(nb.config)
-    # sys.stdout.close
-
-    # print_msg('>> Numba config exported to debug_numba_config.txt')
-
-# elif mode == "numba x86":
-#    nb.config.NUMBA_OPT = 3
-#    NUMBA_DISABLE_INTEL_SVML
 
 import h5py
 import numpy as np
@@ -137,11 +38,10 @@ from mcdc.constant import *
 from mcdc.loop import (
     loop_fixed_source,
     loop_eigenvalue,
-    set_cache,
     build_gpu_progs,
 )
-import mcdc.geometry as geometry
 from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
+import mcdc.src.geometry as geometry
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
@@ -154,12 +54,12 @@ input_deck = mcdc_.input_deck
 
 def run():
     # Override input deck with command-line argument, if given
-    if args.N_particle is not None:
-        input_deck.setting["N_particle"] = args.N_particle
-    if args.output is not None:
-        input_deck.setting["output_name"] = args.output
-    if args.progress_bar is not None:
-        input_deck.setting["progress_bar"] = args.progress_bar
+    if config.args.N_particle is not None:
+        input_deck.setting["N_particle"] = config.args.N_particle
+    if config.args.output is not None:
+        input_deck.setting["output_name"] = config.args.output
+    if config.args.progress_bar is not None:
+        input_deck.setting["progress_bar"] = config.args.progress_bar
 
     # Start timer
     total_start = MPI.Wtime()
@@ -178,8 +78,6 @@ def run():
 
     # Print banner, hardware configuration, and header
     print_banner(mcdc)
-
-    set_cache(mcdc["setting"]["caching"])
 
     print_msg(" Now running TNT...")
     if mcdc["setting"]["mode_eigenvalue"]:
@@ -476,8 +374,8 @@ def dd_prepare():
         input_deck.technique["dd_exchange_rate"] = 100
 
     if input_deck.technique["dd_exchange_rate_padding"] == None:
-        if args.target == "gpu":
-            padding = args.gpu_block_count * 64 * 16
+        if config.args.target == "gpu":
+            padding = config.args.gpu_block_count * 64 * 16
         else:
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
@@ -634,10 +532,11 @@ def prepare():
     # Create root universe if not defined
     # =========================================================================
 
-    N_cell = len(input_deck.cells)
     if input_deck.universes[0] == None:
-        root_universe = UniverseCard(N_cell)
+        N_cell = len(input_deck.cells)
+        root_universe = UniverseCard()
         root_universe.ID = 0
+        root_universe.cell_IDs = np.zeros(N_cell, int)
         for i, cell in enumerate(input_deck.cells):
             root_universe.cell_IDs[i] = cell.ID
         input_deck.universes[0] = root_universe
@@ -676,7 +575,6 @@ def prepare():
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
     type_.make_type_cell(input_deck)
-    type_.make_type_universe(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
     type_.make_type_mesh_tally(input_deck)
@@ -692,7 +590,7 @@ def prepare():
     type_.make_size_rpn(input_deck)
     kernel.adapt_rng(nb.config.DISABLE_JIT)
 
-    input_deck.setting["target"] = target
+    input_deck.setting["target"] = config.target
 
     # =========================================================================
     # Create the global variable container
@@ -806,10 +704,49 @@ def prepare():
 
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
+        surface = mcdc["surfaces"][i]
+        surface_input = input_deck.surfaces[i]
+
         # Direct assignment
         for name in type_.surface.names:
-            if name not in ["BC", "tally_IDs"]:
-                copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
+            if name not in [
+                "type",
+                "BC",
+                "tally_IDs",
+                "move_velocities",
+                "move_translations",
+                "move_time_grid",
+            ]:
+                copy_field(surface, surface_input, name)
+
+        # Type
+        if surface_input.type == "plane-x":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_X
+        elif surface_input.type == "plane-y":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Y
+        elif surface_input.type == "plane-z":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Z
+        elif surface_input.type == "plane":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE
+        elif surface_input.type == "cylinder-x":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_X
+        elif surface_input.type == "cylinder-y":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Y
+        elif surface_input.type == "cylinder-z":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Z
+        elif surface_input.type == "sphere":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
+        elif surface_input.type == "quadric":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
 
         # Boundary condition
         if input_deck.surfaces[i].boundary_type == "interface":
@@ -824,46 +761,73 @@ def prepare():
             N = len(getattr(input_deck.surfaces[i], name))
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
+        # Moves
+        if surface["moving"]:
+            for n in range(surface["N_move"]):
+                duration = surface_input.move_durations[n]
+                velocity = surface_input.move_velocities[n]
+
+                surface["move_velocities"][n] = velocity
+
+                t_start = surface["move_time_grid"][n]
+                surface["move_time_grid"][n + 1] = t_start + duration
+
+                trans_start = surface["move_translations"][n]
+                surface["move_translations"][n + 1] = trans_start + velocity * duration
+
     # =========================================================================
-    # Cells
+    # Set cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
-        for name in ["ID", "fill_ID", "translation", "N_tally"]:
-            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+        cell = mcdc["cells"][i]
+        cell_input = input_deck.cells[i]
+
+        # Directly transferables
+        for name in ["ID", "fill_ID", "translation", "rotation", "N_tally"]:
+            copy_field(cell, cell_input, name)
 
         # Fill type
-        if input_deck.cells[i].fill_type == "material":
-            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
-        elif input_deck.cells[i].fill_type == "universe":
-            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
-        elif input_deck.cells[i].fill_type == "lattice":
-            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+        if cell_input.fill_type == "material":
+            cell["fill_type"] = FILL_MATERIAL
+        elif cell_input.fill_type == "universe":
+            cell["fill_type"] = FILL_UNIVERSE
+        elif cell_input.fill_type == "lattice":
+            cell["fill_type"] = FILL_LATTICE
 
-        # Fill translation flag
-        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
-            mcdc["cells"][i]["fill_translated"] = True
+        # Fill translation
+        if np.max(np.abs(cell["translation"])) > 0.0:
+            cell["fill_translated"] = True
 
-        # Surface data
-        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
-        N_surface = len(input_deck.cells[i].surface_IDs)
-        mcdc["cell_surface_data"][surface_data_idx] = N_surface
-        mcdc["cell_surface_data"][
-            surface_data_idx + 1 : surface_data_idx + N_surface + 1
-        ] = input_deck.cells[i].surface_IDs
-        surface_data_idx += N_surface + 1
+        # Fill rotation
+        if np.max(np.abs(cell["rotation"])) > 0.0:
+            cell["fill_rotated"] = True
 
-        # Region data
-        mcdc["cells"][i]["region_data_idx"] = region_data_idx
-        N_RPN = len(input_deck.cells[i]._region_RPN)
-        mcdc["cell_region_data"][region_data_idx] = N_RPN
-        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
-            input_deck.cells[i]._region_RPN
-        )
-        region_data_idx += N_RPN + 1
+            # Convert rotation
+            cell["rotation"][0] *= PI / 180.0
+            cell["rotation"][1] *= PI / 180.0
+            cell["rotation"][2] *= PI / 180.0
+
+        # Surface IDs
+        cell["surface_data_idx"] = surface_data_idx
+        cell["N_surface"] = len(cell_input.surface_IDs)
+        # The data
+        start = surface_data_idx
+        end = start + cell["N_surface"]
+        mcdc["cells_data_surface"][start:end] = cell_input.surface_IDs
+        surface_data_idx += cell["N_surface"]
+
+        # Region RPN tokens
+        cell["region_data_idx"] = region_data_idx
+        cell["N_region"] = len(cell_input._region_RPN)
+        # The data
+        start = region_data_idx
+        end = start + cell["N_region"]
+        mcdc["cells_data_region"][start:end] = cell_input._region_RPN
+        region_data_idx += cell["N_region"]
 
         # Variables with possible different sizes
         for name in ["tally_IDs"]:
@@ -871,19 +835,27 @@ def prepare():
             mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
 
     # =========================================================================
-    # Universes
+    # Set universes
     # =========================================================================
 
     N_universe = len(input_deck.universes)
+    cell_data_idx = 0
     for i in range(N_universe):
-        for name in type_.universe.names:
-            if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = getattr(input_deck.universes[i], name)
+        universe = mcdc["universes"][i]
+        universe_input = input_deck.universes[i]
 
-        # Variables with possible different sizes
-        for name in ["cell_IDs"]:
-            N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = getattr(input_deck.universes[i], name)
+        # Directly transferables
+        for name in ["ID"]:
+            copy_field(universe, universe_input, name)
+
+        # Cells IDs
+        universe["cell_data_idx"] = cell_data_idx
+        universe["N_cell"] = len(universe_input.cell_IDs)
+        # Cell ID data
+        start = cell_data_idx
+        end = start + universe["N_cell"]
+        mcdc["universes_data_cell"][start:end] = universe_input.cell_IDs
+        cell_data_idx += universe["N_cell"]
 
     # =========================================================================
     # Lattices
@@ -989,6 +961,13 @@ def prepare():
         Ny = len(input_deck.mesh_tallies[i].y) - 1
         Nz = len(input_deck.mesh_tallies[i].z) - 1
         Nt = len(input_deck.mesh_tallies[i].t) - 1
+        mcdc["mesh_tallies"][i]["filter"]["Nmu"] = Nmu
+        mcdc["mesh_tallies"][i]["filter"]["N_azi"] = N_azi
+        mcdc["mesh_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+        mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+        mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
+        mcdc["mesh_tallies"][i]["filter"]["Nt"] = Nt
 
         # Decompose mesh tallies
         if input_deck.technique["domain_decomposition"]:
@@ -1000,6 +979,9 @@ def prepare():
             Nz = len(input_deck.mesh_tallies[i].z[mzn:mzp]) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
             mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
+            mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+            mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+            mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
 
         # Update N_bin
         mcdc["mesh_tallies"][i]["N_bin"] *= N_score
@@ -1201,22 +1183,24 @@ def prepare():
     # Platform Targeting, Adapters, Toggles, etc
     # =========================================================================
 
-    if target == "gpu":
+    if config.target == "gpu":
         if MPI.COMM_WORLD.Get_rank() != 0:
             adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.NEVER)
+        elif config.caching == False:
+            adapt.harm.config.should_compile(adapt.harm.config.ShouldCompile.ALWAYS)
         if not adapt.HAS_HARMONIZE:
             print_error(
                 "No module named 'harmonize' - GPU functionality not available. "
             )
-        adapt.gpu_forward_declare(args)
+        adapt.gpu_forward_declare(config.args)
 
     adapt.set_toggle("iQMC", input_deck.technique["iQMC"])
     adapt.set_toggle("domain_decomp", input_deck.technique["domain_decomposition"])
     adapt.eval_toggle()
-    adapt.target_for(target)
-    if target == "gpu":
-        build_gpu_progs(input_deck, args)
-    adapt.nopython_mode((mode == "numba") or (mode == "numba_debug"))
+    adapt.target_for(config.target)
+    if config.target == "gpu":
+        build_gpu_progs(input_deck, config.args)
+    adapt.nopython_mode((config.mode == "numba") or (config.mode == "numba_debug"))
 
     # =========================================================================
     # Setting
@@ -1312,6 +1296,10 @@ def prepare():
     # WW mesh
     for name in type_.mesh_names[:-1]:
         copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
+    mcdc["technique"]["ww_mesh"]["Nx"] = len(input_deck.technique["ww_mesh"]["x"]) - 1
+    mcdc["technique"]["ww_mesh"]["Ny"] = len(input_deck.technique["ww_mesh"]["y"]) - 1
+    mcdc["technique"]["ww_mesh"]["Nz"] = len(input_deck.technique["ww_mesh"]["z"]) - 1
+    mcdc["technique"]["ww_mesh"]["Nt"] = len(input_deck.technique["ww_mesh"]["t"]) - 1
 
     # WW windows
     mcdc["technique"]["ww"] = input_deck.technique["ww"]
@@ -1326,6 +1314,7 @@ def prepare():
 
     # Survival probability
     mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
+
     # =========================================================================
     # Domain Decomposition
     # =========================================================================
@@ -1336,6 +1325,24 @@ def prepare():
             copy_field(
                 mcdc["technique"]["dd_mesh"], input_deck.technique["dd_mesh"], name
             )
+        mcdc["technique"]["dd_mesh"]["Nx"] = (
+            input_deck.technique["dd_mesh"]["x"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Ny"] = (
+            input_deck.technique["dd_mesh"]["y"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nz"] = (
+            input_deck.technique["dd_mesh"]["z"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nt"] = (
+            input_deck.technique["dd_mesh"]["t"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nmu"] = (
+            input_deck.technique["dd_mesh"]["mu"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["N_azi"] = (
+            input_deck.technique["dd_mesh"]["azi"].size - 1
+        )
         # Set exchange rate
         for name in ["dd_exchange_rate", "dd_repro"]:
             copy_field(mcdc["technique"], input_deck.technique, name)
@@ -1368,6 +1375,14 @@ def prepare():
         iqmc = mcdc["technique"]["iqmc"]
         for name in ["x", "y", "z", "t"]:
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
+        Nx = len(input_deck.technique["iqmc"]["mesh"]["x"]) - 1
+        Ny = len(input_deck.technique["iqmc"]["mesh"]["y"]) - 1
+        Nz = len(input_deck.technique["iqmc"]["mesh"]["z"]) - 1
+        Nt = len(input_deck.technique["iqmc"]["mesh"]["t"]) - 1
+        iqmc["mesh"]["Nx"] = Nx
+        iqmc["mesh"]["Ny"] = Ny
+        iqmc["mesh"]["Nz"] = Nz
+        iqmc["mesh"]["Nt"] = Nt
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
             copy_field(
@@ -1722,25 +1737,38 @@ def generate_hdf5(data, mcdc):
                     break
 
                 mesh = tally["filter"]
-                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"])
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"]
-                )
-                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
 
-                # Shape
-                Nmu = len(mesh["mu"]) - 1
-                N_azi = len(mesh["azi"]) - 1
-                Ng = len(mesh["g"]) - 1
-                Nx = len(mesh["x"]) - 1
-                Ny = len(mesh["y"]) - 1
-                Nz = len(mesh["z"]) - 1
-                Nt = len(mesh["t"]) - 1
+                # Filter
+                Nmu = mesh["Nmu"]
+                N_azi = mesh["N_azi"]
+                Ng = mesh["Ng"]
+                Nx = mesh["Nx"]
+                Ny = mesh["Ny"]
+                Nz = mesh["Nz"]
+                Nt = mesh["Nt"]
                 N_score = tally["N_score"]
+                #
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"][: Nt + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"][: Nx + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"][:Ny] + 1
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"][: Nz + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"][: Nmu + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"][: N_azi + 1]
+                )
+                f.create_dataset(
+                    "tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"][: Ng + 1]
+                )
 
                 if mcdc["technique"]["domain_decomposition"]:
                     Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
@@ -1992,8 +2020,8 @@ def generate_hdf5(data, mcdc):
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:
-                Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
-                Np = mcdc["technique"]["IC_bank_precursor"]["size"]
+                Nn = mcdc["technique"]["IC_bank_neutron"]["size"][0]
+                Np = mcdc["technique"]["IC_bank_precursor"]["size"][0]
                 f.create_dataset(
                     "IC/neutrons",
                     data=mcdc["technique"]["IC_bank_neutron"]["particles"][:Nn],
@@ -2012,7 +2040,7 @@ def generate_hdf5(data, mcdc):
     if mcdc["setting"]["save_particle"]:
         # Gather source bank
         # TODO: Parallel HDF5 and mitigation of large data passing
-        N = mcdc["bank_source"]["size"]
+        N = mcdc["bank_source"]["size"][0]
         neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
 
         # Master saves the particle
@@ -2053,7 +2081,16 @@ def closeout(mcdc):
 # ======================================================================================
 
 
-def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
+def visualize(
+    vis_type,
+    x=0.0,
+    y=0.0,
+    z=0.0,
+    pixels=(100, 100),
+    colors=None,
+    time=np.array([0.0]),
+    save_as=None,
+):
     """
     2D visualization of the created model
 
@@ -2067,14 +2104,17 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
         Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
     z : float or array_like
         Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
-    pixel : array_like
-        Number of respective pixel in the two axes in vis_plane
+    time : array_like
+        Times at which the geometry snapshots are taken
+    pixels : array_like
+        Number of respective pixels in the two axes in vis_plane
     colors : array_like
         List of pairs of material and its color
     """
     # TODO: add input error checkers
 
-    _, mcdc = prepare()
+    _, mcdc_container = prepare()
+    mcdc = mcdc_container[0]
 
     # Color assignment for materials (by material ID)
     if colors is not None:
@@ -2118,43 +2158,57 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
     elif second_key == "z":
         second = z
 
-    # Axis pixel sizes
-    d_first = (first[1] - first[0]) / pixel[0]
-    d_second = (second[1] - second[0]) / pixel[1]
+    # Axis pixels sizes
+    d_first = (first[1] - first[0]) / pixels[0]
+    d_second = (second[1] - second[0]) / pixels[1]
 
-    # Axis pixel grids and midpoints
-    first_grid = np.linspace(first[0], first[1], pixel[0] + 1)
+    # Axis pixels grids and midpoints
+    first_grid = np.linspace(first[0], first[1], pixels[0] + 1)
     first_midpoint = 0.5 * (first_grid[1:] + first_grid[:-1])
 
-    second_grid = np.linspace(second[0], second[1], pixel[1] + 1)
+    second_grid = np.linspace(second[0], second[1], pixels[1] + 1)
     second_midpoint = 0.5 * (second_grid[1:] + second_grid[:-1])
 
     # Set dummy particle
-    particle = np.zeros(1, dtype=type_.particle)[0]
+    particle_container = adapt.local_array(1, type_.particle)
+    particle = particle_container[0]
     particle[reference_key] = reference
     particle["g"] = 0
     particle["E"] = 1e6
 
-    # RGB color data for each pixel
-    data = np.zeros(pixel + (3,))
+    for t in time:
+        # Set time
+        particle["t"] = t
 
-    # Loop over the two axes
-    for i in range(pixel[0]):
-        particle[first_key] = first_midpoint[i]
-        for j in range(pixel[1]):
-            particle[second_key] = second_midpoint[j]
+        # Random direction
+        particle["ux"], particle["uy"], particle["uz"] = (
+            kernel.sample_isotropic_direction(particle_container)
+        )
 
-            # Get material
-            particle["cell_ID"] = -1
-            particle["material_ID"] = -1
-            if geometry.locate_particle(particle, mcdc):
-                data[i, j] = colors[particle["material_ID"]]
-            else:
-                data[i, j] = WHITE
+        # RGB color data for each pixels
+        data = np.zeros(pixels + (3,))
 
-    data = np.transpose(data, (1, 0, 2))
-    plt.imshow(data, origin="lower", extent=first + second)
-    plt.xlabel(first_key + " cm")
-    plt.ylabel(second_key + " cm")
-    plt.title(reference_key + " = %.2f cm" % reference)
-    plt.show()
+        # Loop over the two axes
+        for i in range(pixels[0]):
+            particle[first_key] = first_midpoint[i]
+            for j in range(pixels[1]):
+                particle[second_key] = second_midpoint[j]
+
+                # Get material
+                particle["cell_ID"] = -1
+                particle["material_ID"] = -1
+                if geometry.locate_particle(particle_container, mcdc):
+                    data[i, j] = colors[particle["material_ID"]]
+                else:
+                    data[i, j] = WHITE
+
+        data = np.transpose(data, (1, 0, 2))
+        plt.imshow(data, origin="lower", extent=first + second)
+        plt.xlabel(first_key + " [cm]")
+        plt.ylabel(second_key + " [cm]")
+        plt.title(reference_key + " = %.2f cm" % reference + ", time = %.2f s" % t)
+        if save_as is not None:
+            plt.savefig(save_as + "_%.2f.png" % t)
+            plt.clf()
+        else:
+            plt.show()

@@ -49,8 +49,8 @@ mcdc.tally.mesh_tally(
 mcdc.tally.cell_tally(sphere_cell, scores=["fission"])
 
 mcdc.tally.cs_tally(
-    N_cs_bins=[1601],
-    cs_bin_size=[1],
+    N_cs_bins=[200],
+    cs_bin_size=[3],
     x=np.linspace(0.0, 4.0, 41),
     y=np.linspace(0.0, 4.0, 41),
     scores=["fission"],

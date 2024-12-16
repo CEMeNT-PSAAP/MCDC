@@ -13,8 +13,6 @@ with h5py.File("output.h5", "r") as f:
     phi = tally["flux/mean"][:]
     phi_sd = tally["flux/sdev"][:]
 
-    np.save("flux_results.npy", phi)
-
 
 # Plot result
 X, Y = np.meshgrid(x_mid, x_mid)

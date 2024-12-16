@@ -32,4 +32,5 @@ from mcdc.main import (
     visualize,
 )
 
-__version__ = importlib.metadata.version("mcdc")
+# Temporarily commenting out so docs will build
+# __version__ = importlib.metadata.version("mcdc")
