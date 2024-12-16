@@ -271,13 +271,12 @@ def _get_distance_moving(particle_container, speed, surface):
             return total_distance + distance
 
         # Accumulate distance
-        additional_distance = dt * speed
-        total_distance += additional_distance
+        total_distance += dt * speed
 
         # Modify the particle
-        particle["x"] = x_original + additional_distance * ux_original
-        particle["y"] = y_original + additional_distance * uy_original
-        particle["z"] = z_original + additional_distance * uz_original
+        particle["x"] = x_original + total_distance * ux_original
+        particle["y"] = y_original + total_distance * uy_original
+        particle["z"] = z_original + total_distance * uz_original
         particle["ux"] = ux_original
         particle["uy"] = uy_original
         particle["uz"] = uz_original
