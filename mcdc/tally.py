@@ -207,7 +207,7 @@ def cell_tally(cell, scores=["flux"]):
 
 def cs_tally(
     N_cs_bins=10,
-    size=1,
+    cs_bin_size=1,
     x=np.array([-INF, INF]),
     y=np.array([-INF, INF]),
     z=np.array([-INF, INF]),
@@ -223,13 +223,15 @@ def cs_tally(
 
     # Set ID
     card.ID = len(global_.input_deck.cs_tallies)
-    card.N_cs_bins = N_cs_bins
-    card.size = size
 
     # Set mesh
     card.x = x
     card.y = y
     card.z = z
+
+    # Set bin properties
+    card.N_cs_bins = N_cs_bins
+    card.cs_bin_size = [cs_bin_size[0] / (len(x) - 1) * (x[-1] - x[0])]
 
     # Set other filters
     card.t = t

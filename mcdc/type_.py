@@ -900,7 +900,6 @@ def make_type_cs_tally(input_deck):
     struct = []
 
     # Maximum numbers of mesh and filter grids and scores
-    Nmax_cs_bins = 2
     Nmax_x = 2
     Nmax_y = 2
     Nmax_z = 2
@@ -909,8 +908,8 @@ def make_type_cs_tally(input_deck):
     Nmax_azi = 2
     Nmax_g = 2
     Nmax_score = 1
+    N_cs_centers = 1
     for card in input_deck.cs_tallies:
-        Nmax_cs_bins = max(Nmax_cs_bins, len(card.N_cs_bins))
         Nmax_x = max(Nmax_x, len(card.x))
         Nmax_y = max(Nmax_y, len(card.y))
         Nmax_z = max(Nmax_z, len(card.z))
@@ -919,6 +918,7 @@ def make_type_cs_tally(input_deck):
         Nmax_azi = max(Nmax_azi, len(card.azi))
         Nmax_g = max(Nmax_g, len(card.g))
         Nmax_score = max(Nmax_score, len(card.scores))
+        N_cs_centers = card.N_cs_bins[0]
 
     # # reduce tally sizes for subdomains
     # if input_deck.technique["domain_decomposition"]:
@@ -926,9 +926,16 @@ def make_type_cs_tally(input_deck):
 
     # Set the filter
     filter_ = [
-        ("N_cs_bins", int64),
+        ("N_cs_bins", int),
         ("cs_bin_size", float64),
-        ("cs_centers", float64, (Nmax_cs_bins,)),
+        (
+            "cs_centers",
+            float64,
+            (
+                2,
+                N_cs_centers,
+            ),
+        ),
         ("x", float64, (Nmax_x,)),
         ("y", float64, (Nmax_y,)),
         ("z", float64, (Nmax_z,)),
@@ -937,6 +944,7 @@ def make_type_cs_tally(input_deck):
         ("azi", float64, (Nmax_azi,)),
         ("g", float64, (Nmax_g,)),
     ]
+
     struct += [("filter", filter_)]
 
     # Tally strides
@@ -950,11 +958,16 @@ def make_type_cs_tally(input_deck):
         ("x", int64),
         ("y", int64),
         ("z", int64),
+        # ("N_cs_bins", int64),   # TODO: get rid of this line?
     ]
     struct += [("stride", stride)]
 
-    # Total number of bins
+    # Total number of bins (will be used for the reconstruction)
+    # TODO: Might be able to get rid of this (just get N_bin from the mesh)
     struct += [("N_bin", int64)]
+
+    # Number of compressed sensing bins
+    # struct += [("N_cs_bins", int64)]
 
     # Scores
     struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]

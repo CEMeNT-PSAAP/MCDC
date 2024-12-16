@@ -2,8 +2,13 @@ import argparse, os, sys
 import importlib.metadata
 import matplotlib.pyplot as plt
 import numba as nb
+from scipy.stats.qmc import Halton
+import cvxpy as cp
 
 from matplotlib import colors as mpl_colors
+from matplotlib.patches import Rectangle
+from shapely.geometry import Polygon, box
+import scipy.fft as spfft
 
 # Parse command-line arguments
 #   TODO: Will be inside run() once Python/Numba adapter is integrated
@@ -190,6 +195,11 @@ def run():
         loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
+    # Compressed sensing reconstruction - after the sim runs and gets results
+    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
+    if N_cs_bins != 0:
+        cs_reconstruct(data, mcdc)
+
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
     generate_hdf5(data, mcdc)
@@ -201,6 +211,176 @@ def run():
 
     # Closout
     closeout(mcdc)
+
+
+def calculate_cs_overlap(corners, grid):
+    quadrilateral = Polygon(corners)
+
+    # Get the dimensions of the grid
+    grid_height, grid_width = grid.shape
+
+    # Create an array to hold the overlap values
+    overlap = np.zeros_like(grid, dtype=float)
+
+    # Loop over each grid cell
+    for i in range(grid_height):
+        for j in range(grid_width):
+            # Define the current grid cell as a shapely box
+            cell = box(j - 0.5, i - 0.5, j + 0.5, i + 0.5)
+
+            # Calculate the intersection area between the cell and the quadrilateral
+            intersection = cell.intersection(quadrilateral).area
+
+            # Normalize by the cell area (which is 1 in this case)
+            overlap[i, j] = intersection
+
+    overlap_1d = overlap.flatten()
+
+    return overlap_1d
+
+
+def calculate_cs_A(data, mcdc):
+    x_grid = mcdc["mesh_tallies"]["filter"]["x"][0]
+    y_grid = mcdc["mesh_tallies"]["filter"]["y"][0]
+    Nx = len(x_grid) - 1
+    Ny = len(y_grid) - 1
+
+    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
+    bin_size = mcdc["cs_tallies"]["filter"]["cs_bin_size"][0]
+
+    S = [[] for _ in range(N_cs_bins)]
+
+    [x_centers, y_centers] = mcdc["cs_tallies"]["filter"]["cs_centers"][0]
+
+    # Calculate the overlap grid for each bin, and flatten into a row of S
+    for ibin in range(N_cs_bins):
+        bin_x_min = x_centers[ibin] - bin_size / 2
+        bin_x_max = x_centers[ibin] + bin_size / 2
+        bin_y_min = y_centers[ibin] - bin_size / 2
+        bin_y_max = y_centers[ibin] + bin_size / 2
+
+        overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
+
+        for i in range(len(y_grid) - 1):
+            for j in range(len(x_grid) - 1):
+                cell_x_min = x_grid[j]
+                cell_x_max = x_grid[j + 1]
+                cell_y_min = y_grid[i]
+                cell_y_max = y_grid[i + 1]
+
+                # Calculate overlap in x and y directions
+                overlap_x = max(
+                    0, min(bin_x_max, cell_x_max) - max(bin_x_min, cell_x_min)
+                )
+                overlap_y = max(
+                    0, min(bin_y_max, cell_y_max) - max(bin_y_min, cell_y_min)
+                )
+
+                # Calculate fractional overlap
+                cell_area = (cell_x_max - cell_x_min) * (cell_y_max - cell_y_min)
+                overlap[i, j] = (overlap_x * overlap_y) / cell_area
+
+        S[ibin] = overlap.flatten()
+
+    print(f"N_cs_bin = {N_cs_bins}")
+    S[-1] = np.ones(Nx * Ny)
+    S = np.array(S)
+    S_summed = np.sum(S, axis=0).reshape(Ny, Nx)
+    plt.imshow(S_summed)
+    plt.colorbar()
+    plt.title("S_Summed")
+    plt.show()
+
+    print(S.shape[1])
+    assert S.shape[1] == Nx * Ny, "Size of S must match Nx * Ny."
+    assert (
+        S.shape[1] == mcdc["cs_tallies"]["N_bin"][0]
+    ), "Size of S must match number of cells in desired mesh tally"
+    np.save("sphere_S.npy", S)
+    # TODO: can this be done in a different way? idk
+    # Construct the DCT matrix T
+    idct_basis_x = spfft.idct(np.identity(Nx), axis=0)
+    idct_basis_y = spfft.idct(np.identity(Ny), axis=0)
+
+    T_inv = np.kron(idct_basis_y, idct_basis_x)
+    A = S @ T_inv
+    return A, T_inv
+
+
+def calculate_cs_sparse_solution(data, mcdc, A, b):
+    print(f"A = {A}")
+    print(f"b = {b}")
+    N_fine_cells = mcdc["cs_tallies"]["N_bin"][0]
+    print(f"N_fine_cells = {N_fine_cells}")
+
+    # setting up the problem with CVXPY
+    vx = cp.Variable(N_fine_cells)
+
+    # Basis pursuit denoising
+    l = 0
+    objective = cp.Minimize(0.5 * cp.norm(A @ vx - b, 2) + l * cp.norm(vx, 1))
+    prob = cp.Problem(objective)
+    result = prob.solve(verbose=False)
+
+    # # Basis pursuit
+    # objective = cp.Minimize(cp.norm(vx, 1))
+    # constraints = [A @ vx == b]
+    # prob = cp.Problem(objective, constraints)
+    # result = prob.solve(verbose=True)
+    # print(f'vx.value = {vx.value}')
+
+    # formatting the sparse solution
+    sparse_solution = np.array(vx.value).squeeze()
+
+    return sparse_solution
+
+
+def cs_reconstruct(data, mcdc):
+    tally_bin = data[TALLY]
+
+    print(tally_bin.shape)
+
+    tally = mcdc["cs_tallies"][0]
+    stride = tally["stride"]
+    bin_idx = stride["tally"]
+    N_cs_bins = tally["filter"]["N_cs_bins"]
+    Nx = len(mcdc["mesh_tallies"]["filter"]["x"][0]) - 1
+    Ny = len(mcdc["mesh_tallies"]["filter"]["y"][0]) - 1
+
+    b = tally_bin[TALLY_SUM, bin_idx : bin_idx + N_cs_bins]
+
+    print(f"measurements b = {b}")
+
+    A, T_inv = calculate_cs_A(data, mcdc)
+    x = calculate_cs_sparse_solution(data, mcdc, A, b)
+
+    np.save("sparse_solution.npy", x)
+    print(f"sparse solution shape = {x.shape}")
+    print(x)
+
+    recon = T_inv @ x
+    print(f"recon.shape = {recon.shape}")
+    print(f"recon = {recon}")
+
+    recon_reshaped = recon.reshape(Ny, Nx)
+
+    plt.imshow(recon_reshaped)
+    plt.title("Ny, Nx")
+    plt.colorbar()
+    plt.show()
+
+    return recon
+    # reconstruction
+
+    # # Find the sparse solution, and then find the reconstruction
+    # sparse_solution[res] = finding_sparse_solution(A[res], fluxes[res].size, b, bpdn_lambda)
+    # reconstruction[res] = np.reshape(un_matrix[res] @ sparse_solution[res], fluxes[res].shape)
+    # rescaled_recons[res] = downsample_to_resolution(reconstruction[res], input_flux.shape)
+
+    # if return_centers:
+    #     return reconstruction, input_flux, rescaled_recons, bin_centers[0]
+    # else:
+    #     return reconstruction, input_flux, rescaled_recons
 
 
 # =============================================================================
@@ -216,11 +396,6 @@ def copy_field(dst, src, name):
         data = src[name]
     else:
         data = getattr(src, name)
-
-    # print(f'dst, src, name = {dst, src, name}')
-    # print(f'dst = {dst.dtype.names}')
-    # print(f'name = {name}')
-    # print(f'dst[name] = {dst[name]}')
 
     if isinstance(dst[name], np.ndarray):
         if isinstance(data, np.ndarray) and dst[name].shape != data.shape:
@@ -404,6 +579,45 @@ def dd_mesh_bounds(idx):
     mesh_zp = int(np.where(input_deck.mesh_tallies[idx].z == zp)[0]) + 1
 
     return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
+
+
+def generate_cs_centers(mcdc, N_dim=2, seed=123456789):
+    N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
+    x_lims = (
+        mcdc["cs_tallies"]["filter"]["x"][0][-1],
+        mcdc["cs_tallies"]["filter"]["x"][0][0],
+    )
+    y_lims = (
+        mcdc["cs_tallies"]["filter"]["y"][0][-1],
+        mcdc["cs_tallies"]["filter"]["y"][0][0],
+    )
+
+    # Generate Halton sequence according to the seed
+    halton_seq = Halton(d=N_dim, seed=seed)
+    points = halton_seq.random(n=N_cs_bins)
+
+    # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
+    x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
+    y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
+
+    # # Generate the centers of the cells
+    # x_centers = np.linspace(0.05, 3.95, 40)
+    # y_centers = np.linspace(0.05, 3.95, 40)
+
+    # # Create the meshgrid for all cell centers
+    # X, Y = np.meshgrid(x_centers, y_centers)
+
+    # # Flatten the arrays to get the list of coordinates
+    # x_coords = X.flatten()
+    # y_coords = Y.flatten()
+
+    # x_coords_list = x_coords.tolist()
+    # y_coords_list = y_coords.tolist()
+
+    # x_coords_list.append(2.0)
+    # y_coords_list.append(2.0)
+
+    return (x_coords, y_coords)
 
 
 def prepare():
@@ -928,6 +1142,13 @@ def prepare():
         # Direct assignment
         copy_field(mcdc["cs_tallies"][i], input_deck.cs_tallies[i], "N_bin")
 
+        mcdc["cs_tallies"][i]["filter"]["N_cs_bins"] = input_deck.cs_tallies[
+            i
+        ].N_cs_bins[0]
+        mcdc["cs_tallies"][i]["filter"]["cs_bin_size"] = input_deck.cs_tallies[
+            i
+        ].cs_bin_size[0]
+
         # Filters (variables with possible different sizes)
         if not input_deck.technique["domain_decomposition"]:
             for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
@@ -936,21 +1157,7 @@ def prepare():
                     input_deck.cs_tallies[i], name
                 )
 
-        # else:  # decomposed mesh filters
-        #     mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
-
-        #     # Filters
-        #     new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
-        #     new_y = input_deck.mesh_tallies[i].y[myn:myp]
-        #     new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
-        #     mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
-        #     mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
-        #     mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
-        #     for name in ["t", "mu", "azi", "g"]:
-        #         N = len(getattr(input_deck.mesh_tallies[i], name))
-        #         mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
-        #             input_deck.mesh_tallies[i], name
-        #         )
+        mcdc["cs_tallies"][i]["filter"]["cs_centers"] = generate_cs_centers(mcdc)
 
         # Set tally scores
         N_score = len(input_deck.cs_tallies[i].scores)
@@ -970,45 +1177,12 @@ def prepare():
                 score_type = SCORE_NET_CURRENT
             mcdc["cs_tallies"][i]["scores"][j] = score_type
 
-        # Filter grid sizes
-        Nmu = len(input_deck.cs_tallies[i].mu) - 1
-        N_azi = len(input_deck.cs_tallies[i].azi) - 1
-        Ng = len(input_deck.cs_tallies[i].g) - 1
-        Nx = len(input_deck.cs_tallies[i].x) - 1
-        Ny = len(input_deck.cs_tallies[i].y) - 1
-        Nz = len(input_deck.cs_tallies[i].z) - 1
-        Nt = len(input_deck.cs_tallies[i].t) - 1
-
         # Update N_bin
         mcdc["cs_tallies"][i]["N_bin"] *= N_score
 
-        # Filter strides
-        stride = N_score
-        if Nz > 1:
-            mcdc["cs_tallies"][i]["stride"]["z"] = stride
-            stride *= Nz
-        if Ny > 1:
-            mcdc["cs_tallies"][i]["stride"]["y"] = stride
-            stride *= Ny
-        if Nx > 1:
-            mcdc["cs_tallies"][i]["stride"]["x"] = stride
-            stride *= Nx
-        if Nt > 1:
-            mcdc["cs_tallies"][i]["stride"]["t"] = stride
-            stride *= Nt
-        if Ng > 1:
-            mcdc["cs_tallies"][i]["stride"]["g"] = stride
-            stride *= Ng
-        if N_azi > 1:
-            mcdc["cs_tallies"][i]["stride"]["azi"] = stride
-            stride *= N_azi
-        if Nmu > 1:
-            mcdc["cs_tallies"][i]["stride"]["mu"] = stride
-            stride *= Nmu
-
         # Set tally stride and accumulate total tally size
         mcdc["cs_tallies"][i]["stride"]["tally"] = tally_size
-        tally_size += mcdc["cs_tallies"][i]["N_bin"]
+        tally_size += mcdc["cs_tallies"][i]["filter"]["N_cs_bins"]
 
     # Set tally data
     if not input_deck.technique["uq"]:
@@ -1404,7 +1578,10 @@ def prepare():
 
 
 def cardlist_to_h5group(dictlist, input_group, name):
-    main_group = input_group.create_group(name + "s")
+    if name[-1] != "s":
+        main_group = input_group.create_group(name + "s")
+    else:
+        main_group = input_group.create_group(name)
     for item in dictlist:
         group = main_group.create_group(name + "_%i" % getattr(item, "ID"))
         card_to_h5group(item, group)
@@ -1430,7 +1607,10 @@ def card_to_h5group(card, group):
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
-    main_group = input_group.create_group(name + "s")
+    if name[-1] != "s":
+        main_group = input_group.create_group(name + "s")
+    else:
+        main_group = input_group.create_group(name)
     for item in dictlist:
         group = main_group.create_group(name + "_%i" % item["ID"])
         dict_to_h5group(item, group)
@@ -1525,11 +1705,12 @@ def generate_hdf5(data, mcdc):
                     input_deck.mesh_tallies, input_group, "mesh_tallies"
                 )
                 cardlist_to_h5group(
-                    input_deck.surface_tallies, input_group, "surface_tally"
+                    input_deck.surface_tallies, input_group, "surface_tallies"
                 )
                 cardlist_to_h5group(
                     input_deck.cell_tallies, input_group, "cell_tallies"
                 )
+                cardlist_to_h5group(input_deck.cs_tallies, input_group, "cs_tallies")
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
@@ -1670,14 +1851,6 @@ def generate_hdf5(data, mcdc):
                 N_bin = tally["N_bin"]
                 start = tally["stride"]["tally"]
                 tally_bin = data[TALLY][:, start : start + N_bin]
-
-                # print(f'data = {data[TALLY][2]}')
-                # if data[TALLY][1].all() == data[TALLY][2].all:
-                #     print('hell yeah')
-                # print(f'data keys = {data[TALLY].dtype.names}')
-
-                # print(f'tally_bin = {tally_bin}')
-
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -1687,7 +1860,6 @@ def generate_hdf5(data, mcdc):
                 for i in range(N_score):
                     score_type = tally["scores"][i]
                     score_tally_bin = np.squeeze(tally_bin[i])
-                    # print(f'score_tally_bin = {score_tally_bin}')
                     if score_type == SCORE_FLUX:
                         score_name = "flux"
                     elif score_type == SCORE_NET_CURRENT:
@@ -1697,7 +1869,54 @@ def generate_hdf5(data, mcdc):
                     group_name = "tallies/cell_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
-                    # print(f'ID = {ID}, score_name = {score_name}, mean = {mean}')
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            # CS tallies
+            for ID, tally in enumerate(mcdc["cs_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+                N_cs_bins = tally["filter"]["N_cs_bins"]
+
+                # Shape
+                N_score = tally["N_score"]
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, N_cs_bins, N_score)
+                else:
+                    shape = (5, N_cs_bins, N_score)
+
+                # Reshape tally
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_cs_bins]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 2, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/cs_tally_%i/%s/" % (ID, score_name)
+
+                    center_points = tally["filter"]["cs_centers"]
+                    f.create_dataset(group_name + "center_points", data=center_points)
+
+                    mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
 
                     f.create_dataset(group_name + "mean", data=mean)
