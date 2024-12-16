@@ -1,23 +1,17 @@
 import h5py
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Load results
 with h5py.File("output.h5", "r") as f:
-    # print(f["tallies"].keys())
-    print(f["input_deck"]["cell_tallies"].keys())
+    # trying to compare cs results and mesh results
+    center_points = np.load("center_points.npy")
+    cs_results = f["tallies"]["cs_tally_0"]["fission"]["mean"][:]
+    cs_alphas = cs_results[:-1] / np.max(cs_results[:-1])
 
-    for i in range(len(f["input_deck"]["cell_tallies"])):
-        fission_score = f[f"tallies/cell_tally_{i}/fission"]
+    # plt.scatter(center_points[0][:-1], center_points[1][:-1], alpha=cs_alphas)
+    # plt.show()
 
-        print(
-            f'for sphere {i+1}, mean = {fission_score["mean"][()]}, sdev = {fission_score["sdev"][()]}'
-        )
-
-        # print(fission_score["mean"][()])
-        # print(fission_score["sdev"][()])
-
-        # print(f"fission_score mean = {fission_score["mean"][()]}")
-        # print(f"fission_score mean = {fission_score["sdev"][()]}")
-
-    # cell = f["tallies/cell_tally_0/fission"]
-    # print(f'sphere1 mean = {cell["mean"][()]}')
-    # print(f'sphere2 sdev = {cell["sdev"][()]}')
+    mesh_results = f["tallies"]["mesh_tally_0"]["fission"]["mean"][:]
+    # plt.imshow(mesh_results)
+    # plt.show()

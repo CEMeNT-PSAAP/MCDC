@@ -37,7 +37,6 @@ particle_record = None
 nuclide = None
 material = None
 
-universe = None
 lattice = None
 
 source = None
@@ -519,10 +518,12 @@ def make_type_material(input_deck):
 def make_type_surface(input_deck):
     global surface
 
-    # Maximum number tallies
+    # Maximum number of tallies and movements
     Nmax_tally = 0
+    Nmax_move = 0
     for surface in input_deck.surfaces:
-        Nmax_tally = max(Nmax_tally, len(surface.tally_IDs))
+        Nmax_tally = max(Nmax_tally, surface.N_tally)
+        Nmax_move = max(Nmax_move, surface.N_move)
 
     surface = into_dtype(
         [
@@ -538,12 +539,17 @@ def make_type_surface(input_deck):
             ("H", float64),
             ("I", float64),
             ("J", float64),
-            ("linear", bool_),
+            ("type", int64),
             ("nx", float64),
             ("ny", float64),
             ("nz", float64),
             ("N_tally", int64),
             ("tally_IDs", int64, (Nmax_tally,)),
+            ("moving", bool_),
+            ("N_move", int64),
+            ("move_time_grid", float64, (Nmax_move + 1,)),
+            ("move_translations", float64, (Nmax_move + 1, 3)),
+            ("move_velocities", float64, (Nmax_move, 3)),
         ]
     )
 
@@ -564,17 +570,23 @@ def make_type_cell(input_deck):
     cell = into_dtype(
         [
             ("ID", int64),
+            # Surface IDs
+            ("N_surface", int64),
+            ("surface_data_idx", int64),
+            # Region RPN tokens
+            ("N_region", int64),
+            ("region_data_idx", int64),
             # Fill status
             ("fill_type", int64),
             ("fill_ID", int64),
-            ("fill_translated", bool),
-            # Local coordinate modifier
-            ("translation", float64, (3,)),
-            # Data indices
-            ("surface_data_idx", int64),
-            ("region_data_idx", int64),
+            ("fill_translated", bool_),
+            ("fill_rotated", bool_),
+            # Cell tally
             ("N_tally", int64),
             ("tally_IDs", int64, (Nmax_tally,)),
+            # Local coordinate modifier
+            ("translation", float64, (3,)),
+            ("rotation", float64, (3,)),
         ]
     )
 
@@ -584,15 +596,14 @@ def make_type_cell(input_deck):
 # ==============================================================================
 
 
-def make_type_universe(input_deck):
-    global universe
-
-    # Maximum number of cells per universe
-    Nmax_cell = max([universe.N_cell for universe in input_deck.universes])
-
-    universe = into_dtype(
-        [("ID", int64), ("N_cell", int64), ("cell_IDs", int64, (Nmax_cell,))]
-    )
+universe = into_dtype(
+    [
+        ("ID", int64),
+        # Cell IDs
+        ("N_cell", int64),
+        ("cell_data_idx", int64),
+    ]
+)
 
 
 # ==============================================================================
@@ -769,6 +780,13 @@ def make_type_mesh_tally(input_deck):
         ("mu", float64, (Nmax_mu,)),
         ("azi", float64, (Nmax_azi,)),
         ("g", float64, (Nmax_g,)),
+        ("Nx", int64),
+        ("Ny", int64),
+        ("Nz", int64),
+        ("Nt", int64),
+        ("Nmu", int64),
+        ("N_azi", int64),
+        ("Ng", int64),
     ]
     struct += [("filter", filter_)]
 
@@ -996,7 +1014,6 @@ def make_type_setting(deck):
         ("mode_CE", bool_),
         # Misc.
         ("progress_bar", bool_),
-        ("caching", bool_),
         ("output_name", str_),
         ("save_input_deck", bool_),
         # Eigenvalue mode
@@ -1403,11 +1420,11 @@ def make_type_global(input_deck):
     N_cs_tally = len(input_deck.cs_tallies)
 
     # Cell data sizes
-    N_cell_surface = 0
-    N_cell_region = 0
-    for cell_ in input_deck.cells:
-        N_cell_surface += 1 + len(cell_.surface_IDs)
-        N_cell_region += 1 + len(cell_._region_RPN)
+    N_cell_surface = sum([len(x.surface_IDs) for x in input_deck.cells])
+    N_cell_region = sum([len(x._region_RPN) for x in input_deck.cells])
+
+    # Universe data sizes
+    N_universe_cell = sum([len(x.cell_IDs) for x in input_deck.universes])
 
     # Simulation parameters
     N_particle = input_deck.setting["N_particle"]
@@ -1463,10 +1480,13 @@ def make_type_global(input_deck):
             ("nuclides", nuclide, (N_nuclide,)),
             ("materials", material, (N_material,)),
             ("surfaces", surface, (N_surface,)),
+            # Cells
             ("cells", cell, (N_cell,)),
-            ("cell_surface_data", int64, (N_cell_surface,)),
-            ("cell_region_data", int64, (N_cell_region,)),
+            ("cells_data_surface", int64, (N_cell_surface,)),
+            ("cells_data_region", int64, (N_cell_region,)),
+            # Universes
             ("universes", universe, (N_universe,)),
+            ("universes_data_cell", int64, (N_universe_cell,)),
             ("lattices", lattice, (N_lattice,)),
             ("sources", source, (N_source,)),
             ("mesh_tallies", mesh_tally, (N_mesh_tally,)),
@@ -1585,6 +1605,13 @@ def make_type_mesh(card):
                 ("mu", float64, (Nmu + 1,)),
                 ("azi", float64, (N_azi + 1,)),
                 ("g", float64, (Ng + 1,)),
+                ("Nx", int64),
+                ("Ny", int64),
+                ("Nz", int64),
+                ("Nt", int64),
+                ("Nmu", int64),
+                ("N_azi", int64),
+                ("Ng", int64),
             ]
         ),
         Nx,
@@ -1613,6 +1640,12 @@ def make_type_mesh_(card):
                 ("t", float64, (Nt + 1,)),
                 ("mu", float64, (Nmu + 1,)),
                 ("azi", float64, (N_azi + 1,)),
+                ("Nx", int64),
+                ("Ny", int64),
+                ("Nz", int64),
+                ("Nt", int64),
+                ("Nmu", int64),
+                ("N_azi", int64),
             ]
         ),
         Nx,

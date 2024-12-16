@@ -81,7 +81,7 @@ A full exhaustive list of publications can be found on the `CEMeNT site <https:/
     :maxdepth: 1
 
     install
-    user
+    user/index
     contribution
     theory/index
     pythonapi/index
