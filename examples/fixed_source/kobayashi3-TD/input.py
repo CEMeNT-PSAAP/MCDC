@@ -60,7 +60,7 @@ mcdc.tally.mesh_tally(
     scores=["flux"],
     x=np.linspace(0.0, 60.0, 31),
     y=np.linspace(0.0, 100.0, 51),
-    t=np.linspace(0.0, 200.0, 21),
+    # t=np.linspace(0.0, 200.0, 21),
     # g=np.array([-0.5, 3.5, 6.5]) # fast (0, 1, 2, 3) and thermal (4, 5, 6) groups
 )
 
@@ -69,11 +69,17 @@ mcdc.tally.cell_tally(void_cell, scores=["flux"])
 mcdc.tally.cell_tally(shield_cell, scores=["flux"])
 
 
-mcdc.tally.cs_tally(N_cs_bins=[10], size=[1], scores=["flux"])
+mcdc.tally.cs_tally(
+    N_cs_bins=[150],
+    cs_bin_size=[8],
+    x=np.linspace(0.0, 60.0, 31),
+    y=np.linspace(0.0, 100.0, 51),
+    scores=["flux"],
+)
 
 
 # Setting
-mcdc.setting(N_particle=50)
+mcdc.setting(N_particle=1e5)
 
 # Run
 mcdc.run()
