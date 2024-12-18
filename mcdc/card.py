@@ -426,4 +426,4 @@ class CSTallyCard(TallyCard):
         self.z = np.array([-INF, INF])
         self.N_bin = 1
         self.N_cs_bins = 1
-        self.cs_bin_size = 1
+        self.cs_bin_size = np.array([1.0, 1.0])

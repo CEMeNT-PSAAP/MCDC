@@ -144,18 +144,24 @@ def calculate_cs_A(data, mcdc):
     Ny = len(y_grid) - 1
 
     N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
-    bin_size = mcdc["cs_tallies"]["filter"]["cs_bin_size"][0]
+    cs_bin_size = mcdc["cs_tallies"]["filter"]["cs_bin_size"][0]
 
     S = [[] for _ in range(N_cs_bins)]
 
     [x_centers, y_centers] = mcdc["cs_tallies"]["filter"]["cs_centers"][0]
+    x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
+    y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
+    np.save("center_points.npy", mcdc["cs_tallies"]["filter"]["cs_centers"][0])
 
     # Calculate the overlap grid for each bin, and flatten into a row of S
     for ibin in range(N_cs_bins):
-        bin_x_min = x_centers[ibin] - bin_size / 2
-        bin_x_max = x_centers[ibin] + bin_size / 2
-        bin_y_min = y_centers[ibin] - bin_size / 2
-        bin_y_max = y_centers[ibin] + bin_size / 2
+        if ibin == N_cs_bins - 1:
+            cs_bin_size = np.array([Nx, Ny])
+
+        bin_x_min = x_centers[ibin] - cs_bin_size[0] / 2
+        bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
+        bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
+        bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
 
         overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
 
@@ -167,11 +173,15 @@ def calculate_cs_A(data, mcdc):
                 cell_y_max = y_grid[i + 1]
 
                 # Calculate overlap in x and y directions
-                overlap_x = max(
-                    0, min(bin_x_max, cell_x_max) - max(bin_x_min, cell_x_min)
+                overlap_x = np.maximum(
+                    0,
+                    np.minimum(bin_x_max, cell_x_max)
+                    - np.maximum(bin_x_min, cell_x_min),
                 )
-                overlap_y = max(
-                    0, min(bin_y_max, cell_y_max) - max(bin_y_min, cell_y_min)
+                overlap_y = np.maximum(
+                    0,
+                    np.minimum(bin_y_max, cell_y_max)
+                    - np.maximum(bin_y_min, cell_y_min),
                 )
 
                 # Calculate fractional overlap
@@ -179,22 +189,21 @@ def calculate_cs_A(data, mcdc):
                 overlap[i, j] = (overlap_x * overlap_y) / cell_area
 
         S[ibin] = overlap.flatten()
-
-    print(f"N_cs_bin = {N_cs_bins}")
-    S[-1] = np.ones(Nx * Ny)
     S = np.array(S)
+
     S_summed = np.sum(S, axis=0).reshape(Ny, Nx)
     plt.imshow(S_summed)
     plt.colorbar()
     plt.title("S_Summed")
     plt.show()
 
-    print(S.shape[1])
+    assert np.allclose(S[-1], np.ones(Nx * Ny)), "Last row of S must be all ones"
     assert S.shape[1] == Nx * Ny, "Size of S must match Nx * Ny."
     assert (
         S.shape[1] == mcdc["cs_tallies"]["N_bin"][0]
     ), "Size of S must match number of cells in desired mesh tally"
     np.save("sphere_S.npy", S)
+
     # TODO: can this be done in a different way? idk
     # Construct the DCT matrix T
     idct_basis_x = spfft.idct(np.identity(Nx), axis=0)
@@ -206,10 +215,7 @@ def calculate_cs_A(data, mcdc):
 
 
 def calculate_cs_sparse_solution(data, mcdc, A, b):
-    print(f"A = {A}")
-    print(f"b = {b}")
     N_fine_cells = mcdc["cs_tallies"]["N_bin"][0]
-    print(f"N_fine_cells = {N_fine_cells}")
 
     # setting up the problem with CVXPY
     vx = cp.Variable(N_fine_cells)
@@ -247,23 +253,23 @@ def cs_reconstruct(data, mcdc):
 
     b = tally_bin[TALLY_SUM, bin_idx : bin_idx + N_cs_bins]
 
-    print(f"measurements b = {b}")
+    # print(f"measurements b = {b}")
 
     A, T_inv = calculate_cs_A(data, mcdc)
     x = calculate_cs_sparse_solution(data, mcdc, A, b)
 
     np.save("sparse_solution.npy", x)
-    print(f"sparse solution shape = {x.shape}")
-    print(x)
+    # print(f"sparse solution shape = {x.shape}")
+    # print(x)
 
     recon = T_inv @ x
-    print(f"recon.shape = {recon.shape}")
-    print(f"recon = {recon}")
+    # print(f"recon.shape = {recon.shape}")
+    # print(f"recon = {recon}")
 
     recon_reshaped = recon.reshape(Ny, Nx)
 
     plt.imshow(recon_reshaped)
-    plt.title("Ny, Nx")
+    plt.title("Reconstruction")
     plt.colorbar()
     plt.show()
 
@@ -479,43 +485,43 @@ def dd_mesh_bounds(idx):
     return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
 
 
-def generate_cs_centers(mcdc, N_dim=2, seed=123456789):
-    N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
-    x_lims = (
-        mcdc["cs_tallies"]["filter"]["x"][0][-1],
-        mcdc["cs_tallies"]["filter"]["x"][0][0],
-    )
-    y_lims = (
-        mcdc["cs_tallies"]["filter"]["y"][0][-1],
-        mcdc["cs_tallies"]["filter"]["y"][0][0],
-    )
+def generate_cs_centers(mcdc, N_dim=3, seed=123456789):
+    # N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
+    # x_lims = (
+    #     mcdc["cs_tallies"]["filter"]["x"][0][-1],
+    #     mcdc["cs_tallies"]["filter"]["x"][0][0],
+    # )
+    # y_lims = (
+    #     mcdc["cs_tallies"]["filter"]["y"][0][-1],
+    #     mcdc["cs_tallies"]["filter"]["y"][0][0],
+    # )
 
-    # Generate Halton sequence according to the seed
-    halton_seq = Halton(d=N_dim, seed=seed)
-    points = halton_seq.random(n=N_cs_bins)
+    # # Generate Halton sequence according to the seed
+    # halton_seq = Halton(d=N_dim, seed=seed)
+    # points = halton_seq.random(n=N_cs_bins)
 
-    # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
-    x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
-    y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
+    # # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
+    # x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
+    # y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
 
-    # # Generate the centers of the cells
-    # x_centers = np.linspace(0.05, 3.95, 40)
-    # y_centers = np.linspace(0.05, 3.95, 40)
+    # Generate the centers of the cells
+    x_centers = np.linspace(0.05, 3.95, 40)
+    y_centers = np.linspace(0.05, 3.95, 40)
 
-    # # Create the meshgrid for all cell centers
-    # X, Y = np.meshgrid(x_centers, y_centers)
+    # Create the meshgrid for all cell centers
+    X, Y = np.meshgrid(x_centers, y_centers)
 
-    # # Flatten the arrays to get the list of coordinates
-    # x_coords = X.flatten()
-    # y_coords = Y.flatten()
+    # Flatten the arrays to get the list of coordinates
+    x_coords = X.flatten()
+    y_coords = Y.flatten()
 
-    # x_coords_list = x_coords.tolist()
-    # y_coords_list = y_coords.tolist()
+    x_coords_list = x_coords.tolist()
+    y_coords_list = y_coords.tolist()
 
-    # x_coords_list.append(2.0)
-    # y_coords_list.append(2.0)
+    x_coords_list.append(2.0)
+    y_coords_list.append(2.0)
 
-    return (x_coords, y_coords)
+    return (x_coords_list, y_coords_list)
 
 
 def prepare():
