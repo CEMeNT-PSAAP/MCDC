@@ -945,7 +945,7 @@ def make_type_cs_tally(input_deck):
     # Set the filter
     filter_ = [
         ("N_cs_bins", int),
-        ("cs_bin_size", float64),
+        ("cs_bin_size", float64, (2,)),
         (
             "cs_centers",
             float64,

@@ -209,7 +209,7 @@ def cell_tally(cell, scores=["flux"]):
 
 def cs_tally(
     N_cs_bins=10,
-    cs_bin_size=1,
+    cs_bin_size=([1.0, 1.0]),
     x=np.array([-INF, INF]),
     y=np.array([-INF, INF]),
     z=np.array([-INF, INF]),
@@ -231,9 +231,15 @@ def cs_tally(
     card.y = y
     card.z = z
 
-    # Set bin properties
+    # Set bin properties, convert bin size to problem units
     card.N_cs_bins = N_cs_bins
-    card.cs_bin_size = [cs_bin_size[0] / (len(x) - 1) * (x[-1] - x[0])]
+    print(f"tally.py, {card.cs_bin_size[0]}")
+    print(type(card.cs_bin_size), card.cs_bin_size.shape)
+    card.cs_bin_size[0] = cs_bin_size[0] / (len(x) - 1) * (x[-1] - x[0])
+    card.cs_bin_size[1] = cs_bin_size[1] / (len(y) - 1) * (y[-1] - y[0])
+
+    print(f"tally.py, {card.cs_bin_size[0]}")
+    print(type(card.cs_bin_size), card.cs_bin_size.shape)
 
     # Set other filters
     card.t = t

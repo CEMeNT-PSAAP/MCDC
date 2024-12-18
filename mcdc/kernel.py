@@ -2009,7 +2009,8 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
             SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
             score = flux * SigmaF
 
-        tally_bin[TALLY_SCORE, cell_idx + i] += score
+        adapt.global_add(tally_bin, (TALLY_SCORE, cell_idx + i), round(score))
+        # tally_bin[TALLY_SCORE, cell_idx + i] += score
 
 
 @njit
@@ -2021,13 +2022,9 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
     material = mcdc["materials"][P["material_ID"]]
     N_cs_bins = tally["filter"]["N_cs_bins"]
 
-    # rescaling the size to be in terms of problem units, not mesh cells/pixels
-    Nx = len(tally["filter"]["x"]) - 1
-    cs_bin_size = (
-        tally["filter"]["cs_bin_size"] / Nx
-    )  # TODO: might cause problems in nonysmmetric problems
-
+    cs_bin_size = tally["filter"]["cs_bin_size"]
     cs_centers = tally["filter"]["cs_centers"]
+
     stride = tally["stride"]
     bin_idx = stride["tally"]
 
@@ -2053,9 +2050,9 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
 
         # Last bin covers the whole problem
         if j == N_cs_bins - 1:
-            cs_bin_size = INF
+            cs_bin_size = np.array([INF, INF])
 
-        distance_in_bin = min(
+        distance_in_bin = np.minimum(
             distance,
             calculate_distance_in_coarse_bin(
                 P_arr, distance, center, cs_bin_size, mcdc
@@ -2077,11 +2074,12 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
 
-            tally_bin[TALLY_SCORE, bin_idx + j * tally["N_score"] + i] += score
-
-            # adapt.global_add(
-            #     tally_bin, (TALLY_SCORE, bin_idx + i), score
-            # )  # TODO: fix this score indexing, this is wrong
+            adapt.global_add(
+                tally_bin,
+                (TALLY_SCORE, bin_idx + j * tally["N_score"] + i),
+                round(score),
+            )
+            # tally_bin[TALLY_SCORE, bin_idx + j * tally["N_score"] + i] += score
 
 
 @njit
@@ -2092,7 +2090,6 @@ def calculate_distance_in_coarse_bin(P_arr, distance, center, cs_bin_size, mcdc)
     ux = P["ux"]
     uy = P["uy"]
     uz = P["uz"]
-    ut = 1.0 / physics.get_speed(P_arr, mcdc)
 
     # Particle initial and final coordinate
     x = P["x"]
@@ -2102,14 +2099,13 @@ def calculate_distance_in_coarse_bin(P_arr, distance, center, cs_bin_size, mcdc)
     x_final = x + ux * distance
     y_final = y + uy * distance
     z_final = z + uz * distance
-    t_final = t + ut * distance
 
     start = np.array([x, y])
     end = np.array([x_final, y_final])
 
     # Edges of the coarse bin
-    x_min, x_max = center[0] - cs_bin_size / 2, center[0] + cs_bin_size / 2
-    y_min, y_max = center[1] - cs_bin_size / 2, center[1] + cs_bin_size / 2
+    x_min, x_max = center[0] - cs_bin_size[0] / 2, center[0] + cs_bin_size[0] / 2
+    y_min, y_max = center[1] - cs_bin_size[1] / 2, center[1] + cs_bin_size[1] / 2
 
     def clip_segment_to_box(start, end, x_min, x_max, y_min, y_max):
         t0, t1 = 0.0, 1.0
@@ -2549,6 +2545,7 @@ def move_to_event(P_arr, data, mcdc):
         # CS tallies
         for tally in mcdc["cs_tallies"]:
             score_cs_tally(P_arr, distance, tally, data, mcdc)
+
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
