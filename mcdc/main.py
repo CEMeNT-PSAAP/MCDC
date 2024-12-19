@@ -3,17 +3,10 @@ import importlib.metadata
 import mcdc.config as config
 import matplotlib.pyplot as plt
 import numba as nb
+from matplotlib import colors as mpl_colors
+import scipy.fft as spfft
 from scipy.stats.qmc import Halton
 import cvxpy as cp
-
-import matplotlib.pyplot as plt
-from matplotlib import colors as mpl_colors
-from matplotlib.patches import Rectangle
-from shapely.geometry import Polygon, box
-import scipy.fft as spfft
-
-import numba as nb
-
 
 from mcdc.card import UniverseCard
 from mcdc.print_ import (
@@ -109,32 +102,6 @@ def run():
 
     # Closout
     closeout(mcdc)
-
-
-def calculate_cs_overlap(corners, grid):
-    quadrilateral = Polygon(corners)
-
-    # Get the dimensions of the grid
-    grid_height, grid_width = grid.shape
-
-    # Create an array to hold the overlap values
-    overlap = np.zeros_like(grid, dtype=float)
-
-    # Loop over each grid cell
-    for i in range(grid_height):
-        for j in range(grid_width):
-            # Define the current grid cell as a shapely box
-            cell = box(j - 0.5, i - 0.5, j + 0.5, i + 0.5)
-
-            # Calculate the intersection area between the cell and the quadrilateral
-            intersection = cell.intersection(quadrilateral).area
-
-            # Normalize by the cell area (which is 1 in this case)
-            overlap[i, j] = intersection
-
-    overlap_1d = overlap.flatten()
-
-    return overlap_1d
 
 
 def calculate_cs_A(data, mcdc):

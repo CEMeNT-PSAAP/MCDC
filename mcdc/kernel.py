@@ -32,8 +32,6 @@ def round(float_val):
     # return np.uint64(int_val).view(np.float64)
 
 
-from shapely.geometry import LineString, box
-
 # =============================================================================
 # Domain Decomposition
 # =============================================================================

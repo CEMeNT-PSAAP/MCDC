@@ -19,10 +19,11 @@ with h5py.File("output.h5", "r") as f:
 
     cs_results = f["tallies"]["cs_tally_0"]["fission"]["mean"][:]
 
-    # mesh_results = f["tallies"]["mesh_tally_0"]["fission"]["mean"][:]
-    # plt.imshow(mesh_results)
-    # plt.title("mesh results")
-    # plt.show()
+    mesh_results = f["tallies"]["mesh_tally_0"]["fission"]["mean"][:]
+    plt.imshow(mesh_results)
+    plt.title("mesh results")
+    plt.colorbar()
+    plt.show()
 
 Nx = 40
 Ny = 40
