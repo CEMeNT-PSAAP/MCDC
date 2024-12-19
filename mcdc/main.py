@@ -93,7 +93,7 @@ def run():
         loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
-    # Compressed sensing reconstruction - after the sim runs and gets results
+    # Compressed sensing reconstruction
     N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
     if N_cs_bins != 0:
         cs_reconstruct(data, mcdc)
@@ -151,7 +151,6 @@ def calculate_cs_A(data, mcdc):
     [x_centers, y_centers] = mcdc["cs_tallies"]["filter"]["cs_centers"][0]
     x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
     y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
-    np.save("center_points.npy", mcdc["cs_tallies"]["filter"]["cs_centers"][0])
 
     # Calculate the overlap grid for each bin, and flatten into a row of S
     for ibin in range(N_cs_bins):
@@ -190,19 +189,13 @@ def calculate_cs_A(data, mcdc):
 
         S[ibin] = overlap.flatten()
     S = np.array(S)
-
-    S_summed = np.sum(S, axis=0).reshape(Ny, Nx)
-    plt.imshow(S_summed)
-    plt.colorbar()
-    plt.title("S_Summed")
-    plt.show()
+    mcdc["cs_tallies"]["filter"]["cs_S"] = S
 
     assert np.allclose(S[-1], np.ones(Nx * Ny)), "Last row of S must be all ones"
     assert S.shape[1] == Nx * Ny, "Size of S must match Nx * Ny."
     assert (
         S.shape[1] == mcdc["cs_tallies"]["N_bin"][0]
     ), "Size of S must match number of cells in desired mesh tally"
-    np.save("sphere_S.npy", S)
 
     # TODO: can this be done in a different way? idk
     # Construct the DCT matrix T
@@ -221,7 +214,7 @@ def calculate_cs_sparse_solution(data, mcdc, A, b):
     vx = cp.Variable(N_fine_cells)
 
     # Basis pursuit denoising
-    l = 0
+    l = 0.5
     objective = cp.Minimize(0.5 * cp.norm(A @ vx - b, 2) + l * cp.norm(vx, 1))
     prob = cp.Problem(objective)
     result = prob.solve(verbose=False)
@@ -241,9 +234,6 @@ def calculate_cs_sparse_solution(data, mcdc, A, b):
 
 def cs_reconstruct(data, mcdc):
     tally_bin = data[TALLY]
-
-    print(tally_bin.shape)
-
     tally = mcdc["cs_tallies"][0]
     stride = tally["stride"]
     bin_idx = stride["tally"]
@@ -253,38 +243,13 @@ def cs_reconstruct(data, mcdc):
 
     b = tally_bin[TALLY_SUM, bin_idx : bin_idx + N_cs_bins]
 
-    # print(f"measurements b = {b}")
-
     A, T_inv = calculate_cs_A(data, mcdc)
     x = calculate_cs_sparse_solution(data, mcdc, A, b)
 
-    np.save("sparse_solution.npy", x)
-    # print(f"sparse solution shape = {x.shape}")
-    # print(x)
-
     recon = T_inv @ x
-    # print(f"recon.shape = {recon.shape}")
-    # print(f"recon = {recon}")
-
     recon_reshaped = recon.reshape(Ny, Nx)
 
-    plt.imshow(recon_reshaped)
-    plt.title("Reconstruction")
-    plt.colorbar()
-    plt.show()
-
-    return recon
-    # reconstruction
-
-    # # Find the sparse solution, and then find the reconstruction
-    # sparse_solution[res] = finding_sparse_solution(A[res], fluxes[res].size, b, bpdn_lambda)
-    # reconstruction[res] = np.reshape(un_matrix[res] @ sparse_solution[res], fluxes[res].shape)
-    # rescaled_recons[res] = downsample_to_resolution(reconstruction[res], input_flux.shape)
-
-    # if return_centers:
-    #     return reconstruction, input_flux, rescaled_recons, bin_centers[0]
-    # else:
-    #     return reconstruction, input_flux, rescaled_recons
+    tally["filter"]["cs_reconstruction"] = recon_reshaped
 
 
 # =============================================================================
@@ -486,42 +451,25 @@ def dd_mesh_bounds(idx):
 
 
 def generate_cs_centers(mcdc, N_dim=3, seed=123456789):
-    # N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
-    # x_lims = (
-    #     mcdc["cs_tallies"]["filter"]["x"][0][-1],
-    #     mcdc["cs_tallies"]["filter"]["x"][0][0],
-    # )
-    # y_lims = (
-    #     mcdc["cs_tallies"]["filter"]["y"][0][-1],
-    #     mcdc["cs_tallies"]["filter"]["y"][0][0],
-    # )
+    N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
+    x_lims = (
+        mcdc["cs_tallies"]["filter"]["x"][0][-1],
+        mcdc["cs_tallies"]["filter"]["x"][0][0],
+    )
+    y_lims = (
+        mcdc["cs_tallies"]["filter"]["y"][0][-1],
+        mcdc["cs_tallies"]["filter"]["y"][0][0],
+    )
 
-    # # Generate Halton sequence according to the seed
-    # halton_seq = Halton(d=N_dim, seed=seed)
-    # points = halton_seq.random(n=N_cs_bins)
+    # Generate Halton sequence according to the seed
+    halton_seq = Halton(d=N_dim, seed=seed)
+    points = halton_seq.random(n=N_cs_bins)
 
-    # # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
-    # x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
-    # y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
+    # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
+    x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
+    y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
 
-    # Generate the centers of the cells
-    x_centers = np.linspace(0.05, 3.95, 40)
-    y_centers = np.linspace(0.05, 3.95, 40)
-
-    # Create the meshgrid for all cell centers
-    X, Y = np.meshgrid(x_centers, y_centers)
-
-    # Flatten the arrays to get the list of coordinates
-    x_coords = X.flatten()
-    y_coords = Y.flatten()
-
-    x_coords_list = x_coords.tolist()
-    y_coords_list = y_coords.tolist()
-
-    x_coords_list.append(2.0)
-    y_coords_list.append(2.0)
-
-    return (x_coords_list, y_coords_list)
+    return (x_coords, y_coords)
 
 
 def prepare():
@@ -1948,7 +1896,14 @@ def generate_hdf5(data, mcdc):
                     group_name = "tallies/cs_tally_%i/%s/" % (ID, score_name)
 
                     center_points = tally["filter"]["cs_centers"]
-                    f.create_dataset(group_name + "center_points", data=center_points)
+                    S = tally["filter"]["cs_S"]
+                    reconstruction = tally["filter"]["cs_reconstruction"]
+
+                    f.create_dataset(
+                        "tallies/cs_tally_%i/center_points" % (ID), data=center_points
+                    )
+                    f.create_dataset("tallies/cs_tally_%i/S" % (ID), data=S)
+                    f.create_dataset(group_name + "reconstruction", data=reconstruction)
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]

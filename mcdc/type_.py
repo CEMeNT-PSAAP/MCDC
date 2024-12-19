@@ -954,6 +954,8 @@ def make_type_cs_tally(input_deck):
                 N_cs_centers,
             ),
         ),
+        ("cs_S", float64, (N_cs_centers, (Nmax_x - 1) * (Nmax_y - 1))),
+        ("cs_reconstruction", float64, ((Nmax_x - 1), (Nmax_y - 1))),
         ("x", float64, (Nmax_x,)),
         ("y", float64, (Nmax_y,)),
         ("z", float64, (Nmax_z,)),
