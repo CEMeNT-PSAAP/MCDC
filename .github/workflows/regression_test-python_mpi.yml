@@ -29,4 +29,5 @@ jobs:
         bash .github/workflows/patch.sh
     - name: Regression Test - MPI
       run: |
+        cd test/regression
         python run.py --mpiexec=4
