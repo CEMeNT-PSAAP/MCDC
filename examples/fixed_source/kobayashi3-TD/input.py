@@ -71,7 +71,7 @@ mcdc.tally.cell_tally(shield_cell, scores=["flux"])
 
 mcdc.tally.cs_tally(
     N_cs_bins=[150],
-    cs_bin_size=[8],
+    cs_bin_size=[8.0, 8.0],
     x=np.linspace(0.0, 60.0, 31),
     y=np.linspace(0.0, 100.0, 51),
     scores=["flux"],
@@ -79,7 +79,7 @@ mcdc.tally.cs_tally(
 
 
 # Setting
-mcdc.setting(N_particle=1e5)
+mcdc.setting(N_particle=1e2)
 
 # Run
 mcdc.run()
