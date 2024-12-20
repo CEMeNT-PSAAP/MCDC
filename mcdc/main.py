@@ -122,12 +122,15 @@ def calculate_cs_A(data, mcdc):
     # Calculate the overlap grid for each bin, and flatten into a row of S
     for ibin in range(N_cs_bins):
         if ibin == N_cs_bins - 1:
-            cs_bin_size = np.array([Nx, Ny])
+            cs_bin_size = np.array([x_grid[-1] + x_grid[0], y_grid[-1] + y_grid[0]])
 
         bin_x_min = x_centers[ibin] - cs_bin_size[0] / 2
         bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
         bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
         bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
+
+        print(f"center = {x_centers[ibin], y_centers[ibin]}")
+        print(f"size = {cs_bin_size}")
 
         overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
 
@@ -155,6 +158,9 @@ def calculate_cs_A(data, mcdc):
                 overlap[i, j] = (overlap_x * overlap_y) / cell_area
 
         S[ibin] = overlap.flatten()
+
+    # for i in range(len(S[-1])):
+    #     print(S[-1][i])
     S = np.array(S)
     mcdc["cs_tallies"]["filter"]["cs_S"] = S
 
