@@ -19,7 +19,7 @@ jobs:
       run: |
         pwd
         ls
-    - uses: mpi4py/setup-mpi@v1
+    #- uses: mpi4py/setup-mpi@v1
     - name: Install dependencies
       run: |
         pip install -e .
