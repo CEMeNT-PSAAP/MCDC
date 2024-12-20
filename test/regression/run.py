@@ -104,7 +104,7 @@ for i, name in enumerate(names):
     # Run the test problem (redirect the stdout)
     if mpiexec > 1:
         os.system(
-            "mpirun -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
+            "mpiexec -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
             % (mpiexec, mode, target)
         )
     elif srun > 1:
