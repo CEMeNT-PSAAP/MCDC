@@ -30,4 +30,8 @@ jobs:
     - name: Regression Test - MPI
       run: |
         cd test/regression
-        python run.py --mpiexec=4
+        cd azurv1
+        mpiexec -n 4 python input.py
+        cd ..
+        cd dd_slab_reed
+        mpiexec -n 4 python input.py
