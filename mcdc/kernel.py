@@ -2044,18 +2044,22 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
 
     # Check each coarse bin
     for j in range(N_cs_bins):
-        center = (cs_centers[0][j], cs_centers[1][j])
+        center = np.array([cs_centers[0][j], cs_centers[1][j]])
+        start = np.array([x, y])
+        end = np.array([x_final, y_final])
+
+        distance_inside = calculate_distance_in_coarse_bin(
+            start, end, distance, center, cs_bin_size
+        )
 
         # Last bin covers the whole problem
         if j == N_cs_bins - 1:
-            cs_bin_size = np.array([INF, INF])
+            cs_bin_size_full_problem = np.array([INF, INF], dtype=np.float64)
+            distance_inside = calculate_distance_in_coarse_bin(
+                start, end, distance, center, cs_bin_size_full_problem
+            )
 
-        distance_in_bin = np.minimum(
-            distance,
-            calculate_distance_in_coarse_bin(
-                P_arr, distance, center, cs_bin_size, mcdc
-            ),
-        )
+        distance_in_bin = np.minimum(distance, distance_inside)  # this line is good
 
         # Calculate flux and other scores
         flux = distance_in_bin * P["w"]
@@ -2080,69 +2084,105 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
             # tally_bin[TALLY_SCORE, bin_idx + j * tally["N_score"] + i] += score
 
 
-@njit
-def calculate_distance_in_coarse_bin(P_arr, distance, center, cs_bin_size, mcdc):
-    P = P_arr[0]
+# @njit
+# def cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max):
+#     # Uses Liang-Barsky alog
+#     t0, t1 = 0.0, 1.0
 
-    # Particle 4D direction
-    ux = P["ux"]
-    uy = P["uy"]
-    uz = P["uz"]
+#     dx = end[0] - start[0]
+#     dy = end[1] - start[1]
 
-    # Particle initial and final coordinate
-    x = P["x"]
-    y = P["y"]
-    z = P["z"]
-    t = P["t"]
-    x_final = x + ux * distance
-    y_final = y + uy * distance
-    z_final = z + uz * distance
+#     def clip(p, q):
+#         nonlocal t0, t1
+#         if p < 0:
+#             t = q / p
+#             if t > t1:
+#                 return False
+#             if t > t0:
+#                 t0 = t
+#         elif p > 0:
+#             t = q / p
+#             if t < t0:
+#                 return False
+#             if t < t1:
+#                 t1 = t
+#         elif q < 0:
+#             return False
+#         return True
 
-    start = np.array([x, y])
-    end = np.array([x_final, y_final])
+#     if clip(-dx, start[0] - x_min):
+#         if clip(dx, x_max - start[0]):
+#             if clip(-dy, start[1] - y_min):
+#                 if clip(dy, y_max - start[1]):
+#                     if t1 < 1:
+#                         end = start + t1 * np.array([dx, dy])
+#                     if t0 > 0:
+#                         start = start + t0 * np.array([dx, dy])
+#                     return np.linalg.norm(end - start)
+#     return 0.0
 
-    # Edges of the coarse bin
-    x_min, x_max = center[0] - cs_bin_size[0] / 2, center[0] + cs_bin_size[0] / 2
-    y_min, y_max = center[1] - cs_bin_size[1] / 2, center[1] + cs_bin_size[1] / 2
 
-    def clip_segment_to_box(start, end, x_min, x_max, y_min, y_max):
-        t0, t1 = 0.0, 1.0
+@njit(debug=True)
+def cs_clip(p, q, t0, t1):
+    if p < 0:
+        t = q / p
+        if t > t1:
+            return False, t0, t1
+        if t > t0:
+            t0 = t
+    elif p > 0:
+        t = q / p
+        if t < t0:
+            return False, t0, t1
+        if t < t1:
+            t1 = t
+    elif q < 0:
+        return False, t0, t1
+    return True, t0, t1
 
-        dx = end[0] - start[0]
-        dy = end[1] - start[1]
 
-        def clip(p, q):
-            nonlocal t0, t1
-            if p < 0:
-                t = q / p
-                if t > t1:
-                    return False
-                if t > t0:
-                    t0 = t
-            elif p > 0:
-                t = q / p
-                if t < t0:
-                    return False
-                if t < t1:
-                    t1 = t
-            elif q < 0:
-                return False
-            return True
+@njit(debug=True)
+def cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max):
+    # Uses Liang-Barsky algorithm for finding tracklength in box
+    t0, t1 = 0.0, 1.0
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
 
-        if clip(-dx, start[0] - x_min):
-            if clip(dx, x_max - start[0]):
-                if clip(-dy, start[1] - y_min):
-                    if clip(dy, y_max - start[1]):
-                        if t1 < 1:
-                            end = start + t1 * np.array([dx, dy])
-                        if t0 > 0:
-                            start = start + t0 * np.array([dx, dy])
-                        return np.linalg.norm(end - start)
+    # Perform clipping for each boundary
+    result, t0, t1 = cs_clip(-dx, start[0] - x_min, t0, t1)
+    if not result:
+        return 0.0
+    result, t0, t1 = cs_clip(dx, x_max - start[0], t0, t1)
+    if not result:
+        return 0.0
+    result, t0, t1 = cs_clip(-dy, start[1] - y_min, t0, t1)
+    if not result:
+        return 0.0
+    result, t0, t1 = cs_clip(dy, y_max - start[1], t0, t1)
+    if not result:
         return 0.0
 
-    distance_inside = clip_segment_to_box(start, end, x_min, x_max, y_min, y_max)
+    # Update start and end points based on clipping results
+    if t1 < 1:
+        end = start + t1 * np.array([dx, dy])
+    if t0 > 0:
+        start = start + t0 * np.array([dx, dy])
 
-    return distance_inside
+    return np.linalg.norm(end - start)
+
+
+@njit
+def calculate_distance_in_coarse_bin(start, end, distance, center, cs_bin_size):
+    # Edges of the coarse bin
+    x_min = center[0] - cs_bin_size[0] / 2
+    x_max = center[0] + cs_bin_size[0] / 2
+    y_min = center[1] - cs_bin_size[1] / 2
+    y_max = center[1] + cs_bin_size[1] / 2
+
+    # distance_inside = cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max)
+    distance_inside = 0.1234
+
+    return np.float64(distance_inside)
 
 
 @njit
