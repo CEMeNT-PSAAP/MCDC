@@ -2081,48 +2081,9 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
                 (TALLY_SCORE, bin_idx + j * tally["N_score"] + i),
                 round(score),
             )
-            # tally_bin[TALLY_SCORE, bin_idx + j * tally["N_score"] + i] += score
 
 
-# @njit
-# def cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max):
-#     # Uses Liang-Barsky alog
-#     t0, t1 = 0.0, 1.0
-
-#     dx = end[0] - start[0]
-#     dy = end[1] - start[1]
-
-#     def clip(p, q):
-#         nonlocal t0, t1
-#         if p < 0:
-#             t = q / p
-#             if t > t1:
-#                 return False
-#             if t > t0:
-#                 t0 = t
-#         elif p > 0:
-#             t = q / p
-#             if t < t0:
-#                 return False
-#             if t < t1:
-#                 t1 = t
-#         elif q < 0:
-#             return False
-#         return True
-
-#     if clip(-dx, start[0] - x_min):
-#         if clip(dx, x_max - start[0]):
-#             if clip(-dy, start[1] - y_min):
-#                 if clip(dy, y_max - start[1]):
-#                     if t1 < 1:
-#                         end = start + t1 * np.array([dx, dy])
-#                     if t0 > 0:
-#                         start = start + t0 * np.array([dx, dy])
-#                     return np.linalg.norm(end - start)
-#     return 0.0
-
-
-@njit(debug=True)
+@njit
 def cs_clip(p, q, t0, t1):
     if p < 0:
         t = q / p
@@ -2141,7 +2102,7 @@ def cs_clip(p, q, t0, t1):
     return True, t0, t1
 
 
-@njit(debug=True)
+@njit
 def cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max):
     # Uses Liang-Barsky algorithm for finding tracklength in box
     t0, t1 = 0.0, 1.0
@@ -2179,10 +2140,9 @@ def calculate_distance_in_coarse_bin(start, end, distance, center, cs_bin_size):
     y_min = center[1] - cs_bin_size[1] / 2
     y_max = center[1] + cs_bin_size[1] / 2
 
-    # distance_inside = cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max)
-    distance_inside = 0.1234
+    distance_inside = cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max)
 
-    return np.float64(distance_inside)
+    return distance_inside
 
 
 @njit
