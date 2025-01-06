@@ -152,7 +152,7 @@ def get_indexes(N, nx, ny):
     return i, j, k
 
 
-def get_neighbors(N, w, nx, ny, nz):
+def get_neighbors(N, nx, ny, nz):
     i, j, k = get_indexes(N, nx, ny)
     if i > 0:
         xn = get_d_idx(i - 1, j, k, nx, ny)
@@ -181,16 +181,21 @@ def get_neighbors(N, w, nx, ny, nz):
     return xn, xp, yn, yp, zn, zp
 
 
-def dd_prepare():
+def prepare_domain_decomposition():
+    # Key parameters
     work_ratio = input_deck.technique["dd_work_ratio"]
-
+    N_proc = MPI.COMM_WORLD.Get_size()
+    # Decomposition mesh sizes
     d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
+    # Default parameters
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
-
+    if work_ratio is None:
+        work_ratio = np.ones(d_Nx * d_Ny * d_Nz, dtype=int)
+        input_deck.technique["dd_work_ratio"] = work_ratio
     if input_deck.technique["dd_exchange_rate_padding"] == None:
         if config.args.target == "gpu":
             padding = config.args.gpu_block_count * 64 * 16
@@ -198,34 +203,32 @@ def dd_prepare():
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
 
-    if work_ratio is None:
-        work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
-        input_deck.technique["dd_work_ratio"] = work_ratio
-
+    # Check if the combination of work_ratio and MPI rank size is acceptable
     if (
         input_deck.technique["domain_decomposition"]
-        and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
+        and N_proc % np.sum(work_ratio) != 0
     ):
         print_msg(
-            "Domain work ratio not equal to number of processors, %i != %i "
-            % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
+            "Number of MPI processes (%i) should be a multiple of the sum of the decomposed domain work ratio (%i)"
+            % (N_proc, np.sum(work_ratio))
         )
         exit()
+    N_ratio = int(N_proc / np.sum(work_ratio))
 
+    # Assign domain index and processors' numbers in each domain
     if input_deck.technique["domain_decomposition"]:
-        # Assigning domain index
         i = 0
         rank_info = []
         for n in range(d_Nx * d_Ny * d_Nz):
             ranks = []
-            for r in range(int(work_ratio[n])):
+            for r in range(work_ratio[n] * N_ratio):
                 ranks.append(i)
                 if MPI.COMM_WORLD.Get_rank() == i:
                     d_idx = n
                 i += 1
             rank_info.append(ranks)
         input_deck.technique["dd_idx"] = d_idx
-        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
+        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, d_Nx, d_Ny, d_Nz)
     else:
         input_deck.technique["dd_idx"] = 0
         input_deck.technique["dd_xp_neigh"] = []
@@ -236,6 +239,7 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
         return
 
+    # Assign neighbor processor numbers in all 3x2 sides
     if xp is not None:
         input_deck.technique["dd_xp_neigh"] = rank_info[xp]
     else:
@@ -305,7 +309,7 @@ def prepare():
       (3) Create and set up global variable container `mcdc`
     """
 
-    dd_prepare()
+    prepare_domain_decomposition()
 
     # =========================================================================
     # Create root universe if not defined
