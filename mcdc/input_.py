@@ -1320,7 +1320,6 @@ def domain_decomposition(
     exchange_rate=100000,
     exchange_rate_padding=None,
     work_ratio=None,
-    repro=True,
 ):
     """
     Activate domain decomposition.
@@ -1347,7 +1346,6 @@ def domain_decomposition(
     card["domain_decomposition"] = True
     card["dd_exchange_rate"] = int(exchange_rate)
     card["dd_exchange_rate_padding"] = exchange_rate_padding
-    card["dd_repro"] = repro
     dom_num = 1
     # Set mesh
     if x is not None:

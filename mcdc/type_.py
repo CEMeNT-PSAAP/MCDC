@@ -1024,7 +1024,6 @@ def make_type_technique(input_deck):
     struct += [("dd_work_ratio", int64, (len(card["dd_work_ratio"]),))]
     struct += [("dd_exchange_rate", int64)]
     struct += [("dd_exchange_rate_padding", int64)]
-    struct += [("dd_repro", bool_)]
     struct += [("dd_xp_neigh", int64, (len(card["dd_xp_neigh"]),))]
     struct += [("dd_xn_neigh", int64, (len(card["dd_xn_neigh"]),))]
     struct += [("dd_yp_neigh", int64, (len(card["dd_yp_neigh"]),))]
