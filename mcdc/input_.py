@@ -1359,11 +1359,8 @@ def domain_decomposition(
     if z is not None:
         card["dd_mesh"]["z"] = z
         dom_num += len(z)
-    # Set work ratio
-    if work_ratio is None:
-        card["dd_work_ratio"] = None
-    elif work_ratio is not None:
-        card["dd_work_ratio"] = work_ratio
+
+    card["dd_work_ratio"] = work_ratio
     card["dd_idx"] = 0
     card["dd_xp_neigh"] = []
     card["dd_xn_neigh"] = []
