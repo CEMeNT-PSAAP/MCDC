@@ -83,6 +83,7 @@ class InputDeck:
             "ww_mesh": make_card_mesh(),
             "domain_decomposition": False,
             "dd_idx": 0,
+            "dd_local_rank": 0,
             "dd_mesh": make_card_mesh(),
             "dd_exchange_rate": 0,
             "dd_exchange_rate_padding": 0,

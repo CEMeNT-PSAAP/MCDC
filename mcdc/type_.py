@@ -1419,6 +1419,8 @@ def make_type_global(input_deck):
             ("rng_seed", uint64),
             ("rng_stride", int64),
             ("dd_idx", int64),
+            ("dd_N_local_source", int64),
+            ("dd_local_rank", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
