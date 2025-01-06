@@ -1078,7 +1078,7 @@ def prepare():
             input_deck.technique["dd_mesh"]["azi"].size - 1
         )
         # Set exchange rate
-        for name in ["dd_exchange_rate", "dd_repro"]:
+        for name in ["dd_exchange_rate"]:
             copy_field(mcdc["technique"], input_deck.technique, name)
         # Set domain index
         copy_field(mcdc, input_deck.technique, "dd_idx")

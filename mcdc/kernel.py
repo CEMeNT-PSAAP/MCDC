@@ -702,12 +702,8 @@ def source_particle_dd(seed, mcdc):
 def distribute_work_dd(N, mcdc, precursor=False):
     # Total # of work
     work_size_total = N
-
-    if not mcdc["technique"]["dd_repro"]:
-        work_size, work_start = domain_work(mcdc, mcdc["dd_idx"], N)
-    else:
-        work_start = 0
-        work_size = work_size_total
+    work_start = 0
+    work_size = work_size_total
 
     if not precursor:
         mcdc["mpi_work_start"] = work_start
