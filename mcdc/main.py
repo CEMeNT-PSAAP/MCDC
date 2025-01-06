@@ -225,12 +225,15 @@ def prepare_domain_decomposition():
                 ranks.append(i)
                 if MPI.COMM_WORLD.Get_rank() == i:
                     d_idx = n
+                    local_rank = r
                 i += 1
             rank_info.append(ranks)
         input_deck.technique["dd_idx"] = d_idx
+        input_deck.technique["dd_local_rank"] = local_rank
         xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, d_Nx, d_Ny, d_Nz)
     else:
         input_deck.technique["dd_idx"] = 0
+        input_deck.technique["dd_local_rank"] = 0
         input_deck.technique["dd_xp_neigh"] = []
         input_deck.technique["dd_xn_neigh"] = []
         input_deck.technique["dd_yp_neigh"] = []
@@ -1082,6 +1085,7 @@ def prepare():
             copy_field(mcdc["technique"], input_deck.technique, name)
         # Set domain index
         copy_field(mcdc, input_deck.technique, "dd_idx")
+        copy_field(mcdc, input_deck.technique, "dd_local_rank")
         for name in ["xp", "xn", "yp", "yn", "zp", "zn"]:
             copy_field(mcdc["technique"], input_deck.technique, f"dd_{name}_neigh")
         copy_field(mcdc["technique"], input_deck.technique, "dd_work_ratio")

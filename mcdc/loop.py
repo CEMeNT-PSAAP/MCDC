@@ -200,8 +200,32 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         P = P_arr[0]
 
     # Check if it is beyond current census index
+    hit_census = False
     idx_census = mcdc["idx_census"]
     if P["t"] > mcdc["setting"]["census_time"][idx_census]:
+        hit_census = True
+
+    # Check if particle is in the domain (if decomposed)
+    if mcdc["technique"]["domain_decomposition"]:
+        if not kernel.particle_in_domain(P_arr, mcdc):
+            return
+
+        # Also check if it belongs to the current rank
+        mcdc["dd_N_local_source"] += 1
+        if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 1:
+            if mcdc["dd_N_local_source"] % mcdc["dd_local_rank"] + 1 > 0:
+                return
+
+    # Put into the bank
+    if hit_census:
+        # TODO: Need a special bank for source particles in the later census indices.
+        #       This is needed so that those particles are not prematurely
+        #       population controlled.
+        adapt.add_census(P_arr, prog)
+    else:
+        adapt.add_active(P_arr, prog)
+
+    """
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
@@ -222,6 +246,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         else:
             kernel.recordlike_to_particle(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
+    """
 
 
 @njit
