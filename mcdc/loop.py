@@ -213,7 +213,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         # Also check if it belongs to the current rank
         mcdc["dd_N_local_source"] += 1
         if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 1:
-            if mcdc["dd_N_local_source"] % mcdc["dd_local_rank"] + 1 > 0:
+            if mcdc["dd_N_local_source"] % mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] != mcdc["dd_local_rank"]:
                 return
 
     # Put into the bank

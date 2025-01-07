@@ -214,6 +214,7 @@ def prepare_domain_decomposition():
         )
         exit()
     N_ratio = int(N_proc / np.sum(work_ratio))
+    work_ratio *= N_ratio
 
     # Assign domain index and processors' numbers in each domain
     if input_deck.technique["domain_decomposition"]:
@@ -221,7 +222,7 @@ def prepare_domain_decomposition():
         rank_info = []
         for n in range(d_Nx * d_Ny * d_Nz):
             ranks = []
-            for r in range(work_ratio[n] * N_ratio):
+            for r in range(work_ratio[n]):
                 ranks.append(i)
                 if MPI.COMM_WORLD.Get_rank() == i:
                     d_idx = n
@@ -1408,12 +1409,10 @@ def dd_mergetally(mcdc, data):
     else:
         i = 0
         dd_ranks = []
-        N_proc = MPI.COMM_WORLD.Get_size()
-        N_ratio = int(N_proc / np.sum(mcdc["technique"]["dd_work_ratio"]))
         # find nonzero tally processor IDs
         for n in range(d_Nx * d_Ny * d_Nz):
             dd_ranks.append(i)
-            i += int(mcdc["technique"]["dd_work_ratio"][n]) * N_ratio
+            i += int(mcdc["technique"]["dd_work_ratio"][n])
         # create MPI comm group for nonzero tallies
         dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
         dd_comm = MPI.COMM_WORLD.Create(dd_group)

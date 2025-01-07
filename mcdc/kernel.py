@@ -2101,11 +2101,9 @@ def dd_closeout(data, mcdc):
     with objmode():
         # assign processors to their subdomain group
         i = 0
-        N_proc = MPI.COMM_WORLD.Get_size()
-        N_ratio = int(N_proc / np.sum(mcdc["technique"]["dd_work_ratio"]))
         for n in range(d_Nx * d_Ny * d_Nz):
             dd_ranks = []
-            for r in range(int(mcdc["technique"]["dd_work_ratio"][n]) * N_ratio):
+            for r in range(int(mcdc["technique"]["dd_work_ratio"][n])):
                 dd_ranks.append(i)
                 i += 1
             # create MPI Comm group out of subdomain processors
@@ -2119,7 +2117,7 @@ def dd_closeout(data, mcdc):
                 dd_comm.Reduce(tally_bin[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
             if mcdc["dd_idx"] == n:
                 tally_bin[TALLY_SUM] = buff
-                tally_bin[TALLY_SUM_SQ] = buff_sq * len(dd_ranks)
+                tally_bin[TALLY_SUM_SQ] = buff_sq
 
             # free comm group
             dd_group.Free()
@@ -2157,7 +2155,7 @@ def tally_closeout(data, mcdc):
         # DD Reduce if multiple processors per subdomain
         if N_dd != mcdc["mpi_size"]:
             dd_closeout(data, mcdc)
-
+        #tally[TALLY_SUM_SQ] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
     # Calculate and store statistics
     #   sum --> mean
     #   sum_sq --> standard deviation
@@ -2166,12 +2164,6 @@ def tally_closeout(data, mcdc):
         (tally[TALLY_SUM_SQ] / N_history - np.square(tally[TALLY_SUM]))
         / (N_history - 1)
     )
-    if mcdc["technique"]["domain_decomposition"]:
-        with objmode():
-            # correct tally values
-            N_proc = MPI.COMM_WORLD.Get_size()
-            N_ratio = int(N_proc / np.sum(mcdc["technique"]["dd_work_ratio"]))
-            tally /= N_ratio
 
 
 # =============================================================================
