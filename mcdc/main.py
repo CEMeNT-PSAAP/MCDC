@@ -1394,7 +1394,6 @@ def dd_mergetally(mcdc, data):
     # MPI gather
     if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
         sendcounts = np.array(MPI.COMM_WORLD.gather(len(tally[0]), root=0))
-        # print(MPI.COMM_WORLD.Get_rank(), tally)
         if mcdc["mpi_master"]:
             dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
         else:
@@ -1404,16 +1403,17 @@ def dd_mergetally(mcdc, data):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
             )
-        # print(dd_tally)
 
     # MPI gather for multiprocessor subdomains
     else:
         i = 0
         dd_ranks = []
+        N_proc = MPI.COMM_WORLD.Get_size()
+        N_ratio = int(N_proc / np.sum(mcdc["technique"]["dd_work_ratio"]))
         # find nonzero tally processor IDs
         for n in range(d_Nx * d_Ny * d_Nz):
             dd_ranks.append(i)
-            i += int(mcdc["technique"]["dd_work_ratio"][n])
+            i += int(mcdc["technique"]["dd_work_ratio"][n]) * N_ratio
         # create MPI comm group for nonzero tallies
         dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
         dd_comm = MPI.COMM_WORLD.Create(dd_group)
