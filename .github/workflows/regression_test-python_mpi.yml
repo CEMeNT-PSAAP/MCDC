@@ -29,7 +29,12 @@ jobs:
         bash .github/workflows/patch.sh
         lscpu
         mpiexec -n 2 python -m mpi4py.bench helloworld
+        echo " "
         mpiexec -n 4 python -m mpi4py.bench helloworld
+
+        mpiexec -n 4 python test_mpi.py
+        mpiexec -n 2 python test_mpi.py
+
     - name: Regression Test - MPI
       run: |
         cd test/regression
