@@ -30,4 +30,5 @@ jobs:
     - name: Regression Test - Numba and MPI
       run: |
           cd test/regression
+          mpiexec -n 4 python -m mpi4py.bench helloworld
           python run.py --mode=numba --mpiexec=4
