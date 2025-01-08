@@ -23,9 +23,8 @@ jobs:
     - name: Install dependencies
       run: |
         pip install mpi4py
-    - name: Patch Numba
+    - name: Run MPI
       run : |
-        bash .github/workflows/patch.sh
         lscpu
         mpiexec -n 2 python -m mpi4py.bench helloworld
         echo " "
