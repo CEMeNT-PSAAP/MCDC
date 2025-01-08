@@ -2155,7 +2155,7 @@ def tally_closeout(data, mcdc):
         # DD Reduce if multiple processors per subdomain
         if N_dd != mcdc["mpi_size"]:
             dd_closeout(data, mcdc)
-        #tally[TALLY_SUM_SQ] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
+        # tally[TALLY_SUM_SQ] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
     # Calculate and store statistics
     #   sum --> mean
     #   sum_sq --> standard deviation
