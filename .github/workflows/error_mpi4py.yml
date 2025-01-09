@@ -26,9 +26,9 @@ jobs:
     - name: Run MPI
       run : |
         lscpu
-        mpiexec -n 2 python -m mpi4py.bench helloworld
+        mpirun -n 2 python -m mpi4py.bench helloworld
         echo " "
-        mpiexec -n 4 python -m mpi4py.bench helloworld
+        mpirun -n 4 python -m mpi4py.bench helloworld
 
-        mpiexec -n 4 python test_mpi.py
-        mpiexec -n 2 python test_mpi.py
+        mpirun -n 4 python test_mpi.py
+        mpirun -n 2 python test_mpi.py
