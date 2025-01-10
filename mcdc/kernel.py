@@ -2059,7 +2059,7 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
                 start, end, distance, center, cs_bin_size_full_problem
             )
 
-        distance_in_bin = np.minimum(distance, distance_inside)  # this line is good
+        distance_in_bin = np.minimum(distance, distance_inside)
 
         # Calculate flux and other scores
         flux = distance_in_bin * P["w"]
