@@ -1108,7 +1108,6 @@ def make_type_technique(input_deck):
     struct += [("dd_work_ratio", int64, (len(card["dd_work_ratio"]),))]
     struct += [("dd_exchange_rate", int64)]
     struct += [("dd_exchange_rate_padding", int64)]
-    struct += [("dd_repro", bool_)]
     struct += [("dd_xp_neigh", int64, (len(card["dd_xp_neigh"]),))]
     struct += [("dd_xn_neigh", int64, (len(card["dd_xn_neigh"]),))]
     struct += [("dd_yp_neigh", int64, (len(card["dd_yp_neigh"]),))]
@@ -1506,6 +1505,8 @@ def make_type_global(input_deck):
             ("rng_seed", uint64),
             ("rng_stride", int64),
             ("dd_idx", int64),
+            ("dd_N_local_source", int64),
+            ("dd_local_rank", int64),
             ("k_eff", float64),
             ("k_cycle", float64, (N_cycle,)),
             ("k_avg", float64),
