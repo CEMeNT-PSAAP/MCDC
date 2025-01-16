@@ -1253,7 +1253,6 @@ def time_census(t):
     card = global_.input_deck.setting
     card["census_time"] = t
     card["N_census"] = len(t)
-    print(t)
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
