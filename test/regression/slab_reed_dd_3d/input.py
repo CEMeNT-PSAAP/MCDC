@@ -69,7 +69,12 @@ mcdc.source(x=[4.0,8.0],y=[4.0,8.0],z=[5.0, 6.0], isotropic=True, prob=0.5)
 # Set tally, setting, and run mcdc
 # =============================================================================
 
-mcdc.tally.mesh_tally(scores=["flux"], x=np.linspace(0.0, 8.0, 9), y=np.linspace(0.0, 8.0, 9), z=np.linspace(0.0, 8.0, 9))
+mcdc.tally.mesh_tally(
+    scores=["flux"],
+    x=np.linspace(0.0, 8.0, 9),
+    y=np.linspace(0.0, 8.0, 9),
+    z=np.linspace(0.0, 8.0, 9),
+)
 
 # Setting
 mcdc.setting(N_particle=5000)
