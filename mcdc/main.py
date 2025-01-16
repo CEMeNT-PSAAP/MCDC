@@ -708,7 +708,7 @@ def prepare():
             mcdc["technique"]["dd_xsum"] = len(input_deck.mesh_tallies[i].x) - 1
             mcdc["technique"]["dd_ysum"] = len(input_deck.mesh_tallies[i].y) - 1
             mcdc["technique"]["dd_zsum"] = len(input_deck.mesh_tallies[i].z) - 1
-            
+
             mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
 
             # Filters
