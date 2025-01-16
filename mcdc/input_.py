@@ -1238,12 +1238,13 @@ def time_census(t):
         None (in-place card alterations).
     """
 
-    # Remove census beyond the final tally time grid point
-    while True:
-        if t[-1] >= global_.input_deck.tally["mesh"]["t"][-1]:
-            t = t[:-1]
-        else:
-            break
+    # Make sure that the time grid points are sorted
+    if not is_sorted(t):
+        print_error("Time census: Time grid points have to be sorted.")
+
+    # Make sure that the starting point is larger than zero
+    if t[0] <= 0.0:
+        print_error("Time census: First census time should be larger than zero.")
 
     # Add the default, final census-at-infinity
     t = np.append(t, INF)
@@ -1252,6 +1253,7 @@ def time_census(t):
     card = global_.input_deck.setting
     card["census_time"] = t
     card["N_census"] = len(t)
+    print(t)
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
@@ -1808,3 +1810,12 @@ def save_particle_bank(bank, name):
 
 def reset():
     global_.input_deck.reset()
+
+
+# ==============================================================================
+# Misc
+# ==============================================================================
+
+
+def is_sorted(a):
+    return np.all(a[:-1] <= a[1:])
