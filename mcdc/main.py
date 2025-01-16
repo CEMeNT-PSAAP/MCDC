@@ -705,15 +705,25 @@ def prepare():
                 )
 
         else:  # decomposed mesh filters
+            mcdc["technique"]["dd_xsum"] = len(input_deck.mesh_tallies[i].x) - 1
+            mcdc["technique"]["dd_ysum"] = len(input_deck.mesh_tallies[i].y) - 1
+            mcdc["technique"]["dd_zsum"] = len(input_deck.mesh_tallies[i].z) - 1
+            
             mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
 
             # Filters
             new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
             new_y = input_deck.mesh_tallies[i].y[myn:myp]
             new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
-            mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
-            mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
-            mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
+            xlen = len(new_x)
+            ylen = len(new_y)
+            zlen = len(new_z)
+            mcdc["mesh_tallies"][i]["filter"]["x"][:xlen] = new_x
+            mcdc["mesh_tallies"][i]["filter"]["y"][:ylen] = new_y
+            mcdc["mesh_tallies"][i]["filter"]["z"][:zlen] = new_z
+            mcdc["technique"]["dd_xlen"] = xlen - 1
+            mcdc["technique"]["dd_ylen"] = ylen - 1
+            mcdc["technique"]["dd_zlen"] = zlen - 1
             for name in ["t", "mu", "azi", "g"]:
                 N = len(getattr(input_deck.mesh_tallies[i], name))
                 mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
@@ -1388,9 +1398,9 @@ def dd_mergetally(mcdc, data):
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
     # capture tally lengths for reorganizing later
-    xlen = len(mcdc["mesh_tallies"][0]["filter"]["x"]) - 1
-    ylen = len(mcdc["mesh_tallies"][0]["filter"]["y"]) - 1
-    zlen = len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1
+    xlen = mcdc["technique"]["dd_xlen"]
+    ylen = mcdc["technique"]["dd_ylen"]
+    zlen = mcdc["technique"]["dd_zlen"]
 
     # MPI gather
     if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
@@ -1404,6 +1414,10 @@ def dd_mergetally(mcdc, data):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
             )
+        # gather tally lengths for proper recombination
+        xlens = MPI.COMM_WORLD.gather(xlen, root=0)
+        ylens = MPI.COMM_WORLD.gather(ylen, root=0)
+        zlens = MPI.COMM_WORLD.gather(zlen, root=0)
 
     # MPI gather for multiprocessor subdomains
     else:
@@ -1425,6 +1439,10 @@ def dd_mergetally(mcdc, data):
             # gather tallies
             for i, t in enumerate(tally):
                 dd_comm.Gatherv(tally[i], (dd_tally[i], sendcounts), root=0)
+            # gather tally lengths for proper recombination
+            xlens = dd_comm.gather(xlen, root=0)
+            ylens = dd_comm.gather(ylen, root=0)
+            zlens = dd_comm.gather(zlen, root=0)
         dd_group.Free()
         if MPI.COMM_NULL != dd_comm:
             dd_comm.Free()
@@ -1434,20 +1452,39 @@ def dd_mergetally(mcdc, data):
         # reorganize tally data
         # TODO: find/develop a more efficient algorithm for this
         tally_idx = 0
+        offset = 0
+        ysum = mcdc["technique"]["dd_ysum"]
+        zsum = mcdc["technique"]["dd_zsum"]
         for di in range(0, d_Nx * d_Ny * d_Nz):
             dz = di // (d_Nx * d_Ny)
             dy = (di % (d_Nx * d_Ny)) // d_Nx
             dx = di % d_Nx
+
+            offset = 0
+            # calculate subdomain offset
+            for i in range(0, dx):
+                offset += xlens[i] * ysum * zsum
+
+            for i in range(0, dy):
+                y_ind = i * d_Nx
+                offset += ylens[y_ind] * zsum
+
+            for i in range(0, dz):
+                z_ind = i * d_Nx * d_Ny
+                offset += zlens[z_ind]
+
+            # calculate index within subdomain
+            xlen = xlens[di]
+            ylen = ylens[di]
+            zlen = zlens[di]
             for xi in range(0, xlen):
                 for yi in range(0, ylen):
                     for zi in range(0, zlen):
                         # calculate reorganized index
-                        ind_x = xi * (ylen * d_Ny * zlen * d_Nz) + dx * (
-                            xlen * ylen * d_Ny * zlen * d_Nz
-                        )
-                        ind_y = yi * (xlen * d_Nx) + dy * (ylen * xlen * d_Nx)
-                        ind_z = zi + dz * zlen
-                        buff_idx = ind_x + ind_y + ind_z
+                        ind_x = xi * ysum * zsum
+                        ind_y = yi * zsum
+                        ind_z = zi
+                        buff_idx = offset + ind_x + ind_y + ind_z
                         # place tally value in correct position
                         buff[:, buff_idx] = dd_tally[:, tally_idx]
                         tally_idx += 1
@@ -1472,11 +1509,11 @@ def dd_mergemesh(mcdc, data):
             MPI.COMM_WORLD.gather(len(mcdc["mesh_tallies"][0]["filter"]["x"]), root=0)
         )
         if mcdc["mpi_master"]:
-            x_filter = np.zeros((mcdc["mesh_tallies"].shape, sum(sendcounts)))
+            x_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
         else:
-            x_filter = np.empty((mcdc["mesh_tallies"].shape))  # dummy tally
+            x_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
         # gather mesh
-        for i in range(mcdc["mesh_tallies"].shape):
+        for i in range(mcdc["mesh_tallies"].shape[0]):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=mcdc["mesh_tallies"][i]["filter"]["x"],
                 recvbuf=(x_filter[i], sendcounts),
@@ -1496,7 +1533,7 @@ def dd_mergemesh(mcdc, data):
         else:
             y_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
         # gather mesh
-        for i in range(mcdc["mesh_tallies"].shape):
+        for i in range(mcdc["mesh_tallies"].shape[0]):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=mcdc["mesh_tallies"][i]["filter"]["y"],
                 recvbuf=(y_filter[i], sendcounts),
