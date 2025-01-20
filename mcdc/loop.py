@@ -103,7 +103,9 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 # TODO: Output tally (optional)
 
                 # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+                if mcdc["bank_census"]["size"] > 0:
+                    seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+                    kernel.manage_particle_banks(seed_bank, mcdc)
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:

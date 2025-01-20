@@ -1156,7 +1156,7 @@ def prepare():
     ):
         t_limit = INF
 
-    # Check if time boundary is above the final tally mesh time grid
+    # Set appropriate time boundary
     if mcdc["setting"]["time_boundary"] > t_limit:
         mcdc["setting"]["time_boundary"] = t_limit
 
