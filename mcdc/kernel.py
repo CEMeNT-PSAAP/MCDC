@@ -3038,17 +3038,28 @@ def fission(P_arr, prog):
         else:
             sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
 
+        # Eigenvalue mode: bank right away
+        if mcdc["setting"]["mode_eigenvalue"]:
+            adapt.add_census(P_new_arr, prog)
+            continue
+        # Below is only relevant for fixed-source problem
+
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
             continue
 
-        # Bank
+        # Check if it is beyond current or next census times
+        hit_census = False
+        hit_next_census = False
         idx_census = mcdc["idx_census"]
-        if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
-            adapt.add_census(P_new_arr, prog)
-        elif mcdc["setting"]["mode_eigenvalue"]:
-            adapt.add_census(P_new_arr, prog)
-        else:
+        if idx_census < mcdc['setting']['N_census'] - 1:
+            if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
+                hit_census = True
+                hit_next_census = True
+            elif P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
+                hit_census = True
+
+        if not hit_census:
             # Keep it if it is the last particle
             if n == N - 1:
                 P["alive"] = True
@@ -3061,6 +3072,12 @@ def fission(P_arr, prog):
                 P["w"] = P_new["w"]
             else:
                 adapt.add_active(P_new_arr, prog)
+        elif not hit_next_census:
+            # Particle will participate after the current census
+            adapt.add_census(P_new_arr, prog)
+        else:
+            # Particle will participate in the future
+            adapt.add_future(P_new_arr, prog)
 
 
 @njit

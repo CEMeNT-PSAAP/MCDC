@@ -111,9 +111,10 @@ def loop_fixed_source(data_arr, mcdc_arr):
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
             # Reset banks
-            kernel.set_bank_size(mcdc["bank_source"], 0)
-            kernel.set_bank_size(mcdc["bank_census"], 0)
             kernel.set_bank_size(mcdc["bank_active"], 0)
+            kernel.set_bank_size(mcdc["bank_census"], 0)
+            kernel.set_bank_size(mcdc["bank_source"], 0)
+            kernel.set_bank_size(mcdc["bank_future"], 0)
 
             # Tally history closeout
             kernel.tally_reduce(data, mcdc)
@@ -206,13 +207,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     if P['t'] > mcdc['setting']['time_boundary']:
         return
 
-    # Check if it is beyond current census index
-    hit_census = False
-    idx_census = mcdc["idx_census"]
-    if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-        hit_census = True
-
-    # Check if particle is in the domain (if decomposed)
+    # If domain is decomposed, check if particle is in the domain
     if mcdc["technique"]["domain_decomposition"]:
         if not kernel.particle_in_domain(P_arr, mcdc):
             return
@@ -227,14 +222,26 @@ def generate_source_particle(work_start, idx_work, seed, prog):
             ):
                 return
 
-    # Put into the bank
-    if hit_census:
-        # TODO: Need a special bank for source particles in the later census indices.
-        #       This is needed so that those particles are not prematurely
-        #       population controlled.
+    # Check if it is beyond current or next census times
+    hit_census = False
+    hit_next_census = False
+    idx_census = mcdc["idx_census"]
+    if idx_census < mcdc['setting']['N_census'] - 1:
+        if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
+            hit_census = True
+            hit_next_census = True
+        elif P["t"] > mcdc["setting"]["census_time"][idx_census]:
+            hit_census = True
+
+    # Put into the right bank
+    if not hit_census:
+        adapt.add_active(P_arr, prog)
+    elif not hit_next_census:
+        # Particle will participate after the current census
         adapt.add_census(P_arr, prog)
     else:
-        adapt.add_active(P_arr, prog)
+        # Particle will participate in the future
+        adapt.add_future(P_arr, prog)
 
     """
         if mcdc["technique"]["domain_decomposition"]:
