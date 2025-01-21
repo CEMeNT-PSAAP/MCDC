@@ -88,7 +88,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
             # Check and accordingly promote future particles to censused particle
-            if mcdc['bank_future']['size'][0] > 0:
+            if mcdc["bank_future"]["size"][0] > 0:
                 kernel.check_future_bank(mcdc)
 
             # Loop over source particles
@@ -208,7 +208,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         P = P_arr[0]
 
     # Skip if beyond time boundary
-    if P['t'] > mcdc['setting']['time_boundary']:
+    if P["t"] > mcdc["setting"]["time_boundary"]:
         return
 
     # If domain is decomposed, check if particle is in the domain
@@ -230,7 +230,7 @@ def generate_source_particle(work_start, idx_work, seed, prog):
     hit_census = False
     hit_next_census = False
     idx_census = mcdc["idx_census"]
-    if idx_census < mcdc['setting']['N_census'] - 1:
+    if idx_census < mcdc["setting"]["N_census"] - 1:
         if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
             hit_census = True
             hit_next_census = True
