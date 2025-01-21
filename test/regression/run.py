@@ -127,7 +127,7 @@ for i, name in enumerate(names):
         if target == "gpu":
             gpus_per_task = f"--gpus-per-task=1 "
         os.system(
-            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar %s> tmp 2>&1"
+            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar> tmp 2>&1"
             % (srun, gpus_per_task, mode, target)
         )
     else:
