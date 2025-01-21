@@ -1039,9 +1039,9 @@ def get_particle(P_arr, bank, mcdc):
 @njit
 def check_future_bank(mcdc):
     # Get the data needed
-    bank_future = mcdc['bank_future']
-    bank_census = mcdc['bank_census']
-    next_census_time = mcdc['setting']['census_time'][mcdc['idx_census'] + 1]
+    bank_future = mcdc["bank_future"]
+    bank_census = mcdc["bank_census"]
+    next_census_time = mcdc["setting"]["census_time"][mcdc["idx_census"] + 1]
 
     # Particle container
     P_arr = adapt.local_array(1, type_.particle_record)
@@ -1055,13 +1055,16 @@ def check_future_bank(mcdc):
         copy_recordlike(P_arr, bank_future["particles"][idx : idx + 1])
 
         # Promote the future particle to census bank
-        if P['t'] < next_census_time:
+        if P["t"] < next_census_time:
             adapt.add_census(P_arr, mcdc)
             add_bank_size(bank_future, -1)
 
             # Consolidate the emptied space in the future bank
             j = get_bank_size(bank_future)
-            copy_recordlike(bank_future['particles'][idx : idx + 1], bank_future['particles'][j : j + 1])
+            copy_recordlike(
+                bank_future["particles"][idx : idx + 1],
+                bank_future["particles"][j : j + 1],
+            )
 
 
 @njit
@@ -3081,7 +3084,7 @@ def fission(P_arr, prog):
         hit_census = False
         hit_next_census = False
         idx_census = mcdc["idx_census"]
-        if idx_census < mcdc['setting']['N_census'] - 1:
+        if idx_census < mcdc["setting"]["N_census"] - 1:
             if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
                 hit_census = True
                 hit_next_census = True
