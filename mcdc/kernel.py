@@ -2591,14 +2591,6 @@ def move_to_event(P_arr, data, mcdc):
     elif geometry.check_coincidence(d_collision, distance):
         P["event"] += EVENT_COLLISION
 
-    # Check distance to time boundary
-    if d_time_boundary < distance - COINCIDENCE_TOLERANCE:
-        distance = d_time_boundary
-        P["event"] = EVENT_TIME_BOUNDARY
-        P["surface_ID"] = -1
-    elif geometry.check_coincidence(d_time_boundary, distance):
-        P["event"] += EVENT_TIME_BOUNDARY
-
     # Check distance to time census
     if d_time_census < distance - COINCIDENCE_TOLERANCE:
         distance = d_time_census
@@ -2606,6 +2598,12 @@ def move_to_event(P_arr, data, mcdc):
         P["surface_ID"] = -1
     elif geometry.check_coincidence(d_time_census, distance):
         P["event"] += EVENT_TIME_CENSUS
+
+    # Check distance to time boundary (exclusive event)
+    if d_time_boundary < distance + COINCIDENCE_TOLERANCE:
+        distance = d_time_boundary
+        P["event"] = EVENT_TIME_BOUNDARY
+        P["surface_ID"] = -1
 
     # =========================================================================
     # Move particle

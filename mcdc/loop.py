@@ -98,12 +98,15 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 )
                 loop_source_precursor(seed_source_precursor, data, mcdc)
 
-            # Time census closeout
-            if idx_census < mcdc["setting"]["N_census"] - 1:
-                # TODO: Output tally (optional)
+            # TODO: Output tally
 
-                # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            # No particles censused?
+            if mcdc["bank_census"]["size"] == 0:
+                break
+
+            # Manage particle banks: population control and work rebalance
+            seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            kernel.manage_particle_banks(seed_bank, mcdc)
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
