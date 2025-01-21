@@ -202,6 +202,10 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         P_arr = mcdc["bank_source"]["particles"][idx_work : (idx_work + 1)]
         P = P_arr[0]
 
+    # Skip if beyond time boundary
+    if P['t'] > mcdc['setting']['time_boundary']:
+        return
+
     # Check if it is beyond current census index
     hit_census = False
     idx_census = mcdc["idx_census"]
