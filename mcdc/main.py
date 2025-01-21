@@ -1966,6 +1966,7 @@ def generate_hdf5(data, mcdc):
                 if mcdc["technique"]["iQMC"]:
                     break
                 N_cs_bins = tally["filter"]["N_cs_bins"]
+                cs_bin_size = tally["filter"]["cs_bin_size"]
 
                 # Shape
                 N_score = tally["N_score"]
@@ -2002,8 +2003,18 @@ def generate_hdf5(data, mcdc):
                     f.create_dataset(
                         "tallies/cs_tally_%i/center_points" % (ID), data=center_points
                     )
+
+                    f.create_dataset(
+                        "tallies/cs_tally_%i/N_cs_bins" % (ID), data=N_cs_bins
+                    )
+                    f.create_dataset(
+                        "tallies/cs_tally_%i/cs_bin_size" % (ID), data=cs_bin_size
+                    )
+
+                    # remove these two
                     f.create_dataset("tallies/cs_tally_%i/S" % (ID), data=S)
                     f.create_dataset(group_name + "reconstruction", data=reconstruction)
+                    ####
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]

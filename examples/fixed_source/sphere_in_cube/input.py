@@ -48,6 +48,12 @@ mcdc.tally.mesh_tally(
 
 mcdc.tally.cell_tally(sphere_cell, scores=["fission"])
 
+# mcdc.tally.cs_tally(
+#     N_cs_bins=[150],
+#     cs_bin_size=np.array([5.0, 5.0, 5.0]),
+# )
+
+
 mcdc.tally.cs_tally(
     N_cs_bins=[150],
     cs_bin_size=np.array([5.0, 5.0]),
