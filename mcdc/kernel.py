@@ -1074,8 +1074,11 @@ def manage_particle_banks(seed, mcdc):
         with objmode(time_start="float64"):
             time_start = MPI.Wtime()
 
+    # Reset source bank
+    set_bank_size(mcdc['bank_source'], 0)
+
+    # Normalize weight
     if mcdc["setting"]["mode_eigenvalue"]:
-        # Normalize weight
         normalize_weight(mcdc["bank_census"], mcdc["setting"]["N_particle"])
 
     # Population control
@@ -1545,6 +1548,10 @@ def pct_combing(seed, mcdc):
     idx_start, N_local, N = bank_scanning(bank_census, mcdc)
     idx_end = idx_start + N_local
 
+    # Abort if census bank is empty
+    if N == 0:
+        return
+
     # Teeth distance
     td = N / M
 
@@ -1583,6 +1590,10 @@ def pct_combing_weight(seed, mcdc):
     # Scan the bank based on weight
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
+
+    # Abort if census bank is empty
+    if W == 0.0:
+        return
 
     # Teeth distance
     td = W / M
@@ -1624,6 +1635,10 @@ def pct_splitting_roulette(seed, mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(bank_census, mcdc)
     idx_end = idx_start + N_local
+
+    # Abort if census bank is empty
+    if N == 0:
+        return
 
     # Weight scaling
     ws = float(N) / float(M)
@@ -1670,6 +1685,10 @@ def pct_splitting_roulette_weight(seed, mcdc):
     N_local = get_bank_size(bank_census)
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
+
+    # Abort if census bank is empty
+    if W == 0.0:
+        return
 
     # Weight of the surviving particles
     w_survive = W / M
