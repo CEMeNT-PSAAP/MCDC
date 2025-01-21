@@ -60,7 +60,7 @@ mcdc.tally.mesh_tally(
 )
 
 # Setting
-mcdc.setting(N_particle=9, active_bank_buff=1000, rng_seed=4)
+mcdc.setting(N_particle=15, active_bank_buff=1000, census_bank_buff=5, source_bank_buff=5, rng_seed=1)
 mcdc.time_census(np.logspace(-5, 1, 6))
 mcdc.population_control()
 
