@@ -1417,6 +1417,7 @@ def prepare():
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+    mcdc["bank_future"]["tag"] = "future"
 
     # IC generator banks
     if mcdc["technique"]["IC_generator"]:
