@@ -48,7 +48,7 @@ classifiers = [
     'Operating System :: MacOS',
 ]
 dependencies = [
-    "numba>=0.58.0",
+    "numba>0.60.0",
     "numpy",
     "scipy",
     "matplotlib",
