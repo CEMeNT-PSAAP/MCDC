@@ -87,6 +87,10 @@ def loop_fixed_source(data_arr, mcdc_arr):
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
+            # Check and accordingly promote future particles to censused particle
+            if mcdc['bank_future']['size'][0] > 0:
+                kernel.check_future_bank(mcdc)
+
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
             loop_source(seed_source, data, mcdc)
