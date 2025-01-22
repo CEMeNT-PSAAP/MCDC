@@ -1075,7 +1075,7 @@ def manage_particle_banks(seed, mcdc):
             time_start = MPI.Wtime()
 
     # Reset source bank
-    set_bank_size(mcdc['bank_source'], 0)
+    set_bank_size(mcdc["bank_source"], 0)
 
     # Normalize weight
     if mcdc["setting"]["mode_eigenvalue"]:
