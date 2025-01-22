@@ -1278,6 +1278,10 @@ def bank_rebalance(mcdc):
     idx_start, N_local, N = bank_scanning(mcdc["bank_source"], mcdc)
     idx_end = idx_start + N_local
 
+    # Abort if source bank is empty
+    if N == 0:
+        return
+
     distribute_work(N, mcdc)
 
     # Rebalance not needed if there is only one rank
