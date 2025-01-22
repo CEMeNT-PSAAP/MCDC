@@ -86,11 +86,6 @@ def run():
         loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
-    # Compressed sensing reconstruction
-    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
-    if N_cs_bins != 0:
-        cs_reconstruct(data, mcdc)
-
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
     generate_hdf5(data, mcdc)
@@ -102,122 +97,6 @@ def run():
 
     # Closout
     closeout(mcdc)
-
-
-def calculate_cs_A(data, mcdc):
-    x_grid = mcdc["mesh_tallies"]["filter"]["x"][0]
-    y_grid = mcdc["mesh_tallies"]["filter"]["y"][0]
-    Nx = len(x_grid) - 1
-    Ny = len(y_grid) - 1
-
-    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
-    cs_bin_size = mcdc["cs_tallies"]["filter"]["cs_bin_size"][0]
-
-    S = [[] for _ in range(N_cs_bins)]
-
-    [x_centers, y_centers] = mcdc["cs_tallies"]["filter"]["cs_centers"][0]
-    x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
-    y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
-
-    # Calculate the overlap grid for each bin, and flatten into a row of S
-    for ibin in range(N_cs_bins):
-        if ibin == N_cs_bins - 1:
-            # could just change to -INF, INF
-            cs_bin_size = np.array([x_grid[-1] + x_grid[0], y_grid[-1] + y_grid[0]])
-
-        bin_x_min = x_centers[ibin] - cs_bin_size[0] / 2
-        bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
-        bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
-        bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
-
-        overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
-
-        for i in range(len(y_grid) - 1):
-            for j in range(len(x_grid) - 1):
-                cell_x_min = x_grid[j]
-                cell_x_max = x_grid[j + 1]
-                cell_y_min = y_grid[i]
-                cell_y_max = y_grid[i + 1]
-
-                # Calculate overlap in x and y directions
-                overlap_x = np.maximum(
-                    0,
-                    np.minimum(bin_x_max, cell_x_max)
-                    - np.maximum(bin_x_min, cell_x_min),
-                )
-                overlap_y = np.maximum(
-                    0,
-                    np.minimum(bin_y_max, cell_y_max)
-                    - np.maximum(bin_y_min, cell_y_min),
-                )
-
-                # Calculate fractional overlap
-                cell_area = (cell_x_max - cell_x_min) * (cell_y_max - cell_y_min)
-                overlap[i, j] = (overlap_x * overlap_y) / cell_area
-
-        S[ibin] = overlap.flatten()
-    S = np.array(S)
-    mcdc["cs_tallies"]["filter"]["cs_S"] = S
-
-    assert np.allclose(S[-1], np.ones(Nx * Ny)), "Last row of S must be all ones"
-    assert S.shape[1] == Nx * Ny, "Size of S must match Nx * Ny."
-    assert (
-        S.shape[1] == mcdc["cs_tallies"]["N_bin"][0]
-    ), "Size of S must match number of cells in desired mesh tally"
-
-    # TODO: can this be done in a different way? idk
-    # Construct the DCT matrix T
-    idct_basis_x = spfft.idct(np.identity(Nx), axis=0)
-    idct_basis_y = spfft.idct(np.identity(Ny), axis=0)
-
-    T_inv = np.kron(idct_basis_y, idct_basis_x)
-    A = S @ T_inv
-    return A, T_inv
-
-
-def calculate_cs_sparse_solution(data, mcdc, A, b):
-    N_fine_cells = mcdc["cs_tallies"]["N_bin"][0]
-
-    # setting up the problem with CVXPY
-    vx = cp.Variable(N_fine_cells)
-
-    # Basis pursuit denoising
-    l = 0.5
-    objective = cp.Minimize(0.5 * cp.norm(A @ vx - b, 2) + l * cp.norm(vx, 1))
-    prob = cp.Problem(objective)
-    result = prob.solve(verbose=False)
-
-    # # Basis pursuit
-    # objective = cp.Minimize(cp.norm(vx, 1))
-    # constraints = [A @ vx == b]
-    # prob = cp.Problem(objective, constraints)
-    # result = prob.solve(verbose=True)
-    # print(f'vx.value = {vx.value}')
-
-    # formatting the sparse solution
-    sparse_solution = np.array(vx.value).squeeze()
-
-    return sparse_solution
-
-
-def cs_reconstruct(data, mcdc):
-    tally_bin = data[TALLY]
-    tally = mcdc["cs_tallies"][0]
-    stride = tally["stride"]
-    bin_idx = stride["tally"]
-    N_cs_bins = tally["filter"]["N_cs_bins"]
-    Nx = len(mcdc["mesh_tallies"]["filter"]["x"][0]) - 1
-    Ny = len(mcdc["mesh_tallies"]["filter"]["y"][0]) - 1
-
-    b = tally_bin[TALLY_SUM, bin_idx : bin_idx + N_cs_bins]
-
-    A, T_inv = calculate_cs_A(data, mcdc)
-    x = calculate_cs_sparse_solution(data, mcdc, A, b)
-
-    recon = T_inv @ x
-    recon_reshaped = recon.reshape(Ny, Nx)
-
-    tally["filter"]["cs_reconstruction"] = recon_reshaped
 
 
 # =============================================================================
@@ -2010,11 +1889,6 @@ def generate_hdf5(data, mcdc):
                     f.create_dataset(
                         "tallies/cs_tally_%i/cs_bin_size" % (ID), data=cs_bin_size
                     )
-
-                    # remove these two
-                    f.create_dataset("tallies/cs_tally_%i/S" % (ID), data=S)
-                    f.create_dataset(group_name + "reconstruction", data=reconstruction)
-                    ####
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
