@@ -73,7 +73,7 @@ scores = ["flux"]
 mcdc.tally.mesh_tally(scores=scores, x=x)
 
 # Setting
-mcdc.setting(N_particle=100, progress_bar=False, census_bank_buff=2.0)
+mcdc.setting(N_particle=100, progress_bar=False, census_bank_buff=2.0, source_bank_buff=2.0)
 mcdc.eigenmode(N_inactive=1, N_active=2, gyration_radius="only-x")
 
 # Run
