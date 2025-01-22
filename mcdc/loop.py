@@ -90,9 +90,14 @@ def loop_fixed_source(data_arr, mcdc_arr):
             # Check and accordingly promote future particles to censused particle
             if kernel.get_bank_size(mcdc["bank_future"]) > 0:
                 kernel.check_future_bank(mcdc)
-            if idx_census > 0 and kernel.get_bank_size(mcdc["bank_source"]) == 0 and kernel.get_bank_size(mcdc['bank_census']) == 0 and kernel.get_bank_size(mcdc['bank_future']) == 0:
+            if (
+                idx_census > 0
+                and kernel.get_bank_size(mcdc["bank_source"]) == 0
+                and kernel.get_bank_size(mcdc["bank_census"]) == 0
+                and kernel.get_bank_size(mcdc["bank_future"]) == 0
+            ):
                 # No more particle to work on
-                 break
+                break
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
             loop_source(seed_source, data, mcdc)
@@ -109,7 +114,6 @@ def loop_fixed_source(data_arr, mcdc_arr):
             # Manage particle banks: population control and work rebalance
             seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
             kernel.manage_particle_banks(seed_bank, mcdc)
-
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
