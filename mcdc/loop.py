@@ -109,11 +109,25 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 )
                 loop_source_precursor(seed_source_precursor, data, mcdc)
 
-            # TODO: Output tally
-
             # Manage particle banks: population control and work rebalance
             seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
             kernel.manage_particle_banks(seed_bank, mcdc)
+
+            # Time census-based tally closeout
+            if mcdc['setting']['census_based_tally']:
+                kernel.tally_reduce(data, mcdc)
+                kernel.census_based_tally_output(data, mcdc)
+                # TODO: UQ tally
+
+                # Re-configure census-based tally grids
+                N_bin = mcdc['setting']['census_tally_frequency']
+                t_start = mcdc['setting']['census_time'][idx_census]
+                t_end = mcdc['setting']['census_time'][idx_census + 1]
+                dt = (t_end - t_start) / N_bin
+                for tally in mcdc["mesh_tallies"]:
+                    tally['filter']['t'][0] = t_start
+                    for i in range(N_bin):
+                        tally['filter']['t'][i + 1] = tally['filter']['t'][i] + dt
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
@@ -123,17 +137,19 @@ def loop_fixed_source(data_arr, mcdc_arr):
             kernel.set_bank_size(mcdc["bank_source"], 0)
             kernel.set_bank_size(mcdc["bank_future"], 0)
 
-            # Tally history closeout
-            kernel.tally_reduce(data, mcdc)
-            kernel.tally_accumulate(data, mcdc)
-            # Uq closeout
-            if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(data, mcdc)
+            if not mcdc['setting']['census_based_tally']:
+                # Tally history closeout
+                kernel.tally_reduce(data, mcdc)
+                kernel.tally_accumulate(data, mcdc)
+                # Uq closeout
+                if mcdc["technique"]["uq"]:
+                    kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
-    if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(data, mcdc)
-    kernel.tally_closeout(data, mcdc)
+    if not mcdc['setting']['census_based_tally']:
+        if mcdc["technique"]["uq"]:
+            kernel.uq_tally_closeout(data, mcdc)
+        kernel.tally_closeout(data, mcdc)
 
 
 # =========================================================================
@@ -307,7 +323,8 @@ def source_closeout(prog, idx_work, N_prog, data):
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        kernel.tally_accumulate(data, mcdc)
+        if not mcdc['setting']['census_based_tally']:
+            kernel.tally_accumulate(data, mcdc)
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
