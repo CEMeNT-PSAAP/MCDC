@@ -322,28 +322,43 @@ def generate_cs_centers(mcdc, seed=123456789):
         mcdc["mesh_tallies"]["filter"]["z"][0][0],
     )
 
-    N_dim = 0
-    if x_lims != (INF, -INF):
-        N_dim += 1
-    if y_lims != (INF, -INF):
-        N_dim += 1
     if z_lims != (INF, -INF):
-        N_dim += 1
-    if N_dim == 0:
-        raise ValueError("N_dim can't be zero!!")
+        N_dim = 3
+    else:
+        N_dim = 2
+
+    # N_dim = 0
+    # if x_lims != (INF, -INF):
+    #     N_dim += 1
+    # if y_lims != (INF, -INF):
+    #     N_dim += 1
+    # if z_lims != (INF, -INF):
+    #     N_dim += 1
+    # if N_dim == 0:
+    #     raise ValueError("N_dim can't be zero!!")
 
     # Generate Halton sequence according to the seed
     halton_seq = Halton(d=N_dim, seed=seed)
     points = halton_seq.random(n=N_cs_bins)
 
     # Extract x/y/z coordinates as tuples separately, scaled to the problem dimensions
-    x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
-    y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
+    x_coords = points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0]
+    y_coords = points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0]
+
+    # Last bin is in exact center
+    x_coords[-1] = (x_lims[0] + x_lims[-1]) / 2
+    y_coords[-1] = (y_lims[0] + y_lims[-1]) / 2
+
+    x_coords = tuple(x_coords)
+    y_coords = tuple(y_coords)
+
     if N_dim == 2:
-        return (x_coords, y_coords)
+        z_coords = [0] * len(x_coords)
     elif N_dim == 3:
-        z_coords = tuple(points[:, 2] * (z_lims[1] - z_lims[0]) + z_lims[0])
-        return (x_coords, y_coords, z_coords)
+        z_coords = points[:, 2] * (z_lims[1] - z_lims[0]) + z_lims[0]
+        z_coords[-1] = (z_lims[0] + z_lims[-1]) / 2
+        z_coords = tuple(z_coords)
+    return (x_coords, y_coords, z_coords)
 
 
 def prepare():

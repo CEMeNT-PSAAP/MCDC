@@ -233,7 +233,11 @@ def cs_tally(
 
     # Set bin properties, convert bin size to problem units
     card.N_cs_bins = N_cs_bins
-    card.cs_bin_size = cs_bin_size
+
+    if len(cs_bin_size) == 2:
+        card.cs_bin_size = [cs_bin_size[0], cs_bin_size[1], INF]
+    else:
+        card.cs_bin_size = cs_bin_size
     # card.cs_bin_size[0] = cs_bin_size[0] / (len(x) - 1) * (x[-1] - x[0])
     # card.cs_bin_size[1] = cs_bin_size[1] / (len(y) - 1) * (y[-1] - y[0])
     # card.cs_bin_size[2] = cs_bin_size[2] / (len(z) - 1) * (z[-1] - z[0])
