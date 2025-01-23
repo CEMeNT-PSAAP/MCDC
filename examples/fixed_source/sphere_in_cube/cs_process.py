@@ -3,6 +3,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fft as spfft
 import cvxpy as cp
+import time
+from mpl_toolkits.mplot3d import Axes3D
+
+with h5py.File("output.h5", "r") as f:
+    cs_results = f["tallies"]["cs_tally_0"]["fission"]["mean"][:]
+    print(cs_results.shape)
+    print(cs_results)
+    x_centers = f["tallies"]["cs_tally_0"]["center_points"][0]
+    y_centers = f["tallies"]["cs_tally_0"]["center_points"][1]
+    z_centers = f["tallies"]["cs_tally_0"]["center_points"][2]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(x_centers, y_centers, z_centers, c="b", marker="o")
+    plt.show()
+
+time.sleep(100)
 
 with h5py.File("output.h5", "r") as f:
     # User-defined parameters

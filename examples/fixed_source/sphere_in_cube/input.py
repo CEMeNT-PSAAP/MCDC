@@ -42,28 +42,20 @@ mcdc.tally.mesh_tally(
     scores=["fission"],
     x=np.linspace(0.0, 4.0, 41),
     y=np.linspace(0.0, 4.0, 41),
-    # z=np.linspace(0.0, 4.0, 41),
+    z=np.linspace(0.0, 4.0, 41),
     # t=np.linspace(0.0, 200.0, 2),
 )
 
 mcdc.tally.cell_tally(sphere_cell, scores=["fission"])
 
-# mcdc.tally.cs_tally(
-#     N_cs_bins=[150],
-#     cs_bin_size=np.array([5.0, 5.0, 5.0]),
-# )
-
-
 mcdc.tally.cs_tally(
-    N_cs_bins=[150],
-    cs_bin_size=np.array([5.0, 5.0]),
-    x=np.linspace(0.0, 4.0, 41),
-    y=np.linspace(0.0, 4.0, 41),
+    N_cs_bins=[100],
+    cs_bin_size=np.array([5.0, 5.0, 5.0]),
     scores=["fission"],
 )
 
 # Setting
-mcdc.setting(N_particle=1e3)
+mcdc.setting(N_particle=10)
 mcdc.implicit_capture()
 
 # Run

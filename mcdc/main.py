@@ -305,26 +305,45 @@ def dd_mesh_bounds(idx):
     return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
 
 
-def generate_cs_centers(mcdc, N_dim=3, seed=123456789):
+def generate_cs_centers(mcdc, seed=123456789):
     N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
+
+    # Taking the limits of the problem from the mesh tallies
     x_lims = (
-        mcdc["cs_tallies"]["filter"]["x"][0][-1],
-        mcdc["cs_tallies"]["filter"]["x"][0][0],
+        mcdc["mesh_tallies"]["filter"]["x"][0][-1],
+        mcdc["mesh_tallies"]["filter"]["x"][0][0],
     )
     y_lims = (
-        mcdc["cs_tallies"]["filter"]["y"][0][-1],
-        mcdc["cs_tallies"]["filter"]["y"][0][0],
+        mcdc["mesh_tallies"]["filter"]["y"][0][-1],
+        mcdc["mesh_tallies"]["filter"]["y"][0][0],
     )
+    z_lims = (
+        mcdc["mesh_tallies"]["filter"]["z"][0][-1],
+        mcdc["mesh_tallies"]["filter"]["z"][0][0],
+    )
+
+    N_dim = 0
+    if x_lims != (INF, -INF):
+        N_dim += 1
+    if y_lims != (INF, -INF):
+        N_dim += 1
+    if z_lims != (INF, -INF):
+        N_dim += 1
+    if N_dim == 0:
+        raise ValueError("N_dim can't be zero!!")
 
     # Generate Halton sequence according to the seed
     halton_seq = Halton(d=N_dim, seed=seed)
     points = halton_seq.random(n=N_cs_bins)
 
-    # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
+    # Extract x/y/z coordinates as tuples separately, scaled to the problem dimensions
     x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
     y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
-
-    return (x_coords, y_coords)
+    if N_dim == 2:
+        return (x_coords, y_coords)
+    elif N_dim == 3:
+        z_coords = tuple(points[:, 2] * (z_lims[1] - z_lims[0]) + z_lims[0])
+        return (x_coords, y_coords, z_coords)
 
 
 def prepare():
@@ -931,22 +950,42 @@ def prepare():
     # CS tallies
     for i in range(N_cs_tally):
         # Direct assignment
-        copy_field(mcdc["cs_tallies"][i], input_deck.cs_tallies[i], "N_bin")
+        # copy_field(mcdc["cs_tallies"][i], input_deck.cs_tallies[i], "N_bin")
 
         mcdc["cs_tallies"][i]["filter"]["N_cs_bins"] = input_deck.cs_tallies[
             i
         ].N_cs_bins[0]
-        mcdc["cs_tallies"][i]["filter"]["cs_bin_size"] = input_deck.cs_tallies[
-            i
-        ].cs_bin_size[0]
 
-        # Filters (variables with possible different sizes)
-        if not input_deck.technique["domain_decomposition"]:
-            for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
-                N = len(getattr(input_deck.cs_tallies[i], name))
-                mcdc["cs_tallies"][i]["filter"][name][:N] = getattr(
-                    input_deck.cs_tallies[i], name
-                )
+        # Scaling the bin to be in terms of problem units, not pixels/voxels/etc.
+        x_grid = mcdc["mesh_tallies"][i]["filter"]["x"]
+        y_grid = mcdc["mesh_tallies"][i]["filter"]["y"]
+        z_grid = mcdc["mesh_tallies"][i]["filter"]["z"]
+
+        x_bin_size = input_deck.cs_tallies[i].cs_bin_size[0]
+        y_bin_size = input_deck.cs_tallies[i].cs_bin_size[1]
+        z_bin_size = input_deck.cs_tallies[i].cs_bin_size[2]
+
+        x_bin_size = x_bin_size / (len(x_grid) - 1) * (x_grid[-1] - x_grid[0])
+        y_bin_size = y_bin_size / (len(y_grid) - 1) * (y_grid[-1] - y_grid[0])
+        z_bin_size = z_bin_size / (len(z_grid) - 1) * (z_grid[-1] - z_grid[0])
+
+        mcdc["cs_tallies"][i]["filter"]["cs_bin_size"] = [
+            x_bin_size,
+            y_bin_size,
+            z_bin_size,
+        ]
+
+        # mcdc["cs_tallies"][i]["filter"]["cs_bin_size"] = input_deck.cs_tallies[
+        #     i
+        # ].cs_bin_size[0]
+
+        # # Filters (variables with possible different sizes)
+        # if not input_deck.technique["domain_decomposition"]:
+        #     for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
+        #         N = len(getattr(input_deck.cs_tallies[i], name))
+        #         mcdc["cs_tallies"][i]["filter"][name][:N] = getattr(
+        #             input_deck.cs_tallies[i], name
+        #         )
 
         mcdc["cs_tallies"][i]["filter"]["cs_centers"] = generate_cs_centers(mcdc)
 
@@ -969,7 +1008,7 @@ def prepare():
             mcdc["cs_tallies"][i]["scores"][j] = score_type
 
         # Update N_bin
-        mcdc["cs_tallies"][i]["N_bin"] *= N_score
+        # mcdc["cs_tallies"][i]["N_bin"] *= N_score
 
         # Set tally stride and accumulate total tally size
         mcdc["cs_tallies"][i]["stride"]["tally"] = tally_size
@@ -1876,8 +1915,6 @@ def generate_hdf5(data, mcdc):
                     group_name = "tallies/cs_tally_%i/%s/" % (ID, score_name)
 
                     center_points = tally["filter"]["cs_centers"]
-                    S = tally["filter"]["cs_S"]
-                    reconstruction = tally["filter"]["cs_reconstruction"]
 
                     f.create_dataset(
                         "tallies/cs_tally_%i/center_points" % (ID), data=center_points
