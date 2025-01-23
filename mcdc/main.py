@@ -490,6 +490,18 @@ def prepare():
             i += 1
 
     # =========================================================================
+    # Time census-based tally
+    # =========================================================================
+    # Reset time grid size of all tallies if census-based tally is desired
+
+    if input_deck.setting['census_based_tally']:
+        N_bin = input_deck.setting['census_tally_frequency']
+        t_end = input_deck.setting['census_time'][0]
+        for tally in input_deck.mesh_tallies:
+            tally.N_bin *= N_bin / (len(tally.t) - 1)
+            tally.t = np.linspace(0, t_end, N_bin + 1)
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -1785,6 +1797,10 @@ def generate_hdf5(data, mcdc):
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
                 )
+
+            # No need to output tally if time census-based tally is used
+            if input_deck.setting['census_based_tally']:
+                return
 
             # Mesh tallies
             for ID, tally in enumerate(mcdc["mesh_tallies"]):
