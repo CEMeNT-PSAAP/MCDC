@@ -59,6 +59,8 @@ class InputDeck:
             "gyration_radius_type": GYRATION_RADIUS_ALL,
             "N_census": 1,
             "census_time": np.array([INF]),
+            "census_based_tally": False,
+            "census_tally_frequency": 0,
             "source_file": False,
             "source_file_name": "",
             "IC_file": False,
