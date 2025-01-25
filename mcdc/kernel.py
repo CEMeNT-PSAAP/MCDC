@@ -2306,76 +2306,61 @@ def census_based_tally_output(data, mcdc):
         grid_mu = mesh["mu"][: Nmu + 1]
         grid_azi = mesh["azi"][: N_azi + 1]
         grid_g = mesh["g"][: Ng + 1]
-        # Domain decomposed?
-        if mcdc["technique"]["domain_decomposition"]:
-            grid_x = dd_mesh[0][ID]
-            grid_y = dd_mesh[1][ID]
-            grid_z = dd_mesh[2][ID]
-
+        #'''
         with objmode():
-            with h5py.File(mcdc["setting"]["output_name"] + "-batch_%i-census_%i.h5"%(idx_batch,idx_census), "w") as f:
-                # Save to dataset
-                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
-                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
-                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=grid_z)
-                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=grid_t)
-                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=grid_mu)
-                f.create_dataset("tallies/mesh_tally_%i/grid/azi" % ID, data=grid_azi)
-                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=grid_g)
+            f = h5py.File(mcdc["setting"]["output_name"] + "-batch_%i-census_%i.h5"%(idx_batch,idx_census), "w")
 
-                # Set tally shape
-                N_score = tally["N_score"]
-                if mcdc["technique"]["domain_decomposition"]:
-                    Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
-                    Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
-                    Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
-                if not mcdc["technique"]["uq"]:
-                    shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
-                else:
-                    shape = (5, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+            # Save to dataset
+            f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
+            f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
+            f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=grid_z)
+            f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=grid_t)
+            f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=grid_mu)
+            f.create_dataset("tallies/mesh_tally_%i/grid/azi" % ID, data=grid_azi)
+            f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=grid_g)
 
-                # Reshape tally
-                N_bin = tally["N_bin"]
-                if mcdc["technique"]["domain_decomposition"]:
-                    # use recomposed N_bin
-                    N_bin = 1
-                    for elem in shape:
-                        N_bin *= elem
-                start = tally["stride"]["tally"]
-                tally_bin = data[TALLY][:, start : start + N_bin]
-                if mcdc["technique"]["domain_decomposition"]:
-                    # substitute recomposed tally
-                    tally_bin = dd_tally[:, start : start + N_bin]
-                tally_bin = tally_bin.reshape(shape)
+            # Set tally shape
+            N_score = tally["N_score"]
+            if not mcdc["technique"]["uq"]:
+                shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+            else:
+                shape = (5, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
 
-                # Roll tally so that score is in the front
-                tally_bin = np.rollaxis(tally_bin, 8, 0)
+            # Reshape tally
+            N_bin = tally["N_bin"]
+            start = tally["stride"]["tally"]
+            tally_bin = data[TALLY][:, start : start + N_bin]
+            tally_bin = tally_bin.reshape(shape)
 
-                # Iterate over scores
-                for i in range(N_score):
-                    score_type = tally["scores"][i]
-                    score_tally_bin = np.squeeze(tally_bin[i])
-                    if score_type == SCORE_FLUX:
-                        score_name = "flux"
-                    elif score_type == SCORE_DENSITY:
-                        score_name = "density"
-                    elif score_type == SCORE_TOTAL:
-                        score_name = "total"
-                    elif score_type == SCORE_FISSION:
-                        score_name = "fission"
-                    group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
+            # Roll tally so that score is in the front
+            tally_bin = np.rollaxis(tally_bin, 8, 0)
 
-                    tally_sum = score_tally_bin[TALLY_SUM]
-                    tally_sum_sq = score_tally_bin[TALLY_SUM_SQ]
+            # Iterate over scores
+            for i in range(N_score):
+                score_type = tally["scores"][i]
+                score_tally_bin = np.squeeze(tally_bin[i])
+                score_name = ""
+                if score_type == SCORE_FLUX:
+                    score_name = "flux"
+                elif score_type == SCORE_DENSITY:
+                    score_name = "density"
+                elif score_type == SCORE_TOTAL:
+                    score_name = "total"
+                elif score_type == SCORE_FISSION:
+                    score_name = "fission"
+                group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
-                    f.create_dataset(group_name + "sum", data=tally_sum)
-                    f.create_dataset(group_name + "sum_sq", data=tally_sum_sq)
-                    if mcdc["technique"]["uq"]:
-                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
-                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
-                        uq_var = tot_var - mc_var
-                        f.create_dataset(group_name + "uq_var", data=uq_var)
+                tally_sum = score_tally_bin[TALLY_SUM]
+                tally_sum_sq = score_tally_bin[TALLY_SUM_SQ]
 
+                f.create_dataset(group_name + "score", data=tally_sum)
+                f.create_dataset(group_name + "score_sq", data=tally_sum_sq)
+                if mcdc["technique"]["uq"]:
+                    mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                    tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                    uq_var = tot_var - mc_var
+                    f.create_dataset(group_name + "uq_var", data=uq_var)
+            f.close()
 
 @njit
 def dd_closeout(data, mcdc):

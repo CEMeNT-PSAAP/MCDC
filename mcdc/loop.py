@@ -87,6 +87,20 @@ def loop_fixed_source(data_arr, mcdc_arr):
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
+            # Set census-based tally time grids
+            if mcdc['setting']['census_based_tally']:
+                N_bin = mcdc['setting']['census_tally_frequency']
+                if idx_census == 0:
+                    t_start = 0.0
+                else:
+                    t_start = mcdc['setting']['census_time'][idx_census - 1]
+                t_end = mcdc['setting']['census_time'][idx_census]
+                dt = (t_end - t_start) / N_bin
+                for tally in mcdc["mesh_tallies"]:
+                    tally['filter']['t'][0] = t_start
+                    for i in range(N_bin):
+                        tally['filter']['t'][i + 1] = tally['filter']['t'][i] + dt
+
             # Check and accordingly promote future particles to censused particle
             if kernel.get_bank_size(mcdc["bank_future"]) > 0:
                 kernel.check_future_bank(mcdc)
@@ -116,18 +130,9 @@ def loop_fixed_source(data_arr, mcdc_arr):
             # Time census-based tally closeout
             if mcdc['setting']['census_based_tally']:
                 kernel.tally_reduce(data, mcdc)
-                kernel.census_based_tally_output(data, mcdc)
+                if mcdc['mpi_master']:
+                    kernel.census_based_tally_output(data, mcdc)
                 # TODO: UQ tally
-
-                # Re-configure census-based tally grids
-                N_bin = mcdc['setting']['census_tally_frequency']
-                t_start = mcdc['setting']['census_time'][idx_census]
-                t_end = mcdc['setting']['census_time'][idx_census + 1]
-                dt = (t_end - t_start) / N_bin
-                for tally in mcdc["mesh_tallies"]:
-                    tally['filter']['t'][0] = t_start
-                    for i in range(N_bin):
-                        tally['filter']['t'][i + 1] = tally['filter']['t'][i] + dt
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
