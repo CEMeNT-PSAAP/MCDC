@@ -494,8 +494,8 @@ def prepare():
     # =========================================================================
     # Reset time grid size of all tallies if census-based tally is desired
 
-    if input_deck.setting['census_based_tally']:
-        N_bin = input_deck.setting['census_tally_frequency']
+    if input_deck.setting["census_based_tally"]:
+        N_bin = input_deck.setting["census_tally_frequency"]
         for tally in input_deck.mesh_tallies:
             tally.N_bin *= N_bin / (len(tally.t) - 1)
             tally.t = np.zeros(N_bin + 1)
@@ -1168,8 +1168,8 @@ def prepare():
         t_limit = INF
 
     # Replace the time limit if time census-based tally is used
-    if mcdc['setting']['census_based_tally']:
-        t_limit = mcdc['setting']['census_time'][-2]
+    if mcdc["setting"]["census_based_tally"]:
+        t_limit = mcdc["setting"]["census_time"][-2]
 
     # Set appropriate time boundary
     if mcdc["setting"]["time_boundary"] > t_limit:
@@ -1802,7 +1802,7 @@ def generate_hdf5(data, mcdc):
                 )
 
             # No need to output tally if time census-based tally is used
-            if input_deck.setting['census_based_tally']:
+            if input_deck.setting["census_based_tally"]:
                 return
 
             # Mesh tallies

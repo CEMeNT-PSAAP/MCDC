@@ -1276,8 +1276,8 @@ def time_census(t, tally_frequency=None):
     # Set the census-based tallying
     if tally_frequency is not None and tally_frequency > 0:
         # Reset all tallies' time grids:
-        card['census_based_tally'] = True
-        card['census_tally_frequency'] = tally_frequency
+        card["census_based_tally"] = True
+        card["census_tally_frequency"] = tally_frequency
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
