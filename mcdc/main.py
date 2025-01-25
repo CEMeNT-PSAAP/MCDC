@@ -496,10 +496,9 @@ def prepare():
 
     if input_deck.setting['census_based_tally']:
         N_bin = input_deck.setting['census_tally_frequency']
-        t_end = input_deck.setting['census_time'][0]
         for tally in input_deck.mesh_tallies:
             tally.N_bin *= N_bin / (len(tally.t) - 1)
-            tally.t = np.linspace(0, t_end, N_bin + 1)
+            tally.t = np.zeros(N_bin + 1)
 
     # =========================================================================
     # Adapt kernels
@@ -1167,6 +1166,10 @@ def prepare():
         == 0
     ):
         t_limit = INF
+
+    # Replace the time limit if time census-based tally is used
+    if mcdc['setting']['census_based_tally']:
+        t_limit = mcdc['setting']['census_time'][-2]
 
     # Set appropriate time boundary
     if mcdc["setting"]["time_boundary"] > t_limit:
