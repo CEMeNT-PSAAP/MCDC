@@ -88,18 +88,18 @@ def loop_fixed_source(data_arr, mcdc_arr):
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
             # Set census-based tally time grids
-            if mcdc['setting']['census_based_tally']:
-                N_bin = mcdc['setting']['census_tally_frequency']
+            if mcdc["setting"]["census_based_tally"]:
+                N_bin = mcdc["setting"]["census_tally_frequency"]
                 if idx_census == 0:
                     t_start = 0.0
                 else:
-                    t_start = mcdc['setting']['census_time'][idx_census - 1]
-                t_end = mcdc['setting']['census_time'][idx_census]
+                    t_start = mcdc["setting"]["census_time"][idx_census - 1]
+                t_end = mcdc["setting"]["census_time"][idx_census]
                 dt = (t_end - t_start) / N_bin
                 for tally in mcdc["mesh_tallies"]:
-                    tally['filter']['t'][0] = t_start
+                    tally["filter"]["t"][0] = t_start
                     for i in range(N_bin):
-                        tally['filter']['t'][i + 1] = tally['filter']['t'][i] + dt
+                        tally["filter"]["t"][i + 1] = tally["filter"]["t"][i] + dt
 
             # Check and accordingly promote future particles to censused particle
             if kernel.get_bank_size(mcdc["bank_future"]) > 0:
@@ -128,9 +128,9 @@ def loop_fixed_source(data_arr, mcdc_arr):
             kernel.manage_particle_banks(seed_bank, mcdc)
 
             # Time census-based tally closeout
-            if mcdc['setting']['census_based_tally']:
+            if mcdc["setting"]["census_based_tally"]:
                 kernel.tally_reduce(data, mcdc)
-                if mcdc['mpi_master']:
+                if mcdc["mpi_master"]:
                     kernel.census_based_tally_output(data, mcdc)
                 # TODO: UQ tally
 
@@ -142,7 +142,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
             kernel.set_bank_size(mcdc["bank_source"], 0)
             kernel.set_bank_size(mcdc["bank_future"], 0)
 
-            if not mcdc['setting']['census_based_tally']:
+            if not mcdc["setting"]["census_based_tally"]:
                 # Tally history closeout
                 kernel.tally_reduce(data, mcdc)
                 kernel.tally_accumulate(data, mcdc)
@@ -151,7 +151,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
                     kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
-    if not mcdc['setting']['census_based_tally']:
+    if not mcdc["setting"]["census_based_tally"]:
         if mcdc["technique"]["uq"]:
             kernel.uq_tally_closeout(data, mcdc)
         kernel.tally_closeout(data, mcdc)
@@ -328,7 +328,7 @@ def source_closeout(prog, idx_work, N_prog, data):
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        if not mcdc['setting']['census_based_tally']:
+        if not mcdc["setting"]["census_based_tally"]:
             kernel.tally_accumulate(data, mcdc)
 
     # Tally history closeout for multi-batch uq simulation

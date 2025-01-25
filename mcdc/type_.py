@@ -1030,8 +1030,8 @@ def make_type_setting(deck):
         # Time census
         ("N_census", uint64),
         ("census_time", float64, (card["N_census"],)),
-        ('census_based_tally', bool_),
-        ('census_tally_frequency', int64),
+        ("census_based_tally", bool_),
+        ("census_tally_frequency", int64),
         # Particle source file
         ("source_file", bool_),
         ("source_file_name", str_),

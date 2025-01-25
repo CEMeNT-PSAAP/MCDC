@@ -2273,8 +2273,8 @@ def tally_accumulate(data, mcdc):
 
 @njit
 def census_based_tally_output(data, mcdc):
-    idx_batch = mcdc['idx_batch']
-    idx_census = mcdc['idx_census']
+    idx_batch = mcdc["idx_batch"]
+    idx_census = mcdc["idx_census"]
     tally_bin = data[TALLY]
     N_bin = tally_bin.shape[1]
 
@@ -2308,7 +2308,11 @@ def census_based_tally_output(data, mcdc):
         grid_g = mesh["g"][: Ng + 1]
         #'''
         with objmode():
-            f = h5py.File(mcdc["setting"]["output_name"] + "-batch_%i-census_%i.h5"%(idx_batch,idx_census), "w")
+            f = h5py.File(
+                mcdc["setting"]["output_name"]
+                + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                "w",
+            )
 
             # Save to dataset
             f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
@@ -2361,6 +2365,7 @@ def census_based_tally_output(data, mcdc):
                     uq_var = tot_var - mc_var
                     f.create_dataset(group_name + "uq_var", data=uq_var)
             f.close()
+
 
 @njit
 def dd_closeout(data, mcdc):
