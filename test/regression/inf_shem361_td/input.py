@@ -11,7 +11,7 @@ import mcdc
 
 # Load material data
 with np.load("SHEM-361.npz") as data:
-    SigmaC = data["SigmaC"] * 1.28  # /cm
+    SigmaC = data["SigmaC"] * 1.5  # /cm
     SigmaS = data["SigmaS"]
     SigmaF = data["SigmaF"]
     nu_p = data["nu_p"]
@@ -60,7 +60,7 @@ mcdc.tally.mesh_tally(
 )
 
 # Setting
-mcdc.setting(N_particle=8, active_bank_buff=1000, rng_seed=4)
+mcdc.setting(N_particle=50, active_bank_buff=1000)
 
 # Run
 mcdc.run()
