@@ -57,12 +57,14 @@ if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
     N_batch = 5
     for i_census in range(N_census):
         for i_batch in range(N_batch):
-            with h5py.File("output-batch_%i-census_%i.h5" % (i_batch, i_census), "r") as f:
+            with h5py.File(
+                "output-batch_%i-census_%i.h5" % (i_batch, i_census), "r"
+            ) as f:
                 phi_score = f["tallies/mesh_tally_0/flux/score"][:]
-                phi[5*i_census : 5*i_census+5, :] += phi_score
-                phi_sd[5*i_census : 5*i_census+5, :] += phi_score * phi_score
+                phi[5 * i_census : 5 * i_census + 5, :] += phi_score
+                phi_sd[5 * i_census : 5 * i_census + 5, :] += phi_score * phi_score
     phi /= N_batch
-    phi_sd = np.sqrt((phi_sd / N_batch - np.square(phi))/ (N_batch - 1))
+    phi_sd = np.sqrt((phi_sd / N_batch - np.square(phi)) / (N_batch - 1))
 
 # Write the results
 with h5py.File("output.h5", "a") as f:
