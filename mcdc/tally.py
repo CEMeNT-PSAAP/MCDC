@@ -164,6 +164,7 @@ def surface_tally(
 def cell_tally(
     cell,
     t=np.array([-INF, INF]),
+    g=np.array([-INF, INF]),
     E=np.array([0.0, INF]),
     scores=["flux"],
 ):
@@ -174,6 +175,14 @@ def cell_tally(
     ----------
     cell : CellCard
         Cell to which the tally is attached to
+    t : array_like[float], optional
+        Times that demarcate tally bins.
+    g : array_like[float] or str, optional
+        Energy group halves that demarcate energy group tally bins.
+        String value "all" can be used to tally each individual group.
+    E : array_like[float], optional
+        Energies that demarcate energy tally bins. This overrides `g` in
+        continuous-energy mode.
     scores : list of str {"flux", "net-current"}
         List of physical quantities to be scored.
 
@@ -190,6 +199,12 @@ def cell_tally(
     card.ID = len(global_.input_deck.cell_tallies)
 
     card.t = t
+    # Set energy group grid
+    if type(g) == type("string") and g == "all":
+        G = global_.input_deck.materials[0].G
+        card.g = np.linspace(0, G, G + 1) - 0.5
+    else:
+        card.g = g
     if global_.input_deck.setting["mode_CE"]:
         card.g = E
 

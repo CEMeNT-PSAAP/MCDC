@@ -1951,7 +1951,7 @@ def generate_hdf5(data, mcdc):
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
-                tally_bin = np.rollaxis(tally_bin, 1, 0)
+                tally_bin = np.rollaxis(tally_bin, 3, 0)
 
                 # Iterate over scores
                 for i in range(N_score):
