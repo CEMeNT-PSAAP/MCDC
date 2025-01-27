@@ -1026,6 +1026,8 @@ def prepare():
         N_azi = len(input_deck.cell_tallies[i].azi) - 1
         Ng = len(input_deck.cell_tallies[i].g) - 1
         Nt = len(input_deck.cell_tallies[i].t) - 1
+        mcdc["cell_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["cell_tallies"][i]["filter"]["Nt"] = Nt
 
         # Update N_bin
         mcdc["cell_tallies"][i]["N_bin"] *= N_score
@@ -1921,13 +1923,26 @@ def generate_hdf5(data, mcdc):
                 if mcdc["technique"]["iQMC"]:
                     break
 
+                mesh = tally["filter"]
+
+                # Get grid
+                Nt = mesh["Nt"]
+                Ng = mesh["Ng"]
+                #
+                grid_t = mesh["t"][: Nt + 1]
+                grid_g = mesh["g"][: Ng + 1]
+
+                # Save to dataset
+                f.create_dataset("tallies/cell_tally_%i/grid/t" % ID, data=grid_t)
+                f.create_dataset("tallies/cell_tally_%i/grid/g" % ID, data=grid_g)
+
                 # Shape
                 N_score = tally["N_score"]
 
                 if not mcdc["technique"]["uq"]:
-                    shape = (3, N_score)
+                    shape = (3, Ng, Nt, N_score)
                 else:
-                    shape = (5, N_score)
+                    shape = (5, Ng, Nt, N_score)
 
                 # Reshape tally
                 N_bin = tally["N_bin"]

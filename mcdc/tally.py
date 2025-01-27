@@ -161,7 +161,12 @@ def surface_tally(
     return card
 
 
-def cell_tally(cell, scores=["flux"]):
+def cell_tally(
+    cell,
+    t=np.array([-INF, INF]),
+    E=np.array([0.0, INF]),
+    scores=["flux"],
+):
     """
     Create a tally card to collect MC solutions.
 
@@ -184,13 +189,19 @@ def cell_tally(cell, scores=["flux"]):
     # Set ID
     card.ID = len(global_.input_deck.cell_tallies)
 
+    card.t = t
+    if global_.input_deck.setting["mode_CE"]:
+        card.g = E
+
     # Set cell
     card.cell_ID = cell.ID
     cell.tally_IDs.append(card.ID)
     cell.N_tally += 1
 
     # Calculate total number bins
-    card.N_bin = 1
+    Nt = len(card.t) - 1
+    Ng = len(card.g) - 1
+    card.N_bin = Nt * Ng
 
     # Scores
     for s in scores:

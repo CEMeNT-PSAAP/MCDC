@@ -515,7 +515,6 @@ def loop_particle(P_arr, data, prog):
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
-
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
 
