@@ -889,6 +889,8 @@ def make_type_cell_tally(input_deck):
         ("mu", float64, (Nmax_mu,)),
         ("azi", float64, (Nmax_azi,)),
         ("g", float64, (Nmax_g,)),
+        ("Nt", int64),
+        ("Ng", int64),
     ]
     struct = [("filter", filter_)]
 
