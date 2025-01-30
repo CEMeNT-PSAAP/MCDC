@@ -189,7 +189,7 @@ mcdc.tally.mesh_tally(
 )
 
 # Setting
-mcdc.setting(N_particle=2e1, census_bank_buff=3.0)
+mcdc.setting(N_particle=2e1, census_bank_buff=3.0, source_bank_buff=2.0)
 mcdc.eigenmode(N_inactive=1, N_active=2, gyration_radius="infinite-z")
 mcdc.population_control()
 
