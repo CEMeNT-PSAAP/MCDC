@@ -1,4 +1,4 @@
-import math, numba
+import h5py, math, numba
 
 from mpi4py import MPI
 from numba import (
@@ -1037,14 +1037,48 @@ def get_particle(P_arr, bank, mcdc):
 
 
 @njit
+def check_future_bank(mcdc):
+    # Get the data needed
+    bank_future = mcdc["bank_future"]
+    bank_census = mcdc["bank_census"]
+    next_census_time = mcdc["setting"]["census_time"][mcdc["idx_census"] + 1]
+
+    # Particle container
+    P_arr = adapt.local_array(1, type_.particle_record)
+    P = P_arr[0]
+
+    # Loop over all particles in future bank
+    N = get_bank_size(bank_future)
+    for i in range(N):
+        # Get the next future particle index
+        idx = i - get_bank_size(bank_census)
+        copy_recordlike(P_arr, bank_future["particles"][idx : idx + 1])
+
+        # Promote the future particle to census bank
+        if P["t"] < next_census_time:
+            adapt.add_census(P_arr, mcdc)
+            add_bank_size(bank_future, -1)
+
+            # Consolidate the emptied space in the future bank
+            j = get_bank_size(bank_future)
+            copy_recordlike(
+                bank_future["particles"][idx : idx + 1],
+                bank_future["particles"][j : j + 1],
+            )
+
+
+@njit
 def manage_particle_banks(seed, mcdc):
     # Record time
     if mcdc["mpi_master"]:
         with objmode(time_start="float64"):
             time_start = MPI.Wtime()
 
+    # Reset source bank
+    set_bank_size(mcdc["bank_source"], 0)
+
+    # Normalize weight
     if mcdc["setting"]["mode_eigenvalue"]:
-        # Normalize weight
         normalize_weight(mcdc["bank_census"], mcdc["setting"]["N_particle"])
 
     # Population control
@@ -1057,6 +1091,7 @@ def manage_particle_banks(seed, mcdc):
         mcdc["bank_source"]["particles"][:size] = mcdc["bank_census"]["particles"][
             :size
         ]
+    # TODO: Population control future bank?
 
     # MPI rebalance
     if not mcdc["technique"]["domain_decomposition"]:
@@ -1242,6 +1277,10 @@ def bank_rebalance(mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(mcdc["bank_source"], mcdc)
     idx_end = idx_start + N_local
+
+    # Abort if source bank is empty
+    if N == 0:
+        return
 
     distribute_work(N, mcdc)
 
@@ -1513,6 +1552,10 @@ def pct_combing(seed, mcdc):
     idx_start, N_local, N = bank_scanning(bank_census, mcdc)
     idx_end = idx_start + N_local
 
+    # Abort if census bank is empty
+    if N == 0:
+        return
+
     # Teeth distance
     td = N / M
 
@@ -1551,6 +1594,10 @@ def pct_combing_weight(seed, mcdc):
     # Scan the bank based on weight
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
+
+    # Abort if census bank is empty
+    if W == 0.0:
+        return
 
     # Teeth distance
     td = W / M
@@ -1592,6 +1639,10 @@ def pct_splitting_roulette(seed, mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(bank_census, mcdc)
     idx_end = idx_start + N_local
+
+    # Abort if census bank is empty
+    if N == 0:
+        return
 
     # Weight scaling
     ws = float(N) / float(M)
@@ -1638,6 +1689,10 @@ def pct_splitting_roulette_weight(seed, mcdc):
     N_local = get_bank_size(bank_census)
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
+
+    # Abort if census bank is empty
+    if W == 0.0:
+        return
 
     # Weight of the surviving particles
     w_survive = W / M
@@ -2214,6 +2269,102 @@ def tally_accumulate(data, mcdc):
 
         # Reset score bin
         tally_bin[TALLY_SCORE, i] = 0.0
+
+
+@njit
+def census_based_tally_output(data, mcdc):
+    idx_batch = mcdc["idx_batch"]
+    idx_census = mcdc["idx_census"]
+    tally_bin = data[TALLY]
+    N_bin = tally_bin.shape[1]
+
+    for i in range(N_bin):
+        # Store score and square of score
+        score = tally_bin[TALLY_SCORE, i]
+        tally_bin[TALLY_SUM, i] = score
+        tally_bin[TALLY_SUM_SQ, i] = score * score
+
+        # Reset score bin
+        tally_bin[TALLY_SCORE, i] = 0.0
+
+    for ID, tally in enumerate(mcdc["mesh_tallies"]):
+        mesh = tally["filter"]
+
+        # Get grid
+        Nx = mesh["Nx"]
+        Ny = mesh["Ny"]
+        Nz = mesh["Nz"]
+        Nt = mesh["Nt"]
+        Nmu = mesh["Nmu"]
+        N_azi = mesh["N_azi"]
+        Ng = mesh["Ng"]
+        #
+        grid_x = mesh["x"][: Nx + 1]
+        grid_y = mesh["y"][: Ny + 1]
+        grid_z = mesh["z"][: Nz + 1]
+        grid_t = mesh["t"][: Nt + 1]
+        grid_mu = mesh["mu"][: Nmu + 1]
+        grid_azi = mesh["azi"][: N_azi + 1]
+        grid_g = mesh["g"][: Ng + 1]
+        #'''
+        with objmode():
+            f = h5py.File(
+                mcdc["setting"]["output_name"]
+                + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                "w",
+            )
+
+            # Save to dataset
+            f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
+            f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
+            f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=grid_z)
+            f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=grid_t)
+            f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=grid_mu)
+            f.create_dataset("tallies/mesh_tally_%i/grid/azi" % ID, data=grid_azi)
+            f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=grid_g)
+
+            # Set tally shape
+            N_score = tally["N_score"]
+            if not mcdc["technique"]["uq"]:
+                shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+            else:
+                shape = (5, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+
+            # Reshape tally
+            N_bin = tally["N_bin"]
+            start = tally["stride"]["tally"]
+            tally_bin = data[TALLY][:, start : start + N_bin]
+            tally_bin = tally_bin.reshape(shape)
+
+            # Roll tally so that score is in the front
+            tally_bin = np.rollaxis(tally_bin, 8, 0)
+
+            # Iterate over scores
+            for i in range(N_score):
+                score_type = tally["scores"][i]
+                score_tally_bin = np.squeeze(tally_bin[i])
+                score_name = ""
+                if score_type == SCORE_FLUX:
+                    score_name = "flux"
+                elif score_type == SCORE_DENSITY:
+                    score_name = "density"
+                elif score_type == SCORE_TOTAL:
+                    score_name = "total"
+                elif score_type == SCORE_FISSION:
+                    score_name = "fission"
+                group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
+
+                tally_sum = score_tally_bin[TALLY_SUM]
+                tally_sum_sq = score_tally_bin[TALLY_SUM_SQ]
+
+                f.create_dataset(group_name + "score", data=tally_sum)
+                f.create_dataset(group_name + "score_sq", data=tally_sum_sq)
+                if mcdc["technique"]["uq"]:
+                    mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                    tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                    uq_var = tot_var - mc_var
+                    f.create_dataset(group_name + "uq_var", data=uq_var)
+            f.close()
 
 
 @njit
@@ -3038,17 +3189,28 @@ def fission(P_arr, prog):
         else:
             sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
 
+        # Eigenvalue mode: bank right away
+        if mcdc["setting"]["mode_eigenvalue"]:
+            adapt.add_census(P_new_arr, prog)
+            continue
+        # Below is only relevant for fixed-source problem
+
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
             continue
 
-        # Bank
+        # Check if it is beyond current or next census times
+        hit_census = False
+        hit_next_census = False
         idx_census = mcdc["idx_census"]
-        if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
-            adapt.add_census(P_new_arr, prog)
-        elif mcdc["setting"]["mode_eigenvalue"]:
-            adapt.add_census(P_new_arr, prog)
-        else:
+        if idx_census < mcdc["setting"]["N_census"] - 1:
+            if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
+                hit_census = True
+                hit_next_census = True
+            elif P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
+                hit_census = True
+
+        if not hit_census:
             # Keep it if it is the last particle
             if n == N - 1:
                 P["alive"] = True
@@ -3061,6 +3223,12 @@ def fission(P_arr, prog):
                 P["w"] = P_new["w"]
             else:
                 adapt.add_active(P_new_arr, prog)
+        elif not hit_next_census:
+            # Particle will participate after the current census
+            adapt.add_census(P_new_arr, prog)
+        else:
+            # Particle will participate in the future
+            adapt.add_future(P_new_arr, prog)
 
 
 @njit

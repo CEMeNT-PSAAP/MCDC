@@ -991,9 +991,13 @@ def setting(**kw):
     IC_file : str
         Path to a file containing a description of an initial condition.
     active_bank_buff : int
-        Size of the activate particle bank buffer, for MPI runs.
+        Size of the particle active bank buffer.
     census_bank_buff : int
-        Sets size of the census buffer particle bank.
+        Size of the particle census bank buffer (in multiples of N_particle).
+    source_bank_buff : int
+        Size of the particle source bank buffer (in multiples of N_particle).
+    future_bank_buff : int
+        Size of the particle future bank buffer (in multiples of N_particle).
 
     Returns
     -------
@@ -1019,6 +1023,8 @@ def setting(**kw):
                 "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
+                "source_bank_buff",
+                "future_bank_buff",
             ],
             False,
         )
@@ -1036,6 +1042,8 @@ def setting(**kw):
     IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
+    bank_source_buff = kw.get("source_bank_buff")
+    bank_future_buff = kw.get("future_bank_buff")
 
     # Check if setting card has been initialized
     card = global_.input_deck.setting
@@ -1075,6 +1083,14 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
+
+    # Source bank size multiplier
+    if bank_source_buff is not None:
+        card["bank_source_buff"] = int(bank_source_buff)
+
+    # Future bank size multiplier
+    if bank_future_buff is not None:
+        card["bank_future_buff"] = int(bank_future_buff)
 
     # Save input deck?
     if save_input_deck is not None:
@@ -1224,7 +1240,7 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def time_census(t):
+def time_census(t, tally_frequency=None):
     """
     Set time-census boundaries.
 
@@ -1232,6 +1248,9 @@ def time_census(t):
     ----------
     t : array_like[float]
         The time-census boundaries.
+    tally_frecuency : integer, optional
+        Number of uniform tally time mesh bins in census-based tallying.
+        This overrides manual tally time mesh definitions.
 
     Returns
     -------
@@ -1253,6 +1272,12 @@ def time_census(t):
     card = global_.input_deck.setting
     card["census_time"] = t
     card["N_census"] = len(t)
+
+    # Set the census-based tallying
+    if tally_frequency is not None and tally_frequency > 0:
+        # Reset all tallies' time grids:
+        card["census_based_tally"] = True
+        card["census_tally_frequency"] = tally_frequency
 
 
 def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
