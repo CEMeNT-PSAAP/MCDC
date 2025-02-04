@@ -1030,6 +1030,8 @@ def make_type_setting(deck):
         # Time census
         ("N_census", uint64),
         ("census_time", float64, (card["N_census"],)),
+        ("census_based_tally", bool_),
+        ("census_tally_frequency", int64),
         # Particle source file
         ("source_file", bool_),
         ("source_file_name", str_),
@@ -1435,6 +1437,8 @@ def make_type_global(input_deck):
     # Particle bank buffers
     bank_active_buff = input_deck.setting["bank_active_buff"]
     bank_census_buff = input_deck.setting["bank_census_buff"]
+    bank_source_buff = input_deck.setting["bank_source_buff"]
+    bank_future_buff = input_deck.setting["bank_future_buff"]
 
     # Number of precursor groups
     if mode_MG:
@@ -1450,10 +1454,12 @@ def make_type_global(input_deck):
     bank_active = particle_bank(1 + bank_active_buff)
     if input_deck.setting["mode_eigenvalue"] or input_deck.setting["N_census"] > 1:
         bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
-        bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
+        bank_source = particle_bank(int((1 + bank_source_buff) * N_work))
+        bank_future = particle_bank(int((1 + bank_future_buff) * N_work))
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
+        bank_future = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
     # iQMC bank adjustment
@@ -1461,6 +1467,7 @@ def make_type_global(input_deck):
         bank_source = particle_bank(N_work)
         if input_deck.setting["mode_eigenvalue"]:
             bank_census = particle_bank(0)
+            bank_future = particle_bank(0)
 
     # Source and IC files bank adjustments
     if not input_deck.setting["mode_eigenvalue"]:
@@ -1500,6 +1507,7 @@ def make_type_global(input_deck):
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
+            ("bank_future", bank_future),
             ("bank_precursor", bank_precursor),
             ("rng_seed_base", uint64),
             ("rng_seed", uint64),

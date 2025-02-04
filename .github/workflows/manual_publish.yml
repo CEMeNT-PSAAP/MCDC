@@ -36,9 +36,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install .
         pip install build
-    - name: Patch Numba
-      run : |
-        bash .github/workflows/patch.sh
     - name: Build package
       run: python -m build
     - name: Publish package distributions to PyPI

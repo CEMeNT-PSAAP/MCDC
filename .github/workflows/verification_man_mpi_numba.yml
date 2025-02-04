@@ -26,9 +26,6 @@ jobs:
         #pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py ngsolve distinctipy
         pip list 
         pip install -e .
-    - name: Patch Numba
-      run : |
-        bash .github/workflows/patch.sh
     - name: Verification Tests - Numba and MPI
       run: |
           cd test/verification/analytic
