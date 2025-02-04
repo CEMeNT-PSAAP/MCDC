@@ -59,6 +59,8 @@ class InputDeck:
             "gyration_radius_type": GYRATION_RADIUS_ALL,
             "N_census": 1,
             "census_time": np.array([INF]),
+            "census_based_tally": False,
+            "census_tally_frequency": 0,
             "source_file": False,
             "source_file_name": "",
             "IC_file": False,
@@ -67,6 +69,8 @@ class InputDeck:
             # Below are parameters not copied to mcdc.setting
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
+            "bank_source_buff": 0.25,
+            "bank_future_buff": 0.5,
             # Portability
             "target": "cpu",
         }

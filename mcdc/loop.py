@@ -87,6 +87,31 @@ def loop_fixed_source(data_arr, mcdc_arr):
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
+            # Set census-based tally time grids
+            if mcdc["setting"]["census_based_tally"]:
+                N_bin = mcdc["setting"]["census_tally_frequency"]
+                if idx_census == 0:
+                    t_start = 0.0
+                else:
+                    t_start = mcdc["setting"]["census_time"][idx_census - 1]
+                t_end = mcdc["setting"]["census_time"][idx_census]
+                dt = (t_end - t_start) / N_bin
+                for tally in mcdc["mesh_tallies"]:
+                    tally["filter"]["t"][0] = t_start
+                    for i in range(N_bin):
+                        tally["filter"]["t"][i + 1] = tally["filter"]["t"][i] + dt
+
+            # Check and accordingly promote future particles to censused particle
+            if kernel.get_bank_size(mcdc["bank_future"]) > 0:
+                kernel.check_future_bank(mcdc)
+            if (
+                idx_census > 0
+                and kernel.get_bank_size(mcdc["bank_source"]) == 0
+                and kernel.get_bank_size(mcdc["bank_census"]) == 0
+                and kernel.get_bank_size(mcdc["bank_future"]) == 0
+            ):
+                # No more particle to work on
+                break
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
             loop_source(seed_source, data, mcdc)
@@ -98,31 +123,38 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 )
                 loop_source_precursor(seed_source_precursor, data, mcdc)
 
-            # Time census closeout
-            if idx_census < mcdc["setting"]["N_census"] - 1:
-                # TODO: Output tally (optional)
+            # Manage particle banks: population control and work rebalance
+            seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            kernel.manage_particle_banks(seed_bank, mcdc)
 
-                # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            # Time census-based tally closeout
+            if mcdc["setting"]["census_based_tally"]:
+                kernel.tally_reduce(data, mcdc)
+                if mcdc["mpi_master"]:
+                    kernel.census_based_tally_output(data, mcdc)
+                # TODO: UQ tally
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
             # Reset banks
-            kernel.set_bank_size(mcdc["bank_source"], 0)
-            kernel.set_bank_size(mcdc["bank_census"], 0)
             kernel.set_bank_size(mcdc["bank_active"], 0)
+            kernel.set_bank_size(mcdc["bank_census"], 0)
+            kernel.set_bank_size(mcdc["bank_source"], 0)
+            kernel.set_bank_size(mcdc["bank_future"], 0)
 
-            # Tally history closeout
-            kernel.tally_reduce(data, mcdc)
-            kernel.tally_accumulate(data, mcdc)
-            # Uq closeout
-            if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(data, mcdc)
+            if not mcdc["setting"]["census_based_tally"]:
+                # Tally history closeout
+                kernel.tally_reduce(data, mcdc)
+                kernel.tally_accumulate(data, mcdc)
+                # Uq closeout
+                if mcdc["technique"]["uq"]:
+                    kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
-    if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(data, mcdc)
-    kernel.tally_closeout(data, mcdc)
+    if not mcdc["setting"]["census_based_tally"]:
+        if mcdc["technique"]["uq"]:
+            kernel.uq_tally_closeout(data, mcdc)
+        kernel.tally_closeout(data, mcdc)
 
 
 # =========================================================================
@@ -199,13 +231,11 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         P_arr = mcdc["bank_source"]["particles"][idx_work : (idx_work + 1)]
         P = P_arr[0]
 
-    # Check if it is beyond current census index
-    hit_census = False
-    idx_census = mcdc["idx_census"]
-    if P["t"] > mcdc["setting"]["census_time"][idx_census]:
-        hit_census = True
+    # Skip if beyond time boundary
+    if P["t"] > mcdc["setting"]["time_boundary"]:
+        return
 
-    # Check if particle is in the domain (if decomposed)
+    # If domain is decomposed, check if particle is in the domain
     if mcdc["technique"]["domain_decomposition"]:
         if not kernel.particle_in_domain(P_arr, mcdc):
             return
@@ -220,14 +250,26 @@ def generate_source_particle(work_start, idx_work, seed, prog):
             ):
                 return
 
-    # Put into the bank
-    if hit_census:
-        # TODO: Need a special bank for source particles in the later census indices.
-        #       This is needed so that those particles are not prematurely
-        #       population controlled.
+    # Check if it is beyond current or next census times
+    hit_census = False
+    hit_next_census = False
+    idx_census = mcdc["idx_census"]
+    if idx_census < mcdc["setting"]["N_census"] - 1:
+        if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
+            hit_census = True
+            hit_next_census = True
+        elif P["t"] > mcdc["setting"]["census_time"][idx_census]:
+            hit_census = True
+
+    # Put into the right bank
+    if not hit_census:
+        adapt.add_active(P_arr, prog)
+    elif not hit_next_census:
+        # Particle will participate after the current census
         adapt.add_census(P_arr, prog)
     else:
-        adapt.add_active(P_arr, prog)
+        # Particle will participate in the future
+        adapt.add_future(P_arr, prog)
 
     """
         if mcdc["technique"]["domain_decomposition"]:
@@ -286,7 +328,8 @@ def source_closeout(prog, idx_work, N_prog, data):
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        kernel.tally_accumulate(data, mcdc)
+        if not mcdc["setting"]["census_based_tally"]:
+            kernel.tally_accumulate(data, mcdc)
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
