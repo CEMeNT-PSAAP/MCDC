@@ -337,13 +337,13 @@ Remember that when reporting results from a Monte Carlo solver, you should **alw
 While this script does look rather long, most of these commands are controlling things like axis labels and whatnot.
 But at the end we have something like this.
 
-.. image:: images/user/sf_slab_1.png
+.. image:: ../images/user/sf_slab_1.png
    :width: 266
    :alt: Reference v computed scalar flux, 1e3 particles
-.. image:: images/user/j_slab_1.png
+.. image:: ../images/user/j_slab_1.png
    :width: 266
    :alt: Reference v computed current, 1e3 particles
-.. image:: images/user/af_slab_1.png
+.. image:: ../images/user/af_slab_1.png
    :width: 266
    :alt: Reference v computed angular flux, 1e3 particles
 
@@ -351,13 +351,13 @@ Notice how noisy these solutions are? We only ran 1e3 particles.
 We need more particles to get a less statistically noisy, more converged solution.
 Here's results from the same simulation run with 1e6 particles:
 
-.. image:: images/user/sf_slab_2.png
+.. image:: ../images/user/sf_slab_2.png
    :width: 266
    :alt: Reference v computed scalar flux, 1e6 particles
-.. image:: images/user/j_slab_2.png
+.. image:: ../images/user/j_slab_2.png
    :width: 266
    :alt: Reference v computed current, 1e6 particles
-.. image:: images/user/af_slab_2.png
+.. image:: ../images/user/af_slab_2.png
    :width: 266
    :alt: Reference v computed angular flux, 1e6 particles
 
