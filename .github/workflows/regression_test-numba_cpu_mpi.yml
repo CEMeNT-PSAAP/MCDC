@@ -24,9 +24,6 @@ jobs:
       run: |
         pip install -e .
         pip list 
-    - name: Patch Numba
-      run : |
-        bash .github/workflows/patch.sh
     - name: Regression Test - Numba and MPI
       run: |
           cd test/regression
