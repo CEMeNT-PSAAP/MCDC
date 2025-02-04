@@ -1997,9 +1997,7 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
 
     # Get starting indices
     g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
-    it = mesh_.structured._grid_index(
-        t, 1.0, mesh["t"], Nt + 1, COINCIDENCE_TOLERANCE_TIME
-    )
+
     # Outside grid?
     if (
         t < mesh["t"][0] - COINCIDENCE_TOLERANCE_TIME
@@ -2008,6 +2006,10 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
         or outside_energy
     ):
         return
+
+    it = mesh_.structured._grid_index(
+        t, 1.0, mesh["t"], Nt + 1, COINCIDENCE_TOLERANCE_TIME
+    )
 
     # Tally index
     idx = stride["tally"] + g * stride["g"] + it * stride["t"]
