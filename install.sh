@@ -44,9 +44,6 @@ done
 # Install MC/DC module (and the dependencies)
 pip install -e .
 
-# Patch Numba
-bash patch_numba.sh
-
 # Install pre-commit hook
 pre-commit install
 
