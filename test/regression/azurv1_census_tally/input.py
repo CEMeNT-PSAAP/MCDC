@@ -66,7 +66,8 @@ if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
     phi /= N_batch
     phi_sd = np.sqrt((phi_sd / N_batch - np.square(phi)) / (N_batch - 1))
 
-# Write the results
-with h5py.File("output.h5", "a") as f:
-    f.create_dataset("tallies/mesh_tally_0/flux/mean", data=phi)
-    f.create_dataset("tallies/mesh_tally_0/flux/sdev", data=phi_sd)
+    # Write the results
+    with h5py.File("output.h5", "a") as f:
+        f.create_dataset("tallies/mesh_tally_0/flux/mean", data=phi)
+        f.create_dataset("tallies/mesh_tally_0/flux/sdev", data=phi_sd)
+MPI.COMM_WORLD.Barrier()
