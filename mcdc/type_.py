@@ -49,6 +49,9 @@ technique = None
 global_ = None
 tally = None
 
+trace = None
+trace_slot = None
+
 
 # ==============================================================================
 # MC/DC Member Array Sizes
@@ -1376,6 +1379,7 @@ def make_type_global(input_deck):
             ("source_program_pointer", uintp),
             ("precursor_program_pointer", uintp),
             ("source_seed", uint64),
+            ("trace",trace)
         ]
     )
 
@@ -1477,3 +1481,31 @@ def make_type_mesh_(card):
 
 
 mesh_names = ["x", "y", "z", "t", "mu", "azi", "g"]
+
+
+def make_type_trace_slot():
+    global trace_slot
+
+    trace_slot = into_dtype(
+        [
+            ("runtime",int64,)
+        ]
+    )
+
+
+def make_type_trace(trace_slot_limit):
+    global trace
+
+    trace = into_dtype(
+        [
+            ("slots", trace_slot, (trace_slot_limit,)),
+            ("slot_limit", int64 ),
+        ]
+    )
+
+
+
+
+
+
+

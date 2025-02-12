@@ -10,6 +10,8 @@ import mcdc.kernel as kernel
 import mcdc.print_ as print_module
 import mcdc.type_ as type_
 
+import mcdc.trace as trace
+
 from mcdc.constant import *
 from mcdc.print_ import (
     print_header_batch,
@@ -82,7 +84,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
         # Print multi-batch header
         if mcdc["setting"]["N_batch"] > 1:
             with objmode():
-                print_header_batch(mcdc)
+                pass #print_header_batch(mcdc)
             if mcdc["technique"]["uq"]:
                 seed_uq = kernel.split_seed(seed_batch, SEED_SPLIT_UQ)
                 kernel.uq_reset(mcdc, seed_uq)
@@ -135,7 +137,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
 # =========================================================================
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def loop_eigenvalue(data_arr, mcdc_arr):
 
     # Ensure `data` and `mcdc` exist for the lifetime of the program
@@ -332,7 +334,7 @@ def source_dd_resolution(data, prog):
             terminated = True
 
 
-@njit
+@trace.njit()
 def loop_source(seed, data, mcdc):
     # Progress bar indicator
     N_prog = 0

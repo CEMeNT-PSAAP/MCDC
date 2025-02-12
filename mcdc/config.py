@@ -58,7 +58,6 @@ parser.add_argument(
     default=1,
 )
 
-
 parser.add_argument("--N_particle", type=int, help="Number of particles")
 parser.add_argument("--output", type=str, help="Output file name")
 parser.add_argument("--progress_bar", default=True, action="store_true")
@@ -66,6 +65,13 @@ parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_fals
 parser.add_argument("--clear_cache", action="store_true")
 parser.add_argument("--caching", action="store_true")
 parser.add_argument("--no_caching", dest="caching", action="store_false")
+parser.add_argument("--trace", action="store_true")
+parser.add_argument(
+    "--trace_slot_limit",
+    type=int,
+    help="Maximum number of functions that may be traced.",
+    default=4096,
+)
 parser.set_defaults(caching=False)
 args, unargs = parser.parse_known_args()
 
@@ -74,6 +80,8 @@ mode = args.mode
 target = args.target
 caching = args.caching
 clear_cache = args.clear_cache
+trace = args.trace
+trace_slot_limit = args.trace_slot_limit
 
 from mpi4py import MPI
 import shutil

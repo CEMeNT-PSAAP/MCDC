@@ -1,6 +1,7 @@
 import argparse, os, sys
 import importlib.metadata
 import mcdc.config as config
+import mcdc.trace as trace
 
 import matplotlib.pyplot as plt
 from matplotlib import colors as mpl_colors
@@ -94,6 +95,9 @@ def run():
     # Stop timer
     MPI.COMM_WORLD.Barrier()
     mcdc["runtime_total"] = MPI.Wtime() - total_start
+
+    if config.trace:
+        trace.print_report(mcdc)
 
     # Closout
     closeout(mcdc)
@@ -347,6 +351,8 @@ def prepare():
     # Make types
     # =========================================================================
 
+    type_.make_type_trace_slot()
+    type_.make_type_trace(config.trace_slot_limit)
     type_.make_type_particle(input_deck)
     type_.make_type_particle_record(input_deck)
     type_.make_type_nuclide(input_deck)
