@@ -69,7 +69,7 @@ class InputDeck:
             # Below are parameters not copied to mcdc.setting
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
-            "bank_source_buff": 0.25,
+            "bank_source_buff": 1.0,
             "bank_future_buff": 0.5,
             # Portability
             "target": "cpu",
