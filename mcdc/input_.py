@@ -39,6 +39,10 @@ from mcdc.constant import (
     PI,
     REGION_ALL,
     TINY,
+    WW_MIN,
+    WW_PREVIOUS,
+    WW_USER,
+    WW_WOLLABER,
 )
 from mcdc.print_ import print_error
 import mcdc.type_ as type_
@@ -1280,7 +1284,17 @@ def time_census(t, tally_frequency=None):
         card["census_tally_frequency"] = tally_frequency
 
 
-def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
+def weight_window(
+    x=None,
+    y=None,
+    z=None,
+    t=None,
+    window=None,
+    width=2.5,
+    method={"user"},
+    modifications={},
+    save_ww_data=True,
+):
     """
     Activate weight window variance reduction technique.
 
@@ -1295,10 +1309,14 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     t : array_like[float], optional
         Location of the weight window in t (default None).
     window : array_like[float], optional
-        Bound of the statistic weight of the window (default None).
-    width : array_like[float], optional
-        Statistical width the window will apply (default None).
-
+        Center of the weight windows (default None).
+    width : float, optional
+        Width of the window (default 2.5).
+    epsilon : float, optional
+        Small values used for techniques (default empty list).
+    techniques : list of str, optional
+        List of techniques to use for ww
+        {'user','previous','alpha','min_center','wollaber'} (default {'user'}).
     Returns
     -------
         A weight window card.
@@ -1306,20 +1324,70 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     """
     card = global_.input_deck.technique
     card["weight_window"] = True
+    N_update = 0
 
+    card["ww"]["save"] = save_ww_data
     # Set width
     if width is not None:
-        card["ww_width"] = width
+        card["ww"]["width"] = width
+
+    # Checking WW method
+    method_checked = check_support(
+        "Weight window method",
+        method,
+        ["user", "previous"],
+    )
+    if method_checked == "user":
+        card["ww"]["auto"] = WW_USER
+    elif method_checked == "previous":
+        card["ww"]["auto"] = WW_PREVIOUS
+        # Make tally card
+        for tallycard in global_.input_deck.mesh_tallies:
+            if "flux" in tallycard.scores:
+                x = tallycard.x
+                y = tallycard.y
+                z = tallycard.z
+                t = tallycard.t
+
+    # Checking techniques
+    for mod in modifications:
+        mod_checked = check_support(
+            "Weight window modification",
+            mod[0],
+            ["min-center", "wollaber"],
+        )
+        if mod_checked == "min-center":
+            card["ww"]["epsilon"][WW_MIN] = mod[1]
+        if mod_checked == "wollaber":
+            card["ww"]["epsilon"][WW_WOLLABER] = mod[1]
+            card["ww"]["epsilon"][WW_WOLLABER + 1] = mod[2]
 
     # Set mesh
     if x is not None:
-        card["ww_mesh"]["x"] = x
+        card["ww"]["mesh"]["x"] = x
     if y is not None:
-        card["ww_mesh"]["y"] = y
+        card["ww"]["mesh"]["y"] = y
     if z is not None:
-        card["ww_mesh"]["z"] = z
+        card["ww"]["mesh"]["z"] = z
     if t is not None:
-        card["ww_mesh"]["t"] = t
+        card["ww"]["mesh"]["t"] = t
+
+    if window is None:
+        window_size = []
+        if t is not None:
+            Nt = len(t) - 1
+            window_size.append(Nt)
+        if x is not None:
+            Nx = len(x) - 1
+            window_size.append(Nx)
+        if y is not None:
+            Ny = len(y) - 1
+            window_size.append(Ny)
+        if z is not None:
+            Nz = len(z) - 1
+            window_size.append(Nz)
+        window_size = np.array(window_size)
+        window = np.ones((window_size))
 
     # Set window
     ax_expand = []
@@ -1331,11 +1399,9 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
         ax_expand.append(2)
     if z is None:
         ax_expand.append(3)
-    window /= np.max(window)
     for ax in ax_expand:
         window = np.expand_dims(window, axis=ax)
-    card["ww"] = window
-
+    card["ww"]["center"] = window
     return card
 
 

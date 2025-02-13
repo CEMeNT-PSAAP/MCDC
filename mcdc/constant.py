@@ -144,3 +144,10 @@ XS_NU_SCATTER = 7
 NU_FISSION = 0
 NU_FISSION_PROMPT = 1
 NU_FISSION_DELAYED = 2
+
+# Weight Windows Methods
+WW_USER = 0
+WW_PREVIOUS = 1
+# Weight Windows Modifications
+WW_MIN = 0
+WW_WOLLABER = 1

@@ -9,6 +9,7 @@ from numba import njit
 
 from mcdc.print_ import print_error
 
+from mcdc.constant import WW_PREVIOUS
 
 # ==============================================================================
 # Basic types
@@ -1121,13 +1122,24 @@ def make_type_technique(input_deck):
     # Weight window
     # =========================================================================
 
-    # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww_mesh"])
-    struct += [("ww_mesh", mesh)]
-    struct += [("ww_width", float64)]
+    # =========================================================================
+    # Weight window
+    # =========================================================================
+    ww_list = []
 
-    # Window
-    struct += [("ww", float64, (Nt, Nx, Ny, Nz))]
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww"]["mesh"])
+    ww_list += [("mesh", mesh)]
+    ww_list += [("auto", int64)]
+    ww_list += [("width", float64)]
+    ww_list += [("epsilon", float64, (3,))]
+    ww_list += [("center", float64, (Nt, Nx, Ny, Nz))]
+    ww_list += [("save", bool_)]
+    if card["weight_window"]:
+        if card["ww"]["save"]:
+            if card["ww"]["auto"] == WW_PREVIOUS:
+                ww_list += [("phi_previous", float64, (Nt, Nx, Ny, Nz))]
+    struct += [("ww", into_dtype(ww_list))]
 
     # =========================================================================
     # Weight Roulette
