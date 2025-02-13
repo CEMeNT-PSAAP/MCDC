@@ -2365,6 +2365,17 @@ def census_based_tally_output(data, mcdc):
                     uq_var = tot_var - mc_var
                     f.create_dataset(group_name + "uq_var", data=uq_var)
             f.close()
+            # Save Weight Windows
+            if mcdc["technique"]["ww"]["save"]:
+                center = mcdc["technique"]["ww"]["center"]
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "a",
+                )
+                f.create_dataset(
+                    "weight_window_centers", data=center[idx_census, :, :, :]
+                )
 
 
 @njit
@@ -3494,7 +3505,7 @@ def branchless_collision(P_arr, prog):
 
 
 # =============================================================================
-# Weight widow
+# Weight window
 # =============================================================================
 
 
@@ -3505,11 +3516,11 @@ def weight_window(P_arr, prog):
 
     # Get indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(
-        P_arr, mcdc["technique"]["ww_mesh"]
+        P_arr, mcdc["technique"]["ww"]["mesh"]
     )
 
     # Target weight
-    w_target = mcdc["technique"]["ww"][it, ix, iy, iz]
+    w_target = mcdc["technique"]["ww"]["center"][it, ix, iy, iz]
 
     # Population control factor
     w_target *= mcdc["technique"]["pc_factor"]
@@ -3518,7 +3529,7 @@ def weight_window(P_arr, prog):
     p = P["w"] / w_target
 
     # Window width
-    width = mcdc["technique"]["ww_width"]
+    width = mcdc["technique"]["ww"]["width"]
 
     P_new_arr = adapt.local_array(1, type_.particle_record)
 
@@ -3548,6 +3559,53 @@ def weight_window(P_arr, prog):
             P["alive"] = False
         else:
             P["w"] = w_target
+
+
+@njit
+def update_weight_windows(data, mcdc):
+    idx_batch = mcdc["idx_batch"]
+    idx_census = mcdc["idx_census"]
+    epsilon = mcdc["technique"]["ww"]["epsilon"]
+    # accessing most recent tally dump
+    with objmode():
+        f = h5py.File(
+            mcdc["setting"]["output_name"]
+            + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+            "r",
+        )
+        tallies = f["tallies/mesh_tally_0"]
+        if mcdc["setting"]["census_tally_frequency"] > 1:
+            old_flux = tallies["flux"]["score"][-1]
+        else:
+            old_flux = tallies["flux"]["score"]
+        Nx = mcdc["technique"]["ww"]["mesh"]["Nx"]
+        Ny = mcdc["technique"]["ww"]["mesh"]["Ny"]
+        Nz = mcdc["technique"]["ww"]["mesh"]["Nz"]
+        Nt = mcdc["technique"]["ww"]["mesh"]["Nt"]
+
+        ax_expand = []
+        if Nx == 1:
+            ax_expand.append(0)
+        if Ny == 1:
+            ax_expand.append(1)
+        if Nz == 1:
+            ax_expand.append(2)
+        for ax in ax_expand:
+            old_flux = np.expand_dims(old_flux, axis=ax)
+        center = old_flux
+
+        if epsilon[WW_WOLLABER] > 0:
+            w_min = epsilon[WW_WOLLABER + 1]
+            center = (center) * (
+                1
+                + (1 / epsilon[WW_WOLLABER] - 1)
+                * np.exp(-(center - w_min) / epsilon[WW_WOLLABER])
+            )
+        if epsilon[WW_MIN] > 0:
+            center = center * (1 - epsilon[WW_MIN]) + epsilon[WW_MIN]
+            center[center <= 0] = epsilon[WW_MIN]
+        center /= np.max(center)
+        mcdc["technique"]["ww"]["center"][idx_census + 1] = center
 
 
 # =============================================================================

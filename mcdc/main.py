@@ -1240,15 +1240,29 @@ def prepare():
 
     # WW mesh
     for name in type_.mesh_names[:-1]:
-        copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
-    mcdc["technique"]["ww_mesh"]["Nx"] = len(input_deck.technique["ww_mesh"]["x"]) - 1
-    mcdc["technique"]["ww_mesh"]["Ny"] = len(input_deck.technique["ww_mesh"]["y"]) - 1
-    mcdc["technique"]["ww_mesh"]["Nz"] = len(input_deck.technique["ww_mesh"]["z"]) - 1
-    mcdc["technique"]["ww_mesh"]["Nt"] = len(input_deck.technique["ww_mesh"]["t"]) - 1
+        copy_field(
+            mcdc["technique"]["ww"]["mesh"], input_deck.technique["ww"]["mesh"], name
+        )
 
-    # WW windows
-    mcdc["technique"]["ww"] = input_deck.technique["ww"]
-    mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
+    mcdc["technique"]["ww"]["mesh"]["Nx"] = (
+        len(input_deck.technique["ww"]["mesh"]["x"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Ny"] = (
+        len(input_deck.technique["ww"]["mesh"]["y"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nz"] = (
+        len(input_deck.technique["ww"]["mesh"]["z"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nt"] = (
+        len(input_deck.technique["ww"]["mesh"]["t"]) - 1
+    )
+
+    # WW parameters
+    mcdc["technique"]["ww"]["width"] = input_deck.technique["ww"]["width"]
+    mcdc["technique"]["ww"]["auto"] = input_deck.technique["ww"]["auto"]
+    mcdc["technique"]["ww"]["epsilon"] = input_deck.technique["ww"]["epsilon"]
+    mcdc["technique"]["ww"]["center"] = input_deck.technique["ww"]["center"]
+    mcdc["technique"]["ww"]["save"] = input_deck.technique["ww"]["save"]
 
     # =========================================================================
     # Weight roulette
