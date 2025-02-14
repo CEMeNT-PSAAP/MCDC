@@ -46,12 +46,12 @@ pre_init_program, pre_exec_program, pre_complete, pre_clear_flags = [None] * 4
 # If GPU execution is supported and selected, the functions shown below will
 # be redefined to overwrite the above symbols and perform initialization/
 # finalization of GPU state
-@njit
+@trace.njit()
 def setup_gpu(mcdc):
     pass
 
 
-@njit
+@trace.njit()
 def teardown_gpu(mcdc):
     pass
 
@@ -66,7 +66,7 @@ def teardown_gpu(mcdc):
 #     see more about cacheing here https://numba.readthedocs.io/en/stable/developer/caching.html
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def loop_fixed_source(data_arr, mcdc_arr):
 
     # Ensure `data` and `mcdc` exist for the lifetime of the program
@@ -184,7 +184,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 # =============================================================================
 
 
-@njit()
+@trace.njit()
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.mcdc_global(prog)
 
@@ -214,9 +214,9 @@ def generate_source_particle(work_start, idx_work, seed, prog):
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
             if kernel.particle_in_domain(P_arr, mcdc):
-                adapt.add_census(P_arr, prog)
+                kernel.add_census(P_arr, prog)
         else:
-            adapt.add_census(P_arr, prog)
+            kernel.add_census(P_arr, prog)
     else:
         P_new_arr = adapt.local_array(1, type_.particle)
         P_new = P_new_arr[0]
@@ -226,13 +226,13 @@ def generate_source_particle(work_start, idx_work, seed, prog):
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
             if kernel.particle_in_domain(P_arr, mcdc):
                 kernel.recordlike_to_particle(P_new_arr, P_arr)
-                adapt.add_active(P_new_arr, prog)
+                kernel.add_active(P_new_arr, prog)
         else:
             kernel.recordlike_to_particle(P_new_arr, P_arr)
-            adapt.add_active(P_new_arr, prog)
+            kernel.add_active(P_new_arr, prog)
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def prep_particle(P_arr, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -242,7 +242,7 @@ def prep_particle(P_arr, prog):
         kernel.weight_window(P_arr, prog)
 
 
-@njit()
+@trace.njit()
 def exhaust_active_bank(data, prog):
     mcdc = adapt.mcdc_global(prog)
     P_arr = adapt.local_array(1, type_.particle)
@@ -259,7 +259,7 @@ def exhaust_active_bank(data, prog):
         loop_particle(P_arr, data, mcdc)
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def source_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.mcdc_global(prog)
 
@@ -279,7 +279,7 @@ def source_closeout(prog, idx_work, N_prog, data):
             print_progress(percent, mcdc)
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def source_dd_resolution(data, prog):
     mcdc = adapt.mcdc_global(prog)
 
@@ -415,7 +415,7 @@ BLOCK_COUNT = config.args.gpu_block_count
 ASYNC_EXECUTION = config.args.gpu_strat == "async"
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def gpu_loop_source(seed, data, mcdc):
 
     # Progress bar indicator
@@ -490,7 +490,7 @@ def gpu_loop_source(seed, data, mcdc):
 # =========================================================================
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -499,7 +499,7 @@ def loop_particle(P_arr, data, prog):
         step_particle(P_arr, data, prog)
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -548,7 +548,7 @@ def step_particle(P_arr, data, prog):
 
     # Census time crossing
     if P["event"] & EVENT_TIME_CENSUS:
-        adapt.add_census(P_arr, prog)
+        kernel.add_census(P_arr, prog)
         P["alive"] = False
 
     # Time boundary crossing
@@ -571,7 +571,7 @@ def step_particle(P_arr, data, prog):
 # =============================================================================
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     mcdc = adapt.mcdc_global(prog)
     DNP = DNP_arr[0]
@@ -657,10 +657,10 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
         ) = kernel.sample_isotropic_direction(P_new_arr)
 
         # Push to active bank
-        adapt.add_active(P_new_arr, prog)
+        kernel.add_active(P_new_arr, prog)
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def source_precursor_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.mcdc_global(prog)
 
@@ -676,7 +676,7 @@ def source_precursor_closeout(prog, idx_work, N_prog, data):
             print_progress(percent, mcdc)
 
 
-@njit
+@trace.njit()
 def loop_source_precursor(seed, data, mcdc):
     # TODO: censussed neutrons seeding is still not reproducible
 
@@ -787,7 +787,7 @@ def gpu_precursor_spec():
     )
 
 
-@njit(cache=caching)
+@trace.njit(cache=caching)
 def gpu_loop_source_precursor(seed, data, mcdc):
 
     # Progress bar indicator
@@ -911,7 +911,7 @@ def build_gpu_progs(input_deck, args):
     pre_complete = pre_fns["complete"]
     pre_clear_flags = pre_fns["clear_flags"]
 
-    @njit
+    @trace.njit()
     def real_setup_gpu(mcdc):
         src_set_device(device_id)
         arena_size = ARENA_SIZE
@@ -926,7 +926,7 @@ def build_gpu_progs(input_deck, args):
         pre_init_program(mcdc["precursor_program_pointer"], BLOCK_COUNT)
         return
 
-    @njit
+    @trace.njit()
     def real_teardown_gpu(mcdc):
         src_free_program(adapt.cast_uintp_to_voidptr(mcdc["source_program_pointer"]))
         pre_free_program(adapt.cast_uintp_to_voidptr(mcdc["precursor_program_pointer"]))

@@ -7,6 +7,7 @@ import mcdc.physics as physics
 import mcdc.adapt as adapt
 import mcdc.type_ as type_
 
+import mcdc.trace as trace
 from mcdc.adapt import for_cpu, for_gpu
 from mcdc.algorithm import binary_search
 from mcdc.constant import *
@@ -17,7 +18,7 @@ from mcdc.constant import *
 # ======================================================================================
 
 
-@njit
+@trace.njit()
 def inspect_geometry(particle_container, mcdc):
     """
     Full geometry inspection of the particle:
@@ -150,7 +151,7 @@ def inspect_geometry(particle_container, mcdc):
     return distance
 
 
-@njit
+@trace.njit()
 def locate_particle(particle_container, mcdc):
     """
     Set particle cell and material IDs
@@ -247,7 +248,7 @@ def locate_particle(particle_container, mcdc):
 # ======================================================================================
 
 
-@njit
+@trace.njit()
 def get_cell(particle_container, universe_ID, mcdc):
     """
     Find and return particle cell ID in the given universe
@@ -266,7 +267,7 @@ def get_cell(particle_container, universe_ID, mcdc):
     return -1
 
 
-@njit
+@trace.njit()
 def check_cell(particle_container, cell, mcdc):
     """
     Check if the particle is inside the cell
@@ -308,7 +309,7 @@ def check_cell(particle_container, cell, mcdc):
     return value[0]
 
 
-@njit
+@trace.njit()
 def check_surface_sense(particle_container, surface):
     """
     Check on which side of the surface the particle is
@@ -352,7 +353,7 @@ def report_lost(particle_container):
 # ======================================================================================
 
 
-@njit
+@trace.njit()
 def distance_to_nearest_surface(particle_container, cell, mcdc):
     """
     The termine the nearest cell surface and the distance to it
@@ -387,7 +388,7 @@ def distance_to_nearest_surface(particle_container, cell, mcdc):
 # TODO: make movement a translation and rotation
 
 
-@njit
+@trace.njit()
 def surface_evaluate(particle_container, surface):
     """
     Evaluate the surface equation wrt the particle coordinate
@@ -424,7 +425,7 @@ def surface_evaluate(particle_container, surface):
     )
 
 
-@njit
+@trace.njit()
 def surface_distance(particle_container, surface, mcdc):
     """
     Return particle distance to surface
@@ -521,7 +522,7 @@ def surface_distance(particle_container, surface, mcdc):
         return min(root_1, root_2)
 
 
-@njit
+@trace.njit()
 def surface_bc(particle_container, surface):
     """
     Apply surface boundary condition to the particle
@@ -533,7 +534,7 @@ def surface_bc(particle_container, surface):
         surface_reflect(particle_container, surface)
 
 
-@njit
+@trace.njit()
 def surface_reflect(particle_container, surface):
     """
     Surface-reflect the particle
@@ -553,7 +554,7 @@ def surface_reflect(particle_container, surface):
     particle["uz"] = uz - c * nz
 
 
-@njit
+@trace.njit()
 def surface_normal(particle_container, surface):
     """
     Get the surface outward-normal vector at the particle coordinate
@@ -586,7 +587,7 @@ def surface_normal(particle_container, surface):
     return dx / norm, dy / norm, dz / norm
 
 
-@njit
+@trace.njit()
 def surface_normal_component(particle_container, surface):
     """
     Get the surface outward-normal component of the particle
@@ -610,7 +611,7 @@ def surface_normal_component(particle_container, surface):
 # ======================================================================================
 
 
-@njit
+@trace.njit()
 def check_coincidence(value_1, value_2):
     """
     Check if two values are within coincidence tolerance

@@ -1488,7 +1488,8 @@ def make_type_trace_slot():
 
     trace_slot = into_dtype(
         [
-            ("runtime",int64,)
+            ("runtime_total",int64,(2,)),
+            ("call_total",int64,(2,))
         ]
     )
 

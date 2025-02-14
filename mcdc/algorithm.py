@@ -1,7 +1,8 @@
 from numba import njit
+import mcdc.trace as trace
 
 
-@njit
+@trace.njit()
 def binary_search_with_length(val, grid, length):
     """
     Binary search that returns the bin index of the value `val` given grid `grid`
@@ -28,7 +29,7 @@ def binary_search_with_length(val, grid, length):
     return int(right)
 
 
-@njit
+@trace.njit()
 def binary_search(val, grid):
     """
     Binary search with full length of the given grid.

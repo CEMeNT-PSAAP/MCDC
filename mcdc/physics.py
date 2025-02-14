@@ -2,6 +2,7 @@ import math
 
 from numba import njit
 
+import mcdc.trace as trace
 from mcdc.constant import SQRT_E_TO_SPEED
 
 
@@ -10,7 +11,7 @@ from mcdc.constant import SQRT_E_TO_SPEED
 # ======================================================================================
 
 
-@njit
+@trace.njit()
 def get_speed(particle_container, mcdc):
     """
     Get particle speed

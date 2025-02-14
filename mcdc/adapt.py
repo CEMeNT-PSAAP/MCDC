@@ -4,8 +4,7 @@ from numba import njit, jit, objmode, literal_unroll, types
 from numba.extending import intrinsic
 import numba
 import mcdc.type_ as type_
-import mcdc.kernel as kernel
-
+import mcdc.trace as trace
 
 if importlib.util.find_spec("harmonize") is None:
     HAS_HARMONIZE = False
@@ -343,7 +342,7 @@ def blankout_fn(func):
     return blank
 
 
-def for_(target, on_target=[]):
+def for_(target, transforms=[],on_target=[]):
     def for_inner(func):
         global target_rosters
         mod_name = func.__module__
@@ -351,6 +350,10 @@ def for_(target, on_target=[]):
         params = inspect.signature(func).parameters
         if target not in target_rosters:
             target_rosters[target] = {}
+
+        for tr in transforms:
+            func = tr(func)
+
         target_rosters[target][(mod_name, fn_name)] = func
         # blank = blankout_fn(func)
         param_str = ", ".join(p for p in params)
@@ -367,11 +370,11 @@ def for_(target, on_target=[]):
     return for_inner
 
 
-def for_cpu(on_target=[]):
+def for_cpu(transforms=[],on_target=[]):
     return for_("cpu", on_target=on_target)
 
 
-def for_gpu(on_target=[]):
+def for_gpu(transforms=[],on_target=[]):
     return for_("gpu", on_target=on_target)
 
 
@@ -512,53 +515,6 @@ def thread(prog):
 def thread(prog):
     return thread_gpu(prog)
 
-
-@for_cpu()
-def add_active(particle, prog):
-    kernel.add_particle(particle, prog["bank_active"])
-
-
-@for_gpu()
-def add_active(P_reclike, prog):
-    P = local_array(1, type_.particle)
-    kernel.recordlike_to_particle(P, P_reclike)
-    if SIMPLE_ASYNC:
-        step_async(prog, P[0])
-    else:
-        find_cell_async(prog, P[0])
-
-
-@for_cpu()
-def add_source(particle, prog):
-    kernel.add_particle(particle, prog["bank_source"])
-
-
-@for_gpu()
-def add_source(particle, prog):
-    mcdc = mcdc_global(prog)
-    kernel.add_particle(particle, mcdc["bank_source"])
-
-
-@for_cpu()
-def add_census(particle, prog):
-    kernel.add_particle(particle, prog["bank_census"])
-
-
-@for_gpu()
-def add_census(particle, prog):
-    mcdc = mcdc_global(prog)
-    kernel.add_particle(particle, mcdc["bank_census"])
-
-
-@for_cpu()
-def add_IC(particle, prog):
-    kernel.add_particle(particle, prog["technique"]["IC_bank_neutron_local"])
-
-
-@for_gpu()
-def add_IC(particle, prog):
-    mcdc = mcdc_global(prog)
-    kernel.add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
 
 
 @for_cpu()

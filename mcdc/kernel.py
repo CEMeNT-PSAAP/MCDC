@@ -14,6 +14,7 @@ import mcdc.geometry as geometry
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
 import mcdc.type_ as type_
+import mcdc.trace as trace
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.algorithm import binary_search, binary_search_with_length
@@ -21,7 +22,7 @@ from mcdc.constant import *
 from mcdc.print_ import print_error, print_msg
 
 
-@njit
+@trace.njit()
 def round(float_val):
     return float_val
     # int_val = np.float64(float_val).view(np.uint64)
@@ -29,6 +30,58 @@ def round(float_val):
     #    int_val += 0x10
     # int_val = int_val & ~0x0F
     # return np.uint64(int_val).view(np.float64)
+
+# =============================================================================
+# Banking/Scheduling Adapters
+# =============================================================================
+
+@for_cpu()
+def add_source(particle, prog):
+    add_particle(particle, prog["bank_source"])
+
+
+@for_gpu()
+def add_source(particle, prog):
+    mcdc = adapt.mcdc_global(prog)
+    add_particle(particle, mcdc["bank_source"])
+
+
+@for_cpu()
+def add_census(particle, prog):
+    add_particle(particle, prog["bank_census"])
+
+
+@for_gpu()
+def add_census(particle, prog):
+    mcdc = adapt.mcdc_global(prog)
+    add_particle(particle, mcdc["bank_census"])
+
+
+@for_cpu()
+def add_IC(particle, prog):
+    add_particle(particle, prog["technique"]["IC_bank_neutron_local"])
+
+
+@for_gpu()
+def add_IC(particle, prog):
+    mcdc = adapt.mcdc_global(prog)
+    add_particle(particle, mcdc["technique"]["IC_bank_neutron_local"])
+
+@for_cpu()
+def add_active(particle, prog):
+    add_particle(particle, prog["bank_active"])
+
+
+@for_gpu()
+def add_active(P_reclike, prog):
+    P = adapt.local_array(1, type_.particle)
+    recordlike_to_particle(P, P_reclike)
+    if adapt.SIMPLE_ASYNC:
+        adapt.step_async(prog, P[0])
+    else:
+        adapt.find_cell_async(prog, P[0])
+
+
 
 
 # =============================================================================
@@ -42,7 +95,7 @@ def round(float_val):
 
 @toggle("domain_decomp")
 def domain_crossing(P_arr, prog):
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
     P = P_arr[0]
     # Domain mesh crossing
     seed = P["rng_seed"]
@@ -127,12 +180,12 @@ def clear_requests():
     requests = []
 
 
-@njit
+@trace.njit()
 def dd_check_halt(mcdc):
     return mcdc["domain_decomp"]["work_done"]
 
 
-@njit
+@trace.njit()
 def dd_check_in(mcdc):
     mcdc["domain_decomp"]["send_count"] = 0
     mcdc["domain_decomp"]["recv_count"] = 0
@@ -149,7 +202,7 @@ def dd_check_in(mcdc):
         mcdc["domain_decomp"]["busy_total"] = 0
 
 
-@njit
+@trace.njit()
 def dd_check_out(mcdc):
     with objmode():
         rank = MPI.COMM_WORLD.Get_rank()
@@ -192,7 +245,7 @@ def dd_check_out(mcdc):
         clear_requests()
 
 
-@njit
+@trace.njit()
 def dd_signal_halt(mcdc):
 
     with objmode():
@@ -203,7 +256,7 @@ def dd_signal_halt(mcdc):
     mcdc["domain_decomp"]["work_done"] = True
 
 
-@njit
+@trace.njit()
 def dd_signal_block(mcdc):
 
     with objmode(rank="int64"):
@@ -236,7 +289,7 @@ def dd_signal_block(mcdc):
         dd_signal_halt(mcdc)
 
 
-@njit
+@trace.njit()
 def dd_signal_unblock(mcdc):
 
     with objmode(rank="int64"):
@@ -266,7 +319,7 @@ def dd_signal_unblock(mcdc):
     mcdc["domain_decomp"]["recv_count"] = 0
 
 
-@njit
+@trace.njit()
 def dd_distribute_bank(mcdc, bank, dest_list):
 
     with objmode(send_delta="int64"):
@@ -302,9 +355,9 @@ def dd_initiate_particle_send(prog):
     dd_particle_send(prog)
 
 
-@njit
+@trace.njit()
 def dd_particle_send(prog):
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
     dd_distribute_bank(
         mcdc, mcdc["domain_decomp"]["bank_xp"], mcdc["technique"]["dd_xp_neigh"]
     )
@@ -330,7 +383,7 @@ def dd_particle_send(prog):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def dd_get_recv_tag():
 
     with objmode(tag="int64"):
@@ -341,7 +394,7 @@ def dd_get_recv_tag():
     return tag
 
 
-@njit
+@trace.njit()
 def dd_recv_particles(mcdc):
 
     buff = np.zeros(
@@ -369,7 +422,7 @@ def dd_recv_particles(mcdc):
         mcdc["domain_decomp"]["rank_busy"] = True
 
 
-@njit
+@trace.njit()
 def dd_recv_turnstile(mcdc):
 
     with objmode(busy_delta="int64", send_delta="int64"):
@@ -390,7 +443,7 @@ def dd_recv_turnstile(mcdc):
         dd_signal_halt(mcdc)
 
 
-@njit
+@trace.njit()
 def dd_recv_halt(mcdc):
 
     with objmode():
@@ -402,7 +455,7 @@ def dd_recv_halt(mcdc):
     mcdc["domain_decomp"]["work_done"] = True
 
 
-@njit
+@trace.njit()
 def dd_recv(mcdc):
 
     if mcdc["domain_decomp"]["rank_busy"]:
@@ -426,7 +479,7 @@ def dd_recv(mcdc):
 
 
 # Check if particle is in domain
-@njit
+@trace.njit()
 def particle_in_domain(P_arr, mcdc):
     P = P_arr[0]
     d_idx = mcdc["dd_idx"]
@@ -454,7 +507,7 @@ def particle_in_domain(P_arr, mcdc):
 
 
 # Check for source in domain
-@njit
+@trace.njit()
 def source_in_domain(source, domain_mesh, d_idx):
     d_Nx = domain_mesh["x"].size - 1
     d_Ny = domain_mesh["y"].size - 1
@@ -497,7 +550,7 @@ def source_in_domain(source, domain_mesh, d_idx):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def domain_work(mcdc, domain, N):
     domain_mesh = mcdc["technique"]["dd_mesh"]
 
@@ -621,7 +674,7 @@ def domain_work(mcdc, domain, N):
 # =============================================================================
 
 
-@njit()
+@trace.njit()
 def source_particle_dd(seed, mcdc):
     domain_mesh = mcdc["technique"]["dd_mesh"]
     d_idx = mcdc["dd_idx"]
@@ -697,8 +750,12 @@ def source_particle_dd(seed, mcdc):
     return P
 
 
-@njit
-def distribute_work_dd(N, mcdc, precursor=False):
+@trace.njit()
+def distribute_work_dd(N, mcdc):
+    return distribute_work_dd_precursor(N,mcdc,False)
+
+@trace.njit()
+def distribute_work_dd_precursor(N, mcdc, precursor):
     # Total # of work
     work_size_total = N
 
@@ -723,7 +780,7 @@ def distribute_work_dd(N, mcdc, precursor=False):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def sample_isotropic_direction(P_arr):
     P = P_arr[0]
     # Sample polar cosine and azimuthal angle uniformly
@@ -738,7 +795,7 @@ def sample_isotropic_direction(P_arr):
     return x, y, z
 
 
-@njit
+@trace.njit()
 def sample_white_direction(nx, ny, nz, P_arr):
     P = P_arr[0]
     # Sample polar cosine
@@ -769,14 +826,14 @@ def sample_white_direction(nx, ny, nz, P_arr):
     return x, y, z
 
 
-@njit
+@trace.njit()
 def sample_uniform(a, b, P_arr):
     P = P_arr[0]
     return a + rng(P_arr) * (b - a)
 
 
 # TODO: use cummulative density function and binary search
-@njit
+@trace.njit()
 def sample_discrete(group, P_arr):
     P = P_arr[0]
     tot = 0.0
@@ -787,7 +844,7 @@ def sample_discrete(group, P_arr):
             return i
 
 
-@njit
+@trace.njit()
 def sample_piecewise_linear(cdf, P_arr):
     P = P_arr[0]
     xi = rng(P_arr)
@@ -809,12 +866,12 @@ def sample_piecewise_linear(cdf, P_arr):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def wrapping_mul(a, b):
     return a * b
 
 
-@njit
+@trace.njit()
 def wrapping_add(a, b):
     return a + b
 
@@ -840,7 +897,7 @@ def adapt_rng(object_mode=False):
         wrapping_mul = wrapping_mul_python
 
 
-@njit
+@trace.njit()
 def split_seed(key, seed):
     """murmur_hash64a"""
     multiplier = uint64(0xC6A4A7935BD1E995)
@@ -863,25 +920,25 @@ def split_seed(key, seed):
     return hash_value
 
 
-@njit
+@trace.njit()
 def rng_(seed):
     seed = uint64(seed)
     return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
 
 
-@njit
+@trace.njit()
 def rng(state_arr):
     state = state_arr[0]
     state["rng_seed"] = rng_(state["rng_seed"])
     return state["rng_seed"] / RNG_MOD
 
 
-@njit
+@trace.njit()
 def rng_from_seed(seed):
     return rng_(seed) / RNG_MOD
 
 
-@njit
+@trace.njit()
 def rng_array(seed, shape, size):
     xi = np.zeros(size)
     for i in range(size):
@@ -896,7 +953,7 @@ def rng_array(seed, shape, size):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def source_particle(P_rec_arr, seed, mcdc):
     P_rec = P_rec_arr[0]
     P_rec["rng_seed"] = seed
@@ -960,17 +1017,17 @@ def source_particle(P_rec_arr, seed, mcdc):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def get_bank_size(bank):
     return bank["size"][0]
 
 
-@njit
+@trace.njit()
 def set_bank_size(bank, value):
     bank["size"][0] = value
 
 
-@njit
+@trace.njit()
 def add_bank_size(bank, value):
     return adapt.global_add(bank["size"], 0, value)
 
@@ -986,7 +1043,7 @@ def full_bank_print(bank):
     pass
 
 
-@njit
+@trace.njit()
 def add_particle(P_arr, bank):
     P = P_arr[0]
 
@@ -1000,7 +1057,7 @@ def add_particle(P_arr, bank):
     copy_recordlike(bank["particles"][idx : idx + 1], P_arr)
 
 
-@njit
+@trace.njit()
 def get_particle(P_arr, bank, mcdc):
     P = P_arr[0]
 
@@ -1039,7 +1096,7 @@ def get_particle(P_arr, bank, mcdc):
     return True
 
 
-@njit
+@trace.njit()
 def manage_particle_banks(seed, mcdc):
     # Record time
     if mcdc["mpi_master"]:
@@ -1079,7 +1136,7 @@ def manage_particle_banks(seed, mcdc):
         mcdc["runtime_bank_management"] += time_end - time_start
 
 
-@njit
+@trace.njit()
 def manage_IC_bank(mcdc):
     # Buffer bank
     buff_n = np.zeros(
@@ -1131,7 +1188,7 @@ def manage_IC_bank(mcdc):
     set_bank_size(mcdc["technique"]["IC_bank_precursor_local"], 0)
 
 
-@njit
+@trace.njit()
 def bank_scanning(bank, mcdc):
     N_local = get_bank_size(bank)
 
@@ -1150,7 +1207,7 @@ def bank_scanning(bank, mcdc):
     return idx_start, N_local, N_global
 
 
-@njit
+@trace.njit()
 def bank_scanning_weight(bank, mcdc):
     # Local weight CDF
     N_local = get_bank_size(bank)
@@ -1175,7 +1232,7 @@ def bank_scanning_weight(bank, mcdc):
     return w_start, w_cdf, W_global
 
 
-@njit
+@trace.njit()
 def bank_scanning_DNP(bank, mcdc):
     N_DNP_local = get_bank_size(bank)
 
@@ -1200,7 +1257,7 @@ def bank_scanning_DNP(bank, mcdc):
     return idx_start, N_local, N_global
 
 
-@njit
+@trace.njit()
 def normalize_weight(bank, norm):
     # Get total weight
     W = total_weight(bank)
@@ -1210,7 +1267,7 @@ def normalize_weight(bank, norm):
         P["w"] *= norm / W
 
 
-@njit
+@trace.njit()
 def total_weight(bank):
     # Local total weight
     W_local = np.zeros(1)
@@ -1224,7 +1281,7 @@ def total_weight(bank):
     return buff[0]
 
 
-@njit
+@trace.njit()
 def allreduce(value):
     total = np.zeros(1, np.float64)
     with objmode():
@@ -1232,7 +1289,7 @@ def allreduce(value):
     return total[0]
 
 
-@njit
+@trace.njit()
 def allreduce_array(array):
     buff = np.zeros_like(array)
     with objmode():
@@ -1240,7 +1297,7 @@ def allreduce_array(array):
     array[:] = buff
 
 
-@njit
+@trace.njit()
 def bank_rebalance(mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(mcdc["bank_source"], mcdc)
@@ -1321,8 +1378,12 @@ def bank_rebalance(mcdc):
         mcdc["bank_source"]["particles"][i] = buff[i]
 
 
-@njit
-def distribute_work(N, mcdc, precursor=False):
+@trace.njit()
+def distribute_work(N, mcdc):
+    return distribute_work_precursor(N,mcdc,False)
+
+@trace.njit()
+def distribute_work_precursor(N, mcdc, precursor):
     size = mcdc["mpi_size"]
     rank = mcdc["mpi_rank"]
 
@@ -1382,11 +1443,11 @@ def pp_over_one():
     pass
 
 
-@njit
+@trace.njit()
 def bank_IC(P_arr, prog):
     P = P_arr[0]
 
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
 
     # TODO: Consider multi-nuclide material
     material = mcdc["nuclides"][P["material_ID"]]
@@ -1423,7 +1484,7 @@ def bank_IC(P_arr, prog):
         split_as_record(P_new_arr, P_arr)
         P_new["w"] = 1.0
         P_new["t"] = 0.0
-        adapt.add_IC(P_new_arr, prog)
+        add_IC(P_new_arr, prog)
 
         # Accumulate fission
         SigmaF = material["fission"][g]
@@ -1494,7 +1555,7 @@ def bank_IC(P_arr, prog):
 #       required due to pure-Python behavior of taking things by reference.
 
 
-@njit
+@trace.njit()
 def population_control(seed, mcdc):
     if mcdc["technique"]["pct"] == PCT_COMBING:
         pct_combing(seed, mcdc)
@@ -1506,7 +1567,7 @@ def population_control(seed, mcdc):
         pct_splitting_roulette_weight(seed, mcdc)
 
 
-@njit
+@trace.njit()
 def pct_combing(seed, mcdc):
     bank_census = mcdc["bank_census"]
     M = mcdc["setting"]["N_particle"]
@@ -1542,10 +1603,10 @@ def pct_combing(seed, mcdc):
         split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] *= td
-        adapt.add_source(P_rec_arr, mcdc)
+        add_source(P_rec_arr, mcdc)
 
 
-@njit
+@trace.njit()
 def pct_combing_weight(seed, mcdc):
     bank_census = mcdc["bank_census"]
     M = mcdc["setting"]["N_particle"]
@@ -1583,10 +1644,10 @@ def pct_combing_weight(seed, mcdc):
         split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
         # Set weight
         P_rec["w"] = td
-        adapt.add_source(P_rec_arr, mcdc)
+        add_source(P_rec_arr, mcdc)
 
 
-@njit
+@trace.njit()
 def pct_splitting_roulette(seed, mcdc):
     bank_census = mcdc["bank_census"]
     M = mcdc["setting"]["N_particle"]
@@ -1628,10 +1689,10 @@ def pct_splitting_roulette(seed, mcdc):
             split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
             # Set weight
             P_rec["w"] = w_survive
-            adapt.add_source(P_rec_arr, mcdc)
+            add_source(P_rec_arr, mcdc)
 
 
-@njit
+@trace.njit()
 def pct_splitting_roulette_weight(seed, mcdc):
     bank_census = mcdc["bank_census"]
     M = mcdc["setting"]["N_particle"]
@@ -1671,7 +1732,7 @@ def pct_splitting_roulette_weight(seed, mcdc):
             split_as_record(P_rec_arr, bank_census["particles"][idx : idx + 1])
             # Set weight
             P_rec["w"] = w_survive
-            adapt.add_source(P_rec_arr, mcdc)
+            add_source(P_rec_arr, mcdc)
 
 
 # =============================================================================
@@ -1679,7 +1740,7 @@ def pct_splitting_roulette_weight(seed, mcdc):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def move_particle(P_arr, distance, mcdc):
     P = P_arr[0]
     P["x"] += P["ux"] * distance
@@ -1688,7 +1749,7 @@ def move_particle(P_arr, distance, mcdc):
     P["t"] += distance / physics.get_speed(P_arr, mcdc)
 
 
-@njit
+@trace.njit()
 def copy_recordlike(P_new_arr, P_rec_arr):
     P_new = P_new_arr[0]
     P_rec = P_rec_arr[0]
@@ -1706,7 +1767,7 @@ def copy_recordlike(P_new_arr, P_rec_arr):
     P_new["iqmc"]["w"] = P_rec["iqmc"]["w"]
 
 
-@njit
+@trace.njit()
 def copy_particle(P_new_arr, P_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -1730,7 +1791,7 @@ def copy_particle(P_new_arr, P_arr):
     P_new["iqmc"]["w"] = P["iqmc"]["w"]
 
 
-@njit
+@trace.njit()
 def recordlike_to_particle(P_new_arr, P_rec_arr):
     P_new = P_new_arr[0]
     P_rec = P_rec_arr[0]
@@ -1743,7 +1804,7 @@ def recordlike_to_particle(P_new_arr, P_rec_arr):
     P_new["event"] = -1
 
 
-@njit
+@trace.njit()
 def split_as_record(P_new_rec_arr, P_rec_arr):
     P_rec = P_rec_arr[0]
     P_new_rec = P_new_rec_arr[0]
@@ -1757,7 +1818,7 @@ def split_as_record(P_new_rec_arr, P_rec_arr):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def mesh_get_angular_index(P_arr, mesh):
     P = P_arr[0]
     ux = P["ux"]
@@ -1774,7 +1835,7 @@ def mesh_get_angular_index(P_arr, mesh):
     return mu, azi
 
 
-@njit
+@trace.njit()
 def mesh_get_energy_index(P_arr, mesh, mode_MG):
     P = P_arr[0]
     # Check if outside grid
@@ -1795,7 +1856,7 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def score_mesh_tally(P_arr, distance, tally, data, mcdc):
     P = P_arr[0]
     tally_bin = data[TALLY]
@@ -1955,7 +2016,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             idx += stride["t"]
 
 
-@njit
+@trace.njit()
 def score_surface_tally(P_arr, surface, tally, data, mcdc):
     # TODO: currently not supporting filters
     P = P_arr[0]
@@ -1980,7 +2041,7 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
         adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
 
-@njit
+@trace.njit()
 def tally_reduce(data, mcdc):
     tally_bin = data[TALLY]
     N_bin = tally_bin.shape[1]
@@ -1998,7 +2059,7 @@ def tally_reduce(data, mcdc):
         tally_bin[TALLY_SCORE][:] = buff
 
 
-@njit
+@trace.njit()
 def tally_accumulate(data, mcdc):
     tally_bin = data[TALLY]
     N_bin = tally_bin.shape[1]
@@ -2013,7 +2074,7 @@ def tally_accumulate(data, mcdc):
         tally_bin[TALLY_SCORE, i] = 0.0
 
 
-@njit
+@trace.njit()
 def tally_closeout(data, mcdc):
     tally = data[TALLY]
     N_history = mcdc["setting"]["N_particle"]
@@ -2049,7 +2110,7 @@ def tally_closeout(data, mcdc):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def eigenvalue_tally(P_arr, distance, mcdc):
     P = P_arr[0]
     material = mcdc["materials"][P["material_ID"]]
@@ -2103,7 +2164,7 @@ def eigenvalue_tally(P_arr, distance, mcdc):
             mcdc["C_max"] = C_density
 
 
-@njit
+@trace.njit()
 def eigenvalue_tally_closeout_history(mcdc):
     N_particle = mcdc["setting"]["N_particle"]
 
@@ -2246,7 +2307,7 @@ def eigenvalue_tally_closeout_history(mcdc):
         mcdc["gyration_radius"][idx_cycle] = rms
 
 
-@njit
+@trace.njit()
 def eigenvalue_tally_closeout(mcdc):
     N = mcdc["setting"]["N_active"]
     mcdc["n_avg"] /= N
@@ -2264,7 +2325,7 @@ def eigenvalue_tally_closeout(mcdc):
 # ======================================================================================
 
 
-@njit
+@trace.njit()
 def move_to_event(P_arr, data, mcdc):
     # ==================================================================================
     # Preparation (as needed)
@@ -2371,7 +2432,7 @@ def move_to_event(P_arr, data, mcdc):
     move_particle(P_arr, distance, mcdc)
 
 
-@njit
+@trace.njit()
 def distance_to_collision(P_arr, mcdc):
     P = P_arr[0]
     # Get total cross-section
@@ -2393,10 +2454,10 @@ def distance_to_collision(P_arr, mcdc):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def surface_crossing(P_arr, data, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
@@ -2418,7 +2479,7 @@ def surface_crossing(P_arr, data, prog):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def collision(P_arr, mcdc):
     P = P_arr[0]
     # Get the reaction cross-sections
@@ -2452,10 +2513,10 @@ def collision(P_arr, mcdc):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def scattering(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
     # Kill the current particle
     P["alive"] = False
 
@@ -2499,10 +2560,10 @@ def scattering(P_arr, prog):
             P["E"] = P_new["E"]
             P["w"] = P_new["w"]
         else:
-            adapt.add_active(P_new_arr, prog)
+            add_active(P_new_arr, prog)
 
 
-@njit
+@trace.njit()
 def sample_phasespace_scattering(P_arr, material, P_new_arr, mcdc):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2518,7 +2579,7 @@ def sample_phasespace_scattering(P_arr, material, P_new_arr, mcdc):
         scattering_CE(P_arr, material, P_new_arr, mcdc)
 
 
-@njit
+@trace.njit()
 def sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2531,7 +2592,7 @@ def sample_phasespace_scattering_nuclide(P_arr, nuclide, P_new_arr):
     scattering_MG(P_arr, nuclide, P_new_arr)
 
 
-@njit
+@trace.njit()
 def scattering_MG(P_arr, material, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2559,7 +2620,7 @@ def scattering_MG(P_arr, material, P_new_arr):
     P_new["g"] = g_out
 
 
-@njit
+@trace.njit()
 def scattering_CE(P_arr, material, P_new_arr, mcdc):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2652,7 +2713,7 @@ def scattering_CE(P_arr, material, P_new_arr, mcdc):
     P_new["uz"] = vz / P_speed
 
 
-@njit
+@trace.njit()
 def sample_nucleus_speed(A, P_arr, mcdc):
     P = P_arr[0]
     # Particle speed
@@ -2694,7 +2755,7 @@ def sample_nucleus_speed(A, P_arr, mcdc):
     return Vx, Vy, Vz
 
 
-@njit
+@trace.njit()
 def scatter_direction(ux, uy, uz, mu0, azi):
     cos_azi = math.cos(azi)
     sin_azi = math.sin(azi)
@@ -2725,10 +2786,10 @@ def scatter_direction(ux, uy, uz, mu0, azi):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def fission(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
 
     # Kill the current particle
     P["alive"] = False
@@ -2778,9 +2839,9 @@ def fission(P_arr, prog):
         # Bank
         idx_census = mcdc["idx_census"]
         if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
-            adapt.add_census(P_new_arr, prog)
+            add_census(P_new_arr, prog)
         elif mcdc["setting"]["mode_eigenvalue"]:
-            adapt.add_census(P_new_arr, prog)
+            add_census(P_new_arr, prog)
         else:
             # Keep it if it is the last particle
             if n == N - 1:
@@ -2793,10 +2854,10 @@ def fission(P_arr, prog):
                 P["E"] = P_new["E"]
                 P["w"] = P_new["w"]
             else:
-                adapt.add_active(P_new_arr, prog)
+                add_active(P_new_arr, prog)
 
 
-@njit
+@trace.njit()
 def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2867,7 +2928,7 @@ def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
         P_new["t"] -= math.log(xi) / decay
 
 
-@njit
+@trace.njit()
 def sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2886,7 +2947,7 @@ def sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc):
         fission_CE(P_arr, nuclide, P_new_arr)
 
 
-@njit
+@trace.njit()
 def fission_MG(P_arr, nuclide, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -2931,7 +2992,7 @@ def fission_MG(P_arr, nuclide, P_new_arr):
         P_new["t"] -= math.log(xi) / decay
 
 
-@njit
+@trace.njit()
 def fission_CE(P_arr, nuclide, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
@@ -3022,10 +3083,10 @@ def fission_CE(P_arr, nuclide, P_new_arr):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def branchless_collision(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
 
     material = mcdc["materials"][P["material_ID"]]
 
@@ -3053,7 +3114,7 @@ def branchless_collision(P_arr, prog):
             if P["t"] > mcdc["setting"]["census_time"][idx_census]:
                 P["alive"] = False
                 split_as_record(P_rec_arr, P_arr)
-                adapt.add_active(P_rec_arr, prog)
+                add_active(P_rec_arr, prog)
             elif P["t"] > mcdc["setting"]["time_boundary"]:
                 P["alive"] = False
 
@@ -3063,10 +3124,10 @@ def branchless_collision(P_arr, prog):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def weight_window(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.mcdc_global(prog)
+    mcdc = adapt.adapt.mcdc_global(prog)
 
     # Get indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(
@@ -3096,14 +3157,14 @@ def weight_window(P_arr, prog):
         n_split = math.floor(p)
         for i in range(n_split - 1):
             split_as_record(P_new_arr, P_arr)
-            adapt.add_active(P_new_arr, prog)
+            add_active(P_new_arr, prog)
 
         # Russian roulette
         p -= n_split
         xi = rng(P_arr)
         if xi <= p:
             split_as_record(P_new_arr, P_arr)
-            adapt.add_active(P_new_arr, prog)
+            add_active(P_new_arr, prog)
 
     # Below target
     elif p < 1.0 / width:
@@ -3120,7 +3181,7 @@ def weight_window(P_arr, prog):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def weight_roulette(P_arr, mcdc):
     P = P_arr[0]
     w_survive = mcdc["technique"]["wr_survive"]
@@ -3138,7 +3199,7 @@ def weight_roulette(P_arr, mcdc):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def get_MacroXS(type_, material, P_arr, mcdc):
     P = P_arr[0]
     # Multigroup XS
@@ -3195,7 +3256,7 @@ def get_MacroXS(type_, material, P_arr, mcdc):
     return MacroXS
 
 
-@njit
+@trace.njit()
 def get_microXS(type_, nuclide, E):
     # Cross sections
     if type_ == XS_TOTAL:
@@ -3242,7 +3303,7 @@ def get_microXS(type_, nuclide, E):
         return nu * xs
 
 
-@njit
+@trace.njit()
 def get_XS(data, E, E_grid, NE):
     # Search XS energy bin index
     idx = binary_search_with_length(E, E_grid, NE)
@@ -3262,7 +3323,7 @@ def get_XS(data, E, E_grid, NE):
     return XS1 + (E - E1) * (XS2 - XS1) / (E2 - E1)
 
 
-@njit
+@trace.njit()
 def get_nu_group(type_, nuclide, E, group):
     if type_ == NU_FISSION:
         nu = get_XS(nuclide["ce_nu_p"], E, nuclide["E_nu_p"], nuclide["NE_nu_p"])
@@ -3289,12 +3350,12 @@ def get_nu_group(type_, nuclide, E, group):
         )
 
 
-@njit
+@trace.njit()
 def get_nu(type_, nuclide, E):
     return get_nu_group(type_, nuclide, E, -1)
 
 
-@njit
+@trace.njit()
 def sample_nuclide(material, P_arr, type_, mcdc):
     P = P_arr[0]
     xi = rng(P_arr) * get_MacroXS(type_, material, P_arr, mcdc)
@@ -3311,7 +3372,7 @@ def sample_nuclide(material, P_arr, type_, mcdc):
     return nuclide
 
 
-@njit
+@trace.njit()
 def sample_Eout(P_new_arr, E_grid, NE, chi):
     P_new = P_new_arr[0]
     xi = rng(P_new_arr)
@@ -3332,7 +3393,7 @@ def sample_Eout(P_new_arr, E_grid, NE, chi):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def lartg(f, g):
     """
     Originally a Lapack routine to generate a plane rotation with
@@ -3360,7 +3421,7 @@ def lartg(f, g):
     return c, s, r
 
 
-@njit
+@trace.njit()
 def modified_gram_schmidt(V, u):
     """
     Modified Gram Schmidt routine
@@ -3381,7 +3442,7 @@ def modified_gram_schmidt(V, u):
 # =============================================================================
 
 
-@njit
+@trace.njit()
 def uq_resample(mean, delta, info):
     # Currently only uniform distribution
     shape = mean.shape
@@ -3391,7 +3452,7 @@ def uq_resample(mean, delta, info):
     return mean + (2 * xi - 1) * delta
 
 
-@njit
+@trace.njit()
 def reset_material(mcdc, idm, material_uq):
     # Assumes all nuclides have already been re-sampled
     # Basic XS
@@ -3462,7 +3523,7 @@ def reset_material(mcdc, idm, material_uq):
             material["nu_f"] += material["nu_d"][:, j]
 
 
-@njit
+@trace.njit()
 def reset_nuclide(nuclide, nuclide_uq):
     for name in literal_unroll(
         ("speed", "decay", "capture", "fission", "nu_s", "nu_p")
@@ -3528,7 +3589,7 @@ def reset_nuclide(nuclide, nuclide_uq):
                 nuclide["chi_d"][dg, :] /= np.sum(nuclide["chi_d"][dg, :])
 
 
-@njit
+@trace.njit()
 def uq_reset(mcdc, seed):
     # Types of uq parameters: materials, nuclides
     N = len(mcdc["technique"]["uq_"]["nuclides"])
@@ -3548,7 +3609,7 @@ def uq_reset(mcdc, seed):
         reset_material(mcdc, idm, mcdc["technique"]["uq_"]["materials"][i])
 
 
-@njit
+@trace.njit()
 def uq_tally_closeout_history(data, mcdc):
     tally_bin = data[TALLY]
 
@@ -3559,7 +3620,7 @@ def uq_tally_closeout_history(data, mcdc):
     tally_bin[TALLY_UQ_BATCH] = tally_bin[TALLY_SCORE]
 
 
-@njit
+@trace.njit()
 def uq_tally_closeout_batch(data, mcdc):
     tally_bin = data[TALLY]
 
@@ -3576,7 +3637,7 @@ def uq_tally_closeout_batch(data, mcdc):
     tally_bin[TALLY_UQ_BATCH_VAR][:] = buff
 
 
-@njit
+@trace.njit()
 def uq_tally_closeout(data, mcdc):
     tally_bin = data[TALLY]
 

@@ -97,7 +97,7 @@ def run():
     mcdc["runtime_total"] = MPI.Wtime() - total_start
 
     if config.trace:
-        trace.print_report(mcdc)
+        trace.output_report(mcdc)
 
     # Closout
     closeout(mcdc)
