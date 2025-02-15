@@ -2358,11 +2358,27 @@ def census_based_tally_output(data, mcdc):
         grid_g = mesh["g"][: Ng + 1]
         #'''
         with objmode():
-            f = h5py.File(
-                mcdc["setting"]["output_name"]
-                + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
-                "w",
-            )
+            if ID == 0:
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "w",
+                )
+
+                # Save Weight Windows
+                if mcdc["technique"]["ww"]["save"]:
+                    center = mcdc["technique"]["ww"]["center"]
+                    f.create_dataset(
+                        "weight_window_centers", data=center[idx_census, :, :, :]
+                    )
+                    f.close
+
+            else:
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "a",
+                )
 
             # Save to dataset
             f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
@@ -2415,17 +2431,6 @@ def census_based_tally_output(data, mcdc):
                     uq_var = tot_var - mc_var
                     f.create_dataset(group_name + "uq_var", data=uq_var)
             f.close()
-            # Save Weight Windows
-            if mcdc["technique"]["ww"]["save"]:
-                center = mcdc["technique"]["ww"]["center"]
-                f = h5py.File(
-                    mcdc["setting"]["output_name"]
-                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
-                    "a",
-                )
-                f.create_dataset(
-                    "weight_window_centers", data=center[idx_census, :, :, :]
-                )
 
 
 @njit
@@ -3623,7 +3628,7 @@ def update_weight_windows(data, mcdc):
             + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
             "r",
         )
-        tallies = f["tallies/mesh_tally_0"]
+        tallies = f["tallies/mesh_tally_" + str(mcdc["technique"]["ww"]["tally_idx"])]
         if mcdc["setting"]["census_tally_frequency"] > 1:
             old_flux = tallies["flux"]["score"][-1]
         else:
