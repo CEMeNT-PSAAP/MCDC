@@ -1265,7 +1265,7 @@ def prepare():
     mcdc["technique"]["ww"]["epsilon"] = input_deck.technique["ww"]["epsilon"]
     mcdc["technique"]["ww"]["center"] = input_deck.technique["ww"]["center"]
     mcdc["technique"]["ww"]["save"] = input_deck.technique["ww"]["save"]
-
+    mcdc["technique"]["ww"]["tally_idx"] = input_deck.technique["ww"]["tally_idx"]
     # =========================================================================
     # Weight roulette
     # =========================================================================

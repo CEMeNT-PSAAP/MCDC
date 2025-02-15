@@ -1137,6 +1137,7 @@ def make_type_technique(input_deck):
     ww_list += [("epsilon", float64, (3,))]
     ww_list += [("center", float64, (Nt, Nx, Ny, Nz))]
     ww_list += [("save", bool_)]
+    ww_list += [("tally_idx", int64)]
     if card["weight_window"]:
         if card["ww"]["save"]:
             if card["ww"]["auto"] == WW_PREVIOUS:
