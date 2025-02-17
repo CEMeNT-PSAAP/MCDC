@@ -2043,25 +2043,75 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
     P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
+    mesh = tally["filter"]
     stride = tally["stride"]
-    cell_idx = stride["tally"]
-    score = 0
 
-    # Score
-    flux = distance * P["w"]
-    for i in range(tally["N_score"]):
-        score_type = tally["scores"][i]
-        if score_type == SCORE_FLUX:
-            score = flux
-        elif score_type == SCORE_TOTAL:
-            SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
-            score = flux * SigmaT
-        elif score_type == SCORE_FISSION:
-            SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
-            score = flux * SigmaF
+    # Particle/track properties
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
+    t = P["t"]
+    t_final = t + ut * distance
+    Nt = mesh["Nt"]
 
-        adapt.global_add(tally_bin, (TALLY_SCORE, cell_idx + i), round(score))
-        # tally_bin[TALLY_SCORE, cell_idx + i] += score
+    # Get starting indices
+    g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
+
+    # Outside grid?
+    if (
+        t < mesh["t"][0] - COINCIDENCE_TOLERANCE_TIME
+        or t > mesh["t"][Nt] + COINCIDENCE_TOLERANCE_TIME
+        or (abs(t - mesh["t"][Nt]) < COINCIDENCE_TOLERANCE_TIME)
+        or outside_energy
+    ):
+        return
+
+    it = mesh_.structured._grid_index(
+        t, 1.0, mesh["t"], Nt + 1, COINCIDENCE_TOLERANCE_TIME
+    )
+
+    # Tally index
+    idx = stride["tally"] + g * stride["g"] + it * stride["t"]
+
+    # Sweep through the distance
+    distance_swept = 0.0
+    while distance_swept < distance - COINCIDENCE_TOLERANCE:
+
+        # Find distance to mesh grids
+        dt = (min(mesh["t"][it + 1], t_final) - t) / ut
+
+        # Get the grid crossed
+        distance_scored = INF
+        mesh_crossed = MESH_NONE
+        if dt <= distance_scored:
+            mesh_crossed = MESH_T
+            distance_scored = dt
+
+        # Score
+        flux = distance_scored * P["w"]
+        for i in range(tally["N_score"]):
+            score_type = tally["scores"][i]
+            score = 0
+            if score_type == SCORE_FLUX:
+                score = flux
+            elif score_type == SCORE_TOTAL:
+                SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+                score = flux * SigmaT
+            elif score_type == SCORE_FISSION:
+                SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+                score = flux * SigmaF
+            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+
+        # Accumulate distance swept
+        distance_swept += distance_scored
+
+        # Move the 4D (just t for this tally) position
+        t += distance_scored * ut
+
+        # Increment index and check if out of bounds
+        if mesh_crossed == MESH_T:
+            it += 1
+            if it == Nt:
+                break
+            idx += stride["t"]
 
 
 @njit
