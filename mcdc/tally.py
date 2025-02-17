@@ -102,7 +102,7 @@ def mesh_tally(
         score_checked = check_support(
             "score type",
             s,
-            ["flux", "total", "fission", "density"],
+            ["flux", "total", "fission", "density","time-moment-flux"],
         )
         card.scores.append(score_checked)
 

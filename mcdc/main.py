@@ -892,6 +892,8 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
+            if score_name == "time-moment-flux":
+                score_type = SCORE_LINEAR_FLUX
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
@@ -1883,6 +1885,8 @@ def generate_hdf5(data, mcdc):
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
                         score_name = "fission"
+                    elif score_type == SCORE_LINEAR_FLUX:
+                        score_name = "linear-flux"
                     group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
