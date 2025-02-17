@@ -1958,6 +1958,8 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
+            elif score_type == SCORE_LINEAR_FLUX:
+                score = flux *(t-(mesh["t"][it - 1]+mesh["t"][it])/2)
             adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
