@@ -2182,6 +2182,17 @@ def closeout(mcdc):
                     "runtime/" + name, data=np.array([mcdc["runtime_" + name]])
                 )
 
+        if config.args.runtime_output:
+            with h5py.File(mcdc["setting"]["output_name"] + "-runtime.h5", "w") as f:
+                for name in [
+                    "total",
+                    "preparation",
+                    "simulation",
+                    "output",
+                    "bank_management",
+                ]:
+                    f.create_dataset(name, data=np.array([mcdc["runtime_" + name]]))
+
     print_runtime(mcdc)
     input_deck.reset()
 
