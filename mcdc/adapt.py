@@ -4,7 +4,6 @@ from numba import njit, jit, objmode, literal_unroll, types
 from numba.extending import intrinsic
 import numba
 import mcdc.type_ as type_
-import mcdc.trace as trace
 
 if importlib.util.find_spec("harmonize") is None:
     HAS_HARMONIZE = False
@@ -334,7 +333,7 @@ def blankout_fn(func):
         name = func.__name__
         arg_count = len(inspect.signature(func).parameters)
         blankout_roster[id] = generate_do_nothing(
-            arg_count, crash_on_call=f"blankout fn for {name} should never be called"
+            arg_count, crash_on_call=f"Function \\'{name}\\' was called for a target without a definition denoted by a @for_??? decorator."
         )
 
     blank = blankout_roster[id]
@@ -371,11 +370,11 @@ def for_(target, transforms=[],on_target=[]):
 
 
 def for_cpu(transforms=[],on_target=[]):
-    return for_("cpu", on_target=on_target)
+    return for_("cpu", transforms=transforms, on_target=on_target)
 
 
 def for_gpu(transforms=[],on_target=[]):
-    return for_("gpu", on_target=on_target)
+    return for_("gpu", transforms=transforms, on_target=on_target)
 
 
 def target_for(target):
@@ -398,6 +397,18 @@ def nopython_mode(is_on):
 
     for impl in target_rosters["cpu"].values():
         overwrite_func(impl, impl)
+
+
+
+import numpy as np
+import numba
+
+import mcdc.type_ as type_
+import mcdc.adapt as adapt
+import mcdc.trace as trace
+
+if adapt.HAS_HARMONIZE:
+    import harmonize as harm
 
 
 # =============================================================================
@@ -423,6 +434,7 @@ find_cell_async = None
 
 
 def gpu_forward_declare(args):
+
 
     if args.gpu_rocm_path != None:
         harm.config.set_rocm_path(args.gpu_rocm_path)
@@ -476,60 +488,60 @@ def mcdc_global(prog):
     return prog
 
 
-@for_cpu()
+@adapt.for_cpu()
 def mcdc_global(prog):
     return prog
 
 
-@for_gpu()
+@adapt.for_gpu()
 def mcdc_global(prog):
     return mcdc_global_gpu(prog)
 
 
-@for_cpu()
+@adapt.for_cpu()
 def mcdc_data(prog):
     return None
 
 
-@for_gpu()
+@adapt.for_gpu()
 def mcdc_data(prog):
     return mcdc_data_gpu(prog)
 
 
-@for_cpu()
+@adapt.for_cpu()
 def group(prog):
     return prog
 
 
-@for_gpu()
+@adapt.for_gpu()
 def group(prog):
     return group_gpu(prog)
 
 
-@for_cpu()
+@adapt.for_cpu()
 def thread(prog):
     return prog
 
 
-@for_gpu()
+@adapt.for_gpu()
 def thread(prog):
     return thread_gpu(prog)
 
 
 
-@for_cpu()
+@adapt.for_cpu()
 def global_add(ary, idx, val):
     result = ary[idx]
     ary[idx] += val
     return result
 
 
-@for_gpu()
+@adapt.for_gpu()
 def global_add(ary, idx, val):
     return harm.array_atomic_add(ary, idx, val)
 
 
-@for_cpu()
+@adapt.for_cpu()
 def global_max(ary, idx, val):
     result = ary[idx]
     if ary[idx] < val:
@@ -537,86 +549,7 @@ def global_max(ary, idx, val):
     return result
 
 
-@for_gpu()
+@adapt.for_gpu()
 def global_max(ary, idx, val):
     return harm.array_atomic_max(ary, idx, val)
 
-
-# =========================================================================
-# Program Specifications
-# =========================================================================
-
-state_spec = None
-one_event_fns = None
-multi_event_fns = None
-
-
-device_gpu, group_gpu, thread_gpu = None, None, None
-iterate_async = None
-
-
-def make_spec(target):
-    global state_spec, one_event_fns, multi_event_fns
-    global device_gpu, group_gpu, thread_gpu
-    global iterate_async
-    if target == "gpu":
-        state_spec = (dev_state_type, grp_state_type, thd_state_type)
-        one_event_fns = [iterate]
-        # multi_event_fns = [source,move,scattering,fission,leakage,bcollision]
-        device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
-        (iterate_async,) = harm.RuntimeSpec.async_dispatch(iterate)
-    elif target != "cpu":
-        unknown_target(target)
-
-
-@njit
-def empty_base_func(prog):
-    pass
-
-
-def make_gpu_loop(
-    state_spec,
-    work_make_fn,
-    step_fn,
-    check_fn,
-    arg_type,
-    initial_fn=empty_base_func,
-    final_fn=empty_base_func,
-):
-    async_fn_list = [step_fn]
-    device_gpu, group_gpu, thread_gpu = harm.RuntimeSpec.access_fns(state_spec)
-
-    def make_work(prog: numba.uintp) -> numba.boolean:
-        return work_make_fn(prog)
-
-    def initialize(prog: numba.uintp):
-        initial_fn(prog)
-
-    def finalize(prog: numba.uintp):
-        final_fn(prog)
-
-    def step(prog: numba.uintp, arg: arg_type):
-
-        step_async()
-
-    (step_async,) = harm.RuntimeSpec.async_dispatch(step)
-
-    pass
-
-
-# =========================================================================
-# Compilation and Main Adapter
-# =========================================================================
-
-
-def compiler(func, target):
-    if target == "cpu":
-        return jit(func, nopython=True, nogil=True)  # , parallel=True)
-    elif target == "cpus":
-        return jit(func, nopython=True, nogil=True, parallel=True)
-    elif target == "gpu_device":
-        return cuda.jit(func, device=True)
-    elif target == "gpu":
-        return cuda.jit(func)
-    else:
-        unknown_target(target)

@@ -95,7 +95,7 @@ def add_active(P_reclike, prog):
 
 @toggle("domain_decomp")
 def domain_crossing(P_arr, prog):
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
     P = P_arr[0]
     # Domain mesh crossing
     seed = P["rng_seed"]
@@ -357,7 +357,7 @@ def dd_initiate_particle_send(prog):
 
 @trace.njit()
 def dd_particle_send(prog):
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
     dd_distribute_bank(
         mcdc, mcdc["domain_decomp"]["bank_xp"], mcdc["technique"]["dd_xp_neigh"]
     )
@@ -1447,7 +1447,7 @@ def pp_over_one():
 def bank_IC(P_arr, prog):
     P = P_arr[0]
 
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # TODO: Consider multi-nuclide material
     material = mcdc["nuclides"][P["material_ID"]]
@@ -2457,7 +2457,7 @@ def distance_to_collision(P_arr, mcdc):
 @trace.njit()
 def surface_crossing(P_arr, data, prog):
     P = P_arr[0]
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Implement BC
     surface = mcdc["surfaces"][P["surface_ID"]]
@@ -2516,7 +2516,7 @@ def collision(P_arr, mcdc):
 @trace.njit()
 def scattering(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
     # Kill the current particle
     P["alive"] = False
 
@@ -2789,7 +2789,7 @@ def scatter_direction(ux, uy, uz, mu0, azi):
 @trace.njit()
 def fission(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Kill the current particle
     P["alive"] = False
@@ -3086,7 +3086,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
 @trace.njit()
 def branchless_collision(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     material = mcdc["materials"][P["material_ID"]]
 
@@ -3127,7 +3127,7 @@ def branchless_collision(P_arr, prog):
 @trace.njit()
 def weight_window(P_arr, prog):
     P = P_arr[0]
-    mcdc = adapt.adapt.mcdc_global(prog)
+    mcdc = adapt.mcdc_global(prog)
 
     # Get indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(

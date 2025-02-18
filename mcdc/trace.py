@@ -26,6 +26,10 @@ int64_t mono_clock() {
 
 mono_clock = None
 
+@numba.njit()
+def extern_gpu_clock_rate ():
+    return 1000000000
+
 if config.trace:
     code_path = f"./trace.cpp"
     file = open(code_path,"w")
@@ -38,9 +42,12 @@ if config.trace:
     binding.load_library_permanently(abs_so_path)
     sig = numba.types.int64()
     mono_clock = numba.types.ExternalFunction("mono_clock", sig)
+    extern_gpu_clock_rate = numba.types.ExternalFunction("wall_clock_rate", sig)
 
 
-
+@numba.njit()
+def gpu_clock_rate():
+    return extern_gpu_clock_rate()
 
 
 
@@ -48,11 +55,12 @@ trace_roster = {}
 
 trace_wrapper_template = """
 def trace_{id}_{name} ({arg_str}) :
+    {trace_state_extractor}
     t0 = trace_get_clock()
-    result = njit_func ({arg_str})
+    result = func ({arg_str})
     t1 = trace_get_clock()
-    adapt.global_add(mcdc['trace']['slots'][{id}]['runtime_total'],trace_platform_index(), t1 - t0)
-    adapt.global_add(mcdc['trace']['slots'][{id}]['call_total'],trace_platform_index(),1)
+    adapt.global_add(trace['slots'][{id}]['runtime_total'],trace_platform_index(), t1 - t0)
+    adapt.global_add(trace['slots'][{id}]['call_total'],trace_platform_index(),1)
     return result
 """
 
@@ -82,21 +90,34 @@ def platform_index():
     return 1
 
 
-def njit(*args,**kwargs):
+def trace(transforms=[]):
 
-    def trace_njit_inner(func):
+    def trace_inner(func):
         trace_get_clock = get_clock
         trace_platform_index = platform_index
 
         name = func.__name__
         arg_set = inspect.signature(func).parameters
 
-        if config.trace and ("mcdc" in arg_set):
+        trace_state_extractors = {
+            "mcdc": "trace = mcdc['trace']",
+            "prog": "trace = adapt.mcdc_global(prog)['trace']",
+            "mcdc_arr": "trace = mcdc_arr[0]['trace']",
+        }
+
+        extractor_target = None
+        for target, extractor in trace_state_extractors.items():
+            if target in arg_set:
+                extractor_target = target
+                break
+
+        if config.trace and (extractor_target != None):
 
             global trace_roster
             import mcdc.adapt as adapt
 
-            njit_func = numba.njit(*args,**kwargs)(func)
+            for tr in transforms:
+                func = tr(func)
 
             if func not in trace_roster:
                 trace_roster[name] = {'id': len(trace_roster)}
@@ -108,14 +129,30 @@ def njit(*args,**kwargs):
                 name=name,
                 arg_str=arg_str,
                 id=func_id,
+                trace_state_extractor=trace_state_extractors[extractor_target]
             )
             exec(trace_wrapper_source,locals(),locals())
             trace_func = eval(f"trace_{func_id}_{name}")
-            return numba.njit()(trace_func)
+            return trace_func
         else:
+            return func
+
+    return trace_inner
+
+
+
+def njit(*args,**kwargs):
+
+    def trace_njit_inner(func):
+        trace_func = trace(transforms=[numba.njit(*args,**kwargs)])(func)
+        if (trace_func == func):
             return numba.njit(*args,**kwargs)(func)
+        else:
+            return numba.njit()(trace_func)
 
     return trace_njit_inner
+
+
 
 
 
@@ -123,11 +160,16 @@ def output_report(mcdc):
 
     report = open("report.csv","w")
     report.write(f"function name, cpu total runtime (ns), cpu total calls, gpu total runtime (mystery units), gpu total calls\n")
+    
+    gpu_rate = 1000000000
+    if config.target == "gpu":
+        gpu_rate = gpu_clock_rate()
+    
     for name, info in trace_roster.items():
         func_id = info['id']
         cpu_nsecs = mcdc['trace']['slots'][func_id]['runtime_total'][0]
         cpu_calls = mcdc['trace']['slots'][func_id]['call_total'][0]
-        gpu_nsecs = mcdc['trace']['slots'][func_id]['runtime_total'][1]
+        gpu_nsecs = mcdc['trace']['slots'][func_id]['runtime_total'][1] * 1000000000.0 / gpu_rate
         gpu_calls = mcdc['trace']['slots'][func_id]['call_total'][1]
         report.write(f"{name},{cpu_nsecs},{cpu_calls},{gpu_nsecs},{gpu_calls}\n")
     report.close()
