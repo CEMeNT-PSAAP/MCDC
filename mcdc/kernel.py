@@ -2091,6 +2091,8 @@ def eigenvalue_tally(P_arr, distance, mcdc):
             for i in range(material["N_nuclide"]):
                 ID_nuclide = material["nuclide_IDs"][i]
                 nuclide = mcdc["nuclides"][ID_nuclide]
+                if nuclide["NE_nu_d"] == 0:
+                    continue
                 for j in range(J):
                     nu_d = get_nu_group(NU_FISSION_DELAYED, nuclide, E, j)
                     decay = nuclide["ce_decay"][j]
@@ -3284,6 +3286,7 @@ def get_nu_group(type_, nuclide, E, group):
         return tot
 
     if type_ == NU_FISSION_DELAYED and group != -1:
+
         return get_XS(
             nuclide["ce_nu_d"][group], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
         )
