@@ -3286,7 +3286,6 @@ def get_nu_group(type_, nuclide, E, group):
         return tot
 
     if type_ == NU_FISSION_DELAYED and group != -1:
-
         return get_XS(
             nuclide["ce_nu_d"][group], E, nuclide["E_nu_d"], nuclide["NE_nu_d"]
         )
