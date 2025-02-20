@@ -2884,7 +2884,6 @@ def rejection_sample(P_arr, mcdc):
     if (xi < reject_rat): #real collision
         P["event"] = EVENT_COLLISION
     else: #phantom collision
-        print("phantom")
         P["event"] = EVENT_PHANTOM_COLLISION
 
 # =============================================================================

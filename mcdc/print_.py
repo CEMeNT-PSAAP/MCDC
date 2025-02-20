@@ -54,10 +54,13 @@ def print_banner(mcdc):
             else:
                 solver = mcdc["technique"]["iqmc"]["fixed_source_solver"]
             banner += "         Solver | " + solver + "\n"
+        elif mcdc["technique"]["delta_tracking"]:
+            banner += "      Algorithm | History-based\n"
+            banner += "                | hybrid delta tracking\n"
         else:
             banner += "      Algorithm | History-based\n"
         banner += "  MPI Processes | %i\n" % size
-        banner += " OpenMP Threads | 1"
+        #banner += " OpenMP Threads | 1"
         print(banner)
         sys.stdout.flush()
 

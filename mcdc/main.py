@@ -628,7 +628,7 @@ def prepare():
                 ][:]
 
                 # majorant
-                majorant_energy_grid = np.append(majorant_energy_grid, f[name]["E_xs"])
+                majorant_energy_grid = np.append(majorant_energy_grid, f["E_xs"])
 
     # =========================================================================
     # Materials
@@ -1422,9 +1422,25 @@ def prepare():
     # Delta tracking (majorant copmutation)
     # =========================================================================
 
-    if mcdc["technique"]["delta_tracking"]:
+    def get_XS(data, E, E_grid, NE):
+        # Search XS energy bin index
+        idx = (E, E_grid, NE)
 
-        print_msg("initilizing delta tracking")
+        # Extrapolate if E is outside the given data
+        if idx == -1:
+            idx = 0
+        elif idx + 1 == NE:
+            idx -= 1
+
+        # Linear interpolation
+        E1 = E_grid[idx]
+        E2 = E_grid[idx + 1]
+        XS1 = data[idx]
+        XS2 = data[idx + 1]
+
+        return XS1 + (E - E1) * (XS2 - XS1) / (E2 - E1)
+
+    if mcdc["technique"]["delta_tracking"]:
 
         if mode_CE:
             # sort energy grid and eliminate duplicate energy grid points
@@ -1436,7 +1452,8 @@ def prepare():
             for e in range(majorant_energy_grid.size):
                 for n in range(N_nuclide):
                     nuclide = mcdc["nuclides"][n]
-                    total_xsec_over_nuclides[n] = kernel.get_XS(nuclide, majorant_energy_grid[e], nuclide["E_xs"], nuclide["NE_xs"])
+                    total_xsec_over_nuclides[n] = np.interp(majorant_energy_grid[e], nuclide["E_xs"], nuclide["ce_total"])
+                    #kernel.get_XS(nuclide, majorant_energy_grid[e], nuclide["E_xs"], nuclide["NE_xs"])
 
                 majorant_xsec[e] = np.max(total_xsec_over_nuclides)
 
@@ -1450,6 +1467,7 @@ def prepare():
             for i in range(N_groups):
                 majorant_xsec[i] = np.max(mcdc["nuclides"][:]["total"])
 
+        # This might need to use copy_feild but not sure why
         mcdc["technique"]["micro_majorant_xsec"] = majorant_xsec[:]
         mcdc["technique"]["majorant_energy"] = majorant_energy_grid[:]
         mcdc["technique"]["N_majorant"] = np.size(majorant_xsec)
