@@ -2741,7 +2741,8 @@ def move_to_event(P_arr, data, mcdc):
     #   - Set particle boundary event (surface or lattice crossing, or lost)
     #   - Return distance to boundary (surface or lattice)
 
-    d_boundary = geometry.inspect_geometry(P_arr, mcdc)
+    if not mcdc["technique"]["delta_tracking"]:
+        d_boundary = geometry.inspect_geometry(P_arr, mcdc)
 
     # Particle is lost?
     if P["event"] == EVENT_LOST:
@@ -2769,26 +2770,39 @@ def move_to_event(P_arr, data, mcdc):
     # Distance to next collision
     d_collision = distance_to_collision(P_arr, mcdc)
 
+    #print(d_collision)
+
     # =========================================================================
     # Determine event(s)
     # =========================================================================
     # TODO: Make a function to better maintain the repeating operation
 
-    distance = d_boundary
+    distance = d_domain
 
-    # Check distance to domain
-    if d_domain < distance - COINCIDENCE_TOLERANCE:
-        distance = d_domain
-        P["event"] = EVENT_DOMAIN_CROSSING
-        P["surface_ID"] = -1
-    elif geometry.check_coincidence(d_domain, distance):
-        P["event"] += EVENT_DOMAIN_CROSSING
+    if not mcdc["technique"]["delta_tracking"]:
+        # Check distance to domain
+        if d_domain < distance - COINCIDENCE_TOLERANCE:
+            distance = d_domain
+            P["event"] = EVENT_DOMAIN_CROSSING
+            P["surface_ID"] = -1
+        elif geometry.check_coincidence(d_domain, distance):
+            P["event"] += EVENT_DOMAIN_CROSSING
 
     # Check distance to collision
     if d_collision < distance - COINCIDENCE_TOLERANCE:
         distance = d_collision
-        P["event"] = EVENT_COLLISION
-        P["surface_ID"] = -1
+
+        # DELTA TRACKING REJECTION SAMPLING
+        if mcdc["technique"]["delta_tracking"]:
+            # move locate particle and move to 
+            if not geometry.locate_particle(P_arr, mcdc):
+                # Particle is lost
+                P["event"] = EVENT_LOST
+                return
+            rejection_sample(P_arr, mcdc)
+        else:
+            P["event"] = EVENT_COLLISION
+            P["surface_ID"] = -1
     elif geometry.check_coincidence(d_collision, distance):
         P["event"] += EVENT_COLLISION
 
@@ -2838,8 +2852,12 @@ def move_to_event(P_arr, data, mcdc):
 def distance_to_collision(P_arr, mcdc):
     P = P_arr[0]
     # Get total cross-section
+    
     material = mcdc["materials"][P["material_ID"]]
-    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+    if mcdc["technique"]["delta_tracking"]:
+        SigmaT = get_MacroMaj(material, P_arr, mcdc)
+    else:
+        SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
 
     # Vacuum material?
     if SigmaT == 0.0:
@@ -2850,6 +2868,24 @@ def distance_to_collision(P_arr, mcdc):
     distance = -math.log(xi) / SigmaT
     return distance
 
+
+@njit
+def rejection_sample(P_arr, mcdc):
+    #For use in delta tracking
+    P = P_arr[0]
+
+    material = mcdc["materials"][P["material_ID"]]
+    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+    Maj = get_MacroMaj(material, P_arr, mcdc)
+
+    reject_rat = SigmaT/Maj
+
+    xi = rng(P_arr)
+    if (xi < reject_rat): #real collision
+        P["event"] = EVENT_COLLISION
+    else: #phantom collision
+        print("phantom")
+        P["event"] = EVENT_PHANTOM_COLLISION
 
 # =============================================================================
 # Surface crossing
@@ -3617,6 +3653,35 @@ def weight_roulette(P_arr, mcdc):
     else:
         P["alive"] = False
 
+
+# =============================================================================
+# Delta Tracking
+# =============================================================================
+@njit
+def get_MacroMaj(material, P_arr, mcdc):
+    """Hybrid delta tracking"""
+
+    P = P_arr[0]
+
+    if mcdc["setting"]["mode_MG"]:
+        return(mcdc["technique"]["micro_majorant_xsec"][P["g"]])
+
+    elif mcdc["setting"]["mode_CE"]:
+        # nuclide density over all nuclides
+        # same as assuming all atoms are of same xsec
+        N = 0.0
+        for i in range(material["N_nuclide"]):
+            N += material["nuclide_densities"][i]
+        
+        data = mcdc["technique"]["micro_majorant_xsec"]
+        Egrid = mcdc["technique"]["majorant_energy"]
+        E = P["E"]
+        Ne = mcdc["technique"]["N_majorant"]
+
+        MacroXS = get_XS(data, E, Egrid, Ne)
+        MacroXS *= N
+
+        return MacroXS
 
 # =============================================================================
 # Continuous Energy Physics

@@ -1093,6 +1093,7 @@ def make_type_technique(input_deck):
         ("branchless_collision", bool_),
         ("domain_decomposition", bool_),
         ("uq", bool_),
+        ("delta_tracking", bool_),
     ]
 
     # =========================================================================
@@ -1262,8 +1263,37 @@ def make_type_technique(input_deck):
 
     struct += [("uq_", uq)]
 
+    # =========================================================================
+    # Delta Tracking
+    # =========================================================================
+
+    if mode_MG:
+        struct += [("majorant_energy", float64, (G,))]
+        struct += [("micro_majorant_xsec", float64, (G,))]
+    else:
+        N_majorant = compute_majorant_size(input_deck)
+        struct += [("majorant_energy", float64, (N_majorant,))]
+        struct += [("micro_majorant_xsec", float64, (N_majorant,))]
+    
+    struct += [("N_majorant", int64)]
+
     # Finalize technique type
     technique = into_dtype(struct)
+
+
+def compute_majorant_size(input_deck):
+    """just computes size of majorant!
+    this will be redone in prepare()"""
+
+
+    energy_grid = []
+
+    dir_name = os.getenv("MCDC_XSLIB")
+    for nuc in input_deck.nuclides:
+            with h5py.File(dir_name + "/" + nuc.name + ".h5", "r") as f:
+                energy_grid = np.append( energy_grid, f["E_xs"][:] ) 
+
+    return ( np.size( np.unique( energy_grid ) ) )
 
 
 # UQ

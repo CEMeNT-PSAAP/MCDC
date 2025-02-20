@@ -587,6 +587,10 @@ def step_particle(P_arr, data, prog):
 
             elif P["event"] & EVENT_FISSION:
                 kernel.fission(P_arr, prog)
+    
+    if P["event"] & EVENT_PHANTOM_COLLISION:
+        # delta tracking
+        P["alive"] = True
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:

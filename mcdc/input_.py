@@ -319,7 +319,7 @@ def material(
                     print_error(
                         "Continuous energy data directory not configured \n       "
                         "see https://cement-psaapgithubio.readthedocs.io/en/latest"
-                        "/install.html#configuring-continuous-energy-library \n"
+                        "./install.html#configuring-continuous-energy-library \n"
                     )
 
                 # Fissionable flag
@@ -1239,6 +1239,34 @@ def branchless_collision():
     card["branchless_collision"] = True
     card["weighted_emission"] = False
 
+def delta_tracking():
+    """
+    Activate delta tracking and compute majorant
+    TODO: turn off other incompatible tracking techniques if any
+    """
+    card = global_.input_deck.technique
+    card["delta_tracking"] = True
+    #card["majorant"]
+
+    #energy_grid = []
+
+    # unify energy grids
+    #for i in range(N):
+    #    energy_grid = np.append(energy_grid, material[i]["energy_grid"])
+
+    # sort and remove multiplicity values
+    #energy_grid = np.sort(energy_grid)
+    #energy_grid = np.unique(energy_grid) 
+    # sort energy grid
+    # https://numpy.org/doc/stable/reference/generated/numpy.sort.html
+
+
+    # Compute majorant on unified energy grid
+
+
+    
+
+        
 
 def time_census(t, tally_frequency=None):
     """

@@ -92,6 +92,13 @@ class MaterialCard(InputCard):
         self.flags = []
         self.distribution = ""
 
+class MajorantCard(InputCard):
+    def __init__(self, G=1):
+        InputCard.__init__(self, "Majorant")
+
+        self.G = G
+        self.majorant = np.zeros(G)
+        self.E_grid = np.zeros(G)
 
 class RegionCard(InputCard):
     def __init__(self, type_):

@@ -551,6 +551,8 @@ def prepare():
     # Nuclides
     # =========================================================================
 
+    majorant_energy_grid = []
+
     N_nuclide = len(input_deck.nuclides)
     for i in range(N_nuclide):
         # General data
@@ -624,6 +626,9 @@ def prepare():
                 mcdc["nuclides"][i]["ce_decay"][: len(f["decay_rate"][:])] = f[
                     "decay_rate"
                 ][:]
+
+                # majorant
+                majorant_energy_grid = np.append(majorant_energy_grid, f[name]["E_xs"])
 
     # =========================================================================
     # Materials
@@ -1203,6 +1208,7 @@ def prepare():
         "IC_generator",
         "branchless_collision",
         "uq",
+        "delta_tracking",
     ]:
         copy_field(mcdc["technique"], input_deck.technique, name)
 
@@ -1410,6 +1416,54 @@ def prepare():
                 flags["total"] = True
             if flags["nu_p"] or flags["nu_d"]:
                 flags["nu_f"] = True
+
+
+    # =========================================================================
+    # Delta tracking (majorant copmutation)
+    # =========================================================================
+
+    if mcdc["technique"]["delta_tracking"]:
+
+        print_msg("initilizing delta tracking")
+
+        if mode_CE:
+            # sort energy grid and eliminate duplicate energy grid points
+            majorant_energy_grid = np.unique(majorant_energy_grid)
+            majorant_xsec = np.zeros_like(majorant_energy_grid)
+
+            # find the majorant over all the nuclides at every point on the energy grid
+            total_xsec_over_nuclides = np.zeros(N_nuclide)
+            for e in range(majorant_energy_grid.size):
+                for n in range(N_nuclide):
+                    nuclide = mcdc["nuclides"][n]
+                    total_xsec_over_nuclides[n] = kernel.get_XS(nuclide, majorant_energy_grid[e], nuclide["E_xs"], nuclide["NE_xs"])
+
+                majorant_xsec[e] = np.max(total_xsec_over_nuclides)
+
+        elif mode_MG:
+            N_groups = mcdc["nuclides"][0]["G"]
+            majorant_energy_grid = np.zeros(N_groups)
+            majorant_xsec = np.zeros(N_groups)
+            
+            majorant_energy_grid = mcdc["nuclides"][0]["speed"][:]
+
+            for i in range(N_groups):
+                majorant_xsec[i] = np.max(mcdc["nuclides"][:]["total"])
+
+        mcdc["technique"]["micro_majorant_xsec"] = majorant_xsec[:]
+        mcdc["technique"]["majorant_energy"] = majorant_energy_grid[:]
+        mcdc["technique"]["N_majorant"] = np.size(majorant_xsec)
+
+        #print(mcdc["technique"]["micro_majorant_xsec"])
+
+        #copy_field(mcdc["technique"]["micro_majorant_xsec"], majorant_xsec, "micro_majorant_xsec")
+        #copy_field(mcdc["technique"]["majorant_energy"], majorant_energy_grid, "majorant_energy")
+        #copy_field(mcdc["technique"]["N_majorant"], np.size(majorant_xsec), "N_majorant" )
+
+        #copy_field(mcdc["technique"]["micro_majorant_xsec"], majorant_xsec, )
+        #copy_field(mcdc["technique"]["majorant_energy"], majorant_energy_grid, )
+        #copy_field(mcdc["technique"]["N_majorant"], np.size(majorant_xsec), )
+
 
     # =========================================================================
     # MPI
