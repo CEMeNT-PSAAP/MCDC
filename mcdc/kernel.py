@@ -2308,12 +2308,18 @@ def census_based_tally_output(data, mcdc):
         grid_g = mesh["g"][: Ng + 1]
         #'''
         with objmode():
-            f = h5py.File(
-                mcdc["setting"]["output_name"]
-                + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
-                "w",
-            )
-
+            if ID == 0:
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "w",
+                )
+            else:
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "a",
+                )
             # Save to dataset
             f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
             f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
