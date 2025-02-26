@@ -1,17 +1,16 @@
+import h5py
 import numpy as np
 import matplotlib.pyplot as plt
-import h5py
 import scipy.fft as spfft
 import cvxpy as cp
 
-with h5py.File("output.h5", "r") as f:
-    # User-defined parameters
-    x_grid = np.linspace(0.0, 60.0, 31)
-    y_grid = np.linspace(0.0, 100.0, 51)
+# User-defined parameters - number of cells in each dimension
+Nx = 30
+Ny = 50
 
-    # Parameters not defined by the user
-    Nx = len(x_grid) - 1
-    Ny = len(y_grid) - 1
+with h5py.File("output.h5", "r") as f:
+    x_grid = np.linspace(0.0, 60, Nx + 1)
+    y_grid = np.linspace(0.0, 100, Ny + 1)
     N_cs_bins = f["tallies"]["cs_tally_0"]["N_cs_bins"][()]
     cs_bin_size = f["tallies"]["cs_tally_0"]["cs_bin_size"]
     x_centers = f["tallies"]["cs_tally_0"]["center_points"][0]
@@ -19,76 +18,76 @@ with h5py.File("output.h5", "r") as f:
     x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
     y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
 
-    # Construct S
-    S = [[] for _ in range(N_cs_bins)]
-    # Calculate the overlap grid for each bin, and flatten into a row of S
-    for ibin in range(N_cs_bins):
-        if ibin == N_cs_bins - 1:
-            # could just change to -INF, INF ?
-            cs_bin_size = np.array([x_grid[-1] + x_grid[0], y_grid[-1] + y_grid[0]])
+    x_mins, x_maxs = x_grid[:-1], x_grid[1:]
+    y_mins, y_maxs = y_grid[:-1], y_grid[1:]
 
+    x_mids = (x_mins + x_maxs) / 2
+    y_mids = (y_mins + y_maxs) / 2
+
+    # volume of a single cell
+    cell_volumes = np.multiply.outer(x_maxs - x_mins, y_maxs - y_mins)
+
+    # initialize S
+    S = np.zeros((N_cs_bins, Nx * Ny))
+
+    print("Generating S...")
+    for ibin in range(N_cs_bins):
         bin_x_min = x_centers[ibin] - cs_bin_size[0] / 2
         bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
         bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
         bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
 
-        overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
+        # calculate overlap
+        overlap_x = np.maximum(
+            0,
+            np.minimum(bin_x_max, x_maxs[:, None])
+            - np.maximum(bin_x_min, x_mins[:, None]),
+        )
+        overlap_y = np.maximum(
+            0,
+            np.minimum(bin_y_max, y_maxs[None, :])
+            - np.maximum(bin_y_min, y_mins[None, :]),
+        )
 
-        for i in range(len(y_grid) - 1):
-            for j in range(len(x_grid) - 1):
-                cell_x_min = x_grid[j]
-                cell_x_max = x_grid[j + 1]
-                cell_y_min = y_grid[i]
-                cell_y_max = y_grid[i + 1]
-
-                # Calculate overlap in x and y directions
-                overlap_x = np.maximum(
-                    0,
-                    np.minimum(bin_x_max, cell_x_max)
-                    - np.maximum(bin_x_min, cell_x_min),
-                )
-                overlap_y = np.maximum(
-                    0,
-                    np.minimum(bin_y_max, cell_y_max)
-                    - np.maximum(bin_y_min, cell_y_min),
-                )
-
-                # Calculate fractional overlap
-                cell_area = (cell_x_max - cell_x_min) * (cell_y_max - cell_y_min)
-                overlap[i, j] = (overlap_x * overlap_y) / cell_area
-
+        # calculate fractional overlap
+        overlap = (overlap_x * overlap_y) / cell_volumes
         S[ibin] = overlap.flatten()
-    S = np.array(S)
+
+        for i in range(len(S[-1])):
+            S[-1][i] = 1
 
     cs_results = f["tallies"]["cs_tally_0"]["flux"]["mean"][:]
     mesh_results = f["tallies"]["mesh_tally_0"]["flux"]["mean"][:]
 
 # Perform reconstruction
 N_fine_cells = Nx * Ny
-b = cs_results  # measurement vector for cs reconstruction
+b = cs_results  # measurement vector
+A = (spfft.dct(S.T, type=2, norm="ortho", axis=0)).T  # sensing matrix
 
-# Constructing T and A
-idct_basis_x = spfft.idct(np.identity(Nx), axis=0)
-idct_basis_y = spfft.idct(np.identity(Ny), axis=0)
-
-T_inv = np.kron(idct_basis_y, idct_basis_x)
-A = S @ T_inv
+# idct_basis_x = spfft.idct(np.identity(Nx), norm='ortho', axis=0)
+# idct_basis_y = spfft.idct(np.identity(Ny), norm='ortho', axis=0)
+# T_inv = np.kron(idct_basis_y, idct_basis_x)
+# A = S @ T_inv
 
 
-# "l" is short for lambda, which controls the amount of sparsity vs reconstruction accuracy
-def reconstruct(l):
-    # Basis pursuit denoising solver - change l to get different results
+def reconstruct(lambda_):
+    print(f"Reconstructing with lambda = {lambda_}")
+    # setting up the problem with CVXPY
     vx = cp.Variable(N_fine_cells)
-    objective = cp.Minimize(0.5 * cp.norm(A @ vx - b, 2) + l * cp.norm(vx, 1))
+
+    # Basis pursuit denoising (BPDN)
+    objective = cp.Minimize(
+        0.5 * cp.norm(A @ vx - b, 2) ** 2 + lambda_ * cp.norm(vx, 1)
+    )
     constraints = [(A @ vx)[-1] == b[-1]]
     prob = cp.Problem(objective, constraints)
     result = prob.solve(verbose=False)
-    sparse_solution = np.array(vx.value).squeeze()
 
-    # Obtaining the reconstruction
-    recon = T_inv @ sparse_solution
-    recon_reshaped = recon.reshape(Ny, Nx)
-    return recon_reshaped
+    # formatting the sparse solution
+    sparse_solution = np.array(vx.value).squeeze()
+    result = spfft.idct(sparse_solution, type=2, norm="ortho", axis=0)
+    recon = result.reshape(Nx, Ny)
+    return recon
 
 
 def rel_norm(real, recon):
@@ -100,6 +99,7 @@ def rel_norm(real, recon):
 # Different values of lambda to reconstruct with
 l_array = [
     0,
+    0.000005,
     0.00001,
     0.00005,
     0.0001,
@@ -114,18 +114,18 @@ l_array = [
     0.5,
     0.7,
     1,
-    10,
 ]
 
 # This part plots 16 different reconstructions for the given values of lambda in l_array
 fig, axes = plt.subplots(4, 4, figsize=(12, 12))
+rel_norms = []
 
 for i in range(4):
     for j in range(4):
+        reconstruction = reconstruct(l_array[i * 4 + j])
+        rel_norms.append(rel_norm(reconstruction, mesh_results))
         ax = axes[i, j]
-        im = ax.imshow(
-            reconstruct(l_array[i * 4 + j]), origin="lower", extent=[0, 60, 0, 100]
-        )
+        im = ax.imshow(reconstruction, origin="lower", extent=[0, 60, 0, 100])
         ax.set_title(f"$\lambda$ = {l_array[i * 4 + j]:.5g}")
 
         if j == 0:
@@ -141,12 +141,7 @@ plt.suptitle(
     fontsize=16,
 )
 plt.tight_layout()
-# plt.savefig('BPDN_lambda_testing_sphere.png')
 plt.show()
-
-rel_norms = np.ones(len(l_array))
-for i in range(len(l_array)):
-    rel_norms[i] = rel_norm(reconstruct(l_array[i]), mesh_results)
 
 reference_std_dev = np.linalg.norm(np.std(mesh_results))
 plt.plot(l_array, rel_norms, label="Reconstruction Errors")
@@ -162,8 +157,7 @@ plt.xscale("log")
 plt.yscale("log")
 plt.xlabel("$\lambda$")
 plt.ylabel("Relative L$^2$ Error")
-plt.title("Relative Error vs $\lambda$ - Fissile Sphere Reconstructions")
+plt.title("Relative Error vs $\lambda$ - Kobayashi Reconstructions")
 plt.legend()
 plt.tight_layout()
-# plt.savefig('Relative_error_vs_lambda_sphere.png')
 plt.show()
