@@ -301,5 +301,7 @@ mcdc.setting(N_particle=1e3, census_bank_buff=4)
 mcdc.eigenmode(N_inactive=50, N_active=150, gyration_radius="all")
 mcdc.population_control()
 
+#mcdc.delta_tracking()
+
 # Run
 mcdc.run()

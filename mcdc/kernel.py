@@ -2716,7 +2716,8 @@ def eigenvalue_tally_closeout(mcdc):
 # ======================================================================================
 
 
-@njit
+#@njit
+@profile
 def move_to_event(P_arr, data, mcdc):
     # ==================================================================================
     # Preparation (as needed)
@@ -2741,8 +2742,8 @@ def move_to_event(P_arr, data, mcdc):
     #   - Set particle boundary event (surface or lattice crossing, or lost)
     #   - Return distance to boundary (surface or lattice)
 
-    if not mcdc["technique"]["delta_tracking"]:
-        d_boundary = geometry.inspect_geometry(P_arr, mcdc)
+    #if not mcdc["technique"]["delta_tracking"]:
+    d_boundary = geometry.inspect_geometry(P_arr, mcdc)
 
     # Particle is lost?
     if P["event"] == EVENT_LOST:
@@ -2777,16 +2778,20 @@ def move_to_event(P_arr, data, mcdc):
     # =========================================================================
     # TODO: Make a function to better maintain the repeating operation
 
-    distance = d_domain
+    #if mcdc["technique"]["delta_tracking"]:
+    #    distance = INF
+    #else:
+    distance = d_boundary
+    # TODO: issue when delta tracking particles are lost like crazy
 
-    if not mcdc["technique"]["delta_tracking"]:
-        # Check distance to domain
-        if d_domain < distance - COINCIDENCE_TOLERANCE:
-            distance = d_domain
-            P["event"] = EVENT_DOMAIN_CROSSING
-            P["surface_ID"] = -1
-        elif geometry.check_coincidence(d_domain, distance):
-            P["event"] += EVENT_DOMAIN_CROSSING
+    #if not mcdc["technique"]["delta_tracking"]:
+    #    # Check distance to domain
+    if d_domain < distance - COINCIDENCE_TOLERANCE:
+        distance = d_domain
+        P["event"] = EVENT_DOMAIN_CROSSING
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_domain, distance):
+        P["event"] += EVENT_DOMAIN_CROSSING
 
     # Check distance to collision
     if d_collision < distance - COINCIDENCE_TOLERANCE:

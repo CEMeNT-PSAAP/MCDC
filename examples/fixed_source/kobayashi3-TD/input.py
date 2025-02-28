@@ -81,5 +81,7 @@ mcdc.tally.cs_tally(
 # Setting
 mcdc.setting(N_particle=1e2)
 
+mcdc.delta_tracking()
+
 # Run
 mcdc.run()
