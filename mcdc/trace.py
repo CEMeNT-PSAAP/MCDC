@@ -1,14 +1,18 @@
 import inspect
 import mcdc.config as config
 import mcdc.adapt as adapt
+import mcdc.type_ as type_
 import numba
 import ctypes
 import time
 import subprocess
-from os.path import abspath
+import os
+from mpi4py import MPI
 from llvmlite import binding
+import numpy as np
 
 
+CACH_PATH = './__trace_cache__'
 
 time_code = """
 #include <iostream>
@@ -31,15 +35,18 @@ def extern_gpu_clock_rate ():
     return 1000000000
 
 if config.trace:
-    code_path = f"./trace.cpp"
+    if not os.path.exists(CACH_PATH):
+        os.makedirs(CACH_PATH)
+    base_path = f"{CACH_PATH}/trace"
+    code_path = f"{base_path}.cpp"
+    lib_path  = f"{base_path}.so"
     file = open(code_path,"w")
     file.write(time_code)
     file.close()
-    cmd = "g++ trace.cpp --shared -fPIC -o ./trace.so"
+    cmd = f"g++ {code_path} --shared -fPIC -o {lib_path}"
     subprocess.run(cmd.split(),shell=False,check=True)
-    so_path  = f"./trace.so"
-    abs_so_path = abspath(so_path)
-    binding.load_library_permanently(abs_so_path)
+    abs_lib_path = os.path.abspath(lib_path)
+    binding.load_library_permanently(abs_lib_path)
     sig = numba.types.int64()
     mono_clock = numba.types.ExternalFunction("mono_clock", sig)
     extern_gpu_clock_rate = numba.types.ExternalFunction("wall_clock_rate", sig)
@@ -59,40 +66,58 @@ def trace_{id}_{name} ({arg_str}) :
     t0 = trace_get_clock()
     result = func ({arg_str})
     t1 = trace_get_clock()
-    adapt.global_add(trace['slots'][{id}]['runtime_total'],trace_platform_index(), t1 - t0)
-    adapt.global_add(trace['slots'][{id}]['call_total'],trace_platform_index(),1)
+    platform_index = trace_platform_index()
+    adapt.global_add(trace['slots'][{id}]['runtime_total'],platform_index, t1 - t0)
+    adapt.global_add(trace['slots'][{id}]['call_total'],platform_index,1)
     return result
 """
 
 trace_wrapper_name_template = "trace_{name}"
 
 
-@adapt.for_cpu()
-def get_clock():
-    return mono_clock()
-
 
 sig     = numba.core.typing.signature
 ext_fn  = numba.types.ExternalFunction
 gpu_get_wall_clock = ext_fn("get_wall_clock",sig(numba.types.int64))
 
-@adapt.for_gpu()
+
 def get_clock():
-    return gpu_get_wall_clock()
+    return time.monotonic_ns()
+
+@numba.core.extending.overload(get_clock, target="cpu")
+def cpu_get_clock():
+    def inner_get_clock():
+        return mono_clock()
+    return inner_get_clock
+
+@numba.core.extending.overload(get_clock, target="gpu")
+def gpu_get_clock():
+    def inner_get_clock():
+        return gpu_get_wall_clock()
+    return inner_get_clock
 
 
-@adapt.for_cpu()
 def platform_index():
     return 0
 
-@adapt.for_gpu()
-def platform_index():
-    return 1
+@numba.core.extending.overload(platform_index, target="cpu")
+def cpu_platform_index():
+    def inner_platform_index():
+        return 1
+    return inner_platform_index
+
+@numba.core.extending.overload(platform_index, target="gpu")
+def gpu_platform_index():
+    def inner_platform_index():
+        return 2
+    return inner_platform_index
 
 
 def trace(transforms=[]):
 
     def trace_inner(func):
+        global get_clock
+        global platform_index
         trace_get_clock = get_clock
         trace_platform_index = platform_index
 
@@ -159,18 +184,39 @@ def njit(*args,**kwargs):
 def output_report(mcdc):
 
     report = open("report.csv","w")
-    report.write(f"function name, cpu total runtime (ns), cpu total calls, gpu total runtime (mystery units), gpu total calls\n")
-    
+    report.write("function name, ")
+    report.write("python total runtime (ns), python total calls, ")
+    report.write("cpu total runtime (ns), cpu total calls, ")
+    report.write("gpu total runtime (mystery units), gpu total calls, ")
+    reprot.write("\n")
+
     gpu_rate = 1000000000
     if config.target == "gpu":
         gpu_rate = gpu_clock_rate()
-    
+
+    multi_rank = True
+
     for name, info in trace_roster.items():
         func_id = info['id']
-        cpu_nsecs = mcdc['trace']['slots'][func_id]['runtime_total'][0]
-        cpu_calls = mcdc['trace']['slots'][func_id]['call_total'][0]
-        gpu_nsecs = mcdc['trace']['slots'][func_id]['runtime_total'][1] * 1000000000.0 / gpu_rate
-        gpu_calls = mcdc['trace']['slots'][func_id]['call_total'][1]
-        report.write(f"{name},{cpu_nsecs},{cpu_calls},{gpu_nsecs},{gpu_calls}\n")
+        slot = mcdc['trace']['slots'][func_id]
+
+        if multi_rank:
+            slot_arr = np.empty((1,),type_.trace_slot)
+            MPI.COMM_WORLD.Allreduce(slot['runtime_total'],slot_arr[0]['runtime_total'])
+            MPI.COMM_WORLD.Allreduce(slot['call_total'],slot_arr[0]['call_total'])
+            slot['runtime_total'] = slot_arr[0]['runtime_total']
+            slot['call_total'] = slot_arr[0]['call_total']
+
+        python_nsecs = slot['runtime_total'][0]
+        python_calls = slot['call_total'][0]
+        cpu_nsecs = slot['runtime_total'][1]
+        cpu_calls = slot['call_total'][1]
+        gpu_nsecs = slot['runtime_total'][2] * 1000000000.0 / gpu_rate
+        gpu_calls = slot['call_total'][2]
+        report.write(f"{name},")
+        report.write(f"{python_nsecs},{python_calls},")
+        report.write(f"{cpu_nsecs},{cpu_calls},")
+        report.write(f"{gpu_nsecs},{gpu_calls},")
+        report.write("\n")
     report.close()
 
