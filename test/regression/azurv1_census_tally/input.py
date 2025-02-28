@@ -49,4 +49,3 @@ mcdc.population_control()
 # Run
 mcdc.run()
 mcdc.recombine_tallies()
-
