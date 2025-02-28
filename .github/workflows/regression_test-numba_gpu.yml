@@ -18,10 +18,6 @@ jobs:
         pip install --upgrade pip
     - name: Install MC/DC and Harmonize
       run: |
-        pwd
-        ls
-
-        cd MCDC/
         pip install -e .
         cd ..
 
