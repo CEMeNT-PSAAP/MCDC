@@ -2150,6 +2150,140 @@ def generate_hdf5(data, mcdc):
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 
 
+def recombine_tallies(file="output.h5"):
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        # Load main output file and read input params
+        with h5py.File(file, "r") as f:
+            output_name = str(f["input_deck/setting/output_name"][()])[2:-1]
+            N_particle = f["input_deck/setting/N_particle"][()]
+            N_census = f["input_deck/setting/N_census"][()] - 1
+            N_batch = f["input_deck/setting/N_batch"][()]
+            N_tallies = f["input_deck/setting/census_tally_frequency"][()]
+        f.close()
+        # Combine the tally output into a single file
+
+        collected_tallies = []
+        collected_tally_names = []
+        # Collecting info on number and types of tallies
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                with h5py.File(
+                    output_name + "-batch_%i-census_%i.h5" % (i_batch, i_census), "r"
+                ) as f:
+                    tallies = f["tallies"]
+
+                    for tally in tallies:
+                        if tally not in collected_tally_names:
+                            grid = tallies[tally]["grid"]
+                            tally_list = [tally]
+                            for tally_type in tallies[tally]:
+                                if tally_type != "grid":
+                                    tally_list.append(tally_type)
+                            collected_tallies.append(tally_list)
+                            collected_tally_names.append(tally)
+                f.close()
+
+        for i, tally_info in enumerate(collected_tallies):
+            tally_grid_type = tally_info[0].split("_")[0]
+            tally_number = tally_info[0].split("_")[-1]
+            with h5py.File(output_name + ".h5", "a") as f:
+                grid = f[
+                    "input_deck/"
+                    + tally_grid_type
+                    + "_tallies/"
+                    + tally_grid_type
+                    + "_tallies_"
+                    + tally_number
+                ]
+                t_final = f["input_deck/setting/census_time"][()][-2]
+                t = np.linspace(0, t_final, N_census * N_tallies + 1)
+                Nx = len(grid["x"][()]) - 1
+                Ny = len(grid["y"][()]) - 1
+                Nz = len(grid["z"][()]) - 1
+                Nmu = len(grid["mu"][()]) - 1
+                N_azi = len(grid["azi"][()]) - 1
+                Ng = len(grid["g"][()]) - 1
+                # Creating structure of correct size to hold combined tally
+                for tally_type in tally_info[1:]:
+                    tally_score = np.zeros(
+                        (N_census * N_tallies, Nx, Ny, Nz, Nmu, N_azi, Ng)
+                    )
+                    tally_score = np.squeeze(tally_score)
+                    tally_score_sq = np.zeros_like(tally_score)
+
+                    for i_census in range(N_census):
+                        for i_batch in range(N_batch):
+                            with h5py.File(
+                                output_name
+                                + "-batch_%i-census_%i.h5" % (i_batch, i_census),
+                                "r",
+                            ) as f1:
+                                score = f1[
+                                    "tallies/"
+                                    + tally_info[0]
+                                    + "/"
+                                    + tally_type
+                                    + "/score"
+                                ][:]
+                                tally_score[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += score
+                                tally_score_sq[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += (
+                                    score * score
+                                )
+                    tally_score /= N_batch
+                    tally_score_sq = np.sqrt(
+                        (tally_score_sq / N_batch - np.square(tally_score))
+                        / (N_batch - 1)
+                    )
+
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/mean",
+                        data=tally_score,
+                    )
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/sdev",
+                        data=tally_score_sq,
+                    )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/x", data=grid["x"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/y", data=grid["y"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/z", data=grid["z"][()]
+                )
+                f.create_dataset("tallies/" + tally_info[0] + "/grid/t", data=t)
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/mu", data=grid["mu"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/azi", data=grid["azi"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/g", data=grid["g"][()]
+                )
+            f.close()
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                file_name = (
+                    output_name
+                    + "-batch_"
+                    + str(i_batch)
+                    + "-census_"
+                    + str(i_census)
+                    + ".h5"
+                )
+                os.system("rm " + file_name)
+
+
 def closeout(mcdc):
 
     loop.teardown_gpu(mcdc)
