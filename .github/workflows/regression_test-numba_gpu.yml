@@ -21,6 +21,7 @@ jobs:
         pwd
     - name: Install MC/DC and Harmonize
       run: |
+        source ../ci_testing/bin/activate
         pwd
         pip install -e .
         git clone https://github.com/CEMeNT-PSAAP/harmonize.git
@@ -30,5 +31,6 @@ jobs:
     - name: Regression Test - GPU
       run: |
           pwd
+          source ../ci_testing/bin/activate
           cd MCDC/test/regression
           python run.py --mode=numba --target=gpu
