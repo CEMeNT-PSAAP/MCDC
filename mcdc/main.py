@@ -892,10 +892,20 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
-            if score_name == "time-moment-flux":
+            elif score_name == "mu-sq":
+                score_type = SCORE_MU_SQ
+            elif score_name == "time-moment-flux":
                 score_type = SCORE_TIME_MOMENT_FLUX
-            if score_name == "space-moment-flux":
+            elif score_name == "space-moment-flux":
                 score_type = SCORE_SPACE_MOMENT_FLUX
+            elif score_name == "time-moment-current":
+                score_type = SCORE_TIME_MOMENT_CURRENT
+            elif score_name == "space-moment-current":
+                score_type = SCORE_SPACE_MOMENT_CURRENT
+            elif score_name == "time-moment-mu-sq":
+                score_type = SCORE_TIME_MOMENT_MU_SQ
+            elif score_name == "space-moment-mu-sq":
+                score_type = SCORE_SPACE_MOMENT_MU_SQ
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
@@ -1889,10 +1899,22 @@ def generate_hdf5(data, mcdc):
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
                         score_name = "fission"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "current"
+                    elif score_type == SCORE_MU_SQ:
+                        score_name = "mu-sq"
                     elif score_type == SCORE_TIME_MOMENT_FLUX:
                         score_name = "time-moment-flux"
                     elif score_type == SCORE_SPACE_MOMENT_FLUX:
                         score_name = "space-moment-flux"
+                    elif score_type == SCORE_TIME_MOMENT_CURRENT:
+                        score_name = "time-moment-current"
+                    elif score_type == SCORE_SPACE_MOMENT_CURRENT:
+                        score_name = "space-moment-current"
+                    elif score_type == SCORE_TIME_MOMENT_MU_SQ:
+                        score_name = "time-moment-mu-sq"
+                    elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
+                        score_name = "space-moment-mu-sq"
                     group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
