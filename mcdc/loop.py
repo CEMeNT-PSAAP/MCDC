@@ -71,6 +71,8 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
+        if not mcdc["technique"]["domain_decomposition"]:
+            kernel.distribute_work(N=mcdc["setting"]["N_particle"], mcdc=mcdc)
         mcdc["idx_batch"] = idx_batch
         seed_batch = kernel.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
 

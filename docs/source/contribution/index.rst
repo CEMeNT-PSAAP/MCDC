@@ -20,7 +20,15 @@ To get started making alterations in a cloned repo
 
 Push some particles around!!!!
 
-Please note our `code of conduct <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md>`_ which we take seriously
+.. toctree:: 
+   :hidden:
+   
+   documentation.rst
+
+Check out the :doc:`documentation` guide for info on how to contribute to these docs.
+We understand that documenting code is often a lower priority than the code itself, but it goes a long way towards usability and maintainability.
+
+Please note our `code of conduct <https://github.com/CEMeNT-PSAAP/MCDC/blob/main/CODE_OF_CONDUCT.md>`_, which we take seriously.
 
 ------------
 Code Styling
