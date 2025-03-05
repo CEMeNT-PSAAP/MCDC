@@ -1664,9 +1664,9 @@ def generate_hdf5(data, mcdc):
                 # Set tally shape
                 N_score = tally["N_score"]
                 if mcdc["technique"]["domain_decomposition"]:
-                    Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
-                    Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
-                    Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
+                    Nx = mcdc["technique"]["dd_xsum"]
+                    Ny = mcdc["technique"]["dd_ysum"]
+                    Nz = mcdc["technique"]["dd_zsum"]
                 if not mcdc["technique"]["uq"]:
                     shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
                 else:
