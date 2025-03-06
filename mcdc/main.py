@@ -403,6 +403,17 @@ def prepare():
             i += 1
 
     # =========================================================================
+    # Time census-based tally
+    # =========================================================================
+    # Reset time grid size of all tallies if census-based tally is desired
+
+    if input_deck.setting["census_based_tally"]:
+        N_bin = input_deck.setting["census_tally_frequency"]
+        for tally in input_deck.mesh_tallies:
+            tally.N_bin *= N_bin / (len(tally.t) - 1)
+            tally.t = np.zeros(N_bin + 1)
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -939,6 +950,8 @@ def prepare():
         N_azi = len(input_deck.cell_tallies[i].azi) - 1
         Ng = len(input_deck.cell_tallies[i].g) - 1
         Nt = len(input_deck.cell_tallies[i].t) - 1
+        mcdc["cell_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["cell_tallies"][i]["filter"]["Nt"] = Nt
 
         # Update N_bin
         mcdc["cell_tallies"][i]["N_bin"] *= N_score
@@ -1089,7 +1102,11 @@ def prepare():
     ):
         t_limit = INF
 
-    # Check if time boundary is above the final tally mesh time grid
+    # Replace the time limit if time census-based tally is used
+    if mcdc["setting"]["census_based_tally"]:
+        t_limit = mcdc["setting"]["census_time"][-2]
+
+    # Set appropriate time boundary
     if mcdc["setting"]["time_boundary"] > t_limit:
         mcdc["setting"]["time_boundary"] = t_limit
 
@@ -1350,6 +1367,7 @@ def prepare():
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+    mcdc["bank_future"]["tag"] = "future"
 
     # IC generator banks
     if mcdc["technique"]["IC_generator"]:
@@ -1718,6 +1736,10 @@ def generate_hdf5(data, mcdc):
                     input_deck.technique, input_group.create_group("technique")
                 )
 
+            # No need to output tally if time census-based tally is used
+            if input_deck.setting["census_based_tally"]:
+                return
+
             # Mesh tallies
             for ID, tally in enumerate(mcdc["mesh_tallies"]):
                 if mcdc["technique"]["iQMC"]:
@@ -1854,13 +1876,26 @@ def generate_hdf5(data, mcdc):
                 if mcdc["technique"]["iQMC"]:
                     break
 
+                mesh = tally["filter"]
+
+                # Get grid
+                Nt = mesh["Nt"]
+                Ng = mesh["Ng"]
+                #
+                grid_t = mesh["t"][: Nt + 1]
+                grid_g = mesh["g"][: Ng + 1]
+
+                # Save to dataset
+                f.create_dataset("tallies/cell_tally_%i/grid/t" % ID, data=grid_t)
+                f.create_dataset("tallies/cell_tally_%i/grid/g" % ID, data=grid_g)
+
                 # Shape
                 N_score = tally["N_score"]
 
                 if not mcdc["technique"]["uq"]:
-                    shape = (3, N_score)
+                    shape = (3, Ng, Nt, N_score)
                 else:
-                    shape = (5, N_score)
+                    shape = (5, Ng, Nt, N_score)
 
                 # Reshape tally
                 N_bin = tally["N_bin"]
@@ -1869,7 +1904,7 @@ def generate_hdf5(data, mcdc):
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
-                tally_bin = np.rollaxis(tally_bin, 1, 0)
+                tally_bin = np.rollaxis(tally_bin, 3, 0)
 
                 # Iterate over scores
                 for i in range(N_score):
@@ -2052,6 +2087,140 @@ def generate_hdf5(data, mcdc):
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 
 
+def recombine_tallies(file="output.h5"):
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        # Load main output file and read input params
+        with h5py.File(file, "r") as f:
+            output_name = str(f["input_deck/setting/output_name"][()])[2:-1]
+            N_particle = f["input_deck/setting/N_particle"][()]
+            N_census = f["input_deck/setting/N_census"][()] - 1
+            N_batch = f["input_deck/setting/N_batch"][()]
+            N_tallies = f["input_deck/setting/census_tally_frequency"][()]
+        f.close()
+        # Combine the tally output into a single file
+
+        collected_tallies = []
+        collected_tally_names = []
+        # Collecting info on number and types of tallies
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                with h5py.File(
+                    output_name + "-batch_%i-census_%i.h5" % (i_batch, i_census), "r"
+                ) as f:
+                    tallies = f["tallies"]
+
+                    for tally in tallies:
+                        if tally not in collected_tally_names:
+                            grid = tallies[tally]["grid"]
+                            tally_list = [tally]
+                            for tally_type in tallies[tally]:
+                                if tally_type != "grid":
+                                    tally_list.append(tally_type)
+                            collected_tallies.append(tally_list)
+                            collected_tally_names.append(tally)
+                f.close()
+
+        for i, tally_info in enumerate(collected_tallies):
+            tally_grid_type = tally_info[0].split("_")[0]
+            tally_number = tally_info[0].split("_")[-1]
+            with h5py.File(output_name + ".h5", "a") as f:
+                grid = f[
+                    "input_deck/"
+                    + tally_grid_type
+                    + "_tallies/"
+                    + tally_grid_type
+                    + "_tallies_"
+                    + tally_number
+                ]
+                t_final = f["input_deck/setting/census_time"][()][-2]
+                t = np.linspace(0, t_final, N_census * N_tallies + 1)
+                Nx = len(grid["x"][()]) - 1
+                Ny = len(grid["y"][()]) - 1
+                Nz = len(grid["z"][()]) - 1
+                Nmu = len(grid["mu"][()]) - 1
+                N_azi = len(grid["azi"][()]) - 1
+                Ng = len(grid["g"][()]) - 1
+                # Creating structure of correct size to hold combined tally
+                for tally_type in tally_info[1:]:
+                    tally_score = np.zeros(
+                        (N_census * N_tallies, Nx, Ny, Nz, Nmu, N_azi, Ng)
+                    )
+                    tally_score = np.squeeze(tally_score)
+                    tally_score_sq = np.zeros_like(tally_score)
+
+                    for i_census in range(N_census):
+                        for i_batch in range(N_batch):
+                            with h5py.File(
+                                output_name
+                                + "-batch_%i-census_%i.h5" % (i_batch, i_census),
+                                "r",
+                            ) as f1:
+                                score = f1[
+                                    "tallies/"
+                                    + tally_info[0]
+                                    + "/"
+                                    + tally_type
+                                    + "/score"
+                                ][:]
+                                tally_score[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += score
+                                tally_score_sq[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += (
+                                    score * score
+                                )
+                    tally_score /= N_batch
+                    tally_score_sq = np.sqrt(
+                        (tally_score_sq / N_batch - np.square(tally_score))
+                        / (N_batch - 1)
+                    )
+
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/mean",
+                        data=tally_score,
+                    )
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/sdev",
+                        data=tally_score_sq,
+                    )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/x", data=grid["x"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/y", data=grid["y"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/z", data=grid["z"][()]
+                )
+                f.create_dataset("tallies/" + tally_info[0] + "/grid/t", data=t)
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/mu", data=grid["mu"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/azi", data=grid["azi"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/g", data=grid["g"][()]
+                )
+            f.close()
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                file_name = (
+                    output_name
+                    + "-batch_"
+                    + str(i_batch)
+                    + "-census_"
+                    + str(i_census)
+                    + ".h5"
+                )
+                os.system("rm " + file_name)
+
+
 def closeout(mcdc):
 
     loop.teardown_gpu(mcdc)
@@ -2069,6 +2238,17 @@ def closeout(mcdc):
                 f.create_dataset(
                     "runtime/" + name, data=np.array([mcdc["runtime_" + name]])
                 )
+
+        if config.args.runtime_output:
+            with h5py.File(mcdc["setting"]["output_name"] + "-runtime.h5", "w") as f:
+                for name in [
+                    "total",
+                    "preparation",
+                    "simulation",
+                    "output",
+                    "bank_management",
+                ]:
+                    f.create_dataset(name, data=np.array([mcdc["runtime_" + name]]))
 
     print_runtime(mcdc)
     input_deck.reset()
