@@ -58,14 +58,14 @@ mcdc.source(
 # Tally: z-integrated flux (X-Y section view)
 mcdc.tally.mesh_tally(
     scores=["flux"],
-    x=np.linspace(0.0, 60.0, 31),
-    y=np.linspace(0.0, 100.0, 51),
-    # t=np.linspace(0.0, 200.0, 21),
+    x=np.linspace(0.0, 60.0, 16),
+    y=np.linspace(0.0, 100.0, 26),
+    z=np.linspace(0.0, 60.0, 16),
 )
 
 mcdc.tally.cs_tally(
-    N_cs_bins=[200],
-    cs_bin_size=[5.0, 5.0],
+    N_cs_bins=[500],
+    cs_bin_size=[2.0, 2.0, 2.0],
     scores=["flux"],
 )
 

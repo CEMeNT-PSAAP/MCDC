@@ -3,32 +3,41 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fft as spfft
 import cvxpy as cp
+import time
+import matplotlib.animation as animation
 
 # User-defined parameters - number of cells in each dimension
-Nx = 40
-Ny = 40
+Nx = 20
+Ny = 20
+Nz = 20
 
 with h5py.File("output.h5", "r") as f:
     x_grid = np.linspace(0.0, 4.0, Nx + 1)
     y_grid = np.linspace(0.0, 4.0, Ny + 1)
+    z_grid = np.linspace(0.0, 4.0, Nz + 1)
     N_cs_bins = f["tallies"]["cs_tally_0"]["N_cs_bins"][()]
     cs_bin_size = f["tallies"]["cs_tally_0"]["cs_bin_size"]
     x_centers = f["tallies"]["cs_tally_0"]["center_points"][0]
     y_centers = f["tallies"]["cs_tally_0"]["center_points"][1]
+    z_centers = f["tallies"]["cs_tally_0"]["center_points"][2]
     x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
     y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
-
+    z_centers[-1] = (z_grid[-1] + z_grid[0]) / 2
     x_mins, x_maxs = x_grid[:-1], x_grid[1:]
     y_mins, y_maxs = y_grid[:-1], y_grid[1:]
+    z_mins, z_maxs = z_grid[:-1], z_grid[1:]
 
     x_mids = (x_mins + x_maxs) / 2
     y_mids = (y_mins + y_maxs) / 2
+    z_mids = (z_mins + z_maxs) / 2
 
     # volume of a single cell
-    cell_volumes = np.multiply.outer(x_maxs - x_mins, y_maxs - y_mins)
+    cell_volumes = np.multiply.outer(
+        np.multiply.outer(x_maxs - x_mins, y_maxs - y_mins), z_maxs - z_mins
+    )
 
     # initialize S
-    S = np.zeros((N_cs_bins, Nx * Ny))
+    S = np.zeros((N_cs_bins, Nx * Ny * Nz))
 
     print("Generating S...")
     for ibin in range(N_cs_bins):
@@ -36,21 +45,28 @@ with h5py.File("output.h5", "r") as f:
         bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
         bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
         bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
+        bin_z_min = z_centers[ibin] - cs_bin_size[2] / 2
+        bin_z_max = z_centers[ibin] + cs_bin_size[2] / 2
 
         # calculate overlap
         overlap_x = np.maximum(
             0,
-            np.minimum(bin_x_max, x_maxs[:, None])
-            - np.maximum(bin_x_min, x_mins[:, None]),
+            np.minimum(bin_x_max, x_maxs[:, None, None])
+            - np.maximum(bin_x_min, x_mins[:, None, None]),
         )
         overlap_y = np.maximum(
             0,
-            np.minimum(bin_y_max, y_maxs[None, :])
-            - np.maximum(bin_y_min, y_mins[None, :]),
+            np.minimum(bin_y_max, y_maxs[None, :, None])
+            - np.maximum(bin_y_min, y_mins[None, :, None]),
+        )
+        overlap_z = np.maximum(
+            0,
+            np.minimum(bin_z_max, z_maxs[None, None, :])
+            - np.maximum(bin_z_min, z_mins[None, None, :]),
         )
 
         # calculate fractional overlap
-        overlap = (overlap_x * overlap_y) / cell_volumes
+        overlap = (overlap_x * overlap_y * overlap_z) / cell_volumes
         S[ibin] = overlap.flatten()
 
         for i in range(len(S[-1])):
@@ -58,9 +74,10 @@ with h5py.File("output.h5", "r") as f:
 
     cs_results = f["tallies"]["cs_tally_0"]["fission"]["mean"][:]
     mesh_results = f["tallies"]["mesh_tally_0"]["fission"]["mean"][:]
+    mesh_sdev = f["tallies"]["mesh_tally_0"]["fission"]["sdev"][:]
 
 # Perform reconstruction
-N_fine_cells = Nx * Ny
+N_fine_cells = Nx * Ny * Nz
 b = cs_results  # measurement vector
 A = (spfft.dct(S.T, type=2, norm="ortho", axis=0)).T  # sensing matrix
 
@@ -71,7 +88,9 @@ A = (spfft.dct(S.T, type=2, norm="ortho", axis=0)).T  # sensing matrix
 
 
 def reconstruct(lambda_):
-    print(f"Reconstructing with lambda = {lambda_}")
+    print(f"Reconstructing with lambda = {lambda_}", end="\r")
+    start_time = time.time()
+
     # setting up the problem with CVXPY
     vx = cp.Variable(N_fine_cells)
 
@@ -86,11 +105,14 @@ def reconstruct(lambda_):
     # formatting the sparse solution
     sparse_solution = np.array(vx.value).squeeze()
     result = spfft.idct(sparse_solution, type=2, norm="ortho", axis=0)
-    recon = result.reshape(Ny, Nx)
+    recon = result.reshape(Nz, Ny, Nx)
+    print(
+        f"Reconstructing with lambda = {lambda_}, time = {np.round(time.time() - start_time, 4)}"
+    )
     return recon
 
 
-def rel_norm(real, recon):
+def rel_norm(recon, real):
     real_norm = np.linalg.norm(real.flatten(), ord=2)
     diff = real.flatten() - recon.flatten()
     return np.linalg.norm(diff) / real_norm
@@ -98,35 +120,50 @@ def rel_norm(real, recon):
 
 # Different values of lambda to reconstruct with
 l_array = [
+    "mesh",
     0,
-    0.000005,
-    0.00001,
     0.00005,
     0.0001,
     0.0005,
     0.001,
     0.005,
     0.01,
+    0.025,
     0.05,
+    0.075,
     0.1,
     0.2,
     0.3,
+    0.4,
     0.5,
-    0.7,
-    1,
 ]
 
-# This part plots 16 different reconstructions for the given values of lambda in l_array
-fig, axes = plt.subplots(4, 4, figsize=(12, 12))
+recon_array = []
 rel_norms = []
+for i in range(len(l_array)):
+    if l_array[i] == "mesh":
+        recon_array.append(mesh_results)
+    else:
+        recon_array.append(reconstruct(l_array[i]))
 
+    rel_norms.append(rel_norm(recon_array[i], mesh_results))
+
+
+# Plotting the reconstructions for different lambda values
+fig, axes = plt.subplots(4, 4, figsize=(12, 12))
 for i in range(4):
     for j in range(4):
-        reconstruction = reconstruct(l_array[i * 4 + j])
-        rel_norms.append(rel_norm(reconstruction, mesh_results))
+        reconstruction = recon_array[i * 4 + j]
+        # reconstruction = recon_dict[str(l_array[i * 4 + j])]
         ax = axes[i, j]
-        im = ax.imshow(reconstruction, origin="lower", extent=[0, 4, 0, 4])
-        ax.set_title(f"$\lambda$ = {l_array[i * 4 + j]:.5g}")
+        im = ax.imshow(
+            reconstruction[:, :, Nz // 2], origin="lower", extent=[0, 4, 0, 4]
+        )
+
+        if l_array[i * 4 + j] == "mesh":
+            ax.set_title(f"True Solution")
+        else:
+            ax.set_title(f"$\lambda$ = {l_array[i * 4 + j]:.5g}")
 
         if j == 0:
             ax.set_ylabel("y [cm]")
@@ -141,14 +178,15 @@ plt.suptitle(
     fontsize=16,
 )
 plt.tight_layout()
+# plt.savefig('3D Reconstructions of Fissile Sphere.png')
 plt.show()
 
-reference_std_dev = np.linalg.norm(np.std(mesh_results))
-plt.plot(l_array, rel_norms, label="Reconstruction Errors")
+# Plotting the relative errors
+plt.plot(l_array[2:], rel_norms[2:], label="Reconstruction Errors")
 plt.hlines(
-    reference_std_dev,
-    l_array[0],
-    l_array[-1],
+    np.linalg.norm(mesh_sdev.flatten(), ord=2),
+    plt.xlim()[0],
+    plt.xlim()[1],
     color="black",
     linestyle="--",
     label="Reference Std Dev",
@@ -160,4 +198,5 @@ plt.ylabel("Relative L$^2$ Error")
 plt.title("Relative Error vs $\lambda$ - Fissile Sphere Reconstructions")
 plt.legend()
 plt.tight_layout()
+# plt.savefig('Reconstruction Errors.png')
 plt.show()

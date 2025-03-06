@@ -56,13 +56,13 @@ mcdc.source(x=[0.0, 1.0], y=[0.0, 1.0], isotropic=True)
 
 mcdc.tally.mesh_tally(
     scores=["flux"],
-    x=np.linspace(0.0, 4.0, 41),
-    y=np.linspace(0.0, 4.0, 41),
+    x=np.linspace(0.0, 4.0, 21),
+    y=np.linspace(0.0, 4.0, 21),
 )
 
 mcdc.tally.cs_tally(
-    N_cs_bins=[150],
-    cs_bin_size=[5.0, 5.0],
+    N_cs_bins=[500],
+    cs_bin_size=[1.0, 1.0],
     scores=["flux"],
 )
 
