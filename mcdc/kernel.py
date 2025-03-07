@@ -1945,6 +1945,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
 
         # Score
         flux = distance_scored * P["w"]
+        mu = P["ux"]
         for i in range(tally["N_score"]):
             score_type = tally["scores"][i]
             score = 0
@@ -1958,6 +1959,22 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
+            if score_type == SCORE_NET_CURRENT:
+                score = flux*mu
+            if score_type == SCORE_MU_SQ:
+                score = flux*mu*mu
+            elif score_type == SCORE_TIME_MOMENT_FLUX:
+                score = flux * (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
+            elif score_type == SCORE_SPACE_MOMENT_FLUX:
+                score = flux * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
+            elif score_type == SCORE_TIME_MOMENT_CURRENT:
+                score = flux * mu *  (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
+            elif score_type == SCORE_SPACE_MOMENT_CURRENT:
+                score = flux * mu * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
+            elif score_type == SCORE_TIME_MOMENT_MU_SQ:
+                score = flux * mu * mu * (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
+            elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
+                score = flux * mu * mu * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
             adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
@@ -2364,22 +2381,12 @@ def census_based_tally_output(data, mcdc):
                     + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
                     "w",
                 )
-
-                # Save Weight Windows
-                if mcdc["technique"]["ww"]["save"]:
-                    center = mcdc["technique"]["ww"]["center"]
-                    f.create_dataset(
-                        "weight_window_centers", data=center[idx_census, :, :, :]
-                    )
-                    f.close
-
             else:
                 f = h5py.File(
                     mcdc["setting"]["output_name"]
                     + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
                     "a",
                 )
-
             # Save to dataset
             f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
             f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
