@@ -1579,7 +1579,7 @@ def dd_mergemesh(mcdc, data):
         if d_Nz > 1:
             dd_mesh.append(z_final)
         else:
-            dd_mesh.append("z", mcdc["mesh_tallies"][:]["filter"]["z"])
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["z"])
     return dd_mesh
 
 
