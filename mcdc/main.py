@@ -2282,11 +2282,11 @@ def recombine_tallies(file="output.h5"):
                                     score * score
                                 )
                     tally_score /= N_batch
-                    tally_score_sq = np.sqrt(
-                        (tally_score_sq / N_batch - np.square(tally_score))
-                        / (N_batch - 1)
-                    )
-
+                    if N_batch > 0:
+                        tally_score_sq = np.sqrt(
+                            (tally_score_sq / N_batch - np.square(tally_score))
+                            / (N_batch - 1)
+                        )
                     f.create_dataset(
                         "tallies/" + tally_info[0] + "/" + tally_type + "/mean",
                         data=tally_score,
