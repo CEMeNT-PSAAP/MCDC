@@ -48,9 +48,10 @@ mcdc.setting(
     active_bank_buff=1e4,
     census_bank_buff=1e3,
     source_bank_buff=1e3,
+    N_batch = 5,
 )
 mcdc.time_census(np.linspace(0.0, 20.0, 21)[1:], tally_frequency=1)
-
+'''
 mcdc.weight_window(
     x=np.linspace(-20.5, 20.5, 202),
     method="previous",
@@ -58,39 +59,9 @@ mcdc.weight_window(
     width=2.5,
     save_ww_data=True,
 )
+'''
 mcdc.population_control()
 # Run
 mcdc.run()
 # Combine the tally output into a single file
-if mpi4py.MPI.COMM_WORLD.Get_rank() == 0:
-    phi = np.zeros((20, 201))
-    phi_sd = np.zeros((20, 201))
-    centers = np.zeros((20, 201))
-    N_census = 20
-    N_batch = 1
-    N_tallies = 1
-    for i_census in range(N_census):
-        for i_batch in range(N_batch):
-            with h5py.File(
-                "output-batch_%i-census_%i.h5" % (i_batch, i_census), "r"
-            ) as f:
-                phi_score = f["tallies/mesh_tally_0/flux/score"][:]
-                window_centers = f["weight_window_centers"][:]
-                phi[
-                    N_tallies * i_census : N_tallies * i_census + N_tallies, :
-                ] += phi_score
-                phi_sd[N_tallies * i_census : N_tallies * i_census + N_tallies, :] += (
-                    phi_score * phi_score
-                )
-                centers[
-                    N_tallies * i_census : N_tallies * i_census + N_tallies, :
-                ] += np.squeeze(window_centers)
-    phi /= N_batch
-    phi_sd = np.sqrt(
-        (phi_sd / N_history - np.square(phi / N_history)) / (N_history - 1)
-    )
-    # Write the results
-    with h5py.File("output.h5", "a") as f:
-        f.create_dataset("tallies/mesh_tally_0/flux/mean", data=phi)
-        f.create_dataset("tallies/mesh_tally_0/flux/sdev", data=phi_sd)
-        f.create_dataset("weight_window_centers", data=centers)
+mcdc.recombine_tallies()
