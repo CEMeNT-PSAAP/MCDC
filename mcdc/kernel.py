@@ -2463,6 +2463,7 @@ def surface_crossing(P_arr, data, prog):
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         P["cell_ID"] = -1
+        P["material_ID"] = -1
 
 
 # =============================================================================
