@@ -152,7 +152,7 @@ def get_indexes(N, nx, ny):
     return i, j, k
 
 
-def get_neighbors(N, w, nx, ny, nz):
+def get_neighbors(N, nx, ny, nz):
     i, j, k = get_indexes(N, nx, ny)
     if i > 0:
         xn = get_d_idx(i - 1, j, k, nx, ny)
@@ -181,16 +181,21 @@ def get_neighbors(N, w, nx, ny, nz):
     return xn, xp, yn, yp, zn, zp
 
 
-def dd_prepare():
+def prepare_domain_decomposition():
+    # Key parameters
     work_ratio = input_deck.technique["dd_work_ratio"]
-
+    N_proc = MPI.COMM_WORLD.Get_size()
+    # Decomposition mesh sizes
     d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
+    # Default parameters
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
-
+    if work_ratio is None:
+        work_ratio = np.ones(d_Nx * d_Ny * d_Nz, dtype=int)
+        input_deck.technique["dd_work_ratio"] = work_ratio
     if input_deck.technique["dd_exchange_rate_padding"] == None:
         if config.args.target == "gpu":
             padding = config.args.gpu_block_count * 64 * 16
@@ -198,36 +203,38 @@ def dd_prepare():
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
 
-    if work_ratio is None:
-        work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
-        input_deck.technique["dd_work_ratio"] = work_ratio
-
+    # Check if the combination of work_ratio and MPI rank size is acceptable
     if (
         input_deck.technique["domain_decomposition"]
-        and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
+        and N_proc % np.sum(work_ratio) != 0
     ):
         print_msg(
-            "Domain work ratio not equal to number of processors, %i != %i "
-            % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
+            "Number of MPI processes (%i) should be a multiple of the sum of the decomposed domain work ratio (%i)"
+            % (N_proc, np.sum(work_ratio))
         )
         exit()
+    N_ratio = int(N_proc / np.sum(work_ratio))
+    work_ratio *= N_ratio
 
+    # Assign domain index and processors' numbers in each domain
     if input_deck.technique["domain_decomposition"]:
-        # Assigning domain index
         i = 0
         rank_info = []
         for n in range(d_Nx * d_Ny * d_Nz):
             ranks = []
-            for r in range(int(work_ratio[n])):
+            for r in range(work_ratio[n]):
                 ranks.append(i)
                 if MPI.COMM_WORLD.Get_rank() == i:
                     d_idx = n
+                    local_rank = r
                 i += 1
             rank_info.append(ranks)
         input_deck.technique["dd_idx"] = d_idx
-        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
+        input_deck.technique["dd_local_rank"] = local_rank
+        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, d_Nx, d_Ny, d_Nz)
     else:
         input_deck.technique["dd_idx"] = 0
+        input_deck.technique["dd_local_rank"] = 0
         input_deck.technique["dd_xp_neigh"] = []
         input_deck.technique["dd_xn_neigh"] = []
         input_deck.technique["dd_yp_neigh"] = []
@@ -236,6 +243,7 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
         return
 
+    # Assign neighbor processor numbers in all 3x2 sides
     if xp is not None:
         input_deck.technique["dd_xp_neigh"] = rank_info[xp]
     else:
@@ -305,7 +313,7 @@ def prepare():
       (3) Create and set up global variable container `mcdc`
     """
 
-    dd_prepare()
+    prepare_domain_decomposition()
 
     # =========================================================================
     # Create root universe if not defined
@@ -1074,10 +1082,11 @@ def prepare():
             input_deck.technique["dd_mesh"]["azi"].size - 1
         )
         # Set exchange rate
-        for name in ["dd_exchange_rate", "dd_repro"]:
+        for name in ["dd_exchange_rate"]:
             copy_field(mcdc["technique"], input_deck.technique, name)
         # Set domain index
         copy_field(mcdc, input_deck.technique, "dd_idx")
+        copy_field(mcdc, input_deck.technique, "dd_local_rank")
         for name in ["xp", "xn", "yp", "yn", "zp", "zn"]:
             copy_field(mcdc["technique"], input_deck.technique, f"dd_{name}_neigh")
         copy_field(mcdc["technique"], input_deck.technique, "dd_work_ratio")
@@ -1383,10 +1392,43 @@ def dd_mergetally(mcdc, data):
     ylen = len(mcdc["mesh_tallies"][0]["filter"]["y"]) - 1
     zlen = len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1
 
-    dd_tally = np.zeros((tally.shape[0], tally.shape[1] * d_Nx * d_Ny * d_Nz))
-    # gather tallies
-    for i, t in enumerate(tally):
-        MPI.COMM_WORLD.Gather(tally[i], dd_tally[i], root=0)
+    # MPI gather
+    if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
+        sendcounts = np.array(MPI.COMM_WORLD.gather(len(tally[0]), root=0))
+        if mcdc["mpi_master"]:
+            dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
+        else:
+            dd_tally = np.empty(tally.shape[0])  # dummy tally
+        # gather tallies
+        for i, t in enumerate(tally):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
+            )
+
+    # MPI gather for multiprocessor subdomains
+    else:
+        i = 0
+        dd_ranks = []
+        # find nonzero tally processor IDs
+        for n in range(d_Nx * d_Ny * d_Nz):
+            dd_ranks.append(i)
+            i += int(mcdc["technique"]["dd_work_ratio"][n])
+        # create MPI comm group for nonzero tallies
+        dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
+        dd_comm = MPI.COMM_WORLD.Create(dd_group)
+        dd_tally = np.empty(tally.shape[0])  # dummy tally
+
+        if MPI.COMM_NULL != dd_comm:
+            sendcounts = np.array(dd_comm.gather(len(tally[0]), root=0))
+            if mcdc["mpi_master"]:
+                dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
+            # gather tallies
+            for i, t in enumerate(tally):
+                dd_comm.Gatherv(tally[i], (dd_tally[i], sendcounts), root=0)
+        dd_group.Free()
+        if MPI.COMM_NULL != dd_comm:
+            dd_comm.Free()
+
     if mcdc["mpi_master"]:
         buff = np.zeros_like(dd_tally)
         # reorganize tally data
@@ -1415,10 +1457,100 @@ def dd_mergetally(mcdc, data):
     return dd_tally
 
 
+def dd_mergemesh(mcdc, data):
+    """
+    Performs mesh recombination on domain-decomposed mesh tallies.
+    Gathers and re-organizes mesh data into a single array as it
+      would appear in a non-decomposed simulation.
+    """
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+    # gather mesh filter
+    if d_Nx > 1:
+        sendcounts = np.array(
+            MPI.COMM_WORLD.gather(len(mcdc["mesh_tallies"][0]["filter"]["x"]), root=0)
+        )
+        if mcdc["mpi_master"]:
+            x_filter = np.zeros((mcdc["mesh_tallies"].shape, sum(sendcounts)))
+        else:
+            x_filter = np.empty((mcdc["mesh_tallies"].shape))  # dummy tally
+        # gather mesh
+        for i in range(mcdc["mesh_tallies"].shape):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=mcdc["mesh_tallies"][i]["filter"]["x"],
+                recvbuf=(x_filter[i], sendcounts),
+                root=0,
+            )
+        if mcdc["mpi_master"]:
+            x_final = np.zeros((mcdc["mesh_tallies"].shape[0], x_filter.shape[1] + 1))
+            x_final[:, 0] = mcdc["mesh_tallies"][:]["filter"]["x"][0][0]
+            x_final[:, 1:] = x_filter
+
+    if d_Ny > 1:
+        sendcounts = np.array(
+            MPI.COMM_WORLD.gather(len(mcdc["mesh_tallies"][0]["filter"]["y"]), root=0)
+        )
+        if mcdc["mpi_master"]:
+            y_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
+        else:
+            y_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
+        # gather mesh
+        for i in range(mcdc["mesh_tallies"].shape):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=mcdc["mesh_tallies"][i]["filter"]["y"],
+                recvbuf=(y_filter[i], sendcounts),
+                root=0,
+            )
+        if mcdc["mpi_master"]:
+            y_final = np.zeros((mcdc["mesh_tallies"].shape[0], y_filter.shape[1] + 1))
+            y_final[:, 0] = mcdc["mesh_tallies"][:]["filter"]["y"][0][0]
+            y_final[:, 1:] = y_filter
+
+    if d_Nz > 1:
+        sendcounts = np.array(
+            MPI.COMM_WORLD.gather(
+                len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1, root=0
+            )
+        )
+        if mcdc["mpi_master"]:
+            z_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
+        else:
+            z_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
+        # gather mesh
+        for i in range(mcdc["mesh_tallies"].shape[0]):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=mcdc["mesh_tallies"][i]["filter"]["z"][1:],
+                recvbuf=(z_filter[i], sendcounts),
+                root=0,
+            )
+        if mcdc["mpi_master"]:
+            z_final = np.zeros((mcdc["mesh_tallies"].shape[0], z_filter.shape[1] + 1))
+            z_final[:, 0] = mcdc["mesh_tallies"][:]["filter"]["z"][0][0]
+            z_final[:, 1:] = z_filter
+
+    dd_mesh = []
+    if mcdc["mpi_master"]:
+        if d_Nx > 1:
+            dd_mesh.append(x_final)
+        else:
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["x"])
+        if d_Ny > 1:
+            dd_mesh.append(y_final)
+        else:
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["y"])
+        if d_Nz > 1:
+            dd_mesh.append(z_final)
+        else:
+            dd_mesh.append("z", mcdc["mesh_tallies"][:]["filter"]["z"])
+    return dd_mesh
+
+
 def generate_hdf5(data, mcdc):
 
     if mcdc["technique"]["domain_decomposition"]:
         dd_tally = dd_mergetally(mcdc, data)
+        dd_mesh = dd_mergemesh(mcdc, data)
 
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
@@ -1461,43 +1593,43 @@ def generate_hdf5(data, mcdc):
 
                 mesh = tally["filter"]
 
-                # Filter
-                Nmu = mesh["Nmu"]
-                N_azi = mesh["N_azi"]
-                Ng = mesh["Ng"]
+                # Get grid
                 Nx = mesh["Nx"]
                 Ny = mesh["Ny"]
                 Nz = mesh["Nz"]
                 Nt = mesh["Nt"]
-                N_score = tally["N_score"]
+                Nmu = mesh["Nmu"]
+                N_azi = mesh["N_azi"]
+                Ng = mesh["Ng"]
                 #
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"][: Nt + 1]
-                )
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"][: Nx + 1]
-                )
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"][:Ny] + 1
-                )
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"][: Nz + 1]
-                )
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"][: Nmu + 1]
-                )
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"][: N_azi + 1]
-                )
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"][: Ng + 1]
-                )
+                grid_x = mesh["x"][: Nx + 1]
+                grid_y = mesh["y"][: Ny + 1]
+                grid_z = mesh["z"][: Nz + 1]
+                grid_t = mesh["t"][: Nt + 1]
+                grid_mu = mesh["mu"][: Nmu + 1]
+                grid_azi = mesh["azi"][: N_azi + 1]
+                grid_g = mesh["g"][: Ng + 1]
+                # Domain decomposed?
+                if mcdc["technique"]["domain_decomposition"]:
+                    grid_x = dd_mesh[0][ID]
+                    grid_y = dd_mesh[1][ID]
+                    grid_z = dd_mesh[2][ID]
 
+                # Save to dataset
+                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
+                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
+                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=grid_z)
+                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=grid_t)
+                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=grid_mu)
+                f.create_dataset("tallies/mesh_tally_%i/grid/azi" % ID, data=grid_azi)
+                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=grid_g)
+
+                # Set tally shape
+                N_score = tally["N_score"]
                 if mcdc["technique"]["domain_decomposition"]:
                     Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
                     Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
                     Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
-
                 if not mcdc["technique"]["uq"]:
                     shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
                 else:
