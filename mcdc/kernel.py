@@ -1845,7 +1845,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
 
     # Sweep through the distance
     distance_swept = 0.0
-    while distance_swept < distance:
+    while distance_swept < distance - COINCIDENCE_TOLERANCE:
         # Find distances to the mesh grids
         if ux == 0.0:
             dx = INF
