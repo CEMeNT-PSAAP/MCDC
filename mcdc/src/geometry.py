@@ -406,7 +406,8 @@ def report_lost(particle_container):
     x = particle["x"]
     y = particle["y"]
     z = particle["z"]
-    print("A particle is lost at (", x, y, z, ")")
+    t = particle["t"]
+    print("A particle is lost at (", x, y, z, t, ")")
     particle["alive"] = False
 
 
