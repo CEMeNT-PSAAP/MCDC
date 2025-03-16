@@ -1781,14 +1781,17 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
     # Check if outside grid
     outside = False
 
+    Ng = mesh["Ng"]
+
     if mode_MG:
-        return binary_search(P["g"], mesh["g"]), outside
+        return binary_search_with_length(P["g"], mesh["g"], Ng), outside
+
     else:
         E = P["E"]
-        if E < mesh["g"][0] or E > mesh["g"][-1]:
+        if E < mesh["g"][0] or E > mesh["g"][Ng]:
             outside = True
             return 0, outside
-        return binary_search(P["E"], mesh["g"]), outside
+        return binary_search_with_length(P["E"], mesh["g"], Ng), outside
 
 
 # =============================================================================
@@ -1919,7 +1922,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
         if mesh_crossed == MESH_X:
             if ux > 0.0:
                 ix += 1
-                if ix == len(mesh["x"]) - 1:
+                if ix == mesh["Nx"]:
                     break
                 idx += stride["x"]
             else:
@@ -1930,7 +1933,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
         elif mesh_crossed == MESH_Y:
             if uy > 0.0:
                 iy += 1
-                if iy == len(mesh["y"]) - 1:
+                if iy == mesh["Ny"]:
                     break
                 idx += stride["y"]
             else:
@@ -1941,7 +1944,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
         elif mesh_crossed == MESH_Z:
             if uz > 0.0:
                 iz += 1
-                if iz == len(mesh["z"]) - 1:
+                if iz == mesh["Nz"]:
                     break
                 idx += stride["z"]
             else:
@@ -1951,7 +1954,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
                 idx -= stride["z"]
         elif mesh_crossed == MESH_T:
             it += 1
-            if it == len(mesh["t"]) - 1:
+            if it == mesh["Nt"]:
                 break
             idx += stride["t"]
 
