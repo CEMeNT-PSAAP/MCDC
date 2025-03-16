@@ -51,11 +51,11 @@ for name in names:
             + "Note: Skipping %s (require 4 MPI ranks)" % name
             + Style.RESET_ALL
         )
-    elif name == "dd_cooper" and not (mpiexec == 8 or srun == 8):
+    elif name == "slab_reed_dd_3d" and not ((mpiexec % 16) == 0 or (srun % 16) == 0):
         temp.remove(name)
         print(
             Fore.YELLOW
-            + "Note: Skipping %s (require 8 MPI ranks)" % name
+            + "Note: Skipping %s (require 16 MPI ranks)" % name
             + Style.RESET_ALL
         )
 names = temp
