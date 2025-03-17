@@ -63,10 +63,12 @@ def get_indices(particle_container, mesh):
         outside = True
         return -1, -1, -1, -1, outside
 
-    ix = _grid_index(x, ux, x0, dx)
-    iy = _grid_index(y, uy, y0, dy)
-    iz = _grid_index(z, uz, z0, dz)
-    it = _grid_index(t, 1.0, t0, dt)  # Particle always moves forward in time
+    ix = _grid_index(x, ux, x0, dx, COINCIDENCE_TOLERANCE)
+    iy = _grid_index(y, uy, y0, dy, COINCIDENCE_TOLERANCE)
+    iz = _grid_index(z, uz, z0, dz, COINCIDENCE_TOLERANCE)
+    it = _grid_index(
+        t, 1.0, t0, dt, COINCIDENCE_TOLERANCE_TIME
+    )  # Particle always moves forward in time
 
     return ix, iy, iz, it, outside
 
@@ -120,15 +122,15 @@ def get_crossing_distance(particle_container, speed, mesh):
         return INF
 
     d = INF
-    d = min(d, _grid_distance(x, ux, x0, dx))
-    d = min(d, _grid_distance(y, uy, y0, dy))
-    d = min(d, _grid_distance(z, uz, z0, dz))
+    d = min(d, _grid_distance(x, ux, x0, dx, COINCIDENCE_TOLERANCE))
+    d = min(d, _grid_distance(y, uy, y0, dy, COINCIDENCE_TOLERANCE))
+    d = min(d, _grid_distance(z, uz, z0, dz, COINCIDENCE_TOLERANCE))
     d = min(d, _grid_distance(t, 1.0 / speed, t0, dt, COINCIDENCE_TOLERANCE_TIME))
     return d
 
 
 @njit
-def _grid_index(value, direction, start, width, tolerance=COINCIDENCE_TOLERANCE):
+def _grid_index(value, direction, start, width, tolerance):
     """
     Get grid index given the value and the direction
 
@@ -147,7 +149,7 @@ def _grid_index(value, direction, start, width, tolerance=COINCIDENCE_TOLERANCE)
 
 
 @njit
-def _grid_distance(value, direction, start, width, tolerance=COINCIDENCE_TOLERANCE):
+def _grid_distance(value, direction, start, width, tolerance):
     """
     Get distance to nearest grid given a value and direction
 
