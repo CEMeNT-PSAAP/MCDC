@@ -34,7 +34,7 @@ MPI.COMM_WORLD.Get_size.return_value = 1
 # -- Project information -----------------------------------------------------
 
 project = "MC/DC"
-copyright = "2023, Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
+copyright = "2025, Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 author = "Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 
 # The full version, including alpha/beta/rc tags
