@@ -66,7 +66,9 @@ def get_indices(particle_container, mesh):
     ix = _grid_index(x, ux, x0, dx, COINCIDENCE_TOLERANCE)
     iy = _grid_index(y, uy, y0, dy, COINCIDENCE_TOLERANCE)
     iz = _grid_index(z, uz, z0, dz, COINCIDENCE_TOLERANCE)
-    it = _grid_index(t, 1.0, t0, dt, COINCIDENCE_TOLERANCE_TIME)  # Particle always moves forward in time
+    it = _grid_index(
+        t, 1.0, t0, dt, COINCIDENCE_TOLERANCE_TIME
+    )  # Particle always moves forward in time
 
     return ix, iy, iz, it, outside
 
