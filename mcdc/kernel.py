@@ -2040,9 +2040,16 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
 
     # Check each coarse bin
     for j in range(N_cs_bins):
-        center = np.array([cs_centers[0][j], cs_centers[1][j]])
-        start = np.array([x, y])
-        end = np.array([x_final, y_final])
+        center = adapt.local_array(2, type_.float64)
+        start = adapt.local_array(2, type_.float64)
+        end = adapt.local_array(2, type_.float64)
+        #
+        center[0] = cs_centers[0][j]
+        center[1] = cs_centers[1][j]
+        start[0] = x
+        start[1] = y
+        end[0] = x_final
+        end[1] = y_final
 
         distance_inside = calculate_distance_in_coarse_bin(
             start, end, distance, center, cs_bin_size
@@ -2050,12 +2057,17 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
 
         # Last bin covers the whole problem
         if j == N_cs_bins - 1:
-            cs_bin_size_full_problem = np.array([INF, INF], dtype=np.float64)
+            cs_bin_size_full_problem = adapt.local_array(2, type_.float64)
+            cs_bin_size_full_problem[0] = INF
+            cs_bin_size_full_problem[1] = INF
             distance_inside = calculate_distance_in_coarse_bin(
                 start, end, distance, center, cs_bin_size_full_problem
             )
 
-        distance_in_bin = np.minimum(distance, distance_inside)  # this line is good
+        if distance < distance_inside:
+            distance_in_bin = distance
+        else:
+            distance_in_bin = distance_inside
 
         # Calculate flux and other scores
         flux = distance_in_bin * P["w"]
@@ -2121,11 +2133,16 @@ def cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max):
 
     # Update start and end points based on clipping results
     if t1 < 1:
-        end = start + t1 * np.array([dx, dy])
+        end[0] = start[0] + t1 * dx
+        end[1] = start[1] + t1 * dy
     if t0 > 0:
-        start = start + t0 * np.array([dx, dy])
+        start[0] = start[0] + t0 * dx
+        start[1] = start[1] + t0 * dx
 
-    return np.linalg.norm(end - start)
+    # Return the norm
+    X = end[0] - start[0]
+    Y = end[1] - start[1]
+    return math.sqrt(X**2 + Y**2)
 
 
 @njit
