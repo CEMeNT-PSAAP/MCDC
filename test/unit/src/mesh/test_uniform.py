@@ -278,115 +278,115 @@ def test_get_corssing_distance():
 
 def test__grid_index():
     # Inside bin, going right
-    assert np.isclose(_grid_index(-3.2, 0.4, mesh["x0"], mesh["dx"]), 1)
-    assert np.isclose(_grid_index(3.2, 0.4, mesh["x0"], mesh["dx"]), 4)
+    assert np.isclose(_grid_index(-3.2, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1)
+    assert np.isclose(_grid_index(3.2, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 4)
 
     # Inside bin, going left
-    assert np.isclose(_grid_index(-3.2, -0.4, mesh["x0"], mesh["dx"]), 1)
-    assert np.isclose(_grid_index(3.2, -0.4, mesh["x0"], mesh["dx"]), 4)
+    assert np.isclose(_grid_index(-3.2, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1)
+    assert np.isclose(_grid_index(3.2, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 4)
 
     # At internal grid, going right
-    assert np.isclose(_grid_index(2.0, 0.4, mesh["x0"], mesh["dx"]), 4)
-    assert np.isclose(_grid_index(-2.0, 0.4, mesh["x0"], mesh["dx"]), 2)
+    assert np.isclose(_grid_index(2.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 4)
+    assert np.isclose(_grid_index(-2.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2)
 
     # At internal grid, going left
-    assert np.isclose(_grid_index(2.0, -0.4, mesh["x0"], mesh["dx"]), 3)
-    assert np.isclose(_grid_index(-2.0, -0.4, mesh["x0"], mesh["dx"]), 1)
+    assert np.isclose(_grid_index(2.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 3)
+    assert np.isclose(_grid_index(-2.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1)
 
     # At left-most grid, going right
-    assert np.isclose(_grid_index(-6.0, 0.4, mesh["x0"], mesh["dx"]), 0)
+    assert np.isclose(_grid_index(-6.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 0)
 
     # At right-most grid, going left
-    assert np.isclose(_grid_index(6.0, -0.4, mesh["x0"], mesh["dx"]), 5)
+    assert np.isclose(_grid_index(6.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 5)
 
     # At internal grid (within tolerance), going right
-    assert np.isclose(_grid_index(2.0 + tiny, 0.4, mesh["x0"], mesh["dx"]), 4)
-    assert np.isclose(_grid_index(2.0 - tiny, 0.4, mesh["x0"], mesh["dx"]), 4)
-    assert np.isclose(_grid_index(-2.0 + tiny, 0.4, mesh["x0"], mesh["dx"]), 2)
-    assert np.isclose(_grid_index(-2.0 - tiny, 0.4, mesh["x0"], mesh["dx"]), 2)
+    assert np.isclose(_grid_index(2.0 + tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 4)
+    assert np.isclose(_grid_index(2.0 - tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 4)
+    assert np.isclose(_grid_index(-2.0 + tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2)
+    assert np.isclose(_grid_index(-2.0 - tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2)
 
     # At internal grid (within tolerance), going left
-    assert np.isclose(_grid_index(2.0 + tiny, -0.4, mesh["x0"], mesh["dx"]), 3)
-    assert np.isclose(_grid_index(2.0 - tiny, -0.4, mesh["x0"], mesh["dx"]), 3)
-    assert np.isclose(_grid_index(-2.0 + tiny, -0.4, mesh["x0"], mesh["dx"]), 1)
-    assert np.isclose(_grid_index(-2.0 - tiny, -0.4, mesh["x0"], mesh["dx"]), 1)
+    assert np.isclose(_grid_index(2.0 + tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 3)
+    assert np.isclose(_grid_index(2.0 - tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 3)
+    assert np.isclose(_grid_index(-2.0 + tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1)
+    assert np.isclose(_grid_index(-2.0 - tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1)
 
     # At left-most grid (within tolerance), going right
-    assert np.isclose(_grid_index(-6.0 + tiny, 0.4, mesh["x0"], mesh["dx"]), 0)
-    assert np.isclose(_grid_index(-6.0 - tiny, 0.4, mesh["x0"], mesh["dx"]), 0)
+    assert np.isclose(_grid_index(-6.0 + tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 0)
+    assert np.isclose(_grid_index(-6.0 - tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 0)
 
     # At right-most grid (within tolerance), going left
-    assert np.isclose(_grid_index(6.0 + tiny, -0.4, mesh["x0"], mesh["dx"]), 5)
-    assert np.isclose(_grid_index(6.0 - tiny, -0.4, mesh["x0"], mesh["dx"]), 5)
+    assert np.isclose(_grid_index(6.0 + tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 5)
+    assert np.isclose(_grid_index(6.0 - tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 5)
 
 
 def test__grid_distance():
     # Inside bin, going right
-    assert np.isclose(_grid_distance(-3.2, 0.4, mesh["x0"], mesh["dx"]), 1.2 / 0.4)
-    assert np.isclose(_grid_distance(3.2, 0.4, mesh["x0"], mesh["dx"]), 0.8 / 0.4)
+    assert np.isclose(_grid_distance(-3.2, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1.2 / 0.4)
+    assert np.isclose(_grid_distance(3.2, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 0.8 / 0.4)
 
     # Inside bin, going left
-    assert np.isclose(_grid_distance(-3.2, -0.4, mesh["x0"], mesh["dx"]), 0.8 / 0.4)
-    assert np.isclose(_grid_distance(3.2, -0.4, mesh["x0"], mesh["dx"]), 1.2 / 0.4)
+    assert np.isclose(_grid_distance(-3.2, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 0.8 / 0.4)
+    assert np.isclose(_grid_distance(3.2, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 1.2 / 0.4)
 
     # Outside, moving closer
-    assert np.isclose(_grid_distance(8.0, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-8.0, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(8.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-8.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
 
     # At internal grid, going right
-    assert np.isclose(_grid_distance(2.0, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-2.0, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(2.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-2.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
 
     # At internal grid, going left
-    assert np.isclose(_grid_distance(2.0, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
-    assert np.isclose(_grid_distance(-2.0, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(2.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-2.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
 
     # At left-most grid, going right
-    assert np.isclose(_grid_distance(-6.0, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(-6.0, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
 
     # At right-most grid, going left
-    assert np.isclose(_grid_distance(6.0, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4)
+    assert np.isclose(_grid_distance(6.0, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4)
 
     # At internal grid (within tolerance), going right
     assert np.isclose(
-        _grid_distance(2.0 + tiny, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(2.0 + tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(2.0 - tiny, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(2.0 - tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(-2.0 + tiny, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(-2.0 + tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(-2.0 - tiny, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(-2.0 - tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
 
     # At internal grid (within tolerance), going left
     assert np.isclose(
-        _grid_distance(2.0 + tiny, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(2.0 + tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(2.0 - tiny, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(2.0 - tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(-2.0 + tiny, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(-2.0 + tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(-2.0 - tiny, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(-2.0 - tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
 
     # At left-most grid (within tolerance), going right
     assert np.isclose(
-        _grid_distance(-6.0 + tiny, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(-6.0 + tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(-6.0 - tiny, 0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(-6.0 - tiny, 0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
 
     # At right-most grid (within tolerance), going left
     assert np.isclose(
-        _grid_distance(6.0 + tiny, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(6.0 + tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
     assert np.isclose(
-        _grid_distance(6.0 - tiny, -0.4, mesh["x0"], mesh["dx"]), 2.0 / 0.4
+        _grid_distance(6.0 - tiny, -0.4, mesh["x0"], mesh["dx"], COINCIDENCE_TOLERANCE), 2.0 / 0.4
     )
