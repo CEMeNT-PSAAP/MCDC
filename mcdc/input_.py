@@ -21,6 +21,7 @@ from mcdc.card import (
     UniverseCard,
     LatticeCard,
     SourceCard,
+    MeshTallyCard,
 )
 from mcdc.constant import (
     GYRATION_RADIUS_ALL,
@@ -39,6 +40,10 @@ from mcdc.constant import (
     PI,
     REGION_ALL,
     TINY,
+    WW_MIN,
+    WW_PREVIOUS,
+    WW_USER,
+    WW_WOLLABER,
 )
 from mcdc.print_ import print_error
 import mcdc.type_ as type_
@@ -991,9 +996,13 @@ def setting(**kw):
     IC_file : str
         Path to a file containing a description of an initial condition.
     active_bank_buff : int
-        Size of the activate particle bank buffer, for MPI runs.
+        Size of the particle active bank buffer.
     census_bank_buff : int
-        Sets size of the census buffer particle bank.
+        Size of the particle census bank buffer (in multiples of N_particle).
+    source_bank_buff : int
+        Size of the particle source bank buffer (in multiples of N_particle).
+    future_bank_buff : int
+        Size of the particle future bank buffer (in multiples of N_particle).
 
     Returns
     -------
@@ -1019,6 +1028,8 @@ def setting(**kw):
                 "IC_file",
                 "active_bank_buff",
                 "census_bank_buff",
+                "source_bank_buff",
+                "future_bank_buff",
             ],
             False,
         )
@@ -1036,6 +1047,8 @@ def setting(**kw):
     IC_file = kw.get("IC_file")
     bank_active_buff = kw.get("active_bank_buff")
     bank_census_buff = kw.get("census_bank_buff")
+    bank_source_buff = kw.get("source_bank_buff")
+    bank_future_buff = kw.get("future_bank_buff")
 
     # Check if setting card has been initialized
     card = global_.input_deck.setting
@@ -1075,6 +1088,14 @@ def setting(**kw):
     # Census bank size multiplier
     if bank_census_buff is not None:
         card["bank_census_buff"] = int(bank_census_buff)
+
+    # Source bank size multiplier
+    if bank_source_buff is not None:
+        card["bank_source_buff"] = int(bank_source_buff)
+
+    # Future bank size multiplier
+    if bank_future_buff is not None:
+        card["bank_future_buff"] = int(bank_future_buff)
 
     # Save input deck?
     if save_input_deck is not None:
@@ -1224,7 +1245,7 @@ def branchless_collision():
     card["weighted_emission"] = False
 
 
-def time_census(t):
+def time_census(t, tally_frequency=None):
     """
     Set time-census boundaries.
 
@@ -1232,18 +1253,22 @@ def time_census(t):
     ----------
     t : array_like[float]
         The time-census boundaries.
+    tally_frecuency : integer, optional
+        Number of uniform tally time mesh bins in census-based tallying.
+        This overrides manual tally time mesh definitions.
 
     Returns
     -------
         None (in-place card alterations).
     """
 
-    # Remove census beyond the final tally time grid point
-    while True:
-        if t[-1] >= global_.input_deck.tally["mesh"]["t"][-1]:
-            t = t[:-1]
-        else:
-            break
+    # Make sure that the time grid points are sorted
+    if not is_sorted(t):
+        print_error("Time census: Time grid points have to be sorted.")
+
+    # Make sure that the starting point is larger than zero
+    if t[0] <= 0.0:
+        print_error("Time census: First census time should be larger than zero.")
 
     # Add the default, final census-at-infinity
     t = np.append(t, INF)
@@ -1253,8 +1278,27 @@ def time_census(t):
     card["census_time"] = t
     card["N_census"] = len(t)
 
+    # Set the census-based tallying
+    if tally_frequency is not None and tally_frequency > 0:
+        # Reset all tallies' time grids:
+        card["census_based_tally"] = True
+        card["census_tally_frequency"] = tally_frequency
 
-def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
+
+def weight_window(
+    x=np.array([-INF, INF]),
+    y=np.array([-INF, INF]),
+    z=np.array([-INF, INF]),
+    mu=np.array([-1.0, 1.0]),
+    azi=np.array([-PI, PI]),
+    g=np.array([-INF, INF]),
+    E=np.array([0.0, INF]),
+    window=None,
+    width=2.5,
+    method={"user"},
+    modifications={},
+    save_ww_data=True,
+):
     """
     Activate weight window variance reduction technique.
 
@@ -1269,32 +1313,114 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
     t : array_like[float], optional
         Location of the weight window in t (default None).
     window : array_like[float], optional
-        Bound of the statistic weight of the window (default None).
-    width : array_like[float], optional
-        Statistical width the window will apply (default None).
-
+        Center of the weight windows (default None).
+    width : float, optional
+        Width of the window (default 2.5).
+    epsilon : float, optional
+        Small values used for techniques (default empty list).
+    techniques : list of str, optional
+        List of techniques to use for ww
+        {'user','previous','alpha','min_center','wollaber'} (default {'user'}).
     Returns
     -------
         A weight window card.
 
     """
+
+    t = global_.input_deck.setting["census_time"]
     card = global_.input_deck.technique
     card["weight_window"] = True
+    N_update = 0
 
+    card["ww"]["save"] = save_ww_data
     # Set width
     if width is not None:
-        card["ww_width"] = width
+        card["ww"]["width"] = width
+
+    # Checking WW method
+    method_checked = check_support(
+        "Weight window method",
+        method,
+        ["user", "previous"],
+    )
+    if method_checked == "user":
+        card["ww"]["auto"] = WW_USER
+    elif method_checked == "previous":
+        card["ww"]["auto"] = WW_PREVIOUS
+
+        scores = (["flux"],)
+        # Make tally card
+        tcard = MeshTallyCard()
+
+        # Set ID
+        tcard.ID = len(global_.input_deck.mesh_tallies)
+        card["ww"]["tally_idx"] = tcard.ID
+
+        # Set mesh
+        tcard.x = x
+        tcard.y = y
+        tcard.z = z
+
+        # Set other filters
+        tcard.t = t
+        tcard.mu = mu
+        tcard.azi = azi
+
+        # Set energy group grid
+        if type(g) == type("string") and g == "all":
+            G = global_.input_deck.materials[0].G
+            tcard.g = np.linspace(0, G, G + 1) - 0.5
+        else:
+            tcard.g = g
+        if global_.input_deck.setting["mode_CE"]:
+            tcard.g = E
+
+        # Calculate total number bins
+        Nx = len(tcard.x) - 1
+        Ny = len(tcard.y) - 1
+        Nz = len(tcard.z) - 1
+        Nt = len(tcard.t) - 1
+        Nmu = len(tcard.mu) - 1
+        N_azi = len(tcard.azi) - 1
+        Ng = len(tcard.g) - 1
+        tcard.N_bin = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
+        tcard.scores.append("flux")
+        # Add to deck
+        global_.input_deck.mesh_tallies.append(tcard)
+
+    # Checking techniques
+    for mod in modifications:
+        mod_checked = check_support(
+            "Weight window modification",
+            mod[0],
+            ["min-center", "wollaber"],
+        )
+        if mod_checked == "min-center":
+            card["ww"]["epsilon"][WW_MIN] = mod[1]
+        if mod_checked == "wollaber":
+            card["ww"]["epsilon"][WW_WOLLABER] = mod[1]
+            card["ww"]["epsilon"][WW_WOLLABER + 1] = mod[2]
 
     # Set mesh
-    if x is not None:
-        card["ww_mesh"]["x"] = x
-    if y is not None:
-        card["ww_mesh"]["y"] = y
-    if z is not None:
-        card["ww_mesh"]["z"] = z
-    if t is not None:
-        card["ww_mesh"]["t"] = t
+    card["ww"]["mesh"]["x"] = x
+    card["ww"]["mesh"]["y"] = y
+    card["ww"]["mesh"]["z"] = z
+    card["ww"]["mesh"]["t"] = t
+    card["ww"]["mesh"]["mu"] = mu
+    card["ww"]["mesh"]["azi"] = azi
 
+    # Set energy group grid
+    if type(g) == type("string") and g == "all":
+        G = global_.input_deck.materials[0].G
+        card["ww"]["mesh"]["g"] = np.linspace(0, G, G + 1) - 0.5
+    else:
+        tcard.g = g
+    if global_.input_deck.setting["mode_CE"]:
+        card["ww"]["mesh"]["g"] = E
+
+    if window is None:
+        window = np.ones((Nt, Nx, Ny, Nz))
+    """
     # Set window
     ax_expand = []
     if t is None:
@@ -1305,12 +1431,11 @@ def weight_window(x=None, y=None, z=None, t=None, window=None, width=None):
         ax_expand.append(2)
     if z is None:
         ax_expand.append(3)
-    window /= np.max(window)
     for ax in ax_expand:
         window = np.expand_dims(window, axis=ax)
-    card["ww"] = window
-
-    return card
+    """
+    card["ww"]["center"] = window
+    return card, tcard
 
 
 def domain_decomposition(
@@ -1808,3 +1933,12 @@ def save_particle_bank(bank, name):
 
 def reset():
     global_.input_deck.reset()
+
+
+# ==============================================================================
+# Misc
+# ==============================================================================
+
+
+def is_sorted(a):
+    return np.all(a[:-1] <= a[1:])

@@ -109,16 +109,19 @@ for i, name in enumerate(names):
 
     # Run the test problem (redirect the stdout)
     if mpiexec > 1:
+        gpus_per_task = ""
+        if target == "gpu":
+            gpus_per_task = f"--gpus-per-task=1 "
         os.system(
-            "mpiexec -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (mpiexec, mode, target)
+            "mpiexec -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar> tmp 2>&1"
+            % (mpiexec, gpus_per_task, mode, target)
         )
     elif srun > 1:
         gpus_per_task = ""
         if target == "gpu":
             gpus_per_task = f"--gpus-per-task=1 "
         os.system(
-            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar %s> tmp 2>&1"
+            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar> tmp 2>&1"
             % (srun, gpus_per_task, mode, target)
         )
     else:

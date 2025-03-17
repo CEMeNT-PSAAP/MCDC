@@ -9,6 +9,7 @@ from numba import njit
 
 from mcdc.print_ import print_error
 
+from mcdc.constant import WW_PREVIOUS
 
 # ==============================================================================
 # Basic types
@@ -44,6 +45,7 @@ setting = None
 mesh_tally = None
 surface_tally = None
 cell_tally = None
+cs_tally = None
 technique = None
 
 global_ = None
@@ -894,6 +896,8 @@ def make_type_cell_tally(input_deck):
         ("mu", float64, (Nmax_mu,)),
         ("azi", float64, (Nmax_azi,)),
         ("g", float64, (Nmax_g,)),
+        ("Nt", int64),
+        ("Ng", int64),
     ]
     struct = [("filter", filter_)]
 
@@ -916,6 +920,89 @@ def make_type_cell_tally(input_deck):
 
     # Make tally structure
     cell_tally = into_dtype(struct)
+
+
+def make_type_cs_tally(input_deck):
+    global cs_tally
+    struct = []
+
+    # Maximum numbers of mesh and filter grids and scores
+    Nmax_x = 2
+    Nmax_y = 2
+    Nmax_z = 2
+    Nmax_t = 2
+    Nmax_mu = 2
+    Nmax_azi = 2
+    Nmax_g = 2
+    Nmax_score = 1
+    N_cs_centers = 1
+    for card in input_deck.cs_tallies:
+        Nmax_x = max(Nmax_x, len(card.x))
+        Nmax_y = max(Nmax_y, len(card.y))
+        Nmax_z = max(Nmax_z, len(card.z))
+        Nmax_t = max(Nmax_t, len(card.t))
+        Nmax_mu = max(Nmax_mu, len(card.mu))
+        Nmax_azi = max(Nmax_azi, len(card.azi))
+        Nmax_g = max(Nmax_g, len(card.g))
+        Nmax_score = max(Nmax_score, len(card.scores))
+        N_cs_centers = card.N_cs_bins[0]
+
+    # # reduce tally sizes for subdomains
+    # if input_deck.technique["domain_decomposition"]:
+    #     Nmax_x, Nmax_y, Nmax_z = dd_meshtally(input_deck)
+
+    # Set the filter
+    filter_ = [
+        ("N_cs_bins", int),
+        ("cs_bin_size", float64, (2,)),
+        (
+            "cs_centers",
+            float64,
+            (
+                2,
+                N_cs_centers,
+            ),
+        ),
+        ("cs_S", float64, (N_cs_centers, (Nmax_x - 1) * (Nmax_y - 1))),
+        ("cs_reconstruction", float64, ((Nmax_y - 1), (Nmax_x - 1))),
+        ("x", float64, (Nmax_x,)),
+        ("y", float64, (Nmax_y,)),
+        ("z", float64, (Nmax_z,)),
+        ("t", float64, (Nmax_t,)),
+        ("mu", float64, (Nmax_mu,)),
+        ("azi", float64, (Nmax_azi,)),
+        ("g", float64, (Nmax_g,)),
+    ]
+
+    struct += [("filter", filter_)]
+
+    # Tally strides
+    stride = [
+        ("tally", int64),
+        ("sensitivity", int64),
+        ("mu", int64),
+        ("azi", int64),
+        ("g", int64),
+        ("t", int64),
+        ("x", int64),
+        ("y", int64),
+        ("z", int64),
+        # ("N_cs_bins", int64),   # TODO: get rid of this line?
+    ]
+    struct += [("stride", stride)]
+
+    # Total number of bins (will be used for the reconstruction)
+    # TODO: Might be able to get rid of this (just get N_bin from the mesh)
+    struct += [("N_bin", int64)]
+
+    # Number of compressed sensing bins
+    # struct += [("N_cs_bins", int64)]
+
+    # Scores
+    struct += [("N_score", int64), ("scores", int64, (Nmax_score,))]
+
+    # Make tally structure
+    cs_tally = into_dtype(struct)
 
 
 # ==============================================================================
@@ -952,6 +1039,8 @@ def make_type_setting(deck):
         # Time census
         ("N_census", uint64),
         ("census_time", float64, (card["N_census"],)),
+        ("census_based_tally", bool_),
+        ("census_tally_frequency", int64),
         # Particle source file
         ("source_file", bool_),
         ("source_file_name", str_),
@@ -1047,13 +1136,25 @@ def make_type_technique(input_deck):
     # Weight window
     # =========================================================================
 
-    # Mesh
-    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww_mesh"])
-    struct += [("ww_mesh", mesh)]
-    struct += [("ww_width", float64)]
+    # =========================================================================
+    # Weight window
+    # =========================================================================
+    ww_list = []
 
-    # Window
-    struct += [("ww", float64, (Nt, Nx, Ny, Nz))]
+    # Mesh
+    mesh, Nx, Ny, Nz, Nt, Nmu, N_azi, Ng = make_type_mesh(card["ww"]["mesh"])
+    ww_list += [("mesh", mesh)]
+    ww_list += [("auto", int64)]
+    ww_list += [("width", float64)]
+    ww_list += [("epsilon", float64, (3,))]
+    ww_list += [("center", float64, (Nt, Nx, Ny, Nz))]
+    ww_list += [("save", bool_)]
+    ww_list += [("tally_idx", int64)]
+    if card["weight_window"]:
+        if card["ww"]["save"]:
+            if card["ww"]["auto"] == WW_PREVIOUS:
+                ww_list += [("phi_previous", float64, (Nt, Nx, Ny, Nz))]
+    struct += [("ww", into_dtype(ww_list))]
 
     # =========================================================================
     # Weight Roulette
@@ -1346,6 +1447,7 @@ def make_type_global(input_deck):
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
     N_cell_tally = len(input_deck.cell_tallies)
+    N_cs_tally = len(input_deck.cs_tallies)
 
     # Cell data sizes
     N_cell_surface = sum([len(x.surface_IDs) for x in input_deck.cells])
@@ -1362,6 +1464,8 @@ def make_type_global(input_deck):
     # Particle bank buffers
     bank_active_buff = input_deck.setting["bank_active_buff"]
     bank_census_buff = input_deck.setting["bank_census_buff"]
+    bank_source_buff = input_deck.setting["bank_source_buff"]
+    bank_future_buff = input_deck.setting["bank_future_buff"]
 
     # Number of precursor groups
     if mode_MG:
@@ -1377,10 +1481,12 @@ def make_type_global(input_deck):
     bank_active = particle_bank(1 + bank_active_buff)
     if input_deck.setting["mode_eigenvalue"] or input_deck.setting["N_census"] > 1:
         bank_census = particle_bank(int((1 + bank_census_buff) * N_work))
-        bank_source = particle_bank(int((1 + bank_census_buff) * N_work))
+        bank_source = particle_bank(int((1 + bank_source_buff) * N_work))
+        bank_future = particle_bank(int((1 + bank_future_buff) * N_work))
     else:
         bank_census = particle_bank(0)
         bank_source = particle_bank(0)
+        bank_future = particle_bank(0)
     bank_precursor = precursor_bank(0)
 
     # iQMC bank adjustment
@@ -1388,6 +1494,7 @@ def make_type_global(input_deck):
         bank_source = particle_bank(N_work)
         if input_deck.setting["mode_eigenvalue"]:
             bank_census = particle_bank(0)
+            bank_future = particle_bank(0)
 
     # Source and IC files bank adjustments
     if not input_deck.setting["mode_eigenvalue"]:
@@ -1420,12 +1527,14 @@ def make_type_global(input_deck):
             ("mesh_tallies", mesh_tally, (N_mesh_tally,)),
             ("surface_tallies", surface_tally, (N_surface_tally,)),
             ("cell_tallies", cell_tally, (N_cell_tally,)),
+            ("cs_tallies", cs_tally, (N_cs_tally,)),
             ("setting", setting),
             ("technique", technique),
             ("domain_decomp", domain_decomp),
             ("bank_active", bank_active),
             ("bank_census", bank_census),
             ("bank_source", bank_source),
+            ("bank_future", bank_future),
             ("bank_precursor", bank_precursor),
             ("rng_seed_base", uint64),
             ("rng_seed", uint64),

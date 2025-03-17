@@ -8,7 +8,7 @@ jobs:
     strategy:
         fail-fast: false
         matrix:
-            os: ["ubuntu-latest"] #, "macos-latest"
+            os: ["ubuntu-22.04"] #, "macos-latest"
     steps:
     - uses: actions/checkout@v3
     - name: Set up python 3.11
@@ -24,9 +24,6 @@ jobs:
       run: |
         pip install -e .
         pip list 
-    - name: Patch Numba
-      run : |
-        bash .github/workflows/patch.sh
     - name: Regression Test - MPI
       run: |
         cd test/regression

@@ -18,7 +18,14 @@ sys.path.insert(0, os.path.abspath("../.."))
 # On Read the Docs, need to mock any python packages that would require c
 from unittest.mock import MagicMock
 
-MOCK_MODULES = ["mpi4py", "colorama", "mpi4py.util.dtlib", "sympy", "matplotlib.pyplot"]
+MOCK_MODULES = [
+    "mpi4py",
+    "colorama",
+    "cvxpy",
+    "mpi4py.util.dtlib",
+    "sympy",
+    "matplotlib.pyplot",
+]
 sys.modules.update((mod_name, MagicMock()) for mod_name in MOCK_MODULES)
 from mpi4py import MPI
 
@@ -27,7 +34,7 @@ MPI.COMM_WORLD.Get_size.return_value = 1
 # -- Project information -----------------------------------------------------
 
 project = "MC/DC"
-copyright = "2023, Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
+copyright = "2025, Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 author = "Center for Exascale Monte Carlo Neutron Transport (CEMeNT)"
 
 # The full version, including alpha/beta/rc tags

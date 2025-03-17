@@ -551,6 +551,17 @@ def add_census(particle, prog):
 
 
 @for_cpu()
+def add_future(particle, prog):
+    kernel.add_particle(particle, prog["bank_future"])
+
+
+@for_gpu()
+def add_future(particle, prog):
+    mcdc = mcdc_global(prog)
+    kernel.add_particle(particle, mcdc["bank_future"])
+
+
+@for_cpu()
 def add_IC(particle, prog):
     kernel.add_particle(particle, prog["technique"]["IC_bank_neutron_local"])
 

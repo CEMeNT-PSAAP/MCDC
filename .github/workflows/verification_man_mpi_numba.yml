@@ -8,7 +8,7 @@ jobs:
     strategy:
         fail-fast: false
         matrix:
-            os: ["ubuntu-latest"] #, "macos-latest"
+            os: ["ubuntu-22.04"] #, "macos-latest"
     steps:
     - uses: actions/checkout@v3
     - name: Set up python 3.11
@@ -26,9 +26,6 @@ jobs:
         #pip install numpy numba h5py matplotlib scipy pytest colorama mpi4py ngsolve distinctipy
         pip list 
         pip install -e .
-    - name: Patch Numba
-      run : |
-        bash .github/workflows/patch.sh
     - name: Verification Tests - Numba and MPI
       run: |
           cd test/verification/analytic

@@ -34,7 +34,7 @@ Building an Input Script
 
 Building an input deck can be a complicated and nuanced process. Depending on the type of simulation you need to build, you could end up touching most of the functions in MC/DC, or very few.
 Again, the best way to start building input decks is to look at what we have already done in the ``MCDC/examples`` or ``MCDC/testing`` directories.
-To see more on the available input functions, look through the :doc:`pythonapi/index` section.
+To see more on the available input functions, look through the :doc:`../pythonapi/index` section.
 
 As an example, we walk through building the input for the ``MCDC/examples/fixed_source/slab_absorbium`` problem, which simulates a three-region, purely absorbing, mono-energetic transient slab wall.
 
@@ -242,7 +242,7 @@ and ``f['tally'].keys()`` will return
 
     <KeysViewHDF5 ['current', 'flux', 'grid']>
 
-If needed, you can look around a ``.h5`` file using something like `h5Viewer <https://www.hdfgroup.org/downloads/>`_ (which on linux can be installed with ``sudo apt-get install hdfview``).
+If needed, you can look around a ``.h5`` file using something like `h5Viewer <https://www.hdfgroup.org/download-hdfview/>`_ (which on linux can be installed with ``sudo apt-get install hdfview``).
 Otherwise these arrays can then be manipulated and modified like any other.
 Results are stored as NumPy arrays, so any tool that works with NumPy arrays (*e.g.*, SciPy and Pandas)
 can be used to analyze the data from your simulations.
@@ -337,13 +337,13 @@ Remember that when reporting results from a Monte Carlo solver, you should **alw
 While this script does look rather long, most of these commands are controlling things like axis labels and whatnot.
 But at the end we have something like this.
 
-.. image:: images/user/sf_slab_1.png
+.. image:: ../images/user/sf_slab_1.png
    :width: 266
    :alt: Reference v computed scalar flux, 1e3 particles
-.. image:: images/user/j_slab_1.png
+.. image:: ../images/user/j_slab_1.png
    :width: 266
    :alt: Reference v computed current, 1e3 particles
-.. image:: images/user/af_slab_1.png
+.. image:: ../images/user/af_slab_1.png
    :width: 266
    :alt: Reference v computed angular flux, 1e3 particles
 
@@ -351,13 +351,13 @@ Notice how noisy these solutions are? We only ran 1e3 particles.
 We need more particles to get a less statistically noisy, more converged solution.
 Here's results from the same simulation run with 1e6 particles:
 
-.. image:: images/user/sf_slab_2.png
+.. image:: ../images/user/sf_slab_2.png
    :width: 266
    :alt: Reference v computed scalar flux, 1e6 particles
-.. image:: images/user/j_slab_2.png
+.. image:: ../images/user/j_slab_2.png
    :width: 266
    :alt: Reference v computed current, 1e6 particles
-.. image:: images/user/af_slab_2.png
+.. image:: ../images/user/af_slab_2.png
    :width: 266
    :alt: Reference v computed angular flux, 1e6 particles
 
