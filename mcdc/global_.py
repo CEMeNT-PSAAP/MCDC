@@ -36,6 +36,7 @@ class InputDeck:
         self.mesh_tallies = []
         self.surface_tallies = []
         self.cell_tallies = []
+        self.cs_tallies = []
 
         self.setting = {
             "tag": "Setting",
@@ -58,6 +59,8 @@ class InputDeck:
             "gyration_radius_type": GYRATION_RADIUS_ALL,
             "N_census": 1,
             "census_time": np.array([INF]),
+            "census_based_tally": False,
+            "census_tally_frequency": 0,
             "source_file": False,
             "source_file_name": "",
             "IC_file": False,
@@ -66,6 +69,8 @@ class InputDeck:
             # Below are parameters not copied to mcdc.setting
             "bank_active_buff": 100,
             "bank_census_buff": 1.0,
+            "bank_source_buff": 1.0,
+            "bank_future_buff": 0.5,
             # Portability
             "target": "cpu",
         }
@@ -78,9 +83,15 @@ class InputDeck:
             "pct": "none",
             "pc_factor": 1.0,
             "weight_window": False,
-            "ww": np.ones([1, 1, 1, 1]),
-            "ww_width": 2.5,
-            "ww_mesh": make_card_mesh(),
+            "ww": {
+                "center": np.ones([1, 1, 1, 1]),
+                "width": 2.5,
+                "mesh": make_card_mesh(),
+                "auto": 0,
+                "epsilon": np.zeros(3),
+                "save": False,
+                "tally_idx": 0,
+            },
             "domain_decomposition": False,
             "dd_idx": 0,
             "dd_local_rank": 0,

@@ -30,6 +30,7 @@ from mcdc.main import (
     prepare,
     run,
     visualize,
+    recombine_tallies,
 )
 
 # Temporarily commenting out so docs will build

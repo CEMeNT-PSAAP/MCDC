@@ -1,4 +1,4 @@
-import math, numba
+import h5py, math, numba
 
 from mpi4py import MPI
 from numba import (
@@ -1037,14 +1037,48 @@ def get_particle(P_arr, bank, mcdc):
 
 
 @njit
+def check_future_bank(mcdc):
+    # Get the data needed
+    bank_future = mcdc["bank_future"]
+    bank_census = mcdc["bank_census"]
+    next_census_time = mcdc["setting"]["census_time"][mcdc["idx_census"] + 1]
+
+    # Particle container
+    P_arr = adapt.local_array(1, type_.particle_record)
+    P = P_arr[0]
+
+    # Loop over all particles in future bank
+    N = get_bank_size(bank_future)
+    for i in range(N):
+        # Get the next future particle index
+        idx = i - get_bank_size(bank_census)
+        copy_recordlike(P_arr, bank_future["particles"][idx : idx + 1])
+
+        # Promote the future particle to census bank
+        if P["t"] < next_census_time:
+            adapt.add_census(P_arr, mcdc)
+            add_bank_size(bank_future, -1)
+
+            # Consolidate the emptied space in the future bank
+            j = get_bank_size(bank_future)
+            copy_recordlike(
+                bank_future["particles"][idx : idx + 1],
+                bank_future["particles"][j : j + 1],
+            )
+
+
+@njit
 def manage_particle_banks(seed, mcdc):
     # Record time
     if mcdc["mpi_master"]:
         with objmode(time_start="float64"):
             time_start = MPI.Wtime()
 
+    # Reset source bank
+    set_bank_size(mcdc["bank_source"], 0)
+
+    # Normalize weight
     if mcdc["setting"]["mode_eigenvalue"]:
-        # Normalize weight
         normalize_weight(mcdc["bank_census"], mcdc["setting"]["N_particle"])
 
     # Population control
@@ -1057,6 +1091,7 @@ def manage_particle_banks(seed, mcdc):
         mcdc["bank_source"]["particles"][:size] = mcdc["bank_census"]["particles"][
             :size
         ]
+    # TODO: Population control future bank?
 
     # MPI rebalance
     if not mcdc["technique"]["domain_decomposition"]:
@@ -1242,6 +1277,10 @@ def bank_rebalance(mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(mcdc["bank_source"], mcdc)
     idx_end = idx_start + N_local
+
+    # Abort if source bank is empty
+    if N == 0:
+        return
 
     distribute_work(N, mcdc)
 
@@ -1513,6 +1552,10 @@ def pct_combing(seed, mcdc):
     idx_start, N_local, N = bank_scanning(bank_census, mcdc)
     idx_end = idx_start + N_local
 
+    # Abort if census bank is empty
+    if N == 0:
+        return
+
     # Teeth distance
     td = N / M
 
@@ -1551,6 +1594,10 @@ def pct_combing_weight(seed, mcdc):
     # Scan the bank based on weight
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
+
+    # Abort if census bank is empty
+    if W == 0.0:
+        return
 
     # Teeth distance
     td = W / M
@@ -1592,6 +1639,10 @@ def pct_splitting_roulette(seed, mcdc):
     # Scan the bank
     idx_start, N_local, N = bank_scanning(bank_census, mcdc)
     idx_end = idx_start + N_local
+
+    # Abort if census bank is empty
+    if N == 0:
+        return
 
     # Weight scaling
     ws = float(N) / float(M)
@@ -1638,6 +1689,10 @@ def pct_splitting_roulette_weight(seed, mcdc):
     N_local = get_bank_size(bank_census)
     w_start, w_cdf, W = bank_scanning_weight(bank_census, mcdc)
     w_end = w_cdf[-1]
+
+    # Abort if census bank is empty
+    if W == 0.0:
+        return
 
     # Weight of the surviving particles
     w_survive = W / M
@@ -1890,6 +1945,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
 
         # Score
         flux = distance_scored * P["w"]
+        mu = P["ux"]
         for i in range(tally["N_score"]):
             score_type = tally["scores"][i]
             score = 0
@@ -1903,6 +1959,22 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
+            if score_type == SCORE_NET_CURRENT:
+                score = flux * mu
+            if score_type == SCORE_MU_SQ:
+                score = flux * mu * mu
+            elif score_type == SCORE_TIME_MOMENT_FLUX:
+                score = flux * (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
+            elif score_type == SCORE_SPACE_MOMENT_FLUX:
+                score = flux * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
+            elif score_type == SCORE_TIME_MOMENT_CURRENT:
+                score = flux * mu * (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
+            elif score_type == SCORE_SPACE_MOMENT_CURRENT:
+                score = flux * mu * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
+            elif score_type == SCORE_TIME_MOMENT_MU_SQ:
+                score = flux * mu * mu * (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
+            elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
+                score = flux * mu * mu * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
             adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
@@ -1986,24 +2058,226 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
     P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
+    mesh = tally["filter"]
     stride = tally["stride"]
-    cell_idx = stride["tally"]
-    score = 0
 
-    # Score
-    flux = distance * P["w"]
-    for i in range(tally["N_score"]):
-        score_type = tally["scores"][i]
-        if score_type == SCORE_FLUX:
-            score = flux
-        elif score_type == SCORE_TOTAL:
-            SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
-            score = flux * SigmaT
-        elif score_type == SCORE_FISSION:
-            SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
-            score = flux * SigmaF
+    # Particle/track properties
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
+    t = P["t"]
+    t_final = t + ut * distance
+    Nt = mesh["Nt"]
 
-        tally_bin[TALLY_SCORE, cell_idx] += score
+    # Get starting indices
+    g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
+
+    # Outside grid?
+    if (
+        t < mesh["t"][0] - COINCIDENCE_TOLERANCE_TIME
+        or t > mesh["t"][Nt] + COINCIDENCE_TOLERANCE_TIME
+        or (abs(t - mesh["t"][Nt]) < COINCIDENCE_TOLERANCE_TIME)
+        or outside_energy
+    ):
+        return
+
+    it = mesh_.structured._grid_index(
+        t, 1.0, mesh["t"], Nt + 1, COINCIDENCE_TOLERANCE_TIME
+    )
+
+    # Tally index
+    idx = stride["tally"] + g * stride["g"] + it * stride["t"]
+
+    # Sweep through the distance
+    distance_swept = 0.0
+    while distance_swept < distance - COINCIDENCE_TOLERANCE:
+
+        # Find distance to mesh grids
+        dt = (min(mesh["t"][it + 1], t_final) - t) / ut
+
+        # Get the grid crossed
+        distance_scored = INF
+        mesh_crossed = MESH_NONE
+        if dt <= distance_scored:
+            mesh_crossed = MESH_T
+            distance_scored = dt
+
+        # Score
+        flux = distance_scored * P["w"]
+        for i in range(tally["N_score"]):
+            score_type = tally["scores"][i]
+            score = 0
+            if score_type == SCORE_FLUX:
+                score = flux
+            elif score_type == SCORE_TOTAL:
+                SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+                score = flux * SigmaT
+            elif score_type == SCORE_FISSION:
+                SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+                score = flux * SigmaF
+            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+
+        # Accumulate distance swept
+        distance_swept += distance_scored
+
+        # Move the 4D (just t for this tally) position
+        t += distance_scored * ut
+
+        # Increment index and check if out of bounds
+        if mesh_crossed == MESH_T:
+            it += 1
+            if it == Nt:
+                break
+            idx += stride["t"]
+
+
+@njit
+def score_cs_tally(P_arr, distance, tally, data, mcdc):
+    # Each time that this function is called, EVERY cs bin needs to be checked to see if the particle is in it.
+    # The particle needs to score into all the bins that it is within
+    P = P_arr[0]
+    tally_bin = data[TALLY]
+    material = mcdc["materials"][P["material_ID"]]
+    N_cs_bins = tally["filter"]["N_cs_bins"]
+
+    cs_bin_size = tally["filter"]["cs_bin_size"]
+    cs_centers = tally["filter"]["cs_centers"]
+
+    stride = tally["stride"]
+    bin_idx = stride["tally"]
+
+    # Particle 4D direction
+    ux = P["ux"]
+    uy = P["uy"]
+    uz = P["uz"]
+    ut = 1.0 / physics.get_speed(P_arr, mcdc)
+
+    # Particle initial and final coordinate
+    x = P["x"]
+    y = P["y"]
+    z = P["z"]
+    t = P["t"]
+    x_final = x + ux * distance
+    y_final = y + uy * distance
+    z_final = z + uz * distance
+    t_final = t + ut * distance
+
+    # Check each coarse bin
+    for j in range(N_cs_bins):
+        center = adapt.local_array(2, type_.float64)
+        start = adapt.local_array(2, type_.float64)
+        end = adapt.local_array(2, type_.float64)
+        #
+        center[0] = cs_centers[0][j]
+        center[1] = cs_centers[1][j]
+        start[0] = x
+        start[1] = y
+        end[0] = x_final
+        end[1] = y_final
+
+        distance_inside = calculate_distance_in_coarse_bin(
+            start, end, distance, center, cs_bin_size
+        )
+
+        # Last bin covers the whole problem
+        if j == N_cs_bins - 1:
+            cs_bin_size_full_problem = adapt.local_array(2, type_.float64)
+            cs_bin_size_full_problem[0] = INF
+            cs_bin_size_full_problem[1] = INF
+            distance_inside = calculate_distance_in_coarse_bin(
+                start, end, distance, center, cs_bin_size_full_problem
+            )
+
+        if distance < distance_inside:
+            distance_in_bin = distance
+        else:
+            distance_in_bin = distance_inside
+
+        # Calculate flux and other scores
+        flux = distance_in_bin * P["w"]
+        for i in range(tally["N_score"]):
+            score_type = tally["scores"][i]
+            if score_type == SCORE_FLUX:
+                score = flux
+            elif score_type == SCORE_DENSITY:
+                score = flux / physics.get_speed(P_arr, mcdc)
+            elif score_type == SCORE_TOTAL:
+                SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+                score = flux * SigmaT
+            elif score_type == SCORE_FISSION:
+                SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
+                score = flux * SigmaF
+
+            adapt.global_add(
+                tally_bin,
+                (TALLY_SCORE, bin_idx + j * tally["N_score"] + i),
+                round(score),
+            )
+
+
+@njit
+def cs_clip(p, q, t0, t1):
+    if p < 0:
+        t = q / p
+        if t > t1:
+            return False, t0, t1
+        if t > t0:
+            t0 = t
+    elif p > 0:
+        t = q / p
+        if t < t0:
+            return False, t0, t1
+        if t < t1:
+            t1 = t
+    elif q < 0:
+        return False, t0, t1
+    return True, t0, t1
+
+
+@njit
+def cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max):
+    # Uses Liang-Barsky algorithm for finding tracklength in box
+    t0, t1 = 0.0, 1.0
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+
+    # Perform clipping for each boundary
+    result, t0, t1 = cs_clip(-dx, start[0] - x_min, t0, t1)
+    if not result:
+        return 0.0
+    result, t0, t1 = cs_clip(dx, x_max - start[0], t0, t1)
+    if not result:
+        return 0.0
+    result, t0, t1 = cs_clip(-dy, start[1] - y_min, t0, t1)
+    if not result:
+        return 0.0
+    result, t0, t1 = cs_clip(dy, y_max - start[1], t0, t1)
+    if not result:
+        return 0.0
+
+    # Update start and end points based on clipping results
+    if t1 < 1:
+        end[0] = start[0] + t1 * dx
+        end[1] = start[1] + t1 * dy
+    if t0 > 0:
+        start[0] = start[0] + t0 * dx
+        start[1] = start[1] + t0 * dx
+
+    # Return the norm
+    X = end[0] - start[0]
+    Y = end[1] - start[1]
+    return math.sqrt(X**2 + Y**2)
+
+
+@njit
+def calculate_distance_in_coarse_bin(start, end, distance, center, cs_bin_size):
+    # Edges of the coarse bin
+    x_min = center[0] - cs_bin_size[0] / 2
+    x_max = center[0] + cs_bin_size[0] / 2
+    y_min = center[1] - cs_bin_size[1] / 2
+    y_max = center[1] + cs_bin_size[1] / 2
+
+    distance_inside = cs_tracklength_in_box(start, end, x_min, x_max, y_min, y_max)
+
+    return distance_inside
 
 
 @njit
@@ -2068,25 +2342,119 @@ def tally_reduce(data, mcdc):
 
 @njit
 def tally_accumulate(data, mcdc):
-
-    # print(f'fixed_source_data = {data[TALLY][TALLY_SCORE][-1]}')
-
     tally_bin = data[TALLY]
-    # print(data[0][0, 30000], data[0][0, 30001])
     N_bin = tally_bin.shape[1]
-
-    # print(f'N_bin = {N_bin}')
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq
         score = tally_bin[TALLY_SCORE, i]
-        # if (score != 0 and i > 29999):
-        #     print(f'score = {score}, i = {i}')
         tally_bin[TALLY_SUM, i] += score
         tally_bin[TALLY_SUM_SQ, i] += score * score
 
         # Reset score bin
         tally_bin[TALLY_SCORE, i] = 0.0
+
+
+@njit
+def census_based_tally_output(data, mcdc):
+    idx_batch = mcdc["idx_batch"]
+    idx_census = mcdc["idx_census"]
+    tally_bin = data[TALLY]
+    N_bin = tally_bin.shape[1]
+
+    for i in range(N_bin):
+        # Store score and square of score
+        score = tally_bin[TALLY_SCORE, i]
+        tally_bin[TALLY_SUM, i] = score
+        tally_bin[TALLY_SUM_SQ, i] = score * score
+
+        # Reset score bin
+        tally_bin[TALLY_SCORE, i] = 0.0
+
+    for ID, tally in enumerate(mcdc["mesh_tallies"]):
+        mesh = tally["filter"]
+
+        # Get grid
+        Nx = mesh["Nx"]
+        Ny = mesh["Ny"]
+        Nz = mesh["Nz"]
+        Nt = mesh["Nt"]
+        Nmu = mesh["Nmu"]
+        N_azi = mesh["N_azi"]
+        Ng = mesh["Ng"]
+        #
+        grid_x = mesh["x"][: Nx + 1]
+        grid_y = mesh["y"][: Ny + 1]
+        grid_z = mesh["z"][: Nz + 1]
+        grid_t = mesh["t"][: Nt + 1]
+        grid_mu = mesh["mu"][: Nmu + 1]
+        grid_azi = mesh["azi"][: N_azi + 1]
+        grid_g = mesh["g"][: Ng + 1]
+        #'''
+        with objmode():
+            if ID == 0:
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "w",
+                )
+            else:
+                f = h5py.File(
+                    mcdc["setting"]["output_name"]
+                    + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+                    "a",
+                )
+            # Save to dataset
+            f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
+            f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
+            f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=grid_z)
+            f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=grid_t)
+            f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=grid_mu)
+            f.create_dataset("tallies/mesh_tally_%i/grid/azi" % ID, data=grid_azi)
+            f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=grid_g)
+
+            # Set tally shape
+            N_score = tally["N_score"]
+            if not mcdc["technique"]["uq"]:
+                shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+            else:
+                shape = (5, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
+
+            # Reshape tally
+            N_bin = tally["N_bin"]
+            start = tally["stride"]["tally"]
+            tally_bin = data[TALLY][:, start : start + N_bin]
+            tally_bin = tally_bin.reshape(shape)
+
+            # Roll tally so that score is in the front
+            tally_bin = np.rollaxis(tally_bin, 8, 0)
+
+            # Iterate over scores
+            for i in range(N_score):
+                score_type = tally["scores"][i]
+                score_tally_bin = np.squeeze(tally_bin[i])
+                score_name = ""
+                if score_type == SCORE_FLUX:
+                    score_name = "flux"
+                elif score_type == SCORE_DENSITY:
+                    score_name = "density"
+                elif score_type == SCORE_TOTAL:
+                    score_name = "total"
+                elif score_type == SCORE_FISSION:
+                    score_name = "fission"
+                group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
+
+                tally_sum = score_tally_bin[TALLY_SUM]
+                tally_sum_sq = score_tally_bin[TALLY_SUM_SQ]
+
+                f.create_dataset(group_name + "score", data=tally_sum)
+                f.create_dataset(group_name + "score_sq", data=tally_sum_sq)
+                if mcdc["technique"]["uq"]:
+                    mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                    tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                    uq_var = tot_var - mc_var
+                    f.create_dataset(group_name + "uq_var", data=uq_var)
+            f.close()
 
 
 @njit
@@ -2464,14 +2832,6 @@ def move_to_event(P_arr, data, mcdc):
     elif geometry.check_coincidence(d_collision, distance):
         P["event"] += EVENT_COLLISION
 
-    # Check distance to time boundary
-    if d_time_boundary < distance - COINCIDENCE_TOLERANCE:
-        distance = d_time_boundary
-        P["event"] = EVENT_TIME_BOUNDARY
-        P["surface_ID"] = -1
-    elif geometry.check_coincidence(d_time_boundary, distance):
-        P["event"] += EVENT_TIME_BOUNDARY
-
     # Check distance to time census
     if d_time_census < distance - COINCIDENCE_TOLERANCE:
         distance = d_time_census
@@ -2479,6 +2839,12 @@ def move_to_event(P_arr, data, mcdc):
         P["surface_ID"] = -1
     elif geometry.check_coincidence(d_time_census, distance):
         P["event"] += EVENT_TIME_CENSUS
+
+    # Check distance to time boundary (exclusive event)
+    if d_time_boundary < distance + COINCIDENCE_TOLERANCE:
+        distance = d_time_boundary
+        P["event"] = EVENT_TIME_BOUNDARY
+        P["surface_ID"] = -1
 
     # =========================================================================
     # Move particle
@@ -2496,6 +2862,11 @@ def move_to_event(P_arr, data, mcdc):
             ID = cell["tally_IDs"][i]
             tally = mcdc["cell_tallies"][ID]
             score_cell_tally(P_arr, distance, tally, data, mcdc)
+
+        # CS tallies
+        for tally in mcdc["cs_tallies"]:
+            score_cs_tally(P_arr, distance, tally, data, mcdc)
+
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
 
@@ -2547,6 +2918,7 @@ def surface_crossing(P_arr, data, prog):
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
         P["cell_ID"] = -1
+        P["material_ID"] = -1
 
 
 # =============================================================================
@@ -2907,17 +3279,28 @@ def fission(P_arr, prog):
         else:
             sample_phasespace_fission_nuclide(P_arr, nuclide, P_new_arr, mcdc)
 
+        # Eigenvalue mode: bank right away
+        if mcdc["setting"]["mode_eigenvalue"]:
+            adapt.add_census(P_new_arr, prog)
+            continue
+        # Below is only relevant for fixed-source problem
+
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
             continue
 
-        # Bank
+        # Check if it is beyond current or next census times
+        hit_census = False
+        hit_next_census = False
         idx_census = mcdc["idx_census"]
-        if P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
-            adapt.add_census(P_new_arr, prog)
-        elif mcdc["setting"]["mode_eigenvalue"]:
-            adapt.add_census(P_new_arr, prog)
-        else:
+        if idx_census < mcdc["setting"]["N_census"] - 1:
+            if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
+                hit_census = True
+                hit_next_census = True
+            elif P_new["t"] > mcdc["setting"]["census_time"][idx_census]:
+                hit_census = True
+
+        if not hit_census:
             # Keep it if it is the last particle
             if n == N - 1:
                 P["alive"] = True
@@ -2930,6 +3313,12 @@ def fission(P_arr, prog):
                 P["w"] = P_new["w"]
             else:
                 adapt.add_active(P_new_arr, prog)
+        elif not hit_next_census:
+            # Particle will participate after the current census
+            adapt.add_census(P_new_arr, prog)
+        else:
+            # Particle will participate in the future
+            adapt.add_future(P_new_arr, prog)
 
 
 @njit
@@ -3195,7 +3584,7 @@ def branchless_collision(P_arr, prog):
 
 
 # =============================================================================
-# Weight widow
+# Weight window
 # =============================================================================
 
 
@@ -3206,11 +3595,11 @@ def weight_window(P_arr, prog):
 
     # Get indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(
-        P_arr, mcdc["technique"]["ww_mesh"]
+        P_arr, mcdc["technique"]["ww"]["mesh"]
     )
 
     # Target weight
-    w_target = mcdc["technique"]["ww"][it, ix, iy, iz]
+    w_target = mcdc["technique"]["ww"]["center"][it, ix, iy, iz]
 
     # Population control factor
     w_target *= mcdc["technique"]["pc_factor"]
@@ -3219,7 +3608,7 @@ def weight_window(P_arr, prog):
     p = P["w"] / w_target
 
     # Window width
-    width = mcdc["technique"]["ww_width"]
+    width = mcdc["technique"]["ww"]["width"]
 
     P_new_arr = adapt.local_array(1, type_.particle_record)
 
@@ -3249,6 +3638,53 @@ def weight_window(P_arr, prog):
             P["alive"] = False
         else:
             P["w"] = w_target
+
+
+@njit
+def update_weight_windows(data, mcdc):
+    idx_batch = mcdc["idx_batch"]
+    idx_census = mcdc["idx_census"]
+    epsilon = mcdc["technique"]["ww"]["epsilon"]
+    # accessing most recent tally dump
+    with objmode():
+        f = h5py.File(
+            mcdc["setting"]["output_name"]
+            + "-batch_%i-census_%i.h5" % (idx_batch, idx_census),
+            "r",
+        )
+        tallies = f["tallies/mesh_tally_" + str(mcdc["technique"]["ww"]["tally_idx"])]
+        if mcdc["setting"]["census_tally_frequency"] > 1:
+            old_flux = tallies["flux"]["score"][-1]
+        else:
+            old_flux = tallies["flux"]["score"]
+        Nx = mcdc["technique"]["ww"]["mesh"]["Nx"]
+        Ny = mcdc["technique"]["ww"]["mesh"]["Ny"]
+        Nz = mcdc["technique"]["ww"]["mesh"]["Nz"]
+        Nt = mcdc["technique"]["ww"]["mesh"]["Nt"]
+
+        ax_expand = []
+        if Nx == 1:
+            ax_expand.append(0)
+        if Ny == 1:
+            ax_expand.append(1)
+        if Nz == 1:
+            ax_expand.append(2)
+        for ax in ax_expand:
+            old_flux = np.expand_dims(old_flux, axis=ax)
+        center = old_flux
+
+        if epsilon[WW_WOLLABER] > 0:
+            w_min = epsilon[WW_WOLLABER + 1]
+            center = (center) * (
+                1
+                + (1 / epsilon[WW_WOLLABER] - 1)
+                * np.exp(-(center - w_min) / epsilon[WW_WOLLABER])
+            )
+        if epsilon[WW_MIN] > 0:
+            center = center * (1 - epsilon[WW_MIN]) + epsilon[WW_MIN]
+            center[center <= 0] = epsilon[WW_MIN]
+        center /= np.max(center)
+        mcdc["technique"]["ww"]["center"][idx_census + 1] = center
 
 
 # =============================================================================

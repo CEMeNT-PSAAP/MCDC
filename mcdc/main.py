@@ -1,12 +1,12 @@
 import argparse, os, sys
 import importlib.metadata
 import mcdc.config as config
-
 import matplotlib.pyplot as plt
-from matplotlib import colors as mpl_colors
-
 import numba as nb
-
+from matplotlib import colors as mpl_colors
+import scipy.fft as spfft
+from scipy.stats.qmc import Halton
+import cvxpy as cp
 
 from mcdc.card import UniverseCard
 from mcdc.print_ import (
@@ -86,6 +86,11 @@ def run():
         loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
+    # Compressed sensing reconstruction
+    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
+    if N_cs_bins != 0:
+        cs_reconstruct(data, mcdc)
+
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
     generate_hdf5(data, mcdc)
@@ -97,6 +102,122 @@ def run():
 
     # Closout
     closeout(mcdc)
+
+
+def calculate_cs_A(data, mcdc):
+    x_grid = mcdc["mesh_tallies"]["filter"]["x"][0]
+    y_grid = mcdc["mesh_tallies"]["filter"]["y"][0]
+    Nx = len(x_grid) - 1
+    Ny = len(y_grid) - 1
+
+    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
+    cs_bin_size = mcdc["cs_tallies"]["filter"]["cs_bin_size"][0]
+
+    S = [[] for _ in range(N_cs_bins)]
+
+    [x_centers, y_centers] = mcdc["cs_tallies"]["filter"]["cs_centers"][0]
+    x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
+    y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
+
+    # Calculate the overlap grid for each bin, and flatten into a row of S
+    for ibin in range(N_cs_bins):
+        if ibin == N_cs_bins - 1:
+            # could just change to -INF, INF
+            cs_bin_size = np.array([x_grid[-1] + x_grid[0], y_grid[-1] + y_grid[0]])
+
+        bin_x_min = x_centers[ibin] - cs_bin_size[0] / 2
+        bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
+        bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
+        bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
+
+        overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
+
+        for i in range(len(y_grid) - 1):
+            for j in range(len(x_grid) - 1):
+                cell_x_min = x_grid[j]
+                cell_x_max = x_grid[j + 1]
+                cell_y_min = y_grid[i]
+                cell_y_max = y_grid[i + 1]
+
+                # Calculate overlap in x and y directions
+                overlap_x = np.maximum(
+                    0,
+                    np.minimum(bin_x_max, cell_x_max)
+                    - np.maximum(bin_x_min, cell_x_min),
+                )
+                overlap_y = np.maximum(
+                    0,
+                    np.minimum(bin_y_max, cell_y_max)
+                    - np.maximum(bin_y_min, cell_y_min),
+                )
+
+                # Calculate fractional overlap
+                cell_area = (cell_x_max - cell_x_min) * (cell_y_max - cell_y_min)
+                overlap[i, j] = (overlap_x * overlap_y) / cell_area
+
+        S[ibin] = overlap.flatten()
+    S = np.array(S)
+    mcdc["cs_tallies"]["filter"]["cs_S"] = S
+
+    assert np.allclose(S[-1], np.ones(Nx * Ny)), "Last row of S must be all ones"
+    assert S.shape[1] == Nx * Ny, "Size of S must match Nx * Ny."
+    assert (
+        S.shape[1] == mcdc["cs_tallies"]["N_bin"][0]
+    ), "Size of S must match number of cells in desired mesh tally"
+
+    # TODO: can this be done in a different way? idk
+    # Construct the DCT matrix T
+    idct_basis_x = spfft.idct(np.identity(Nx), axis=0)
+    idct_basis_y = spfft.idct(np.identity(Ny), axis=0)
+
+    T_inv = np.kron(idct_basis_y, idct_basis_x)
+    A = S @ T_inv
+    return A, T_inv
+
+
+def calculate_cs_sparse_solution(data, mcdc, A, b):
+    N_fine_cells = mcdc["cs_tallies"]["N_bin"][0]
+
+    # setting up the problem with CVXPY
+    vx = cp.Variable(N_fine_cells)
+
+    # Basis pursuit denoising
+    l = 0.5
+    objective = cp.Minimize(0.5 * cp.norm(A @ vx - b, 2) + l * cp.norm(vx, 1))
+    prob = cp.Problem(objective)
+    result = prob.solve(verbose=False)
+
+    # # Basis pursuit
+    # objective = cp.Minimize(cp.norm(vx, 1))
+    # constraints = [A @ vx == b]
+    # prob = cp.Problem(objective, constraints)
+    # result = prob.solve(verbose=True)
+    # print(f'vx.value = {vx.value}')
+
+    # formatting the sparse solution
+    sparse_solution = np.array(vx.value).squeeze()
+
+    return sparse_solution
+
+
+def cs_reconstruct(data, mcdc):
+    tally_bin = data[TALLY]
+    tally = mcdc["cs_tallies"][0]
+    stride = tally["stride"]
+    bin_idx = stride["tally"]
+    N_cs_bins = tally["filter"]["N_cs_bins"]
+    Nx = len(mcdc["mesh_tallies"]["filter"]["x"][0]) - 1
+    Ny = len(mcdc["mesh_tallies"]["filter"]["y"][0]) - 1
+
+    b = tally_bin[TALLY_SUM, bin_idx : bin_idx + N_cs_bins]
+
+    A, T_inv = calculate_cs_A(data, mcdc)
+    x = calculate_cs_sparse_solution(data, mcdc, A, b)
+
+    recon = T_inv @ x
+    recon_reshaped = recon.reshape(Ny, Nx)
+
+    tally["filter"]["cs_reconstruction"] = recon_reshaped
 
 
 # =============================================================================
@@ -305,6 +426,28 @@ def dd_mesh_bounds(idx):
     return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
 
 
+def generate_cs_centers(mcdc, N_dim=3, seed=123456789):
+    N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
+    x_lims = (
+        mcdc["cs_tallies"]["filter"]["x"][0][-1],
+        mcdc["cs_tallies"]["filter"]["x"][0][0],
+    )
+    y_lims = (
+        mcdc["cs_tallies"]["filter"]["y"][0][-1],
+        mcdc["cs_tallies"]["filter"]["y"][0][0],
+    )
+
+    # Generate Halton sequence according to the seed
+    halton_seq = Halton(d=N_dim, seed=seed)
+    points = halton_seq.random(n=N_cs_bins)
+
+    # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
+    x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
+    y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
+
+    return (x_coords, y_coords)
+
+
 def prepare():
     """
     Preparing the MC transport simulation:
@@ -347,6 +490,17 @@ def prepare():
             i += 1
 
     # =========================================================================
+    # Time census-based tally
+    # =========================================================================
+    # Reset time grid size of all tallies if census-based tally is desired
+
+    if input_deck.setting["census_based_tally"]:
+        N_bin = input_deck.setting["census_tally_frequency"]
+        for tally in input_deck.mesh_tallies:
+            tally.N_bin *= N_bin / (len(tally.t) - 1)
+            tally.t = np.zeros(N_bin + 1)
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -367,6 +521,7 @@ def prepare():
     type_.make_type_mesh_tally(input_deck)
     type_.make_type_surface_tally(input_deck)
     type_.make_type_cell_tally(input_deck)
+    type_.make_type_cs_tally(input_deck)
     type_.make_type_setting(input_deck)
     type_.make_type_uq(input_deck)
     type_.make_type_domain_decomp(input_deck)
@@ -689,6 +844,7 @@ def prepare():
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
     N_cell_tally = len(input_deck.cell_tallies)
+    N_cs_tally = len(input_deck.cs_tallies)
     tally_size = 0
 
     # Mesh tallies
@@ -746,6 +902,20 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
+            elif score_name == "mu-sq":
+                score_type = SCORE_MU_SQ
+            elif score_name == "time-moment-flux":
+                score_type = SCORE_TIME_MOMENT_FLUX
+            elif score_name == "space-moment-flux":
+                score_type = SCORE_SPACE_MOMENT_FLUX
+            elif score_name == "time-moment-current":
+                score_type = SCORE_TIME_MOMENT_CURRENT
+            elif score_name == "space-moment-current":
+                score_type = SCORE_SPACE_MOMENT_CURRENT
+            elif score_name == "time-moment-mu-sq":
+                score_type = SCORE_TIME_MOMENT_MU_SQ
+            elif score_name == "space-moment-mu-sq":
+                score_type = SCORE_SPACE_MOMENT_MU_SQ
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
@@ -891,6 +1061,8 @@ def prepare():
         N_azi = len(input_deck.cell_tallies[i].azi) - 1
         Ng = len(input_deck.cell_tallies[i].g) - 1
         Nt = len(input_deck.cell_tallies[i].t) - 1
+        mcdc["cell_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["cell_tallies"][i]["filter"]["Nt"] = Nt
 
         # Update N_bin
         mcdc["cell_tallies"][i]["N_bin"] *= N_score
@@ -898,21 +1070,68 @@ def prepare():
         # Filter strides
         stride = N_score
         if Nt > 1:
-            mcdc["mesh_tallies"][i]["stride"]["t"] = stride
+            mcdc["cell_tallies"][i]["stride"]["t"] = stride
             stride *= Nt
         if Ng > 1:
-            mcdc["mesh_tallies"][i]["stride"]["g"] = stride
+            mcdc["cell_tallies"][i]["stride"]["g"] = stride
             stride *= Ng
         if N_azi > 1:
-            mcdc["mesh_tallies"][i]["stride"]["azi"] = stride
+            mcdc["cell_tallies"][i]["stride"]["azi"] = stride
             stride *= N_azi
         if Nmu > 1:
-            mcdc["mesh_tallies"][i]["stride"]["mu"] = stride
+            mcdc["cell_tallies"][i]["stride"]["mu"] = stride
             stride *= Nmu
 
         # Set tally stride and accumulate total tally size
         mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["cell_tallies"][i]["N_bin"]
+
+    # CS tallies
+    for i in range(N_cs_tally):
+        # Direct assignment
+        copy_field(mcdc["cs_tallies"][i], input_deck.cs_tallies[i], "N_bin")
+
+        mcdc["cs_tallies"][i]["filter"]["N_cs_bins"] = input_deck.cs_tallies[
+            i
+        ].N_cs_bins[0]
+        mcdc["cs_tallies"][i]["filter"]["cs_bin_size"] = input_deck.cs_tallies[
+            i
+        ].cs_bin_size[0]
+
+        # Filters (variables with possible different sizes)
+        if not input_deck.technique["domain_decomposition"]:
+            for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.cs_tallies[i], name))
+                mcdc["cs_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.cs_tallies[i], name
+                )
+
+        mcdc["cs_tallies"][i]["filter"]["cs_centers"] = generate_cs_centers(mcdc)
+
+        # Set tally scores
+        N_score = len(input_deck.cs_tallies[i].scores)
+        mcdc["cs_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.cs_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "density":
+                score_type = SCORE_DENSITY
+            elif score_name == "total":
+                score_type = SCORE_TOTAL
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["cs_tallies"][i]["scores"][j] = score_type
+
+        # Update N_bin
+        mcdc["cs_tallies"][i]["N_bin"] *= N_score
+
+        # Set tally stride and accumulate total tally size
+        mcdc["cs_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["cs_tallies"][i]["filter"]["N_cs_bins"]
 
     # Set tally data
     if not input_deck.technique["uq"]:
@@ -974,7 +1193,11 @@ def prepare():
     ):
         t_limit = INF
 
-    # Check if time boundary is above the final tally mesh time grid
+    # Replace the time limit if time census-based tally is used
+    if mcdc["setting"]["census_based_tally"]:
+        t_limit = mcdc["setting"]["census_time"][-2]
+
+    # Set appropriate time boundary
     if mcdc["setting"]["time_boundary"] > t_limit:
         mcdc["setting"]["time_boundary"] = t_limit
 
@@ -1043,16 +1266,30 @@ def prepare():
 
     # WW mesh
     for name in type_.mesh_names[:-1]:
-        copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
-    mcdc["technique"]["ww_mesh"]["Nx"] = len(input_deck.technique["ww_mesh"]["x"]) - 1
-    mcdc["technique"]["ww_mesh"]["Ny"] = len(input_deck.technique["ww_mesh"]["y"]) - 1
-    mcdc["technique"]["ww_mesh"]["Nz"] = len(input_deck.technique["ww_mesh"]["z"]) - 1
-    mcdc["technique"]["ww_mesh"]["Nt"] = len(input_deck.technique["ww_mesh"]["t"]) - 1
+        copy_field(
+            mcdc["technique"]["ww"]["mesh"], input_deck.technique["ww"]["mesh"], name
+        )
 
-    # WW windows
-    mcdc["technique"]["ww"] = input_deck.technique["ww"]
-    mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
+    mcdc["technique"]["ww"]["mesh"]["Nx"] = (
+        len(input_deck.technique["ww"]["mesh"]["x"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Ny"] = (
+        len(input_deck.technique["ww"]["mesh"]["y"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nz"] = (
+        len(input_deck.technique["ww"]["mesh"]["z"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nt"] = (
+        len(input_deck.technique["ww"]["mesh"]["t"]) - 1
+    )
 
+    # WW parameters
+    mcdc["technique"]["ww"]["width"] = input_deck.technique["ww"]["width"]
+    mcdc["technique"]["ww"]["auto"] = input_deck.technique["ww"]["auto"]
+    mcdc["technique"]["ww"]["epsilon"] = input_deck.technique["ww"]["epsilon"]
+    mcdc["technique"]["ww"]["center"] = input_deck.technique["ww"]["center"]
+    mcdc["technique"]["ww"]["save"] = input_deck.technique["ww"]["save"]
+    mcdc["technique"]["ww"]["tally_idx"] = input_deck.technique["ww"]["tally_idx"]
     # =========================================================================
     # Weight roulette
     # =========================================================================
@@ -1235,6 +1472,7 @@ def prepare():
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+    mcdc["bank_future"]["tag"] = "future"
 
     # IC generator banks
     if mcdc["technique"]["IC_generator"]:
@@ -1342,7 +1580,10 @@ def prepare():
 
 
 def cardlist_to_h5group(dictlist, input_group, name):
-    main_group = input_group.create_group(name + "s")
+    if name[-1] != "s":
+        main_group = input_group.create_group(name + "s")
+    else:
+        main_group = input_group.create_group(name)
     for item in dictlist:
         group = main_group.create_group(name + "_%i" % getattr(item, "ID"))
         card_to_h5group(item, group)
@@ -1368,7 +1609,10 @@ def card_to_h5group(card, group):
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
-    main_group = input_group.create_group(name + "s")
+    if name[-1] != "s":
+        main_group = input_group.create_group(name + "s")
+    else:
+        main_group = input_group.create_group(name)
     for item in dictlist:
         group = main_group.create_group(name + "_%i" % item["ID"])
         dict_to_h5group(item, group)
@@ -1613,15 +1857,20 @@ def generate_hdf5(data, mcdc):
                     input_deck.mesh_tallies, input_group, "mesh_tallies"
                 )
                 cardlist_to_h5group(
-                    input_deck.surface_tallies, input_group, "surface_tally"
+                    input_deck.surface_tallies, input_group, "surface_tallies"
                 )
                 cardlist_to_h5group(
                     input_deck.cell_tallies, input_group, "cell_tallies"
                 )
+                cardlist_to_h5group(input_deck.cs_tallies, input_group, "cs_tallies")
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
                 )
+
+            # No need to output tally if time census-based tally is used
+            if input_deck.setting["census_based_tally"]:
+                return
 
             # Mesh tallies
             for ID, tally in enumerate(mcdc["mesh_tallies"]):
@@ -1701,6 +1950,22 @@ def generate_hdf5(data, mcdc):
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
                         score_name = "fission"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "current"
+                    elif score_type == SCORE_MU_SQ:
+                        score_name = "mu-sq"
+                    elif score_type == SCORE_TIME_MOMENT_FLUX:
+                        score_name = "time-moment-flux"
+                    elif score_type == SCORE_SPACE_MOMENT_FLUX:
+                        score_name = "space-moment-flux"
+                    elif score_type == SCORE_TIME_MOMENT_CURRENT:
+                        score_name = "time-moment-current"
+                    elif score_type == SCORE_SPACE_MOMENT_CURRENT:
+                        score_name = "space-moment-current"
+                    elif score_type == SCORE_TIME_MOMENT_MU_SQ:
+                        score_name = "time-moment-mu-sq"
+                    elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
+                        score_name = "space-moment-mu-sq"
                     group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
@@ -1759,36 +2024,40 @@ def generate_hdf5(data, mcdc):
                 if mcdc["technique"]["iQMC"]:
                     break
 
+                mesh = tally["filter"]
+
+                # Get grid
+                Nt = mesh["Nt"]
+                Ng = mesh["Ng"]
+                #
+                grid_t = mesh["t"][: Nt + 1]
+                grid_g = mesh["g"][: Ng + 1]
+
+                # Save to dataset
+                f.create_dataset("tallies/cell_tally_%i/grid/t" % ID, data=grid_t)
+                f.create_dataset("tallies/cell_tally_%i/grid/g" % ID, data=grid_g)
+
                 # Shape
                 N_score = tally["N_score"]
 
                 if not mcdc["technique"]["uq"]:
-                    shape = (3, N_score)
+                    shape = (3, Ng, Nt, N_score)
                 else:
-                    shape = (5, N_score)
+                    shape = (5, Ng, Nt, N_score)
 
                 # Reshape tally
                 N_bin = tally["N_bin"]
                 start = tally["stride"]["tally"]
                 tally_bin = data[TALLY][:, start : start + N_bin]
-
-                # print(f'data = {data[TALLY][2]}')
-                # if data[TALLY][1].all() == data[TALLY][2].all:
-                #     print('hell yeah')
-                # print(f'data keys = {data[TALLY].dtype.names}')
-
-                # print(f'tally_bin = {tally_bin}')
-
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
-                tally_bin = np.rollaxis(tally_bin, 1, 0)
+                tally_bin = np.rollaxis(tally_bin, 3, 0)
 
                 # Iterate over scores
                 for i in range(N_score):
                     score_type = tally["scores"][i]
                     score_tally_bin = np.squeeze(tally_bin[i])
-                    # print(f'score_tally_bin = {score_tally_bin}')
                     if score_type == SCORE_FLUX:
                         score_name = "flux"
                     elif score_type == SCORE_NET_CURRENT:
@@ -1798,7 +2067,61 @@ def generate_hdf5(data, mcdc):
                     group_name = "tallies/cell_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
-                    # print(f'ID = {ID}, score_name = {score_name}, mean = {mean}')
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            # CS tallies
+            for ID, tally in enumerate(mcdc["cs_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+                N_cs_bins = tally["filter"]["N_cs_bins"]
+
+                # Shape
+                N_score = tally["N_score"]
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, N_cs_bins, N_score)
+                else:
+                    shape = (5, N_cs_bins, N_score)
+
+                # Reshape tally
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_cs_bins]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 2, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/cs_tally_%i/%s/" % (ID, score_name)
+
+                    center_points = tally["filter"]["cs_centers"]
+                    S = tally["filter"]["cs_S"]
+                    reconstruction = tally["filter"]["cs_reconstruction"]
+
+                    f.create_dataset(
+                        "tallies/cs_tally_%i/center_points" % (ID), data=center_points
+                    )
+                    f.create_dataset("tallies/cs_tally_%i/S" % (ID), data=S)
+                    f.create_dataset(group_name + "reconstruction", data=reconstruction)
+
+                    mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
 
                     f.create_dataset(group_name + "mean", data=mean)
@@ -1908,6 +2231,140 @@ def generate_hdf5(data, mcdc):
                 f.create_dataset("particles_size", data=len(neutrons[:]))
 
 
+def recombine_tallies(file="output.h5"):
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        # Load main output file and read input params
+        with h5py.File(file, "r") as f:
+            output_name = str(f["input_deck/setting/output_name"][()])[2:-1]
+            N_particle = f["input_deck/setting/N_particle"][()]
+            N_census = f["input_deck/setting/N_census"][()] - 1
+            N_batch = f["input_deck/setting/N_batch"][()]
+            N_tallies = f["input_deck/setting/census_tally_frequency"][()]
+        f.close()
+        # Combine the tally output into a single file
+
+        collected_tallies = []
+        collected_tally_names = []
+        # Collecting info on number and types of tallies
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                with h5py.File(
+                    output_name + "-batch_%i-census_%i.h5" % (i_batch, i_census), "r"
+                ) as f:
+                    tallies = f["tallies"]
+
+                    for tally in tallies:
+                        if tally not in collected_tally_names:
+                            grid = tallies[tally]["grid"]
+                            tally_list = [tally]
+                            for tally_type in tallies[tally]:
+                                if tally_type != "grid":
+                                    tally_list.append(tally_type)
+                            collected_tallies.append(tally_list)
+                            collected_tally_names.append(tally)
+                f.close()
+
+        for i, tally_info in enumerate(collected_tallies):
+            tally_grid_type = tally_info[0].split("_")[0]
+            tally_number = tally_info[0].split("_")[-1]
+            with h5py.File(output_name + ".h5", "a") as f:
+                grid = f[
+                    "input_deck/"
+                    + tally_grid_type
+                    + "_tallies/"
+                    + tally_grid_type
+                    + "_tallies_"
+                    + tally_number
+                ]
+                t_final = f["input_deck/setting/census_time"][()][-2]
+                t = np.linspace(0, t_final, N_census * N_tallies + 1)
+                Nx = len(grid["x"][()]) - 1
+                Ny = len(grid["y"][()]) - 1
+                Nz = len(grid["z"][()]) - 1
+                Nmu = len(grid["mu"][()]) - 1
+                N_azi = len(grid["azi"][()]) - 1
+                Ng = len(grid["g"][()]) - 1
+                # Creating structure of correct size to hold combined tally
+                for tally_type in tally_info[1:]:
+                    tally_score = np.zeros(
+                        (N_census * N_tallies, Nx, Ny, Nz, Nmu, N_azi, Ng)
+                    )
+                    tally_score = np.squeeze(tally_score)
+                    tally_score_sq = np.zeros_like(tally_score)
+
+                    for i_census in range(N_census):
+                        for i_batch in range(N_batch):
+                            with h5py.File(
+                                output_name
+                                + "-batch_%i-census_%i.h5" % (i_batch, i_census),
+                                "r",
+                            ) as f1:
+                                score = f1[
+                                    "tallies/"
+                                    + tally_info[0]
+                                    + "/"
+                                    + tally_type
+                                    + "/score"
+                                ][:]
+                                tally_score[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += score
+                                tally_score_sq[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += (
+                                    score * score
+                                )
+                    tally_score /= N_batch
+                    if N_batch > 0:
+                        tally_score_sq = np.sqrt(
+                            (tally_score_sq / N_batch - np.square(tally_score))
+                            / (N_batch - 1)
+                        )
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/mean",
+                        data=tally_score,
+                    )
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/sdev",
+                        data=tally_score_sq,
+                    )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/x", data=grid["x"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/y", data=grid["y"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/z", data=grid["z"][()]
+                )
+                f.create_dataset("tallies/" + tally_info[0] + "/grid/t", data=t)
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/mu", data=grid["mu"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/azi", data=grid["azi"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/g", data=grid["g"][()]
+                )
+            f.close()
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                file_name = (
+                    output_name
+                    + "-batch_"
+                    + str(i_batch)
+                    + "-census_"
+                    + str(i_census)
+                    + ".h5"
+                )
+                os.system("rm " + file_name)
+
+
 def closeout(mcdc):
 
     loop.teardown_gpu(mcdc)
@@ -1925,6 +2382,17 @@ def closeout(mcdc):
                 f.create_dataset(
                     "runtime/" + name, data=np.array([mcdc["runtime_" + name]])
                 )
+
+        if config.args.runtime_output:
+            with h5py.File(mcdc["setting"]["output_name"] + "-runtime.h5", "w") as f:
+                for name in [
+                    "total",
+                    "preparation",
+                    "simulation",
+                    "output",
+                    "bank_management",
+                ]:
+                    f.create_dataset(name, data=np.array([mcdc["runtime_" + name]]))
 
     print_runtime(mcdc)
     input_deck.reset()

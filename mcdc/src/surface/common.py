@@ -49,7 +49,10 @@ def check_sense(particle_container, speed, surface):
     # Check if coincident on the surface
     if abs(result) < COINCIDENCE_TOLERANCE:
         # Determine sense based on the direction
-        return get_normal_component(particle_container, speed, surface) > 0.0
+        return (
+            get_normal_component(particle_container, speed, surface)
+            > 0.0  # TODO: Do we need to include COINCIDENCE TOLERANCE here?
+        )
 
     return result > 0.0
 
@@ -107,11 +110,15 @@ def get_normal_component(particle_container, speed, surface):
     """
     particle = particle_container[0]
     if surface["moving"]:
-        # Temporarily translate particle direction
+        # Temporarily translate particle parameters
+        x_original = particle["x"]
+        y_original = particle["y"]
+        z_original = particle["z"]
         ux_original = particle["ux"]
         uy_original = particle["uy"]
         uz_original = particle["uz"]
         idx = _get_move_idx(particle["t"], surface)
+        _translate_particle_position(particle_container, surface, idx)
         _translate_particle_direction(particle_container, speed, surface, idx)
 
     if surface["type"] & SURFACE_LINEAR:
@@ -136,7 +143,10 @@ def get_normal_component(particle_container, speed, surface):
             result = quadric.get_normal_component(particle_container, surface)
 
     if surface["moving"]:
-        # Restore particle direction
+        # Restore particle parameters
+        particle["x"] = x_original
+        particle["y"] = y_original
+        particle["z"] = z_original
         particle["ux"] = ux_original
         particle["uy"] = uy_original
         particle["uz"] = uz_original
@@ -220,7 +230,7 @@ def _get_distance_moving(particle_container, speed, surface):
     Get particle distance to moving surface
     """
     particle = particle_container[0]
-    # Store original particle and surface parameters (will be temporarily changed)
+    # Store original particle parameters (will be temporarily changed)
     x_original = particle["x"]
     y_original = particle["y"]
     z_original = particle["z"]
@@ -228,7 +238,6 @@ def _get_distance_moving(particle_container, speed, surface):
     uy_original = particle["uy"]
     uz_original = particle["uz"]
     t_original = particle["t"]
-    surface["moving"] = False
 
     # Move interval index
     idx = _get_move_idx(particle["t"], surface)
@@ -245,15 +254,11 @@ def _get_distance_moving(particle_container, speed, surface):
         # Get distance
         distance = _get_distance_static(particle_container, surface)
 
-        # Beyond the interval?
+        # Intersection within the interval?
         distance_time = distance / speed
         dt = surface["move_time_grid"][idx + 1] - particle["t"]
-        if distance_time > dt:
-            distance = INF
-
-        # Intersecting?
-        if distance < INF:
-            # Restore particle and surface parameters
+        if distance_time < dt:
+            # Restore particle parameters
             particle["x"] = x_original
             particle["y"] = y_original
             particle["z"] = z_original
@@ -261,19 +266,17 @@ def _get_distance_moving(particle_container, speed, surface):
             particle["uy"] = uy_original
             particle["uz"] = uz_original
             particle["t"] = t_original
-            surface["moving"] = True
 
             # Return the total distance
             return total_distance + distance
 
         # Accumulate distance
-        additional_distance = dt * speed
-        total_distance += additional_distance
+        total_distance += dt * speed
 
         # Modify the particle
-        particle["x"] = x_original + additional_distance * ux_original
-        particle["y"] = y_original + additional_distance * uy_original
-        particle["z"] = z_original + additional_distance * uz_original
+        particle["x"] = x_original + total_distance * ux_original
+        particle["y"] = y_original + total_distance * uy_original
+        particle["z"] = z_original + total_distance * uz_original
         particle["ux"] = ux_original
         particle["uy"] = uy_original
         particle["uz"] = uz_original
@@ -282,7 +285,7 @@ def _get_distance_moving(particle_container, speed, surface):
         # Check next interval
         idx += 1
 
-    # Restore particle and surface parameters
+    # Restore particle parameters
     particle["x"] = x_original
     particle["y"] = y_original
     particle["z"] = z_original
@@ -290,7 +293,6 @@ def _get_distance_moving(particle_container, speed, surface):
     particle["uy"] = uy_original
     particle["uz"] = uz_original
     particle["t"] = t_original
-    surface["moving"] = True
 
     # No intersection
     return INF

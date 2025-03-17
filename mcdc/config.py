@@ -66,6 +66,7 @@ parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_fals
 parser.add_argument("--clear_cache", action="store_true")
 parser.add_argument("--caching", action="store_true")
 parser.add_argument("--no_caching", dest="caching", action="store_false")
+parser.add_argument("--runtime_output", default=False, action="store_true")
 parser.set_defaults(caching=False)
 args, unargs = parser.parse_known_args()
 
