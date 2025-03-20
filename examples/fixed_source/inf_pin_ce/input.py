@@ -62,5 +62,5 @@ mcdc.tally.mesh_tally(
     E=np.loadtxt("energy_grid.txt"),
     t=np.insert(np.logspace(-8, 2, 50), 0, 0.0),
 )
-mcdc.setting(N_particle=1e2, active_bank_buff=1000)
+mcdc.setting(N_particle=1e5, active_bank_buff=1000000)
 mcdc.run()

@@ -360,7 +360,8 @@ def prepare():
     # =========================================================================
 
     type_.make_type_trace_slot()
-    type_.make_type_trace(config.trace_slot_limit)
+    type_.make_type_trace_fingerprint()
+    type_.make_type_trace(config.trace_slot_limit,config.trace_fingerprint_limit,config.trace_thread_count)
     type_.make_type_particle(input_deck)
     type_.make_type_particle_record(input_deck)
     type_.make_type_nuclide(input_deck)

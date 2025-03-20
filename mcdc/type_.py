@@ -51,7 +51,7 @@ tally = None
 
 trace = None
 trace_slot = None
-
+trace_fingerprint = None
 
 # ==============================================================================
 # MC/DC Member Array Sizes
@@ -1495,14 +1495,30 @@ def make_type_trace_slot():
         ]
     )
 
+def make_type_trace_fingerprint():
+    global trace_fingerprint
+    trace_fingerprint = into_dtype(
+        [
+            ("stack_id",int64),
+            ("func_id",int64),
+            ("depth",int64),
+            ("hash",int64),
+        ]
+        )
 
-def make_type_trace(trace_slot_limit):
+def make_type_trace(slot_limit,fingerprint_limit,thread_count):
+    global trace_fingerprint
+    global trace_slot
     global trace
 
     trace = into_dtype(
         [
-            ("slots", trace_slot, (trace_slot_limit,)),
+            ("slots", trace_slot, (slot_limit,)),
             ("slot_limit", int64 ),
+            ("fingerprints", trace_fingerprint, (fingerprint_limit,)),
+            ("fingerprint_slot_limit", int64 ),
+            ("fingerprint_offset", int64, (2,) ),
+            ("thread_state",trace_fingerprint,(thread_count,))
         ]
     )
 

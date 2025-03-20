@@ -72,6 +72,12 @@ parser.add_argument(
     help="Maximum number of functions that may be traced.",
     default=4096,
 )
+parser.add_argument(
+    "--trace_fingerprint_limit",
+    type=int,
+    help="Maximum number of function call fingerprints that may be collected.",
+    default=100000,
+)
 parser.set_defaults(caching=False)
 args, unargs = parser.parse_known_args()
 
@@ -80,8 +86,22 @@ mode = args.mode
 target = args.target
 caching = args.caching
 clear_cache = args.clear_cache
+
+# Config for tracing threads
 trace = args.trace
 trace_slot_limit = args.trace_slot_limit
+trace_fingerprint_limit = args.trace_fingerprint_limit
+trace_thread_count = 1
+
+if trace:
+    # Allocate one thread slot for the CPU and one for each GPU thread
+    if target == 'gpu': 
+        trace_thread_count = 1 + args.gpu_block_count * 64
+else:
+    # Minimize allocation sizes if tracing is not being used
+    trace_thread_count = 1
+    trace_fingerprint_limit = 1
+
 
 from mpi4py import MPI
 import shutil
