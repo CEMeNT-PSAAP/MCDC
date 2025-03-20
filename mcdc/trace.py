@@ -52,6 +52,8 @@ if config.trace:
     extern_gpu_clock_rate = numba.types.ExternalFunction("wall_clock_rate", sig)
 
 
+
+
 @numba.njit()
 def gpu_clock_rate():
     return extern_gpu_clock_rate()
@@ -116,12 +118,11 @@ trace_wrapper_name_template = "trace_{name}"
 
 sig     = numba.core.typing.signature
 ext_fn  = numba.types.ExternalFunction
-get_integer_thread_id = ext_fn("get_wall_clock",sig(numba.types.int64))
+gpu_get_wall_clock = ext_fn("get_wall_clock",sig(numba.types.int64))
 
 sig     = numba.core.typing.signature
 ext_fn  = numba.types.ExternalFunction
 get_integer_thread_id = ext_fn("get_integer_thread_id",sig(numba.types.int64))
-
 
 
 ###############################################################################
@@ -173,7 +174,7 @@ def gpu_platform_index():
 ###############################################################################
 
 def thread_id():
-    pass
+    return 0
 
 @numba.core.extending.overload(thread_id, target="cpu")
 def cpu_thread_id():
@@ -183,8 +184,8 @@ def cpu_thread_id():
 
 @numba.core.extending.overload(thread_id, target="gpu")
 def gpu_thread_id():
-    def inner_thread_id(trace,id):
-        return 1 + get_integer_thread_id()
+    def inner_thread_id():
+        return 0
     return inner_thread_id
 
 
@@ -203,6 +204,7 @@ def alloc_stack_id(trace):
 @numba.njit
 def get_stack_id(trace):
     return trace['thread_state']['slot'][thread_id()]['stack_id']
+
 
 
 
@@ -247,13 +249,13 @@ def get_prev_fingerprint_slot(trace):
 # Records hash and associated metadata to tracing data structures
 ###############################################################################
 
-@numba.njit
+#@numba.njit
 def log_hash(trace,hash_value):
     offset = adapt.global_add(trace['fingerprint_offset'],0,1)
     if offset >= trace['fingerprint_slot_limit']:
         return
     trace['fingerprints'][offset]['stack_id'] = get_stack_id(trace)
-    trace['fingerprints'][offset]['func_id']  = get_fn_id(trace)
+    trace['fingerprints'][offset]['func_id']  = get_func_id(trace)
     trace['fingerprints'][offset]['depth']    = get_depth(trace)
     trace['fingerprints'][offset]['hash']     = 0
 
@@ -324,7 +326,6 @@ def trace(transforms=[]):
                 arg_str,
                 trace_state_extractors[extractor_target]
             )
-            print(hash_fn_code)
             exec(hash_fn_code,locals(),locals())
             exec(trace_wrapper_source,locals(),locals())
             trace_func = eval(f"trace_{func_id}_{name}")
