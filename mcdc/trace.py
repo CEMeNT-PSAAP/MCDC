@@ -178,17 +178,43 @@ def njit(*args,**kwargs):
     return trace_njit_inner
 
 
+def dd_mergetrace(mcdc):
+    d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
+    d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
+    d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
+    i = 0
+    for n in range(d_Nx * d_Ny * d_Nz):
+        dd_ranks = []
+        for r in range(int(mcdc["technique"]["dd_work_ratio"][n])):
+            dd_ranks.append(i)
+            i += 1
+        # create MPI Comm group out of subdomain processors
+        dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
+        dd_comm = MPI.COMM_WORLD.Create(dd_group)
+        # MPI Reduce on subdomain processors
+        for name, info in trace_roster.items():
+            func_id = info['id']
 
+            if MPI.COMM_NULL != dd_comm:
+                python_nsecs = dd_comm.reduce(mcdc['trace']['slots'][func_id]['runtime_total'][0], MPI.SUM)
+                python_calls = dd_comm.reduce(mcdc['trace']['slots'][func_id]['call_total'][0], MPI.SUM)
+                cpu_nsecs = dd_comm.reduce(mcdc['trace']['slots'][func_id]['runtime_total'][1], MPI.SUM)
+                cpu_calls = dd_comm.reduce(mcdc['trace']['slots'][func_id]['call_total'][1], MPI.SUM)
+                if mcdc["dd_local_rank"] == 0:
+                    mcdc['trace']['slots'][func_id]['runtime_total'][0] = python_nsecs
+                    mcdc['trace']['slots'][func_id]['call_total'][0] = python_calls
+                    mcdc['trace']['slots'][func_id]['runtime_total'][1] = cpu_nsecs
+                    mcdc['trace']['slots'][func_id]['call_total'][1] = cpu_calls
+            
+        # free comm group
+        dd_group.Free()
+        if MPI.COMM_NULL != dd_comm:
+            dd_comm.Free()
 
-
+            
 def output_report(mcdc):
 
-    is_root = MPI.COMM_WORLD.Get_rank()
-    multi_rank = (MPI.COMM_WORLD.Get_size() > 1)
-
-    report = None
-
-    if is_root:
+    if not mcdc["technique"]["domain_decomposition"]:
         report = open("report.csv","w")
         report.write("function name, ")
         report.write("python total runtime (ns), python total calls, ")
@@ -196,23 +222,23 @@ def output_report(mcdc):
         report.write("gpu total runtime (mystery units), gpu total calls, ")
         report.write("\n")
 
-    gpu_rate = 1000000000
-    if config.target == "gpu":
-        gpu_rate = gpu_clock_rate()
+        gpu_rate = 1000000000
+        if config.target == "gpu":
+            gpu_rate = gpu_clock_rate()
 
+        multi_rank = True
 
-    for name, info in trace_roster.items():
-        func_id = info['id']
-        slot = mcdc['trace']['slots'][func_id]
+        for name, info in trace_roster.items():
+            func_id = info['id']
+            slot = mcdc['trace']['slots'][func_id]
 
-        if multi_rank:
-            slot_arr = np.empty((1,),type_.trace_slot)
-            MPI.COMM_WORLD.Allreduce(slot['runtime_total'],slot_arr[0]['runtime_total'])
-            MPI.COMM_WORLD.Allreduce(slot['call_total'],slot_arr[0]['call_total'])
-            slot['runtime_total'] = slot_arr[0]['runtime_total']
-            slot['call_total'] = slot_arr[0]['call_total']
+            if multi_rank:
+                slot_arr = np.empty((1,),type_.trace_slot)
+                MPI.COMM_WORLD.Allreduce(slot['runtime_total'],slot_arr[0]['runtime_total'])
+                MPI.COMM_WORLD.Allreduce(slot['call_total'],slot_arr[0]['call_total'])
+                slot['runtime_total'] = slot_arr[0]['runtime_total']
+                slot['call_total'] = slot_arr[0]['call_total']
 
-        if is_root:
             python_nsecs = slot['runtime_total'][0]
             python_calls = slot['call_total'][0]
             cpu_nsecs = slot['runtime_total'][1]
@@ -224,7 +250,44 @@ def output_report(mcdc):
             report.write(f"{cpu_nsecs},{cpu_calls},")
             report.write(f"{gpu_nsecs},{gpu_calls},")
             report.write("\n")
-
-    if is_root:
         report.close()
+
+    else: # write report for each subdomain
+        dd_mergetrace(mcdc)
+        d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
+        d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
+        d_Nz = mcdc["technique"]["dd_mesh"]["z"].size - 1
+
+        i = 0
+        for n in range(d_Nx * d_Ny * d_Nz):
+            if mcdc["dd_local_rank"] == 0 and mcdc["dd_idx"] == n:
+                report_name = f"report{n}.csv"
+                report = open(report_name, "w")
+                report.write("function name, ")
+                report.write("python total runtime (ns), python total calls, ")
+                report.write("cpu total runtime (ns), cpu total calls, ")
+                report.write("gpu total runtime (mystery units), gpu total calls, ")
+                report.write("\n")
+
+                gpu_rate = 1000000000
+                if config.target == "gpu":
+                    gpu_rate = gpu_clock_rate()
+
+                for name, info in trace_roster.items():
+                    func_id = info['id']
+                    slot = mcdc['trace']['slots'][func_id]
+                    
+                    python_nsecs = slot['runtime_total'][0]
+                    python_calls = slot['call_total'][0]
+                    cpu_nsecs = slot['runtime_total'][1]
+                    cpu_calls = slot['call_total'][1]
+                    gpu_nsecs = slot['runtime_total'][2] * 1000000000.0 / gpu_rate
+                    gpu_calls = slot['call_total'][2]
+                    report.write(f"{name},")
+                    report.write(f"{python_nsecs},{python_calls},")
+                    report.write(f"{cpu_nsecs},{cpu_calls},")
+                    report.write(f"{gpu_nsecs},{gpu_calls},")
+                    report.write("\n")
+                report.close()
+            
 
