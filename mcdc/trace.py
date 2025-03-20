@@ -141,7 +141,7 @@ def cpu_get_clock():
 @numba.core.extending.overload(get_clock, target="gpu")
 def gpu_get_clock():
     def inner_get_clock():
-        return get_integer_thread_id()
+        return gpu_get_wall_clock()
     return inner_get_clock
 
 
