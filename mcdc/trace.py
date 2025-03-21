@@ -67,7 +67,7 @@ def calculate_hash(arg):
 
 @numba.core.extending.overload(calculate_hash)
 def caluclate_hash_overload(arg):
-    if not instance(arg,numba.types.Hashable):
+    if not isinstance(arg,numba.types.Hashable):
         def calc(arg):
             return 0
         return calc
@@ -95,8 +95,8 @@ trace_roster = {}
 trace_wrapper_template = """
 def trace_{id}_{name} ({arg_str}) :
     {trace_state_extractor}
-    #hash = trace_hash_{id}_{name}({arg_str})
-    #log_hash(trace,hash)
+    hash = trace_hash_{id}_{name}({arg_str})
+    log_hash(trace,hash)
     old_id = get_func_id(trace)
     old_depth = get_depth(trace)
     set_func_id(trace,{id})
@@ -199,11 +199,11 @@ def gpu_thread_id():
 @numba.njit
 def alloc_stack_id(trace):
     stack_id = adapt.global_add(trace['thread_state']['stack_id_offset'],0,1)
-    trace['thread_state']['slot'][thread_id()]['stack_id'] = stack_id
+    trace['thread_state'][thread_id()]['stack_id'] = stack_id
 
 @numba.njit
 def get_stack_id(trace):
-    return trace['thread_state']['slot'][thread_id()]['stack_id']
+    return trace['thread_state'][thread_id()]['stack_id']
 
 
 
@@ -249,7 +249,7 @@ def get_prev_fingerprint_slot(trace):
 # Records hash and associated metadata to tracing data structures
 ###############################################################################
 
-#@numba.njit
+@numba.njit
 def log_hash(trace,hash_value):
     offset = adapt.global_add(trace['fingerprint_offset'],0,1)
     if offset >= trace['fingerprint_slot_limit']:
@@ -382,6 +382,10 @@ def dd_mergetrace(mcdc):
         if MPI.COMM_NULL != dd_comm:
             dd_comm.Free()
 
+def initialize(mcdc):
+    mcdc['trace']['slot_limit'] = config.trace_slot_limit
+    mcdc['trace']['fingerprint_slot_limit'] = config.trace_slot_limit
+
 
 def output_report(mcdc):
 
@@ -460,5 +464,27 @@ def output_report(mcdc):
                     report.write(f"{gpu_nsecs},{gpu_calls},")
                     report.write("\n")
                 report.close()
+
+
+def output_fingerprints(mcdc):
+
+    if not mcdc["technique"]["domain_decomposition"]:
+        prints = open("fingerprints.csv","w")
+        for idx in range(mcdc['trace']['fingerprint_offset'][0]):
+            fp = mcdc['trace']['fingerprints'][idx]
+            prints.write(f"{fp}\n")
+        prints.close()
+    else:
+        my_rank = MPI.Get_rank()
+        for rank in range(MPI.Get_size()):
+            if rank != my_rank:
+                continue
+            if rank == 0:
+                prints = open("fingerprints.csv","w")
+            else:
+                prints = open("fingerprints.csv","a")
+
+
+            prints.close()
 
 

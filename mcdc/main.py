@@ -98,6 +98,7 @@ def run():
 
     if config.trace:
         trace.output_report(mcdc)
+        trace.output_fingerprints(mcdc)
 
     # Closout
     closeout(mcdc)
@@ -790,6 +791,12 @@ def prepare():
     if config.target == "gpu":
         build_gpu_progs(input_deck, config.args)
     adapt.nopython_mode((config.mode == "numba") or (config.mode == "numba_debug"))
+
+
+    # =========================================================================
+    # Initialize Function Tracing Data
+    # =========================================================================
+    trace.initialize(mcdc)
 
     # =========================================================================
     # Setting
