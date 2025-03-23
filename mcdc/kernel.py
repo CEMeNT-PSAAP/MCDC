@@ -2527,11 +2527,17 @@ def tally_closeout(data, mcdc):
     # Calculate and store statistics
     #   sum --> mean
     #   sum_sq --> standard deviation
-    tally[TALLY_SUM] = tally[TALLY_SUM] / N_history
-    tally[TALLY_SUM_SQ] = np.sqrt(
-        (tally[TALLY_SUM_SQ] / N_history - np.square(tally[TALLY_SUM]))
-        / (N_history - 1)
-    )
+    N_bin = tally.shape[1]
+    for i in range(N_bin):
+        tally[TALLY_SUM][i] = tally[TALLY_SUM][i] / N_history
+        radicand = (
+            tally[TALLY_SUM_SQ][i] / N_history - np.square(tally[TALLY_SUM][i])
+        ) / (N_history - 1)
+        # Check for round-off error
+        if abs(radicand) < 1e-18:
+            tally[TALLY_SUM_SQ][i] = 0.0
+        else:
+            tally[TALLY_SUM_SQ][i] = np.sqrt(radicand)
 
 
 # =============================================================================
