@@ -702,11 +702,11 @@ def source_particle_dd(seed, mcdc):
 def distribute_work_dd(N, mcdc, precursor=False):
     idx = mcdc["dd_idx"]
     size = mcdc["technique"]["dd_work_ratio"][idx]
-    rank = mcdc["technique"]["dd_local_rank"]
-    
+    rank = mcdc["dd_local_rank"]
+
     # Total # of work
     work_size_total = N
-    
+
     # Evenly distribute work
     work_size = math.floor(N / size)
 
