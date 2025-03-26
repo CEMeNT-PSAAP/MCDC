@@ -700,10 +700,28 @@ def source_particle_dd(seed, mcdc):
 
 @njit
 def distribute_work_dd(N, mcdc, precursor=False):
+    idx = mcdc["dd_idx"]
+    size = mcdc["technique"]["dd_work_ratio"][idx]
+    rank = mcdc["technique"]["dd_local_rank"]
+    
     # Total # of work
     work_size_total = N
-    work_start = 0
-    work_size = work_size_total
+    
+    # Evenly distribute work
+    work_size = math.floor(N / size)
+
+    # Starting index (based on even distribution)
+    work_start = work_size * rank
+
+    # Count reminder
+    rem = N % size
+
+    # Assign reminder and update starting index
+    if rank < rem:
+        work_size += 1
+        work_start += rank
+    else:
+        work_start += rem
 
     if not precursor:
         mcdc["mpi_work_start"] = work_start
