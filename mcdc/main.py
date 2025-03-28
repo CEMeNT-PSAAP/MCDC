@@ -24,6 +24,7 @@ import numpy as np
 
 from mpi4py import MPI
 
+import mcdc.random as random
 import mcdc.kernel as kernel
 import mcdc.type_ as type_
 
@@ -354,7 +355,7 @@ def prepare():
     # Adapt kernels
     # =========================================================================
 
-    kernel.adapt_rng(nb.config.DISABLE_JIT)
+    random.adapt_rng(nb.config.DISABLE_JIT)
 
     # =========================================================================
     # Make types
@@ -380,7 +381,7 @@ def prepare():
     type_.make_type_technique(input_deck)
     type_.make_type_global(input_deck)
     type_.make_size_rpn(input_deck)
-    kernel.adapt_rng(nb.config.DISABLE_JIT)
+    random.adapt_rng(nb.config.DISABLE_JIT)
 
     input_deck.setting["target"] = config.target
 

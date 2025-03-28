@@ -1518,7 +1518,8 @@ def make_type_trace(slot_limit,fingerprint_limit,thread_count):
             ("fingerprints", trace_fingerprint, (fingerprint_limit,)),
             ("fingerprint_slot_limit", int64 ),
             ("fingerprint_offset", int64, (2,) ),
-            ("thread_state",trace_fingerprint,(thread_count,))
+            ("thread_state",trace_fingerprint,(thread_count,)),
+            ("stack_id_offset", int64, (1,) )
         ]
     )
 

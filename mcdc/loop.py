@@ -10,6 +10,7 @@ import mcdc.kernel as kernel
 import mcdc.print_ as print_module
 import mcdc.type_ as type_
 
+import mcdc.random as random
 import mcdc.trace as trace
 
 from mcdc.constant import *
@@ -79,28 +80,28 @@ def loop_fixed_source(data_arr, mcdc_arr):
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
         mcdc["idx_batch"] = idx_batch
-        seed_batch = kernel.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
+        seed_batch = random.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
 
         # Print multi-batch header
         if mcdc["setting"]["N_batch"] > 1:
             with objmode():
                 pass #print_header_batch(mcdc)
             if mcdc["technique"]["uq"]:
-                seed_uq = kernel.split_seed(seed_batch, SEED_SPLIT_UQ)
+                seed_uq = random.split_seed(seed_batch, SEED_SPLIT_UQ)
                 kernel.uq_reset(mcdc, seed_uq)
 
         # Loop over time censuses
         for idx_census in range(mcdc["setting"]["N_census"]):
             mcdc["idx_census"] = idx_census
-            seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
+            seed_census = random.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
             # Loop over source particles
-            seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
+            seed_source = random.split_seed(seed_census, SEED_SPLIT_SOURCE)
             loop_source(seed_source, data, mcdc)
 
             # Loop over source precursors
             if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
-                seed_source_precursor = kernel.split_seed(
+                seed_source_precursor = random.split_seed(
                     seed_census, SEED_SPLIT_SOURCE_PRECURSOR
                 )
                 loop_source_precursor(seed_source_precursor, data, mcdc)
@@ -110,7 +111,7 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 # TODO: Output tally (optional)
 
                 # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+                seed_bank = random.split_seed(seed_census, SEED_SPLIT_BANK)
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
@@ -149,10 +150,10 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 
     # Loop over power iteration cycles
     for idx_cycle in range(mcdc["setting"]["N_cycle"]):
-        seed_cycle = kernel.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
+        seed_cycle = random.split_seed(idx_cycle, mcdc["setting"]["rng_seed"])
 
         # Loop over source particles
-        seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
+        seed_source = random.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
         loop_source(seed_source, data, mcdc)
 
         # Tally "history" closeout
@@ -166,7 +167,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
             print_progress_eigenvalue(mcdc)
 
         # Manage particle banks
-        seed_bank = kernel.split_seed(seed_cycle, SEED_SPLIT_BANK)
+        seed_bank = random.split_seed(seed_cycle, SEED_SPLIT_BANK)
         kernel.manage_particle_banks(seed_bank, mcdc)
 
         # Entering active cycle?
@@ -188,7 +189,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.mcdc_global(prog)
 
-    seed_work = kernel.split_seed(work_start + idx_work, seed)
+    seed_work = random.split_seed(work_start + idx_work, seed)
 
     # =====================================================================
     # Get a source particle and put into active bank
@@ -504,11 +505,14 @@ def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 
+    trace.begin_stack(mcdc)
+
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
 
     # Execute events
     if P["event"] == EVENT_LOST:
+        trace.end_stack(mcdc)
         return
 
     # Collision
@@ -565,6 +569,7 @@ def step_particle(P_arr, data, prog):
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
             kernel.weight_roulette(P_arr, mcdc)
 
+    trace.end_stack(mcdc)
 
 # =============================================================================
 # Precursor source loop
@@ -583,7 +588,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     # Create new particle
     P_new_arr = adapt.local_array(1, type_.particle)
     P_new = P_new_arr[0]
-    part_seed = kernel.split_seed(particle_idx, seed_work)
+    part_seed = random.split_seed(particle_idx, seed_work)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
     P_new["w"] = 1.0
@@ -705,8 +710,8 @@ def loop_source_precursor(seed, data, mcdc):
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        seed_work = kernel.split_seed(idx_work, seed)
-        if kernel.rng_from_seed(seed_work) < w - N:
+        seed_work = random.split_seed(idx_work, seed)
+        if random.rng_from_seed(seed_work) < w - N:
             N += 1
         DNP["w"] = N
 
@@ -746,8 +751,8 @@ def gpu_precursor_spec():
         w = DNP["w"]
         N = math.floor(w)
         # "Roulette" the last particle
-        seed_work = kernel.split_seed(idx_work, seed)
-        if kernel.rng_from_seed(seed_work) < w - N:
+        seed_work = random.split_seed(idx_work, seed)
+        if random.rng_from_seed(seed_work) < w - N:
             N += 1
         DNP["w"] = N
 

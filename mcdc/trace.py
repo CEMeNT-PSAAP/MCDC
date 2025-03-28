@@ -12,6 +12,9 @@ from llvmlite import binding
 import numpy as np
 
 
+from mcdc.random import hash_data, split_seed
+
+
 CACH_PATH = './__trace_cache__'
 
 time_code = """
@@ -59,32 +62,15 @@ def gpu_clock_rate():
     return extern_gpu_clock_rate()
 
 
-def calculate_hash(arg):
-    if isinstance(arg,numba.types.Hashable):
-        return hash(arg)
-    else:
-        return 0
-
-@numba.core.extending.overload(calculate_hash)
-def caluclate_hash_overload(arg):
-    if not isinstance(arg,numba.types.Hashable):
-        def calc(arg):
-            return 0
-        return calc
-    else:
-        def calc(arg):
-            return numba.uint64(hash(arg))
-        return calc
-
-
 def generate_trace_hash_fn(id,name,arg_list,arg_str,trace_state_extractor):
     code = "@numba.njit()\n"
     code += f"def trace_hash_{id}_{name} ({arg_str}):\n"
     code += f"    {trace_state_extractor}\n"
     code += f"    result = numba.uint64(0)\n"
     for arg in arg_list:
-        code += f"    result = result ^ numba.uint64(calculate_hash({arg}))\n"
-    code += f"    return result\n"
+        code += f"    result = split_seed(result,hash_data({arg}))\n"
+    code += f"    print(\"{arg_str} -> \", result)\n"
+    code += f"    return result & numba.uint64(0x7FFFFFFFFFFFFFFF)\n"
     return code
 
 
@@ -197,13 +183,19 @@ def gpu_thread_id():
 ###############################################################################
 
 @numba.njit
-def alloc_stack_id(trace):
-    stack_id = adapt.global_add(trace['thread_state']['stack_id_offset'],0,1)
+def begin_stack(mcdc):
+    trace = mcdc['trace']
+    stack_id = adapt.global_add(trace['stack_id_offset'],0,1)
     trace['thread_state'][thread_id()]['stack_id'] = stack_id
 
 @numba.njit
 def get_stack_id(trace):
     return trace['thread_state'][thread_id()]['stack_id']
+
+@numba.njit
+def end_stack(mcdc):
+    trace = mcdc['trace']
+    trace['thread_state'][thread_id()]['stack_id'] = 0
 
 
 
@@ -251,13 +243,18 @@ def get_prev_fingerprint_slot(trace):
 
 @numba.njit
 def log_hash(trace,hash_value):
+    stack_id = get_stack_id(trace)
+    if stack_id == 0:
+        return
+    if trace['fingerprint_offset'][0] >= trace['fingerprint_slot_limit']:
+        return
     offset = adapt.global_add(trace['fingerprint_offset'],0,1)
     if offset >= trace['fingerprint_slot_limit']:
         return
     trace['fingerprints'][offset]['stack_id'] = get_stack_id(trace)
     trace['fingerprints'][offset]['func_id']  = get_func_id(trace)
     trace['fingerprints'][offset]['depth']    = get_depth(trace)
-    trace['fingerprints'][offset]['hash']     = 0
+    trace['fingerprints'][offset]['hash']     = hash_value
 
 
 
@@ -280,9 +277,11 @@ def trace(transforms=[]):
         get_stack_id = globals()['get_stack_id']
         get_depth    = globals()['get_depth']
         set_depth    = globals()['set_depth']
-        calculate_hash = globals()['calculate_hash']
+        hash_data    = globals()['hash_data']
+        split_seed   = globals()['split_seed']
 
         name = func.__name__
+        print(f"FN: {name}")
         arg_set = inspect.signature(func).parameters
 
         trace_state_extractors = {
@@ -385,6 +384,7 @@ def dd_mergetrace(mcdc):
 def initialize(mcdc):
     mcdc['trace']['slot_limit'] = config.trace_slot_limit
     mcdc['trace']['fingerprint_slot_limit'] = config.trace_slot_limit
+    mcdc['trace']['stack_id_offset'][0] = 1
 
 
 def output_report(mcdc):

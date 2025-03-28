@@ -14,7 +14,9 @@ import mcdc.geometry as geometry
 import mcdc.mesh as mesh_
 import mcdc.physics as physics
 import mcdc.type_ as type_
+import mcdc.random as random
 import mcdc.trace as trace
+
 
 from mcdc.adapt import toggle, for_cpu, for_gpu
 from mcdc.algorithm import binary_search, binary_search_with_length
@@ -696,7 +698,7 @@ def source_particle_dd(seed, mcdc):
 
     P["rng_seed"] = seed
     # Sample source
-    xi = rng(P_arr)
+    xi = random.rng(P_arr)
     tot = 0.0
     for source in mcdc["sources"]:
         if source_in_domain(source, domain_mesh, d_idx):
@@ -784,8 +786,8 @@ def distribute_work_dd_precursor(N, mcdc, precursor):
 def sample_isotropic_direction(P_arr):
     P = P_arr[0]
     # Sample polar cosine and azimuthal angle uniformly
-    mu = 2.0 * rng(P_arr) - 1.0
-    azi = 2.0 * PI * rng(P_arr)
+    mu = 2.0 * random.rng(P_arr) - 1.0
+    azi = 2.0 * PI * random.rng(P_arr)
 
     # Convert to Cartesian coordinates
     c = (1.0 - mu**2) ** 0.5
@@ -799,10 +801,10 @@ def sample_isotropic_direction(P_arr):
 def sample_white_direction(nx, ny, nz, P_arr):
     P = P_arr[0]
     # Sample polar cosine
-    mu = math.sqrt(rng(P_arr))
+    mu = math.sqrt(random.rng(P_arr))
 
     # Sample azimuthal direction
-    azi = 2.0 * PI * rng(P_arr)
+    azi = 2.0 * PI * random.rng(P_arr)
     cos_azi = math.cos(azi)
     sin_azi = math.sin(azi)
     Ac = (1.0 - mu**2) ** 0.5
@@ -829,7 +831,7 @@ def sample_white_direction(nx, ny, nz, P_arr):
 @trace.njit()
 def sample_uniform(a, b, P_arr):
     P = P_arr[0]
-    return a + rng(P_arr) * (b - a)
+    return a + random.rng(P_arr) * (b - a)
 
 
 # TODO: use cummulative density function and binary search
@@ -837,7 +839,7 @@ def sample_uniform(a, b, P_arr):
 def sample_discrete(group, P_arr):
     P = P_arr[0]
     tot = 0.0
-    xi = rng(P_arr)
+    xi = random.rng(P_arr)
     for i in range(group.shape[0]):
         tot += group[i]
         if tot > xi:
@@ -847,7 +849,7 @@ def sample_discrete(group, P_arr):
 @trace.njit()
 def sample_piecewise_linear(cdf, P_arr):
     P = P_arr[0]
-    xi = rng(P_arr)
+    xi = random.rng(P_arr)
 
     # Get bin
     idx = binary_search(xi, cdf[1])
@@ -860,92 +862,7 @@ def sample_piecewise_linear(cdf, P_arr):
     return y1 + (xi - x1) * (y2 - y1) / (x2 - x1)
 
 
-# =============================================================================
-# Random number generator
-#   LCG with hash seed-split
-# =============================================================================
 
-
-@trace.njit()
-def wrapping_mul(a, b):
-    return a * b
-
-
-@trace.njit()
-def wrapping_add(a, b):
-    return a + b
-
-
-def wrapping_mul_python(a, b):
-    a = uint64(a)
-    b = uint64(b)
-    with np.errstate(all="ignore"):
-        return a * b
-
-
-def wrapping_add_python(a, b):
-    a = uint64(a)
-    b = uint64(b)
-    with np.errstate(all="ignore"):
-        return a + b
-
-
-def adapt_rng(object_mode=False):
-    global wrapping_add, wrapping_mul
-    if object_mode:
-        wrapping_add = wrapping_add_python
-        wrapping_mul = wrapping_mul_python
-
-
-@trace.njit()
-def split_seed(key, seed):
-    """murmur_hash64a"""
-    multiplier = uint64(0xC6A4A7935BD1E995)
-    length = uint64(8)
-    rotator = uint64(47)
-    key = uint64(key)
-    seed = uint64(seed)
-
-    hash_value = uint64(seed) ^ wrapping_mul(length, multiplier)
-
-    key = wrapping_mul(key, multiplier)
-    key ^= key >> rotator
-    key = wrapping_mul(key, multiplier)
-    hash_value ^= key
-    hash_value = wrapping_mul(hash_value, multiplier)
-
-    hash_value ^= hash_value >> rotator
-    hash_value = wrapping_mul(hash_value, multiplier)
-    hash_value ^= hash_value >> rotator
-    return hash_value
-
-
-@trace.njit()
-def rng_(seed):
-    seed = uint64(seed)
-    return wrapping_add(wrapping_mul(RNG_G, seed), RNG_C) & RNG_MOD_MASK
-
-
-@trace.njit()
-def rng(state_arr):
-    state = state_arr[0]
-    state["rng_seed"] = rng_(state["rng_seed"])
-    return state["rng_seed"] / RNG_MOD
-
-
-@trace.njit()
-def rng_from_seed(seed):
-    return rng_(seed) / RNG_MOD
-
-
-@trace.njit()
-def rng_array(seed, shape, size):
-    xi = np.zeros(size)
-    for i in range(size):
-        xi_seed = split_seed(i, seed)
-        xi[i] = rng_from_seed(xi_seed)
-    xi = xi.reshape(shape)
-    return xi
 
 
 # =============================================================================
@@ -959,7 +876,7 @@ def source_particle(P_rec_arr, seed, mcdc):
     P_rec["rng_seed"] = seed
 
     # Sample source
-    xi = rng(P_rec_arr)
+    xi = random.rng(P_rec_arr)
     tot = 0.0
     for source in mcdc["sources"]:
         tot += source["prob"]
@@ -1478,7 +1395,7 @@ def bank_IC(P_arr, prog):
         pn_over_one()
 
     # Sample particle
-    if rng(P_arr) < Pn:
+    if random.rng(P_arr) < Pn:
         P_new_arr = adapt.local_array(1, type_.particle)
         P_new = P_new_arr[0]
         split_as_record(P_new_arr, P_arr)
@@ -1526,7 +1443,7 @@ def bank_IC(P_arr, prog):
         pp_over_one()
 
     # Sample precursor
-    if rng(P_arr) < Pp:
+    if random.rng(P_arr) < Pp:
         idx = add_bank_size(mcdc["technique"]["IC_bank_precursor_local"], 1)
         precursor = mcdc["technique"]["IC_bank_precursor_local"]["precursors"][idx]
         precursor["x"] = P["x"]
@@ -1535,7 +1452,7 @@ def bank_IC(P_arr, prog):
         precursor["w"] = wp_prime / wn_prime
 
         # Sample group
-        xi = rng(P_arr) * total
+        xi = random.rng(P_arr) * total
         total = 0.0
         for j in range(J):
             total += nu_d[j] / decay[j]
@@ -1680,7 +1597,7 @@ def pct_splitting_roulette(seed, mcdc):
         N_split = math.floor(sn)
 
         # Survive the russian roulette?
-        xi = rng(bank_census["particles"][idx : idx + 1])
+        xi = random.rng(bank_census["particles"][idx : idx + 1])
         if xi < sn - N_split:
             N_split += 1
 
@@ -1723,7 +1640,7 @@ def pct_splitting_roulette_weight(seed, mcdc):
         N_split = math.floor(sn)
 
         # Survive the russian roulette?
-        xi = rng(bank_census["particles"][idx : idx + 1])
+        xi = random.rng(bank_census["particles"][idx : idx + 1])
         if xi < sn - N_split:
             N_split += 1
 
@@ -1810,7 +1727,7 @@ def split_as_record(P_new_rec_arr, P_rec_arr):
     P_new_rec = P_new_rec_arr[0]
     copy_recordlike(P_new_rec_arr, P_rec_arr)
     P_new_rec["rng_seed"] = split_seed(P_rec["rng_seed"], SEED_SPLIT_PARTICLE)
-    rng(P_rec_arr)
+    random.rng(P_rec_arr)
 
 
 # =============================================================================
@@ -2444,7 +2361,7 @@ def distance_to_collision(P_arr, mcdc):
         return INF
 
     # Sample collision distance
-    xi = rng(P_arr)
+    xi = random.rng(P_arr)
     distance = -math.log(xi) / SigmaT
     return distance
 
@@ -2496,7 +2413,7 @@ def collision(P_arr, mcdc):
         SigmaT -= SigmaC
 
     # Sample collision type
-    xi = rng(P_arr) * SigmaT
+    xi = random.rng(P_arr) * SigmaT
     tot = SigmaS
     if tot > xi:
         P["event"] += EVENT_SCATTERING
@@ -2533,7 +2450,7 @@ def scattering(P_arr, prog):
     g = P["g"]
     if mcdc["setting"]["mode_MG"]:
         nu_s = material["nu_s"][g]
-        N = int(math.floor(weight_eff * nu_s + rng(P_arr)))
+        N = int(math.floor(weight_eff * nu_s + random.rng(P_arr)))
     else:
         N = 1
 
@@ -2597,10 +2514,10 @@ def scattering_MG(P_arr, material, P_new_arr):
     P_new = P_new_arr[0]
     P = P_arr[0]
     # Sample scattering angle
-    mu0 = 2.0 * rng(P_new_arr) - 1.0
+    mu0 = 2.0 * random.rng(P_new_arr) - 1.0
 
     # Scatter direction
-    azi = 2.0 * PI * rng(P_new_arr)
+    azi = 2.0 * PI * random.rng(P_new_arr)
     P_new["ux"], P_new["uy"], P_new["uz"] = scatter_direction(
         P["ux"], P["uy"], P["uz"], mu0, azi
     )
@@ -2611,7 +2528,7 @@ def scattering_MG(P_arr, material, P_new_arr):
     chi_s = material["chi_s"][g]
 
     # Sample outgoing energy
-    xi = rng(P_new_arr)
+    xi = random.rng(P_new_arr)
     tot = 0.0
     for g_out in range(G):
         tot += chi_s[g_out]
@@ -2634,7 +2551,7 @@ def scattering_CE(P_arr, material, P_new_arr, mcdc):
     """
     # Sample nuclide
     nuclide = sample_nuclide(material, P_arr, XS_SCATTER, mcdc)
-    xi = rng(P_arr) * get_MacroXS(XS_SCATTER, material, P_arr, mcdc)
+    xi = random.rng(P_arr) * get_MacroXS(XS_SCATTER, material, P_arr, mcdc)
     tot = 0.0
     for i in range(material["N_nuclide"]):
         ID_nuclide = material["nuclide_IDs"][i]
@@ -2684,8 +2601,8 @@ def scattering_CE(P_arr, material, P_new_arr, mcdc):
     uz = vz / P_speed
 
     # Scatter the direction in COM
-    mu0 = 2.0 * rng(P_arr) - 1.0
-    azi = 2.0 * PI * rng(P_arr)
+    mu0 = 2.0 * random.rng(P_arr) - 1.0
+    azi = 2.0 * PI * random.rng(P_arr)
     ux_new, uy_new, uz_new = scatter_direction(ux, uy, uz, mu0, azi)
 
     # Neutron final velocity - COM
@@ -2729,24 +2646,24 @@ def sample_nucleus_speed(A, P_arr, mcdc):
     #   rejection sampling
     y = beta * P_speed
     while True:
-        if rng(P_arr) < 2.0 / (2.0 + PI_SQRT * y):
-            x = math.sqrt(-math.log(rng(P_arr) * rng(P_arr)))
+        if random.rng(P_arr) < 2.0 / (2.0 + PI_SQRT * y):
+            x = math.sqrt(-math.log(random.rng(P_arr) * rng(P_arr)))
         else:
-            cos_val = math.cos(PI_HALF * rng(P_arr))
+            cos_val = math.cos(PI_HALF * random.rng(P_arr))
             x = math.sqrt(
-                -math.log(rng(P_arr)) - math.log(rng(P_arr)) * cos_val * cos_val
+                -math.log(random.rng(P_arr)) - math.log(rng(P_arr)) * cos_val * cos_val
             )
         V_tilda = x / beta
-        mu_tilda = 2.0 * rng(P_arr) - 1.0
+        mu_tilda = 2.0 * random.rng(P_arr) - 1.0
 
         # Accept candidate V_tilda and mu_tilda?
-        if rng(P_arr) > math.sqrt(
+        if random.rng(P_arr) > math.sqrt(
             P_speed * P_speed + V_tilda * V_tilda - 2.0 * P_speed * V_tilda * mu_tilda
         ) / (P_speed + V_tilda):
             break
 
     # Set nuclide velocity - LAB
-    azi = 2.0 * PI * rng(P_arr)
+    azi = 2.0 * PI * random.rng(P_arr)
     ux, uy, uz = scatter_direction(P["ux"], P["uy"], P["uz"], mu_tilda, azi)
     Vx = ux * V_tilda
     Vy = uy * V_tilda
@@ -2814,7 +2731,7 @@ def fission(P_arr, prog):
         nuclide = sample_nuclide(material, P_arr, XS_FISSION, mcdc)
         E = P["E"]
         nu = get_nu(NU_FISSION, nuclide, E)
-    N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + rng(P_arr)))
+    N = int(math.floor(weight_eff * nu / mcdc["k_eff"] + random.rng(P_arr)))
 
     P_new_arr = adapt.local_array(1, type_.particle_record)
     P_new = P_new_arr[0]
@@ -2880,7 +2797,7 @@ def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
     P_new["ux"], P_new["uy"], P_new["uz"] = sample_isotropic_direction(P_new_arr)
 
     # Prompt or delayed?
-    xi = rng(P_new_arr) * nu
+    xi = random.rng(P_new_arr) * nu
     tot = nu_p
     if xi < tot:
         prompt = True
@@ -2900,7 +2817,7 @@ def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
                     decay = nuclide["decay"][j]
                     break
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
-                xi = rng(P_new_arr) * nu_d[j] * SigmaF
+                xi = random.rng(P_new_arr) * nu_d[j] * SigmaF
                 tot = 0.0
                 for i in range(N_nuclide):
                     nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -2914,7 +2831,7 @@ def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
                 break
 
     # Sample outgoing energy
-    xi = rng(P_new_arr)
+    xi = random.rng(P_new_arr)
     tot = 0.0
     for g_out in range(G):
         tot += spectrum[g_out]
@@ -2924,7 +2841,7 @@ def sample_phasespace_fission(P_arr, material, P_new_arr, mcdc):
 
     # Sample emission time
     if not prompt:
-        xi = rng(P_new_arr)
+        xi = random.rng(P_new_arr)
         P_new["t"] -= math.log(xi) / decay
 
 
@@ -2961,7 +2878,7 @@ def fission_MG(P_arr, nuclide, P_new_arr):
         nu_d = nuclide["nu_d"][g]
 
     # Prompt or delayed?
-    xi = rng(P_new_arr) * nu
+    xi = random.rng(P_new_arr) * nu
     tot = nu_p
     if xi < tot:
         prompt = True
@@ -2978,7 +2895,7 @@ def fission_MG(P_arr, nuclide, P_new_arr):
                 break
 
     # Sample outgoing energy
-    xi = rng(P_new_arr)
+    xi = random.rng(P_new_arr)
     tot = 0.0
     for g_out in range(G):
         tot += spectrum[g_out]
@@ -2988,7 +2905,7 @@ def fission_MG(P_arr, nuclide, P_new_arr):
 
     # Sample emission time
     if not prompt:
-        xi = rng(P_new_arr)
+        xi = random.rng(P_new_arr)
         P_new["t"] -= math.log(xi) / decay
 
 
@@ -3008,7 +2925,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
     # Delayed?
     prompt = True
     delayed_group = -1
-    xi = rng(P_new_arr) * nu
+    xi = random.rng(P_new_arr) * nu
     tot = nu_p
     if xi > tot:
         prompt = False
@@ -3074,7 +2991,7 @@ def fission_CE(P_arr, nuclide, P_new_arr):
 
     # Sample emission time
     if not prompt:
-        xi = rng(P_new_arr)
+        xi = random.rng(P_new_arr)
         P_new["t"] -= math.log(xi) / nuclide["ce_decay"][delayed_group]
 
 
@@ -3100,7 +3017,7 @@ def branchless_collision(P_arr, prog):
     P_rec_arr = adapt.local_array(1, type_.particle_record)
 
     # Set spectrum and decay rate
-    if rng(P_arr) < n_scatter / n_total:
+    if random.rng(P_arr) < n_scatter / n_total:
         sample_phasespace_scattering(P_arr, material, P_arr, mcdc)
     else:
         if mcdc["setting"]["mode_MG"]:
@@ -3161,7 +3078,7 @@ def weight_window(P_arr, prog):
 
         # Russian roulette
         p -= n_split
-        xi = rng(P_arr)
+        xi = random.rng(P_arr)
         if xi <= p:
             split_as_record(P_new_arr, P_arr)
             add_active(P_new_arr, prog)
@@ -3169,7 +3086,7 @@ def weight_window(P_arr, prog):
     # Below target
     elif p < 1.0 / width:
         # Russian roulette
-        xi = rng(P_arr)
+        xi = random.rng(P_arr)
         if xi > p:
             P["alive"] = False
         else:
@@ -3186,7 +3103,7 @@ def weight_roulette(P_arr, mcdc):
     P = P_arr[0]
     w_survive = mcdc["technique"]["wr_survive"]
     prob_survive = P["w"] / w_survive
-    if rng(P_arr) <= prob_survive:
+    if random.rng(P_arr) <= prob_survive:
         P["w"] = w_survive
         if mcdc["technique"]["iQMC"]:
             P["iqmc"]["w"][:] = w_survive
@@ -3358,7 +3275,7 @@ def get_nu(type_, nuclide, E):
 @trace.njit()
 def sample_nuclide(material, P_arr, type_, mcdc):
     P = P_arr[0]
-    xi = rng(P_arr) * get_MacroXS(type_, material, P_arr, mcdc)
+    xi = random.rng(P_arr) * get_MacroXS(type_, material, P_arr, mcdc)
     tot = 0.0
     for i in range(material["N_nuclide"]):
         ID_nuclide = material["nuclide_IDs"][i]
@@ -3375,7 +3292,7 @@ def sample_nuclide(material, P_arr, type_, mcdc):
 @trace.njit()
 def sample_Eout(P_new_arr, E_grid, NE, chi):
     P_new = P_new_arr[0]
-    xi = rng(P_new_arr)
+    xi = random.rng(P_new_arr)
 
     # Determine bin index
     idx = binary_search_with_length(xi, chi, NE)
