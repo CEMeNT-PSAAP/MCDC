@@ -2,9 +2,12 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fft as spfft
-import cvxpy as cp
 import time
-import matplotlib.animation as animation
+
+try:
+    import cvxpy as cp
+except ImportError:
+    print("CVXPY has not been installed. Please install it with 'pip install cvxpy'")
 
 # User-defined parameters - number of cells in each dimension
 Nx = 20
@@ -72,9 +75,9 @@ with h5py.File("output.h5", "r") as f:
         for i in range(len(S[-1])):
             S[-1][i] = 1
 
-    cs_results = f["tallies"]["cs_tally_0"]["fission"]["mean"][:]
-    mesh_results = f["tallies"]["mesh_tally_0"]["fission"]["mean"][:]
-    mesh_sdev = f["tallies"]["mesh_tally_0"]["fission"]["sdev"][:]
+    cs_results = f["tallies"]["cs_tally_0"]["flux"]["mean"][:]
+    mesh_results = f["tallies"]["mesh_tally_0"]["flux"]["mean"][:]
+    mesh_sdev = f["tallies"]["mesh_tally_0"]["flux"]["sdev"][:]
 
 # Perform reconstruction
 N_fine_cells = Nx * Ny * Nz
@@ -113,9 +116,12 @@ def reconstruct(lambda_):
 
 
 def rel_norm(recon, real):
-    real_norm = np.linalg.norm(real.flatten(), ord=2)
-    diff = real.flatten() - recon.flatten()
-    return np.linalg.norm(diff) / real_norm
+    recon = recon.flatten()
+    real = real.flatten()
+    recon_norm = np.linalg.norm(recon, ord=2)
+    real_norm = np.linalg.norm(real, ord=2)
+
+    return np.abs((recon_norm - real_norm) / real_norm)
 
 
 # Different values of lambda to reconstruct with
@@ -125,66 +131,51 @@ l_array = [
     0.00005,
     0.0001,
     0.0005,
+    0.00075,
     0.001,
+    0.0025,
     0.005,
+    0.0075,
     0.01,
-    0.025,
-    0.05,
-    0.075,
-    0.1,
-    0.2,
-    0.3,
-    0.4,
-    0.5,
+    0.0125,
+    0.015,
+    0.0175,
+    0.02,
+    0.03,
 ]
 
-recon_array = []
-rel_norms = []
-for i in range(len(l_array)):
-    if l_array[i] == "mesh":
-        recon_array.append(mesh_results)
-    else:
-        recon_array.append(reconstruct(l_array[i]))
-
-    rel_norms.append(rel_norm(recon_array[i], mesh_results))
-
+# Create reconstructions and compute relative norms
+recon_array = [mesh_results if l == "mesh" else reconstruct(l) for l in l_array]
+rel_norms = [rel_norm(recon, mesh_results) for recon in recon_array]
 
 # Plotting the reconstructions for different lambda values
 fig, axes = plt.subplots(4, 4, figsize=(12, 12))
-for i in range(4):
-    for j in range(4):
-        reconstruction = recon_array[i * 4 + j]
-        # reconstruction = recon_dict[str(l_array[i * 4 + j])]
-        ax = axes[i, j]
-        im = ax.imshow(
-            reconstruction[:, :, Nz // 2], origin="lower", extent=[0, 4, 0, 4]
-        )
+for i, ax in enumerate(axes.flat):
+    l = l_array[i]
+    reconstruction = recon_array[i]
+    im = ax.imshow(reconstruction[:, :, Nz // 2], origin="lower", extent=[0, 4, 0, 4])
 
-        if l_array[i * 4 + j] == "mesh":
-            ax.set_title(f"True Solution")
-        else:
-            ax.set_title(f"$\lambda$ = {l_array[i * 4 + j]:.5g}")
+    ax.set_title(f"True Solution" if l == "mesh" else f"$\lambda$ = {l:.5g}")
+    ax.set_ylabel("y [cm]" if i % 4 == 0 else "")
+    ax.set_xlabel("x [cm]" if i >= 12 else "")
 
-        if j == 0:
-            ax.set_ylabel("y [cm]")
-        if i == 3:
-            ax.set_xlabel("x [cm]")
-
-        cbar = fig.colorbar(im, ax=ax, orientation="vertical", shrink=1)
-        cbar.formatter.set_powerlimits((0, 0))
+    # Add colorbar
+    cbar = fig.colorbar(im, ax=ax, orientation="vertical", shrink=1)
+    cbar.formatter.set_powerlimits((0, 0))
 
 plt.suptitle(
     "Basis Pursuit Denoising Reconstructions with Different Values of $\lambda$",
     fontsize=16,
 )
 plt.tight_layout()
-# plt.savefig('3D Reconstructions of Cooper Combo.png')
+plt.savefig("3D Reconstructions of Cooper.png")
 plt.show()
 
 # Plotting the relative errors
 plt.plot(l_array[2:], rel_norms[2:], label="Reconstruction Errors")
 plt.hlines(
-    np.linalg.norm(mesh_sdev.flatten(), ord=2),
+    np.linalg.norm(mesh_sdev.flatten(), ord=2)
+    / np.linalg.norm(mesh_results.flatten(), ord=2),
     plt.xlim()[0],
     plt.xlim()[1],
     color="black",
@@ -195,8 +186,8 @@ plt.xscale("log")
 plt.yscale("log")
 plt.xlabel("$\lambda$")
 plt.ylabel("Relative L$^2$ Error")
-plt.title("Relative Error vs $\lambda$ - Cooper Combo Reconstructions")
+plt.title("Relative Error vs $\lambda$ - Cooper Reconstructions")
 plt.legend()
 plt.tight_layout()
-# plt.savefig('Reconstruction Errors.png')
+plt.savefig("Reconstruction Errors.png")
 plt.show()

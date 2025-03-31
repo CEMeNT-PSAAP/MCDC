@@ -24,5 +24,7 @@ with h5py.File("output.h5", "r") as f:
     phi = flux["mean"][:]
     phi_sd = flux["sdev"][:]
 
+    print(len(x))
+
     plt.imshow(phi[:, :, 0])
     plt.show()
