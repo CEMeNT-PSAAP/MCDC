@@ -24,6 +24,7 @@ Push some particles around!!!!
    :hidden:
    
    documentation.rst
+   ci.rst
 
 Check out the :doc:`documentation` guide for info on how to contribute to these docs.
 We understand that documenting code is often a lower priority than the code itself, but it goes a long way towards usability and maintainability.
@@ -119,6 +120,8 @@ there are a few different places a dev will need to make alterations
 -------
 Testing
 -------
+
+Check out the :doc:`ci` for more info on how we run these tests automatically 
 
 MC/DC has a robust testing suite that your changes must be able to pass before a PR is accepted.
 Unit tests for functions that have them are ran in a pure python from.

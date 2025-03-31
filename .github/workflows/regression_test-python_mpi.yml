@@ -28,3 +28,4 @@ jobs:
       run: |
         cd test/regression
         python run.py --mpiexec=4
+        python run.py --mpiexec=16 --name=slab_reed_dd_3d

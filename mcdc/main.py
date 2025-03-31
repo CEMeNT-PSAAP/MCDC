@@ -774,15 +774,25 @@ def prepare():
                 )
 
         else:  # decomposed mesh filters
+            mcdc["technique"]["dd_xsum"] = len(input_deck.mesh_tallies[i].x) - 1
+            mcdc["technique"]["dd_ysum"] = len(input_deck.mesh_tallies[i].y) - 1
+            mcdc["technique"]["dd_zsum"] = len(input_deck.mesh_tallies[i].z) - 1
+
             mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
 
             # Filters
             new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
             new_y = input_deck.mesh_tallies[i].y[myn:myp]
             new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
-            mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
-            mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
-            mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
+            xlen = len(new_x)
+            ylen = len(new_y)
+            zlen = len(new_z)
+            mcdc["mesh_tallies"][i]["filter"]["x"][:xlen] = new_x
+            mcdc["mesh_tallies"][i]["filter"]["y"][:ylen] = new_y
+            mcdc["mesh_tallies"][i]["filter"]["z"][:zlen] = new_z
+            mcdc["technique"]["dd_xlen"] = xlen - 1
+            mcdc["technique"]["dd_ylen"] = ylen - 1
+            mcdc["technique"]["dd_zlen"] = zlen - 1
             for name in ["t", "mu", "azi", "g"]:
                 N = len(getattr(input_deck.mesh_tallies[i], name))
                 mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
@@ -805,6 +815,20 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
+            elif score_name == "mu-sq":
+                score_type = SCORE_MU_SQ
+            elif score_name == "time-moment-flux":
+                score_type = SCORE_TIME_MOMENT_FLUX
+            elif score_name == "space-moment-flux":
+                score_type = SCORE_SPACE_MOMENT_FLUX
+            elif score_name == "time-moment-current":
+                score_type = SCORE_TIME_MOMENT_CURRENT
+            elif score_name == "space-moment-current":
+                score_type = SCORE_SPACE_MOMENT_CURRENT
+            elif score_name == "time-moment-mu-sq":
+                score_type = SCORE_TIME_MOMENT_MU_SQ
+            elif score_name == "space-moment-mu-sq":
+                score_type = SCORE_SPACE_MOMENT_MU_SQ
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
@@ -1175,16 +1199,30 @@ def prepare():
 
     # WW mesh
     for name in type_.mesh_names[:-1]:
-        copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
-    mcdc["technique"]["ww_mesh"]["Nx"] = len(input_deck.technique["ww_mesh"]["x"]) - 1
-    mcdc["technique"]["ww_mesh"]["Ny"] = len(input_deck.technique["ww_mesh"]["y"]) - 1
-    mcdc["technique"]["ww_mesh"]["Nz"] = len(input_deck.technique["ww_mesh"]["z"]) - 1
-    mcdc["technique"]["ww_mesh"]["Nt"] = len(input_deck.technique["ww_mesh"]["t"]) - 1
+        copy_field(
+            mcdc["technique"]["ww"]["mesh"], input_deck.technique["ww"]["mesh"], name
+        )
 
-    # WW windows
-    mcdc["technique"]["ww"] = input_deck.technique["ww"]
-    mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
+    mcdc["technique"]["ww"]["mesh"]["Nx"] = (
+        len(input_deck.technique["ww"]["mesh"]["x"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Ny"] = (
+        len(input_deck.technique["ww"]["mesh"]["y"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nz"] = (
+        len(input_deck.technique["ww"]["mesh"]["z"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nt"] = (
+        len(input_deck.technique["ww"]["mesh"]["t"]) - 1
+    )
 
+    # WW parameters
+    mcdc["technique"]["ww"]["width"] = input_deck.technique["ww"]["width"]
+    mcdc["technique"]["ww"]["auto"] = input_deck.technique["ww"]["auto"]
+    mcdc["technique"]["ww"]["epsilon"] = input_deck.technique["ww"]["epsilon"]
+    mcdc["technique"]["ww"]["center"] = input_deck.technique["ww"]["center"]
+    mcdc["technique"]["ww"]["save"] = input_deck.technique["ww"]["save"]
+    mcdc["technique"]["ww"]["tally_idx"] = input_deck.technique["ww"]["tally_idx"]
     # =========================================================================
     # Weight roulette
     # =========================================================================
@@ -1537,9 +1575,9 @@ def dd_mergetally(mcdc, data):
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
     # capture tally lengths for reorganizing later
-    xlen = len(mcdc["mesh_tallies"][0]["filter"]["x"]) - 1
-    ylen = len(mcdc["mesh_tallies"][0]["filter"]["y"]) - 1
-    zlen = len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1
+    xlen = mcdc["technique"]["dd_xlen"]
+    ylen = mcdc["technique"]["dd_ylen"]
+    zlen = mcdc["technique"]["dd_zlen"]
 
     # MPI gather
     if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
@@ -1553,6 +1591,10 @@ def dd_mergetally(mcdc, data):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
             )
+        # gather tally lengths for proper recombination
+        xlens = MPI.COMM_WORLD.gather(xlen, root=0)
+        ylens = MPI.COMM_WORLD.gather(ylen, root=0)
+        zlens = MPI.COMM_WORLD.gather(zlen, root=0)
 
     # MPI gather for multiprocessor subdomains
     else:
@@ -1574,6 +1616,10 @@ def dd_mergetally(mcdc, data):
             # gather tallies
             for i, t in enumerate(tally):
                 dd_comm.Gatherv(tally[i], (dd_tally[i], sendcounts), root=0)
+            # gather tally lengths for proper recombination
+            xlens = dd_comm.gather(xlen, root=0)
+            ylens = dd_comm.gather(ylen, root=0)
+            zlens = dd_comm.gather(zlen, root=0)
         dd_group.Free()
         if MPI.COMM_NULL != dd_comm:
             dd_comm.Free()
@@ -1583,20 +1629,39 @@ def dd_mergetally(mcdc, data):
         # reorganize tally data
         # TODO: find/develop a more efficient algorithm for this
         tally_idx = 0
+        offset = 0
+        ysum = mcdc["technique"]["dd_ysum"]
+        zsum = mcdc["technique"]["dd_zsum"]
         for di in range(0, d_Nx * d_Ny * d_Nz):
             dz = di // (d_Nx * d_Ny)
             dy = (di % (d_Nx * d_Ny)) // d_Nx
             dx = di % d_Nx
+
+            offset = 0
+            # calculate subdomain offset
+            for i in range(0, dx):
+                offset += xlens[i] * ysum * zsum
+
+            for i in range(0, dy):
+                y_ind = i * d_Nx
+                offset += ylens[y_ind] * zsum
+
+            for i in range(0, dz):
+                z_ind = i * d_Nx * d_Ny
+                offset += zlens[z_ind]
+
+            # calculate index within subdomain
+            xlen = xlens[di]
+            ylen = ylens[di]
+            zlen = zlens[di]
             for xi in range(0, xlen):
                 for yi in range(0, ylen):
                     for zi in range(0, zlen):
                         # calculate reorganized index
-                        ind_x = xi * (ylen * d_Ny * zlen * d_Nz) + dx * (
-                            xlen * ylen * d_Ny * zlen * d_Nz
-                        )
-                        ind_y = yi * (xlen * d_Nx) + dy * (ylen * xlen * d_Nx)
-                        ind_z = zi + dz * zlen
-                        buff_idx = ind_x + ind_y + ind_z
+                        ind_x = xi * ysum * zsum
+                        ind_y = yi * zsum
+                        ind_z = zi
+                        buff_idx = offset + ind_x + ind_y + ind_z
                         # place tally value in correct position
                         buff[:, buff_idx] = dd_tally[:, tally_idx]
                         tally_idx += 1
@@ -1621,11 +1686,11 @@ def dd_mergemesh(mcdc, data):
             MPI.COMM_WORLD.gather(len(mcdc["mesh_tallies"][0]["filter"]["x"]), root=0)
         )
         if mcdc["mpi_master"]:
-            x_filter = np.zeros((mcdc["mesh_tallies"].shape, sum(sendcounts)))
+            x_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
         else:
-            x_filter = np.empty((mcdc["mesh_tallies"].shape))  # dummy tally
+            x_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
         # gather mesh
-        for i in range(mcdc["mesh_tallies"].shape):
+        for i in range(mcdc["mesh_tallies"].shape[0]):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=mcdc["mesh_tallies"][i]["filter"]["x"],
                 recvbuf=(x_filter[i], sendcounts),
@@ -1645,7 +1710,7 @@ def dd_mergemesh(mcdc, data):
         else:
             y_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
         # gather mesh
-        for i in range(mcdc["mesh_tallies"].shape):
+        for i in range(mcdc["mesh_tallies"].shape[0]):
             MPI.COMM_WORLD.Gatherv(
                 sendbuf=mcdc["mesh_tallies"][i]["filter"]["y"],
                 recvbuf=(y_filter[i], sendcounts),
@@ -1691,7 +1756,7 @@ def dd_mergemesh(mcdc, data):
         if d_Nz > 1:
             dd_mesh.append(z_final)
         else:
-            dd_mesh.append("z", mcdc["mesh_tallies"][:]["filter"]["z"])
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["z"])
     return dd_mesh
 
 
@@ -1781,9 +1846,9 @@ def generate_hdf5(data, mcdc):
                 # Set tally shape
                 N_score = tally["N_score"]
                 if mcdc["technique"]["domain_decomposition"]:
-                    Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
-                    Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
-                    Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
+                    Nx = mcdc["technique"]["dd_xsum"]
+                    Ny = mcdc["technique"]["dd_ysum"]
+                    Nz = mcdc["technique"]["dd_zsum"]
                 if not mcdc["technique"]["uq"]:
                     shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
                 else:
@@ -1818,6 +1883,22 @@ def generate_hdf5(data, mcdc):
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
                         score_name = "fission"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "current"
+                    elif score_type == SCORE_MU_SQ:
+                        score_name = "mu-sq"
+                    elif score_type == SCORE_TIME_MOMENT_FLUX:
+                        score_name = "time-moment-flux"
+                    elif score_type == SCORE_SPACE_MOMENT_FLUX:
+                        score_name = "space-moment-flux"
+                    elif score_type == SCORE_TIME_MOMENT_CURRENT:
+                        score_name = "time-moment-current"
+                    elif score_type == SCORE_SPACE_MOMENT_CURRENT:
+                        score_name = "space-moment-current"
+                    elif score_type == SCORE_TIME_MOMENT_MU_SQ:
+                        score_name = "time-moment-mu-sq"
+                    elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
+                        score_name = "space-moment-mu-sq"
                     group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
@@ -2175,11 +2256,11 @@ def recombine_tallies(file="output.h5"):
                                     score * score
                                 )
                     tally_score /= N_batch
-                    tally_score_sq = np.sqrt(
-                        (tally_score_sq / N_batch - np.square(tally_score))
-                        / (N_batch - 1)
-                    )
-
+                    if N_batch > 0:
+                        tally_score_sq = np.sqrt(
+                            (tally_score_sq / N_batch - np.square(tally_score))
+                            / (N_batch - 1)
+                        )
                     f.create_dataset(
                         "tallies/" + tally_info[0] + "/" + tally_type + "/mean",
                         data=tally_score,

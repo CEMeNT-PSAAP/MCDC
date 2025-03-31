@@ -63,15 +63,6 @@ for name in names:
             + "Note: Skipping %s (require multiple of 16 MPI ranks)" % name
             + Style.RESET_ALL
         )
-    elif name == "cooper_dd" and (
-        not parallel_run or not (mpiexec % 8 == 0 and srun % 8 == 0)
-    ):
-        temp.remove(name)
-        print(
-            Fore.YELLOW
-            + "Note: Skipping %s (require multiple of 8 MPI ranks)" % name
-            + Style.RESET_ALL
-        )
 
 names = temp
 

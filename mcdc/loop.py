@@ -134,6 +134,11 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 kernel.tally_reduce(data, mcdc)
                 if mcdc["mpi_master"]:
                     kernel.census_based_tally_output(data, mcdc)
+                    if (
+                        mcdc["technique"]["weight_window"]
+                        and idx_census < mcdc["setting"]["N_census"] - 2
+                    ):
+                        kernel.update_weight_windows(data, mcdc)
                 # TODO: UQ tally
 
         # Multi-batch closeout
