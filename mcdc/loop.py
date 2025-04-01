@@ -618,7 +618,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     else:
         SigmaF = material["fission"][g]  # MG only
         nu_d = material["nu_d"][g]
-        xi = kernel.rng(P_new_arr) * nu_d[j] * SigmaF
+        xi = random.rng(P_new_arr) * nu_d[j] * SigmaF
         tot = 0.0
         for i in range(N_nuclide):
             nuclide = mcdc["nuclides"][material["nuclide_IDs"][i]]
@@ -631,7 +631,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
                 break
 
     # Sample emission time
-    P_new["t"] = -math.log(kernel.rng(P_new_arr)) / decay
+    P_new["t"] = -math.log(random.rng(P_new_arr)) / decay
     idx_census = mcdc["idx_census"]
     if idx_census > 0:
         P_new["t"] += mcdc["setting"]["census_time"][idx_census - 1]
@@ -646,7 +646,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
             return
 
         # Sample energy
-        xi = kernel.rng(P_new_arr)
+        xi = random.rng(P_new_arr)
         tot = 0.0
         for g_out in range(G):
             tot += spectrum[g_out]

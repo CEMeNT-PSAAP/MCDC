@@ -1,5 +1,6 @@
 import numba
 from numba.types import uint64
+from numba import literal_unroll
 import numpy as np
 from mcdc.constant import *
 
@@ -130,7 +131,8 @@ def bits_to_uint(arg):
 
 
 @numba.core.extending.overload(bits_to_uint)
-def overload_bits_to_uint(kind):
+def overload_bits_to_uint(arg):
+    kind = numba.typeof(arg)
     if kind == numba.uint8:
         def inner(arg):
             return arg
@@ -178,7 +180,9 @@ def overload_bits_to_uint(kind):
                 return numba.uint8(0)
         return inner
     else:
-        return numba.uint8(0)
+        def inner(arg):
+            return numba.uint8(0)
+        return inner
 
 def hash_data(arg):
     kind = numba.typeof(arg)
@@ -216,37 +220,27 @@ def hash_data(arg):
 
 @numba.core.extending.overload(hash_data)
 def overload_hash_data(arg):
-    print(f"KIND: {arg}")
+    from numba import literal_unroll
     kind = arg
     if isinstance(kind,numba.types.Record):
         kind_dtype = numba.np.numpy_support.as_dtype(kind)
-        keys = tuple(kind_dtype.fields.keys())
-        if kind_dtype.itemsize > 1024:
-            def inner(arg):
-                return numba.uint64(0)
-            return inner
-        else:
-            def inner(arg):
-                result = numba.uint64(0)
-                mask   = numba.uint64(0x7FFFFFFFFFFFFFFF)
-                for key in numba.literal_unroll(keys):
-                    result = split_seed(result,hash_data(arg[key]))
-                return result
-            return inner
+        keys = kind_dtype.names
+        def inner(arg):
+            result = numba.uint64(0)
+            mask   = numba.uint64(0x7FFFFFFFFFFFFFFF)
+            for key in literal_unroll(keys):
+                result = split_seed(result,hash_data(arg[key]))
+            return result
+        return inner
     elif isinstance(kind,numba.types.Array):
         kind_dtype = numba.np.numpy_support.as_dtype(kind.dtype)
-        if kind_dtype.itemsize*len(arg) > 1024:
-            def inner(arg):
-                return numba.uint64(0)
-            return inner
-        else:
-            def inner(arg):
-                result = numba.uint64(0)
-                mask   = numba.uint64(0x7FFFFFFFFFFFFFFF)
-                for value in arg:
-                    result = split_seed(result,hash_data(value) & mask)
-                return numba.uint64(result)
-            return inner
+        def inner(arg):
+            result = numba.uint64(0)
+            mask   = numba.uint64(0x7FFFFFFFFFFFFFFF)
+            for value in arg:
+                result = split_seed(result,hash_data(value) & mask)
+            return numba.uint64(result)
+        return inner
     elif isinstance(kind,numba.types.Integer):
         def inner(arg):
             result =  rng_(bits_to_uint(arg))

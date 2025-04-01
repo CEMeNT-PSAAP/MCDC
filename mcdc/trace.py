@@ -16,6 +16,10 @@ from mcdc.random import hash_data, split_seed
 
 
 CACH_PATH = './__trace_cache__'
+FINGERPRINT_ARG_SIZE_LIMIT = 1024
+
+
+
 
 time_code = """
 #include <iostream>
@@ -62,16 +66,19 @@ def gpu_clock_rate():
     return extern_gpu_clock_rate()
 
 
+
+
 def generate_trace_hash_fn(id,name,arg_list,arg_str,trace_state_extractor):
     code = "@numba.njit()\n"
     code += f"def trace_hash_{id}_{name} ({arg_str}):\n"
     code += f"    {trace_state_extractor}\n"
     code += f"    result = numba.uint64(0)\n"
     for arg in arg_list:
-        code += f"    result = split_seed(result,hash_data({arg}))\n"
-    code += f"    print(\"{arg_str} -> \", result)\n"
+        code += f"    result = split_seed(result,trace_hash_data({arg}))\n"
+        #code += f"    if trace_hashable({arg}):\n        print(\"{arg} -> \", result)\n"
     code += f"    return result & numba.uint64(0x7FFFFFFFFFFFFFFF)\n"
     return code
+
 
 
 
@@ -81,17 +88,17 @@ trace_roster = {}
 trace_wrapper_template = """
 def trace_{id}_{name} ({arg_str}) :
     {trace_state_extractor}
-    hash = trace_hash_{id}_{name}({arg_str})
-    log_hash(trace,hash)
-    old_id = get_func_id(trace)
-    old_depth = get_depth(trace)
-    set_func_id(trace,{id})
-    set_depth(trace,old_depth+1)
+    #hash = trace_hash_{id}_{name}({arg_str})
+    #log_hash(trace,hash)
+    #old_id = get_func_id(trace)
+    #old_depth = get_depth(trace)
+    #set_func_id(trace,{id})
+    #set_depth(trace,old_depth+1)
     t0 = trace_get_clock()
     result = func ({arg_str})
     t1 = trace_get_clock()
-    set_func_id(trace,old_id)
-    set_depth(trace,old_depth)
+    #set_func_id(trace,old_id)
+    #set_depth(trace,old_depth)
     platform_index = trace_platform_index()
     adapt.global_add(trace['slots'][{id}]['runtime_total'],platform_index, t1 - t0)
     adapt.global_add(trace['slots'][{id}]['call_total'],platform_index,1)
@@ -258,6 +265,82 @@ def log_hash(trace,hash_value):
 
 
 
+###############################################################################
+# Wrapper for the hashing functions of mcdc.random, with size guards
+###############################################################################
+
+def trace_hashable(arg):
+    kind = numba.typeof(arg)
+    if isinstance(kind,numba.types.Record):
+        return kind.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT
+    elif isinstance(kind,numba.types.Array):
+        return len(arg) * kind.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT
+    else:
+        return True
+
+@numba.core.extending.overload(trace_hashable)
+def overload_trace_hashable(arg):
+    kind = arg
+    if isinstance(kind,numba.types.Record):
+        kind_dtype = numba.np.numpy_support.as_dtype(kind)
+        if kind_dtype.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT:
+            def inner(arg):
+                return True
+            return inner
+        else:
+            def inner(arg):
+                return False
+            return inner
+    elif isinstance(kind,numba.types.Array):
+        def inner(arg):
+            return len(arg) * arg.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT
+        return inner
+    else:
+        def inner(arg):
+            return True
+        return inner
+
+
+
+@numba.njit()
+def trace_hash_data(arg):
+    if trace_hashable(arg):
+        return hash_data(arg)
+    else:
+        return numba.uint64(0)
+
+
+#def trace_hash_data(arg):
+#    kind = numba.typeof(arg)
+#    if isinstance(kind,numba.types.Record):
+#        if kind.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT:
+#            return random.hash_data(arg)
+#        else:
+#            return numba.uint64(0)
+#    elif isinstance(kind,numba.types.Array):
+#        if len(arg) * arg.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT
+#            return random.hash_data(arg)
+#        else:
+#            return numba.uint64(0)
+#    else:
+#        return random.hash_data(arg)
+#
+#@numba.core.extending.overload(trace_hash_data)
+#def overload_trace_hash_data(arg):
+#    kind = arg
+#    if isinstance(kind,numba.types.Record):
+#        if kind.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT:
+#            return random.hash_data(arg)
+#        else:
+#            return numba.uint64(0)
+#    elif isinstance(kind,numba.types.Array):
+#        if len(arg) * arg.itemsize <= FINGERPRINT_ARG_SIZE_LIMIT
+#            return random.hash_data(arg)
+#        else:
+#            return numba.uint64(0)
+#    else:
+#        return random.hash_data(arg)
+#
 
 
 ###############################################################################
@@ -279,9 +362,10 @@ def trace(transforms=[]):
         set_depth    = globals()['set_depth']
         hash_data    = globals()['hash_data']
         split_seed   = globals()['split_seed']
+        trace_hash_data   = globals()['trace_hash_data']
+        trace_hashable   = globals()['trace_hashable']
 
         name = func.__name__
-        print(f"FN: {name}")
         arg_set = inspect.signature(func).parameters
 
         trace_state_extractors = {
@@ -468,11 +552,16 @@ def output_report(mcdc):
 
 def output_fingerprints(mcdc):
 
+    id_to_name_map = {}
+    for name, entry in trace_roster.items():
+        id_to_name_map[entry['id']] = name
+
     if not mcdc["technique"]["domain_decomposition"]:
         prints = open("fingerprints.csv","w")
         for idx in range(mcdc['trace']['fingerprint_offset'][0]):
-            fp = mcdc['trace']['fingerprints'][idx]
-            prints.write(f"{fp}\n")
+            stack_id, fn_id, depth, hash_value = mcdc['trace']['fingerprints'][idx]
+            name = id_to_name_map[fn_id]
+            prints.write(f"{stack_id}, {depth}, {name}, {hash_value}\n")
         prints.close()
     else:
         my_rank = MPI.Get_rank()
@@ -483,8 +572,6 @@ def output_fingerprints(mcdc):
                 prints = open("fingerprints.csv","w")
             else:
                 prints = open("fingerprints.csv","a")
-
-
             prints.close()
 
 

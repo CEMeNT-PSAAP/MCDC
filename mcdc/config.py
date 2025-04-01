@@ -65,7 +65,7 @@ parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_fals
 parser.add_argument("--clear_cache", action="store_true")
 parser.add_argument("--caching", action="store_true")
 parser.add_argument("--no_caching", dest="caching", action="store_false")
-parser.add_argument("--trace", action="store_true")
+parser.add_argument("--trace", type=str, default="none", choices=["none","timing","regression"])
 parser.add_argument(
     "--trace_slot_limit",
     type=int,
@@ -93,7 +93,19 @@ trace_slot_limit = args.trace_slot_limit
 trace_fingerprint_limit = args.trace_fingerprint_limit
 trace_thread_count = 1
 
-if trace:
+TRACE_NONE=0
+TRACE_TIMING=1
+TRACE_REGRESSION=2
+
+trace_mode_ids = {
+    'none' : TRACE_NONE,
+    'timing' : TRACE_TIMING,
+    'regression' : TRACE_REGRESSION,
+}
+
+trace_mode = trace_mode_ids[trace]
+
+if trace_mode != TRACE_NONE:
     # Allocate one thread slot for the CPU and one for each GPU thread
     if target == 'gpu': 
         trace_thread_count = 1 + args.gpu_block_count * 64
