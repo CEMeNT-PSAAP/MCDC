@@ -162,7 +162,7 @@ for i, name in enumerate(names):
                     a = output[name][()]
                     b = answer[name][()]
 
-                    #if (("sdev" in result) or ("uq_var" in result)) and (
+                    # if (("sdev" in result) or ("uq_var" in result)) and (
                     if ("uq_var" in result) and (args.target == "gpu"):
                         continue
                     # Passed?
