@@ -1850,9 +1850,8 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
 
 
 @njit
-def score_mesh_tally(P_arr, distance, tally, data, mcdc):
+def score_mesh_tally(P_arr, distance, tally, data_tally, mcdc):
     P = P_arr[0]
-    tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     mesh = tally["filter"]
     stride = tally["stride"]
@@ -1974,7 +1973,7 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
                 score = flux * mu * mu * (t - (mesh["t"][it - 1] + mesh["t"][it]) / 2)
             elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
                 score = flux * mu * mu * (x - (mesh["x"][ix + 1] + mesh["x"][ix]) / 2)
-            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+            adapt.global_add(data_tally, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -2027,11 +2026,10 @@ def score_mesh_tally(P_arr, distance, tally, data, mcdc):
 
 
 @njit
-def score_surface_tally(P_arr, surface, tally, data, mcdc):
+def score_surface_tally(P_arr, surface, tally, data_tally, mcdc):
     # TODO: currently not supporting filters
     P = P_arr[0]
 
-    tally_bin = data[TALLY]
     stride = tally["stride"]
 
     # The tally index
@@ -2049,13 +2047,12 @@ def score_surface_tally(P_arr, surface, tally, data, mcdc):
             score = flux
         elif score_type == SCORE_NET_CURRENT:
             score = flux * mu
-        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+        adapt.global_add(data_tally, (TALLY_SCORE, idx + i), round(score))
 
 
 @njit
-def score_cell_tally(P_arr, distance, tally, data, mcdc):
+def score_cell_tally(P_arr, distance, tally, data_tally, mcdc):
     P = P_arr[0]
-    tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     mesh = tally["filter"]
     stride = tally["stride"]
@@ -2112,7 +2109,7 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
             elif score_type == SCORE_FISSION:
                 SigmaF = get_MacroXS(XS_FISSION, material, P_arr, mcdc)
                 score = flux * SigmaF
-            adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+            adapt.global_add(data_tally, (TALLY_SCORE, idx + i), round(score))
 
         # Accumulate distance swept
         distance_swept += distance_scored
@@ -2129,11 +2126,10 @@ def score_cell_tally(P_arr, distance, tally, data, mcdc):
 
 
 @njit
-def score_cs_tally(P_arr, distance, tally, data, mcdc):
+def score_cs_tally(P_arr, distance, tally, data_tally, mcdc):
     # Each time that this function is called, EVERY cs bin needs to be checked to see if the particle is in it.
     # The particle needs to score into all the bins that it is within
     P = P_arr[0]
-    tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     N_cs_bins = tally["filter"]["N_cs_bins"]
 
@@ -2206,7 +2202,7 @@ def score_cs_tally(P_arr, distance, tally, data, mcdc):
                 score = flux * SigmaF
 
             adapt.global_add(
-                tally_bin,
+                data_tally,
                 (TALLY_SCORE, bin_idx + j * tally["N_score"] + i),
                 round(score),
             )
@@ -2280,8 +2276,7 @@ def calculate_distance_in_coarse_bin(start, end, distance, center, cs_bin_size):
 
 
 @njit
-def dd_reduce(data, mcdc):
-    tally_bin = data[TALLY]
+def dd_reduce(data_tally, mcdc):
 
     # find number of subdomains
     d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
@@ -2300,11 +2295,11 @@ def dd_reduce(data, mcdc):
             dd_group = MPI.COMM_WORLD.group.Incl(dd_group)
             dd_comm = MPI.COMM_WORLD.Create(dd_group)
             # MPI Reduce on subdomain processors
-            buff = np.zeros_like(tally_bin[TALLY_SCORE])
+            buff = np.zeros_like(data_tally[TALLY_SCORE])
             if MPI.COMM_NULL != dd_comm:
-                dd_comm.Reduce(tally_bin[TALLY_SCORE], buff, MPI.SUM, 0)
+                dd_comm.Reduce(data_tally[TALLY_SCORE], buff, MPI.SUM, 0)
             if mcdc["dd_idx"] == n:
-                tally_bin[TALLY_SCORE][:] = buff
+                data_tally[TALLY_SCORE][:] = buff
             # free comm group
             dd_group.Free()
             if MPI.COMM_NULL != dd_comm:
@@ -2312,21 +2307,20 @@ def dd_reduce(data, mcdc):
 
 
 @njit
-def tally_reduce(data, mcdc):
-    tally_bin = data[TALLY]
-    N_bin = tally_bin.shape[1]
+def tally_reduce(data_tally, mcdc):
+    N_bin = data_tally.shape[1]
 
     # Normalize
     N_particle = mcdc["setting"]["N_particle"]
     for i in range(N_bin):
-        tally_bin[TALLY_SCORE][i] /= N_particle
+        data_tally[TALLY_SCORE][i] /= N_particle
 
     if not mcdc["technique"]["domain_decomposition"]:
         # MPI Reduce
-        buff = np.zeros_like(tally_bin[TALLY_SCORE])
+        buff = np.zeros_like(data_tally[TALLY_SCORE])
         with objmode():
-            MPI.COMM_WORLD.Reduce(tally_bin[TALLY_SCORE], buff, MPI.SUM, 0)
-        tally_bin[TALLY_SCORE][:] = buff
+            MPI.COMM_WORLD.Reduce(data_tally[TALLY_SCORE], buff, MPI.SUM, 0)
+        data_tally[TALLY_SCORE][:] = buff
 
     else:
         # find number of subdomains
@@ -2336,39 +2330,37 @@ def tally_reduce(data, mcdc):
         N_dd *= mcdc["technique"]["dd_mesh"]["z"].size - 1
         # DD Reduce if multiple processors per subdomain
         if N_dd != mcdc["mpi_size"]:
-            dd_reduce(data, mcdc)
+            dd_reduce(data_tally, mcdc)
 
 
 @njit
-def tally_accumulate(data, mcdc):
-    tally_bin = data[TALLY]
-    N_bin = tally_bin.shape[1]
+def tally_accumulate(data_tally, mcdc):
+    N_bin = data_tally.shape[1]
 
     for i in range(N_bin):
         # Accumulate score and square of score into sum and sum_sq
-        score = tally_bin[TALLY_SCORE, i]
-        tally_bin[TALLY_SUM, i] += score
-        tally_bin[TALLY_SUM_SQ, i] += score * score
+        score = data_tally[TALLY_SCORE, i]
+        data_tally[TALLY_SUM, i] += score
+        data_tally[TALLY_SUM_SQ, i] += score * score
 
         # Reset score bin
-        tally_bin[TALLY_SCORE, i] = 0.0
+        data_tally[TALLY_SCORE, i] = 0.0
 
 
 @njit
-def census_based_tally_output(data, mcdc):
+def census_based_tally_output(data_tally, mcdc):
     idx_batch = mcdc["idx_batch"]
     idx_census = mcdc["idx_census"]
-    tally_bin = data[TALLY]
-    N_bin = tally_bin.shape[1]
+    N_bin = data_tally.shape[1]
 
     for i in range(N_bin):
         # Store score and square of score
-        score = tally_bin[TALLY_SCORE, i]
-        tally_bin[TALLY_SUM, i] = score
-        tally_bin[TALLY_SUM_SQ, i] = score * score
+        score = data_tally[TALLY_SCORE, i]
+        data_tally[TALLY_SUM, i] = score
+        data_tally[TALLY_SUM_SQ, i] = score * score
 
         # Reset score bin
-        tally_bin[TALLY_SCORE, i] = 0.0
+        data_tally[TALLY_SCORE, i] = 0.0
 
     for ID, tally in enumerate(mcdc["mesh_tallies"]):
         mesh = tally["filter"]
@@ -2422,7 +2414,7 @@ def census_based_tally_output(data, mcdc):
             # Reshape tally
             N_bin = tally["N_bin"]
             start = tally["stride"]["tally"]
-            tally_bin = data[TALLY][:, start : start + N_bin]
+            tally_bin = data_tally[:, start : start + N_bin]
             tally_bin = tally_bin.reshape(shape)
 
             # Roll tally so that score is in the front
@@ -2457,9 +2449,7 @@ def census_based_tally_output(data, mcdc):
 
 
 @njit
-def dd_closeout(data, mcdc):
-    tally_bin = data[TALLY]
-
+def dd_closeout(data_tally, mcdc):
     # find number of subdomains
     d_Nx = mcdc["technique"]["dd_mesh"]["x"].size - 1
     d_Ny = mcdc["technique"]["dd_mesh"]["y"].size - 1
@@ -2477,14 +2467,14 @@ def dd_closeout(data, mcdc):
             dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
             dd_comm = MPI.COMM_WORLD.Create(dd_group)
             # MPI Reduce on subdomain processors
-            buff = np.zeros_like(tally_bin[TALLY_SUM])
-            buff_sq = np.zeros_like(tally_bin[TALLY_SUM_SQ])
+            buff = np.zeros_like(data_tally[TALLY_SUM])
+            buff_sq = np.zeros_like(data_tally[TALLY_SUM_SQ])
             if MPI.COMM_NULL != dd_comm:
-                dd_comm.Reduce(tally_bin[TALLY_SUM], buff, MPI.SUM, 0)
-                dd_comm.Reduce(tally_bin[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
+                dd_comm.Reduce(data_tally[TALLY_SUM], buff, MPI.SUM, 0)
+                dd_comm.Reduce(data_tally[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
             if mcdc["dd_idx"] == n:
-                tally_bin[TALLY_SUM] = buff
-                tally_bin[TALLY_SUM_SQ] = buff_sq
+                data_tally[TALLY_SUM] = buff
+                data_tally[TALLY_SUM_SQ] = buff_sq
 
             # free comm group
             dd_group.Free()
@@ -2493,8 +2483,7 @@ def dd_closeout(data, mcdc):
 
 
 @njit
-def tally_closeout(data, mcdc):
-    tally = data[TALLY]
+def tally_closeout(data_tally, mcdc):
     N_history = mcdc["setting"]["N_particle"]
 
     if mcdc["setting"]["N_batch"] > 1:
@@ -2505,13 +2494,13 @@ def tally_closeout(data, mcdc):
 
     elif not mcdc["technique"]["domain_decomposition"]:
         # MPI Reduce
-        buff = np.zeros_like(tally[TALLY_SUM])
-        buff_sq = np.zeros_like(tally[TALLY_SUM_SQ])
+        buff = np.zeros_like(data_tally[TALLY_SUM])
+        buff_sq = np.zeros_like(data_tally[TALLY_SUM_SQ])
         with objmode():
-            MPI.COMM_WORLD.Reduce(tally[TALLY_SUM], buff, MPI.SUM, 0)
-            MPI.COMM_WORLD.Reduce(tally[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
-        tally[TALLY_SUM] = buff
-        tally[TALLY_SUM_SQ] = buff_sq
+            MPI.COMM_WORLD.Reduce(data_tally[TALLY_SUM], buff, MPI.SUM, 0)
+            MPI.COMM_WORLD.Reduce(data_tally[TALLY_SUM_SQ], buff_sq, MPI.SUM, 0)
+        data_tally[TALLY_SUM] = buff
+        data_tally[TALLY_SUM_SQ] = buff_sq
 
     else:
         # find number of subdomains
@@ -2521,22 +2510,22 @@ def tally_closeout(data, mcdc):
         N_dd *= mcdc["technique"]["dd_mesh"]["z"].size - 1
         # DD Reduce if multiple processors per subdomain
         if N_dd != mcdc["mpi_size"]:
-            dd_closeout(data, mcdc)
-        # tally[TALLY_SUM_SQ] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
+            dd_closeout(data_tally, mcdc)
     # Calculate and store statistics
     #   sum --> mean
     #   sum_sq --> standard deviation
-    N_bin = tally.shape[1]
+    N_bin = data_tally.shape[1]
     for i in range(N_bin):
-        tally[TALLY_SUM][i] = tally[TALLY_SUM][i] / N_history
+        data_tally[TALLY_SUM][i] = data_tally[TALLY_SUM][i] / N_history
         radicand = (
-            tally[TALLY_SUM_SQ][i] / N_history - np.square(tally[TALLY_SUM][i])
+            data_tally[TALLY_SUM_SQ][i] / N_history
+            - np.square(data_tally[TALLY_SUM][i])
         ) / (N_history - 1)
         # Check for round-off error
         if abs(radicand) < 1e-18:
-            tally[TALLY_SUM_SQ][i] = 0.0
+            data_tally[TALLY_SUM_SQ][i] = 0.0
         else:
-            tally[TALLY_SUM_SQ][i] = np.sqrt(radicand)
+            data_tally[TALLY_SUM_SQ][i] = np.sqrt(radicand)
 
 
 # =============================================================================
@@ -2762,7 +2751,7 @@ def eigenvalue_tally_closeout(mcdc):
 
 
 @njit
-def move_to_event(P_arr, data, mcdc):
+def move_to_event(P_arr, data_tally, mcdc):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
@@ -2859,18 +2848,18 @@ def move_to_event(P_arr, data, mcdc):
     if mcdc["cycle_active"]:
         # Mesh tallies
         for tally in mcdc["mesh_tallies"]:
-            score_mesh_tally(P_arr, distance, tally, data, mcdc)
+            score_mesh_tally(P_arr, distance, tally, data_tally, mcdc)
 
         # Cell tallies
         cell = mcdc["cells"][P["cell_ID"]]
         for i in range(cell["N_tally"]):
             ID = cell["tally_IDs"][i]
             tally = mcdc["cell_tallies"][ID]
-            score_cell_tally(P_arr, distance, tally, data, mcdc)
+            score_cell_tally(P_arr, distance, tally, data_tally, mcdc)
 
         # CS tallies
         for tally in mcdc["cs_tallies"]:
-            score_cs_tally(P_arr, distance, tally, data, mcdc)
+            score_cs_tally(P_arr, distance, tally, data_tally, mcdc)
 
     if mcdc["setting"]["mode_eigenvalue"]:
         eigenvalue_tally(P_arr, distance, mcdc)
@@ -2902,7 +2891,7 @@ def distance_to_collision(P_arr, mcdc):
 
 
 @njit
-def surface_crossing(P_arr, data, prog):
+def surface_crossing(P_arr, data_tally, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 
@@ -2918,7 +2907,7 @@ def surface_crossing(P_arr, data, prog):
     for i in range(surface["N_tally"]):
         ID = surface["tally_IDs"][i]
         tally = mcdc["surface_tallies"][ID]
-        score_surface_tally(P_arr, surface, tally, data, mcdc)
+        score_surface_tally(P_arr, surface, tally, data_tally, mcdc)
 
     # Need to check new cell later?
     if P["alive"] and not surface["BC"] == BC_REFLECTIVE:
@@ -4126,49 +4115,45 @@ def uq_reset(mcdc, seed):
 
 
 @njit
-def uq_tally_closeout_history(data, mcdc):
-    tally_bin = data[TALLY]
-
+def uq_tally_closeout_history(data_tally, mcdc):
     # Assumes N_batch > 1
     # Accumulate square of history score, but continue to accumulate bin
-    history_bin = tally_bin[TALLY_SCORE] - tally_bin[TALLY_UQ_BATCH]
-    tally_bin[TALLY_UQ_BATCH_VAR] += history_bin**2
-    tally_bin[TALLY_UQ_BATCH] = tally_bin[TALLY_SCORE]
+    history_bin = data_tally[TALLY_SCORE] - data_tally[TALLY_UQ_BATCH]
+    data_tally[TALLY_UQ_BATCH_VAR] += history_bin**2
+    data_tally[TALLY_UQ_BATCH] = data_tally[TALLY_SCORE]
 
 
 @njit
-def uq_tally_closeout_batch(data, mcdc):
-    tally_bin = data[TALLY]
-
+def uq_tally_closeout_batch(data_tally, mcdc):
     # Reset bin
-    N_bin = tally_bin.shape[1]
+    N_bin = data_tally.shape[1]
     for i in range(N_bin):
         # Reset score bin
-        tally_bin[TALLY_UQ_BATCH, i] = 0.0
+        data_tally[TALLY_UQ_BATCH, i] = 0.0
 
     # MPI Reduce
     buff = np.zeros(N_bin)
     with objmode():
-        MPI.COMM_WORLD.Reduce(np.array(tally_bin[TALLY_UQ_BATCH_VAR]), buff, MPI.SUM, 0)
-    tally_bin[TALLY_UQ_BATCH_VAR][:] = buff
+        MPI.COMM_WORLD.Reduce(
+            np.array(data_tally[TALLY_UQ_BATCH_VAR]), buff, MPI.SUM, 0
+        )
+    data_tally[TALLY_UQ_BATCH_VAR][:] = buff
 
 
 @njit
-def uq_tally_closeout(data, mcdc):
-    tally_bin = data[TALLY]
-
+def uq_tally_closeout(data_tally, mcdc):
     N_history = mcdc["setting"]["N_particle"]
 
-    tally_bin[TALLY_UQ_BATCH_VAR] = (
-        tally_bin[TALLY_UQ_BATCH_VAR] / N_history - tally_bin[TALLY_SUM_SQ]
+    data_tally[TALLY_UQ_BATCH_VAR] = (
+        data_tally[TALLY_UQ_BATCH_VAR] / N_history - data_tally[TALLY_SUM_SQ]
     ) / (N_history - 1)
 
     # If we're here, N_batch > 1
     N_history = mcdc["setting"]["N_batch"]
 
     # Store results
-    mean = tally_bin[TALLY_SUM] / N_history
-    tally_bin[TALLY_UQ_BATCH_VAR] /= N_history
-    tally_bin[TALLY_UQ_BATCH] = (
-        tally_bin[TALLY_SUM_SQ] - N_history * np.square(mean)
+    mean = data_tally[TALLY_SUM] / N_history
+    data_tally[TALLY_UQ_BATCH_VAR] /= N_history
+    data_tally[TALLY_UQ_BATCH] = (
+        data_tally[TALLY_SUM_SQ] - N_history * np.square(mean)
     ) / (N_history - 1)

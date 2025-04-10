@@ -60,12 +60,10 @@ def teardown_gpu(mcdc):
 
 
 @njit
-def loop_fixed_source(data_arr, mcdc_arr):
+def loop_fixed_source(data_tally, mcdc_arr):
 
-    # Ensure `data` and `mcdc` exist for the lifetime of the program
+    # Ensure `mcdc` exist for the lifetime of the program
     # by intentionally leaking their memory
-    adapt.leak(data_arr)
-    data = data_arr[0]
     adapt.leak(mcdc_arr)
     mcdc = mcdc_arr[0]
 
@@ -118,14 +116,14 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 break
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
-            loop_source(seed_source, data, mcdc)
+            loop_source(seed_source, data_tally, mcdc)
 
             # Loop over source precursors
             if kernel.get_bank_size(mcdc["bank_precursor"]) > 0:
                 seed_source_precursor = kernel.split_seed(
                     seed_census, SEED_SPLIT_SOURCE_PRECURSOR
                 )
-                loop_source_precursor(seed_source_precursor, data, mcdc)
+                loop_source_precursor(seed_source_precursor, data_tally, mcdc)
 
             # Manage particle banks: population control and work rebalance
             seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
@@ -133,14 +131,14 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
             # Time census-based tally closeout
             if mcdc["setting"]["census_based_tally"]:
-                kernel.tally_reduce(data, mcdc)
+                kernel.tally_reduce(data_tally, mcdc)
                 if mcdc["mpi_master"]:
-                    kernel.census_based_tally_output(data, mcdc)
+                    kernel.census_based_tally_output(data_tally, mcdc)
                     if (
                         mcdc["technique"]["weight_window"]
                         and idx_census < mcdc["setting"]["N_census"] - 2
                     ):
-                        kernel.update_weight_windows(data, mcdc)
+                        kernel.update_weight_windows(data_tally, mcdc)
                 # TODO: UQ tally
 
         # Multi-batch closeout
@@ -158,18 +156,18 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
             if not mcdc["setting"]["census_based_tally"]:
                 # Tally history closeout
-                kernel.tally_reduce(data, mcdc)
-                kernel.tally_accumulate(data, mcdc)
+                kernel.tally_reduce(data_tally, mcdc)
+                kernel.tally_accumulate(data_tally, mcdc)
 
                 # Uq closeout
                 if mcdc["technique"]["uq"]:
-                    kernel.uq_tally_closeout_batch(data, mcdc)
+                    kernel.uq_tally_closeout_batch(data_tally, mcdc)
 
     # Tally closeout
     if not mcdc["setting"]["census_based_tally"]:
         if mcdc["technique"]["uq"]:
-            kernel.uq_tally_closeout(data, mcdc)
-        kernel.tally_closeout(data, mcdc)
+            kernel.uq_tally_closeout(data_tally, mcdc)
+        kernel.tally_closeout(data_tally, mcdc)
 
 
 # =========================================================================
@@ -178,11 +176,9 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
 
 @njit
-def loop_eigenvalue(data_arr, mcdc_arr):
-    # Ensure `data` and `mcdc` exist for the lifetime of the program
+def loop_eigenvalue(data_tally, mcdc_arr):
+    # Ensure `mcdc` exist for the lifetime of the program
     # by intentionally leaking their memory
-    adapt.leak(data_arr)
-    data = data_arr[0]
     adapt.leak(mcdc_arr)
     mcdc = mcdc_arr[0]
 
@@ -192,13 +188,13 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 
         # Loop over source particles
         seed_source = kernel.split_seed(seed_cycle, SEED_SPLIT_SOURCE)
-        loop_source(seed_source, data, mcdc)
+        loop_source(seed_source, data_tally, mcdc)
 
         # Tally "history" closeout
         kernel.eigenvalue_tally_closeout_history(mcdc)
         if mcdc["cycle_active"]:
-            kernel.tally_reduce(data, mcdc)
-            kernel.tally_accumulate(data, mcdc)
+            kernel.tally_reduce(data_tally, mcdc)
+            kernel.tally_accumulate(data_tally, mcdc)
 
         # DD closeout
         if mcdc["technique"]["domain_decomposition"]:
@@ -219,7 +215,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
             mcdc["cycle_active"] = True
 
     # Tally closeout
-    kernel.tally_closeout(data, mcdc)
+    kernel.tally_closeout(data_tally, mcdc)
     kernel.eigenvalue_tally_closeout(mcdc)
 
 
@@ -326,7 +322,7 @@ def prep_particle(P_arr, prog):
 
 
 @njit
-def exhaust_active_bank(data, prog):
+def exhaust_active_bank(data_tally, prog):
     mcdc = adapt.mcdc_global(prog)
     P_arr = adapt.local_array(1, type_.particle)
     P = P_arr[0]
@@ -339,21 +335,21 @@ def exhaust_active_bank(data, prog):
         prep_particle(P_arr, prog)
 
         # Particle loop
-        loop_particle(P_arr, data, mcdc)
+        loop_particle(P_arr, data_tally, mcdc)
 
 
 @njit
-def source_closeout(prog, idx_work, N_prog, data):
+def source_closeout(prog, idx_work, N_prog, data_tally):
     mcdc = adapt.mcdc_global(prog)
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
         if not mcdc["setting"]["census_based_tally"]:
-            kernel.tally_accumulate(data, mcdc)
+            kernel.tally_accumulate(data_tally, mcdc)
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout_history(data, mcdc)
+        kernel.uq_tally_closeout_history(data_tally, mcdc)
 
     # Progress printout
     percent = (idx_work + 1.0) / mcdc["mpi_work_size"]
@@ -419,7 +415,7 @@ def source_dd_resolution(data, prog):
 
 
 @njit
-def loop_source(seed, data, mcdc):
+def loop_source(seed, data_tally, mcdc):
     # Progress bar indicator
     N_prog = 0
 
@@ -435,12 +431,12 @@ def loop_source(seed, data, mcdc):
         generate_source_particle(work_start, idx_work, seed, mcdc)
 
         # Run the source particle and its secondaries
-        exhaust_active_bank(data, mcdc)
+        exhaust_active_bank(data_tally, mcdc)
 
-        source_closeout(mcdc, idx_work, N_prog, data)
+        source_closeout(mcdc, idx_work, N_prog, data_tally)
 
     if mcdc["technique"]["domain_decomposition"]:
-        source_dd_resolution(data, mcdc)
+        source_dd_resolution(data_tally, mcdc)
 
 
 def gpu_sources_spec():
@@ -563,21 +559,21 @@ def gpu_loop_source(seed, data, mcdc):
 
 
 @njit
-def loop_particle(P_arr, data, prog):
+def loop_particle(P_arr, data_tally, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 
     while P["alive"]:
-        step_particle(P_arr, data, prog)
+        step_particle(P_arr, data_tally, prog)
 
 
 @njit
-def step_particle(P_arr, data, prog):
+def step_particle(P_arr, data_tally, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 
     # Determine and move to event
-    kernel.move_to_event(P_arr, data, mcdc)
+    kernel.move_to_event(P_arr, data_tally, mcdc)
 
     # Execute events
     if P["event"] == EVENT_LOST:
@@ -610,7 +606,7 @@ def step_particle(P_arr, data, prog):
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:
-        kernel.surface_crossing(P_arr, data, prog)
+        kernel.surface_crossing(P_arr, data_tally, prog)
         if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
                 kernel.domain_crossing(P_arr, prog)

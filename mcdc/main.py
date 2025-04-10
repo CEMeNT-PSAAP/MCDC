@@ -64,8 +64,7 @@ def run():
     if input_deck.technique["iQMC"]:
         iqmc_validate_inputs(input_deck)
 
-    data_arr, mcdc_arr = prepare()
-    data = data_arr[0]
+    data_tally, mcdc_arr = prepare()
     mcdc = mcdc_arr[0]
     mcdc["runtime_preparation"] = MPI.Wtime() - preparation_start
 
@@ -81,19 +80,19 @@ def run():
     if mcdc["technique"]["iQMC"]:
         iqmc_simulation(mcdc_arr)
     elif mcdc["setting"]["mode_eigenvalue"]:
-        loop_eigenvalue(data_arr, mcdc_arr)
+        loop_eigenvalue(data_tally, mcdc_arr)
     else:
-        loop_fixed_source(data_arr, mcdc_arr)
+        loop_fixed_source(data_tally, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
     # Compressed sensing reconstruction
     N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
     if N_cs_bins != 0:
-        cs_reconstruct(data, mcdc)
+        cs_reconstruct(data_tally, mcdc)
 
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
-    generate_hdf5(data, mcdc)
+    generate_hdf5(data_tally, mcdc)
     mcdc["runtime_output"] = MPI.Wtime() - output_start
 
     # Stop timer
@@ -845,7 +844,7 @@ def prepare():
     N_surface_tally = len(input_deck.surface_tallies)
     N_cell_tally = len(input_deck.cell_tallies)
     N_cs_tally = len(input_deck.cs_tallies)
-    tally_size = 0
+    tally_bin_size = 0
 
     # Mesh tallies
     for i in range(N_mesh_tally):
@@ -976,8 +975,8 @@ def prepare():
             stride *= Nmu
 
         # Set tally stride and accumulate total tally size
-        mcdc["mesh_tallies"][i]["stride"]["tally"] = tally_size
-        tally_size += mcdc["mesh_tallies"][i]["N_bin"]
+        mcdc["mesh_tallies"][i]["stride"]["tally"] = tally_bin_size
+        tally_bin_size += mcdc["mesh_tallies"][i]["N_bin"]
 
     # Surface tallies
     for i in range(N_surface_tally):
@@ -1023,8 +1022,8 @@ def prepare():
             stride *= Nmu
 
         # Set tally stride and accumulate total tally size
-        mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
-        tally_size += mcdc["surface_tallies"][i]["N_bin"]
+        mcdc["surface_tallies"][i]["stride"]["tally"] = tally_bin_size
+        tally_bin_size += mcdc["surface_tallies"][i]["N_bin"]
 
     # Cell tallies
     for i in range(N_cell_tally):
@@ -1083,8 +1082,8 @@ def prepare():
             stride *= Nmu
 
         # Set tally stride and accumulate total tally size
-        mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
-        tally_size += mcdc["cell_tallies"][i]["N_bin"]
+        mcdc["cell_tallies"][i]["stride"]["tally"] = tally_bin_size
+        tally_bin_size += mcdc["cell_tallies"][i]["N_bin"]
 
     # CS tallies
     for i in range(N_cs_tally):
@@ -1130,21 +1129,15 @@ def prepare():
         mcdc["cs_tallies"][i]["N_bin"] *= N_score
 
         # Set tally stride and accumulate total tally size
-        mcdc["cs_tallies"][i]["stride"]["tally"] = tally_size
-        tally_size += mcdc["cs_tallies"][i]["filter"]["N_cs_bins"]
+        mcdc["cs_tallies"][i]["stride"]["tally"] = tally_bin_size
+        tally_bin_size += mcdc["cs_tallies"][i]["filter"]["N_cs_bins"]
 
     # Set tally data
     if not input_deck.technique["uq"]:
-        tally = np.zeros((3, tally_size), dtype=type_.float64)
+        tally_bin_N_copies = 3
     else:
-        tally = np.zeros((5, tally_size), dtype=type_.float64)
-
-    # =========================================================================
-    # Establish Data Type from Tally Info and Construct Tallies
-    # =========================================================================
-
-    type_.make_type_tally(input_deck, tally_size)
-    data_arr = np.zeros(1, dtype=type_.tally)
+        tally_bin_N_copies = 5
+    data_tally = np.zeros((tally_bin_N_copies, tally_bin_size), dtype=type_.float64)
 
     # =========================================================================
     # Platform Targeting, Adapters, Toggles, etc
@@ -1576,7 +1569,7 @@ def prepare():
     # Finalize data: wrapping into a tuple
     # =========================================================================
 
-    return data_arr, mcdc_arr
+    return data_tally, mcdc_arr
 
 
 def cardlist_to_h5group(dictlist, input_group, name):
@@ -1628,14 +1621,13 @@ def dict_to_h5group(dict_, group):
             group[k] = v
 
 
-def dd_mergetally(mcdc, data):
+def dd_mergetally(mcdc, data_tally):
     """
     Performs tally recombination on domain-decomposed mesh tallies.
     Gathers and re-organizes tally data into a single array as it
       would appear in a non-decomposed simulation.
     """
 
-    tally = data[TALLY]
     # create bin for recomposed tallies
     d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
@@ -1648,15 +1640,15 @@ def dd_mergetally(mcdc, data):
 
     # MPI gather
     if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
-        sendcounts = np.array(MPI.COMM_WORLD.gather(len(tally[0]), root=0))
+        sendcounts = np.array(MPI.COMM_WORLD.gather(len(data_tally[0]), root=0))
         if mcdc["mpi_master"]:
-            dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
+            dd_tally = np.zeros((data_tally.shape[0], sum(sendcounts)))
         else:
-            dd_tally = np.empty(tally.shape[0])  # dummy tally
+            dd_tally = np.empty(data_tally.shape[0])  # dummy tally
         # gather tallies
-        for i, t in enumerate(tally):
+        for i, t in enumerate(data_tally):
             MPI.COMM_WORLD.Gatherv(
-                sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
+                sendbuf=data_tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
             )
         # gather tally lengths for proper recombination
         xlens = MPI.COMM_WORLD.gather(xlen, root=0)
@@ -1674,15 +1666,15 @@ def dd_mergetally(mcdc, data):
         # create MPI comm group for nonzero tallies
         dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
         dd_comm = MPI.COMM_WORLD.Create(dd_group)
-        dd_tally = np.empty(tally.shape[0])  # dummy tally
+        dd_tally = np.empty(data_tally.shape[0])  # dummy tally
 
         if MPI.COMM_NULL != dd_comm:
-            sendcounts = np.array(dd_comm.gather(len(tally[0]), root=0))
+            sendcounts = np.array(dd_comm.gather(len(data_tally[0]), root=0))
             if mcdc["mpi_master"]:
-                dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
+                dd_tally = np.zeros((data_tally.shape[0], sum(sendcounts)))
             # gather tallies
-            for i, t in enumerate(tally):
-                dd_comm.Gatherv(tally[i], (dd_tally[i], sendcounts), root=0)
+            for i, t in enumerate(data_tally):
+                dd_comm.Gatherv(data_tally[i], (dd_tally[i], sendcounts), root=0)
             # gather tally lengths for proper recombination
             xlens = dd_comm.gather(xlen, root=0)
             ylens = dd_comm.gather(ylen, root=0)
@@ -1738,7 +1730,7 @@ def dd_mergetally(mcdc, data):
     return dd_tally
 
 
-def dd_mergemesh(mcdc, data):
+def dd_mergemesh(mcdc, data_tally):
     """
     Performs mesh recombination on domain-decomposed mesh tallies.
     Gathers and re-organizes mesh data into a single array as it
@@ -1827,11 +1819,11 @@ def dd_mergemesh(mcdc, data):
     return dd_mesh
 
 
-def generate_hdf5(data, mcdc):
+def generate_hdf5(data_tally, mcdc):
 
     if mcdc["technique"]["domain_decomposition"]:
-        dd_tally = dd_mergetally(mcdc, data)
-        dd_mesh = dd_mergemesh(mcdc, data)
+        dd_tally = dd_mergetally(mcdc, data_tally)
+        dd_mesh = dd_mergemesh(mcdc, data_tally)
 
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
@@ -1929,7 +1921,7 @@ def generate_hdf5(data, mcdc):
                     for elem in shape:
                         N_bin *= elem
                 start = tally["stride"]["tally"]
-                tally_bin = data[TALLY][:, start : start + N_bin]
+                tally_bin = data_tally[:, start : start + N_bin]
                 if mcdc["technique"]["domain_decomposition"]:
                     # substitute recomposed tally
                     tally_bin = dd_tally[:, start : start + N_bin]
@@ -1995,7 +1987,7 @@ def generate_hdf5(data, mcdc):
                 # Reshape tally
                 N_bin = tally["N_bin"]
                 start = tally["stride"]["tally"]
-                tally_bin = data[TALLY][:, start : start + N_bin]
+                tally_bin = data_tally[:, start : start + N_bin]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -2048,7 +2040,7 @@ def generate_hdf5(data, mcdc):
                 # Reshape tally
                 N_bin = tally["N_bin"]
                 start = tally["stride"]["tally"]
-                tally_bin = data[TALLY][:, start : start + N_bin]
+                tally_bin = data_tally[:, start : start + N_bin]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front
@@ -2093,7 +2085,7 @@ def generate_hdf5(data, mcdc):
 
                 # Reshape tally
                 start = tally["stride"]["tally"]
-                tally_bin = data[TALLY][:, start : start + N_cs_bins]
+                tally_bin = data_tally[:, start : start + N_cs_bins]
                 tally_bin = tally_bin.reshape(shape)
 
                 # Roll tally so that score is in the front

@@ -49,7 +49,6 @@ cs_tally = None
 technique = None
 
 global_ = None
-tally = None
 
 
 # ==============================================================================
@@ -1584,17 +1583,6 @@ def make_type_global(input_deck):
             ("source_seed", uint64),
         ]
     )
-
-
-def make_type_tally(input_deck, tally_size):
-    global tally
-
-    if not input_deck.technique["uq"]:
-        width = 3
-    else:
-        width = 5
-
-    tally = into_dtype([("tally", float64, (width, tally_size))])
 
 
 # ==============================================================================
