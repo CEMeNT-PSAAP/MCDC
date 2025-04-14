@@ -2787,8 +2787,8 @@ def move_to_event(P_arr, data, mcdc):
     #   - Set particle boundary event (surface or lattice crossing, or lost)
     #   - Return distance to boundary (surface or lattice)
 
-    #if not mcdc["technique"]["delta_tracking"]:
-    d_boundary = geometry.inspect_geometry(P_arr, mcdc)
+    if not mcdc["technique"]["delta_tracking"]:
+        d_boundary = geometry.inspect_geometry(P_arr, mcdc)
 
     # Particle is lost?
     if P["event"] == EVENT_LOST:
@@ -2816,35 +2816,36 @@ def move_to_event(P_arr, data, mcdc):
     # Distance to next collision
     d_collision = distance_to_collision(P_arr, mcdc)
 
-    #print(d_collision)
 
     # =========================================================================
     # Determine event(s)
     # =========================================================================
     # TODO: Make a function to better maintain the repeating operation
 
-    #if mcdc["technique"]["delta_tracking"]:
-    #    distance = INF
-    #else:
-    distance = d_boundary
-    # TODO: issue when delta tracking particles are lost like crazy
+    # analoug tracking assumes d_boundary as distance setter
+    # delta tracking assumes d_collision
+    if mcdc["technique"]["delta_tracking"]:
+        distance = d_collision
+    else:
+        distance = d_boundary
 
-    #if not mcdc["technique"]["delta_tracking"]:
-    #    # Check distance to domain
-    if d_domain < distance - COINCIDENCE_TOLERANCE:
-        distance = d_domain
-        P["event"] = EVENT_DOMAIN_CROSSING
-        P["surface_ID"] = -1
-    elif geometry.check_coincidence(d_domain, distance):
-        P["event"] += EVENT_DOMAIN_CROSSING
+    if not mcdc["technique"]["delta_tracking"]:
+        # Check distance to domain
+        if d_domain < distance - COINCIDENCE_TOLERANCE:
+            distance = d_domain
+            P["event"] = EVENT_DOMAIN_CROSSING
+            P["surface_ID"] = -1
+        elif geometry.check_coincidence(d_domain, distance):
+            P["event"] += EVENT_DOMAIN_CROSSING
 
     # Check distance to collision
-    if d_collision < distance - COINCIDENCE_TOLERANCE:
-        distance = d_collision
+    if (d_collision < distance - COINCIDENCE_TOLERANCE) or (mcdc["technique"]["delta_tracking"]):
+        if not mcdc["technique"]["delta_tracking"]:
+            distance = d_collision
 
         # DELTA TRACKING REJECTION SAMPLING
         if mcdc["technique"]["delta_tracking"]:
-            # move locate particle and move to 
+            # finding the particle
             if not geometry.locate_particle(P_arr, mcdc):
                 # Particle is lost
                 P["event"] = EVENT_LOST
@@ -2853,6 +2854,7 @@ def move_to_event(P_arr, data, mcdc):
         else:
             P["event"] = EVENT_COLLISION
             P["surface_ID"] = -1
+
     elif geometry.check_coincidence(d_collision, distance):
         P["event"] += EVENT_COLLISION
 
@@ -3751,7 +3753,7 @@ def weight_roulette(P_arr, mcdc):
 
 
 # =============================================================================
-# Delta Tracking
+# Delta Tracking specific functions
 # =============================================================================
 @njit
 def get_MacroMaj(material, P_arr, mcdc):
@@ -3778,6 +3780,27 @@ def get_MacroMaj(material, P_arr, mcdc):
         MacroXS *= N
 
         return MacroXS
+
+
+@njit 
+def phantom_scatter(P_arr):
+    """delta tracking phantom collision event
+       isotropically scattering a particle to avoid biasing the soultion
+        """
+
+    P = P_arr[0]
+
+    # Sample scattering angle
+    mu0 = 2.0 * rng(P_arr) - 1.0
+
+    # Scatter direction
+    azi = 2.0 * PI * rng(P_arr)
+
+    P["ux"], P["uy"], P["uz"] = scatter_direction(
+        P["ux"], P["uy"], P["uz"], mu0, azi
+    )
+
+
 
 # =============================================================================
 # Continuous Energy Physics

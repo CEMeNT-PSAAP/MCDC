@@ -254,8 +254,8 @@ def locate_particle(particle_container, mcdc):
     particle["uy"] = uy_global
     particle["uz"] = uz_global
 
-    # Report lost particle
-    if particle_is_lost:
+    # Report lost particle if not delta tracking
+    if particle_is_lost: #and not mcdc["technique"]["delta_tracking"]:
         report_lost(particle_container)
 
     return not particle_is_lost

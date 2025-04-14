@@ -446,8 +446,7 @@ def material(
 
 
 def surface(type_, bc="interface", **kw):
-    """
-    Create a surface to define the region of a cell.
+    """Create a surface to define the region of a cell.
 
     Parameters
     ----------
