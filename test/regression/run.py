@@ -63,15 +63,6 @@ for name in names:
             + "Note: Skipping %s (require multiple of 16 MPI ranks)" % name
             + Style.RESET_ALL
         )
-    elif name == "cooper_dd" and (
-        not parallel_run or not (mpiexec % 8 == 0 and srun % 8 == 0)
-    ):
-        temp.remove(name)
-        print(
-            Fore.YELLOW
-            + "Note: Skipping %s (require multiple of 8 MPI ranks)" % name
-            + Style.RESET_ALL
-        )
 
 names = temp
 
@@ -171,9 +162,8 @@ for i, name in enumerate(names):
                     a = output[name][()]
                     b = answer[name][()]
 
-                    if (("sdev" in result) or ("uq_var" in result)) and (
-                        args.target == "gpu"
-                    ):
+                    # if (("sdev" in result) or ("uq_var" in result)) and (
+                    if ("uq_var" in result) and (args.target == "gpu"):
                         continue
                     # Passed?
                     if np.isclose(a, b).all():

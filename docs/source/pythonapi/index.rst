@@ -55,7 +55,6 @@ Defining techniques
 
    mcdc.branchless_collision
    mcdc.domain_decomposition
-   mcdc.dsm
    mcdc.IC_generator
    mcdc.iQMC
    mcdc.implicit_capture

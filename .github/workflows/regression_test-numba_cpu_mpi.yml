@@ -26,5 +26,6 @@ jobs:
         pip list 
     - name: Regression Test - Numba and MPI
       run: |
-          cd test/regression
-          python run.py --mode=numba --mpiexec=4
+        cd test/regression
+        python run.py --mode=numba --mpiexec=4
+        python run.py --mode=numba --mpiexec=16 --name=slab_reed_dd_3d
