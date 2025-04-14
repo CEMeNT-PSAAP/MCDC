@@ -37,7 +37,7 @@ mcdc.source(point=[0.0, 0.0, 0.0], isotropic=True, time=[1e-10, 1e-10])
 
 # Tally: cell-average, cell-edge, and time-edge scalar fluxes
 mcdc.tally.mesh_tally(
-    scores=["flux"],
+    scores=["flux", "time-moment-flux"],
     x=np.linspace(-20.5, 20.5, 202),
     t=np.linspace(0.0, 20.0, 21),
 )

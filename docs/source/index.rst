@@ -16,19 +16,22 @@ a rapid methods development platform for for modern HPCs and is targeting CPUs a
 
 MC/DC has support for continuous energy and multi-group transport.
 It can solve more traditional k-eigenvalue problems (used to determine neutron population growth rates in reactors) as well as fully dynamic simulations.
-It has a novel continuous geometry movement function that models transient elements (*e.g.*, control rods or pulsed neutron experiments) more accurately than the step functions used by other codes.
-It also supports some simple Domain decomposition, with more complex algorithms currently being implemented.
+It has a novel continuous geometry movement function that models transient elements (e.g., control rods or pulsed neutron experiments) more accurately than the step functions used by other codes.
+It also supports some simple domain decomposition, with more complex algorithms currently being implemented.
 
 MC/DC is machine portable and is validated to run on:
 
 * linux-64 (x86)
+* win-64 (x86 windows)
 * osx-64 (x86, intel based macs)
 * osx-arm64 (apple silicon based macs)
 * linux-ppc64 (IBM POWER9)
 * linux-nvidia-cuda
-* win-64 (runs but not recommend!)
+* linux-amd-rocm
 
-Primary development is done by the `Center for Exascale Monte Carlo Neutron Transport <https://cement-psaap.github.io/>`_ (CEMeNT).
+MC/DC has been run on some of the largest super computers in the world including the Dane, `Lassen (#72) <https://www.top500.org/system/179567>`_, and `Tuolumne (#10) <https://www.top500.org/system/180308/>`_  machines from LLNL and been scaled upto 1000 nodes.
+Primary development is done by the `Center for Exascale Monte Carlo Neutron Transport <https://cement-psaap.github.io/>`_ (CEMeNT)
+
 
 .. image:: images/home/cement-logo-1.png
    :width: 650
@@ -68,8 +71,8 @@ with support from the following institutions
    :alt: North Carolina state university logo
    :target: https://www.ncsu.edu/
 
-Work within MC/DC has resulted in a large number of journal and conference publications, presentations.
-A full exhaustive list of publications can be found on the `CEMeNT site <https://cement-psaap.github.io/publications/>`_
+Work on within MC/DC has resulted in a number of journal publications and conference publications/presentations.
+A full list of publications can be found on the `CEMeNT website <https://cement-psaap.github.io/publications/>`_ .
 
 .. only:: html
 
@@ -82,7 +85,7 @@ A full exhaustive list of publications can be found on the `CEMeNT site <https:/
 
     install
     user/index
-    contribution
+    contribution/index
     theory/index
     pythonapi/index
     pubs
@@ -140,6 +143,6 @@ please cite our article in the Journal of Open Source software
 
 If you are developing or working with specific numerical methods please take greater care
 to cite the specific publications where that work is presented.
-An exhaustive list can be found on our :ref:`pubs` page.
-Also check out and even longer list of associated publications on our
-`center's publications page <https://cement-psaap.github.io/publications/>`_
+A selected list can be found on our :ref:`pubs` page.
+Also check out an even longer list of associated publications on our
+`center's publications page <https://cement-psaap.github.io/publications/>`_ .

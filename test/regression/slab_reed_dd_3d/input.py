@@ -60,10 +60,10 @@ mcdc.source(x=[4.0, 8.0], y=[4.0, 8.0], z=[0.0, 2.0], isotropic=True, prob=50.0)
 
 # Isotropic source in the first half of the outermost medium,
 # with 1/100 strength
-mcdc.source(x=[0.0, 4.0], y=[0.0, 4.0], z=[4.0, 6.0], isotropic=True, prob=0.5)
-mcdc.source(x=[4.0, 8.0], y=[0.0, 4.0], z=[4.0, 6.0], isotropic=True, prob=0.5)
-mcdc.source(x=[0.0, 4.0], y=[4.0, 8.0], z=[4.0, 6.0], isotropic=True, prob=0.5)
-mcdc.source(x=[4.0, 8.0], y=[4.0, 8.0], z=[4.0, 6.0], isotropic=True, prob=0.5)
+mcdc.source(x=[0.0, 4.0], y=[0.0, 4.0], z=[5.0, 6.0], isotropic=True, prob=0.5)
+mcdc.source(x=[4.0, 8.0], y=[0.0, 4.0], z=[5.0, 6.0], isotropic=True, prob=0.5)
+mcdc.source(x=[0.0, 4.0], y=[4.0, 8.0], z=[5.0, 6.0], isotropic=True, prob=0.5)
+mcdc.source(x=[4.0, 8.0], y=[4.0, 8.0], z=[5.0, 6.0], isotropic=True, prob=0.5)
 
 # =============================================================================
 # Set tally, setting, and run mcdc
@@ -77,7 +77,7 @@ mcdc.tally.mesh_tally(
 )
 
 # Setting
-mcdc.setting(N_particle=5000)
+mcdc.setting(N_particle=5000, N_batch=2)
 dd_x = np.array([0.0, 4.0, 8.0])
 dd_y = np.array([0.0, 4.0, 8.0])
 dd_z = np.array([0.0, 2.0, 3.0, 5.0, 8.0])
