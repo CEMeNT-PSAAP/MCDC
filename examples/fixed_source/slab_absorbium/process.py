@@ -20,6 +20,8 @@ with h5py.File("output.h5", "r") as f:
     psi = np.transpose(psi)
     psi_sd = np.transpose(psi_sd)
 
+
+
 I = len(z) - 1
 N = len(mu) - 1
 
@@ -40,13 +42,15 @@ for n in range(N):
 # Reference solution
 phi_ref, _, psi_ref = reference(z, mu)
 
+print(phi_ref)
+
 # Flux - spatial average
 plt.plot(z_mid, phi, "-b", label="MC")
 plt.fill_between(z_mid, phi - phi_sd, phi + phi_sd, alpha=0.2, color="b")
-plt.plot(z_mid, phi_ref, "--r", label="Ref.")
+plt.plot(z_mid, phi_ref, "--r^", label="Ref.")
 plt.xlabel(r"$z$, cm")
 plt.ylabel("Flux")
-plt.ylim([0.06, 0.16])
+#plt.ylim([0.06])
 plt.grid()
 plt.legend()
 plt.title(r"$\bar{\phi}_i$")

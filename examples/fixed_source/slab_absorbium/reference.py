@@ -11,7 +11,7 @@ def reference(x, mu):
     # Parameters
     SigmaT3 = 1.0
     SigmaT1 = 1.5
-    SigmaT2 = 2.0
+    SigmaT2 = 1.5
     q1 = 1.0 / 6.0 / 2
     q2 = 1.0 / 6.0 / 2
     q3 = 1.0 / 6.0 / 2
