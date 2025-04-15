@@ -2890,9 +2890,11 @@ def move_to_event(P_arr, data, mcdc):
     # =========================================================================
     # Move particle
     # =========================================================================
-    event_cont = P["event"]
-    geometry.inspect_geometry(P_arr, mcdc)
-    P["event"] = event_cont
+    #event_cont = P["event"]
+    #geometry.inspect_geometry(P_arr, mcdc)
+    #P["event"] = event_cont
+    #print("before tally mesh data: ", data)
+    #print("z: {}, uz: {}, distance: {}".format( P["z"], P["uz"], distance ) )
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
@@ -2917,6 +2919,9 @@ def move_to_event(P_arr, data, mcdc):
 
     # Move particle
     move_particle(P_arr, distance, mcdc)
+
+    #print("after tally mesh data: ", data)
+    #print("z: {}, uz: {}, distance: {}".format( P["z"], P["uz"], distance ) )
 
 
 @njit
@@ -2953,9 +2958,12 @@ def rejection_sample(P_arr, mcdc):
 
     xi = rng(P_arr)
 
+    #print("Rejection sample data z: {}, SigmaT: {}, majorant: {}, rejection_ratio: {}, xi: {}".format(P['z'], SigmaT, Maj, reject_rat, xi) )
+
     if (xi < reject_rat): #real collision
         P["event"] = EVENT_COLLISION
     else: #phantom collision
+        #print("RJECTED")
         P["event"] = EVENT_PHANTOM_COLLISION
 
 # =============================================================================

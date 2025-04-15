@@ -151,7 +151,7 @@ def inspect_geometry(particle_container, mcdc):
     particle["uz"] = uz_global
 
     # Report lost particle
-    if event == EVENT_LOST:
+    if (event == EVENT_LOST):
         report_lost(particle_container)
 
     # Assign particle event

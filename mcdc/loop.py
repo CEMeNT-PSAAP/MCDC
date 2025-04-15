@@ -435,9 +435,15 @@ def loop_source(seed, data, mcdc):
         generate_source_particle(work_start, idx_work, seed, mcdc)
 
         # Run the source particle and its secondaries
+        #print()
+        #print()
+        #print()
+        #print("\nparticle history {}".format(idx_work))
         exhaust_active_bank(data, mcdc)
 
         source_closeout(mcdc, idx_work, N_prog, data)
+
+    #print(data)
 
     if mcdc["technique"]["domain_decomposition"]:
         source_dd_resolution(data, mcdc)
@@ -566,9 +572,11 @@ def gpu_loop_source(seed, data, mcdc):
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
-
+    l = 0
     while P["alive"]:
+        #print("particle step {}".format(l))
         step_particle(P_arr, data, prog)
+        l+=1
 
 
 #@njit
@@ -577,6 +585,10 @@ def loop_particle(P_arr, data, prog):
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
+
+    geometry.locate_particle(P_arr, mcdc)
+
+    #cur_mat = P["material_ID"]
 
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
@@ -609,10 +621,15 @@ def step_particle(P_arr, data, prog):
 
             elif P["event"] & EVENT_FISSION:
                 kernel.fission(P_arr, prog)
-    
+
     if P["event"] & EVENT_PHANTOM_COLLISION:
+        #if cur_mat != P["material_ID"]:
+        #    print("particle moved materials while delta tracking!")
         # delta tracking
         P["alive"] = True
+        P["cell_ID"] = -1
+        P["material_ID"] = -1
+
         #kernel.phantom_scatter(P_arr)
 
     # Surface and domain crossing
