@@ -1503,7 +1503,11 @@ def prepare():
             majorant_energy_grid = mcdc["nuclides"][0]["speed"][:]
 
             for i in range(N_groups):
-                majorant_xsec[i] = np.max(mcdc["nuclides"][:]["total"])
+                majorant_xsec[i] = np.max(mcdc["nuclides"][:]["total"][:,i])
+                #print(mcdc["nuclides"][:]["total"].shape)
+                #print(mcdc["nuclides"][:]["total"])
+
+        print(majorant_xsec)
 
         # This might need to use copy_feild but not sure why
         mcdc["technique"]["micro_majorant_xsec"] = majorant_xsec[:]

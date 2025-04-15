@@ -1849,6 +1849,20 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
 # =============================================================================
 
 
+def score_collision_tally(P_arr, distance, tally, data, mcdc):
+    P = P_arr[0]
+    tally_bin = data[TALLY]
+    material = mcdc["materials"][P["material_ID"]]
+    mesh = tally["filter"]
+    stride = tally["stride"]
+
+    # find the mesh cell I am in
+
+
+    # add 
+
+
+
 @njit
 def score_mesh_tally(P_arr, distance, tally, data, mcdc):
     P = P_arr[0]
@@ -2762,7 +2776,8 @@ def eigenvalue_tally_closeout(mcdc):
 
 
 #@njit
-@profile
+#@profile
+@njit
 def move_to_event(P_arr, data, mcdc):
     # ==================================================================================
     # Preparation (as needed)
@@ -2794,7 +2809,7 @@ def move_to_event(P_arr, data, mcdc):
     if P["event"] == EVENT_LOST:
         return
 
-    # ==================================================================================
+    # p
     # Get distances to other events
     # ==================================================================================
 
@@ -2816,7 +2831,6 @@ def move_to_event(P_arr, data, mcdc):
     # Distance to next collision
     d_collision = distance_to_collision(P_arr, mcdc)
 
-
     # =========================================================================
     # Determine event(s)
     # =========================================================================
@@ -2825,7 +2839,7 @@ def move_to_event(P_arr, data, mcdc):
     # analoug tracking assumes d_boundary as distance setter
     # delta tracking assumes d_collision
     if mcdc["technique"]["delta_tracking"]:
-        distance = d_collision
+        distance = INF
     else:
         distance = d_boundary
 
@@ -2839,9 +2853,9 @@ def move_to_event(P_arr, data, mcdc):
             P["event"] += EVENT_DOMAIN_CROSSING
 
     # Check distance to collision
-    if (d_collision < distance - COINCIDENCE_TOLERANCE) or (mcdc["technique"]["delta_tracking"]):
-        if not mcdc["technique"]["delta_tracking"]:
-            distance = d_collision
+    if (d_collision < distance - COINCIDENCE_TOLERANCE): #or (mcdc["technique"]["delta_tracking"]):
+        #if not mcdc["technique"]["delta_tracking"]:
+        distance = d_collision
 
         # DELTA TRACKING REJECTION SAMPLING
         if mcdc["technique"]["delta_tracking"]:
@@ -2850,6 +2864,7 @@ def move_to_event(P_arr, data, mcdc):
                 # Particle is lost
                 P["event"] = EVENT_LOST
                 return
+            
             rejection_sample(P_arr, mcdc)
         else:
             P["event"] = EVENT_COLLISION
@@ -2875,10 +2890,14 @@ def move_to_event(P_arr, data, mcdc):
     # =========================================================================
     # Move particle
     # =========================================================================
+    event_cont = P["event"]
+    geometry.inspect_geometry(P_arr, mcdc)
+    P["event"] = event_cont
 
     # Score tracklength tallies
     if mcdc["cycle_active"]:
         # Mesh tallies
+        #if not (P["event"] == EVENT_PHANTOM_COLLISION):
         for tally in mcdc["mesh_tallies"]:
             score_mesh_tally(P_arr, distance, tally, data, mcdc)
 
@@ -2914,7 +2933,7 @@ def distance_to_collision(P_arr, mcdc):
     # Vacuum material?
     if SigmaT == 0.0:
         return INF
-
+    
     # Sample collision distance
     xi = rng(P_arr)
     distance = -math.log(xi) / SigmaT
@@ -2933,6 +2952,7 @@ def rejection_sample(P_arr, mcdc):
     reject_rat = SigmaT/Maj
 
     xi = rng(P_arr)
+
     if (xi < reject_rat): #real collision
         P["event"] = EVENT_COLLISION
     else: #phantom collision
@@ -3795,6 +3815,15 @@ def phantom_scatter(P_arr):
 
     # Scatter direction
     azi = 2.0 * PI * rng(P_arr)
+
+    #mu  = 2.0*rands[2*i] - 1.0
+    #azi = 2.0*math.pi*rands[2*i+1]
+    #
+    ## Convert to Cartesian coordinate
+    #c = (1.0 - mu**2)**0.5
+    #p_dir_y[scatter_indices[i]] = math.cos(azi)*c
+    #p_dir_z[scatter_indices[i]] = math.sin(azi)*c
+    #p_dir_x[scatter_indices[i]] = mu
 
     P["ux"], P["uy"], P["uz"] = scatter_direction(
         P["ux"], P["uy"], P["uz"], mu0, azi

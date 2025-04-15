@@ -572,7 +572,8 @@ def loop_particle(P_arr, data, prog):
 
 
 #@njit
-@profile
+#@profile
+@njit
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -612,11 +613,11 @@ def step_particle(P_arr, data, prog):
     if P["event"] & EVENT_PHANTOM_COLLISION:
         # delta tracking
         P["alive"] = True
-        kernel.phantom_scatter(P_arr)
+        #kernel.phantom_scatter(P_arr)
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:
-        print("never!")
+        #print("never!")
         kernel.surface_crossing(P_arr, data, prog)
         if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
