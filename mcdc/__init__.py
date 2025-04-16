@@ -30,6 +30,8 @@ from mcdc.main import (
     prepare,
     run,
     visualize,
+    recombine_tallies,
 )
 
-__version__ = importlib.metadata.version("mcdc")
+# Temporarily commenting out so docs will build
+# __version__ = importlib.metadata.version("mcdc")

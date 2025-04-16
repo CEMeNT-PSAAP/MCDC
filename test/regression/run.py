@@ -43,21 +43,27 @@ if "__pycache__" in names:
 
 # Skip domain decomp tests unless there are 4 MPI processes
 temp = names.copy()
+parallel_run = mpiexec > 0 or srun > 0
 for name in names:
-    if name == "dd_slab_reed" and not (mpiexec == 4 or srun == 4):
+    if name == "slab_reed_dd" and (
+        not parallel_run or not (mpiexec % 4 == 0 and srun % 4 == 0)
+    ):
         temp.remove(name)
         print(
             Fore.YELLOW
-            + "Note: Skipping %s (require 4 MPI ranks)" % name
+            + "Note: Skipping %s (require multiple of 4 MPI ranks)" % name
             + Style.RESET_ALL
         )
-    elif name == "dd_cooper" and not (mpiexec == 8 or srun == 8):
+    elif name == "slab_reed_dd_3d" and (
+        not parallel_run or not (mpiexec % 16 == 0 and srun % 16 == 0)
+    ):
         temp.remove(name)
         print(
             Fore.YELLOW
-            + "Note: Skipping %s (require 8 MPI ranks)" % name
+            + "Note: Skipping %s (require multiple of 16 MPI ranks)" % name
             + Style.RESET_ALL
         )
+
 names = temp
 
 # Skip iqmc if GPU run
@@ -103,16 +109,19 @@ for i, name in enumerate(names):
 
     # Run the test problem (redirect the stdout)
     if mpiexec > 1:
+        gpus_per_task = ""
+        if target == "gpu":
+            gpus_per_task = f"--gpus-per-task=1 "
         os.system(
-            "mpiexec -n %i python input.py --mode=%s --target=%s --output=output --no-progress-bar > tmp 2>&1"
-            % (mpiexec, mode, target)
+            "mpiexec -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar> tmp 2>&1"
+            % (mpiexec, gpus_per_task, mode, target)
         )
     elif srun > 1:
         gpus_per_task = ""
         if target == "gpu":
             gpus_per_task = f"--gpus-per-task=1 "
         os.system(
-            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar %s> tmp 2>&1"
+            "srun -n %i %s python input.py --mode=%s --target=%s --output=output --no-progress-bar> tmp 2>&1"
             % (srun, gpus_per_task, mode, target)
         )
     else:
@@ -153,9 +162,8 @@ for i, name in enumerate(names):
                     a = output[name][()]
                     b = answer[name][()]
 
-                    if (("sdev" in result) or ("uq_var" in result)) and (
-                        args.target == "gpu"
-                    ):
+                    # if (("sdev" in result) or ("uq_var" in result)) and (
+                    if ("uq_var" in result) and (args.target == "gpu"):
                         continue
                     # Passed?
                     if np.isclose(a, b).all():

@@ -1,12 +1,12 @@
 import argparse, os, sys
 import importlib.metadata
 import mcdc.config as config
-
 import matplotlib.pyplot as plt
-from matplotlib import colors as mpl_colors
-
 import numba as nb
-
+from matplotlib import colors as mpl_colors
+import scipy.fft as spfft
+from scipy.stats.qmc import Halton
+import cvxpy as cp
 
 from mcdc.card import UniverseCard
 from mcdc.print_ import (
@@ -33,8 +33,8 @@ from mcdc.loop import (
     loop_eigenvalue,
     build_gpu_progs,
 )
-import mcdc.geometry as geometry
 from mcdc.iqmc.iqmc_loop import iqmc_simulation, iqmc_validate_inputs
+import mcdc.src.geometry as geometry
 
 import mcdc.loop as loop
 from mcdc.print_ import print_banner, print_msg, print_runtime, print_header_eigenvalue
@@ -86,6 +86,11 @@ def run():
         loop_fixed_source(data_arr, mcdc_arr)
     mcdc["runtime_simulation"] = MPI.Wtime() - simulation_start
 
+    # Compressed sensing reconstruction
+    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
+    if N_cs_bins != 0:
+        cs_reconstruct(data, mcdc)
+
     # Output: generate hdf5 output files
     output_start = MPI.Wtime()
     generate_hdf5(data, mcdc)
@@ -97,6 +102,122 @@ def run():
 
     # Closout
     closeout(mcdc)
+
+
+def calculate_cs_A(data, mcdc):
+    x_grid = mcdc["mesh_tallies"]["filter"]["x"][0]
+    y_grid = mcdc["mesh_tallies"]["filter"]["y"][0]
+    Nx = len(x_grid) - 1
+    Ny = len(y_grid) - 1
+
+    N_cs_bins = mcdc["cs_tallies"]["filter"]["N_cs_bins"][0]
+    cs_bin_size = mcdc["cs_tallies"]["filter"]["cs_bin_size"][0]
+
+    S = [[] for _ in range(N_cs_bins)]
+
+    [x_centers, y_centers] = mcdc["cs_tallies"]["filter"]["cs_centers"][0]
+    x_centers[-1] = (x_grid[-1] + x_grid[0]) / 2
+    y_centers[-1] = (y_grid[-1] + y_grid[0]) / 2
+
+    # Calculate the overlap grid for each bin, and flatten into a row of S
+    for ibin in range(N_cs_bins):
+        if ibin == N_cs_bins - 1:
+            # could just change to -INF, INF
+            cs_bin_size = np.array([x_grid[-1] + x_grid[0], y_grid[-1] + y_grid[0]])
+
+        bin_x_min = x_centers[ibin] - cs_bin_size[0] / 2
+        bin_x_max = x_centers[ibin] + cs_bin_size[0] / 2
+        bin_y_min = y_centers[ibin] - cs_bin_size[1] / 2
+        bin_y_max = y_centers[ibin] + cs_bin_size[1] / 2
+
+        overlap = np.zeros((len(y_grid) - 1, len(x_grid) - 1))
+
+        for i in range(len(y_grid) - 1):
+            for j in range(len(x_grid) - 1):
+                cell_x_min = x_grid[j]
+                cell_x_max = x_grid[j + 1]
+                cell_y_min = y_grid[i]
+                cell_y_max = y_grid[i + 1]
+
+                # Calculate overlap in x and y directions
+                overlap_x = np.maximum(
+                    0,
+                    np.minimum(bin_x_max, cell_x_max)
+                    - np.maximum(bin_x_min, cell_x_min),
+                )
+                overlap_y = np.maximum(
+                    0,
+                    np.minimum(bin_y_max, cell_y_max)
+                    - np.maximum(bin_y_min, cell_y_min),
+                )
+
+                # Calculate fractional overlap
+                cell_area = (cell_x_max - cell_x_min) * (cell_y_max - cell_y_min)
+                overlap[i, j] = (overlap_x * overlap_y) / cell_area
+
+        S[ibin] = overlap.flatten()
+    S = np.array(S)
+    mcdc["cs_tallies"]["filter"]["cs_S"] = S
+
+    assert np.allclose(S[-1], np.ones(Nx * Ny)), "Last row of S must be all ones"
+    assert S.shape[1] == Nx * Ny, "Size of S must match Nx * Ny."
+    assert (
+        S.shape[1] == mcdc["cs_tallies"]["N_bin"][0]
+    ), "Size of S must match number of cells in desired mesh tally"
+
+    # TODO: can this be done in a different way? idk
+    # Construct the DCT matrix T
+    idct_basis_x = spfft.idct(np.identity(Nx), axis=0)
+    idct_basis_y = spfft.idct(np.identity(Ny), axis=0)
+
+    T_inv = np.kron(idct_basis_y, idct_basis_x)
+    A = S @ T_inv
+    return A, T_inv
+
+
+def calculate_cs_sparse_solution(data, mcdc, A, b):
+    N_fine_cells = mcdc["cs_tallies"]["N_bin"][0]
+
+    # setting up the problem with CVXPY
+    vx = cp.Variable(N_fine_cells)
+
+    # Basis pursuit denoising
+    l = 0.5
+    objective = cp.Minimize(0.5 * cp.norm(A @ vx - b, 2) + l * cp.norm(vx, 1))
+    prob = cp.Problem(objective)
+    result = prob.solve(verbose=False)
+
+    # # Basis pursuit
+    # objective = cp.Minimize(cp.norm(vx, 1))
+    # constraints = [A @ vx == b]
+    # prob = cp.Problem(objective, constraints)
+    # result = prob.solve(verbose=True)
+    # print(f'vx.value = {vx.value}')
+
+    # formatting the sparse solution
+    sparse_solution = np.array(vx.value).squeeze()
+
+    return sparse_solution
+
+
+def cs_reconstruct(data, mcdc):
+    tally_bin = data[TALLY]
+    tally = mcdc["cs_tallies"][0]
+    stride = tally["stride"]
+    bin_idx = stride["tally"]
+    N_cs_bins = tally["filter"]["N_cs_bins"]
+    Nx = len(mcdc["mesh_tallies"]["filter"]["x"][0]) - 1
+    Ny = len(mcdc["mesh_tallies"]["filter"]["y"][0]) - 1
+
+    b = tally_bin[TALLY_SUM, bin_idx : bin_idx + N_cs_bins]
+
+    A, T_inv = calculate_cs_A(data, mcdc)
+    x = calculate_cs_sparse_solution(data, mcdc, A, b)
+
+    recon = T_inv @ x
+    recon_reshaped = recon.reshape(Ny, Nx)
+
+    tally["filter"]["cs_reconstruction"] = recon_reshaped
 
 
 # =============================================================================
@@ -152,7 +273,7 @@ def get_indexes(N, nx, ny):
     return i, j, k
 
 
-def get_neighbors(N, w, nx, ny, nz):
+def get_neighbors(N, nx, ny, nz):
     i, j, k = get_indexes(N, nx, ny)
     if i > 0:
         xn = get_d_idx(i - 1, j, k, nx, ny)
@@ -181,16 +302,21 @@ def get_neighbors(N, w, nx, ny, nz):
     return xn, xp, yn, yp, zn, zp
 
 
-def dd_prepare():
+def prepare_domain_decomposition():
+    # Key parameters
     work_ratio = input_deck.technique["dd_work_ratio"]
-
+    N_proc = MPI.COMM_WORLD.Get_size()
+    # Decomposition mesh sizes
     d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
     d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
+    # Default parameters
     if input_deck.technique["dd_exchange_rate"] == None:
         input_deck.technique["dd_exchange_rate"] = 100
-
+    if work_ratio is None:
+        work_ratio = np.ones(d_Nx * d_Ny * d_Nz, dtype=int)
+        input_deck.technique["dd_work_ratio"] = work_ratio
     if input_deck.technique["dd_exchange_rate_padding"] == None:
         if config.args.target == "gpu":
             padding = config.args.gpu_block_count * 64 * 16
@@ -198,36 +324,38 @@ def dd_prepare():
             padding = 0
         input_deck.technique["dd_exchange_rate_padding"] = padding
 
-    if work_ratio is None:
-        work_ratio = np.ones(d_Nx * d_Ny * d_Nz)
-        input_deck.technique["dd_work_ratio"] = work_ratio
-
+    # Check if the combination of work_ratio and MPI rank size is acceptable
     if (
         input_deck.technique["domain_decomposition"]
-        and np.sum(work_ratio) != MPI.COMM_WORLD.Get_size()
+        and N_proc % np.sum(work_ratio) != 0
     ):
         print_msg(
-            "Domain work ratio not equal to number of processors, %i != %i "
-            % (np.sum(work_ratio), MPI.COMM_WORLD.Get_size())
+            "Number of MPI processes (%i) should be a multiple of the sum of the decomposed domain work ratio (%i)"
+            % (N_proc, np.sum(work_ratio))
         )
         exit()
+    N_ratio = int(N_proc / np.sum(work_ratio))
+    work_ratio *= N_ratio
 
+    # Assign domain index and processors' numbers in each domain
     if input_deck.technique["domain_decomposition"]:
-        # Assigning domain index
         i = 0
         rank_info = []
         for n in range(d_Nx * d_Ny * d_Nz):
             ranks = []
-            for r in range(int(work_ratio[n])):
+            for r in range(work_ratio[n]):
                 ranks.append(i)
                 if MPI.COMM_WORLD.Get_rank() == i:
                     d_idx = n
+                    local_rank = r
                 i += 1
             rank_info.append(ranks)
         input_deck.technique["dd_idx"] = d_idx
-        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, 0, d_Nx, d_Ny, d_Nz)
+        input_deck.technique["dd_local_rank"] = local_rank
+        xn, xp, yn, yp, zn, zp = get_neighbors(d_idx, d_Nx, d_Ny, d_Nz)
     else:
         input_deck.technique["dd_idx"] = 0
+        input_deck.technique["dd_local_rank"] = 0
         input_deck.technique["dd_xp_neigh"] = []
         input_deck.technique["dd_xn_neigh"] = []
         input_deck.technique["dd_yp_neigh"] = []
@@ -236,6 +364,7 @@ def dd_prepare():
         input_deck.technique["dd_zn_neigh"] = []
         return
 
+    # Assign neighbor processor numbers in all 3x2 sides
     if xp is not None:
         input_deck.technique["dd_xp_neigh"] = rank_info[xp]
     else:
@@ -297,6 +426,28 @@ def dd_mesh_bounds(idx):
     return mesh_xn, mesh_xp, mesh_yn, mesh_yp, mesh_zn, mesh_zp
 
 
+def generate_cs_centers(mcdc, N_dim=3, seed=123456789):
+    N_cs_bins = int(mcdc["cs_tallies"]["filter"]["N_cs_bins"])
+    x_lims = (
+        mcdc["cs_tallies"]["filter"]["x"][0][-1],
+        mcdc["cs_tallies"]["filter"]["x"][0][0],
+    )
+    y_lims = (
+        mcdc["cs_tallies"]["filter"]["y"][0][-1],
+        mcdc["cs_tallies"]["filter"]["y"][0][0],
+    )
+
+    # Generate Halton sequence according to the seed
+    halton_seq = Halton(d=N_dim, seed=seed)
+    points = halton_seq.random(n=N_cs_bins)
+
+    # Extract x and y coordinates as tuples separately, scaled to the problem dimensions
+    x_coords = tuple(points[:, 0] * (x_lims[1] - x_lims[0]) + x_lims[0])
+    y_coords = tuple(points[:, 1] * (y_lims[1] - y_lims[0]) + y_lims[0])
+
+    return (x_coords, y_coords)
+
+
 def prepare():
     """
     Preparing the MC transport simulation:
@@ -305,16 +456,17 @@ def prepare():
       (3) Create and set up global variable container `mcdc`
     """
 
-    dd_prepare()
+    prepare_domain_decomposition()
 
     # =========================================================================
     # Create root universe if not defined
     # =========================================================================
 
-    N_cell = len(input_deck.cells)
     if input_deck.universes[0] == None:
-        root_universe = UniverseCard(N_cell)
+        N_cell = len(input_deck.cells)
+        root_universe = UniverseCard()
         root_universe.ID = 0
+        root_universe.cell_IDs = np.zeros(N_cell, int)
         for i, cell in enumerate(input_deck.cells):
             root_universe.cell_IDs[i] = cell.ID
         input_deck.universes[0] = root_universe
@@ -338,6 +490,17 @@ def prepare():
             i += 1
 
     # =========================================================================
+    # Time census-based tally
+    # =========================================================================
+    # Reset time grid size of all tallies if census-based tally is desired
+
+    if input_deck.setting["census_based_tally"]:
+        N_bin = input_deck.setting["census_tally_frequency"]
+        for tally in input_deck.mesh_tallies:
+            tally.N_bin *= N_bin / (len(tally.t) - 1)
+            tally.t = np.zeros(N_bin + 1)
+
+    # =========================================================================
     # Adapt kernels
     # =========================================================================
 
@@ -352,11 +515,13 @@ def prepare():
     type_.make_type_nuclide(input_deck)
     type_.make_type_material(input_deck)
     type_.make_type_surface(input_deck)
-    type_.make_type_universe(input_deck)
+    type_.make_type_cell(input_deck)
     type_.make_type_lattice(input_deck)
     type_.make_type_source(input_deck)
     type_.make_type_mesh_tally(input_deck)
     type_.make_type_surface_tally(input_deck)
+    type_.make_type_cell_tally(input_deck)
+    type_.make_type_cs_tally(input_deck)
     type_.make_type_setting(input_deck)
     type_.make_type_uq(input_deck)
     type_.make_type_domain_decomp(input_deck)
@@ -480,10 +645,49 @@ def prepare():
 
     N_surface = len(input_deck.surfaces)
     for i in range(N_surface):
+        surface = mcdc["surfaces"][i]
+        surface_input = input_deck.surfaces[i]
+
         # Direct assignment
         for name in type_.surface.names:
-            if name not in ["BC", "tally_IDs"]:
-                copy_field(mcdc["surfaces"][i], input_deck.surfaces[i], name)
+            if name not in [
+                "type",
+                "BC",
+                "tally_IDs",
+                "move_velocities",
+                "move_translations",
+                "move_time_grid",
+            ]:
+                copy_field(surface, surface_input, name)
+
+        # Type
+        if surface_input.type == "plane-x":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_X
+        elif surface_input.type == "plane-y":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Y
+        elif surface_input.type == "plane-z":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE_Z
+        elif surface_input.type == "plane":
+            surface["type"] = SURFACE_LINEAR
+            surface["type"] += SURFACE_PLANE
+        elif surface_input.type == "cylinder-x":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_X
+        elif surface_input.type == "cylinder-y":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Y
+        elif surface_input.type == "cylinder-z":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_CYLINDER_Z
+        elif surface_input.type == "sphere":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
+        elif surface_input.type == "quadric":
+            surface["type"] = SURFACE_QUADRATIC
+            surface["type"] += SURFACE_SPHERE
 
         # Boundary condition
         if input_deck.surfaces[i].boundary_type == "interface":
@@ -498,61 +702,101 @@ def prepare():
             N = len(getattr(input_deck.surfaces[i], name))
             mcdc["surfaces"][i][name][:N] = getattr(input_deck.surfaces[i], name)
 
+        # Moves
+        if surface["moving"]:
+            for n in range(surface["N_move"]):
+                duration = surface_input.move_durations[n]
+                velocity = surface_input.move_velocities[n]
+
+                surface["move_velocities"][n] = velocity
+
+                t_start = surface["move_time_grid"][n]
+                surface["move_time_grid"][n + 1] = t_start + duration
+
+                trans_start = surface["move_translations"][n]
+                surface["move_translations"][n + 1] = trans_start + velocity * duration
+
     # =========================================================================
-    # Cells
+    # Set cells
     # =========================================================================
 
     N_cell = len(input_deck.cells)
     surface_data_idx = 0
     region_data_idx = 0
     for i in range(N_cell):
-        for name in ["ID", "fill_ID", "translation"]:
-            copy_field(mcdc["cells"][i], input_deck.cells[i], name)
+        cell = mcdc["cells"][i]
+        cell_input = input_deck.cells[i]
+
+        # Directly transferables
+        for name in ["ID", "fill_ID", "translation", "rotation", "N_tally"]:
+            copy_field(cell, cell_input, name)
 
         # Fill type
-        if input_deck.cells[i].fill_type == "material":
-            mcdc["cells"][i]["fill_type"] = FILL_MATERIAL
-        elif input_deck.cells[i].fill_type == "universe":
-            mcdc["cells"][i]["fill_type"] = FILL_UNIVERSE
-        elif input_deck.cells[i].fill_type == "lattice":
-            mcdc["cells"][i]["fill_type"] = FILL_LATTICE
+        if cell_input.fill_type == "material":
+            cell["fill_type"] = FILL_MATERIAL
+        elif cell_input.fill_type == "universe":
+            cell["fill_type"] = FILL_UNIVERSE
+        elif cell_input.fill_type == "lattice":
+            cell["fill_type"] = FILL_LATTICE
 
-        # Fill translation flag
-        if np.max(np.abs(mcdc["cells"][i]["translation"])) > 0.0:
-            mcdc["cells"][i]["fill_translated"] = True
+        # Fill translation
+        if np.max(np.abs(cell["translation"])) > 0.0:
+            cell["fill_translated"] = True
 
-        # Surface data
-        mcdc["cells"][i]["surface_data_idx"] = surface_data_idx
-        N_surface = len(input_deck.cells[i].surface_IDs)
-        mcdc["cell_surface_data"][surface_data_idx] = N_surface
-        mcdc["cell_surface_data"][
-            surface_data_idx + 1 : surface_data_idx + N_surface + 1
-        ] = input_deck.cells[i].surface_IDs
-        surface_data_idx += N_surface + 1
+        # Fill rotation
+        if np.max(np.abs(cell["rotation"])) > 0.0:
+            cell["fill_rotated"] = True
 
-        # Region data
-        mcdc["cells"][i]["region_data_idx"] = region_data_idx
-        N_RPN = len(input_deck.cells[i]._region_RPN)
-        mcdc["cell_region_data"][region_data_idx] = N_RPN
-        mcdc["cell_region_data"][region_data_idx + 1 : region_data_idx + N_RPN + 1] = (
-            input_deck.cells[i]._region_RPN
-        )
-        region_data_idx += N_RPN + 1
+            # Convert rotation
+            cell["rotation"][0] *= PI / 180.0
+            cell["rotation"][1] *= PI / 180.0
+            cell["rotation"][2] *= PI / 180.0
+
+        # Surface IDs
+        cell["surface_data_idx"] = surface_data_idx
+        cell["N_surface"] = len(cell_input.surface_IDs)
+        # The data
+        start = surface_data_idx
+        end = start + cell["N_surface"]
+        mcdc["cells_data_surface"][start:end] = cell_input.surface_IDs
+        surface_data_idx += cell["N_surface"]
+
+        # Region RPN tokens
+        cell["region_data_idx"] = region_data_idx
+        cell["N_region"] = len(cell_input._region_RPN)
+        # The data
+        start = region_data_idx
+        end = start + cell["N_region"]
+        mcdc["cells_data_region"][start:end] = cell_input._region_RPN
+        region_data_idx += cell["N_region"]
+
+        # Variables with possible different sizes
+        for name in ["tally_IDs"]:
+            N = len(getattr(input_deck.cells[i], name))
+            mcdc["cells"][i][name][:N] = getattr(input_deck.cells[i], name)
 
     # =========================================================================
-    # Universes
+    # Set universes
     # =========================================================================
 
     N_universe = len(input_deck.universes)
+    cell_data_idx = 0
     for i in range(N_universe):
-        for name in type_.universe.names:
-            if name not in ["cell_IDs"]:
-                mcdc["universes"][i][name] = getattr(input_deck.universes[i], name)
+        universe = mcdc["universes"][i]
+        universe_input = input_deck.universes[i]
 
-        # Variables with possible different sizes
-        for name in ["cell_IDs"]:
-            N = mcdc["universes"][i]["N_cell"]
-            mcdc["universes"][i][name][:N] = getattr(input_deck.universes[i], name)
+        # Directly transferables
+        for name in ["ID"]:
+            copy_field(universe, universe_input, name)
+
+        # Cells IDs
+        universe["cell_data_idx"] = cell_data_idx
+        universe["N_cell"] = len(universe_input.cell_IDs)
+        # Cell ID data
+        start = cell_data_idx
+        end = start + universe["N_cell"]
+        mcdc["universes_data_cell"][start:end] = universe_input.cell_IDs
+        cell_data_idx += universe["N_cell"]
 
     # =========================================================================
     # Lattices
@@ -599,6 +843,8 @@ def prepare():
 
     N_mesh_tally = len(input_deck.mesh_tallies)
     N_surface_tally = len(input_deck.surface_tallies)
+    N_cell_tally = len(input_deck.cell_tallies)
+    N_cs_tally = len(input_deck.cs_tallies)
     tally_size = 0
 
     # Mesh tallies
@@ -615,15 +861,25 @@ def prepare():
                 )
 
         else:  # decomposed mesh filters
+            mcdc["technique"]["dd_xsum"] = len(input_deck.mesh_tallies[i].x) - 1
+            mcdc["technique"]["dd_ysum"] = len(input_deck.mesh_tallies[i].y) - 1
+            mcdc["technique"]["dd_zsum"] = len(input_deck.mesh_tallies[i].z) - 1
+
             mxn, mxp, myn, myp, mzn, mzp = dd_mesh_bounds(i)
 
             # Filters
             new_x = input_deck.mesh_tallies[i].x[mxn:mxp]
             new_y = input_deck.mesh_tallies[i].y[myn:myp]
             new_z = input_deck.mesh_tallies[i].z[mzn:mzp]
-            mcdc["mesh_tallies"][i]["filter"]["x"] = new_x
-            mcdc["mesh_tallies"][i]["filter"]["y"] = new_y
-            mcdc["mesh_tallies"][i]["filter"]["z"] = new_z
+            xlen = len(new_x)
+            ylen = len(new_y)
+            zlen = len(new_z)
+            mcdc["mesh_tallies"][i]["filter"]["x"][:xlen] = new_x
+            mcdc["mesh_tallies"][i]["filter"]["y"][:ylen] = new_y
+            mcdc["mesh_tallies"][i]["filter"]["z"][:zlen] = new_z
+            mcdc["technique"]["dd_xlen"] = xlen - 1
+            mcdc["technique"]["dd_ylen"] = ylen - 1
+            mcdc["technique"]["dd_zlen"] = zlen - 1
             for name in ["t", "mu", "azi", "g"]:
                 N = len(getattr(input_deck.mesh_tallies[i], name))
                 mcdc["mesh_tallies"][i]["filter"][name][:N] = getattr(
@@ -646,6 +902,20 @@ def prepare():
                 score_type = SCORE_FISSION
             elif score_name == "net-current":
                 score_type = SCORE_NET_CURRENT
+            elif score_name == "mu-sq":
+                score_type = SCORE_MU_SQ
+            elif score_name == "time-moment-flux":
+                score_type = SCORE_TIME_MOMENT_FLUX
+            elif score_name == "space-moment-flux":
+                score_type = SCORE_SPACE_MOMENT_FLUX
+            elif score_name == "time-moment-current":
+                score_type = SCORE_TIME_MOMENT_CURRENT
+            elif score_name == "space-moment-current":
+                score_type = SCORE_SPACE_MOMENT_CURRENT
+            elif score_name == "time-moment-mu-sq":
+                score_type = SCORE_TIME_MOMENT_MU_SQ
+            elif score_name == "space-moment-mu-sq":
+                score_type = SCORE_SPACE_MOMENT_MU_SQ
             mcdc["mesh_tallies"][i]["scores"][j] = score_type
 
         # Filter grid sizes
@@ -656,6 +926,13 @@ def prepare():
         Ny = len(input_deck.mesh_tallies[i].y) - 1
         Nz = len(input_deck.mesh_tallies[i].z) - 1
         Nt = len(input_deck.mesh_tallies[i].t) - 1
+        mcdc["mesh_tallies"][i]["filter"]["Nmu"] = Nmu
+        mcdc["mesh_tallies"][i]["filter"]["N_azi"] = N_azi
+        mcdc["mesh_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+        mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+        mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
+        mcdc["mesh_tallies"][i]["filter"]["Nt"] = Nt
 
         # Decompose mesh tallies
         if input_deck.technique["domain_decomposition"]:
@@ -667,6 +944,9 @@ def prepare():
             Nz = len(input_deck.mesh_tallies[i].z[mzn:mzp]) - 1
             Nt = len(input_deck.mesh_tallies[i].t) - 1
             mcdc["mesh_tallies"][i]["N_bin"] = Nx * Ny * Nz * Nt * Nmu * N_azi * Ng
+            mcdc["mesh_tallies"][i]["filter"]["Nx"] = Nx
+            mcdc["mesh_tallies"][i]["filter"]["Ny"] = Ny
+            mcdc["mesh_tallies"][i]["filter"]["Nz"] = Nz
 
         # Update N_bin
         mcdc["mesh_tallies"][i]["N_bin"] *= N_score
@@ -746,6 +1026,119 @@ def prepare():
         mcdc["surface_tallies"][i]["stride"]["tally"] = tally_size
         tally_size += mcdc["surface_tallies"][i]["N_bin"]
 
+    # Cell tallies
+    for i in range(N_cell_tally):
+        copy_field(mcdc["cell_tallies"][i], input_deck.cell_tallies[i], "N_bin")
+
+        # Filters (variables with possible different sizes)
+        for name in ["t", "mu", "azi", "g"]:
+            N = len(getattr(input_deck.cell_tallies[i], name))
+            mcdc["cell_tallies"][i]["filter"][name][:N] = getattr(
+                input_deck.cell_tallies[i], name
+            )
+
+        # Differentiating the tallies by cell_ID
+        mcdc["cell_tallies"][i]["filter"]["cell_ID"] = getattr(
+            input_deck.cell_tallies[i], "cell_ID"
+        )
+
+        # Set tally scores and their strides
+        N_score = len(input_deck.cell_tallies[i].scores)
+        mcdc["cell_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.cell_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["cell_tallies"][i]["scores"][j] = score_type
+
+        # Filter grid sizes
+        Nmu = len(input_deck.cell_tallies[i].mu) - 1
+        N_azi = len(input_deck.cell_tallies[i].azi) - 1
+        Ng = len(input_deck.cell_tallies[i].g) - 1
+        Nt = len(input_deck.cell_tallies[i].t) - 1
+        mcdc["cell_tallies"][i]["filter"]["Ng"] = Ng
+        mcdc["cell_tallies"][i]["filter"]["Nt"] = Nt
+
+        # Update N_bin
+        mcdc["cell_tallies"][i]["N_bin"] *= N_score
+
+        # Filter strides
+        stride = N_score
+        if Nt > 1:
+            mcdc["cell_tallies"][i]["stride"]["t"] = stride
+            stride *= Nt
+        if Ng > 1:
+            mcdc["cell_tallies"][i]["stride"]["g"] = stride
+            stride *= Ng
+        if N_azi > 1:
+            mcdc["cell_tallies"][i]["stride"]["azi"] = stride
+            stride *= N_azi
+        if Nmu > 1:
+            mcdc["cell_tallies"][i]["stride"]["mu"] = stride
+            stride *= Nmu
+
+        # Set tally stride and accumulate total tally size
+        mcdc["cell_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["cell_tallies"][i]["N_bin"]
+
+    # CS tallies
+    for i in range(N_cs_tally):
+        # Direct assignment
+        copy_field(mcdc["cs_tallies"][i], input_deck.cs_tallies[i], "N_bin")
+
+        mcdc["cs_tallies"][i]["filter"]["N_cs_bins"] = input_deck.cs_tallies[
+            i
+        ].N_cs_bins[0]
+        mcdc["cs_tallies"][i]["filter"]["cs_bin_size"] = input_deck.cs_tallies[
+            i
+        ].cs_bin_size[0]
+
+        # Filters (variables with possible different sizes)
+        if not input_deck.technique["domain_decomposition"]:
+            for name in ["x", "y", "z", "t", "mu", "azi", "g"]:
+                N = len(getattr(input_deck.cs_tallies[i], name))
+                mcdc["cs_tallies"][i]["filter"][name][:N] = getattr(
+                    input_deck.cs_tallies[i], name
+                )
+
+        mcdc["cs_tallies"][i]["filter"]["cs_centers"] = generate_cs_centers(mcdc)
+
+        # Set tally scores
+        N_score = len(input_deck.cs_tallies[i].scores)
+        mcdc["cs_tallies"][i]["N_score"] = N_score
+        for j in range(N_score):
+            score_name = input_deck.cs_tallies[i].scores[j]
+            score_type = None
+            if score_name == "flux":
+                score_type = SCORE_FLUX
+            elif score_name == "density":
+                score_type = SCORE_DENSITY
+            elif score_name == "total":
+                score_type = SCORE_TOTAL
+            elif score_name == "fission":
+                score_type = SCORE_FISSION
+            elif score_name == "net-current":
+                score_type = SCORE_NET_CURRENT
+            mcdc["cs_tallies"][i]["scores"][j] = score_type
+
+        # Update N_bin
+        mcdc["cs_tallies"][i]["N_bin"] *= N_score
+
+        # Set tally stride and accumulate total tally size
+        mcdc["cs_tallies"][i]["stride"]["tally"] = tally_size
+        tally_size += mcdc["cs_tallies"][i]["filter"]["N_cs_bins"]
+
+    # Set tally data
+    if not input_deck.technique["uq"]:
+        tally = np.zeros((3, tally_size), dtype=type_.float64)
+    else:
+        tally = np.zeros((5, tally_size), dtype=type_.float64)
+
     # =========================================================================
     # Establish Data Type from Tally Info and Construct Tallies
     # =========================================================================
@@ -786,14 +1179,25 @@ def prepare():
     t_limit = max(
         [
             tally["filter"]["t"][-1]
-            for tally in list(mcdc["mesh_tallies"]) + list(mcdc["surface_tallies"])
+            for tally in list(mcdc["mesh_tallies"])
+            + list(mcdc["surface_tallies"])
+            + list(mcdc["cell_tallies"])
         ]
     )
 
-    if len(input_deck.mesh_tallies) + len(input_deck.surface_tallies) == 0:
+    if (
+        len(input_deck.mesh_tallies)
+        + len(input_deck.surface_tallies)
+        + len(input_deck.cell_tallies)
+        == 0
+    ):
         t_limit = INF
 
-    # Check if time boundary is above the final tally mesh time grid
+    # Replace the time limit if time census-based tally is used
+    if mcdc["setting"]["census_based_tally"]:
+        t_limit = mcdc["setting"]["census_time"][-2]
+
+    # Set appropriate time boundary
     if mcdc["setting"]["time_boundary"] > t_limit:
         mcdc["setting"]["time_boundary"] = t_limit
 
@@ -862,12 +1266,30 @@ def prepare():
 
     # WW mesh
     for name in type_.mesh_names[:-1]:
-        copy_field(mcdc["technique"]["ww_mesh"], input_deck.technique["ww_mesh"], name)
+        copy_field(
+            mcdc["technique"]["ww"]["mesh"], input_deck.technique["ww"]["mesh"], name
+        )
 
-    # WW windows
-    mcdc["technique"]["ww"] = input_deck.technique["ww"]
-    mcdc["technique"]["ww_width"] = input_deck.technique["ww_width"]
+    mcdc["technique"]["ww"]["mesh"]["Nx"] = (
+        len(input_deck.technique["ww"]["mesh"]["x"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Ny"] = (
+        len(input_deck.technique["ww"]["mesh"]["y"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nz"] = (
+        len(input_deck.technique["ww"]["mesh"]["z"]) - 1
+    )
+    mcdc["technique"]["ww"]["mesh"]["Nt"] = (
+        len(input_deck.technique["ww"]["mesh"]["t"]) - 1
+    )
 
+    # WW parameters
+    mcdc["technique"]["ww"]["width"] = input_deck.technique["ww"]["width"]
+    mcdc["technique"]["ww"]["auto"] = input_deck.technique["ww"]["auto"]
+    mcdc["technique"]["ww"]["epsilon"] = input_deck.technique["ww"]["epsilon"]
+    mcdc["technique"]["ww"]["center"] = input_deck.technique["ww"]["center"]
+    mcdc["technique"]["ww"]["save"] = input_deck.technique["ww"]["save"]
+    mcdc["technique"]["ww"]["tally_idx"] = input_deck.technique["ww"]["tally_idx"]
     # =========================================================================
     # Weight roulette
     # =========================================================================
@@ -877,6 +1299,7 @@ def prepare():
 
     # Survival probability
     mcdc["technique"]["wr_survive"] = input_deck.technique["wr_survive"]
+
     # =========================================================================
     # Domain Decomposition
     # =========================================================================
@@ -887,11 +1310,30 @@ def prepare():
             copy_field(
                 mcdc["technique"]["dd_mesh"], input_deck.technique["dd_mesh"], name
             )
+        mcdc["technique"]["dd_mesh"]["Nx"] = (
+            input_deck.technique["dd_mesh"]["x"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Ny"] = (
+            input_deck.technique["dd_mesh"]["y"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nz"] = (
+            input_deck.technique["dd_mesh"]["z"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nt"] = (
+            input_deck.technique["dd_mesh"]["t"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["Nmu"] = (
+            input_deck.technique["dd_mesh"]["mu"].size - 1
+        )
+        mcdc["technique"]["dd_mesh"]["N_azi"] = (
+            input_deck.technique["dd_mesh"]["azi"].size - 1
+        )
         # Set exchange rate
-        for name in ["dd_exchange_rate", "dd_repro"]:
+        for name in ["dd_exchange_rate"]:
             copy_field(mcdc["technique"], input_deck.technique, name)
         # Set domain index
         copy_field(mcdc, input_deck.technique, "dd_idx")
+        copy_field(mcdc, input_deck.technique, "dd_local_rank")
         for name in ["xp", "xn", "yp", "yn", "zp", "zn"]:
             copy_field(mcdc["technique"], input_deck.technique, f"dd_{name}_neigh")
         copy_field(mcdc["technique"], input_deck.technique, "dd_work_ratio")
@@ -919,6 +1361,14 @@ def prepare():
         iqmc = mcdc["technique"]["iqmc"]
         for name in ["x", "y", "z", "t"]:
             copy_field(iqmc["mesh"], input_deck.technique["iqmc"]["mesh"], name)
+        Nx = len(input_deck.technique["iqmc"]["mesh"]["x"]) - 1
+        Ny = len(input_deck.technique["iqmc"]["mesh"]["y"]) - 1
+        Nz = len(input_deck.technique["iqmc"]["mesh"]["z"]) - 1
+        Nt = len(input_deck.technique["iqmc"]["mesh"]["t"]) - 1
+        iqmc["mesh"]["Nx"] = Nx
+        iqmc["mesh"]["Ny"] = Ny
+        iqmc["mesh"]["Nz"] = Nz
+        iqmc["mesh"]["Nt"] = Nt
         # pass in score list
         for name, value in input_deck.technique["iqmc"]["score_list"].items():
             copy_field(
@@ -1022,6 +1472,7 @@ def prepare():
     mcdc["bank_active"]["tag"] = "active"
     mcdc["bank_census"]["tag"] = "census"
     mcdc["bank_source"]["tag"] = "source"
+    mcdc["bank_future"]["tag"] = "future"
 
     # IC generator banks
     if mcdc["technique"]["IC_generator"]:
@@ -1129,7 +1580,10 @@ def prepare():
 
 
 def cardlist_to_h5group(dictlist, input_group, name):
-    main_group = input_group.create_group(name + "s")
+    if name[-1] != "s":
+        main_group = input_group.create_group(name + "s")
+    else:
+        main_group = input_group.create_group(name)
     for item in dictlist:
         group = main_group.create_group(name + "_%i" % getattr(item, "ID"))
         card_to_h5group(item, group)
@@ -1155,7 +1609,10 @@ def card_to_h5group(card, group):
 
 
 def dictlist_to_h5group(dictlist, input_group, name):
-    main_group = input_group.create_group(name + "s")
+    if name[-1] != "s":
+        main_group = input_group.create_group(name + "s")
+    else:
+        main_group = input_group.create_group(name)
     for item in dictlist:
         group = main_group.create_group(name + "_%i" % item["ID"])
         dict_to_h5group(item, group)
@@ -1185,33 +1642,93 @@ def dd_mergetally(mcdc, data):
     d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
 
     # capture tally lengths for reorganizing later
-    xlen = len(mcdc["mesh_tallies"][0]["filter"]["x"]) - 1
-    ylen = len(mcdc["mesh_tallies"][0]["filter"]["y"]) - 1
-    zlen = len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1
+    xlen = mcdc["technique"]["dd_xlen"]
+    ylen = mcdc["technique"]["dd_ylen"]
+    zlen = mcdc["technique"]["dd_zlen"]
 
-    dd_tally = np.zeros((tally.shape[0], tally.shape[1] * d_Nx * d_Ny * d_Nz))
-    # gather tallies
-    for i, t in enumerate(tally):
-        MPI.COMM_WORLD.Gather(tally[i], dd_tally[i], root=0)
+    # MPI gather
+    if (d_Nx * d_Ny * d_Nz) == MPI.COMM_WORLD.Get_size():
+        sendcounts = np.array(MPI.COMM_WORLD.gather(len(tally[0]), root=0))
+        if mcdc["mpi_master"]:
+            dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
+        else:
+            dd_tally = np.empty(tally.shape[0])  # dummy tally
+        # gather tallies
+        for i, t in enumerate(tally):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=tally[i], recvbuf=(dd_tally[i], sendcounts), root=0
+            )
+        # gather tally lengths for proper recombination
+        xlens = MPI.COMM_WORLD.gather(xlen, root=0)
+        ylens = MPI.COMM_WORLD.gather(ylen, root=0)
+        zlens = MPI.COMM_WORLD.gather(zlen, root=0)
+
+    # MPI gather for multiprocessor subdomains
+    else:
+        i = 0
+        dd_ranks = []
+        # find nonzero tally processor IDs
+        for n in range(d_Nx * d_Ny * d_Nz):
+            dd_ranks.append(i)
+            i += int(mcdc["technique"]["dd_work_ratio"][n])
+        # create MPI comm group for nonzero tallies
+        dd_group = MPI.COMM_WORLD.group.Incl(dd_ranks)
+        dd_comm = MPI.COMM_WORLD.Create(dd_group)
+        dd_tally = np.empty(tally.shape[0])  # dummy tally
+
+        if MPI.COMM_NULL != dd_comm:
+            sendcounts = np.array(dd_comm.gather(len(tally[0]), root=0))
+            if mcdc["mpi_master"]:
+                dd_tally = np.zeros((tally.shape[0], sum(sendcounts)))
+            # gather tallies
+            for i, t in enumerate(tally):
+                dd_comm.Gatherv(tally[i], (dd_tally[i], sendcounts), root=0)
+            # gather tally lengths for proper recombination
+            xlens = dd_comm.gather(xlen, root=0)
+            ylens = dd_comm.gather(ylen, root=0)
+            zlens = dd_comm.gather(zlen, root=0)
+        dd_group.Free()
+        if MPI.COMM_NULL != dd_comm:
+            dd_comm.Free()
+
     if mcdc["mpi_master"]:
         buff = np.zeros_like(dd_tally)
         # reorganize tally data
         # TODO: find/develop a more efficient algorithm for this
         tally_idx = 0
+        offset = 0
+        ysum = mcdc["technique"]["dd_ysum"]
+        zsum = mcdc["technique"]["dd_zsum"]
         for di in range(0, d_Nx * d_Ny * d_Nz):
             dz = di // (d_Nx * d_Ny)
             dy = (di % (d_Nx * d_Ny)) // d_Nx
             dx = di % d_Nx
+
+            offset = 0
+            # calculate subdomain offset
+            for i in range(0, dx):
+                offset += xlens[i] * ysum * zsum
+
+            for i in range(0, dy):
+                y_ind = i * d_Nx
+                offset += ylens[y_ind] * zsum
+
+            for i in range(0, dz):
+                z_ind = i * d_Nx * d_Ny
+                offset += zlens[z_ind]
+
+            # calculate index within subdomain
+            xlen = xlens[di]
+            ylen = ylens[di]
+            zlen = zlens[di]
             for xi in range(0, xlen):
                 for yi in range(0, ylen):
                     for zi in range(0, zlen):
                         # calculate reorganized index
-                        ind_x = xi * (ylen * d_Ny * zlen * d_Nz) + dx * (
-                            xlen * ylen * d_Ny * zlen * d_Nz
-                        )
-                        ind_y = yi * (xlen * d_Nx) + dy * (ylen * xlen * d_Nx)
-                        ind_z = zi + dz * zlen
-                        buff_idx = ind_x + ind_y + ind_z
+                        ind_x = xi * ysum * zsum
+                        ind_y = yi * zsum
+                        ind_z = zi
+                        buff_idx = offset + ind_x + ind_y + ind_z
                         # place tally value in correct position
                         buff[:, buff_idx] = dd_tally[:, tally_idx]
                         tally_idx += 1
@@ -1221,10 +1738,100 @@ def dd_mergetally(mcdc, data):
     return dd_tally
 
 
+def dd_mergemesh(mcdc, data):
+    """
+    Performs mesh recombination on domain-decomposed mesh tallies.
+    Gathers and re-organizes mesh data into a single array as it
+      would appear in a non-decomposed simulation.
+    """
+    d_Nx = input_deck.technique["dd_mesh"]["x"].size - 1
+    d_Ny = input_deck.technique["dd_mesh"]["y"].size - 1
+    d_Nz = input_deck.technique["dd_mesh"]["z"].size - 1
+    # gather mesh filter
+    if d_Nx > 1:
+        sendcounts = np.array(
+            MPI.COMM_WORLD.gather(len(mcdc["mesh_tallies"][0]["filter"]["x"]), root=0)
+        )
+        if mcdc["mpi_master"]:
+            x_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
+        else:
+            x_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
+        # gather mesh
+        for i in range(mcdc["mesh_tallies"].shape[0]):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=mcdc["mesh_tallies"][i]["filter"]["x"],
+                recvbuf=(x_filter[i], sendcounts),
+                root=0,
+            )
+        if mcdc["mpi_master"]:
+            x_final = np.zeros((mcdc["mesh_tallies"].shape[0], x_filter.shape[1] + 1))
+            x_final[:, 0] = mcdc["mesh_tallies"][:]["filter"]["x"][0][0]
+            x_final[:, 1:] = x_filter
+
+    if d_Ny > 1:
+        sendcounts = np.array(
+            MPI.COMM_WORLD.gather(len(mcdc["mesh_tallies"][0]["filter"]["y"]), root=0)
+        )
+        if mcdc["mpi_master"]:
+            y_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
+        else:
+            y_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
+        # gather mesh
+        for i in range(mcdc["mesh_tallies"].shape[0]):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=mcdc["mesh_tallies"][i]["filter"]["y"],
+                recvbuf=(y_filter[i], sendcounts),
+                root=0,
+            )
+        if mcdc["mpi_master"]:
+            y_final = np.zeros((mcdc["mesh_tallies"].shape[0], y_filter.shape[1] + 1))
+            y_final[:, 0] = mcdc["mesh_tallies"][:]["filter"]["y"][0][0]
+            y_final[:, 1:] = y_filter
+
+    if d_Nz > 1:
+        sendcounts = np.array(
+            MPI.COMM_WORLD.gather(
+                len(mcdc["mesh_tallies"][0]["filter"]["z"]) - 1, root=0
+            )
+        )
+        if mcdc["mpi_master"]:
+            z_filter = np.zeros((mcdc["mesh_tallies"].shape[0], sum(sendcounts)))
+        else:
+            z_filter = np.empty((mcdc["mesh_tallies"].shape[0]))  # dummy tally
+        # gather mesh
+        for i in range(mcdc["mesh_tallies"].shape[0]):
+            MPI.COMM_WORLD.Gatherv(
+                sendbuf=mcdc["mesh_tallies"][i]["filter"]["z"][1:],
+                recvbuf=(z_filter[i], sendcounts),
+                root=0,
+            )
+        if mcdc["mpi_master"]:
+            z_final = np.zeros((mcdc["mesh_tallies"].shape[0], z_filter.shape[1] + 1))
+            z_final[:, 0] = mcdc["mesh_tallies"][:]["filter"]["z"][0][0]
+            z_final[:, 1:] = z_filter
+
+    dd_mesh = []
+    if mcdc["mpi_master"]:
+        if d_Nx > 1:
+            dd_mesh.append(x_final)
+        else:
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["x"])
+        if d_Ny > 1:
+            dd_mesh.append(y_final)
+        else:
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["y"])
+        if d_Nz > 1:
+            dd_mesh.append(z_final)
+        else:
+            dd_mesh.append(mcdc["mesh_tallies"][:]["filter"]["z"])
+    return dd_mesh
+
+
 def generate_hdf5(data, mcdc):
 
     if mcdc["technique"]["domain_decomposition"]:
         dd_tally = dd_mergetally(mcdc, data)
+        dd_mesh = dd_mergemesh(mcdc, data)
 
     if mcdc["mpi_master"]:
         if mcdc["setting"]["progress_bar"]:
@@ -1246,14 +1853,24 @@ def generate_hdf5(data, mcdc):
                 cardlist_to_h5group(input_deck.universes, input_group, "universe")
                 cardlist_to_h5group(input_deck.lattices, input_group, "lattice")
                 cardlist_to_h5group(input_deck.sources, input_group, "source")
-                cardlist_to_h5group(input_deck.mesh_tallies, input_group, "mesh_tallie")
                 cardlist_to_h5group(
-                    input_deck.surface_tallies, input_group, "surface_tally"
+                    input_deck.mesh_tallies, input_group, "mesh_tallies"
                 )
+                cardlist_to_h5group(
+                    input_deck.surface_tallies, input_group, "surface_tallies"
+                )
+                cardlist_to_h5group(
+                    input_deck.cell_tallies, input_group, "cell_tallies"
+                )
+                cardlist_to_h5group(input_deck.cs_tallies, input_group, "cs_tallies")
                 dict_to_h5group(input_deck.setting, input_group.create_group("setting"))
                 dict_to_h5group(
                     input_deck.technique, input_group.create_group("technique")
                 )
+
+            # No need to output tally if time census-based tally is used
+            if input_deck.setting["census_based_tally"]:
+                return
 
             # Mesh tallies
             for ID, tally in enumerate(mcdc["mesh_tallies"]):
@@ -1261,31 +1878,44 @@ def generate_hdf5(data, mcdc):
                     break
 
                 mesh = tally["filter"]
-                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=mesh["t"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=mesh["x"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=mesh["y"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=mesh["z"])
-                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=mesh["mu"])
-                f.create_dataset(
-                    "tallies/mesh_tally_%i/grid/azi" % ID, data=mesh["azi"]
-                )
-                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=mesh["g"])
 
-                # Shape
-                Nmu = len(mesh["mu"]) - 1
-                N_azi = len(mesh["azi"]) - 1
-                Ng = len(mesh["g"]) - 1
-                Nx = len(mesh["x"]) - 1
-                Ny = len(mesh["y"]) - 1
-                Nz = len(mesh["z"]) - 1
-                Nt = len(mesh["t"]) - 1
-                N_score = tally["N_score"]
-
+                # Get grid
+                Nx = mesh["Nx"]
+                Ny = mesh["Ny"]
+                Nz = mesh["Nz"]
+                Nt = mesh["Nt"]
+                Nmu = mesh["Nmu"]
+                N_azi = mesh["N_azi"]
+                Ng = mesh["Ng"]
+                #
+                grid_x = mesh["x"][: Nx + 1]
+                grid_y = mesh["y"][: Ny + 1]
+                grid_z = mesh["z"][: Nz + 1]
+                grid_t = mesh["t"][: Nt + 1]
+                grid_mu = mesh["mu"][: Nmu + 1]
+                grid_azi = mesh["azi"][: N_azi + 1]
+                grid_g = mesh["g"][: Ng + 1]
+                # Domain decomposed?
                 if mcdc["technique"]["domain_decomposition"]:
-                    Nx *= input_deck.technique["dd_mesh"]["x"].size - 1
-                    Ny *= input_deck.technique["dd_mesh"]["y"].size - 1
-                    Nz *= input_deck.technique["dd_mesh"]["z"].size - 1
+                    grid_x = dd_mesh[0][ID]
+                    grid_y = dd_mesh[1][ID]
+                    grid_z = dd_mesh[2][ID]
 
+                # Save to dataset
+                f.create_dataset("tallies/mesh_tally_%i/grid/x" % ID, data=grid_x)
+                f.create_dataset("tallies/mesh_tally_%i/grid/y" % ID, data=grid_y)
+                f.create_dataset("tallies/mesh_tally_%i/grid/z" % ID, data=grid_z)
+                f.create_dataset("tallies/mesh_tally_%i/grid/t" % ID, data=grid_t)
+                f.create_dataset("tallies/mesh_tally_%i/grid/mu" % ID, data=grid_mu)
+                f.create_dataset("tallies/mesh_tally_%i/grid/azi" % ID, data=grid_azi)
+                f.create_dataset("tallies/mesh_tally_%i/grid/g" % ID, data=grid_g)
+
+                # Set tally shape
+                N_score = tally["N_score"]
+                if mcdc["technique"]["domain_decomposition"]:
+                    Nx = mcdc["technique"]["dd_xsum"]
+                    Ny = mcdc["technique"]["dd_ysum"]
+                    Nz = mcdc["technique"]["dd_zsum"]
                 if not mcdc["technique"]["uq"]:
                     shape = (3, Nmu, N_azi, Ng, Nt, Nx, Ny, Nz, N_score)
                 else:
@@ -1320,6 +1950,22 @@ def generate_hdf5(data, mcdc):
                         score_name = "total"
                     elif score_type == SCORE_FISSION:
                         score_name = "fission"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "current"
+                    elif score_type == SCORE_MU_SQ:
+                        score_name = "mu-sq"
+                    elif score_type == SCORE_TIME_MOMENT_FLUX:
+                        score_name = "time-moment-flux"
+                    elif score_type == SCORE_SPACE_MOMENT_FLUX:
+                        score_name = "space-moment-flux"
+                    elif score_type == SCORE_TIME_MOMENT_CURRENT:
+                        score_name = "time-moment-current"
+                    elif score_type == SCORE_SPACE_MOMENT_CURRENT:
+                        score_name = "space-moment-current"
+                    elif score_type == SCORE_TIME_MOMENT_MU_SQ:
+                        score_name = "time-moment-mu-sq"
+                    elif score_type == SCORE_SPACE_MOMENT_MU_SQ:
+                        score_name = "space-moment-mu-sq"
                     group_name = "tallies/mesh_tally_%i/%s/" % (ID, score_name)
 
                     mean = score_tally_bin[TALLY_SUM]
@@ -1361,6 +2007,119 @@ def generate_hdf5(data, mcdc):
                     score_tally_bin = np.squeeze(tally_bin[i])
                     score_name = "net-current"
                     group_name = "tallies/surface_tally_%i/%s/" % (ID, score_name)
+
+                    mean = score_tally_bin[TALLY_SUM]
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            # Cell tallies
+            for ID, tally in enumerate(mcdc["cell_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+
+                mesh = tally["filter"]
+
+                # Get grid
+                Nt = mesh["Nt"]
+                Ng = mesh["Ng"]
+                #
+                grid_t = mesh["t"][: Nt + 1]
+                grid_g = mesh["g"][: Ng + 1]
+
+                # Save to dataset
+                f.create_dataset("tallies/cell_tally_%i/grid/t" % ID, data=grid_t)
+                f.create_dataset("tallies/cell_tally_%i/grid/g" % ID, data=grid_g)
+
+                # Shape
+                N_score = tally["N_score"]
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, Ng, Nt, N_score)
+                else:
+                    shape = (5, Ng, Nt, N_score)
+
+                # Reshape tally
+                N_bin = tally["N_bin"]
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_bin]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 3, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/cell_tally_%i/%s/" % (ID, score_name)
+
+                    mean = score_tally_bin[TALLY_SUM]
+                    sdev = score_tally_bin[TALLY_SUM_SQ]
+
+                    f.create_dataset(group_name + "mean", data=mean)
+                    f.create_dataset(group_name + "sdev", data=sdev)
+                    if mcdc["technique"]["uq"]:
+                        mc_var = score_tally_bin[TALLY_UQ_BATCH_VAR]
+                        tot_var = score_tally_bin[TALLY_UQ_BATCH]
+                        uq_var = tot_var - mc_var
+                        f.create_dataset(group_name + "uq_var", data=uq_var)
+
+            # CS tallies
+            for ID, tally in enumerate(mcdc["cs_tallies"]):
+                if mcdc["technique"]["iQMC"]:
+                    break
+                N_cs_bins = tally["filter"]["N_cs_bins"]
+
+                # Shape
+                N_score = tally["N_score"]
+
+                if not mcdc["technique"]["uq"]:
+                    shape = (3, N_cs_bins, N_score)
+                else:
+                    shape = (5, N_cs_bins, N_score)
+
+                # Reshape tally
+                start = tally["stride"]["tally"]
+                tally_bin = data[TALLY][:, start : start + N_cs_bins]
+                tally_bin = tally_bin.reshape(shape)
+
+                # Roll tally so that score is in the front
+                tally_bin = np.rollaxis(tally_bin, 2, 0)
+
+                # Iterate over scores
+                for i in range(N_score):
+                    score_type = tally["scores"][i]
+                    score_tally_bin = np.squeeze(tally_bin[i])
+                    if score_type == SCORE_FLUX:
+                        score_name = "flux"
+                    elif score_type == SCORE_NET_CURRENT:
+                        score_name = "net-current"
+                    elif score_type == SCORE_FISSION:
+                        score_name = "fission"
+                    group_name = "tallies/cs_tally_%i/%s/" % (ID, score_name)
+
+                    center_points = tally["filter"]["cs_centers"]
+                    S = tally["filter"]["cs_S"]
+                    reconstruction = tally["filter"]["cs_reconstruction"]
+
+                    f.create_dataset(
+                        "tallies/cs_tally_%i/center_points" % (ID), data=center_points
+                    )
+                    f.create_dataset("tallies/cs_tally_%i/S" % (ID), data=S)
+                    f.create_dataset(group_name + "reconstruction", data=reconstruction)
 
                     mean = score_tally_bin[TALLY_SUM]
                     sdev = score_tally_bin[TALLY_SUM_SQ]
@@ -1438,8 +2197,8 @@ def generate_hdf5(data, mcdc):
 
             # IC generator
             if mcdc["technique"]["IC_generator"]:
-                Nn = mcdc["technique"]["IC_bank_neutron"]["size"]
-                Np = mcdc["technique"]["IC_bank_precursor"]["size"]
+                Nn = mcdc["technique"]["IC_bank_neutron"]["size"][0]
+                Np = mcdc["technique"]["IC_bank_precursor"]["size"][0]
                 f.create_dataset(
                     "IC/neutrons",
                     data=mcdc["technique"]["IC_bank_neutron"]["particles"][:Nn],
@@ -1458,7 +2217,7 @@ def generate_hdf5(data, mcdc):
     if mcdc["setting"]["save_particle"]:
         # Gather source bank
         # TODO: Parallel HDF5 and mitigation of large data passing
-        N = mcdc["bank_source"]["size"]
+        N = mcdc["bank_source"]["size"][0]
         neutrons = MPI.COMM_WORLD.gather(mcdc["bank_source"]["particles"][:N])
 
         # Master saves the particle
@@ -1470,6 +2229,140 @@ def generate_hdf5(data, mcdc):
             with h5py.File(mcdc["setting"]["output_name"] + ".h5", "a") as f:
                 f.create_dataset("particles", data=neutrons[:])
                 f.create_dataset("particles_size", data=len(neutrons[:]))
+
+
+def recombine_tallies(file="output.h5"):
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        # Load main output file and read input params
+        with h5py.File(file, "r") as f:
+            output_name = str(f["input_deck/setting/output_name"][()])[2:-1]
+            N_particle = f["input_deck/setting/N_particle"][()]
+            N_census = f["input_deck/setting/N_census"][()] - 1
+            N_batch = f["input_deck/setting/N_batch"][()]
+            N_tallies = f["input_deck/setting/census_tally_frequency"][()]
+        f.close()
+        # Combine the tally output into a single file
+
+        collected_tallies = []
+        collected_tally_names = []
+        # Collecting info on number and types of tallies
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                with h5py.File(
+                    output_name + "-batch_%i-census_%i.h5" % (i_batch, i_census), "r"
+                ) as f:
+                    tallies = f["tallies"]
+
+                    for tally in tallies:
+                        if tally not in collected_tally_names:
+                            grid = tallies[tally]["grid"]
+                            tally_list = [tally]
+                            for tally_type in tallies[tally]:
+                                if tally_type != "grid":
+                                    tally_list.append(tally_type)
+                            collected_tallies.append(tally_list)
+                            collected_tally_names.append(tally)
+                f.close()
+
+        for i, tally_info in enumerate(collected_tallies):
+            tally_grid_type = tally_info[0].split("_")[0]
+            tally_number = tally_info[0].split("_")[-1]
+            with h5py.File(output_name + ".h5", "a") as f:
+                grid = f[
+                    "input_deck/"
+                    + tally_grid_type
+                    + "_tallies/"
+                    + tally_grid_type
+                    + "_tallies_"
+                    + tally_number
+                ]
+                t_final = f["input_deck/setting/census_time"][()][-2]
+                t = np.linspace(0, t_final, N_census * N_tallies + 1)
+                Nx = len(grid["x"][()]) - 1
+                Ny = len(grid["y"][()]) - 1
+                Nz = len(grid["z"][()]) - 1
+                Nmu = len(grid["mu"][()]) - 1
+                N_azi = len(grid["azi"][()]) - 1
+                Ng = len(grid["g"][()]) - 1
+                # Creating structure of correct size to hold combined tally
+                for tally_type in tally_info[1:]:
+                    tally_score = np.zeros(
+                        (N_census * N_tallies, Nx, Ny, Nz, Nmu, N_azi, Ng)
+                    )
+                    tally_score = np.squeeze(tally_score)
+                    tally_score_sq = np.zeros_like(tally_score)
+
+                    for i_census in range(N_census):
+                        for i_batch in range(N_batch):
+                            with h5py.File(
+                                output_name
+                                + "-batch_%i-census_%i.h5" % (i_batch, i_census),
+                                "r",
+                            ) as f1:
+                                score = f1[
+                                    "tallies/"
+                                    + tally_info[0]
+                                    + "/"
+                                    + tally_type
+                                    + "/score"
+                                ][:]
+                                tally_score[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += score
+                                tally_score_sq[
+                                    N_tallies * i_census : N_tallies * i_census
+                                    + N_tallies,
+                                    :,
+                                ] += (
+                                    score * score
+                                )
+                    tally_score /= N_batch
+                    if N_batch > 0:
+                        tally_score_sq = np.sqrt(
+                            (tally_score_sq / N_batch - np.square(tally_score))
+                            / (N_batch - 1)
+                        )
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/mean",
+                        data=tally_score,
+                    )
+                    f.create_dataset(
+                        "tallies/" + tally_info[0] + "/" + tally_type + "/sdev",
+                        data=tally_score_sq,
+                    )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/x", data=grid["x"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/y", data=grid["y"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/z", data=grid["z"][()]
+                )
+                f.create_dataset("tallies/" + tally_info[0] + "/grid/t", data=t)
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/mu", data=grid["mu"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/azi", data=grid["azi"][()]
+                )
+                f.create_dataset(
+                    "tallies/" + tally_info[0] + "/grid/g", data=grid["g"][()]
+                )
+            f.close()
+        for i_census in range(N_census):
+            for i_batch in range(N_batch):
+                file_name = (
+                    output_name
+                    + "-batch_"
+                    + str(i_batch)
+                    + "-census_"
+                    + str(i_census)
+                    + ".h5"
+                )
+                os.system("rm " + file_name)
 
 
 def closeout(mcdc):
@@ -1490,6 +2383,17 @@ def closeout(mcdc):
                     "runtime/" + name, data=np.array([mcdc["runtime_" + name]])
                 )
 
+        if config.args.runtime_output:
+            with h5py.File(mcdc["setting"]["output_name"] + "-runtime.h5", "w") as f:
+                for name in [
+                    "total",
+                    "preparation",
+                    "simulation",
+                    "output",
+                    "bank_management",
+                ]:
+                    f.create_dataset(name, data=np.array([mcdc["runtime_" + name]]))
+
     print_runtime(mcdc)
     input_deck.reset()
 
@@ -1499,7 +2403,16 @@ def closeout(mcdc):
 # ======================================================================================
 
 
-def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
+def visualize(
+    vis_type,
+    x=0.0,
+    y=0.0,
+    z=0.0,
+    pixels=(100, 100),
+    colors=None,
+    time=np.array([0.0]),
+    save_as=None,
+):
     """
     2D visualization of the created model
 
@@ -1513,14 +2426,17 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
         Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
     z : float or array_like
         Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
-    pixel : array_like
-        Number of respective pixel in the two axes in vis_plane
+    time : array_like
+        Times at which the geometry snapshots are taken
+    pixels : array_like
+        Number of respective pixels in the two axes in vis_plane
     colors : array_like
         List of pairs of material and its color
     """
     # TODO: add input error checkers
 
-    _, mcdc = prepare()
+    _, mcdc_container = prepare()
+    mcdc = mcdc_container[0]
 
     # Color assignment for materials (by material ID)
     if colors is not None:
@@ -1564,43 +2480,57 @@ def visualize(vis_type, x=0.0, y=0.0, z=0.0, pixel=(100, 100), colors=None):
     elif second_key == "z":
         second = z
 
-    # Axis pixel sizes
-    d_first = (first[1] - first[0]) / pixel[0]
-    d_second = (second[1] - second[0]) / pixel[1]
+    # Axis pixels sizes
+    d_first = (first[1] - first[0]) / pixels[0]
+    d_second = (second[1] - second[0]) / pixels[1]
 
-    # Axis pixel grids and midpoints
-    first_grid = np.linspace(first[0], first[1], pixel[0] + 1)
+    # Axis pixels grids and midpoints
+    first_grid = np.linspace(first[0], first[1], pixels[0] + 1)
     first_midpoint = 0.5 * (first_grid[1:] + first_grid[:-1])
 
-    second_grid = np.linspace(second[0], second[1], pixel[1] + 1)
+    second_grid = np.linspace(second[0], second[1], pixels[1] + 1)
     second_midpoint = 0.5 * (second_grid[1:] + second_grid[:-1])
 
     # Set dummy particle
-    particle = np.zeros(1, dtype=type_.particle)[0]
+    particle_container = adapt.local_array(1, type_.particle)
+    particle = particle_container[0]
     particle[reference_key] = reference
     particle["g"] = 0
     particle["E"] = 1e6
 
-    # RGB color data for each pixel
-    data = np.zeros(pixel + (3,))
+    for t in time:
+        # Set time
+        particle["t"] = t
 
-    # Loop over the two axes
-    for i in range(pixel[0]):
-        particle[first_key] = first_midpoint[i]
-        for j in range(pixel[1]):
-            particle[second_key] = second_midpoint[j]
+        # Random direction
+        particle["ux"], particle["uy"], particle["uz"] = (
+            kernel.sample_isotropic_direction(particle_container)
+        )
 
-            # Get material
-            particle["cell_ID"] = -1
-            particle["material_ID"] = -1
-            if geometry.locate_particle(particle, mcdc):
-                data[i, j] = colors[particle["material_ID"]]
-            else:
-                data[i, j] = WHITE
+        # RGB color data for each pixels
+        data = np.zeros(pixels + (3,))
 
-    data = np.transpose(data, (1, 0, 2))
-    plt.imshow(data, origin="lower", extent=first + second)
-    plt.xlabel(first_key + " cm")
-    plt.ylabel(second_key + " cm")
-    plt.title(reference_key + " = %.2f cm" % reference)
-    plt.show()
+        # Loop over the two axes
+        for i in range(pixels[0]):
+            particle[first_key] = first_midpoint[i]
+            for j in range(pixels[1]):
+                particle[second_key] = second_midpoint[j]
+
+                # Get material
+                particle["cell_ID"] = -1
+                particle["material_ID"] = -1
+                if geometry.locate_particle(particle_container, mcdc):
+                    data[i, j] = colors[particle["material_ID"]]
+                else:
+                    data[i, j] = WHITE
+
+        data = np.transpose(data, (1, 0, 2))
+        plt.imshow(data, origin="lower", extent=first + second)
+        plt.xlabel(first_key + " [cm]")
+        plt.ylabel(second_key + " [cm]")
+        plt.title(reference_key + " = %.2f cm" % reference + ", time = %.2f s" % t)
+        if save_as is not None:
+            plt.savefig(save_as + "_%.2f.png" % t)
+            plt.clf()
+        else:
+            plt.show()
