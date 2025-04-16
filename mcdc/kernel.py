@@ -1848,18 +1848,48 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
 # Tally operations
 # =============================================================================
 
-
-def score_collision_tally(P_arr, distance, tally, data, mcdc):
+@njit
+def score_mesh_collision_tally(P_arr, distance, tally, data, mcdc):
     P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
     mesh = tally["filter"]
     stride = tally["stride"]
 
-    # find the mesh cell I am in
+    # Easily identified tally bin indices
+    mu, azi = mesh_get_angular_index(P_arr, mesh)
+    g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
+
+    # Get starting indices
+    ix, iy, iz, it, outside = mesh_.structured.get_indices(P_arr, mesh)
+
+    if outside or outside_energy:
+        return
+
+    idx = (
+        stride["tally"]
+        + mu * stride["mu"]
+        + azi * stride["azi"]
+        + g * stride["g"]
+        + it * stride["t"]
+        + ix * stride["x"]
+        + iy * stride["y"]
+        + iz * stride["z"]
+    )
+
+    # TODO: for loop over number of tallies
+    i = 0 # cus I am only doing flux tallies
+    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+    if P["event"] == EVENT_COLLISION:
+        score = 1.0/SigmaT
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx+i), round(score))
+    elif P["event"] == EVENT_PHANTOM_COLLISION:
+        score = 0
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx+i), round(score))
+    
+    return
 
 
-    # add 
 
 
 
@@ -2897,28 +2927,32 @@ def move_to_event(P_arr, data, mcdc):
     #print("z: {}, uz: {}, distance: {}".format( P["z"], P["uz"], distance ) )
 
     # Score tracklength tallies
-    if mcdc["cycle_active"]:
-        # Mesh tallies
-        #if not (P["event"] == EVENT_PHANTOM_COLLISION):
-        for tally in mcdc["mesh_tallies"]:
-            score_mesh_tally(P_arr, distance, tally, data, mcdc)
+    if not mcdc["technique"]["delta_tracking"]:
+        if mcdc["cycle_active"]:
+            # Mesh tallies
+            #if not (P["event"] == EVENT_PHANTOM_COLLISION):
+            for tally in mcdc["mesh_tallies"]:
+                score_mesh_tally(P_arr, distance, tally, data, mcdc)
 
-        # Cell tallies
-        cell = mcdc["cells"][P["cell_ID"]]
-        for i in range(cell["N_tally"]):
-            ID = cell["tally_IDs"][i]
-            tally = mcdc["cell_tallies"][ID]
-            score_cell_tally(P_arr, distance, tally, data, mcdc)
+            # Cell tallies
+            cell = mcdc["cells"][P["cell_ID"]]
+            for i in range(cell["N_tally"]):
+                ID = cell["tally_IDs"][i]
+                tally = mcdc["cell_tallies"][ID]
+                score_cell_tally(P_arr, distance, tally, data, mcdc)
 
-        # CS tallies
-        for tally in mcdc["cs_tallies"]:
-            score_cs_tally(P_arr, distance, tally, data, mcdc)
+            # CS tallies
+            for tally in mcdc["cs_tallies"]:
+                score_cs_tally(P_arr, distance, tally, data, mcdc)
 
-    if mcdc["setting"]["mode_eigenvalue"]:
-        eigenvalue_tally(P_arr, distance, mcdc)
+        if mcdc["setting"]["mode_eigenvalue"]:
+            eigenvalue_tally(P_arr, distance, mcdc)
 
     # Move particle
     move_particle(P_arr, distance, mcdc)
+
+    if mcdc["technique"]["delta_tracking"]:
+        score_mesh_collision_tally(P_arr, distance, mcdc["mesh_tallies"][0], data, mcdc)
 
     #print("after tally mesh data: ", data)
     #print("z: {}, uz: {}, distance: {}".format( P["z"], P["uz"], distance ) )

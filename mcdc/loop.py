@@ -434,11 +434,6 @@ def loop_source(seed, data, mcdc):
     for idx_work in range(work_size):
         generate_source_particle(work_start, idx_work, seed, mcdc)
 
-        # Run the source particle and its secondaries
-        #print()
-        #print()
-        #print()
-        #print("\nparticle history {}".format(idx_work))
         exhaust_active_bank(data, mcdc)
 
         source_closeout(mcdc, idx_work, N_prog, data)
@@ -586,9 +581,18 @@ def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
 
-    geometry.locate_particle(P_arr, mcdc)
+    #geometry.locate_particle(P_arr, mcdc)
 
-    #cur_mat = P["material_ID"]
+    #cur_mat = P["material_ID"].copy()
+    #cur_loc = P['z']
+
+    #mat_loc = 2
+    #if cur_loc < 4:
+    #    mat_loc = 0
+    #else:
+    #    mat_loc = 1
+    
+    #end_loc = mat_loc
 
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
@@ -623,12 +627,10 @@ def step_particle(P_arr, data, prog):
                 kernel.fission(P_arr, prog)
 
     if P["event"] & EVENT_PHANTOM_COLLISION:
-        #if cur_mat != P["material_ID"]:
-        #    print("particle moved materials while delta tracking!")
         # delta tracking
         P["alive"] = True
-        P["cell_ID"] = -1
-        P["material_ID"] = -1
+        #P["cell_ID"] = -1
+        #P["material_ID"] = -1
 
         #kernel.phantom_scatter(P_arr)
 
@@ -662,6 +664,25 @@ def step_particle(P_arr, data, prog):
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
             kernel.weight_roulette(P_arr, mcdc)
 
+    #geometry.locate_particle(P_arr, mcdc)
+    #P = P_arr[0]
+
+    #if P['z'] < 4:
+    #    end_loc = 0
+    #    P["material_ID"] = 1
+    #else:
+    #    end_loc = 1
+    #    P["material_ID"] = 0
+    #if end_loc != mat_loc:
+    #    print("\nparticle moved regions")
+    #    print("z0: {}, z1: {}".format(cur_loc, P['z']))
+    #    print(cur_mat)
+    #    print(P["material_ID"])
+    #    
+
+    #if cur_mat != P["material_ID"]:
+    #        print("\nparticle moved materials while delta tracking!")
+    #        print("OLD {}, NEW {}".format(cur_mat, P["material_ID"]))
 
 # =============================================================================
 # Precursor source loop

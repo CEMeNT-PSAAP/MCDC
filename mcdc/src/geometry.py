@@ -256,7 +256,10 @@ def locate_particle(particle_container, mcdc):
 
     # Report lost particle if not delta tracking
     if particle_is_lost: #and not mcdc["technique"]["delta_tracking"]:
-        report_lost(particle_container)
+        if mcdc["technique"]["delta_tracking"]:
+            particle["alive"] = False
+        else:
+            report_lost(particle_container)
 
     return not particle_is_lost
 
