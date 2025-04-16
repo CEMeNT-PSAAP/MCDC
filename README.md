@@ -120,4 +120,4 @@ Morgan et al. (2024). Monte Carlo / Dynamic Code (MC/DC): An accelerated Python 
 
 ## License
 
-MC/DC is licensed under a BSD-3 clause license. We believe in open source software.
+MC/DC is licensed under a BSD-3 clause license. We believe in open source software. 

@@ -5,7 +5,7 @@ import shutil
 
 import mcdc.config as config
 import mcdc.adapt as adapt
-import mcdc.geometry as geometry
+import mcdc.src.geometry as geometry
 import mcdc.kernel as kernel
 import mcdc.print_ as print_module
 import mcdc.type_ as type_
@@ -58,13 +58,8 @@ def teardown_gpu(mcdc):
 # Fixed-source loop
 # =========================================================================
 
-# about caching:
-#     it is enabled as a default at the jit call level
-#     to effectivly disable cache, delete the cache folder (often located in /MCDC/mcdc/__pycache__)
-#     see more about cacheing here https://numba.readthedocs.io/en/stable/developer/caching.html
 
-
-@njit(cache=caching)
+@njit
 def loop_fixed_source(data_arr, mcdc_arr):
 
     # Ensure `data` and `mcdc` exist for the lifetime of the program
@@ -76,6 +71,10 @@ def loop_fixed_source(data_arr, mcdc_arr):
 
     # Loop over batches
     for idx_batch in range(mcdc["setting"]["N_batch"]):
+        if not mcdc["technique"]["domain_decomposition"]:
+            kernel.distribute_work(N=mcdc["setting"]["N_particle"], mcdc=mcdc)
+        else:
+            kernel.distribute_work_dd(N=mcdc["setting"]["N_particle"], mcdc=mcdc)
         mcdc["idx_batch"] = idx_batch
         seed_batch = kernel.split_seed(idx_batch, mcdc["setting"]["rng_seed"])
 
@@ -92,6 +91,31 @@ def loop_fixed_source(data_arr, mcdc_arr):
             mcdc["idx_census"] = idx_census
             seed_census = kernel.split_seed(seed_batch, SEED_SPLIT_CENSUS)
 
+            # Set census-based tally time grids
+            if mcdc["setting"]["census_based_tally"]:
+                N_bin = mcdc["setting"]["census_tally_frequency"]
+                if idx_census == 0:
+                    t_start = 0.0
+                else:
+                    t_start = mcdc["setting"]["census_time"][idx_census - 1]
+                t_end = mcdc["setting"]["census_time"][idx_census]
+                dt = (t_end - t_start) / N_bin
+                for tally in mcdc["mesh_tallies"]:
+                    tally["filter"]["t"][0] = t_start
+                    for i in range(N_bin):
+                        tally["filter"]["t"][i + 1] = tally["filter"]["t"][i] + dt
+
+            # Check and accordingly promote future particles to censused particle
+            if kernel.get_bank_size(mcdc["bank_future"]) > 0:
+                kernel.check_future_bank(mcdc)
+            if (
+                idx_census > 0
+                and kernel.get_bank_size(mcdc["bank_source"]) == 0
+                and kernel.get_bank_size(mcdc["bank_census"]) == 0
+                and kernel.get_bank_size(mcdc["bank_future"]) == 0
+            ):
+                # No more particle to work on
+                break
             # Loop over source particles
             seed_source = kernel.split_seed(seed_census, SEED_SPLIT_SOURCE)
             loop_source(seed_source, data, mcdc)
@@ -103,31 +127,49 @@ def loop_fixed_source(data_arr, mcdc_arr):
                 )
                 loop_source_precursor(seed_source_precursor, data, mcdc)
 
-            # Time census closeout
-            if idx_census < mcdc["setting"]["N_census"] - 1:
-                # TODO: Output tally (optional)
+            # Manage particle banks: population control and work rebalance
+            seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            kernel.manage_particle_banks(seed_bank, mcdc)
 
-                # Manage particle banks: population control and work rebalance
-                seed_bank = kernel.split_seed(seed_census, SEED_SPLIT_BANK)
+            # Time census-based tally closeout
+            if mcdc["setting"]["census_based_tally"]:
+                kernel.tally_reduce(data, mcdc)
+                if mcdc["mpi_master"]:
+                    kernel.census_based_tally_output(data, mcdc)
+                    if (
+                        mcdc["technique"]["weight_window"]
+                        and idx_census < mcdc["setting"]["N_census"] - 2
+                    ):
+                        kernel.update_weight_windows(data, mcdc)
+                # TODO: UQ tally
 
         # Multi-batch closeout
         if mcdc["setting"]["N_batch"] > 1:
             # Reset banks
-            kernel.set_bank_size(mcdc["bank_source"], 0)
-            kernel.set_bank_size(mcdc["bank_census"], 0)
             kernel.set_bank_size(mcdc["bank_active"], 0)
+            kernel.set_bank_size(mcdc["bank_census"], 0)
+            kernel.set_bank_size(mcdc["bank_source"], 0)
+            kernel.set_bank_size(mcdc["bank_future"], 0)
 
-            # Tally history closeout
-            kernel.tally_reduce(data, mcdc)
-            kernel.tally_accumulate(data, mcdc)
-            # Uq closeout
-            if mcdc["technique"]["uq"]:
-                kernel.uq_tally_closeout_batch(data, mcdc)
+            # DD closeout
+            if mcdc["technique"]["domain_decomposition"]:
+                mcdc["dd_N_local_source"] = 0
+                mcdc["domain_decomp"]["work_done"] = False
+
+            if not mcdc["setting"]["census_based_tally"]:
+                # Tally history closeout
+                kernel.tally_reduce(data, mcdc)
+                kernel.tally_accumulate(data, mcdc)
+
+                # Uq closeout
+                if mcdc["technique"]["uq"]:
+                    kernel.uq_tally_closeout_batch(data, mcdc)
 
     # Tally closeout
-    if mcdc["technique"]["uq"]:
-        kernel.uq_tally_closeout(data, mcdc)
-    kernel.tally_closeout(data, mcdc)
+    if not mcdc["setting"]["census_based_tally"]:
+        if mcdc["technique"]["uq"]:
+            kernel.uq_tally_closeout(data, mcdc)
+        kernel.tally_closeout(data, mcdc)
 
 
 # =========================================================================
@@ -135,9 +177,8 @@ def loop_fixed_source(data_arr, mcdc_arr):
 # =========================================================================
 
 
-@njit(cache=caching)
+@njit
 def loop_eigenvalue(data_arr, mcdc_arr):
-
     # Ensure `data` and `mcdc` exist for the lifetime of the program
     # by intentionally leaking their memory
     adapt.leak(data_arr)
@@ -158,6 +199,11 @@ def loop_eigenvalue(data_arr, mcdc_arr):
         if mcdc["cycle_active"]:
             kernel.tally_reduce(data, mcdc)
             kernel.tally_accumulate(data, mcdc)
+
+        # DD closeout
+        if mcdc["technique"]["domain_decomposition"]:
+            mcdc["dd_N_local_source"] = 0
+            mcdc["domain_decomp"]["work_done"] = False
 
         # Print progress
         with objmode():
@@ -182,7 +228,7 @@ def loop_eigenvalue(data_arr, mcdc_arr):
 # =============================================================================
 
 
-@njit()
+@njit
 def generate_source_particle(work_start, idx_work, seed, prog):
     mcdc = adapt.mcdc_global(prog)
 
@@ -205,9 +251,47 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         P_arr = mcdc["bank_source"]["particles"][idx_work : (idx_work + 1)]
         P = P_arr[0]
 
-    # Check if it is beyond current census index
+    # Skip if beyond time boundary
+    if P["t"] > mcdc["setting"]["time_boundary"]:
+        return
+
+    # If domain is decomposed, check if particle is in the domain
+    if mcdc["technique"]["domain_decomposition"]:
+        if not kernel.particle_in_domain(P_arr, mcdc):
+            return
+
+        # Also check if it belongs to the current rank
+        mcdc["dd_N_local_source"] += 1
+        if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 1:
+            if (
+                mcdc["dd_N_local_source"]
+                % mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
+                != mcdc["dd_local_rank"]
+            ):
+                return
+
+    # Check if it is beyond current or next census times
+    hit_census = False
+    hit_next_census = False
     idx_census = mcdc["idx_census"]
-    if P["t"] > mcdc["setting"]["census_time"][idx_census]:
+    if idx_census < mcdc["setting"]["N_census"] - 1:
+        if P["t"] > mcdc["setting"]["census_time"][idx_census + 1]:
+            hit_census = True
+            hit_next_census = True
+        elif P["t"] > mcdc["setting"]["census_time"][idx_census]:
+            hit_census = True
+
+    # Put into the right bank
+    if not hit_census:
+        adapt.add_active(P_arr, prog)
+    elif not hit_next_census:
+        # Particle will participate after the current census
+        adapt.add_census(P_arr, prog)
+    else:
+        # Particle will participate in the future
+        adapt.add_future(P_arr, prog)
+
+    """
         if mcdc["technique"]["domain_decomposition"]:
             if mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]] > 0:
                 P["w"] /= mcdc["technique"]["dd_work_ratio"][mcdc["dd_idx"]]
@@ -228,9 +312,10 @@ def generate_source_particle(work_start, idx_work, seed, prog):
         else:
             kernel.recordlike_to_particle(P_new_arr, P_arr)
             adapt.add_active(P_new_arr, prog)
+    """
 
 
-@njit(cache=caching)
+@njit
 def prep_particle(P_arr, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -240,7 +325,7 @@ def prep_particle(P_arr, prog):
         kernel.weight_window(P_arr, prog)
 
 
-@njit()
+@njit
 def exhaust_active_bank(data, prog):
     mcdc = adapt.mcdc_global(prog)
     P_arr = adapt.local_array(1, type_.particle)
@@ -257,13 +342,14 @@ def exhaust_active_bank(data, prog):
         loop_particle(P_arr, data, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def source_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.mcdc_global(prog)
 
     # Tally history closeout for one-batch fixed-source simulation
     if not mcdc["setting"]["mode_eigenvalue"] and mcdc["setting"]["N_batch"] == 1:
-        kernel.tally_accumulate(data, mcdc)
+        if not mcdc["setting"]["census_based_tally"]:
+            kernel.tally_accumulate(data, mcdc)
 
     # Tally history closeout for multi-batch uq simulation
     if mcdc["technique"]["uq"]:
@@ -277,7 +363,7 @@ def source_closeout(prog, idx_work, N_prog, data):
             print_progress(percent, mcdc)
 
 
-@njit(cache=caching)
+@njit
 def source_dd_resolution(data, prog):
     mcdc = adapt.mcdc_global(prog)
 
@@ -346,22 +432,10 @@ def loop_source(seed, data, mcdc):
     work_end = work_start + work_size
 
     for idx_work in range(work_size):
-
-        # =====================================================================
-        # Generate a source particle
-        # =====================================================================
-
         generate_source_particle(work_start, idx_work, seed, mcdc)
 
-        # =====================================================================
         # Run the source particle and its secondaries
-        # =====================================================================
-
         exhaust_active_bank(data, mcdc)
-
-        # =====================================================================
-        # Closeout
-        # =====================================================================
 
         source_closeout(mcdc, idx_work, N_prog, data)
 
@@ -488,7 +562,7 @@ def gpu_loop_source(seed, data, mcdc):
 # =========================================================================
 
 
-@njit(cache=caching)
+@njit
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -497,7 +571,7 @@ def loop_particle(P_arr, data, prog):
         step_particle(P_arr, data, prog)
 
 
-@njit(cache=caching)
+@njit
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
@@ -569,8 +643,8 @@ def step_particle(P_arr, data, prog):
 # =============================================================================
 
 
-@njit(cache=caching)
-def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
+@njit
+def generate_precursor_particle(DNP_arr, particle_idx, seed, prog):
     mcdc = adapt.mcdc_global(prog)
     DNP = DNP_arr[0]
 
@@ -581,7 +655,7 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     # Create new particle
     P_new_arr = adapt.local_array(1, type_.particle)
     P_new = P_new_arr[0]
-    part_seed = kernel.split_seed(particle_idx, seed_work)
+    part_seed = kernel.split_seed(particle_idx, seed)
     P_new["rng_seed"] = part_seed
     P_new["alive"] = True
     P_new["w"] = 1.0
@@ -590,15 +664,21 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
     P_new["x"] = DNP["x"]
     P_new["y"] = DNP["y"]
     P_new["z"] = DNP["z"]
+    P_new["t"] = 0.0
 
-    # Get material
-    _ = geometry.inspect_geometry(P_new_arr, mcdc)
-    if P_new["cell_ID"] > -1:
-        material_ID = P_new["material_ID"]
+    # Sample direction
+    P_new["ux"], P_new["uy"], P_new["uz"] = kernel.sample_isotropic_direction(P_new_arr)
+
+    # Get cell and material
+    P_new["cell_ID"] = -1
+    P_new["material_ID"] = -1
+    _ = geometry.locate_particle(P_new_arr, mcdc)
+
     # Skip if particle is lost
-    else:
+    if P_new["material_ID"] == -1:
         return
 
+    material_ID = P_new["material_ID"]
     material = mcdc["materials"][material_ID]
     G = material["G"]
 
@@ -631,9 +711,6 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
 
     # Accept if it is inside current census index
     if P_new["t"] < mcdc["setting"]["census_time"][idx_census]:
-        # Reduce precursor weight
-        DNP["w"] -= 1.0
-
         # Skip if it's beyond time boundary
         if P_new["t"] > mcdc["setting"]["time_boundary"]:
             return
@@ -647,18 +724,11 @@ def generate_precursor_particle(DNP_arr, particle_idx, seed_work, prog):
                 break
         P_new["g"] = g_out
 
-        # Sample direction
-        (
-            P_new["ux"],
-            P_new["uy"],
-            P_new["uz"],
-        ) = kernel.sample_isotropic_direction(P_new_arr)
-
         # Push to active bank
         adapt.add_active(P_new_arr, prog)
 
 
-@njit(cache=caching)
+@njit
 def source_precursor_closeout(prog, idx_work, N_prog, data):
     mcdc = adapt.mcdc_global(prog)
 
@@ -676,51 +746,32 @@ def source_precursor_closeout(prog, idx_work, N_prog, data):
 
 @njit
 def loop_source_precursor(seed, data, mcdc):
-    # TODO: censussed neutrons seeding is still not reproducible
-
     # Progress bar indicator
     N_prog = 0
 
-    # =========================================================================
-    # Sync. RNG skip ahead for reproducibility
-    # =========================================================================
+    # TODO: Domain decomposition (see loop_source)
 
-    # Exscan upper estimate of number of particles generated locally
-    idx_start, N_local, N_global = kernel.bank_scanning_DNP(
-        mcdc["bank_precursor"], mcdc
-    )
-
-    # =========================================================================
     # Loop over precursor sources
-    # =========================================================================
+    work_start = mcdc["mpi_work_start_precursor"]
+    work_size = mcdc["mpi_work_size_precursor"]
+    work_end = work_start + work_size
 
-    for idx_work in range(mcdc["mpi_work_size_precursor"]):
+    for idx_work in range(work_size):
         # Get precursor
         DNP_arr = mcdc["bank_precursor"]["precursors"][idx_work : (idx_work + 1)]
         DNP = DNP_arr[0]
+        seed_precursor = kernel.split_seed(work_start + idx_work, seed)
+        # Note the seed is only used once
 
         # Determine number of particles to be generated
-        w = DNP["w"]
-        N = math.floor(w)
-        # "Roulette" the last particle
-        seed_work = kernel.split_seed(idx_work, seed)
-        if kernel.rng_from_seed(seed_work) < w - N:
-            N += 1
-        DNP["w"] = N
+        nu = DNP["w"]
+        xi = kernel.rng_from_seed(seed_precursor)
+        N = int(math.floor(nu + xi))
 
-        # =====================================================================
         # Loop over source particles from the source precursor
-        # =====================================================================
-
         for particle_idx in range(N):
-
-            generate_precursor_particle(DNP_arr, particle_idx, seed_work, mcdc)
-
+            generate_precursor_particle(DNP_arr, particle_idx, seed_precursor, mcdc)
             exhaust_active_bank(data, mcdc)
-
-        # =====================================================================
-        # Closeout
-        # =====================================================================
 
         source_precursor_closeout(mcdc, idx_work, N_prog, data)
 
@@ -838,7 +889,6 @@ def gpu_loop_source_precursor(seed, data, mcdc):
 
     kernel.set_bank_size(mcdc["bank_active"], 0)
 
-    print(kernel.get_bank_size(mcdc["bank_census"]))
     # =====================================================================
     # Closeout (moved out of loop)
     # =====================================================================

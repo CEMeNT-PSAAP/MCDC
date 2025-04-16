@@ -11,6 +11,10 @@ import matplotlib.animation as animation
 
 # Results
 with h5py.File("output.h5", "r") as f:
+    cs_recon = f["tallies/cs_tally_0/flux/reconstruction"][:]
+    plt.imshow(cs_recon)
+    plt.show()
+
     tallies = f["tallies/mesh_tally_0"]
     flux = tallies["flux"]
     grid = tallies["grid"]
@@ -25,19 +29,8 @@ with h5py.File("output.h5", "r") as f:
     phi = flux["mean"][:]
     phi_sd = flux["sdev"][:]
 
-fig, ax = plt.subplots()
-cax = ax.pcolormesh(X, Y, phi[0], vmin=phi[0].min(), vmax=phi[0].max())
-text = ax.text(0.02, 1.02, "", transform=ax.transAxes)
-ax.set_aspect("equal", "box")
-ax.set_xlabel("$y$ [cm]")
-ax.set_ylabel("$x$ [cm]")
-
-
-def animate(i):
-    cax.set_array(phi[i])
-    cax.set_clim(phi[i].min(), phi[i].max())
-    text.set_text(r"$t \in [%.1f,%.1f]$ s" % (t[i], t[i + 1]))
-
-
-anim = animation.FuncAnimation(fig, animate, interval=10, frames=len(t) - 1)
-plt.show()
+    for i in range(len(f["input_deck"]["cell_tallies"])):
+        flux_score = f[f"tallies/cell_tally_{i}/flux"]
+        print(
+            f'cell {i+1} mean = {flux_score["mean"][()]}, sdev = {flux_score["sdev"][()]}'
+        )

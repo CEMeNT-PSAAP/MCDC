@@ -169,6 +169,10 @@ class SurfaceCard(InputCard):
         self.nz = 0.0
         self.N_tally = 0
         self.tally_IDs = []
+        self.moving = False
+        self.N_move = 1
+        self.move_velocities = [(0.0, 0.0, 0.0)]
+        self.move_durations = [INF]
 
     def _create_halfspace(self, positive):
         region = RegionCard("halfspace")
@@ -198,6 +202,22 @@ class SurfaceCard(InputCard):
     def __neg__(self):
         return self._create_halfspace(False)
 
+    def move(self, velocities, durations):
+        self.moving = True
+        self.N_move = len(durations) + 1
+
+        if isinstance(velocities, np.ndarray):
+            velocities = velocities.tolist()
+            durations = durations.tolist()
+
+        self.move_velocities = velocities
+        self.move_velocities.append([0.0, 0.0, 0.0])
+        self.move_velocities = np.array(self.move_velocities)
+
+        self.move_durations = durations
+        self.move_durations.append(INF)
+        self.move_durations = np.array(self.move_durations)
+
 
 class CellCard(InputCard):
     def __init__(self):
@@ -210,7 +230,10 @@ class CellCard(InputCard):
         self.fill_type = "material"
         self.fill_ID = None
         self.translation = np.array([0.0, 0.0, 0.0])
+        self.rotation = np.array([0.0, 0.0, 0.0])
         self.surface_IDs = np.zeros(0, dtype=int)
+        self.N_tally = 0
+        self.tally_IDs = []
         self._region_RPN = []  # Reverse Polish Notation
 
     def set_region_RPN(self):
@@ -289,13 +312,12 @@ class CellCard(InputCard):
 
 
 class UniverseCard(InputCard):
-    def __init__(self, N_cell):
+    def __init__(self):
         InputCard.__init__(self, "Universe")
 
         # Set card data
         self.ID = None
-        self.N_cell = N_cell
-        self.cell_IDs = np.zeros(N_cell, dtype=int)
+        self.cell_IDs = np.zeros(0, dtype=int)
 
 
 class LatticeCard(InputCard):
@@ -383,3 +405,25 @@ class SurfaceTallyCard(TallyCard):
         # Set card data
         self.surface_ID = surface_ID
         self.N_bin = 1
+
+
+class CellTallyCard(TallyCard):
+    def __init__(self, cell_ID):
+        TallyCard.__init__(self, "Cell tally")
+
+        # Set card data
+        self.cell_ID = cell_ID
+        self.N_bin = 1
+
+
+class CSTallyCard(TallyCard):
+    def __init__(self):
+        TallyCard.__init__(self, "CS tally")
+
+        # Set card data
+        self.x = np.array([-INF, INF])
+        self.y = np.array([-INF, INF])
+        self.z = np.array([-INF, INF])
+        self.N_bin = 1
+        self.N_cs_bins = 1
+        self.cs_bin_size = np.array([1.0, 1.0])
