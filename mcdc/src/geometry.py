@@ -71,7 +71,7 @@ def inspect_geometry(particle_container, mcdc):
         elif check_coincidence(d_surface, distance):
             # Add event if not there yet
             if not event & EVENT_SURFACE_CROSSING:
-                event += EVENT_SURFACE_CROSSING
+                event = EVENT_SURFACE_CROSSING
                 particle["surface_ID"] = surface_ID
             # If surface crossing is already there, prioritize the outer surface ID
 
@@ -151,7 +151,7 @@ def inspect_geometry(particle_container, mcdc):
     particle["uz"] = uz_global
 
     # Report lost particle
-    if (event == EVENT_LOST):
+    if event == EVENT_LOST:
         report_lost(particle_container)
 
     # Assign particle event
@@ -255,7 +255,7 @@ def locate_particle(particle_container, mcdc):
     particle["uz"] = uz_global
 
     # Report lost particle if not delta tracking
-    if particle_is_lost: #and not mcdc["technique"]["delta_tracking"]:
+    if particle_is_lost:  # and not mcdc["technique"]["delta_tracking"]:
         if mcdc["technique"]["delta_tracking"]:
             particle["alive"] = False
         else:

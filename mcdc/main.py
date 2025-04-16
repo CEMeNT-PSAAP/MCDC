@@ -1233,6 +1233,7 @@ def prepare():
         "branchless_collision",
         "uq",
         "delta_tracking",
+        "collision_estimator",
     ]:
         copy_field(mcdc["technique"], input_deck.technique, name)
 
@@ -1455,7 +1456,6 @@ def prepare():
             if flags["nu_p"] or flags["nu_d"]:
                 flags["nu_f"] = True
 
-
     # =========================================================================
     # Delta tracking (majorant copmutation)
     # =========================================================================
@@ -1490,8 +1490,10 @@ def prepare():
             for e in range(majorant_energy_grid.size):
                 for n in range(N_nuclide):
                     nuclide = mcdc["nuclides"][n]
-                    total_xsec_over_nuclides[n] = np.interp(majorant_energy_grid[e], nuclide["E_xs"], nuclide["ce_total"])
-                    #kernel.get_XS(nuclide, majorant_energy_grid[e], nuclide["E_xs"], nuclide["NE_xs"])
+                    total_xsec_over_nuclides[n] = np.interp(
+                        majorant_energy_grid[e], nuclide["E_xs"], nuclide["ce_total"]
+                    )
+                    # kernel.get_XS(nuclide, majorant_energy_grid[e], nuclide["E_xs"], nuclide["NE_xs"])
 
                 majorant_xsec[e] = np.max(total_xsec_over_nuclides)
 
@@ -1499,31 +1501,16 @@ def prepare():
             N_groups = mcdc["nuclides"][0]["G"]
             majorant_energy_grid = np.zeros(N_groups)
             majorant_xsec = np.zeros(N_groups)
-            
+
             majorant_energy_grid = mcdc["nuclides"][0]["speed"][:]
 
             for i in range(N_groups):
-                majorant_xsec[i] = np.max(mcdc["nuclides"][:]["total"][:,i])
-                #print(mcdc["nuclides"][:]["total"].shape)
-                #print(mcdc["nuclides"][:]["total"])
-
-        print(majorant_xsec)
+                majorant_xsec[i] = np.max(mcdc["nuclides"][:]["total"][:, i])
 
         # This might need to use copy_feild but not sure why
         mcdc["technique"]["micro_majorant_xsec"] = majorant_xsec[:]
         mcdc["technique"]["majorant_energy"] = majorant_energy_grid[:]
         mcdc["technique"]["N_majorant"] = np.size(majorant_xsec)
-
-        #print(mcdc["technique"]["micro_majorant_xsec"])
-
-        #copy_field(mcdc["technique"]["micro_majorant_xsec"], majorant_xsec, "micro_majorant_xsec")
-        #copy_field(mcdc["technique"]["majorant_energy"], majorant_energy_grid, "majorant_energy")
-        #copy_field(mcdc["technique"]["N_majorant"], np.size(majorant_xsec), "N_majorant" )
-
-        #copy_field(mcdc["technique"]["micro_majorant_xsec"], majorant_xsec, )
-        #copy_field(mcdc["technique"]["majorant_energy"], majorant_energy_grid, )
-        #copy_field(mcdc["technique"]["N_majorant"], np.size(majorant_xsec), )
-
 
     # =========================================================================
     # MPI

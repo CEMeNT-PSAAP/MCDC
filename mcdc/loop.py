@@ -438,8 +438,6 @@ def loop_source(seed, data, mcdc):
 
         source_closeout(mcdc, idx_work, N_prog, data)
 
-    #print(data)
-
     if mcdc["technique"]["domain_decomposition"]:
         source_dd_resolution(data, mcdc)
 
@@ -567,32 +565,14 @@ def gpu_loop_source(seed, data, mcdc):
 def loop_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
-    l = 0
     while P["alive"]:
-        #print("particle step {}".format(l))
         step_particle(P_arr, data, prog)
-        l+=1
 
 
-#@njit
-#@profile
 @njit
 def step_particle(P_arr, data, prog):
     P = P_arr[0]
     mcdc = adapt.mcdc_global(prog)
-
-    #geometry.locate_particle(P_arr, mcdc)
-
-    #cur_mat = P["material_ID"].copy()
-    #cur_loc = P['z']
-
-    #mat_loc = 2
-    #if cur_loc < 4:
-    #    mat_loc = 0
-    #else:
-    #    mat_loc = 1
-    
-    #end_loc = mat_loc
 
     # Determine and move to event
     kernel.move_to_event(P_arr, data, mcdc)
@@ -629,14 +609,10 @@ def step_particle(P_arr, data, prog):
     if P["event"] & EVENT_PHANTOM_COLLISION:
         # delta tracking
         P["alive"] = True
-        #P["cell_ID"] = -1
-        #P["material_ID"] = -1
-
-        #kernel.phantom_scatter(P_arr)
+        # TODO Apply boundary conditions
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:
-        #print("never!")
         kernel.surface_crossing(P_arr, data, prog)
         if P["event"] & EVENT_DOMAIN_CROSSING:
             if mcdc["surfaces"][P["surface_ID"]]["BC"] == BC_NONE:
@@ -664,25 +640,6 @@ def step_particle(P_arr, data, prog):
         if abs(P["w"]) <= mcdc["technique"]["wr_threshold"]:
             kernel.weight_roulette(P_arr, mcdc)
 
-    #geometry.locate_particle(P_arr, mcdc)
-    #P = P_arr[0]
-
-    #if P['z'] < 4:
-    #    end_loc = 0
-    #    P["material_ID"] = 1
-    #else:
-    #    end_loc = 1
-    #    P["material_ID"] = 0
-    #if end_loc != mat_loc:
-    #    print("\nparticle moved regions")
-    #    print("z0: {}, z1: {}".format(cur_loc, P['z']))
-    #    print(cur_mat)
-    #    print(P["material_ID"])
-    #    
-
-    #if cur_mat != P["material_ID"]:
-    #        print("\nparticle moved materials while delta tracking!")
-    #        print("OLD {}, NEW {}".format(cur_mat, P["material_ID"]))
 
 # =============================================================================
 # Precursor source loop

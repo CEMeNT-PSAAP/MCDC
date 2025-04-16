@@ -60,7 +60,7 @@ def print_banner(mcdc):
         else:
             banner += "      Algorithm | History-based\n"
         banner += "  MPI Processes | %i\n" % size
-        #banner += " OpenMP Threads | 1"
+        # banner += " OpenMP Threads | 1"
         print(banner)
         sys.stdout.flush()
 

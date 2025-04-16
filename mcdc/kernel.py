@@ -1848,8 +1848,12 @@ def mesh_get_energy_index(P_arr, mesh, mode_MG):
 # Tally operations
 # =============================================================================
 
+
 @njit
-def score_mesh_collision_tally(P_arr, distance, tally, data, mcdc):
+def score_mesh_collision_tally(P_arr, tally, data, mcdc):
+    """Scoring tallies with a collision estimator,
+    FLUX TALLIES ONLYT FOR NOW
+    """
     P = P_arr[0]
     tally_bin = data[TALLY]
     material = mcdc["materials"][P["material_ID"]]
@@ -1860,7 +1864,7 @@ def score_mesh_collision_tally(P_arr, distance, tally, data, mcdc):
     mu, azi = mesh_get_angular_index(P_arr, mesh)
     g, outside_energy = mesh_get_energy_index(P_arr, mesh, mcdc["setting"]["mode_MG"])
 
-    # Get starting indices
+    # Get current indices indices
     ix, iy, iz, it, outside = mesh_.structured.get_indices(P_arr, mesh)
 
     if outside or outside_energy:
@@ -1878,19 +1882,14 @@ def score_mesh_collision_tally(P_arr, distance, tally, data, mcdc):
     )
 
     # TODO: for loop over number of tallies
-    i = 0 # cus I am only doing flux tallies
-    SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+    i = 0  # cus we are only doing flux tallies
+
     if P["event"] == EVENT_COLLISION:
-        score = 1.0/SigmaT
-        adapt.global_add(tally_bin, (TALLY_SCORE, idx+i), round(score))
-    elif P["event"] == EVENT_PHANTOM_COLLISION:
-        score = 0
-        adapt.global_add(tally_bin, (TALLY_SCORE, idx+i), round(score))
-    
+        SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
+        score = 1.0 / SigmaT
+        adapt.global_add(tally_bin, (TALLY_SCORE, idx + i), round(score))
+
     return
-
-
-
 
 
 @njit
@@ -2805,8 +2804,6 @@ def eigenvalue_tally_closeout(mcdc):
 # ======================================================================================
 
 
-#@njit
-#@profile
 @njit
 def move_to_event(P_arr, data, mcdc):
     # ==================================================================================
@@ -2816,7 +2813,7 @@ def move_to_event(P_arr, data, mcdc):
 
     # Multigroup preparation
     #   In MG mode, particle speed is material-dependent.
-    if mcdc["setting"]["mode_MG"]:
+    if mcdc["setting"]["mode_MG"] and not mcdc["technique"]["delta_tracking"]:
         # If material is not identified yet, locate the particle
         if P["material_ID"] == -1:
             if not geometry.locate_particle(P_arr, mcdc):
@@ -2839,7 +2836,11 @@ def move_to_event(P_arr, data, mcdc):
     if P["event"] == EVENT_LOST:
         return
 
-    # p
+    # Particle is dead?
+    if P["alive"] == False:
+        return
+
+    # ==================================================================================
     # Get distances to other events
     # ==================================================================================
 
@@ -2866,39 +2867,24 @@ def move_to_event(P_arr, data, mcdc):
     # =========================================================================
     # TODO: Make a function to better maintain the repeating operation
 
-    # analoug tracking assumes d_boundary as distance setter
-    # delta tracking assumes d_collision
     if mcdc["technique"]["delta_tracking"]:
         distance = INF
     else:
         distance = d_boundary
 
-    if not mcdc["technique"]["delta_tracking"]:
-        # Check distance to domain
-        if d_domain < distance - COINCIDENCE_TOLERANCE:
-            distance = d_domain
-            P["event"] = EVENT_DOMAIN_CROSSING
-            P["surface_ID"] = -1
-        elif geometry.check_coincidence(d_domain, distance):
-            P["event"] += EVENT_DOMAIN_CROSSING
+    # Check distance to domain
+    if d_domain < distance - COINCIDENCE_TOLERANCE:
+        distance = d_domain
+        P["event"] = EVENT_DOMAIN_CROSSING
+        P["surface_ID"] = -1
+    elif geometry.check_coincidence(d_domain, distance):
+        P["event"] += EVENT_DOMAIN_CROSSING
 
     # Check distance to collision
-    if (d_collision < distance - COINCIDENCE_TOLERANCE): #or (mcdc["technique"]["delta_tracking"]):
-        #if not mcdc["technique"]["delta_tracking"]:
+    if d_collision < distance - COINCIDENCE_TOLERANCE:
         distance = d_collision
-
-        # DELTA TRACKING REJECTION SAMPLING
-        if mcdc["technique"]["delta_tracking"]:
-            # finding the particle
-            if not geometry.locate_particle(P_arr, mcdc):
-                # Particle is lost
-                P["event"] = EVENT_LOST
-                return
-            
-            rejection_sample(P_arr, mcdc)
-        else:
-            P["event"] = EVENT_COLLISION
-            P["surface_ID"] = -1
+        P["event"] = EVENT_COLLISION
+        P["surface_ID"] = -1
 
     elif geometry.check_coincidence(d_collision, distance):
         P["event"] += EVENT_COLLISION
@@ -2917,20 +2903,10 @@ def move_to_event(P_arr, data, mcdc):
         P["event"] = EVENT_TIME_BOUNDARY
         P["surface_ID"] = -1
 
-    # =========================================================================
-    # Move particle
-    # =========================================================================
-    #event_cont = P["event"]
-    #geometry.inspect_geometry(P_arr, mcdc)
-    #P["event"] = event_cont
-    #print("before tally mesh data: ", data)
-    #print("z: {}, uz: {}, distance: {}".format( P["z"], P["uz"], distance ) )
-
     # Score tracklength tallies
-    if not mcdc["technique"]["delta_tracking"]:
+    if not mcdc["technique"]["collision_estimator"]:
         if mcdc["cycle_active"]:
             # Mesh tallies
-            #if not (P["event"] == EVENT_PHANTOM_COLLISION):
             for tally in mcdc["mesh_tallies"]:
                 score_mesh_tally(P_arr, distance, tally, data, mcdc)
 
@@ -2948,21 +2924,38 @@ def move_to_event(P_arr, data, mcdc):
         if mcdc["setting"]["mode_eigenvalue"]:
             eigenvalue_tally(P_arr, distance, mcdc)
 
+    # =========================================================================
     # Move particle
+    # =========================================================================
+
     move_particle(P_arr, distance, mcdc)
 
-    if mcdc["technique"]["delta_tracking"]:
-        score_mesh_collision_tally(P_arr, distance, mcdc["mesh_tallies"][0], data, mcdc)
+    # =========================================================================
+    # Delta Tracking
+    # =========================================================================
 
-    #print("after tally mesh data: ", data)
-    #print("z: {}, uz: {}, distance: {}".format( P["z"], P["uz"], distance ) )
+    # Delta tracking rejection sampleing must happen AFTER the particle is moved
+    if (mcdc["technique"]["delta_tracking"]) and (P["event"] == EVENT_COLLISION):
+        # finding the particle
+        P["cell_ID"] = -1
+        P["material_ID"] = -1
+        if not geometry.locate_particle(P_arr, mcdc):
+            # Particle is lost out of bounds
+            P["event"] = EVENT_LOST
+            P["alive"] = False
+            return
+
+        rejection_sample(P_arr, mcdc)
+
+    if mcdc["technique"]["collision_estimator"]:
+        score_mesh_collision_tally(P_arr, mcdc["mesh_tallies"][0], data, mcdc)
 
 
 @njit
 def distance_to_collision(P_arr, mcdc):
     P = P_arr[0]
     # Get total cross-section
-    
+
     material = mcdc["materials"][P["material_ID"]]
     if mcdc["technique"]["delta_tracking"]:
         SigmaT = get_MacroMaj(material, P_arr, mcdc)
@@ -2972,7 +2965,7 @@ def distance_to_collision(P_arr, mcdc):
     # Vacuum material?
     if SigmaT == 0.0:
         return INF
-    
+
     # Sample collision distance
     xi = rng(P_arr)
     distance = -math.log(xi) / SigmaT
@@ -2981,24 +2974,22 @@ def distance_to_collision(P_arr, mcdc):
 
 @njit
 def rejection_sample(P_arr, mcdc):
-    #For use in delta tracking
+    # For use in delta tracking
     P = P_arr[0]
 
     material = mcdc["materials"][P["material_ID"]]
     SigmaT = get_MacroXS(XS_TOTAL, material, P_arr, mcdc)
     Maj = get_MacroMaj(material, P_arr, mcdc)
 
-    reject_rat = SigmaT/Maj
+    reject_rat = SigmaT / Maj
 
     xi = rng(P_arr)
 
-    #print("Rejection sample data z: {}, SigmaT: {}, majorant: {}, rejection_ratio: {}, xi: {}".format(P['z'], SigmaT, Maj, reject_rat, xi) )
-
-    if (xi < reject_rat): #real collision
+    if xi < reject_rat:  # real collision
         P["event"] = EVENT_COLLISION
-    else: #phantom collision
-        #print("RJECTED")
+    else:  # phantom collision
         P["event"] = EVENT_PHANTOM_COLLISION
+
 
 # =============================================================================
 # Surface crossing
@@ -3815,8 +3806,10 @@ def weight_roulette(P_arr, mcdc):
 
 
 # =============================================================================
-# Delta Tracking specific functions
+# Majorant function --- Delta Tracking
 # =============================================================================
+
+
 @njit
 def get_MacroMaj(material, P_arr, mcdc):
     """Hybrid delta tracking"""
@@ -3824,7 +3817,7 @@ def get_MacroMaj(material, P_arr, mcdc):
     P = P_arr[0]
 
     if mcdc["setting"]["mode_MG"]:
-        return(mcdc["technique"]["micro_majorant_xsec"][P["g"]])
+        return mcdc["technique"]["micro_majorant_xsec"][P["g"]]
 
     elif mcdc["setting"]["mode_CE"]:
         # nuclide density over all nuclides
@@ -3832,7 +3825,7 @@ def get_MacroMaj(material, P_arr, mcdc):
         N = 0.0
         for i in range(material["N_nuclide"]):
             N += material["nuclide_densities"][i]
-        
+
         data = mcdc["technique"]["micro_majorant_xsec"]
         Egrid = mcdc["technique"]["majorant_energy"]
         E = P["E"]
@@ -3842,35 +3835,6 @@ def get_MacroMaj(material, P_arr, mcdc):
         MacroXS *= N
 
         return MacroXS
-
-
-@njit 
-def phantom_scatter(P_arr):
-    """delta tracking phantom collision event
-       isotropically scattering a particle to avoid biasing the soultion
-        """
-
-    P = P_arr[0]
-
-    # Sample scattering angle
-    mu0 = 2.0 * rng(P_arr) - 1.0
-
-    # Scatter direction
-    azi = 2.0 * PI * rng(P_arr)
-
-    #mu  = 2.0*rands[2*i] - 1.0
-    #azi = 2.0*math.pi*rands[2*i+1]
-    #
-    ## Convert to Cartesian coordinate
-    #c = (1.0 - mu**2)**0.5
-    #p_dir_y[scatter_indices[i]] = math.cos(azi)*c
-    #p_dir_z[scatter_indices[i]] = math.sin(azi)*c
-    #p_dir_x[scatter_indices[i]] = mu
-
-    P["ux"], P["uy"], P["uz"] = scatter_direction(
-        P["ux"], P["uy"], P["uz"], mu0, azi
-    )
-
 
 
 # =============================================================================
