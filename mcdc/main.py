@@ -1460,42 +1460,59 @@ def prepare():
     # Delta tracking (majorant copmutation)
     # =========================================================================
 
-    def get_XS(data, E, E_grid, NE):
-        # Search XS energy bin index
-        idx = (E, E_grid, NE)
-
-        # Extrapolate if E is outside the given data
-        if idx == -1:
-            idx = 0
-        elif idx + 1 == NE:
-            idx -= 1
-
-        # Linear interpolation
-        E1 = E_grid[idx]
-        E2 = E_grid[idx + 1]
-        XS1 = data[idx]
-        XS2 = data[idx + 1]
-
-        return XS1 + (E - E1) * (XS2 - XS1) / (E2 - E1)
-
     if mcdc["technique"]["delta_tracking"]:
-
         if mode_CE:
-            # sort energy grid and eliminate duplicate energy grid points
+
+            # TODO: Use numpy functions (currently can't as data is disorginized and requires extrapolation)
+            try:
+                import scipy
+            except:
+                print_error(
+                    "SciPy not found!\n"
+                    "Contininous energy delta tracking requires\n\
+                     interpolation functions from Scipy to construct the marjoant,\n \
+                     try `pip install scipy`"
+                )
+
+            # unify the energy grids from all nuclides
+            majorant_energy_grid = np.array([])
+            for n in range(N_nuclide):
+                nuclide = mcdc["nuclides"][n]
+                majorant_energy_grid = np.append(majorant_energy_grid, nuclide["E_xs"])
+
+            # sort energy grid and eliminate duplicate points
             majorant_energy_grid = np.unique(majorant_energy_grid)
             majorant_xsec = np.zeros_like(majorant_energy_grid)
 
-            # find the majorant over all the nuclides at every point on the energy grid
-            total_xsec_over_nuclides = np.zeros(N_nuclide)
-            for e in range(majorant_energy_grid.size):
-                for n in range(N_nuclide):
-                    nuclide = mcdc["nuclides"][n]
-                    total_xsec_over_nuclides[n] = np.interp(
-                        majorant_energy_grid[e], nuclide["E_xs"], nuclide["ce_total"]
-                    )
-                    # kernel.get_XS(nuclide, majorant_energy_grid[e], nuclide["E_xs"], nuclide["NE_xs"])
+            # find the majorant at every point on the energy grid
+            for n in range(N_nuclide):
+                nuclide = mcdc["nuclides"][n]
 
-                majorant_xsec[e] = np.max(total_xsec_over_nuclides)
+                # builds an interploation funciton for a given nuclide
+                total_xsec_unified = scipy.interpolate.interp1d(
+                    nuclide["E_xs"], nuclide["ce_total"], bounds_error=False
+                )
+
+                # evaluates nuclide interploation function at all unified energy grid points
+                total_xsec_unified = total_xsec_unified(majorant_energy_grid)
+
+                # compares old majorant xsec and the currently evaluated unified xsec and picks the larger xsecs
+                majorant_xsec = np.max((majorant_xsec, total_xsec_unified), axis=0)
+
+            # import matplotlib.pyplot as plt
+            # plt.figure()
+            # plt.plot(majorant_energy_grid, majorant_xsec, '^', label="majorant")
+            # for n in range(N_nuclide):
+            #     nuclide = mcdc["nuclides"][n]
+            #     plt.plot(nuclide["E_xs"], nuclide["ce_total"], label=n)
+            # plt.xscale("log")
+            # plt.yscale("log")
+            # plt.xlabel("E [kev]")
+            # plt.ylabel("σ")
+            # plt.legend()
+            # plt.show()
+
+            # exit()
 
         elif mode_MG:
             N_groups = mcdc["nuclides"][0]["G"]

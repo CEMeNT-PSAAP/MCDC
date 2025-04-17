@@ -1318,7 +1318,7 @@ def compute_majorant_size(input_deck):
         with h5py.File(dir_name + "/" + nuc.name + ".h5", "r") as f:
             energy_grid = np.append(energy_grid, f["E_xs"][:])
 
-    return np.size(np.unique(energy_grid))
+    return np.size(np.unique(energy_grid)) + 1
 
 
 # UQ
