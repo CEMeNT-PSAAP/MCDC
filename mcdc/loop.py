@@ -609,7 +609,7 @@ def step_particle(P_arr, data, prog):
     if P["event"] & EVENT_PHANTOM_COLLISION:
         # delta tracking
         P["alive"] = True
-        # TODO Apply boundary conditions
+        # TODO Apply reflecting boundary conditions
 
     # Surface and domain crossing
     if P["event"] & EVENT_SURFACE_CROSSING:

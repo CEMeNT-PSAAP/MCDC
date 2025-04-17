@@ -1881,7 +1881,7 @@ def score_mesh_collision_tally(P_arr, tally, data, mcdc):
         + iz * stride["z"]
     )
 
-    # TODO: for loop over number of tallies
+    # TODO: loop over number of tallies
     i = 0  # cus we are only doing flux tallies
 
     if P["event"] == EVENT_COLLISION:
@@ -2885,7 +2885,6 @@ def move_to_event(P_arr, data, mcdc):
         distance = d_collision
         P["event"] = EVENT_COLLISION
         P["surface_ID"] = -1
-
     elif geometry.check_coincidence(d_collision, distance):
         P["event"] += EVENT_COLLISION
 
@@ -2941,6 +2940,7 @@ def move_to_event(P_arr, data, mcdc):
         P["material_ID"] = -1
         if not geometry.locate_particle(P_arr, mcdc):
             # Particle is lost out of bounds
+            # geometry.check_boundary_conditions(P_arr, mcdc)
             P["event"] = EVENT_LOST
             P["alive"] = False
             return
