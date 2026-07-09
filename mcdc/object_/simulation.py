@@ -30,11 +30,11 @@ from numpy.typing import NDArray
 
 ####
 
-from mcdc.object_.base import ObjectSingleton
+from mcdc.object_.base import ObjectBase
 from mcdc.object_.data import DataBase, DataNone
 from mcdc.object_.distribution import DistributionBase, DistributionNone
 from mcdc.object_.gpu_tools import GPUMeta
-from mcdc.object_.mesh import MeshBase, MeshUniform
+from mcdc.object_.mesh import MeshBase
 from mcdc.object_.particle import ParticleBank
 from mcdc.object_.settings import Settings
 from mcdc.object_.universe import Universe, Lattice
@@ -44,7 +44,7 @@ from mcdc.object_.universe import Universe, Lattice
 # ======================================================================================
 
 
-class Simulation(ObjectSingleton):
+class Simulation(ObjectBase):
     # Annotations for Numba mode
     label: str = "simulation"
     non_numba: list[str] = [
@@ -58,19 +58,19 @@ class Simulation(ObjectSingleton):
     # Physics
     data: list[DataBase]
     distributions: list[DistributionBase]
-    materials: list[MaterialBase]
-    elements: list[Element]
+    neutron_reactions: list[NeutronReactionBase]
     electron_reactions: list[ElectronReactionBase]
     nuclides: list[Nuclide]
-    neutron_reactions: list[NeutronReactionBase]
+    elements: list[Element]
+    materials: list[MaterialBase]
     sources: list[Source]
 
     # Geometry
-    cells: list[Cell]
-    lattices: list[Lattice]
-    regions: list[Region]
     surfaces: list[Surface]
+    regions: list[Region]
+    cells: list[Cell]
     universes: list[Universe]
+    lattices: list[Lattice]
     meshes: list[MeshBase]
 
     # Tallies
@@ -92,31 +92,37 @@ class Simulation(ObjectSingleton):
     bank_source: ParticleBank
     bank_future: ParticleBank
 
-    # Simulation parameters
+    # Simulation indices
     idx_work: int
     idx_cycle: int
     idx_census: int
     idx_batch: int
-    dd_idx: int
-    dd_N_local_source: int
-    dd_local_rank: int
+
+    # k-eigenvalue globals
     k_eff: float
     k_cycle: NDArray[float64]
     k_avg: float
     k_sdv: float
+    k_avg_running: float
+    k_sdv_running: float
+    #
     n_avg: float
     n_sdv: float
     n_max: float
+    #
     C_avg: float
     C_sdv: float
     C_max: float
-    k_avg_running: float
-    k_sdv_running: float
-    gyration_radius: NDArray[float64]
-    cycle_active: bool
+    #
     eigenvalue_tally_nuSigmaF: Annotated[NDArray[float64], (1,)]
     eigenvalue_tally_n: Annotated[NDArray[float64], (1,)]
     eigenvalue_tally_C: Annotated[NDArray[float64], (1,)]
+    #
+    gyration_radius: NDArray[float64]
+    #
+    cycle_active: bool
+
+    # MPI parameters
     mpi_size: int
     mpi_rank: int
     mpi_master: bool
@@ -124,6 +130,8 @@ class Simulation(ObjectSingleton):
     mpi_work_size: int
     mpi_work_size_total: int
     mpi_work_iter: Annotated[NDArray[int64], (1,)]
+
+    # Runtimes
     runtime_total: float
     runtime_preparation: float
     runtime_simulation: float
@@ -135,7 +143,7 @@ class Simulation(ObjectSingleton):
     source_seed: int
 
     def __init__(self):
-        super().__init__()
+        super().__init__(register=False)
 
         # ==============================================================================
         # Simulation objects
@@ -144,19 +152,19 @@ class Simulation(ObjectSingleton):
         # Physics
         self.data = [DataNone()]
         self.distributions = [DistributionNone()]
-        self.materials = []
-        self.elements = []
+        self.neutron_reactions = []
         self.electron_reactions = []
         self.nuclides = []
-        self.neutron_reactions = []
+        self.elements = []
+        self.materials = []
         self.sources = []
 
         # Geometry
-        self.cells = []
-        self.lattices = []
-        self.regions = []
         self.surfaces = []
+        self.regions = []
+        self.cells = []
         self.universes = [Universe("Root Universe", root=True)]
+        self.lattices = []
         self.meshes = []
 
         # Tallies
@@ -182,7 +190,7 @@ class Simulation(ObjectSingleton):
         self.bank_future = ParticleBank(tag="future")
 
         # ==============================================================================
-        # Simulation parameters
+        # Simulation variables and parameters
         # ==============================================================================
 
         # Simulation indices
@@ -191,29 +199,29 @@ class Simulation(ObjectSingleton):
         self.idx_census = 0
         self.idx_batch = 0
 
-        # Domain decomposition
-        self.dd_idx = 0
-        self.dd_N_local_source = 0
-        self.dd_local_rank = 0
-
         # Eigenvalue simulation
         self.k_eff = 0.0
         self.k_cycle = np.ones(1)
         self.k_avg = 0.0
         self.k_sdv = 0.0
+        self.k_avg_running = 0.0
+        self.k_sdv_running = 0.0
+        #
         self.n_avg = 0.0  # Neutron density
         self.n_sdv = 0.0
         self.n_max = 0.0
+        #
         self.C_avg = 0.0  # Precursor density
         self.C_sdv = 0.0
         self.C_max = 0.0
-        self.k_avg_running = 0.0
-        self.k_sdv_running = 0.0
-        self.gyration_radius = np.zeros(1)
-        self.cycle_active = False
+        #
         self.eigenvalue_tally_nuSigmaF = np.zeros(1)
         self.eigenvalue_tally_n = np.zeros(1)
         self.eigenvalue_tally_C = np.zeros(1)
+        #
+        self.gyration_radius = np.zeros(1)
+        #
+        self.cycle_active = False
 
         # MPI parameters
         self.mpi_size = MPI.COMM_WORLD.Get_size()
@@ -224,7 +232,7 @@ class Simulation(ObjectSingleton):
         self.mpi_work_size_total = 0
         self.mpi_work_iter = np.zeros(1, dtype=int64)
 
-        # Runtime records
+        # Runtimes
         self.runtime_total = 0.0
         self.runtime_preparation = 0.0
         self.runtime_simulation = 0.0
@@ -235,8 +243,11 @@ class Simulation(ObjectSingleton):
         self.gpu_meta = GPUMeta()
         self.source_seed = 0
 
-    def set_root_universe(self, cells=[]):
-        self.universes[0].cells = cells
+    # ==================================================================================
+    # Run simulation
+    # ==================================================================================
 
+    def run(self):
+        from mcdc.main import run
 
-simulation = Simulation()
+        return run(self)

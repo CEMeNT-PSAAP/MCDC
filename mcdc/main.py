@@ -3,7 +3,7 @@
 # ======================================================================================
 
 
-def run():
+def run(simulationPy):
     """
     Execute the MC/DC simulation.
 
@@ -21,8 +21,6 @@ def run():
     time_total_start = MPI.Wtime()
 
     # Get settings and MPI master status
-    from mcdc.object_.simulation import simulation as simulationPy
-
     settings = simulationPy.settings
     master = MPI.COMM_WORLD.Get_rank() == 0
 
