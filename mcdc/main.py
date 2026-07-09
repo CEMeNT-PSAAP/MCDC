@@ -42,7 +42,7 @@ def run(simulationPy):
     #       The use of container is necessary to ensure proper mutability and tracking
     #       of the structure when running in different kinds of machines supported by
     #       the Numba-based compilation framework.
-    simulation_container, data = preparation()
+    simulation_container, data = preparation(simulationPy)
     simulation = simulation_container[0]
 
     # Print headers
@@ -116,12 +116,11 @@ def run(simulationPy):
 # ======================================================================================
 
 
-def preparation():
+def preparation(simulationPy):
     import math
 
     from mpi4py import MPI
 
-    from mcdc.object_.simulation import simulation as simulationPy
     from mcdc.object_.material import (
         Material,
         MaterialMG,

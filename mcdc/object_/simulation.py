@@ -1,14 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated
 
-from mcdc.object_.technique import (
-    ImplicitCapture,
-    PopulationControl,
-    GlobalWeightRoulette,
-    WeightWindows,
-    WeightedEmission,
-)
-
 if TYPE_CHECKING:
     from mcdc.object_.cell import Cell, Region
     from mcdc.object_.element import Element
@@ -24,6 +16,7 @@ if TYPE_CHECKING:
 
 import numpy as np
 
+from collections.abc import Sequence
 from mpi4py import MPI
 from numpy import float64, int64
 from numpy.typing import NDArray
@@ -37,6 +30,14 @@ from mcdc.object_.gpu_tools import GPUMeta
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.particle import ParticleBank
 from mcdc.object_.settings import Settings
+from mcdc.object_.technique import (
+    ImplicitCapture,
+    PopulationControl,
+    GlobalWeightRoulette,
+    WeightWindows,
+    WeightedEmission,
+)
+
 from mcdc.object_.universe import Universe, Lattice
 
 # ======================================================================================
@@ -142,7 +143,7 @@ class Simulation(ObjectBase):
     gpu_meta: GPUMeta
     source_seed: int
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(register=False)
 
         # ==============================================================================
@@ -244,10 +245,28 @@ class Simulation(ObjectBase):
         self.source_seed = 0
 
     # ==================================================================================
-    # Run simulation
+    # Simulation object setters
     # ==================================================================================
 
-    def run(self):
+    def set_model(self, cells: Sequence[Cell]) -> None:
+        self.universes[0].cells = list(cells)
+
+    def set_sources(self, sources: Sequence[Source]) -> None:
+        self.sources = list(sources)
+
+    def set_tallies(self, tallies: Sequence[Tally]) -> None:
+        self.tallies = list(tallies)
+
+    # ==================================================================================
+    # Operations
+    # ==================================================================================
+
+    def visualize_model(self, vis_type, x, y, z, pixels, colors, time, save_as) -> None:
+        from mcdc.visualize import visualize_model
+
+        visualize_model(self, vis_type, x, y, z, pixels, colors, time, save_as)
+
+    def run(self) -> None:
         from mcdc.main import run
 
-        return run(self)
+        run(self)
