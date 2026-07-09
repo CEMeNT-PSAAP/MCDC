@@ -89,7 +89,7 @@ class Tally(ObjectPolymorphic):
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
-        time: Sequence[float] | NoneType = None,
+        time: Sequence[float] | NDArray[float64] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
     ) -> TallySurfaceCrossing | TallyTracklength | TallyCollision:
         # Determine tally estimator type and create the instance based on the provided

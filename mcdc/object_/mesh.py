@@ -171,9 +171,9 @@ class MeshStructured(MeshBase):
     def __init__(
         self,
         name: str = "",
-        x: Sequence[float] = [-INF, INF],
-        y: Sequence[float] = [-INF, INF],
-        z: Sequence[float] = [-INF, INF],
+        x: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
+        y: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
+        z: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
     ):
         type_ = MESH_STRUCTURED
         super().__init__(type_, name)
