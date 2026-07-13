@@ -19,11 +19,6 @@ class ObjectBase:
         super().__setattr__(key, value)
 
 
-class ObjectSingleton(ObjectBase):
-    def __init__(self):
-        super().__init__()
-
-
 class ObjectNonSingleton(ObjectBase):
     ID: int
 

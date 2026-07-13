@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.constant import PARTICLE_NEUTRON
-from mcdc.object_.base import ObjectBase, ObjectSingleton
+from mcdc.object_.base import ObjectBase, ObjectBase
 
 
 @dataclass
@@ -45,7 +45,7 @@ class Particle(ParticleData):
     event: int = -1
 
 
-class ParticleBank(ObjectSingleton):
+class ParticleBank(ObjectBase):
     label: str = "particle_bank"
     non_numba: list[str] = ["particles"]
     particles: list[ParticleData] = []

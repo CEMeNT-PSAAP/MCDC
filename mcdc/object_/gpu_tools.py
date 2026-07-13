@@ -3,11 +3,11 @@ from numpy import uintp
 
 ####
 
-from mcdc.object_.base import ObjectSingleton
+from mcdc.object_.base import ObjectBase
 
 
 @dataclass
-class GPUMeta(ObjectSingleton):
+class GPUMeta(ObjectBase):
     # Annotations for Numba mode
     label: str = "gpu_meta"
     #
