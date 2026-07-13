@@ -98,19 +98,15 @@ class Cell(MCDCObject):
     mcdc.Universe : Groups cells into a universe.
     """
 
-    # Annotations for Numba mode
-    label: str = "cell"
-    non_numba: list[str] = ["region", "fill", "region_RPN"]
-    #
     name: str
-    region: Region
-    fill: MaterialBase | Universe | Lattice | NoneType
+    region: Region  # Non-numba
+    fill: MaterialBase | Universe | Lattice | NoneType  # Non-numba
     fill_translated: bool
     fill_rotated: bool
     translation: Annotated[NDArray[float64], (3,)]
     rotation: Annotated[NDArray[float64], (3,)]
     region_RPN_tokens: list[int]
-    region_RPN: Boolean
+    region_RPN: Boolean  # Non-numba
     surfaces: list[Surface]
     collision_tallies: list[TallyCollision]
     tracklength_tallies: list[TallyTracklength]
@@ -126,7 +122,10 @@ class Cell(MCDCObject):
         translation: Sequence[float] = [0.0, 0.0, 0.0],
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
     ):
+        # MC/DC framework metadata
         super().__init__()
+        self.label = "cell"
+        self.non_numba += ["region", "fill", "region_RPN"]
 
         # Set name
         if name == "":

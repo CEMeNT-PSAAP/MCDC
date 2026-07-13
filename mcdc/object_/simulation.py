@@ -65,24 +65,12 @@ class Simulation(MCDCBase):
     the execution backend.
     """
 
-    _next_compile_ID: int = 1
-
-    # Annotations for Numba mode
-    label: str = "simulation"
-    non_numba: list[str] = [
-        "regions",
-        "bank_active",
-        "bank_census",
-        "bank_source",
-        "bank_future",
-        "_next_compile_ID",
-        "compiled",
-    ]
+    _next_compile_ID: int = 1  # Non-Numba
 
     # Basic parameters
     name: str
-    compile_ID: int
-    compiled: bool
+    compile_ID: int  # Non-Numba
+    compiled: bool  # Non-Numba
 
     # Physics
     data: list[DataBase]
@@ -96,7 +84,7 @@ class Simulation(MCDCBase):
 
     # Geometry
     surfaces: list[Surface]
-    regions: list[Region]
+    regions: list[Region]  # Non-Numba
     cells: list[Cell]
     universes: list[Universe]
     lattices: list[Lattice]
@@ -116,10 +104,10 @@ class Simulation(MCDCBase):
     population_control: PopulationControl
 
     # Particle banks
-    bank_active: ParticleBank
-    bank_census: ParticleBank
-    bank_source: ParticleBank
-    bank_future: ParticleBank
+    bank_active: ParticleBank  # Non-Numba
+    bank_census: ParticleBank  # Non-Numba
+    bank_source: ParticleBank  # Non-Numba
+    bank_future: ParticleBank  # Non-Numba
 
     # Simulation indices
     idx_work: int
@@ -180,7 +168,17 @@ class Simulation(MCDCBase):
             User-defined simulation name. If omitted, an unnamed simulation is
             created.
         """
-        super().__init__()
+        non_numba = [
+            "regions",
+            "bank_active",
+            "bank_census",
+            "bank_source",
+            "bank_future",
+            "_next_compile_ID",
+            "compiled",
+            "compile_ID",
+        ]
+        super().__init__("simulation", non_numba)
 
         # Set name
         self.name = name or "(Unnamed simulation)"

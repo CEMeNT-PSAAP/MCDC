@@ -1,9 +1,5 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from mcdc.object_.simulation import Simulation
-    from mcdc.object_.base import MCDCObject
-
+from mcdc.object_.simulation import Simulation
+from mcdc.object_.base import MCDCObject
 
 # ======================================================================================
 # Run Simulation
@@ -356,8 +352,8 @@ def compile_simulation(simulationPy: Simulation, compile_ID: int):
     # ==================================================================================
 
     next_ID = {
-        "data": 1,
-        "distribution": 1,
+        "data": 0,
+        "distribution": 0,
         "neutron_reaction": 0,
         "electron_reaction": 0,
         "nuclide": 0,
@@ -366,23 +362,27 @@ def compile_simulation(simulationPy: Simulation, compile_ID: int):
         "surface": 0,
         "region": 0,
         "cell": 0,
-        "universe": 1,
+        "universe": 0,
         "lattice": 0,
         "mesh": 0,
     }
 
     # ==================================================================================
-    # Compile root universe
+    # Assign ID to reserved objects
+    # ==================================================================================
+
+    set_IDs(simulationPy.data[0], next_ID, compile_ID)
+    set_IDs(simulationPy.distributions[0], next_ID, compile_ID)
+    set_IDs(simulationPy.universes[0], next_ID, compile_ID)
+
+    # ==================================================================================
+    # Compile root universe cells
     # ==================================================================================
 
     root_universe = simulationPy.universes[0]
-    root_universe.ID = 0
-    root_universe.compile_ID = compile_ID
 
     for cell in root_universe.cells:
-        set_IDs(cell, "cell", next_ID, compile_ID)
-        cell.ID = next_ID["cell"]
-        cell.compile_ID = compile_ID
+        set_IDs(cell, next_ID, compile_ID)
 
     # ==================================================================================
     # Set material data as needed
@@ -561,6 +561,8 @@ def compile_simulation(simulationPy: Simulation, compile_ID: int):
 
 def set_IDs(object_: MCDCObject, next_ID: dict, compile_ID: int) -> None:
     object_.ID = next_ID[object_.label]
+    object_.compile_ID = compile_ID
+    next_ID[object_.label] += 1
 
 
 # ======================================================================================
