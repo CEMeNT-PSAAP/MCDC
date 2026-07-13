@@ -5,25 +5,49 @@ class MCDCBase:
     """Base class for all Python-side MC/DC objects.
 
     ``MCDCBase`` provides functionality shared by framework objects,
-    including runtime type checking and common metadata used during
-    preparation and execution.
+    including runtime type checking and common metadata.
+
+    Parameters
+    ----------
+    label : str
+        Framework label identifying the object category.
+
+    non_numba : list of str
+        Additional attribute names excluded from the compiled
+        representation.
+
+    Attributes
+    ----------
+    label : str
+        Framework label identifying the object category.
+
+    non_numba : list of str
+        Names of object attributes that are excluded from the compiled
+        representation.
 
     Notes
     -----
-    This class represents the root of the Python object hierarchy. It does
-    not correspond directly to objects stored in the compiled simulation.
-    Framework metadata includes an object label and the list of attributes
-    excluded from the compiled representation.
+    This class is the root of the Python-side MC/DC object hierarchy. It does
+    not directly correspond to objects stored in the compiled simulation.
     """
 
-    non_numba: list[str] = ["non_numba", "label"]
     label: str
+    non_numba: list[str] = ["non_numba", "label"]
 
-    def __init__(self):
-        """Initialize common framework metadata."""
-        # Create an instance-local copy so subclasses can safely extend it.
-        self.non_numba = list(self.non_numba)
-        self.label = "(Unlabeled)"
+    def __init__(self, label: str, non_numba: list[str]):
+        """Initialize common framework metadata.
+
+        Parameters
+        ----------
+        label : str
+            Framework label identifying the object category.
+
+        non_numba : list of str
+            Additional attribute names excluded from the compiled
+            representation.
+        """
+        self.label = label
+        self.non_numba = ["label", "non_numba"] + non_numba
 
     def __setattr__(self, key, value):
         """Assign an attribute with runtime type checking.
@@ -41,55 +65,132 @@ class MCDCObject(MCDCBase):
     """Base class for compiled MC/DC objects.
 
     ``MCDCObject`` represents objects that are collected during simulation
-    compilation and assigned deterministic identifiers for the compiled
-    model.
+    compilation and assigned deterministic identifiers.
+
+    Parameters
+    ----------
+    label : str
+        Framework label identifying the object category.
+
+    non_numba : list of str
+        Additional attribute names excluded from the compiled representation.
+
+    Attributes
+    ----------
+    ID : int
+        Identifier of the object within its compiled collection. The default
+        value is ``-1`` until the object is collected during compilation.
+
+    compile_ID : int
+        Identifier of the compilation in which ``ID`` was assigned. The default
+        value is ``0`` until the object is collected during compilation.
 
     Notes
     -----
-    During compilation, each object is assigned an object identifier and the
-    identifier of the compilation in which it was collected.
+    During compilation, each object receives a unique object identifier within
+    its collection and records the compilation in which the identifier was
+    assigned.
     """
 
     ID: int
     compile_ID: int
 
-    def __init__(self):
-        """Initialize compilation metadata."""
-        super().__init__()
+    def __init__(self, label: str, non_numba: list[str]):
+        """Initialize compilation metadata.
+
+        Parameters
+        ----------
+        label : str
+            Framework label identifying the object category.
+
+        non_numba : list of str
+            Additional attribute names excluded from the compiled
+            representation.
+        """
+        super().__init__(label, non_numba)
 
         self.ID = -1
         self.compile_ID = 0
-        self.non_numba += ["ID", "compile_ID"]
+        self.non_numba += ["compile_ID"]
 
 
 class MCDCPolymorphic(MCDCObject):
-    """Base class for polymorphic compiled objects.
+    """Base class for polymorphic compiled MC/DC objects.
 
-    Polymorphic objects belong to families that share a common compiled
-    representation while supporting multiple concrete subclasses.
+    Polymorphic objects belong to object families identified by ``label``.
+    Within each family, concrete subclasses are identified by ``child_label``
+    and ``child_type``.
 
-    Notes
-    -----
-    In addition to the object identifier, polymorphic objects receive a
-    child identifier that is unique within their polymorphic family.
+    Parameters
+    ----------
+    label : str
+        Framework label identifying the object family.
+
+    child_label : str
+        Framework label identifying the concrete polymorphic subtype.
+
+    child_type : int
+        Integer identifier specifying the concrete polymorphic subtype.
+
+    non_numba : list of str
+        Additional attribute names excluded from the compiled representation.
+
+    Attributes
+    ----------
+    ID : int
+        Identifier of the object within its compiled collection. The default
+        value is ``-1`` until the object is collected during compilation.
+
+    compile_ID : int
+        Identifier of the compilation in which ``ID`` and ``child_ID`` were
+        assigned. The default value is ``0`` until compilation.
+
+    child_label : str
+        Framework label identifying the concrete polymorphic subtype.
+
+    child_type : int
+        Integer discriminator used to represent the concrete subtype in the
+        compiled model.
+
+    child_ID : int
+        Identifier of the object within its concrete polymorphic subtype. The
+        default value is ``-1`` until compilation.
     """
 
+    child_label: str
+    child_type: int
     child_ID: int
-    type: int
 
-    def __init__(self, type_: int):
+    def __init__(
+        self,
+        label: str,
+        child_label: str,
+        child_type: int,
+        non_numba: list[str],
+    ):
         """Initialize polymorphic compilation metadata.
 
         Parameters
         ----------
-        type_ : int
-            Integer identifier specifying the concrete polymorphic type.
-        """
-        super().__init__()
+        label : str
+            Framework label identifying the object family.
 
+        child_label : str
+            Framework label identifying the concrete polymorphic subtype.
+
+        child_type : int
+            Integer identifier specifying the concrete polymorphic subtype.
+
+        non_numba : list of str
+            Additional attribute names excluded from the compiled
+            representation.
+        """
+        super().__init__(label, non_numba)
+
+        self.child_label = child_label
+        self.child_type = child_type
         self.child_ID = -1
-        self.type = type_
-        self.non_numba += ["child_ID"]
+        self.non_numba += ["child_label"]
 
 
 # ======================================================================================
