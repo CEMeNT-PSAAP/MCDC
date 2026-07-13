@@ -1,9 +1,16 @@
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mcdc.object_.simulation import Simulation
+    from mcdc.object_.base import MCDCObject
+
+
 # ======================================================================================
 # Run Simulation
 # ======================================================================================
 
 
-def run_simulation(simulationPy):
+def run_simulation(simulationPy: Simulation):
     """
     Execute the MC/DC simulation.
 
@@ -321,17 +328,61 @@ def prepare(simulationPy):
 # ======================================================================================
 
 
-def compile_simulation(simulationPy, compile_ID):
-    # Empty out
-    # Go over cells in the root universe
+def compile_simulation(simulationPy: Simulation, compile_ID: int):
 
-    from mcdc.object_.material import (
-        Material,
-        MaterialMG,
-        set_elements_from_nuclides,
-        set_nuclides_from_elements,
-        update_fissionable_from_nuclides,
-    )
+    # ==================================================================================
+    # Reset derived object lists
+    # ==================================================================================
+
+    # Physics
+    simulationPy.data = [simulationPy.data[0]]  # Keep None
+    simulationPy.distributions = [simulationPy.distributions[0]]  # Keep None
+    simulationPy.neutron_reactions = []
+    simulationPy.electron_reactions = []
+    simulationPy.nuclides = []
+    simulationPy.elements = []
+    simulationPy.materials = []
+
+    # Geometry
+    simulationPy.surfaces = []
+    simulationPy.regions = []
+    simulationPy.cells = []
+    simulationPy.universes = [simulationPy.universes[0]]  # Keep root universe
+    simulationPy.lattices = []
+    simulationPy.meshes = []
+
+    # ==================================================================================
+    # Object IDs
+    # ==================================================================================
+
+    next_ID = {
+        "data": 1,
+        "distribution": 1,
+        "neutron_reaction": 0,
+        "electron_reaction": 0,
+        "nuclide": 0,
+        "element": 0,
+        "material": 0,
+        "surface": 0,
+        "region": 0,
+        "cell": 0,
+        "universe": 1,
+        "lattice": 0,
+        "mesh": 0,
+    }
+
+    # ==================================================================================
+    # Compile root universe
+    # ==================================================================================
+
+    root_universe = simulationPy.universes[0]
+    root_universe.ID = 0
+    root_universe.compile_ID = compile_ID
+
+    for cell in root_universe.cells:
+        set_IDs(cell, "cell", next_ID, compile_ID)
+        cell.ID = next_ID["cell"]
+        cell.compile_ID = compile_ID
 
     # ==================================================================================
     # Set material data as needed
@@ -506,6 +557,10 @@ def compile_simulation(simulationPy, compile_ID):
     # ==================================================================================
 
     return simulation_container, data
+
+
+def set_IDs(object_: MCDCObject, next_ID: dict, compile_ID: int) -> None:
+    object_.ID = next_ID[object_.label]
 
 
 # ======================================================================================

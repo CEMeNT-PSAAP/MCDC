@@ -213,7 +213,10 @@ class Simulation(MCDCBase):
         # Tallies
         self.tallies = []
 
-        # Settings
+        # ==============================================================================
+        # Simulation settings and techniques
+        # ==============================================================================
+
         self.settings = Settings()
 
         # Techniques
