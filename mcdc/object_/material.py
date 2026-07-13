@@ -12,7 +12,6 @@ from mcdc.constant import MATERIAL, MATERIAL_MG
 from mcdc.object_.base import ObjectPolymorphic
 from mcdc.object_.element import Element
 from mcdc.object_.nuclide import Nuclide
-from mcdc.object_.simulation import simulation
 from mcdc.object_.util import ISOTOPIC_ABUNDANCE
 from mcdc.print_ import print_1d_array, print_error
 
@@ -32,17 +31,16 @@ class MaterialBase(ObjectPolymorphic):
         super().__init__(type_)
 
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed material)"
         else:
-            self.name = f"{self.label}_{self.child_ID}"
+            self.name = name
 
         self.fissionable = False
 
     def __repr__(self):
         text = "\n"
         text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - Fissionable: {self.fissionable}\n"
         return text

@@ -29,17 +29,16 @@ class MeshBase(ObjectPolymorphic):
         super().__init__(type_)
 
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed mesh)"
         else:
-            self.name = f"{self.label}_{self.child_ID}"
+            self.name = name
 
         self.N_bin = 0
 
     def __repr__(self):
         text = "\n"
         text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - # of bins: {self.N_bin}\n"
         return text

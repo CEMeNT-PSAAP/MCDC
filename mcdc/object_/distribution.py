@@ -39,8 +39,8 @@ class DistributionBase(ObjectPolymorphic):
     # Annotations for Numba mode
     label: str = "distribution"
 
-    def __init__(self, type_, register=True):
-        super().__init__(type_, register)
+    def __init__(self, type_):
+        super().__init__(type_)
 
     def __repr__(self):
         text = "\n"
@@ -86,7 +86,7 @@ class DistributionNone(DistributionBase):
 
     def __init__(self):
         type_ = DISTRIBUTION_NONE
-        super().__init__(type_, False)
+        super().__init__(type_)
         self.ID = 0
 
 

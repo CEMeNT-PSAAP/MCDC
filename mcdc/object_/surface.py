@@ -139,10 +139,12 @@ class Surface(ObjectNonSingleton):
 
         # Type and name
         self.type = type_
-        if name != "":
-            self.name = name
+
+        # Set name
+        if name == "":
+            self.name = "(Unnamed surface)"
         else:
-            self.name = f"{self.label}_{self.ID}"
+            self.name = name
 
         # Boundary condition
         if boundary_condition == "none":
@@ -201,7 +203,6 @@ class Surface(ObjectNonSingleton):
         """
         text = "\n"
         text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - Boundary condition: {decode_BC_type(self.boundary_condition)}\n"
 
@@ -298,7 +299,12 @@ class Surface(ObjectNonSingleton):
     # ==================================================================================
 
     @classmethod
-    def PlaneX(cls, name: str = "", x: float = 0.0, boundary_condition: str = "none"):
+    def PlaneX(
+        cls,
+        name: str = "",
+        x: float = 0.0,
+        boundary_condition: str = "none",
+    ):
         """
         Create a plane perpendicular to +x at x = constant.
 
@@ -330,7 +336,12 @@ class Surface(ObjectNonSingleton):
         return surface
 
     @classmethod
-    def PlaneY(cls, name: str = "", y: float = 0.0, boundary_condition: str = "none"):
+    def PlaneY(
+        cls,
+        name: str = "",
+        y: float = 0.0,
+        boundary_condition: str = "none",
+    ):
         """
         Create a plane perpendicular to +y at y = constant.
 
@@ -362,7 +373,12 @@ class Surface(ObjectNonSingleton):
         return surface
 
     @classmethod
-    def PlaneZ(cls, name: str = "", z: float = 0.0, boundary_condition: str = "none"):
+    def PlaneZ(
+        cls,
+        name: str = "",
+        z: float = 0.0,
+        boundary_condition: str = "none",
+    ):
         """
         Create a plane perpendicular to +z at z = constant.
 

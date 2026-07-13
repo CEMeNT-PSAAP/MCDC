@@ -44,7 +44,6 @@ from mcdc.constant import (
 )
 from mcdc.object_.mesh import MeshBase, MeshStructured, MeshUniform
 from mcdc.object_.base import ObjectPolymorphic
-from mcdc.object_.simulation import simulation
 from mcdc.print_ import print_1d_array, print_error
 
 
@@ -152,10 +151,10 @@ class Tally(ObjectPolymorphic):
         spatial_shape: tuple[int, ...] | NoneType = None,
     ):
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed tally)"
         else:
-            self.name = f"{self.label}_{self.child_ID}"
+            self.name = name
 
         # Set scores
         self.scores = []
@@ -274,7 +273,6 @@ class Tally(ObjectPolymorphic):
     def __repr__(self):
         text = "\n"
         text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         return text
 
@@ -498,7 +496,7 @@ class TallyCollision(Tally):
         if isinstance(self.cell, Cell):
             text += f"  - Cell filter: {self.cell.name}\n"
         if isinstance(self.mesh, MeshBase):
-            text += f"  - Mesh: {mesh_module.decode_type(self.mesh.type)} (ID {self.mesh.ID})\n"
+            text += f"  - Mesh: {mesh_module.decode_type(self.mesh.type)}\n"
         text += super()._phasespace_filter_text()
         text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
         return text
@@ -600,16 +598,21 @@ class TallyTracklength(Tally):
             self.mesh_stride_x = N_score * mesh.Nz * mesh.Ny
 
         # Attach to all cells if cell filter is not specified
+        # TODO
+        """
         if cell is None:
             for cell_ in simulation.cells:
                 cell_.tracklength_tallies.append(self)
+        """
 
     def __repr__(self):
+        from mcdc.object_.cell import Cell
+
         text = super().__repr__()
         if isinstance(self.cell, Cell):
             text += f"  - Cell filter: {self.cell.name}\n"
         if isinstance(self.mesh, MeshBase):
-            text += f"  - Mesh: {mesh_module.decode_type(self.mesh.type)} (ID {self.mesh.ID})\n"
+            text += f"  - Mesh: {mesh_module.decode_type(self.mesh.type)}\n"
         text += super()._phasespace_filter_text()
         text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
         return text

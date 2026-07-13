@@ -18,7 +18,6 @@ from mcdc.object_.neutron_reaction import (
     NeutronReactionInelasticScattering,
     set_energy_distribution,
 )
-from mcdc.object_.simulation import simulation
 from mcdc.print_ import print_1d_array, print_error
 
 # ======================================================================================
@@ -74,7 +73,7 @@ class Nuclide(ObjectNonSingleton):
         self.excitation_level = int(file["excitation_level"][()])
         file.close()
 
-    def set_neutron_data(self):
+    def set_neutron_data(self, simulation):
         nuclide_name = self.name
         temperature = self.temperature
 
@@ -161,7 +160,7 @@ class Nuclide(ObjectNonSingleton):
         ):
             for MT in MTs[rx_name]:
                 h5_group = file[f"neutron_reactions/{rx_name}/{MT}"]
-                reaction = rx_class.from_h5_group(h5_group)
+                reaction = rx_class.from_h5_group(h5_group, simulation)
                 rx_container.append(reaction)
 
         # ==============================================================================

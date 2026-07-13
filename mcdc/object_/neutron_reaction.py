@@ -10,8 +10,6 @@ from mcdc.constant import (
     ANGLE_ISOTROPIC,
     ANGLE_ENERGY_CORRELATED,
     ANGLE_DISTRIBUTED,
-    INTERPOLATION_LINEAR,
-    INTERPOLATION_LOG,
     NEUTRON_REACTION_CAPTURE,
     NEUTRON_REACTION_ELASTIC_SCATTERING,
     NEUTRON_REACTION_FISSION,
@@ -31,7 +29,6 @@ from mcdc.object_.distribution import (
     DistributionTabulatedEnergyAngle,
     DistributionNBody,
 )
-from mcdc.object_.simulation import simulation
 from mcdc.print_ import print_1d_array, print_error
 
 # ======================================================================================

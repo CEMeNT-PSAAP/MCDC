@@ -29,8 +29,8 @@ class DataBase(ObjectPolymorphic):
     # Annotations for Numba mode
     label: str = "data"
 
-    def __init__(self, type_, register=True):
-        super().__init__(type_, register)
+    def __init__(self, type_):
+        super().__init__(type_)
 
     def __repr__(self):
         text = "\n"
@@ -61,7 +61,7 @@ class DataNone(DataBase):
 
     def __init__(self):
         type_ = DATA_NONE
-        super().__init__(type_, False)
+        super().__init__(type_)
         self.ID = 0
 
 

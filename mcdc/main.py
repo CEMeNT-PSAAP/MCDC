@@ -1,9 +1,9 @@
 # ======================================================================================
-# Run
+# Run Simulation
 # ======================================================================================
 
 
-def run(simulationPy):
+def run_simulation(simulationPy):
     """
     Execute the MC/DC simulation.
 
@@ -112,11 +112,11 @@ def run(simulationPy):
 
 
 # ======================================================================================
-# Preparation
+# Prepare
 # ======================================================================================
 
 
-def preparation(simulationPy):
+def prepare(simulationPy):
     import math
 
     from mpi4py import MPI
@@ -159,7 +159,199 @@ def preparation(simulationPy):
     # Set nuclear and atomic data for transported particles
     if settings.neutron_transport:
         for nuclide in simulationPy.nuclides:
-            nuclide.set_neutron_data()
+            nuclide.set_neutron_data(simulationPy)
+
+        for material in simulationPy.materials:
+            if isinstance(material, Material):
+                update_fissionable_from_nuclides(material)
+
+    if settings.electron_transport:
+        for element in simulationPy.elements:
+            element.set_electron_data()
+
+    # Set physics mode
+    if len(simulationPy.materials) == 0:
+        # Default physics in dummy mode
+        settings.neutron_multigroup_mode = True
+    else:
+        settings.neutron_multigroup_mode = isinstance(
+            simulationPy.materials[0], MaterialMG
+        )
+
+    # ==================================================================================
+    # Adjust simulation parameters as needed
+    # ==================================================================================
+
+    # Reset time grid size of all tallies if census-based tally is desired
+    if settings.use_census_based_tally:
+        N_bin = settings.census_tally_frequency
+        for tally in simulationPy.tallies:
+            tally._use_census_based_tally(N_bin)
+
+    # Normalize source probability
+    norm = 0.0
+    for source in simulationPy.sources:
+        norm += source.probability
+    for source in simulationPy.sources:
+        source.probability /= norm
+
+    # Create root universe if not defined
+    if len(simulationPy.universes[0].cells) == 0:
+        simulationPy.universes[0].cells = simulationPy.cells
+
+    # Initial guess
+    simulationPy.k_eff = settings.k_init
+
+    # Activate tally scoring for fixed-source
+    if not settings.neutron_eigenvalue_mode:
+        simulationPy.cycle_active = True
+    # All active eigenvalue cycle?
+    elif settings.N_inactive == 0:
+        simulationPy.cycle_active = True
+
+    # ==================================================================================
+    # Set particle bank sizes
+    # ==================================================================================
+
+    # Some sizes
+    N_particle = settings.N_particle
+    N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
+    N_census = settings.N_census
+
+    # Determine bank size
+    if settings.neutron_eigenvalue_mode or N_census == 1:
+        settings.future_bank_buffer_ratio = 0.0
+    if not settings.neutron_eigenvalue_mode and N_census == 1:
+        settings.census_bank_buffer_ratio = 0.0
+        settings.source_bank_buffer_ratio = 0.0
+    size_active = settings.active_bank_buffer
+    size_census = int((settings.census_bank_buffer_ratio) * N_work)
+    size_source = int((settings.source_bank_buffer_ratio) * N_work)
+    size_future = int((settings.future_bank_buffer_ratio) * N_work)
+
+    # Set bank size
+    simulationPy.bank_active.size[0] = size_active
+    simulationPy.bank_census.size[0] = size_census
+    simulationPy.bank_source.size[0] = size_source
+    simulationPy.bank_future.size[0] = size_future
+
+    # ==================================================================================
+    # Generate Numba-supported "Objects"
+    # ==================================================================================
+
+    from mcdc.code_factory.numba_objects_generator import generate_numba_objects
+    from mcdc.code_factory.literals_generator import make_literals
+
+    make_literals(simulationPy)
+
+    simulation_container, data = generate_numba_objects(simulationPy)
+    simulation = simulation_container[0]
+
+    # Reload mcdc getters and setters
+    import importlib
+    import mcdc.mcdc_get as mcdc_get
+    import mcdc.mcdc_set as mcdc_set
+
+    importlib.reload(mcdc_get)
+    importlib.reload(mcdc_set)
+
+    # ==================================================================================
+    # Adapt functions as needed
+    # ==================================================================================
+
+    # Pick physics model
+    import mcdc.transport.physics as physics
+
+    if settings.neutron_multigroup_mode:
+        physics.neutron.particle_speed = physics.neutron.multigroup.particle_speed
+        physics.neutron.macro_xs = physics.neutron.multigroup.macro_xs
+        physics.neutron.neutron_production_xs = (
+            physics.neutron.multigroup.neutron_production_xs
+        )
+        physics.neutron.collision = physics.neutron.multigroup.collision
+
+    # Pick Python-version RNG if needed
+    import mcdc.config as config
+    import mcdc.transport.rng as rng
+
+    if config.mode == "python":
+        rng.wrapping_add = rng.wrapping_add_python
+        rng.wrapping_mul = rng.wrapping_mul_python
+
+    # TODO: Find out why the following is needed to avoid circular import
+    import mcdc.transport.particle_bank as particle_bank_module
+
+    # ==================================================================================
+    # Source particles from file
+    # ==================================================================================
+    # TODO: Use parallel h5py, may need to compile for speed
+
+    import h5py
+
+    # All ranks, take turn
+    for i in range(simulation["mpi_size"]):
+        if simulation["mpi_rank"] == i:
+            if settings.use_source_file:
+                with h5py.File(settings.source_file_name, "r") as f:
+                    # Get source particle size
+                    N_particle = f["particles_size"][()]
+
+                    # Redistribute work
+                    mpi.distribute_work(N_particle, simulation)
+                    N_local = simulation["mpi_work_size"]
+                    start = simulation["mpi_work_start"]
+                    end = start + N_local
+
+                    # Add particles to source bank
+                    simulation["bank_source"]["particles"][:N_local] = f["particles"][
+                        start:end
+                    ]
+                    simulation["bank_source"]["size"] = N_local
+        MPI.COMM_WORLD.Barrier()
+
+    # ==================================================================================
+    # Finalize
+    # ==================================================================================
+
+    return simulation_container, data
+
+
+# ======================================================================================
+# Compile Simulation
+# ======================================================================================
+
+
+def compile_simulation(simulationPy, compile_ID):
+    # Empty out
+    # Go over cells in the root universe
+
+    from mcdc.object_.material import (
+        Material,
+        MaterialMG,
+        set_elements_from_nuclides,
+        set_nuclides_from_elements,
+        update_fissionable_from_nuclides,
+    )
+
+    # ==================================================================================
+    # Set material data as needed
+    # ==================================================================================
+
+    # Set material compositions based on transported particles
+    for material in simulationPy.materials:
+        if not isinstance(material, Material):
+            continue
+
+        if settings.neutron_transport and len(material.nuclides) == 0:
+            set_nuclides_from_elements(material)
+
+        if settings.electron_transport and len(material.elements) == 0:
+            set_elements_from_nuclides(material)
+
+    # Set nuclear and atomic data for transported particles
+    if settings.neutron_transport:
+        for nuclide in simulationPy.nuclides:
+            nuclide.set_neutron_data(simulationPy)
 
         for material in simulationPy.materials:
             if isinstance(material, Material):

@@ -19,7 +19,6 @@ from mcdc.constant import (
 )
 from mcdc.object_.base import ObjectNonSingleton
 from mcdc.object_.distribution import DistributionTabulated, DistributionPMF
-from mcdc.object_.simulation import simulation
 from mcdc.object_.util import move_object
 from mcdc.print_ import print_error
 
@@ -230,10 +229,10 @@ class Source(ObjectNonSingleton):
         super().__init__()
 
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed source)"
         else:
-            self.name = f"{self.label}_{self.ID}"
+            self.name = name
 
         # ==============================================================================
         # Default attributes
@@ -361,7 +360,6 @@ class Source(ObjectNonSingleton):
     def __repr__(self):
         text = "\n"
         text += f"Source\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - Particle: {decode_particle_type(self.particle_type)}\n"
         text += f"  - Probability: {self.probability * 100}%\n"
@@ -378,16 +376,12 @@ class Source(ObjectNonSingleton):
             text += f"  - Direction [ux, uy, yz]: {self.direction}\n"
         elif self.white_direction:
             text += f"  - Isotropic halfspace: {self.direction}\n"
-        if simulation.materials[0].label == "multigroup_material":
-            if self.mono_energetic:
-                text += f"  - Energy group: {self.energy_group} \n"
-            else:
-                text += f"  - Energy group: {distribution.decode_type(self.energy_group_pmf.type)} [ID: {self.energy_group_pmf.ID}]\n"
+        if self.mono_energetic:
+            text += (
+                f"  - Energy / energy group: {self.energy} eV / {self.energy_group}\n"
+            )
         else:
-            if self.mono_energetic:
-                text += f"  - Energy: {self.energy} eV\n"
-            else:
-                text += f"  - Energy: {distribution.decode_type(self.energy_pdf)} [ID: {self.energy_pdf.ID}]\n"
+            text += f"  - Energy / energy group: PDF / PMF\n"
         if self.discrete_time:
             text += f"  - Time: {self.time} s\n"
         else:

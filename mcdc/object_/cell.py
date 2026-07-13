@@ -30,7 +30,6 @@ from mcdc.constant import (
 )
 from mcdc.object_.base import ObjectNonSingleton
 from mcdc.object_.material import MaterialBase
-from mcdc.object_.simulation import simulation
 from mcdc.object_.tally import TallyCollision, TallyTracklength
 from mcdc.object_.universe import Universe, Lattice
 from mcdc.print_ import print_error
@@ -38,18 +37,6 @@ from mcdc.print_ import print_error
 # ======================================================================================
 # Region
 # ======================================================================================
-
-
-# Region-making helper that checks if an identical region is already created
-def make_region(type_, A, B):
-    for existing_region in simulation.regions:
-        if (
-            type_ == existing_region.type
-            and A == existing_region.A
-            and B == existing_region.B
-        ):
-            return existing_region
-    return Region(type_, A, B)
 
 
 class Region(ObjectNonSingleton):
@@ -66,35 +53,20 @@ class Region(ObjectNonSingleton):
 
     @classmethod
     def make_halfspace(cls, surface, sense):
-        region = make_region("halfspace", surface, sense)
+        region = Region("halfspace", surface, sense)
         return region
 
     def __and__(self, other):
-        return make_region("intersection", self, other)
+        return Region("intersection", self, other)
 
     def __or__(self, other):
-        return make_region("union", self, other)
+        return Region("union", self, other)
 
     def __invert__(self):
-        return make_region("complement", self, None)
+        return Region("complement", self, None)
 
     def __repr__(self):
-        text = "Region: "
-        if self.type == "halfspace":
-            if self.B > 0:
-                text += "+s%i" % self.A.ID
-            else:
-                text += "-s%i" % self.A.ID
-        elif self.type == "intersection":
-            text += "r%i & r%i" % (self.A.ID, self.B.ID)
-        elif self.type == "union":
-            text += "r%i | r%i" % (self.A.ID, self.B.ID)
-        elif self.type == "complement":
-            text += "~r%i" % (self.A.ID)
-        elif self.type == "all":
-            text += "all"
-
-        return text
+        return f"Region: {str.capitalize(self.type)}"
 
 
 # ======================================================================================
@@ -157,14 +129,14 @@ class Cell(ObjectNonSingleton):
         super().__init__()
 
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed cell)"
         else:
-            self.name = f"{self.label}_{self.ID}"
+            self.name = name
 
         # Set region
         if region is None:
-            self.region = make_region("all", None, None)
+            self.region = Region("all", None, None)
         else:
             self.region = region
 
@@ -184,15 +156,19 @@ class Cell(ObjectNonSingleton):
             self.rotation *= PI / 180.0
 
         # Set region Reversed Polished Notation (RPN)
+        # TODO
+        """
         if self.region.type != "all":
             self.region_RPN_tokens = generate_RPN_tokens(self.region)
             self.region_RPN = generate_RPN(self.region_RPN_tokens)
         else:
             self.region_RPN_tokens = []
             self.region_RPN = Boolean(True)
+        """
 
         # List surfaces
-        self.surfaces = list_surfaces(self.region_RPN_tokens)
+        # TODO
+        # self.surfaces = list_surfaces(self.region_RPN_tokens)
 
         # Cell tallies
         self.collision_tallies = []
@@ -222,7 +198,6 @@ class Cell(ObjectNonSingleton):
     def __repr__(self):
         text = "\n"
         text += f"Cell\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - {self.region}\n"
         if isinstance(self.fill, MaterialBase):
@@ -235,7 +210,7 @@ class Cell(ObjectNonSingleton):
             text += f"  - Translation: {self.translation}\n"
         if self.fill_rotated:
             text += f"  - Rotation: {self.rotation * 180 / PI}\n"
-        text += f"  - Bounding surfaces: {[x.ID for x in self.surfaces]}\n"
+        # text += f"  - Bounding surfaces: {[x.ID for x in self.surfaces]}\n"
         if len(self.collision_tallies) > 0:
             text += f"  - Collision tallies: {[x.ID for x in self.collision_tallies]}\n"
         if len(self.tracklength_tallies) > 0:

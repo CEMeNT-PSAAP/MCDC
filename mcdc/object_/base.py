@@ -6,10 +6,7 @@ from mcdc.print_ import print_error
 
 
 class ObjectBase:
-    def __init__(self, register):
-        if register and isinstance(self, ObjectNonSingleton):
-            register_object(self)
-
+    def __init__(self):
         if "non_numba" in dir(self):
             self.non_numba += ["non_numba", "label"]
         else:
@@ -24,15 +21,15 @@ class ObjectBase:
 
 class ObjectSingleton(ObjectBase):
     def __init__(self):
-        super().__init__(register=False)
+        super().__init__()
 
 
 class ObjectNonSingleton(ObjectBase):
     ID: int
 
-    def __init__(self, register=True):
+    def __init__(self):
         self.ID = -1
-        super().__init__(register)
+        super().__init__()
 
         if "non_numba" in dir(self):
             self.non_numba += ["ID"]
@@ -44,10 +41,10 @@ class ObjectPolymorphic(ObjectNonSingleton):
     child_ID: int
     type: int
 
-    def __init__(self, type_, register=True):
+    def __init__(self, type_):
         self.child_ID = -1
         self.type = type_
-        super().__init__(register)
+        super().__init__()
 
         self.non_numba += ["child_ID"]
 

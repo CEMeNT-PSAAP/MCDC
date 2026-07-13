@@ -46,6 +46,27 @@ from mcdc.object_.universe import Universe, Lattice
 
 
 class Simulation(ObjectBase):
+    """MC/DC transport simulation.
+
+    A ``Simulation`` represents a complete transport calculation. It combines
+    the physical model, source definitions, simulation settings, tally
+    definitions, and transport techniques required to execute a Monte Carlo
+    simulation.
+
+    A simulation is first constructed using Python objects. Before execution,
+    the model is compiled into an execution-ready representation optimized for
+    MC/DC's transport engine.
+
+    Notes
+    -----
+    The Python object graph is independent of the compiled representation used
+    during transport. Compilation traverses the object graph, assigns internal
+    identifiers, validates the model, and generates the data structures used by
+    the execution backend.
+    """
+
+    _next_compile_ID: int = 1
+
     # Annotations for Numba mode
     label: str = "simulation"
     non_numba: list[str] = [
@@ -54,7 +75,14 @@ class Simulation(ObjectBase):
         "bank_census",
         "bank_source",
         "bank_future",
+        "_next_compile_ID",
+        "compiled",
     ]
+
+    # Basic parameters
+    name: str
+    compile_ID: int
+    compiled: bool
 
     # Physics
     data: list[DataBase]
@@ -143,8 +171,22 @@ class Simulation(ObjectBase):
     gpu_meta: GPUMeta
     source_seed: int
 
-    def __init__(self) -> None:
-        super().__init__(register=False)
+    def __init__(self, name: str = "") -> None:
+        """Create a simulation.
+
+        Parameters
+        ----------
+        name : str, optional
+            User-defined simulation name. If omitted, an unnamed simulation is
+            created.
+        """
+        super().__init__()
+
+        # Set name
+        self.name = name or "(Unnamed simulation)"
+
+        self.compile_ID = 0
+        self.compiled = False
 
         # ==============================================================================
         # Simulation objects
@@ -249,24 +291,169 @@ class Simulation(ObjectBase):
     # ==================================================================================
 
     def set_model(self, cells: Sequence[Cell]) -> None:
+        """Set the simulation model.
+
+        Parameters
+        ----------
+        cells : Sequence[Cell]
+            Cells that define the root universe of the model.
+
+        Notes
+        -----
+        Only the root cells are stored. Connected geometry and physics objects are
+        discovered automatically during compilation.
+        """
         self.universes[0].cells = list(cells)
+        self.compiled = False
 
     def set_sources(self, sources: Sequence[Source]) -> None:
+        """Set the simulation source definitions.
+
+        Parameters
+        ----------
+        sources : Sequence[Source]
+            Source definitions used to initialize particles.
+
+        Notes
+        -----
+        Connected distributions and supporting objects are collected during
+        compilation.
+        """
         self.sources = list(sources)
+        self.compiled = False
 
     def set_tallies(self, tallies: Sequence[Tally]) -> None:
+        """Set the simulation tally definitions.
+
+        Parameters
+        ----------
+        tallies : Sequence[Tally]
+            Tallies used to score transport quantities.
+
+        Notes
+        -----
+        Connected meshes, filters, and other referenced objects are collected
+        during compilation.
+        """
         self.tallies = list(tallies)
+        self.compiled = False
 
     # ==================================================================================
     # Operations
     # ==================================================================================
 
-    def visualize_model(self, vis_type, x, y, z, pixels, colors, time, save_as) -> None:
+    def compile(self) -> None:
+        """Compile the simulation.
+
+        Compilation validates the simulation, discovers all connected objects,
+        assigns internal identifiers, and generates the execution-ready data
+        structures used by the transport engine.
+
+        Notes
+        -----
+        Compilation does not perform particle transport. It only prepares the
+        simulation for execution or other operations that require the compiled
+        representation.
+        """
+        from mcdc.main import compile_simulation
+
+        compile_ID = type(self)._next_compile_ID
+
+        try:
+            compile_simulation(self, compile_ID)
+        except Exception:
+            self.compiled = False
+            raise
+
+        self.compile_ID = compile_ID
+        type(self)._next_compile_ID += 1
+        self.compiled = True
+
+    def visualize_model(
+        self,
+        vis_plane,
+        x,
+        y,
+        z,
+        pixels,
+        colors,
+        time,
+        save_as,
+    ) -> None:
+        """Visualize the simulation model.
+
+        Generate two-dimensional slices of the simulation geometry at one or more
+        times. If necessary, the simulation is compiled automatically before
+        visualization.
+
+        Parameters
+        ----------
+        vis_plane : {'xy', 'xz', 'yz', 'yx', 'zx', 'zy'}
+            Coordinate plane to visualize.
+
+        x : float or array_like
+            Plane x-coordinate for ``'yz'`` visualization, or x-axis range for
+            ``'xy'`` and ``'xz'`` visualizations.
+
+        y : float or array_like
+            Plane y-coordinate for ``'xz'`` visualization, or y-axis range for
+            ``'xy'`` and ``'yz'`` visualizations.
+
+        z : float or array_like
+            Plane z-coordinate for ``'xy'`` visualization, or z-axis range for
+            ``'xz'`` and ``'yz'`` visualizations.
+
+        pixels : array_like
+            Number of pixels along the two visualization axes.
+
+        colors : array_like
+            Sequence of ``(material, color)`` pairs used to render the model.
+
+        time : float or array_like
+            Time or times at which geometry snapshots are generated.
+
+        save_as : str, optional
+            Output filename. If omitted, the visualization is displayed without
+            saving.
+
+        Notes
+        -----
+        Visualization uses the compiled model representation but does not perform
+        particle transport or modify the compiled simulation state.
+        """
+        if not self.compiled:
+            self.compile()
+
         from mcdc.visualize import visualize_model
 
-        visualize_model(self, vis_type, x, y, z, pixels, colors, time, save_as)
+        visualize_model(self, vis_plane, x, y, z, pixels, colors, time, save_as)
 
     def run(self) -> None:
-        from mcdc.main import run
+        """Execute the transport simulation.
 
-        run(self)
+        If necessary, the simulation is compiled automatically before execution.
+
+        Notes
+        -----
+        Compilation is invalidated after execution because transport updates the
+        internal simulation state. If the Python model is modified directly without
+        using the public simulation interface, users are responsible for ensuring
+        the simulation is recompiled before subsequent operations.
+        """
+        from mcdc.main import run_simulation
+
+        if not self.compiled:
+            self.compile()
+
+        try:
+            run_simulation(self)
+        finally:
+            self.compiled = False
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"name={self.name!r}, "
+            f"compiled={self.compiled}, "
+            f"compile_ID={self.compile_ID})"
+        )

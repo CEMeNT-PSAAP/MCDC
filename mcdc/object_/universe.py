@@ -55,16 +55,16 @@ class Universe(ObjectNonSingleton):
     def __init__(self, name: str = "", cells: list[Cell] = [], root: bool = False):
         # Custom treatment for root universe
         if root:
-            super().__init__(register=False)
+            super().__init__()
             self.ID = 0
         else:
             super().__init__()
 
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed universe)"
         else:
-            self.name = f"{self.label}_{self.ID}"
+            self.name = name
 
         self.cells = cells
 
@@ -138,10 +138,10 @@ class Lattice(ObjectNonSingleton):
         super().__init__()
 
         # Set name
-        if name != "":
-            self.name = name
+        if name == "":
+            self.name = "(Unnamed lattice)"
         else:
-            self.name = f"{self.label}_{self.ID}"
+            self.name = name
 
         # Default uniform grids
         self.x0 = -INF
