@@ -1,42 +1,88 @@
 from mcdc.print_ import print_error
 
-# ======================================================================================
-# Object base classes
-# ======================================================================================
 
+class MCDCBase:
+    """Base class for all Python-side MC/DC objects.
 
-class ObjectBase:
+    ``MCDCBase`` provides functionality shared by framework objects,
+    including runtime type checking and metadata used during preparation
+    and execution.
+
+    Notes
+    -----
+    This class represents the root of the Python object hierarchy. It does
+    not correspond directly to objects stored in the compiled simulation.
+    """
+
     def __init__(self):
-        if "non_numba" in dir(self):
+        """Initialize common object metadata."""
+        if hasattr(self, "non_numba"):
             self.non_numba += ["non_numba", "label"]
         else:
             self.non_numba = ["non_numba", "label"]
 
     def __setattr__(self, key, value):
+        """Assign an attribute with runtime type checking.
+
+        Attribute assignments are validated against the class type
+        annotations before being stored.
+        """
         hints = getattr(self.__class__, "__annotations__", {})
         if key in hints and not check_type(value, hints[key], self.__class__, self):
             print_error(f"{key} must be {hints[key]!r}, got {value!r}")
         super().__setattr__(key, value)
 
 
-class ObjectNonSingleton(ObjectBase):
+class MCDCObject(MCDCBase):
+    """Base class for compiled MC/DC objects.
+
+    ``MCDCObject`` represents objects that are collected during simulation
+    compilation and assigned unique identifiers for the compiled model.
+
+    Notes
+    -----
+    During compilation, each object is assigned an object identifier and the
+    identifier of the compilation in which it was collected.
+    """
+
     ID: int
+    compile_ID: int
 
     def __init__(self):
+        """Initialize compilation metadata."""
         self.ID = -1
+        self.compile_ID = 0
         super().__init__()
 
-        if "non_numba" in dir(self):
-            self.non_numba += ["ID"]
+        if hasattr(self, "non_numba"):
+            self.non_numba += ["ID", "compile_ID"]
         else:
-            self.non_numba = ["ID"]
+            self.non_numba = ["ID", "compile_ID"]
 
 
-class ObjectPolymorphic(ObjectNonSingleton):
+class MCDCPolymorphic(MCDCObject):
+    """Base class for polymorphic compiled objects.
+
+    Polymorphic objects belong to families that share a common compiled
+    representation while supporting multiple concrete object types.
+
+    Notes
+    -----
+    In addition to the object identifier, polymorphic objects receive a
+    child identifier that is unique within their polymorphic family.
+    """
+
     child_ID: int
     type: int
 
     def __init__(self, type_):
+        """Initialize polymorphic compilation metadata.
+
+        Parameters
+        ----------
+        type_ : int
+            Integer identifier specifying the concrete polymorphic type.
+        """
         self.child_ID = -1
         self.type = type_
         super().__init__()
