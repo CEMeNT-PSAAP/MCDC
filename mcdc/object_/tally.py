@@ -43,11 +43,11 @@ from mcdc.constant import (
     TALLY_TRACKLENGTH,
 )
 from mcdc.object_.mesh import MeshBase, MeshStructured, MeshUniform
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.print_ import print_1d_array, print_error
 
 
-class Tally(ObjectPolymorphic):
+class Tally(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "tally"
 

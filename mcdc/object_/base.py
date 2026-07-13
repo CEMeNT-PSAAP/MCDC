@@ -147,7 +147,7 @@ def register_object(object_):
         print_error(f"Unidentified object list for object {object_}")
 
     object_.ID = len(object_list)
-    if isinstance(object_, ObjectPolymorphic):
+    if isinstance(object_, MCDCPolymorphic):
         object_.child_ID = sum([x.type == object_.type for x in object_list])
     object_list.append(object_)
 

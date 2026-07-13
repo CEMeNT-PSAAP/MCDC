@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.constant import INTERPOLATION_LINEAR
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.data import DataBase, DataPolynomial, DataTable
 from mcdc.object_.distribution import DistributionBase
 from mcdc.object_.neutron_reaction import (
@@ -25,7 +25,7 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class Nuclide(ObjectNonSingleton):
+class Nuclide(MCDCObject):
     # Annotations for Numba mode
     label: str = "nuclide"
     #

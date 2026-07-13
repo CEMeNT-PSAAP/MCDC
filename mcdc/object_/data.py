@@ -17,7 +17,7 @@ from mcdc.constant import (
     INTERPOLATION_SEMILOGY,
     INTERPOLATION_LOG,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.print_ import print_1d_array, print_error
 
 # ======================================================================================
@@ -25,7 +25,7 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class DataBase(ObjectPolymorphic):
+class DataBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "data"
 

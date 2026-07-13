@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.constant import INF, MESH_STRUCTURED, MESH_UNIFORM
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.print_ import print_1d_array
 
 # ======================================================================================
@@ -15,7 +15,7 @@ from mcdc.print_ import print_1d_array
 # ======================================================================================
 
 
-class MeshBase(ObjectPolymorphic):
+class MeshBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "mesh"
     #

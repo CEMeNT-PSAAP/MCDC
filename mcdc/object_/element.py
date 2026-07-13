@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 ####
 
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.electron_reaction import (
     ElectronReactionBremsstrahlung,
     ElectronReactionElasticScattering,
@@ -16,7 +16,7 @@ from mcdc.object_.electron_reaction import (
 )
 
 
-class Element(ObjectNonSingleton):
+class Element(MCDCObject):
     # Annotations for Numba mode
     label: str = "element"
     #

@@ -15,7 +15,7 @@ from mcdc.constant import (
     REFERENCE_FRAME_COM,
     REFERENCE_FRAME_LAB,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.object_.data import DataBase, DataTable
 from mcdc.object_.distribution import DistributionBase, DistributionMultiTable
 from mcdc.print_ import print_1d_array
@@ -25,7 +25,7 @@ from mcdc.print_ import print_1d_array
 # ======================================================================================
 
 
-class ElectronReactionBase(ObjectPolymorphic):
+class ElectronReactionBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "electron_reaction"
     #

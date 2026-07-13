@@ -9,7 +9,7 @@ from typing import Annotated
 ####
 
 from mcdc.constant import MATERIAL, MATERIAL_MG
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.object_.element import Element
 from mcdc.object_.nuclide import Nuclide
 from mcdc.object_.util import ISOTOPIC_ABUNDANCE
@@ -20,7 +20,7 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class MaterialBase(ObjectPolymorphic):
+class MaterialBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "material"
     #

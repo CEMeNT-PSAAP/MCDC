@@ -15,7 +15,7 @@ from numpy._typing import NDArray
 ####
 
 from mcdc.constant import INF
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.util import flatten
 
 # ======================================================================================
@@ -23,7 +23,7 @@ from mcdc.util import flatten
 # ======================================================================================
 
 
-class Universe(ObjectNonSingleton):
+class Universe(MCDCObject):
     """
     Define a list of cells as a universe.
 
@@ -85,7 +85,7 @@ class Universe(ObjectNonSingleton):
 # ======================================================================================
 
 
-class Lattice(ObjectNonSingleton):
+class Lattice(MCDCObject):
     """
     Define a regular lattice of universes.
 

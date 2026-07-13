@@ -17,7 +17,7 @@ from mcdc.constant import (
     INF,
     PI,
 )
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.distribution import DistributionTabulated, DistributionPMF
 from mcdc.object_.util import move_object
 from mcdc.print_ import print_error
@@ -37,7 +37,7 @@ def decode_particle_type(type_):
 # ======================================================================================
 
 
-class Source(ObjectNonSingleton):
+class Source(MCDCObject):
     """
     Define a particle source.
 

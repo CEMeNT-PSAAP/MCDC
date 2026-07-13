@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.constant import *
-from mcdc.object_.base import ObjectBase
+from mcdc.object_.base import MCDCBase
 from mcdc.object_.util import is_sorted
 from mcdc.print_ import print_error
 
@@ -19,7 +19,7 @@ from mcdc.print_ import print_error
 
 
 @dataclass
-class Settings(ObjectBase):
+class Settings(MCDCBase):
     # Annotations for Numba mode
     label: str = "settings"
 

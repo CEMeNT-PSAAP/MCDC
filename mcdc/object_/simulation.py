@@ -23,7 +23,7 @@ from numpy.typing import NDArray
 
 ####
 
-from mcdc.object_.base import ObjectBase
+from mcdc.object_.base import MCDCBase
 from mcdc.object_.data import DataBase, DataNone
 from mcdc.object_.distribution import DistributionBase, DistributionNone
 from mcdc.object_.gpu_tools import GPUMeta
@@ -45,7 +45,7 @@ from mcdc.object_.universe import Universe, Lattice
 # ======================================================================================
 
 
-class Simulation(ObjectBase):
+class Simulation(MCDCBase):
     """MC/DC transport simulation.
 
     A ``Simulation`` represents a complete transport calculation. It combines

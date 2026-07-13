@@ -29,7 +29,7 @@ from mcdc.constant import (
     SURFACE_TORUS_Z,
     SURFACE_TORUS,
 )
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.cell import Region
 from mcdc.object_.tally import TallySurfaceCrossing
 from mcdc.object_.util import move_object
@@ -40,7 +40,7 @@ from mcdc.print_ import print_error
 # ======================================================================================
 
 
-class Surface(ObjectNonSingleton):
+class Surface(MCDCObject):
     """
     Geometric surface primitive with optional boundary condition and motion.
 

@@ -1,7 +1,7 @@
 import numpy as np
 
 from mcdc.constant import INF
-from mcdc.object_.base import ObjectBase
+from mcdc.object_.base import MCDCBase
 from mcdc.object_.mesh import MeshBase, MeshUniform
 from mcdc.print_ import print_error
 from numpy.typing import NDArray
@@ -12,7 +12,7 @@ from typing import Annotated
 # ======================================================================================
 
 
-class ImplicitCapture(ObjectBase):
+class ImplicitCapture(MCDCBase):
     # Annotations for Numba mode
     label: str = "implicit_capture"
     active: bool
@@ -29,7 +29,7 @@ class ImplicitCapture(ObjectBase):
 # ======================================================================================
 
 
-class WeightedEmission(ObjectBase):
+class WeightedEmission(MCDCBase):
     # Annotations for Numba mode
     label: str = "weighted_emission"
 
@@ -50,7 +50,7 @@ class WeightedEmission(ObjectBase):
 # ======================================================================================
 
 
-class GlobalWeightRoulette(ObjectBase):
+class GlobalWeightRoulette(MCDCBase):
     # Annotations for Numba mode
     label: str = "global_weight_roulette"
 
@@ -78,7 +78,7 @@ class GlobalWeightRoulette(ObjectBase):
 # ======================================================================================
 
 
-class WeightWindows(ObjectBase):
+class WeightWindows(MCDCBase):
     label: str = "weight_windows"
 
     active: bool
@@ -180,7 +180,7 @@ class WeightWindows(ObjectBase):
 # ======================================================================================
 
 
-class PopulationControl(ObjectBase):
+class PopulationControl(MCDCBase):
     # Annotations for Numba mode
     label: str = "population_control"
     active: bool

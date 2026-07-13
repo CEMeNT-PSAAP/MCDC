@@ -20,7 +20,7 @@ from mcdc.constant import (
     INTERPOLATION_HISTOGRAM,
     INTERPOLATION_LINEAR,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.object_.data import DataTable
 from mcdc.object_.util import (
     cdf_from_pdf,
@@ -35,7 +35,7 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class DistributionBase(ObjectPolymorphic):
+class DistributionBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "distribution"
 

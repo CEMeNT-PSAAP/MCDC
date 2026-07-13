@@ -8,11 +8,11 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.constant import PARTICLE_NEUTRON
-from mcdc.object_.base import ObjectBase, ObjectBase
+from mcdc.object_.base import MCDCBase, MCDCBase
 
 
 @dataclass
-class ParticleData(ObjectBase):
+class ParticleData(MCDCBase):
     label: str = "particle_data"
     x: float = 0.0
     y: float = 0.0
@@ -29,7 +29,7 @@ class ParticleData(ObjectBase):
 
 
 @dataclass
-class CollisionData(ObjectBase):
+class CollisionData(MCDCBase):
     label: str = "collision_data"
     energy_deposition: float = 0.0
 
@@ -45,7 +45,7 @@ class Particle(ParticleData):
     event: int = -1
 
 
-class ParticleBank(ObjectBase):
+class ParticleBank(MCDCBase):
     label: str = "particle_bank"
     non_numba: list[str] = ["particles"]
     particles: list[ParticleData] = []

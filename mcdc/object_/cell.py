@@ -28,7 +28,7 @@ from mcdc.constant import (
     FILL_UNIVERSE,
     PI,
 )
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.material import MaterialBase
 from mcdc.object_.tally import TallyCollision, TallyTracklength
 from mcdc.object_.universe import Universe, Lattice
@@ -39,7 +39,7 @@ from mcdc.print_ import print_error
 # ======================================================================================
 
 
-class Region(ObjectNonSingleton):
+class Region(MCDCObject):
     type: str
     A: Surface | Region | NoneType
     B: Region | int | NoneType
@@ -74,7 +74,7 @@ class Region(ObjectNonSingleton):
 # ======================================================================================
 
 
-class Cell(ObjectNonSingleton):
+class Cell(MCDCObject):
     """
     Define a cell from a region and a fill.
 

@@ -17,7 +17,7 @@ from mcdc.constant import (
     REFERENCE_FRAME_COM,
     REFERENCE_FRAME_LAB,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.object_.data import encode_interpolation
 from mcdc.object_.distribution import (
     DistributionBase,
@@ -36,7 +36,7 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class NeutronReactionBase(ObjectPolymorphic):
+class NeutronReactionBase(MCDCPolymorphic):
     # Annotations for Numba mode
     label: str = "neutron_reaction"
     #
