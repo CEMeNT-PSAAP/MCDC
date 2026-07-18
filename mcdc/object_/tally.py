@@ -313,10 +313,6 @@ def decode_score_type(type_, lower_case=False):
 
 
 class TallySurfaceCrossing(Tally):
-    # Annotations for Numba mode
-    label: str = "surface_crossing_tally"
-    non_numba: list[str] = ["surface", "cell"]
-
     # Spatial filters
     surface: Surface | NoneType
     surface_filtered: bool
@@ -337,8 +333,12 @@ class TallySurfaceCrossing(Tally):
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
-        type_ = TALLY_SURFACE_CROSSING
-        super(Tally, self).__init__(type_)
+        super(Tally, self).__init__(
+            label="tally",
+            child_label="surface_crossing_tally",
+            child_type=TALLY_SURFACE_CROSSING,
+            non_numba=["surface", "cell"],
+        )
         super().__init__(
             name,
             scores,
@@ -397,10 +397,6 @@ class TallySurfaceCrossing(Tally):
 
 
 class TallyCollision(Tally):
-    # Annotations for Numba mode
-    label: str = "collision_tally"
-    non_numba: list[str] = ["cell", "mesh"]
-
     # Spatial filters
     cell: Cell | NoneType
     cell_filtered: bool
@@ -427,12 +423,17 @@ class TallyCollision(Tally):
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
-        type_ = TALLY_COLLISION
         spatial_shape = None
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
 
-        super(Tally, self).__init__(type_)
+        super(Tally, self).__init__(
+            label="tally",
+            child_label="collision_tally",
+            child_type=TALLY_COLLISION,
+            non_numba=["cell", "mesh"],
+        )
+
         super().__init__(
             name,
             scores,
@@ -508,10 +509,6 @@ class TallyCollision(Tally):
 
 
 class TallyTracklength(Tally):
-    # Annotations for Numba mode
-    label: str = "tracklength_tally"
-    non_numba: list[str] = ["cell", "mesh"]
-
     # Spatial filters
     cell: Cell | NoneType
     cell_filtered: bool
@@ -538,12 +535,17 @@ class TallyTracklength(Tally):
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
-        type_ = TALLY_TRACKLENGTH
         spatial_shape = None
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
 
-        super(Tally, self).__init__(type_)
+        super(Tally, self).__init__(
+            label="tally",
+            child_label="tracklength_tally",
+            child_type=TALLY_TRACKLENGTH,
+            non_numba=["cell", "mesh"],
+        )
+
         super().__init__(
             name,
             scores,
