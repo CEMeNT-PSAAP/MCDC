@@ -20,9 +20,6 @@ from mcdc.print_ import print_error
 
 @dataclass
 class Settings(MCDCBase):
-    # Annotations for Numba mode
-    label: str = "settings"
-
     # Basic
     N_particle: int = 0
     N_batch: int = 1
@@ -73,7 +70,8 @@ class Settings(MCDCBase):
     gpu_storage: int = GPU_STORAGE_SEPARATE
 
     def __post_init__(self):
-        super().__init__()
+        """Initialize settings framework metadata."""
+        super().__init__(label="settings", non_numba=[])
 
     def set_time_census(self, time, tally_frequency=None):
         # Make sure that the time grid points are sorted

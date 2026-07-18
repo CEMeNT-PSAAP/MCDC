@@ -47,18 +47,12 @@ class Universe(MCDCObject):
     """
 
     # Annotations for Numba mode
-    label: str = "universe"
-    #
     name: str
     cells: list[Cell]
 
-    def __init__(self, name: str = "", cells: list[Cell] = [], root: bool = False):
+    def __init__(self, name: str = "", cells: list[Cell] = []):
         # Custom treatment for root universe
-        if root:
-            super().__init__()
-            self.ID = 0
-        else:
-            super().__init__()
+        super().__init__(label="universe", non_numba=[])
 
         # Set name
         if name == "":

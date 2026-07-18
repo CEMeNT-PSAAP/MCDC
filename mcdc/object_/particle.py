@@ -46,13 +46,12 @@ class Particle(ParticleData):
 
 
 class ParticleBank(MCDCBase):
-    label: str = "particle_bank"
-    non_numba: list[str] = ["particles"]
     particles: list[ParticleData] = []
     size: Annotated[NDArray[int64], (1,)]
     tag: str = ""
 
     def __init__(self, tag):
-        super().__init__()
+        """Initialize particle bank framework metadata."""
+        super().__init__(label="particle_bank", non_numba=["particles"])
         self.tag = tag
         self.size = np.zeros(1, dtype=int64)

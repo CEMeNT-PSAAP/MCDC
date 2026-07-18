@@ -204,7 +204,7 @@ class Simulation(MCDCBase):
         self.surfaces = []
         self.regions = []
         self.cells = []
-        self.universes = [Universe("Root Universe", root=True)]
+        self.universes = [Universe("Root Universe")]
         self.lattices = []
         self.meshes = []
 
@@ -338,6 +338,21 @@ class Simulation(MCDCBase):
         """
         self.tallies = list(tallies)
         self.compiled = False
+
+    def set_root_universe(self, cells: Sequence[Cell]) -> None:
+        """Set the cells of the root universe.
+
+        Parameters
+        ----------
+        cells : Sequence[Cell]
+            Cells contained directly in the root universe.
+
+        Notes
+        -----
+        The root universe occupies index ``0`` in the compiled universe array.
+        Geometry tracking begins from this universe by default.
+        """
+        self.universes[0].cells = list(cells)
 
     # ==================================================================================
     # Operations

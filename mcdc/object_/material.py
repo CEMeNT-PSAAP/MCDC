@@ -21,14 +21,23 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class MaterialBase(MCDCPolymorphic):
-    # Annotations for Numba mode
-    label: str = "material"
-    #
     name: str
     fissionable: bool
 
-    def __init__(self, type_, name):
-        super().__init__(type_)
+    def __init__(
+        self,
+        name: str,
+        child_label: str,
+        child_type: int,
+        non_numba: list[str],
+    ) -> None:
+        """Initialize material base framework metadata."""
+        super().__init__(
+            label="material",
+            child_label=child_label,
+            child_type=child_type,
+            non_numba=non_numba,
+        )
 
         # Set name
         if name == "":
@@ -88,10 +97,6 @@ class Material(MaterialBase):
     mcdc.MaterialMG : Creates a multigroup material.
     """
 
-    # Annotations for Numba mode
-    label: str = "native_material"
-    non_numba: list[str] = ["nuclide_composition", "element_composition"]
-    #
     nuclide_composition: dict[Nuclide, float]
     element_composition: dict[Element, float]
     #
@@ -107,8 +112,12 @@ class Material(MaterialBase):
         element_composition: dict[str, float] = {},
         temperature: float = 293.6,
     ):
-        type_ = MATERIAL
-        super().__init__(type_, name)
+        super().__init__(
+            name,
+            child_label="native_material",
+            child_type=MATERIAL,
+            non_numba=["nuclide_composition", "element_composition"],
+        )
 
         # Temperature
         self.temperature = temperature
@@ -271,9 +280,6 @@ class MaterialMG(MaterialBase):
     mcdc.Material : Creates a continuous-energy material.
     """
 
-    # Annotations for Numba mode
-    label: str = "multigroup_material"
-    #
     G: int
     J: int
     mgxs_speed: Annotated[NDArray[float64], ("G",)]
@@ -305,8 +311,12 @@ class MaterialMG(MaterialBase):
         speed: NDArray[float64] | NoneType = None,
         decay_rate: NDArray[float64] | NoneType = None,
     ):
-        type_ = MATERIAL_MG
-        super().__init__(type_, name)
+        super().__init__(
+            name,
+            child_label="multigroup_material",
+            child_type=MATERIAL,
+            non_numba=[],
+        )
 
         # Energy group size
         if capture is not None:
