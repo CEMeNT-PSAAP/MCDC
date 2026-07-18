@@ -164,9 +164,6 @@ class Source(MCDCObject):
     ... )
     """
 
-    # Annotations for Numba mode
-    label: str = "source"
-    #
     name: str
     # Position
     point_source: bool
@@ -226,7 +223,7 @@ class Source(MCDCObject):
         probability: float = 1.0,
     ):
 
-        super().__init__()
+        super().__init__(label="source", non_numba=[])
 
         # Set name
         if name == "":

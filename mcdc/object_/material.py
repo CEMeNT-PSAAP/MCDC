@@ -314,7 +314,7 @@ class MaterialMG(MaterialBase):
         super().__init__(
             name,
             child_label="multigroup_material",
-            child_type=MATERIAL,
+            child_type=MATERIAL_MG,
             non_numba=[],
         )
 

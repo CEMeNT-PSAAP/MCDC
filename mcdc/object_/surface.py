@@ -101,9 +101,6 @@ class Surface(MCDCObject):
         Human-readable boundary condition name.
     """
 
-    # Annotations for Numba mode
-    label: str = "surface"
-    #
     type: int
     name: str
     boundary_condition: int
@@ -135,7 +132,8 @@ class Surface(MCDCObject):
     tallies: list[TallySurfaceCrossing]
 
     def __init__(self, type_, name, boundary_condition):
-        super().__init__()
+        """Initialize surface framework metadata."""
+        super().__init__(label="surface", non_numba=[])
 
         # Type and name
         self.type = type_

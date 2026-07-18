@@ -45,7 +45,7 @@ class Region(MCDCObject):
     B: Region | int | NoneType
 
     def __init__(self, type_, A, B):
-        super().__init__()
+        super().__init__(label="region", non_numba=[])
 
         self.type = type_
         self.A = A
@@ -123,9 +123,7 @@ class Cell(MCDCObject):
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
     ):
         # MC/DC framework metadata
-        super().__init__()
-        self.label = "cell"
-        self.non_numba += ["region", "fill", "region_RPN"]
+        super().__init__(label="cell", non_numba=["region", "fill", "region_RPN"])
 
         # Set name
         if name == "":

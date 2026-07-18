@@ -16,17 +16,26 @@ from mcdc.print_ import print_1d_array
 
 
 class MeshBase(MCDCPolymorphic):
-    # Annotations for Numba mode
-    label: str = "mesh"
-    #
     name: str
     N_bin: int
     Nx: int
     Ny: int
     Nz: int
 
-    def __init__(self, type_, name):
-        super().__init__(type_)
+    def __init__(
+        self,
+        name: str,
+        child_label: str,
+        child_type: int,
+        non_numba: list[str],
+    ) -> None:
+        """Initialize mesh base framework metadata."""
+        super().__init__(
+            label="mesh",
+            child_label=child_label,
+            child_type=child_type,
+            non_numba=non_numba,
+        )
 
         # Set name
         if name == "":
@@ -84,9 +93,6 @@ class MeshUniform(MeshBase):
     mcdc.TallyMesh : Creates a tally on a mesh.
     """
 
-    # Annotations for Numba mode
-    label: str = "uniform_mesh"
-    #
     x0: float
     dx: float
     Nx: int
@@ -104,8 +110,12 @@ class MeshUniform(MeshBase):
         y: tuple[float, float, int] = (-INF, 2 * INF, 1),
         z: tuple[float, float, int] = (-INF, 2 * INF, 1),
     ):
-        type_ = MESH_UNIFORM
-        super().__init__(type_, name)
+        super().__init__(
+            name,
+            child_label="uniform mesh",
+            child_type=MESH_UNIFORM,
+            non_numba=[],
+        )
 
         # Set the grid
         self.x0 = x[0]
@@ -160,9 +170,6 @@ class MeshStructured(MeshBase):
     mcdc.TallyMesh : Creates a tally on a mesh.
     """
 
-    # Annotations for Numba mode
-    label: str = "structured_mesh"
-    #
     x: NDArray[float64]
     y: NDArray[float64]
     z: NDArray[float64]
@@ -174,8 +181,12 @@ class MeshStructured(MeshBase):
         y: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
         z: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
     ):
-        type_ = MESH_STRUCTURED
-        super().__init__(type_, name)
+        super().__init__(
+            name,
+            child_label="structured mesh",
+            child_type=MESH_STRUCTURED,
+            non_numba=[],
+        )
 
         # Set the grid
         self.x = np.array(x)
