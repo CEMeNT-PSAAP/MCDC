@@ -24,8 +24,8 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.object_.base import MCDCBase
-from mcdc.object_.data import DataBase, DataNone
-from mcdc.object_.distribution import DistributionBase, DistributionNone
+from mcdc.object_.data import DataBase
+from mcdc.object_.distribution import DistributionBase
 from mcdc.object_.gpu_tools import GPUMeta
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.particle import ParticleBank
@@ -87,6 +87,7 @@ class Simulation(MCDCBase):
     regions: list[Region]  # Non-Numba
     cells: list[Cell]
     universes: list[Universe]
+    root_universe: Universe
     lattices: list[Lattice]
     meshes: list[MeshBase]
 
@@ -168,48 +169,29 @@ class Simulation(MCDCBase):
             User-defined simulation name. If omitted, an unnamed simulation is
             created.
         """
-        non_numba = [
-            "regions",
-            "bank_active",
-            "bank_census",
-            "bank_source",
-            "bank_future",
-            "_next_compile_ID",
-            "compiled",
-            "compile_ID",
-        ]
-        super().__init__("simulation", non_numba)
-
-        # Set name
-        self.name = name or "(Unnamed simulation)"
+        super().__init__(
+            label="simulation",
+            non_numba=[
+                "regions",
+                "root_universe",
+                "bank_active",
+                "bank_census",
+                "bank_source",
+                "bank_future",
+                "_next_compile_ID",
+                "compiled",
+                "compile_ID",
+            ],
+        )
 
         self.compile_ID = 0
         self.compiled = False
 
-        # ==============================================================================
-        # Simulation objects
-        # ==============================================================================
+        self.name = name or "(Unnamed simulation)"
+        self.root_universe = Universe("Root Universe")
 
-        # Physics
-        self.data = [DataNone()]
-        self.distributions = [DistributionNone()]
-        self.neutron_reactions = []
-        self.electron_reactions = []
-        self.nuclides = []
-        self.elements = []
-        self.materials = []
-        self.sources = []
-
-        # Geometry
-        self.surfaces = []
-        self.regions = []
-        self.cells = []
-        self.universes = [Universe("Root Universe")]
-        self.lattices = []
-        self.meshes = []
-
-        # Tallies
-        self.tallies = []
+        # Initialize with empty object lists
+        self._reset_object_lists()
 
         # ==============================================================================
         # Simulation settings and techniques
@@ -287,6 +269,28 @@ class Simulation(MCDCBase):
         self.gpu_meta = GPUMeta()
         self.source_seed = 0
 
+    def _reset_object_lists(self) -> None:
+        # Physics
+        self.data = []
+        self.distributions = []
+        self.neutron_reactions = []
+        self.electron_reactions = []
+        self.nuclides = []
+        self.elements = []
+        self.materials = []
+        self.sources = []
+
+        # Geometry
+        self.surfaces = []
+        self.regions = []
+        self.cells = []
+        self.universes = []
+        self.lattices = []
+        self.meshes = []
+
+        # Tallies
+        self.tallies = []
+
     # ==================================================================================
     # Simulation object setters
     # ==================================================================================
@@ -304,7 +308,7 @@ class Simulation(MCDCBase):
         Only the root cells are stored. Connected geometry and physics objects are
         discovered automatically during compilation.
         """
-        self.universes[0].cells = list(cells)
+        self.root_universe.cells = list(cells)
         self.compiled = False
 
     def set_sources(self, sources: Sequence[Source]) -> None:
@@ -339,21 +343,6 @@ class Simulation(MCDCBase):
         self.tallies = list(tallies)
         self.compiled = False
 
-    def set_root_universe(self, cells: Sequence[Cell]) -> None:
-        """Set the cells of the root universe.
-
-        Parameters
-        ----------
-        cells : Sequence[Cell]
-            Cells contained directly in the root universe.
-
-        Notes
-        -----
-        The root universe occupies index ``0`` in the compiled universe array.
-        Geometry tracking begins from this universe by default.
-        """
-        self.universes[0].cells = list(cells)
-
     # ==================================================================================
     # Operations
     # ==================================================================================
@@ -371,18 +360,12 @@ class Simulation(MCDCBase):
         simulation for execution or other operations that require the compiled
         representation.
         """
-        from mcdc.main import compile_simulation
+        from mcdc.code_factory.python_objects_compiler import compile_simulation
 
-        compile_ID = type(self)._next_compile_ID
-
-        try:
-            compile_simulation(self, compile_ID)
-        except Exception:
-            self.compiled = False
-            raise
-
-        self.compile_ID = compile_ID
+        self.compile_ID = type(self)._next_compile_ID
         type(self)._next_compile_ID += 1
+
+        compile_simulation(self)
         self.compiled = True
 
     def visualize_model(
@@ -461,10 +444,8 @@ class Simulation(MCDCBase):
         if not self.compiled:
             self.compile()
 
-        try:
-            run_simulation(self)
-        finally:
-            self.compiled = False
+        run_simulation(self)
+        self.compiled = False
 
     def __repr__(self) -> str:
         return (

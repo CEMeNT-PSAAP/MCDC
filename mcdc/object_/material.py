@@ -49,7 +49,7 @@ class MaterialBase(MCDCPolymorphic):
 
     def __repr__(self):
         text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text += f"{decode_type(self.child_type)}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - Fissionable: {self.fissionable}\n"
         return text

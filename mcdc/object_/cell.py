@@ -99,20 +99,22 @@ class Cell(MCDCObject):
     """
 
     name: str
+
     region: Region  # Non-numba
+    region_RPN_tokens: list[int]
+    region_RPN: Boolean  # Non-numba
+    surfaces: list[Surface]
+
     fill: MaterialBase | Universe | Lattice | NoneType  # Non-numba
+    fill_type: int
+    fill_ID: int
     fill_translated: bool
     fill_rotated: bool
     translation: Annotated[NDArray[float64], (3,)]
     rotation: Annotated[NDArray[float64], (3,)]
-    region_RPN_tokens: list[int]
-    region_RPN: Boolean  # Non-numba
-    surfaces: list[Surface]
+
     collision_tallies: list[TallyCollision]
     tracklength_tallies: list[TallyTracklength]
-    #
-    fill_type: int
-    fill_ID: int
 
     def __init__(
         self,
@@ -125,19 +127,8 @@ class Cell(MCDCObject):
         # MC/DC framework metadata
         super().__init__(label="cell", non_numba=["region", "fill", "region_RPN"])
 
-        # Set name
-        if name == "":
-            self.name = "(Unnamed cell)"
-        else:
-            self.name = name
-
-        # Set region
-        if region is None:
-            self.region = Region("all", None, None)
-        else:
-            self.region = region
-
-        # Set fill
+        self.name = name or "(Unnamed cell)"
+        self.region = region or Region("all", None, None)
         self.fill = fill
 
         # Local coordinate modifier

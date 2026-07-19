@@ -2,59 +2,14 @@ from mcdc.print_ import print_error
 
 
 class MCDCBase:
-    """Base class for all Python-side MC/DC objects.
-
-    ``MCDCBase`` provides functionality shared by framework objects,
-    including runtime type checking and common metadata.
-
-    Parameters
-    ----------
-    label : str
-        Framework label identifying the object category.
-
-    non_numba : list of str
-        Additional attribute names excluded from the compiled
-        representation.
-
-    Attributes
-    ----------
-    label : str
-        Framework label identifying the object category.
-
-    non_numba : list of str
-        Names of object attributes that are excluded from the compiled
-        representation.
-
-    Notes
-    -----
-    This class is the root of the Python-side MC/DC object hierarchy. It does
-    not directly correspond to objects stored in the compiled simulation.
-    """
-
     label: str
-    non_numba: list[str] = ["non_numba", "label"]
+    non_numba: list[str]
 
     def __init__(self, label: str, non_numba: list[str]):
-        """Initialize common framework metadata.
-
-        Parameters
-        ----------
-        label : str
-            Framework label identifying the object category.
-
-        non_numba : list of str
-            Additional attribute names excluded from the compiled
-            representation.
-        """
         self.label = label
         self.non_numba = ["label", "non_numba"] + non_numba
 
     def __setattr__(self, key, value):
-        """Assign an attribute with runtime type checking.
-
-        Attribute assignments are validated against the class type
-        annotations before being stored.
-        """
         hints = getattr(self.__class__, "__annotations__", {})
         if key in hints and not check_type(value, hints[key], self.__class__, self):
             print_error(f"{key} must be {hints[key]!r}, got {value!r}")
@@ -62,51 +17,10 @@ class MCDCBase:
 
 
 class MCDCObject(MCDCBase):
-    """Base class for compiled MC/DC objects.
-
-    ``MCDCObject`` represents objects that are collected during simulation
-    compilation and assigned deterministic identifiers.
-
-    Parameters
-    ----------
-    label : str
-        Framework label identifying the object category.
-
-    non_numba : list of str
-        Additional attribute names excluded from the compiled representation.
-
-    Attributes
-    ----------
-    ID : int
-        Identifier of the object within its compiled collection. The default
-        value is ``-1`` until the object is collected during compilation.
-
-    compile_ID : int
-        Identifier of the compilation in which ``ID`` was assigned. The default
-        value is ``0`` until the object is collected during compilation.
-
-    Notes
-    -----
-    During compilation, each object receives a unique object identifier within
-    its collection and records the compilation in which the identifier was
-    assigned.
-    """
-
     ID: int
     compile_ID: int
 
     def __init__(self, label: str, non_numba: list[str]):
-        """Initialize compilation metadata.
-
-        Parameters
-        ----------
-        label : str
-            Framework label identifying the object category.
-
-        non_numba : list of str
-            Additional attribute names excluded from the compiled
-            representation.
-        """
         super().__init__(label, non_numba)
 
         self.ID = -1
@@ -115,48 +29,6 @@ class MCDCObject(MCDCBase):
 
 
 class MCDCPolymorphic(MCDCObject):
-    """Base class for polymorphic compiled MC/DC objects.
-
-    Polymorphic objects belong to object families identified by ``label``.
-    Within each family, concrete subclasses are identified by ``child_label``
-    and ``child_type``.
-
-    Parameters
-    ----------
-    label : str
-        Framework label identifying the object family.
-
-    child_label : str
-        Framework label identifying the concrete polymorphic subtype.
-
-    child_type : int
-        Integer identifier specifying the concrete polymorphic subtype.
-
-    non_numba : list of str
-        Additional attribute names excluded from the compiled representation.
-
-    Attributes
-    ----------
-    ID : int
-        Identifier of the object within its compiled collection. The default
-        value is ``-1`` until the object is collected during compilation.
-
-    compile_ID : int
-        Identifier of the compilation in which ``ID`` and ``child_ID`` were
-        assigned. The default value is ``0`` until compilation.
-
-    child_label : str
-        Framework label identifying the concrete polymorphic subtype.
-
-    child_type : int
-        Integer discriminator used to represent the concrete subtype in the
-        compiled model.
-
-    child_ID : int
-        Identifier of the object within its concrete polymorphic subtype. The
-        default value is ``-1`` until compilation.
-    """
-
     child_label: str
     child_type: int
     child_ID: int
@@ -168,23 +40,6 @@ class MCDCPolymorphic(MCDCObject):
         child_type: int,
         non_numba: list[str],
     ):
-        """Initialize polymorphic compilation metadata.
-
-        Parameters
-        ----------
-        label : str
-            Framework label identifying the object family.
-
-        child_label : str
-            Framework label identifying the concrete polymorphic subtype.
-
-        child_type : int
-            Integer identifier specifying the concrete polymorphic subtype.
-
-        non_numba : list of str
-            Additional attribute names excluded from the compiled
-            representation.
-        """
         super().__init__(label, non_numba)
 
         self.child_label = child_label
@@ -193,66 +48,62 @@ class MCDCPolymorphic(MCDCObject):
         self.non_numba += ["child_label"]
 
 
-# ======================================================================================
-# Helper functions
-# ======================================================================================
-
-
-def register_object(object_):
-    from mcdc.object_.simulation import simulation
-
-    from mcdc.object_.cell import Region, Cell
-    from mcdc.object_.universe import Universe, Lattice
-    from mcdc.object_.data import DataBase
-    from mcdc.object_.distribution import DistributionBase
-    from mcdc.object_.element import Element
-    from mcdc.object_.electron_reaction import ElectronReactionBase
-    from mcdc.object_.material import MaterialBase
-    from mcdc.object_.mesh import MeshBase
-    from mcdc.object_.nuclide import Nuclide
-    from mcdc.object_.neutron_reaction import NeutronReactionBase
-    from mcdc.object_.source import Source
-    from mcdc.object_.surface import Surface
-    from mcdc.object_.tally import Tally
-
-    object_list = []
-    if isinstance(object_, Cell):
-        object_list = simulation.cells
-    elif isinstance(object_, DataBase):
-        object_list = simulation.data
-    elif isinstance(object_, DistributionBase):
-        object_list = simulation.distributions
-    elif isinstance(object_, Lattice):
-        object_list = simulation.lattices
-    elif isinstance(object_, MaterialBase):
-        object_list = simulation.materials
-    elif isinstance(object_, MeshBase):
-        object_list = simulation.meshes
-    elif isinstance(object_, Element):
-        object_list = simulation.elements
-    elif isinstance(object_, ElectronReactionBase):
-        object_list = simulation.electron_reactions
-    elif isinstance(object_, Nuclide):
-        object_list = simulation.nuclides
-    elif isinstance(object_, NeutronReactionBase):
-        object_list = simulation.neutron_reactions
-    elif isinstance(object_, Region):
-        object_list = simulation.regions
-    elif isinstance(object_, Source):
-        object_list = simulation.sources
-    elif isinstance(object_, Surface):
-        object_list = simulation.surfaces
-    elif isinstance(object_, Tally):
-        object_list = simulation.tallies
-    elif isinstance(object_, Universe):
-        object_list = simulation.universes
-    else:
-        print_error(f"Unidentified object list for object {object_}")
-
-    object_.ID = len(object_list)
-    if isinstance(object_, MCDCPolymorphic):
-        object_.child_ID = sum([x.type == object_.type for x in object_list])
-    object_list.append(object_)
+MCDC_OBJECT_LABELS = [
+    # Geometry
+    "surface",
+    "region",
+    "cell",
+    "universe",
+    "lattice",
+    # Materials
+    "material",
+    "native_material",
+    "multigroup_material",
+    "element",
+    "nuclide",
+    # Source
+    "source",
+    # Tallies
+    "tally",
+    "surface_crossing_tally",
+    "collision_tally",
+    "tracklength_tally",
+    # Meshes
+    "mesh",
+    "uniform_mesh",
+    "structured_mesh",
+    # Neutron reactions
+    "neutron_reaction",
+    "neutron_elastic_scattering_reaction",
+    "neutron_capture_reaction",
+    "neutron_inelastic_scattering_reaction",
+    "neutron_fission_reaction",
+    # Electron reactions
+    "electron_reaction",
+    "electron_ionization_reaction",
+    "electron_elastic_scattering_reaction",
+    "electron_bremsstrahlung_reaction",
+    "electron_excitation_reaction",
+    # Data
+    "data",
+    "none_data",
+    "table_data",
+    "polynomial_data",
+    # Distribution
+    "distribution",
+    "none_distribution",
+    "pmf_distribution",
+    "tabulated_distribution",
+    "mult_table_distribution",
+    "level_scattering_distribution",
+    "evaporation_distribution",
+    "maxwellian_distribution",
+    "kalbach_mann_distribution",
+    "tabulated_energy_angle_distribution",
+    "nbody_distribution",
+    # Misc.
+    "gpu_meta",
+]
 
 
 # ======================================================================================
@@ -265,130 +116,6 @@ import numpy as np
 from typing import get_origin, get_args, Union, Annotated
 
 
-def _name_from_str(s: str) -> str:
-    s = _strip_prefixes(s)
-    # strip generic args like "NDArray[float64]" → "NDArray"
-    s = s.split("[", 1)[0]
-    return s.split(".")[-1].strip()
-
-
-def _mro_name_match(value, want: str) -> bool:
-    """Subclass-friendly match without resolving: compare wanted name to any base in MRO."""
-    want_name = _name_from_str(want)
-    return any(base.__name__ == want_name for base in value.__class__.mro())
-
-
-# ---------- helpers for STRING annotations ----------
-_ANN_RE = re.compile(r"^\s*(?:typing\.)?Annotated\[(.*)\]\s*$")
-
-
-def _split_top_level(s: str, sep: str = ",", brackets: str = "[]()") -> list[str]:
-    out, buf, depth = [], [], 0
-    opens = set(brackets[::2])
-    closes = set(brackets[1::2])
-    pairs = dict(zip(brackets[1::2], brackets[::2]))
-    for ch in s:
-        if ch in opens:
-            depth += 1
-        elif ch in closes:
-            depth -= 1
-        if ch == sep and depth == 0:
-            out.append("".join(buf).strip())
-            buf = []
-        else:
-            buf.append(ch)
-    if buf:
-        out.append("".join(buf).strip())
-    return out
-
-
-def _strip_prefixes(s: str) -> str:
-    # normalize common module prefixes used in annotations
-    return (
-        s.replace("typing.", "")
-        .replace("numpy.typing.", "")
-        .replace("numpy.", "")
-        .replace("np.", "")
-    )
-
-
-def _parse_annotated_str(hint_str: str):
-    """
-    If hint_str is 'Annotated[ ... ]', return (base_str, meta_list) else None.
-    meta_list items remain raw strings (no eval).
-    """
-    m = _ANN_RE.match(_strip_prefixes(hint_str))
-    if not m:
-        return None
-    inner = m.group(1)
-    parts = _split_top_level(inner, sep=",")
-    if not parts:
-        return None
-    base = parts[0].strip()
-    meta = [p.strip() for p in parts[1:]]
-    return base, meta
-
-
-def _shape_tuple_from_str(s: str):
-    """
-    Parse '(3,)', '(None, 3)', '(2,3,4)' → tuple[int|None, ...] or None if not a shape.
-    """
-    s = s.strip()
-    if not (s.startswith("(") and s.endswith(")")):
-        return None
-    body = s[1:-1].strip()
-    if not body:
-        return ()
-    items = _split_top_level(body, sep=",")
-    out = []
-    for it in items:
-        it = it.strip()
-        if it == "":
-            continue  # allow trailing comma
-        if it == "None":
-            out.append(None)
-        else:
-            try:
-                out.append(int(it))
-            except ValueError:
-                return None
-    return tuple(out)
-
-
-def _is_ndarray_base_str(base_str: str) -> bool:
-    base_norm = _strip_prefixes(base_str)
-    return base_norm.startswith("NDArray[") or base_norm.startswith("ndarray[")
-
-
-def _extract_ndarray_dtype_key_from_str(base_str: str) -> str | None:
-    base_norm = _strip_prefixes(base_str)
-    if "[" not in base_norm or "]" not in base_norm:
-        return None
-    inside = base_norm[base_norm.find("[") + 1 : base_norm.rfind("]")].strip()
-    return _strip_prefixes(inside)  # e.g. 'float' or 'float64'
-
-
-def _dtype_matches(arr: np.ndarray, dtype_key: str | None) -> bool:
-    if dtype_key is None:
-        return True
-    key = dtype_key.lower()
-    if key == "float":
-        return np.issubdtype(arr.dtype, np.floating)
-    if key == "int":
-        return np.issubdtype(arr.dtype, np.integer)
-    try:
-        return arr.dtype == np.dtype(key)  # e.g. 'float64', 'int32'
-    except TypeError:
-        return True  # unknown key → do not fail hard
-
-
-def _shape_matches(arr: np.ndarray, shape: tuple[int | None, ...]) -> bool:
-    if arr.ndim != len(shape):
-        return False
-    return all(dim is None or dim == s for s, dim in zip(arr.shape, shape))
-
-
-# ---------- main checker ----------
 def check_type(value, hint, cls, obj=None) -> bool:
     """
     Best-effort runtime checker tolerant of *string* annotations (no eval).
@@ -522,3 +249,126 @@ def check_type(value, hint, cls, obj=None) -> bool:
         return isinstance(value, origin)
     except TypeError:
         return True
+
+
+def _name_from_str(s: str) -> str:
+    s = _strip_prefixes(s)
+    # strip generic args like "NDArray[float64]" → "NDArray"
+    s = s.split("[", 1)[0]
+    return s.split(".")[-1].strip()
+
+
+def _mro_name_match(value, want: str) -> bool:
+    """Subclass-friendly match without resolving: compare wanted name to any base in MRO."""
+    want_name = _name_from_str(want)
+    return any(base.__name__ == want_name for base in value.__class__.mro())
+
+
+# ---------- helpers for STRING annotations ----------
+_ANN_RE = re.compile(r"^\s*(?:typing\.)?Annotated\[(.*)\]\s*$")
+
+
+def _split_top_level(s: str, sep: str = ",", brackets: str = "[]()") -> list[str]:
+    out, buf, depth = [], [], 0
+    opens = set(brackets[::2])
+    closes = set(brackets[1::2])
+    pairs = dict(zip(brackets[1::2], brackets[::2]))
+    for ch in s:
+        if ch in opens:
+            depth += 1
+        elif ch in closes:
+            depth -= 1
+        if ch == sep and depth == 0:
+            out.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        out.append("".join(buf).strip())
+    return out
+
+
+def _strip_prefixes(s: str) -> str:
+    # normalize common module prefixes used in annotations
+    return (
+        s.replace("typing.", "")
+        .replace("numpy.typing.", "")
+        .replace("numpy.", "")
+        .replace("np.", "")
+    )
+
+
+def _parse_annotated_str(hint_str: str):
+    """
+    If hint_str is 'Annotated[ ... ]', return (base_str, meta_list) else None.
+    meta_list items remain raw strings (no eval).
+    """
+    m = _ANN_RE.match(_strip_prefixes(hint_str))
+    if not m:
+        return None
+    inner = m.group(1)
+    parts = _split_top_level(inner, sep=",")
+    if not parts:
+        return None
+    base = parts[0].strip()
+    meta = [p.strip() for p in parts[1:]]
+    return base, meta
+
+
+def _shape_tuple_from_str(s: str):
+    """
+    Parse '(3,)', '(None, 3)', '(2,3,4)' → tuple[int|None, ...] or None if not a shape.
+    """
+    s = s.strip()
+    if not (s.startswith("(") and s.endswith(")")):
+        return None
+    body = s[1:-1].strip()
+    if not body:
+        return ()
+    items = _split_top_level(body, sep=",")
+    out = []
+    for it in items:
+        it = it.strip()
+        if it == "":
+            continue  # allow trailing comma
+        if it == "None":
+            out.append(None)
+        else:
+            try:
+                out.append(int(it))
+            except ValueError:
+                return None
+    return tuple(out)
+
+
+def _is_ndarray_base_str(base_str: str) -> bool:
+    base_norm = _strip_prefixes(base_str)
+    return base_norm.startswith("NDArray[") or base_norm.startswith("ndarray[")
+
+
+def _extract_ndarray_dtype_key_from_str(base_str: str) -> str | None:
+    base_norm = _strip_prefixes(base_str)
+    if "[" not in base_norm or "]" not in base_norm:
+        return None
+    inside = base_norm[base_norm.find("[") + 1 : base_norm.rfind("]")].strip()
+    return _strip_prefixes(inside)  # e.g. 'float' or 'float64'
+
+
+def _dtype_matches(arr: np.ndarray, dtype_key: str | None) -> bool:
+    if dtype_key is None:
+        return True
+    key = dtype_key.lower()
+    if key == "float":
+        return np.issubdtype(arr.dtype, np.floating)
+    if key == "int":
+        return np.issubdtype(arr.dtype, np.integer)
+    try:
+        return arr.dtype == np.dtype(key)  # e.g. 'float64', 'int32'
+    except TypeError:
+        return True  # unknown key → do not fail hard
+
+
+def _shape_matches(arr: np.ndarray, shape: tuple[int | None, ...]) -> bool:
+    if arr.ndim != len(shape):
+        return False
+    return all(dim is None or dim == s for s, dim in zip(arr.shape, shape))
