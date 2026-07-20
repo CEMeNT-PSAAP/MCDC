@@ -46,18 +46,11 @@ class MeshBase(MCDCPolymorphic):
         self.N_bin = 0
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
         text += f"  - # of bins: {self.N_bin}\n"
         return text
-
-
-def decode_type(type_):
-    if type_ == MESH_UNIFORM:
-        return "Uniform mesh"
-    elif type_ == MESH_STRUCTURED:
-        return "Structured mesh"
 
 
 # ======================================================================================

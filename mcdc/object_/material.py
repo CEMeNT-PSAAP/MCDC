@@ -31,35 +31,18 @@ class MaterialBase(MCDCPolymorphic):
         child_type: int,
         non_numba: list[str],
     ) -> None:
-        """Initialize material base framework metadata."""
-        super().__init__(
-            label="material",
-            child_label=child_label,
-            child_type=child_type,
-            non_numba=non_numba,
-        )
+        # MC/DC framework metadata
+        super().__init__("material", child_label, child_type, non_numba)
 
-        # Set name
-        if name == "":
-            self.name = "(Unnamed material)"
-        else:
-            self.name = name
-
+        self.name = name or "(Unnamed material)"
         self.fissionable = False
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.child_type)}\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
         text += f"  - Fissionable: {self.fissionable}\n"
         return text
-
-
-def decode_type(type_):
-    if type_ == MATERIAL:
-        return "Material"
-    elif type_ == MATERIAL_MG:
-        return "Multigroup material"
 
 
 # ======================================================================================
@@ -68,38 +51,9 @@ def decode_type(type_):
 
 
 class Material(MaterialBase):
-    """
-    Define a continuous-energy material from a nuclide composition.
+    nuclide_composition: dict[Nuclide, float]  # Non-numba
+    element_composition: dict[Element, float]  # Non-numba
 
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    nuclide_composition : dict
-        Dictionary mapping nuclide names (str) to atom densities (float).
-    element_composition : dict
-        Dictionary mapping element names (str) to atom densities (float).
-    temperature : float, optional
-        Temperature in Kelvin (default 293.6 K).
-
-    Returns
-    -------
-    Material
-        The material object.
-
-    Notes
-    -----
-    Requires the ``MCDC_LIB`` environment variable to point to the nuclear
-    data library directory.
-
-    See Also
-    --------
-    mcdc.MaterialMG : Creates a multigroup material.
-    """
-
-    nuclide_composition: dict[Nuclide, float]
-    element_composition: dict[Element, float]
-    #
     nuclides: list[Nuclide]
     elements: list[Element]
     nuclide_densities: NDArray[float64]
@@ -112,11 +66,12 @@ class Material(MaterialBase):
         element_composition: dict[str, float] = {},
         temperature: float = 293.6,
     ):
+        # MC/DC framework metadata
         super().__init__(
             name,
-            child_label="native_material",
-            child_type=MATERIAL,
-            non_numba=["nuclide_composition", "element_composition"],
+            "native_material",
+            MATERIAL,
+            ["nuclide_composition", "element_composition"],
         )
 
         # Temperature
@@ -213,6 +168,7 @@ class Material(MaterialBase):
 
     def __repr__(self):
         text = super().__repr__()
+
         text += f"  - Temperature: {self.temperature} K\n"
         if len(self.nuclide_composition) > 0:
             text += f"  - Nuclide composition [atoms/barn-cm]\n"
@@ -239,47 +195,6 @@ TEMPERATURES = [0.1, 233.15, 273.15, 293.6, 600.0, 900.0, 1200.0, 2500.0]
 
 
 class MaterialMG(MaterialBase):
-    """
-    Define a multigroup material.
-
-    Cross-section arrays are provided as NumPy arrays of length ``G`` (number
-    of energy groups). Scatter and fission matrices are ``(G, G)``.
-
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    capture : ndarray, optional
-        Capture cross section for each group.
-    scatter : ndarray, optional
-        Scattering matrix ``(G, G)``.
-    fission : ndarray, optional
-        Fission cross section for each group.
-    nu_s : ndarray, optional
-        Average scattering multiplicity.
-    nu_p : ndarray, optional
-        Average prompt fission neutron yield.
-    nu_d : ndarray, optional
-        Average delayed fission neutron yield.
-    chi_p : ndarray, optional
-        Prompt fission spectrum.
-    chi_d : ndarray, optional
-        Delayed fission spectrum.
-    speed : ndarray, optional
-        Neutron speeds for each group (cm/s).
-    decay_rate : ndarray, optional
-        Delayed neutron precursor decay rates (1/s).
-
-    Returns
-    -------
-    MaterialMG
-        The multigroup material object.
-
-    See Also
-    --------
-    mcdc.Material : Creates a continuous-energy material.
-    """
-
     G: int
     J: int
     mgxs_speed: Annotated[NDArray[float64], ("G",)]
@@ -311,12 +226,8 @@ class MaterialMG(MaterialBase):
         speed: NDArray[float64] | NoneType = None,
         decay_rate: NDArray[float64] | NoneType = None,
     ):
-        super().__init__(
-            name,
-            child_label="multigroup_material",
-            child_type=MATERIAL_MG,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__(name, "multigroup_material", MATERIAL_MG, [])
 
         # Energy group size
         if capture is not None:
@@ -326,6 +237,7 @@ class MaterialMG(MaterialBase):
         elif fission is not None:
             G = len(fission)
         else:
+            G = 0
             print_error("Need to supply capture, scatter, or fission for MaterialMG")
         self.G = G
 
@@ -429,8 +341,9 @@ class MaterialMG(MaterialBase):
             else:
                 if chi_d is None:
                     print_error("Need to supply chi_d if nu_d is provided and G > 1")
-                # Transpose: [gout, dg] -> [dg, gout]
-                self.mgxs_chi_d = np.swapaxes(chi_d, 0, 1)[:, :]
+                else:
+                    # Transpose: [gout, dg] -> [dg, gout]
+                    self.mgxs_chi_d = np.swapaxes(chi_d, 0, 1)[:, :]
             # Normalize
             for dg in range(J):
                 if np.sum(self.mgxs_chi_d[dg, :]) > 0.0:
@@ -438,6 +351,7 @@ class MaterialMG(MaterialBase):
 
     def __repr__(self):
         text = super().__repr__()
+
         text += f"  - Multigroup data\n"
         text += f"    - G: {self.G}\n"
         text += f"    - J: {self.J}\n"

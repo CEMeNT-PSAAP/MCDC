@@ -55,25 +55,14 @@ class NeutronReactionBase(MCDCPolymorphic):
         self.q_value = q_value
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text = super().__repr__()
+
         text += f"  - ID: {self.ID}\n"
         text += f"  - MT: {self.MT}\n"
         text += f"  - XS {print_1d_array(self.xs)} barn\n"
         text += f"  - Reference frame: {decode_reference_frame(self.reference_frame)}\n"
         text += f"  - Q-value: {self.q_value}\n"
         return text
-
-
-def decode_type(type_):
-    if type_ == NEUTRON_REACTION_ELASTIC_SCATTERING:
-        return "Neutron elastic scattering"
-    elif type_ == NEUTRON_REACTION_CAPTURE:
-        return "Neutron capture"
-    elif type_ == NEUTRON_REACTION_INELASTIC_SCATTERING:
-        return "Neutron inelastic scattering"
-    elif type_ == NEUTRON_REACTION_FISSION:
-        return "Neutron fission"
 
 
 def decode_reference_frame(type_):

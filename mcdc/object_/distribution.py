@@ -34,85 +34,14 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class DistributionBase(MCDCPolymorphic):
-    """Base class for probability distributions.
-
-    Distribution objects describe probability laws used throughout MC/DC,
-    including source distributions and secondary-particle distributions.
-
-    Parameters
-    ----------
-    child_label : str
-        Framework label identifying the concrete distribution subtype.
-
-    child_type : int
-        Integer identifier specifying the concrete distribution subtype.
-
-    non_numba : list of str
-        Additional attribute names excluded from the compiled representation.
-    """
-
     def __init__(
         self,
         child_label: str,
         child_type: int,
         non_numba: list[str],
     ) -> None:
-        """Initialize distribution framework metadata."""
-        super().__init__(
-            label="distribution",
-            child_label=child_label,
-            child_type=child_type,
-            non_numba=non_numba,
-        )
-
-    def __repr__(self) -> str:
-        """Return a human-readable description of the distribution."""
-        text = "\n"
-        text += f"{decode_type(self.child_type)}\n"
-        text += f"  - ID: {self.ID}\n"
-        return text
-
-
-def decode_type(child_type: int) -> str:
-    """Convert a distribution type code to a human-readable name.
-
-    Parameters
-    ----------
-    child_type : int
-        Distribution type code.
-
-    Returns
-    -------
-    str
-        Human-readable distribution name.
-
-    Raises
-    ------
-    ValueError
-        If the distribution type code is unknown.
-    """
-    if child_type == DISTRIBUTION_NONE:
-        return "Distribution (None)"
-    if child_type == DISTRIBUTION_PMF:
-        return "Distribution (PMF)"
-    if child_type == DISTRIBUTION_TABULATED:
-        return "Distribution (Tabulated)"
-    if child_type == DISTRIBUTION_MULTITABLE:
-        return "Distribution (Multi-table)"
-    if child_type == DISTRIBUTION_LEVEL_SCATTERING:
-        return "Distribution (Level scattering)"
-    if child_type == DISTRIBUTION_EVAPORATION:
-        return "Distribution (Evaporation)"
-    if child_type == DISTRIBUTION_MAXWELLIAN:
-        return "Distribution (Maxwellian spectrum)"
-    if child_type == DISTRIBUTION_KALBACH_MANN:
-        return "Distribution (Kalbach-Mann)"
-    if child_type == DISTRIBUTION_TABULATED_ENERGY_ANGLE:
-        return "Distribution (Tabulated energy-angle)"
-    if child_type == DISTRIBUTION_N_BODY:
-        return "Distribution (N-body)"
-
-    raise ValueError(f"Unknown distribution type: {child_type}")
+        # MC/DC framework metadata
+        super().__init__("distribution", child_label, child_type, non_numba)
 
 
 # ======================================================================================
@@ -124,15 +53,9 @@ def decode_type(child_type: int) -> str:
 
 
 class DistributionNone(DistributionBase):
-    """Placeholder for the absence of a stored distribution."""
-
     def __init__(self) -> None:
-        """Create an empty distribution object."""
-        super().__init__(
-            child_label="none_distribution",
-            child_type=DISTRIBUTION_NONE,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("none_distribution", DISTRIBUTION_NONE, [])
 
 
 # ======================================================================================
@@ -141,33 +64,13 @@ class DistributionNone(DistributionBase):
 
 
 class DistributionPMF(DistributionBase):
-    """Discrete probability mass function."""
-
     value: NDArray[float64]
     pmf: NDArray[float64]
     cmf: NDArray[float64]
 
-    def __init__(
-        self,
-        value: ArrayLike,
-        pmf: ArrayLike,
-    ) -> None:
-        """Create a discrete probability mass function.
-
-        Parameters
-        ----------
-        value : array_like
-            Values sampled by the distribution.
-
-        pmf : array_like
-            Probability masses corresponding to ``value``. The masses are
-            normalized internally.
-        """
-        super().__init__(
-            child_label="pmf_distribution",
-            child_type=DISTRIBUTION_PMF,
-            non_numba=[],
-        )
+    def __init__(self, value: ArrayLike, pmf: ArrayLike) -> None:
+        # MC/DC framework metadata
+        super().__init__("pmf_distribution", DISTRIBUTION_PMF, [])
 
         self.value = np.asarray(value, dtype=float64)
         pmf_array = np.asarray(pmf, dtype=float64)
@@ -184,8 +87,8 @@ class DistributionPMF(DistributionBase):
         self.pmf, self.cmf = cmf_from_pmf(pmf_array)
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the PMF."""
         text = super().__repr__()
+
         text += f"  - value {print_1d_array(self.value)}\n"
         text += f"  - pmf {print_1d_array(self.pmf)}\n"
         return text
@@ -197,17 +100,6 @@ class DistributionPMF(DistributionBase):
 
 
 class DistributionTabulated(DistributionBase):
-    """One-dimensional tabulated probability distribution.
-
-    The distribution is stored as a :class:`DataTable` whose independent
-    variable contains sample values and whose dependent variable contains the
-    normalized probability density. The cumulative distribution is stored as
-    auxiliary table data for sampling.
-
-    A PDF input is treated as piecewise linear. A CDF input is treated as
-    piecewise linear, producing a histogram PDF.
-    """
-
     pdf: DataTable
 
     def __init__(
@@ -216,30 +108,8 @@ class DistributionTabulated(DistributionBase):
         pdf: ArrayLike | None = None,
         cdf: ArrayLike | None = None,
     ) -> None:
-        """Create a tabulated distribution from either a PDF or CDF.
-
-        Parameters
-        ----------
-        value : array_like
-            Sample values.
-
-        pdf : array_like, optional
-            Probability densities at the sample values. The PDF is normalized
-            and its CDF is calculated by trapezoidal integration.
-
-        cdf : array_like, optional
-            Cumulative probabilities at the sample values. The CDF is
-            normalized and a histogram PDF is derived from it.
-
-        Notes
-        -----
-        Exactly one of ``pdf`` or ``cdf`` must be provided.
-        """
-        super().__init__(
-            child_label="tabulated_distribution",
-            child_type=DISTRIBUTION_TABULATED,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("tabulated_distribution", DISTRIBUTION_TABULATED, [])
 
         if (pdf is None) == (cdf is None):
             print_error("Exactly one of pdf or cdf must be provided.")
@@ -286,8 +156,8 @@ class DistributionTabulated(DistributionBase):
         )
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - value {print_1d_array(self.pdf.x)}\n"
         text += f"  - probability density {print_1d_array(self.pdf.y)}\n"
         text += "  - cumulative distribution " f"{print_1d_array(self.pdf.aux[0])}\n"
@@ -300,12 +170,6 @@ class DistributionTabulated(DistributionBase):
 
 
 class DistributionMultiTable(DistributionBase):
-    """Distribution represented by tabulated distributions on a grid.
-
-    Each grid point owns one :class:`DistributionTabulated`. The flattened
-    ``value`` array is divided into individual tables using ``offset``.
-    """
-
     grid: NDArray[float64]
     tables: list[DistributionTabulated]
 
@@ -317,34 +181,8 @@ class DistributionMultiTable(DistributionBase):
         pdf: ArrayLike | None = None,
         cdf: ArrayLike | None = None,
     ) -> None:
-        """Create a multi-table distribution.
-
-        Parameters
-        ----------
-        grid : array_like
-            Grid values associated with the tabulated distributions.
-
-        offset : array_like
-            Starting index of each table in the flattened arrays.
-
-        value : array_like
-            Flattened sample values for all tables.
-
-        pdf : array_like, optional
-            Flattened PDF values.
-
-        cdf : array_like, optional
-            Flattened CDF values.
-
-        Notes
-        -----
-        Exactly one of ``pdf`` or ``cdf`` must be provided.
-        """
-        super().__init__(
-            child_label="multi_table_distribution",
-            child_type=DISTRIBUTION_MULTITABLE,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("multi_table_distribution", DISTRIBUTION_MULTITABLE, [])
 
         if (pdf is None) == (cdf is None):
             print_error("Exactly one of pdf or cdf must be provided.")
@@ -407,17 +245,19 @@ class DistributionMultiTable(DistributionBase):
                     value_array[start_i:stop_i],
                     pdf=pdf_array[start_i:stop_i],
                 )
-            else:
+            elif cdf_array is not None:
                 table = DistributionTabulated(
                     value_array[start_i:stop_i],
                     cdf=cdf_array[start_i:stop_i],
                 )
+            else:
+                table = DistributionTabulated([])  # Unachievable
 
             self.tables.append(table)
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - grid: {print_1d_array(self.grid)}\n"
         text += f"  - tables: {len(self.tables)}\n"
 
@@ -433,25 +273,23 @@ class DistributionMultiTable(DistributionBase):
 
 
 class DistributionLevelScattering(DistributionBase):
-    """Level-scattering energy distribution."""
-
     C1: float
     C2: float
 
     def __init__(self, C1: float, C2: float) -> None:
-        """Create a level-scattering distribution."""
+        # MC/DC framework metadata
         super().__init__(
-            child_label="level_scattering_distribution",
-            child_type=DISTRIBUTION_LEVEL_SCATTERING,
-            non_numba=[],
+            "level_scattering_distribution",
+            DISTRIBUTION_LEVEL_SCATTERING,
+            [],
         )
 
         self.C1 = C1
         self.C2 = C2
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - C1: {self.C1} [/eV^l]\n"
         text += f"  - C2: {self.C2}\n"
         return text
@@ -463,25 +301,19 @@ class DistributionLevelScattering(DistributionBase):
 
 
 class DistributionEvaporation(DistributionBase):
-    """Evaporation energy distribution."""
-
     nuclear_temperature: DataTable
     restriction_energy: float
 
     def __init__(
         self,
-        nuclear_temperature_energy_grid: ArrayLike,
-        nuclear_temperature_value: ArrayLike,
+        nuclear_temperature_energy_grid: NDArray[float64],
+        nuclear_temperature_value: NDArray[float64],
         restriction_energy: float,
         temperature_interpolations: int | Sequence[int],
         interpolation_boundaries: Sequence[int] | None,
     ) -> None:
-        """Create an evaporation distribution."""
-        super().__init__(
-            child_label="evaporation_distribution",
-            child_type=DISTRIBUTION_EVAPORATION,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("evaporation_distribution", DISTRIBUTION_EVAPORATION, [])
 
         self.restriction_energy = restriction_energy
         self.nuclear_temperature = DataTable(
@@ -492,8 +324,8 @@ class DistributionEvaporation(DistributionBase):
         )
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - Restriction energy: {self.restriction_energy} [eV]\n"
         text += (
             "  - Nuclear temperature "
@@ -512,25 +344,19 @@ class DistributionEvaporation(DistributionBase):
 
 
 class DistributionMaxwellian(DistributionBase):
-    """Maxwellian energy distribution."""
-
     nuclear_temperature: DataTable
     restriction_energy: float
 
     def __init__(
         self,
-        nuclear_temperature_energy_grid: ArrayLike,
-        nuclear_temperature_value: ArrayLike,
+        nuclear_temperature_energy_grid: NDArray[float64],
+        nuclear_temperature_value: NDArray[float64],
         restriction_energy: float,
         temperature_interpolations: int | Sequence[int],
         interpolation_boundaries: Sequence[int] | None,
     ) -> None:
-        """Create a Maxwellian distribution."""
-        super().__init__(
-            child_label="maxwellian_distribution",
-            child_type=DISTRIBUTION_MAXWELLIAN,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("maxwellian_distribution", DISTRIBUTION_MAXWELLIAN, [])
 
         self.restriction_energy = restriction_energy
         self.nuclear_temperature = DataTable(
@@ -541,8 +367,8 @@ class DistributionMaxwellian(DistributionBase):
         )
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - Restriction energy: {self.restriction_energy} [eV]\n"
         text += (
             "  - Nuclear temperature "
@@ -561,8 +387,6 @@ class DistributionMaxwellian(DistributionBase):
 
 
 class DistributionKalbachMann(DistributionBase):
-    """Kalbach-Mann correlated energy-angle distribution."""
-
     energy: NDArray[float64]
     offset: NDArray[int64]
     energy_out: NDArray[float64]
@@ -580,12 +404,8 @@ class DistributionKalbachMann(DistributionBase):
         precompound_factor: ArrayLike,
         angular_slope: ArrayLike,
     ) -> None:
-        """Create a Kalbach-Mann distribution."""
-        super().__init__(
-            child_label="kalbach_mann_distribution",
-            child_type=DISTRIBUTION_KALBACH_MANN,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("kalbach_mann_distribution", DISTRIBUTION_KALBACH_MANN, [])
 
         self.energy = np.asarray(energy, dtype=float64)
         self.offset = np.asarray(offset, dtype=int64)
@@ -604,8 +424,8 @@ class DistributionKalbachMann(DistributionBase):
         )
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - grid {print_1d_array(self.energy)} [eV]\n"
         text += f"  - offset {print_1d_array(self.offset)}\n"
         text += f"  - energy {print_1d_array(self.energy_out)} [eV]\n"
@@ -621,8 +441,6 @@ class DistributionKalbachMann(DistributionBase):
 
 
 class DistributionTabulatedEnergyAngle(DistributionBase):
-    """Tabulated correlated energy-angle distribution."""
-
     energy: NDArray[float64]
     offset: NDArray[int64]
     energy_out: NDArray[float64]
@@ -643,7 +461,7 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
         cosine: ArrayLike,
         cosine_pdf: ArrayLike,
     ) -> None:
-        """Create a tabulated correlated energy-angle distribution."""
+        # MC/DC framework metadata
         super().__init__(
             child_label="tabulated_energy_angle_distribution",
             child_type=DISTRIBUTION_TABULATED_ENERGY_ANGLE,
@@ -702,8 +520,8 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
             )
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - grid {print_1d_array(self.energy)} [eV]\n"
         text += f"  - offset {print_1d_array(self.offset)}\n"
         text += f"  - energy {print_1d_array(self.energy_out)} [eV]\n"
@@ -720,12 +538,6 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
 
 
 class DistributionNBody(DistributionBase):
-    """N-body energy distribution represented by a tabulated PDF and CDF.
-
-    The input probability density is normalized internally, and the
-    corresponding cumulative distribution is generated for sampling.
-    """
-
     pdf: DataTable
 
     def __init__(
@@ -733,22 +545,8 @@ class DistributionNBody(DistributionBase):
         values: ArrayLike,
         probabilities: ArrayLike,
     ) -> None:
-        """Create an N-body distribution.
-
-        Parameters
-        ----------
-        values : array_like
-            Tabulated sample values.
-
-        probabilities : array_like
-            Probability densities at the sample values. The values do not need
-            to be normalized.
-        """
-        super().__init__(
-            child_label="nbody_distribution",
-            child_type=DISTRIBUTION_N_BODY,
-            non_numba=[],
-        )
+        # MC/DC framework metadata
+        super().__init__("nbody_distribution", DISTRIBUTION_N_BODY, [])
 
         value_array = np.asarray(values, dtype=float64)
         probability_array = np.asarray(probabilities, dtype=float64)
@@ -773,8 +571,8 @@ class DistributionNBody(DistributionBase):
         )
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the distribution."""
         text = super().__repr__()
+
         text += f"  - value {print_1d_array(self.pdf.x)}\n"
         text += f"  - pdf {print_1d_array(self.pdf.y)}\n"
         return text

@@ -7,10 +7,7 @@ from typing import Annotated, Sequence
 
 ####
 
-import mcdc.object_.distribution as distribution
-
 from mcdc.constant import (
-    INTERPOLATION_LINEAR,
     PARTICLE_NEUTRON,
     PARTICLE_ELECTRON,
     PARTICLE_PROTON,
@@ -165,12 +162,14 @@ class Source(MCDCObject):
     """
 
     name: str
+
     # Position
     point_source: bool
     point: Annotated[NDArray[float64], (3,)]
     x: Annotated[NDArray[float64], (2,)]
     y: Annotated[NDArray[float64], (2,)]
     z: Annotated[NDArray[float64], (2,)]
+
     # Direction
     isotropic_direction: bool
     mono_direction: bool
@@ -178,19 +177,24 @@ class Source(MCDCObject):
     direction: Annotated[NDArray[float64], (3,)]
     polar_cosine: Annotated[NDArray[float64], (2,)]
     azimuthal: Annotated[NDArray[float64], (2,)]
+
     # Energy
     mono_energetic: bool
     energy_group: int
     energy: float
     energy_group_pmf: DistributionPMF
     energy_pdf: DistributionTabulated
+
     # Time
     discrete_time: bool
     time: float
     time_range: Annotated[NDArray[float64], (2,)]
-    #
+
+    # Misc.
     particle_type: int
     probability: float
+
+    # Movement
     moving: bool
     N_move: int
     N_move_grid: int
@@ -222,14 +226,10 @@ class Source(MCDCObject):
         #
         probability: float = 1.0,
     ):
+        # MC/DC framework metadata
+        super().__init__("source", [])
 
-        super().__init__(label="source", non_numba=[])
-
-        # Set name
-        if name == "":
-            self.name = "(Unnamed source)"
-        else:
-            self.name = name
+        self.name = name or "(Unnamed source)"
 
         # ==============================================================================
         # Default attributes
@@ -314,7 +314,7 @@ class Source(MCDCObject):
         if energy_group is not None:
             if type(energy_group) == int:
                 self.energy_group = energy_group
-            else:
+            elif isinstance(energy_group, Sequence):
                 self.mono_energetic = False
                 self.energy_group_pmf = DistributionPMF(
                     energy_group[0], energy_group[1]
@@ -322,7 +322,7 @@ class Source(MCDCObject):
         elif energy is not None:
             if type(energy) == float:
                 self.energy = energy
-            else:
+            elif isinstance(energy, Sequence):
                 self.mono_energetic = False
                 self.energy_pdf = DistributionTabulated(
                     np.array(energy[0]), np.array(energy[1])
@@ -354,9 +354,20 @@ class Source(MCDCObject):
         self.move_time_grid = np.array([0.0, INF])
         self.move_translations = np.zeros((2, 3))
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        # Compile distributions
+        self.energy_group_pmf._compile_into_simulation(simulation)
+        self.energy_pdf._compile_into_simulation(simulation)
+
+        return True
+
     def __repr__(self):
-        text = "\n"
-        text += f"Source\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
         text += f"  - Particle: {decode_particle_type(self.particle_type)}\n"
         text += f"  - Probability: {self.probability * 100}%\n"

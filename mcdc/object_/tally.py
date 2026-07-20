@@ -18,8 +18,6 @@ from types import NoneType
 
 ####
 
-import mcdc.object_.mesh as mesh_module
-
 from mcdc.constant import (
     INF,
     MESH_STRUCTURED,
@@ -48,9 +46,6 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Tally(MCDCPolymorphic):
-    # Annotations for Numba mode
-    label: str = "tally"
-
     # Basic properties
     name: str
     scores: list[int]
@@ -150,6 +145,7 @@ class Tally(MCDCPolymorphic):
         time: Sequence[float] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
     ):
+
         # Set name
         if name == "":
             self.name = "(Unnamed tally)"
@@ -196,12 +192,13 @@ class Tally(MCDCPolymorphic):
             self.azi = np.array(azi)
             self.filter_direction = True
         if polar_reference is not None:
-            polar_reference = np.array(polar_reference)
-            self.polar_reference /= polar_reference / np.linalg.norm(polar_reference)
+            polar_reference_arr = np.array(polar_reference)
+            self.polar_reference /= polar_reference_arr / np.linalg.norm(
+                polar_reference_arr
+            )
         if energy is not None:
             if type(energy) == str and energy == "all_groups":
-                G = simulation.materials[0].G
-                self.energy = np.linspace(0, G, G + 1) - 0.5
+                self.energy = np.array([0])  # A placeholder
             else:
                 self.energy = np.array(energy)
             self.filter_energy = True
@@ -224,7 +221,7 @@ class Tally(MCDCPolymorphic):
         # Set bins and strides
         self._set_bin_shape_and_strides(shape)
 
-    def _set_bin_shape_and_strides(self, shape):
+    def _set_bin_shape_and_strides(self, shape: tuple):
         # Set bins
         self.bin_shape = list(shape)
 
@@ -234,7 +231,7 @@ class Tally(MCDCPolymorphic):
         self.stride_azi = reduce(operator.mul, shape[2:])
         self.stride_mu = reduce(operator.mul, shape[1:])
 
-    def _use_census_based_tally(self, frequency):
+    def _use_census_based_tally(self, frequency: int, simulation):
         first_census = simulation.settings.census_time[0]
         self.time = np.linspace(0.0, first_census, frequency + 1)
 
@@ -256,13 +253,18 @@ class Tally(MCDCPolymorphic):
 
     def _phasespace_filter_text(self):
         text = ""
-        text += f"  - Scores: {[decode_score_type(x) for x in self.scores]}\n"
+        text += (
+            f"  - Scores: {", ".join([decode_score_type(x) for x in self.scores])}\n"
+        )
         if self.filter_time or self.filter_energy or self.filter_direction:
             text += f"  - Phase-space filters\n"
         if self.filter_time:
             text += f"    - Time {print_1d_array(self.time)} s\n"
         if self.filter_energy:
-            text += f"    - Energy {print_1d_array(self.energy)} eV\n"
+            if len(self.energy) == 1:
+                text += f"    - Energy: All groups\n"
+            else:
+                text += f"    - Energy {print_1d_array(self.energy)} eV\n"
         if self.filter_direction:
             text += f"    - Direction\n"
             text += f"    -   Polar reference: {self.polar_reference}\n"
@@ -270,20 +272,23 @@ class Tally(MCDCPolymorphic):
             text += f"    -   Azimuthal angle {print_1d_array(self.azi)}\n"
         return text
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        # Set "all_group" energy filter
+        if len(self.energy) == 1:
+            G = simulation.materials[0].G
+            self.energy = np.linspace(0, G, G + 1) - 0.5
+
+        return True
+
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
         return text
-
-
-def decode_type(type_):
-    if type_ == TALLY_TRACKLENGTH:
-        return "Tracklength tally"
-    elif type_ == TALLY_SURFACE_CROSSING:
-        return "Surface crossing tally"
-    elif type_ == TALLY_COLLISION:
-        return "Collision tally"
 
 
 def decode_score_type(type_, lower_case=False):
@@ -305,6 +310,9 @@ def decode_score_type(type_, lower_case=False):
         return "Current out" if not lower_case else "current-out"
     elif type_ == SCORE_ENERGY_DEPOSITION:
         return "Energy deposition" if not lower_case else "energy_deposition"
+    else:
+        print_error(f"Unknown tally score code: {type_}")
+        return "Unknown score"
 
 
 # ======================================================================================
@@ -313,11 +321,11 @@ def decode_score_type(type_, lower_case=False):
 
 
 class TallySurfaceCrossing(Tally):
-    # Spatial filters
-    surface: Surface | NoneType
+    surface: Surface | NoneType  # Non-numba
     surface_filtered: bool
     surface_filter_ID: int
-    cell: Cell | NoneType
+
+    cell: Cell | NoneType  # Non-numba
     cell_filtered: bool
     cell_filter_ID: int
 
@@ -333,12 +341,14 @@ class TallySurfaceCrossing(Tally):
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
+        # MC/DC framework metadata
         super(Tally, self).__init__(
             label="tally",
             child_label="surface_crossing_tally",
             child_type=TALLY_SURFACE_CROSSING,
             non_numba=["surface", "cell"],
         )
+
         super().__init__(
             name,
             scores,
@@ -380,8 +390,16 @@ class TallySurfaceCrossing(Tally):
                 for boundary_surface in cell.surfaces:
                     boundary_surface.tallies.append(self)
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        return True
+
     def __repr__(self):
         text = super().__repr__()
+
         if isinstance(self.surface, Surface):
             text += f"  - Surface filter: {self.surface.name}\n"
         if isinstance(self.cell, Cell):
@@ -427,6 +445,7 @@ class TallyCollision(Tally):
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
 
+        # MC/DC framework metadata
         super(Tally, self).__init__(
             label="tally",
             child_label="collision_tally",
@@ -487,17 +506,24 @@ class TallyCollision(Tally):
             self.mesh_stride_y = N_score * mesh.Nz
             self.mesh_stride_x = N_score * mesh.Nz * mesh.Ny
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
         # Attach to all cells if cell filter is not specified
-        if cell is None:
-            for cell_ in simulation.cells:
-                cell_.collision_tallies.append(self)
+        if not self.cell:
+            for cell in simulation.cells:
+                cell.collision_tallies.append(self)
+
+        return True
 
     def __repr__(self):
         text = super().__repr__()
-        if isinstance(self.cell, Cell):
+        if self.cell:
             text += f"  - Cell filter: {self.cell.name}\n"
-        if isinstance(self.mesh, MeshBase):
-            text += f"  - Mesh: {mesh_module.decode_type(self.mesh.type)}\n"
+        if self.mesh:
+            text += f"  - Mesh: {self.mesh.name}\n"
         text += super()._phasespace_filter_text()
         text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
         return text
@@ -539,6 +565,7 @@ class TallyTracklength(Tally):
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
 
+        # MC/DC framework metadata
         super(Tally, self).__init__(
             label="tally",
             child_label="tracklength_tally",
@@ -599,22 +626,25 @@ class TallyTracklength(Tally):
             self.mesh_stride_y = N_score * mesh.Nz
             self.mesh_stride_x = N_score * mesh.Nz * mesh.Ny
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
         # Attach to all cells if cell filter is not specified
-        # TODO
-        """
-        if cell is None:
-            for cell_ in simulation.cells:
-                cell_.tracklength_tallies.append(self)
-        """
+        if not self.cell:
+            for cell in simulation.cells:
+                cell.collision_tallies.append(self)
+
+        return True
 
     def __repr__(self):
-        from mcdc.object_.cell import Cell
-
         text = super().__repr__()
-        if isinstance(self.cell, Cell):
+
+        if self.cell:
             text += f"  - Cell filter: {self.cell.name}\n"
-        if isinstance(self.mesh, MeshBase):
-            text += f"  - Mesh: {mesh_module.decode_type(self.mesh.type)}\n"
+        if self.mesh:
+            text += f"  - Mesh: {self.mesh.name}\n"
         text += super()._phasespace_filter_text()
         text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
         return text

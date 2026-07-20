@@ -42,24 +42,13 @@ class ElectronReactionBase(MCDCPolymorphic):
         self.reference_frame = reference_frame
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text = super().__repr__()
+
         text += f"  - ID: {self.ID}\n"
         text += f"  - MT: {self.MT}\n"
         text += f"  - XS {print_1d_array(self.xs)} barn\n"
         text += f"  - Reference frame: {decode_reference_frame(self.reference_frame)}\n"
         return text
-
-
-def decode_type(type_):
-    if type_ == ELECTRON_REACTION_IONIZATION:
-        return "Electron ionization"
-    elif type_ == ELECTRON_REACTION_ELASTIC_SCATTERING:
-        return "Electron elastic scattering"
-    elif type_ == ELECTRON_REACTION_BREMSSTRAHLUNG:
-        return "Electron bremsstrahlung"
-    elif type_ == ELECTRON_REACTION_EXCITATION:
-        return "Electron excitation"
 
 
 def decode_reference_frame(type_):

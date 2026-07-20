@@ -1,76 +1,109 @@
-from mcdc.object_.base import MCDCObject
+from mcdc.object_.base import MCDCObject, MCDCPolymorphic
+from mcdc.object_.cell import Region, Cell
+from mcdc.object_.data import DataBase, DataNone
+from mcdc.object_.distribution import DistributionBase, DistributionNone
+from mcdc.object_.electron_reaction import ElectronReactionBase
+from mcdc.object_.element import Element
+from mcdc.object_.material import MaterialBase
+from mcdc.object_.mesh import MeshBase
+from mcdc.object_.neutron_reaction import NeutronReactionBase
+from mcdc.object_.nuclide import Nuclide
+from mcdc.object_.universe import Universe, Lattice
 from mcdc.object_.simulation import Simulation
+from mcdc.object_.source import Source
+from mcdc.object_.surface import Surface
+from mcdc.object_.tally import Tally
+from mcdc.print_ import print_error
+
+NONE_OBJECT_CLASSES = (DataNone, DistributionNone)  # Has customized compilation
 
 
-def compile_simulation(simulationPy: Simulation):
-    from mcdc.object_.base import MCDC_OBJECT_LABELS
-    from mcdc.object_.data import DataNone
-    from mcdc.object_.distribution import DistributionNone
+def compile_simulation(simulation: Simulation):
+    # Reset model
+    simulation._reset_model()
 
-    # Reset derived object lists
-    simulationPy._reset_object_lists()
-
-    # Object IDs counter
-    # TODO: Remove
-    next_ID = dict.fromkeys(MCDC_OBJECT_LABELS, 0)
+    # Reserved ojects
+    none_data = DataNone()
+    none_distribution = DistributionNone()
 
     # Compile reserved objects
-    compile_object(simulationPy.root_universe, simulationPy)
+    none_data._compile_into_simulation(simulation)
+    none_distribution._compile_into_simulation(simulation)
 
-    # Root universe
-    simulationPy.universes.append(simulationPy.root_universe)
+    # Compile model
+    root_universe = simulation.root_universe
+    root_universe._compile_into_simulation(simulation)
 
-    # "None" objects
-    simulationPy.data.append(DataNone())
-    simulationPy.distributions.append(DistributionNone())
+    # Compile source
+    sources = simulation.sources
+    simulation.sources = []
+    for source in sources:
+        source._compile_into_simulation(simulation)
+
+    # Compile tally
+    tallies = simulation.tallies
+    simulation.tallies = []
+    print(tallies)
+    for tally in tallies:
+        tally._compile_into_simulation(simulation)
+    print(simulation.tallies)
+
+    # Compile settings
+
+
+def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
+    # Skip if already compiled
+    if object_.compile_ID == simulation.compile_ID:
+        return False
+
+    # Get the object list
+    if isinstance(object_, Cell):
+        object_list = simulation.cells
+    elif isinstance(object_, DataBase):
+        object_list = simulation.data
+    elif isinstance(object_, DistributionBase):
+        object_list = simulation.distributions
+    elif isinstance(object_, Lattice):
+        object_list = simulation.lattices
+    elif isinstance(object_, MaterialBase):
+        object_list = simulation.materials
+    elif isinstance(object_, MeshBase):
+        object_list = simulation.meshes
+    elif isinstance(object_, Element):
+        object_list = simulation.elements
+    elif isinstance(object_, ElectronReactionBase):
+        object_list = simulation.electron_reactions
+    elif isinstance(object_, Nuclide):
+        object_list = simulation.nuclides
+    elif isinstance(object_, NeutronReactionBase):
+        object_list = simulation.neutron_reactions
+    elif isinstance(object_, Region):
+        object_list = simulation.regions
+    elif isinstance(object_, Source):
+        object_list = simulation.sources
+    elif isinstance(object_, Surface):
+        object_list = simulation.surfaces
+    elif isinstance(object_, Tally):
+        object_list = simulation.tallies
+    elif isinstance(object_, Universe):
+        object_list = simulation.universes
+    else:
+        object_list = []
+        print_error(f"Unidentified object list for object {object_}")
 
     # Assign IDs
-    assign_IDs(simulationPy.data[0], next_ID, compile_ID)
-    assign_IDs(simulationPy.distributions[0], next_ID, compile_ID)
-    assign_IDs(simulationPy.universes[0], next_ID, compile_ID)
+    object_.ID = len(object_list)
+    if isinstance(object_, MCDCPolymorphic):
+        object_.child_ID = sum(
+            [
+                x.child_type == object_.child_type
+                for x in object_list
+                if isinstance(x, MCDCPolymorphic)
+            ]
+        )
+    object_.compile_ID = simulation.compile_ID
 
-    # ==================================================================================
-    # Compile model
-    # ==================================================================================
+    # Register to simulation (TODO: Resolve IDE error message)
+    object_list.append(object_)
 
-    root_universe = simulationPy.universes[0]
-
-    # Loop over root universe cells
-    for cell in root_universe.cells:
-        assign_IDs(cell, next_ID, compile_ID)
-
-        # Fill
-        fill = cell.fill
-
-        ## Material
-        if isinstance(fill, MaterialBase):
-            simulationPy.materials.append(fill)
-            assign_IDs(fill, next_ID, compile_ID)
-
-        ## Universe
-        elif isinstance(fill, Universe):
-            simulationPy.universes.append(fill)
-            assign_IDs(fill, next_ID, compile_ID)
-
-        ## Lattice
-        elif isinstance(fill, Lattice):
-            simulationPy.lattices.append(fill)
-            assign_IDs(fill, next_ID, compile_ID)
-
-
-def compile_object(object_: MCDCObject, simulationPy: Simulation) -> None:
-    object_type = type(object_)
-    print(object_type)
-    matching_members = {
-        k: v
-        for k, v in vars(simulationPy).items()
-        if isinstance(v, list) and all(isinstance(x, object_type) for x in v)
-    }
-    print(matching_members)
-    exit()
-
-    # Assign ID
-
-    object_.ID = next_ID[object_.label]
-    object_.compile_ID = compile_ID
-    next_ID[object_.label] += 1
+    return True

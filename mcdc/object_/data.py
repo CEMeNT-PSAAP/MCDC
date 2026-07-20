@@ -25,66 +25,14 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class DataBase(MCDCPolymorphic):
-    """Base class for compiled data objects.
-
-    Data objects store numerical information used by physics models,
-    distributions, and other MC/DC objects. Concrete subclasses determine the
-    representation of the stored data.
-    """
-
     def __init__(
         self,
         child_label: str,
         child_type: int,
         non_numba: list[str],
     ) -> None:
-        """Initialize data framework metadata.
-
-        Parameters
-        ----------
-        child_label : str
-            Framework label identifying the concrete data representation.
-
-        child_type : int
-            Integer identifier specifying the concrete data representation.
-
-        non_numba : list of str
-            Additional attribute names excluded from the compiled
-            representation.
-        """
+        # MC/DC framework metadata
         super().__init__("data", child_label, child_type, non_numba)
-
-    def __repr__(self) -> str:
-        """Return a human-readable description of the data object."""
-        return f"\n{decode_type(self.child_type)}\n"
-
-
-def decode_type(type_: int) -> str:
-    """Convert a data type code to a human-readable name.
-
-    Parameters
-    ----------
-    type_ : int
-        Data type code.
-
-    Returns
-    -------
-    str
-        Human-readable data type name.
-
-    Raises
-    ------
-    ValueError
-        If the data type code is unknown.
-    """
-    if type_ == DATA_NONE:
-        return "Data (None)"
-    if type_ == DATA_TABLE:
-        return "Data (Table)"
-    if type_ == DATA_POLYNOMIAL:
-        return "Data (Polynomial function)"
-
-    raise ValueError(f"Unknown data type: {type_}")
 
 
 # ======================================================================================
@@ -95,10 +43,8 @@ def decode_type(type_: int) -> str:
 
 
 class DataNone(DataBase):
-    """Placeholder for the absence of stored data."""
-
     def __init__(self) -> None:
-        """Create an empty data object."""
+        # MC/DC framework metadata
         super().__init__("none_data", DATA_NONE, [])
 
 
@@ -108,14 +54,6 @@ class DataNone(DataBase):
 
 
 class DataTable(DataBase):
-    """Tabulated one-dimensional data with interpolation regions.
-
-    Interpolation laws are applied to ``y`` over regions of ``x``. Optional
-    auxiliary arrays may store additional values aligned with ``x``, such as
-    cumulative distribution functions associated with tabulated probability
-    densities. Auxiliary data are stored for lookup and are not interpolated.
-    """
-
     # Main data
     N: int
     x: NDArray[float64]
@@ -137,34 +75,7 @@ class DataTable(DataBase):
         interpolation_boundaries: Sequence[int] | None = None,
         aux: NDArray[float64] | None = None,
     ) -> None:
-        """Create a tabulated data object.
-
-        Parameters
-        ----------
-        x : ndarray of float64
-            One-dimensional independent-variable values.
-
-        y : ndarray of float64
-            One-dimensional dependent-variable values aligned with ``x``.
-
-        interpolations : int or sequence of int
-            Interpolation law applied to the entire table, or an ordered
-            sequence of interpolation laws for multiple regions.
-
-        interpolation_boundaries : sequence of int, optional
-            Exclusive upper index of each interpolation region. Required when
-            multiple interpolation laws are provided. The final boundary must
-            equal ``len(x)``.
-
-        aux : ndarray of float64, optional
-            Auxiliary data aligned with ``x``. A one-dimensional array is
-            stored with shape ``(1, N)``. A two-dimensional array must have
-            shape ``(N_aux, N)``.
-
-        Notes
-        -----
-        Interpolation boundaries use Python-style exclusive upper indices.
-        """
+        # MC/DC framework metadata
         super().__init__("table_data", DATA_TABLE, [])
 
         # Set primary data
@@ -258,8 +169,8 @@ class DataTable(DataBase):
             decode_interpolation(interpolation)
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the tabulated data."""
         text = super().__repr__()
+
         text += f"  - x {print_1d_array(self.x)}\n"
         text += f"  - y {print_1d_array(self.y)}\n"
 
@@ -291,23 +202,6 @@ class DataTable(DataBase):
 
 
 def decode_interpolation(type_: int) -> str:
-    """Convert an interpolation type code to its string name.
-
-    Parameters
-    ----------
-    type_ : int
-        Interpolation type code.
-
-    Returns
-    -------
-    str
-        Interpolation name.
-
-    Raises
-    ------
-    ValueError
-        If the interpolation type code is unknown.
-    """
     if type_ == INTERPOLATION_HISTOGRAM:
         return "histogram"
     if type_ == INTERPOLATION_LINEAR:
@@ -323,23 +217,6 @@ def decode_interpolation(type_: int) -> str:
 
 
 def encode_interpolation(name: str) -> int:
-    """Convert an interpolation name to its integer type code.
-
-    Parameters
-    ----------
-    name : str
-        Interpolation name.
-
-    Returns
-    -------
-    int
-        Interpolation type code.
-
-    Raises
-    ------
-    ValueError
-        If the interpolation name is unknown.
-    """
     if name == "histogram":
         return INTERPOLATION_HISTOGRAM
     if name == "linear":
@@ -360,19 +237,10 @@ def encode_interpolation(name: str) -> int:
 
 
 class DataPolynomial(DataBase):
-    """Polynomial data represented by an ordered coefficient array."""
-
     coefficients: NDArray[float64]
 
     def __init__(self, coefficients: NDArray[float64]) -> None:
-        """Create a polynomial data object.
-
-        Parameters
-        ----------
-        coefficients : ndarray of float64
-            One-dimensional polynomial coefficients ordered according to the
-            convention used by the consuming MC/DC method.
-        """
+        # MC/DC framework metadata
         super().__init__("polynomial_data", DATA_POLYNOMIAL, [])
 
         self.coefficients = np.asarray(coefficients, dtype=float64)
@@ -381,7 +249,7 @@ class DataPolynomial(DataBase):
             print_error("coefficients must be one-dimensional.")
 
     def __repr__(self) -> str:
-        """Return a human-readable summary of the polynomial data."""
         text = super().__repr__()
+
         text += f"  - coefficients {print_1d_array(self.coefficients)}\n"
         return text

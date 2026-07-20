@@ -9,16 +9,6 @@ from mcdc.object_.universe import Lattice, Universe
 
 
 def run_simulation(simulationPy: Simulation):
-    """
-    Execute the MC/DC simulation.
-
-    Runs the transport simulation defined by the current problem
-    (materials, geometry, sources, tallies, and settings).
-    Results are written to an HDF5 output file.
-
-    Command-line arguments (``--N_particle``, ``--output``, etc.) override
-    the corresponding settings when provided.
-    """
     import mcdc.print_ as print_module
     from mpi4py import MPI
 
@@ -37,7 +27,7 @@ def run_simulation(simulationPy: Simulation):
     time_prep_start = MPI.Wtime()
 
     # Override settings with command-line arguments
-    override_settings()
+    override_settings(simulationPy)
 
     # Generate the program state:
     #   - `simulation`: the simulation structure, storing fixed side data and meta data
@@ -47,7 +37,7 @@ def run_simulation(simulationPy: Simulation):
     #       The use of container is necessary to ensure proper mutability and tracking
     #       of the structure when running in different kinds of machines supported by
     #       the Numba-based compilation framework.
-    simulation_container, data = preparation(simulationPy)
+    simulation_container, data = prepare(simulationPy)
     simulation = simulation_container[0]
 
     # Print headers
@@ -191,7 +181,7 @@ def prepare(simulationPy):
     if settings.use_census_based_tally:
         N_bin = settings.census_tally_frequency
         for tally in simulationPy.tallies:
-            tally._use_census_based_tally(N_bin)
+            tally._use_census_based_tally(N_bin, simulationPy)
 
     # Normalize source probability
     norm = 0.0
@@ -326,9 +316,8 @@ def prepare(simulationPy):
 # ======================================================================================
 
 
-def override_settings():
+def override_settings(simulationPy):
     import mcdc.config as config
-    from mcdc.object_.simulation import simulation as simulationPy
 
     settings = simulationPy.settings
 

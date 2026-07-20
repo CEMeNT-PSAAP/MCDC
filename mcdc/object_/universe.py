@@ -24,53 +24,32 @@ from mcdc.util import flatten
 
 
 class Universe(MCDCObject):
-    """
-    Define a list of cells as a universe.
-
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    cells : list of Cell
-        List of cells that comprise the universe.
-    root : bool, optional
-        Flag to set as the root universe (ID = 0).
-
-    Returns
-    -------
-    Universe
-        The universe object.
-
-    See Also
-    --------
-    mcdc.Cell : Creates a cell that can be used to define a universe.
-    """
-
-    # Annotations for Numba mode
     name: str
     cells: list[Cell]
 
     def __init__(self, name: str = "", cells: list[Cell] = []):
-        # Custom treatment for root universe
-        super().__init__(label="universe", non_numba=[])
+        # MC/DC framework metadata
+        super().__init__("universe", [])
 
-        # Set name
-        if name == "":
-            self.name = "(Unnamed universe)"
-        else:
-            self.name = name
-
+        self.name = name or "(Unnamed universe)"
         self.cells = cells
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        # Compile cells
+        for cell in self.cells:
+            cell._compile_into_simulation(simulation)
+
+        return True
+
     def __repr__(self):
-        text = "\n"
-        text += f"Universe\n"
-        if self.ID == 0:
-            text += f"  - ID: {self.ID} (root)\n"
-        else:
-            text += f"  - ID: {self.ID}\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
-        text += f"Cells: {[x.ID for x in self.cells]}"
+        text += f"  - Cells: {", ".join([x.name for x in self.cells])}\n"
         return text
 
 
@@ -80,45 +59,21 @@ class Universe(MCDCObject):
 
 
 class Lattice(MCDCObject):
-    """
-    Define a regular lattice of universes.
-
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    x : tuple of (float, float, int), optional
-        Lattice specification along x: ``(x0, dx, Nx)``.
-    y : tuple of (float, float, int), optional
-        Lattice specification along y: ``(y0, dy, Ny)``.
-    z : tuple of (float, float, int), optional
-        Lattice specification along z: ``(z0, dz, Nz)``.
-    universes : list of Universe
-        Array of universes filling each lattice cell.
-
-    Returns
-    -------
-    Lattice
-        The lattice object.
-
-    See Also
-    --------
-    mcdc.Universe : Creates a universe to place in a lattice.
-    """
-
-    # Annotations for Numba mode
-    label: str = "lattice"
-    #
     name: str
+
     x0: float
     dx: float
     Nx: int
+
     y0: float
     dy: float
     Ny: int
+
     z0: float
     dz: float
     Nz: int
+
+    universes: list[Universe]  # Non-numba
     universe_IDs: Annotated[NDArray[int64], ("Nx", "Ny", "Nz")]
 
     def __init__(
@@ -127,15 +82,12 @@ class Lattice(MCDCObject):
         x: tuple[float, float, int] | NoneType = None,
         y: tuple[float, float, int] | NoneType = None,
         z: tuple[float, float, int] | NoneType = None,
-        universes: list[Universe] = None,
+        universes: list[Universe] = [],
     ):
-        super().__init__()
+        super().__init__("lattice", ["universes"])
 
-        # Set name
-        if name == "":
-            self.name = "(Unnamed lattice)"
-        else:
-            self.name = name
+        self.name = name or "(Unnamed lattice)"
+        self.universes = universes
 
         # Default uniform grids
         self.x0 = -INF
@@ -185,12 +137,11 @@ class Lattice(MCDCObject):
         self.universe_IDs = np.array(universe_IDs)
 
     def __repr__(self):
-        text = "\n"
-        text += f"Lattice\n"
-        text += f"  - ID: {self.ID}\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
         text += f"  - (x0, dx, Nx): ({self.x0}, {self.dx}, {self.Nx})\n"
         text += f"  - (y0, dy, Ny): ({self.y0}, {self.dy}, {self.Ny})\n"
         text += f"  - (z0, dz, Nz): ({self.z0}, {self.dz}, {self.Nz})\n"
-        text += f"Universes: {set([x.ID for x in list(flatten(self.universes))])}"
+        text += f"Universes: {set([x.name for x in list(flatten(self.universes))])}"
         return text

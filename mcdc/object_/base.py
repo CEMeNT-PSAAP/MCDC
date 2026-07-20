@@ -27,6 +27,20 @@ class MCDCObject(MCDCBase):
         self.compile_ID = 0
         self.non_numba += ["compile_ID"]
 
+    def __repr__(self) -> str:
+        nice_label = self.label.replace("_", " ").title()
+        text = "\n"
+        text += f"{nice_label}\n"
+        if self.compile_ID > 0:
+            text += f"  (compile_ID={self.compile_ID}, ID={self.ID})\n"
+
+        return text
+
+    def _compile_into_simulation(self, simulation) -> bool:
+        from mcdc.code_factory.python_objects_compiler import register_object
+
+        return register_object(self, simulation)
+
 
 class MCDCPolymorphic(MCDCObject):
     child_label: str
@@ -47,63 +61,15 @@ class MCDCPolymorphic(MCDCObject):
         self.child_ID = -1
         self.non_numba += ["child_label"]
 
+    def __repr__(self) -> str:
+        nice_label = self.label.replace("_", " ").title()
+        nice_sublabel = self.child_label.replace("_", " ").title()
+        text = "\n"
+        text += f"{nice_label} - {nice_sublabel}\n"
+        if self.compile_ID > 0:
+            text += f"  (compile_ID={self.compile_ID}, ID={self.ID})\n"
 
-MCDC_OBJECT_LABELS = [
-    # Geometry
-    "surface",
-    "region",
-    "cell",
-    "universe",
-    "lattice",
-    # Materials
-    "material",
-    "native_material",
-    "multigroup_material",
-    "element",
-    "nuclide",
-    # Source
-    "source",
-    # Tallies
-    "tally",
-    "surface_crossing_tally",
-    "collision_tally",
-    "tracklength_tally",
-    # Meshes
-    "mesh",
-    "uniform_mesh",
-    "structured_mesh",
-    # Neutron reactions
-    "neutron_reaction",
-    "neutron_elastic_scattering_reaction",
-    "neutron_capture_reaction",
-    "neutron_inelastic_scattering_reaction",
-    "neutron_fission_reaction",
-    # Electron reactions
-    "electron_reaction",
-    "electron_ionization_reaction",
-    "electron_elastic_scattering_reaction",
-    "electron_bremsstrahlung_reaction",
-    "electron_excitation_reaction",
-    # Data
-    "data",
-    "none_data",
-    "table_data",
-    "polynomial_data",
-    # Distribution
-    "distribution",
-    "none_distribution",
-    "pmf_distribution",
-    "tabulated_distribution",
-    "mult_table_distribution",
-    "level_scattering_distribution",
-    "evaporation_distribution",
-    "maxwellian_distribution",
-    "kalbach_mann_distribution",
-    "tabulated_energy_angle_distribution",
-    "nbody_distribution",
-    # Misc.
-    "gpu_meta",
-]
+        return text
 
 
 # ======================================================================================

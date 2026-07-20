@@ -45,7 +45,8 @@ class Region(MCDCObject):
     B: Region | int | NoneType
 
     def __init__(self, type_, A, B):
-        super().__init__(label="region", non_numba=[])
+        # MC/DC framework metadata
+        super().__init__("region", [])
 
         self.type = type_
         self.A = A
@@ -66,7 +67,7 @@ class Region(MCDCObject):
         return Region("complement", self, None)
 
     def __repr__(self):
-        return f"Region: {str.capitalize(self.type)}"
+        return f"{str.capitalize(self.type)} Region"
 
 
 # ======================================================================================
@@ -75,36 +76,15 @@ class Region(MCDCObject):
 
 
 class Cell(MCDCObject):
-    """
-    Define a cell from a region and a fill.
-
-    Parameters
-    ----------
-    region : Region, optional
-        The spatial region defining the cell boundaries.
-        Constructed using ``+surface`` / ``-surface`` half-space operators.
-    fill : Material or MaterialMG or Universe or Lattice, optional
-        The material or universe that fills the cell.
-    name : str, optional
-        User label.
-    translation : array_like of float, optional
-        Translation vector ``[tx, ty, tz]`` in cm.
-    rotation : array_like of float, optional
-        Rotation angles ``[rx, ry, rz]`` in degrees.
-
-    See Also
-    --------
-    mcdc.Surface : Creates surfaces that can be used to define cell regions.
-    mcdc.Universe : Groups cells into a universe.
-    """
-
     name: str
 
+    # Region definition
     region: Region  # Non-numba
     region_RPN_tokens: list[int]
     region_RPN: Boolean  # Non-numba
     surfaces: list[Surface]
 
+    # Fill definition
     fill: MaterialBase | Universe | Lattice | NoneType  # Non-numba
     fill_type: int
     fill_ID: int
@@ -113,6 +93,7 @@ class Cell(MCDCObject):
     translation: Annotated[NDArray[float64], (3,)]
     rotation: Annotated[NDArray[float64], (3,)]
 
+    # Attached tallies
     collision_tallies: list[TallyCollision]
     tracklength_tallies: list[TallyTracklength]
 
@@ -125,7 +106,7 @@ class Cell(MCDCObject):
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
     ):
         # MC/DC framework metadata
-        super().__init__(label="cell", non_numba=["region", "fill", "region_RPN"])
+        super().__init__("cell", ["region", "region_RPN", "fill"])
 
         self.name = name or "(Unnamed cell)"
         self.region = region or Region("all", None, None)
@@ -143,31 +124,21 @@ class Cell(MCDCObject):
             # Convert ritation
             self.rotation *= PI / 180.0
 
-        # Set region Reversed Polished Notation (RPN)
-        # TODO
-        """
-        if self.region.type != "all":
-            self.region_RPN_tokens = generate_RPN_tokens(self.region)
-            self.region_RPN = generate_RPN(self.region_RPN_tokens)
-        else:
-            self.region_RPN_tokens = []
-            self.region_RPN = Boolean(True)
-        """
-
-        # List surfaces
-        # TODO
-        # self.surfaces = list_surfaces(self.region_RPN_tokens)
-
         # Cell tallies
         self.collision_tallies = []
         self.tracklength_tallies = []
 
-        # ==============================================================================
-        # Numba attribute manual set up
-        # ==============================================================================
+    def _compile_into_simulation(self, simulation) -> bool:
+        # Already compiled?
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        # Compile fill if needed
+        fill = self.fill
+        if fill:
+            fill._compile_into_simulation(simulation)
 
         # Numba representation of the cell fill
-        #   (Because polymorphic Ffill object is not supported)
         if isinstance(fill, MaterialBase):
             self.fill_type = FILL_MATERIAL
             self.fill_ID = fill.ID
@@ -180,20 +151,32 @@ class Cell(MCDCObject):
         elif fill == None:
             self.fill_type = FILL_NONE
             self.fill_ID = -1
+
+        # Set region Reversed Polished Notation (RPN)
+        if self.region.type != "all":
+            self.region_RPN_tokens = generate_RPN_tokens(self.region, simulation)
+            self.region_RPN = generate_RPN(self.region_RPN_tokens)
         else:
-            print_error(f"Unsupported cell fill: {fill}")
+            self.region_RPN_tokens = []
+            self.region_RPN = Boolean(True)
+
+        # List surfaces
+        self.surfaces = list_surfaces(self.region_RPN_tokens, simulation)
+
+        return True
 
     def __repr__(self):
-        text = "\n"
-        text += f"Cell\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
-        text += f"  - {self.region}\n"
-        if isinstance(self.fill, MaterialBase):
-            text += f"  - Fill (material): {self.fill.name}\n"
-        elif isinstance(self.fill, Lattice):
-            text += f"  - Fill (lattice): {self.fill.name}\n"
-        elif isinstance(self.fill, Universe):
-            text += f"  - Fill (universe): {self.fill.name}\n"
+        if self.compile_ID > 0:
+            text += f"  - Region RPN: {self.region_RPN}\n"
+        else:
+            text += f"  - {self.region}\n"
+        if self.fill:
+            text += f"  - Fill [{self.fill.label.title().replace("_"," ")}]: {self.fill.name}\n"
+        else:
+            text += f"  - Fill [None]"
         if self.fill_translated:
             text += f"  - Translation: {self.translation}\n"
         if self.fill_rotated:
@@ -208,7 +191,9 @@ class Cell(MCDCObject):
         return text
 
 
-def generate_RPN_tokens(region):
+def generate_RPN_tokens(region, simulation):
+    from mcdc.object_.surface import Surface
+
     # The RPN tokens
     rpn_tokens = []
 
@@ -216,17 +201,46 @@ def generate_RPN_tokens(region):
     stack = [region]
     while len(stack) > 0:
         token = stack.pop()
+
+        # Resolve region token
         if isinstance(token, Region):
-            if token.type == "halfspace":
-                rpn_tokens.append(token.A.ID)
-                if token.B < 0:
+            A = token.A
+            B = token.B
+
+            if token.type == "halfspace" and (
+                isinstance(A, Surface) and isinstance(B, int)
+            ):
+                surface = A
+                sense = B
+
+                # Compile and register surface
+                surface._compile_into_simulation(simulation)
+                rpn_tokens.append(surface.ID)
+
+                if sense < 0:
                     rpn_tokens.append(BOOL_NOT)
-            elif token.type == "intersection":
+
+            elif token.type == "intersection" and (
+                isinstance(A, Region) and isinstance(B, Region)
+            ):
                 stack += ["&", token.A, token.B]
-            elif token.type == "union":
+
+            elif token.type == "union" and (
+                isinstance(A, Region) and isinstance(B, Region)
+            ):
                 stack += ["|", token.A, token.B]
-            elif token.type == "complement":
+
+            elif token.type == "complement" and (
+                isinstance(A, Region) and isinstance(B, Region)
+            ):
                 stack += ["~", token.A]
+
+            else:
+                print_error(
+                    f"Invalid RPN tokens for Region of type {token.type}: {A}, {B}"
+                )
+
+        # Register RPN token
         else:
             if token == "&":
                 rpn_tokens.append(BOOL_AND)
@@ -235,7 +249,7 @@ def generate_RPN_tokens(region):
             elif token == "~":
                 rpn_tokens.append(BOOL_NOT)
             else:
-                print_error(f"Unrecognized token in the generating region RPN: {token}")
+                print_error(f"Unrecognized RPN token: {token}")
 
     return rpn_tokens
 
@@ -265,13 +279,12 @@ def generate_RPN(rpn_tokens):
     return sympy.logic.boolalg.simplify_logic(stack[0])
 
 
-def list_surfaces(rpn_tokens):
+def list_surfaces(rpn_tokens, simulation):
     surfaces = []
 
     for token in rpn_tokens:
         if token >= 0:
             surface = simulation.surfaces[token]
-            if surface not in surfaces:
-                surfaces.append(surface)
+            surfaces.append(surface)
 
     return sorted(surfaces, key=attrgetter("ID"))
