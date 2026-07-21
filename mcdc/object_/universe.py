@@ -84,6 +84,7 @@ class Lattice(MCDCObject):
         z: tuple[float, float, int] | NoneType = None,
         universes: list[Universe] = [],
     ):
+        # MC/DC framework metadata
         super().__init__("lattice", ["universes"])
 
         self.name = name or "(Unnamed lattice)"

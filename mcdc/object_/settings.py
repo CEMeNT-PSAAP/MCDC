@@ -70,8 +70,8 @@ class Settings(MCDCBase):
     gpu_storage: int = GPU_STORAGE_SEPARATE
 
     def __post_init__(self):
-        """Initialize settings framework metadata."""
-        super().__init__(label="settings", non_numba=[])
+        # MC/DC framework metadata
+        super().__init__("settings", [])
 
     def set_time_census(self, time, tally_frequency=None):
         # Make sure that the time grid points are sorted
@@ -130,12 +130,6 @@ class Settings(MCDCBase):
                 self.gyration_radius_type = GYRATION_RADIUS_ONLY_Z
             else:
                 print_error("Unknown gyration radius type")
-
-        # Allocate cycle-wise quantities
-        from mcdc.object_.simulation import simulation
-
-        simulation.k_cycle = np.zeros(self.N_cycle)
-        simulation.gyration_radius = np.zeros(self.N_cycle)
 
     def set_source_file(self, source_file_name):
         self.use_source_file = True

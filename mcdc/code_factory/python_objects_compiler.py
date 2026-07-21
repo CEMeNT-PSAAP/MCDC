@@ -1,3 +1,5 @@
+import numpy as np
+
 from mcdc.object_.base import MCDCObject, MCDCPolymorphic
 from mcdc.object_.cell import Region, Cell
 from mcdc.object_.data import DataBase, DataNone
@@ -48,7 +50,11 @@ def compile_simulation(simulation: Simulation):
         tally._compile_into_simulation(simulation)
     print(simulation.tallies)
 
-    # Compile settings
+    # Apply settings as needed
+    settings = simulation.settings
+    if simulation.settings.neutron_eigenvalue_mode:
+        simulation.k_cycle = np.zeros(settings.N_cycle)
+        simulation.gyration_radius = np.zeros(settings.N_cycle)
 
 
 def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
