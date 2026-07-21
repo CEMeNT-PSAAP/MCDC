@@ -23,7 +23,6 @@ from mcdc.object_.base import (
     MCDCBase,
     MCDCObject,
     MCDCPolymorphic,
-    ObjectSingleton,
 )
 from mcdc.object_.particle import Particle, ParticleBank, ParticleData
 from mcdc.object_.tally import Tally

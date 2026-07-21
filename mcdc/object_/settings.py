@@ -1,6 +1,5 @@
 from typing import List
 import h5py
-from h5py._hl.dataset import sel
 import numpy as np
 
 from dataclasses import dataclass, field

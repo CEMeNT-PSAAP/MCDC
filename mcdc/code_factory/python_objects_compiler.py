@@ -45,10 +45,8 @@ def compile_simulation(simulation: Simulation):
     # Compile tally
     tallies = simulation.tallies
     simulation.tallies = []
-    print(tallies)
     for tally in tallies:
         tally._compile_into_simulation(simulation)
-    print(simulation.tallies)
 
     # Apply settings as needed
     settings = simulation.settings
