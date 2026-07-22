@@ -1,14 +1,17 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("AZURV1")
+
 # ======================================================================================
-# Set model
+# Set simulation model
 # ======================================================================================
 # Infinite medium with isotropic plane surface at the center
 # Based on Ganapol LA-UR-01-1854 (AZURV1 benchmark)
 # Effective scattering ratio c = 1.1
 
-# Set materials
+# Materials
 m = mcdc.MaterialMG(
     capture=np.array([1.0 / 3.0]),
     scatter=np.array([[1.0 / 3.0]]),
@@ -16,36 +19,44 @@ m = mcdc.MaterialMG(
     nu_p=np.array([2.3]),
 )
 
-# Set surfaces
+# Surfaces
 s1 = mcdc.Surface.PlaneX(x=-1e10, boundary_condition="reflective")
 s2 = mcdc.Surface.PlaneX(x=1e10, boundary_condition="reflective")
 
-# Set cells
-mcdc.Cell(region=+s1 & -s2, fill=m)
+# Cells
+cell = mcdc.Cell(region=+s1 & -s2, fill=m)
+
+# Set model
+simulation.set_model([cell])
 
 # ======================================================================================
-# Set source
+# Set simulation sources
 # ======================================================================================
 # Isotropic pulse at x=t=0
 
-mcdc.Source(
+source = mcdc.Source(
     position=[0.0, 0.0, 0.0],
     isotropic=True,
     energy_group=0,
     time=0.0,
 )
+simulation.set_sources([source])
 
 # ======================================================================================
-# Set tallies, settings, and run MC/DC
+# Set simulation tallies
 # ======================================================================================
 
-# Tallies
 mesh = mcdc.MeshStructured(x=np.linspace(-20.5, 20.5, 202))
-mcdc.Tally(mesh=mesh, scores=["flux"], time=np.linspace(0.0, 20.0, 21))
+tally = mcdc.Tally(mesh=mesh, scores=["flux"], time=np.linspace(0.0, 20.0, 21))
+simulation.set_tallies([tally])
+
+# ======================================================================================
+# Simulation settings and run simulation
+# ======================================================================================
 
 # Settings
-mcdc.settings.N_particle = 60
-mcdc.settings.N_batch = 2
+simulation.settings.N_particle = 60
+simulation.settings.N_batch = 2
 
 # Run
-mcdc.run()
+simulation.run()
