@@ -149,6 +149,7 @@ class Tally(MCDCPolymorphic):
         time: Sequence[float] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
     ):
+        super().__init__()
 
         # Set name
         self.name = name or "(Unnamed tally)"

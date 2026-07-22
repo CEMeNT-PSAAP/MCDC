@@ -229,6 +229,8 @@ class Source(MCDCObject):
         #
         probability: float = 1.0,
     ):
+        super().__init__()
+
         self.name = name or "(Unnamed source)"
 
         # ==============================================================================

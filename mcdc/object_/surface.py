@@ -75,6 +75,8 @@ class Surface(MCDCObject):
     tallies: list[TallySurfaceCrossing]
 
     def __init__(self, type_, name, boundary_condition):
+        super().__init__()
+
         self.type = type_
         self.name = name or "(Unnamed surface)"
 

@@ -31,6 +31,8 @@ class Universe(MCDCObject):
     cells: list[Cell]
 
     def __init__(self, name: str = "", cells: list[Cell] = []):
+        super().__init__()
+
         self.name = name or "(Unnamed universe)"
         self.cells = cells
 
@@ -60,7 +62,8 @@ class Universe(MCDCObject):
 
 class Lattice(MCDCObject):
     # MC/DC framework metadata
-    label = "particle_bank"
+    label = "lattice"
+    non_numba = ["universes"]
 
     name: str
 
@@ -87,8 +90,7 @@ class Lattice(MCDCObject):
         z: tuple[float, float, int] | NoneType = None,
         universes: list[Universe] = [],
     ):
-        # MC/DC framework metadata
-        super().__init__("lattice", ["universes"])
+        super().__init__()
 
         self.name = name or "(Unnamed lattice)"
         self.universes = universes

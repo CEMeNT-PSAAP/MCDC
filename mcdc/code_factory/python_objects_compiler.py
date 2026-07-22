@@ -98,9 +98,9 @@ def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
     # Assign IDs
     object_.ID = len(object_list)
     if isinstance(object_, MCDCPolymorphic):
-        object_.child_ID = sum(
+        object_.sub_ID = sum(
             [
-                x.child_type == object_.child_type
+                x.sub_type == object_.sub_type
                 for x in object_list
                 if isinstance(x, MCDCPolymorphic)
             ]

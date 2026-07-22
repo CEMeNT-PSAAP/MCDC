@@ -109,6 +109,8 @@ class Cell(MCDCObject):
         translation: Sequence[float] = [0.0, 0.0, 0.0],
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
     ):
+        super().__init__()
+
         self.name = name or "(Unnamed cell)"
         self.region = region or Region("all", None, None)
         self.fill = fill

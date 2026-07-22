@@ -106,9 +106,6 @@ def generate_numba_objects(simulation):
     accessor_targets = {}
 
     for mcdc_class in mcdc_classes:
-        print(mcdc_class.label)
-        print(mcdc_class.non_numba)
-        exit()
         annotations[mcdc_class.label] = {}
         structures[mcdc_class.label] = []
         accessor_targets[mcdc_class.label] = []
@@ -164,6 +161,11 @@ def generate_numba_objects(simulation):
                 new_annotations = parse_annotations_dict(new_annotations)
 
             annotations[mcdc_class.label].update(new_annotations)
+
+        print(mcdc_class.label)
+        print(mcdc_class.__annotations__)
+        print(annotations[mcdc_class.label])
+        input()
 
     # Particle banks
     for name in bank_names:

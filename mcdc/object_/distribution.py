@@ -68,6 +68,8 @@ class DistributionPMF(DistributionBase):
     cmf: NDArray[float64]
 
     def __init__(self, value: ArrayLike, pmf: ArrayLike) -> None:
+        super().__init__()
+
         self.value = np.asarray(value, dtype=float64)
         pmf_array = np.asarray(pmf, dtype=float64)
 
@@ -108,6 +110,8 @@ class DistributionTabulated(DistributionBase):
         pdf: ArrayLike | None = None,
         cdf: ArrayLike | None = None,
     ) -> None:
+        super().__init__()
+
         if (pdf is None) == (cdf is None):
             print_error("Exactly one of pdf or cdf must be provided.")
 
@@ -182,6 +186,8 @@ class DistributionMultiTable(DistributionBase):
         pdf: ArrayLike | None = None,
         cdf: ArrayLike | None = None,
     ) -> None:
+        super().__init__()
+
         if (pdf is None) == (cdf is None):
             print_error("Exactly one of pdf or cdf must be provided.")
 
@@ -279,6 +285,8 @@ class DistributionLevelScattering(DistributionBase):
     C2: float
 
     def __init__(self, C1: float, C2: float) -> None:
+        super().__init__()
+
         self.C1 = C1
         self.C2 = C2
 
@@ -311,6 +319,8 @@ class DistributionEvaporation(DistributionBase):
         temperature_interpolations: int | Sequence[int],
         interpolation_boundaries: Sequence[int] | None,
     ) -> None:
+        super().__init__()
+
         self.restriction_energy = restriction_energy
         self.nuclear_temperature = DataTable(
             nuclear_temperature_energy_grid,
@@ -355,6 +365,8 @@ class DistributionMaxwellian(DistributionBase):
         temperature_interpolations: int | Sequence[int],
         interpolation_boundaries: Sequence[int] | None,
     ) -> None:
+        super().__init__()
+
         self.restriction_energy = restriction_energy
         self.nuclear_temperature = DataTable(
             nuclear_temperature_energy_grid,
@@ -405,6 +417,8 @@ class DistributionKalbachMann(DistributionBase):
         precompound_factor: ArrayLike,
         angular_slope: ArrayLike,
     ) -> None:
+        super().__init__()
+
         self.energy = np.asarray(energy, dtype=float64)
         self.offset = np.asarray(offset, dtype=int64)
         self.energy_out = np.asarray(energy_out, dtype=float64)
@@ -463,6 +477,8 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
         cosine: ArrayLike,
         cosine_pdf: ArrayLike,
     ) -> None:
+        super().__init__()
+
         self.energy = np.asarray(energy, dtype=float64)
         self.offset = np.asarray(offset, dtype=int64)
         self.energy_out = np.asarray(energy_out, dtype=float64)
@@ -544,6 +560,8 @@ class DistributionNBody(DistributionBase):
         values: ArrayLike,
         probabilities: ArrayLike,
     ) -> None:
+        super().__init__()
+
         value_array = np.asarray(values, dtype=float64)
         probability_array = np.asarray(probabilities, dtype=float64)
 

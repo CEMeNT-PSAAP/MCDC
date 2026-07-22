@@ -28,10 +28,9 @@ class MaterialBase(MCDCPolymorphic):
     name: str
     fissionable: bool
 
-    def __init__(
-        self,
-        name: str,
-    ) -> None:
+    def __init__(self, name: str) -> None:
+        super().__init__()
+
         self.name = name or "(Unnamed material)"
         self.fissionable = False
 

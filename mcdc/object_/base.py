@@ -3,18 +3,12 @@ from mcdc.print_ import print_error
 
 class MCDCBase:
     label: str
-    non_numba: list[str]
 
     def __init_subclass__(cls):
         if not hasattr(cls, "label"):
             raise NotImplementedError(
                 f"MC/DC class '{cls.__name__}' must have 'label' class attribute."
             )
-
-        if not hasattr(cls, "non_numba"):
-            cls.non_numba = ["label", "non_numba"]
-        else:
-            cls.non_numba += ["label", "non_numba"]
 
     def __setattr__(self, key, value):
         hints = getattr(self.__class__, "__annotations__", {})
@@ -29,11 +23,6 @@ class MCDCObject(MCDCBase):
 
     ID: int
     compile_ID: int
-
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-
-        cls.non_numba += ["compile_ID"]
 
     def __init__(self):
         self.ID = -1
