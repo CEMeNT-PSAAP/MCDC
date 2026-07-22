@@ -21,19 +21,17 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class MaterialBase(MCDCPolymorphic):
+    # MC/DC framework metadata
+    label = "material"
+    sub_type = -1
+
     name: str
     fissionable: bool
 
     def __init__(
         self,
         name: str,
-        child_label: str,
-        child_type: int,
-        non_numba: list[str],
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("material", child_label, child_type, non_numba)
-
         self.name = name or "(Unnamed material)"
         self.fissionable = False
 
@@ -51,6 +49,11 @@ class MaterialBase(MCDCPolymorphic):
 
 
 class Material(MaterialBase):
+    # MC/DC framework metadata
+    label = "native_material"
+    sub_type = MATERIAL
+    non_numba = ["nuclide_composition", "element_composition"]
+
     nuclide_composition: dict[Nuclide, float]  # Non-numba
     element_composition: dict[Element, float]  # Non-numba
 
@@ -66,13 +69,7 @@ class Material(MaterialBase):
         element_composition: dict[str, float] = {},
         temperature: float = 293.6,
     ):
-        # MC/DC framework metadata
-        super().__init__(
-            name,
-            "native_material",
-            MATERIAL,
-            ["nuclide_composition", "element_composition"],
-        )
+        super().__init__(name)
 
         # Temperature
         self.temperature = temperature
@@ -195,6 +192,10 @@ TEMPERATURES = [0.1, 233.15, 273.15, 293.6, 600.0, 900.0, 1200.0, 2500.0]
 
 
 class MaterialMG(MaterialBase):
+    # MC/DC framework metadata
+    label = "multigroup_material"
+    sub_type = MATERIAL_MG
+
     G: int
     J: int
     mgxs_speed: Annotated[NDArray[float64], ("G",)]
@@ -226,8 +227,7 @@ class MaterialMG(MaterialBase):
         speed: NDArray[float64] | NoneType = None,
         decay_rate: NDArray[float64] | NoneType = None,
     ):
-        # MC/DC framework metadata
-        super().__init__(name, "multigroup_material", MATERIAL_MG, [])
+        super().__init__(name)
 
         # Energy group size
         if capture is not None:

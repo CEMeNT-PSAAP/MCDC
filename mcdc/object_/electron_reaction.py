@@ -26,16 +26,17 @@ from mcdc.print_ import print_1d_array
 
 
 class ElectronReactionBase(MCDCPolymorphic):
-    # Annotations for Numba mode
-    label: str = "electron_reaction"
-    #
+    # MC/DC framework metadata
+    label = "electron_reaction"
+    sub_type = -1
+
     MT: int
     xs: NDArray[float64]
     xs_offset_: int  # "xs_offset" is reserved for "xs"
     reference_frame: int
 
-    def __init__(self, type_, MT, xs, xs_offset, reference_frame):
-        super().__init__(type_)
+    def __init__(self, MT, xs, xs_offset, reference_frame):
+        super().__init__()
         self.MT = MT
         self.xs = xs
         self.xs_offset_ = xs_offset
@@ -64,9 +65,10 @@ def decode_reference_frame(type_):
 
 
 class ElectronReactionIonization(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_ionization_reaction"
-    #
+    # MC/DC framework metadata
+    label = "electron_ionization_reaction"
+    sub_type = ELECTRON_REACTION_IONIZATION
+
     N_subshell: int
     subshell_xs: list[DataBase]
     subshell_product: list[DistributionBase]
@@ -80,8 +82,7 @@ class ElectronReactionIonization(ElectronReactionBase):
         subshell_xs,
         subshell_product,
     ):
-        type_ = ELECTRON_REACTION_IONIZATION
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
 
         self.N_subshell = len(subshell_xs)
         self.subshell_xs = subshell_xs
@@ -156,9 +157,10 @@ class ElectronReactionIonization(ElectronReactionBase):
 
 
 class ElectronReactionElasticScattering(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_elastic_scattering_reaction"
-    #
+    # MC/DC framework metadata
+    label = "electron_elastic_scattering_reaction"
+    sub_type = ELECTRON_REACTION_ELASTIC_SCATTERING
+
     mu_cut: float
     xs_large: DataBase
     mu: DistributionMultiTable
@@ -172,8 +174,7 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
         xs_large,
         mu,
     ):
-        type_ = ELECTRON_REACTION_ELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
         self.mu_cut = MU_CUTOFF
         self.xs_large = xs_large
         self.mu = mu
@@ -219,14 +220,14 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
 
 
 class ElectronReactionBremsstrahlung(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_bremsstrahlung_reaction"
-    #
+    # MC/DC framework metadata
+    label = "electron_bremsstrahlung_reaction"
+    sub_type = ELECTRON_REACTION_BREMSSTRAHLUNG
+
     eloss: DataBase
 
     def __init__(self, MT, xs, xs_offset, reference_frame, eloss):
-        type_ = ELECTRON_REACTION_BREMSSTRAHLUNG
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
         self.eloss = eloss
 
     @classmethod
@@ -250,14 +251,14 @@ class ElectronReactionBremsstrahlung(ElectronReactionBase):
 
 
 class ElectronReactionExcitation(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_excitation_reaction"
-    #
+    # MC/DC framework metadata
+    label = "electron_excitation_reaction"
+    sub_type = ELECTRON_REACTION_EXCITATION
+
     eloss: DataBase
 
     def __init__(self, MT, xs, xs_offset, reference_frame, eloss):
-        type_ = ELECTRON_REACTION_EXCITATION
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
         self.eloss = eloss
 
     @classmethod

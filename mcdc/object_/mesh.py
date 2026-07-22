@@ -16,6 +16,10 @@ from mcdc.print_ import print_1d_array
 
 
 class MeshBase(MCDCPolymorphic):
+    # MC/DC framework metadata
+    label = "mesh"
+    sub_type = -1
+
     name: str
     N_bin: int
     Nx: int
@@ -25,24 +29,8 @@ class MeshBase(MCDCPolymorphic):
     def __init__(
         self,
         name: str,
-        child_label: str,
-        child_type: int,
-        non_numba: list[str],
     ) -> None:
-        """Initialize mesh base framework metadata."""
-        super().__init__(
-            label="mesh",
-            child_label=child_label,
-            child_type=child_type,
-            non_numba=non_numba,
-        )
-
-        # Set name
-        if name == "":
-            self.name = "(Unnamed mesh)"
-        else:
-            self.name = name
-
+        self.name = name or "(Unnamed mesh)"
         self.N_bin = 0
 
     def __repr__(self):
@@ -59,32 +47,9 @@ class MeshBase(MCDCPolymorphic):
 
 
 class MeshUniform(MeshBase):
-    """
-    Define a uniform rectilinear mesh.
-
-    Each axis is specified as ``(origin, width, N_bins)``.
-
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    x : tuple of (float, float, int), optional
-        ``(x0, dx, Nx)`` — origin, bin width, and number of bins along x.
-    y : tuple of (float, float, int), optional
-        ``(y0, dy, Ny)`` — origin, bin width, and number of bins along y.
-    z : tuple of (float, float, int), optional
-        ``(z0, dz, Nz)`` — origin, bin width, and number of bins along z.
-
-    Returns
-    -------
-    MeshUniform
-        The uniform mesh object.
-
-    See Also
-    --------
-    mcdc.MeshStructured : Creates a mesh with arbitrary bin edges.
-    mcdc.TallyMesh : Creates a tally on a mesh.
-    """
+    # MC/DC framework metadata
+    label = "uniform_mesh"
+    sub_type = MESH_UNIFORM
 
     x0: float
     dx: float
@@ -105,9 +70,6 @@ class MeshUniform(MeshBase):
     ):
         super().__init__(
             name,
-            child_label="uniform mesh",
-            child_type=MESH_UNIFORM,
-            non_numba=[],
         )
 
         # Set the grid
@@ -138,30 +100,9 @@ class MeshUniform(MeshBase):
 
 
 class MeshStructured(MeshBase):
-    """
-    Define a structured rectilinear mesh with arbitrary bin edges.
-
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    x : array_like of float, optional
-        Bin edges along x (cm).
-    y : array_like of float, optional
-        Bin edges along y (cm).
-    z : array_like of float, optional
-        Bin edges along z (cm).
-
-    Returns
-    -------
-    MeshStructured
-        The structured mesh object.
-
-    See Also
-    --------
-    mcdc.MeshUniform : Creates a uniform mesh.
-    mcdc.TallyMesh : Creates a tally on a mesh.
-    """
+    # MC/DC framework metadata
+    label = "structured_mesh"
+    sub_type = MESH_STRUCTURED
 
     x: NDArray[float64]
     y: NDArray[float64]
@@ -174,12 +115,7 @@ class MeshStructured(MeshBase):
         y: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
         z: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
     ):
-        super().__init__(
-            name,
-            child_label="structured mesh",
-            child_type=MESH_STRUCTURED,
-            non_numba=[],
-        )
+        super().__init__(name)
 
         # Set the grid
         self.x = np.array(x)

@@ -13,6 +13,9 @@ from mcdc.object_.base import MCDCBase, MCDCBase
 
 @dataclass
 class ParticleData(MCDCBase):
+    # MC/DC framework metadata
+    label = "particle_data"
+
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
@@ -26,22 +29,20 @@ class ParticleData(MCDCBase):
     particle_type: int = PARTICLE_NEUTRON
     rng_seed: uint64 = uint64(1)
 
-    def __post_init__(self):
-        # MC/DC framework metadata
-        super().__init__("particle_data", [])
-
 
 @dataclass
 class CollisionData(MCDCBase):
-    energy_deposition: float = 0.0
+    # MC/DC framework metadata
+    label = "collision_data"
 
-    def __post_init__(self):
-        # MC/DC framework metadata
-        super().__init__("collision_data", [])
+    energy_deposition: float = 0.0
 
 
 @dataclass
 class Particle(ParticleData):
+    # MC/DC framework metadata
+    label = "particle"
+
     cell_ID: int = -1
     material_ID: int = -1
     surface_ID: int = -1
@@ -49,20 +50,16 @@ class Particle(ParticleData):
     fresh: bool = False
     event: int = -1
 
-    def __post_init__(self):
-        # MC/DC framework metadata
-        super(ParticleData, self).__init__("particle", [])
-
 
 class ParticleBank(MCDCBase):
+    # MC/DC framework metadata
+    label = "particle_bank"
+    non_numba = ["particles"]
+
     particles: list[ParticleData] = []  # Non-numba
     size: Annotated[NDArray[int64], (1,)]
     tag: str = ""
 
     def __init__(self, tag):
-        # MC/DC framework metadata
-        """Initialize particle bank framework metadata."""
-        super().__init__("particle_bank", ["particles"])
-
         self.tag = tag
         self.size = np.zeros(1, dtype=int64)

@@ -26,6 +26,9 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Nuclide(MCDCObject):
+    # MC/DC framework metadata
+    label = "nuclide"
+
     # Annotations for Numba mode
     label: str = "nuclide"
     #

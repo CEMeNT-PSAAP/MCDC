@@ -19,6 +19,9 @@ from mcdc.print_ import print_error
 
 @dataclass
 class Settings(MCDCBase):
+    # MC/DC framework metadata
+    label = "settings"
+
     # Basic
     N_particle: int = 0
     N_batch: int = 1
@@ -67,10 +70,6 @@ class Settings(MCDCBase):
     gpu_strategy: int = GPU_STRATEGY_ASYNC
     gpu_async_type: int = GPU_ASYNC_SIMPLE
     gpu_storage: int = GPU_STORAGE_SEPARATE
-
-    def __post_init__(self):
-        # MC/DC framework metadata
-        super().__init__("settings", [])
 
     def set_time_census(self, time, tally_frequency=None):
         # Make sure that the time grid points are sorted

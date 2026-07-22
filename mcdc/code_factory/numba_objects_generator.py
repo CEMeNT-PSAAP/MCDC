@@ -106,6 +106,9 @@ def generate_numba_objects(simulation):
     accessor_targets = {}
 
     for mcdc_class in mcdc_classes:
+        print(mcdc_class.label)
+        print(mcdc_class.non_numba)
+        exit()
         annotations[mcdc_class.label] = {}
         structures[mcdc_class.label] = []
         accessor_targets[mcdc_class.label] = []

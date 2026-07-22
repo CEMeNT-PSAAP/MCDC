@@ -25,14 +25,9 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class DataBase(MCDCPolymorphic):
-    def __init__(
-        self,
-        child_label: str,
-        child_type: int,
-        non_numba: list[str],
-    ) -> None:
-        # MC/DC framework metadata
-        super().__init__("data", child_label, child_type, non_numba)
+    # MC/DC framework metadata
+    label = "data"
+    sub_type = -1
 
 
 # ======================================================================================
@@ -43,9 +38,9 @@ class DataBase(MCDCPolymorphic):
 
 
 class DataNone(DataBase):
-    def __init__(self) -> None:
-        # MC/DC framework metadata
-        super().__init__("none_data", DATA_NONE, [])
+    # MC/DC framework metadata
+    label = "none_data"
+    sub_type = DATA_NONE
 
 
 # ======================================================================================
@@ -54,6 +49,10 @@ class DataNone(DataBase):
 
 
 class DataTable(DataBase):
+    # MC/DC framework metadata
+    label = "table_data"
+    sub_type = DATA_TABLE
+
     # Main data
     N: int
     x: NDArray[float64]
@@ -75,9 +74,6 @@ class DataTable(DataBase):
         interpolation_boundaries: Sequence[int] | None = None,
         aux: NDArray[float64] | None = None,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("table_data", DATA_TABLE, [])
-
         # Set primary data
         self.x = np.asarray(x, dtype=float64)
         self.y = np.asarray(y, dtype=float64)
@@ -237,12 +233,13 @@ def encode_interpolation(name: str) -> int:
 
 
 class DataPolynomial(DataBase):
+    # MC/DC framework metadata
+    label = "polynomial_data"
+    sub_type = DATA_POLYNOMIAL
+
     coefficients: NDArray[float64]
 
     def __init__(self, coefficients: NDArray[float64]) -> None:
-        # MC/DC framework metadata
-        super().__init__("polynomial_data", DATA_POLYNOMIAL, [])
-
         self.coefficients = np.asarray(coefficients, dtype=float64)
 
         if self.coefficients.ndim != 1:

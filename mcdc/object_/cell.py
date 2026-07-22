@@ -40,14 +40,14 @@ from mcdc.print_ import print_error
 
 
 class Region(MCDCObject):
+    # MC/DC framework metadata
+    label = "region"
+
     type: str
     A: Surface | Region | NoneType
     B: Region | int | NoneType
 
     def __init__(self, type_, A, B):
-        # MC/DC framework metadata
-        super().__init__("region", [])
-
         self.type = type_
         self.A = A
         self.B = B
@@ -76,6 +76,10 @@ class Region(MCDCObject):
 
 
 class Cell(MCDCObject):
+    # MC/DC framework metadata
+    label = "cell"
+    non_numba = ["region", "region_RPN", "fill"]
+
     name: str
 
     # Region definition
@@ -105,9 +109,6 @@ class Cell(MCDCObject):
         translation: Sequence[float] = [0.0, 0.0, 0.0],
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
     ):
-        # MC/DC framework metadata
-        super().__init__("cell", ["region", "region_RPN", "fill"])
-
         self.name = name or "(Unnamed cell)"
         self.region = region or Region("all", None, None)
         self.fill = fill

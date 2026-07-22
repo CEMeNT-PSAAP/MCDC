@@ -24,13 +24,13 @@ from mcdc.util import flatten
 
 
 class Universe(MCDCObject):
+    # MC/DC framework metadata
+    label = "particle_bank"
+
     name: str
     cells: list[Cell]
 
     def __init__(self, name: str = "", cells: list[Cell] = []):
-        # MC/DC framework metadata
-        super().__init__("universe", [])
-
         self.name = name or "(Unnamed universe)"
         self.cells = cells
 
@@ -59,6 +59,9 @@ class Universe(MCDCObject):
 
 
 class Lattice(MCDCObject):
+    # MC/DC framework metadata
+    label = "particle_bank"
+
     name: str
 
     x0: float

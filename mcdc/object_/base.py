@@ -5,9 +5,16 @@ class MCDCBase:
     label: str
     non_numba: list[str]
 
-    def __init__(self, label: str, non_numba: list[str]):
-        self.label = label
-        self.non_numba = ["label", "non_numba"] + non_numba
+    def __init_subclass__(cls):
+        if not hasattr(cls, "label"):
+            raise NotImplementedError(
+                f"MC/DC class '{cls.__name__}' must have 'label' class attribute."
+            )
+
+        if not hasattr(cls, "non_numba"):
+            cls.non_numba = ["label", "non_numba"]
+        else:
+            cls.non_numba += ["label", "non_numba"]
 
     def __setattr__(self, key, value):
         hints = getattr(self.__class__, "__annotations__", {})
@@ -17,15 +24,20 @@ class MCDCBase:
 
 
 class MCDCObject(MCDCBase):
+    # MC/DC framework metadata
+    label = "object"
+
     ID: int
     compile_ID: int
 
-    def __init__(self, label: str, non_numba: list[str]):
-        super().__init__(label, non_numba)
+    def __init_subclass__(cls):
+        super().__init_subclass__()
 
+        cls.non_numba += ["compile_ID"]
+
+    def __init__(self):
         self.ID = -1
         self.compile_ID = 0
-        self.non_numba += ["compile_ID"]
 
     def __repr__(self) -> str:
         nice_label = self.label.replace("_", " ").title()
@@ -43,31 +55,31 @@ class MCDCObject(MCDCBase):
 
 
 class MCDCPolymorphic(MCDCObject):
-    child_label: str
-    child_type: int
-    child_ID: int
+    # MC/DC framework metadata
+    label = "polymorphic"
 
-    def __init__(
-        self,
-        label: str,
-        child_label: str,
-        child_type: int,
-        non_numba: list[str],
-    ):
-        super().__init__(label, non_numba)
+    sub_type: int
+    sub_ID: int
 
-        self.child_label = child_label
-        self.child_type = child_type
-        self.child_ID = -1
-        self.non_numba += ["child_label"]
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+
+        if not hasattr(cls, "sub_type"):
+            raise NotImplementedError(
+                f"MC/DC class '{cls.__name__}' must have 'sub_type' class attribute."
+            )
+
+    def __init__(self):
+        super().__init__()
+
+        self.sub_ID = -1
 
     def __repr__(self) -> str:
         nice_label = self.label.replace("_", " ").title()
-        nice_sublabel = self.child_label.replace("_", " ").title()
         text = "\n"
-        text += f"{nice_label} - {nice_sublabel}\n"
+        text += f"{nice_label}\n"
         if self.compile_ID > 0:
-            text += f"  (compile_ID={self.compile_ID}, ID={self.ID})\n"
+            text += f"  (compile_ID={self.compile_ID}, ID={self.ID}, sub_ID={self.sub_ID})\n"
 
         return text
 

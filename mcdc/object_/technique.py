@@ -13,12 +13,12 @@ from typing import Annotated
 
 
 class ImplicitCapture(MCDCBase):
+    # MC/DC framework metadata
+    label = "implicit_capture"
+
     active: bool
 
     def __init__(self):
-        # MC/DC framework metadata
-        super().__init__("implicit_capture", [])
-
         self.active = False
 
     def __call__(self, active: bool = True):
@@ -31,13 +31,13 @@ class ImplicitCapture(MCDCBase):
 
 
 class WeightedEmission(MCDCBase):
+    # MC/DC framework metadata
+    label = "weighted_emission"
+
     active: bool
     weight_target: float
 
     def __init__(self):
-        # MC/DC framework metadata
-        super().__init__("weighted_emission", [])
-
         self.active = False
         self.weight_target = 0.0
 
@@ -52,14 +52,14 @@ class WeightedEmission(MCDCBase):
 
 
 class GlobalWeightRoulette(MCDCBase):
+    # MC/DC framework metadata
+    label = "global_weight_roulette"
+
     active: bool
     weight_threshold: float
     weight_target: float
 
     def __init__(self):
-        # MC/DC framework metadata
-        super().__init__("global_weight_roulette", [])
-
         self.active = False
         self.weight_threshold = 0.0
         self.weight_target = 1.0
@@ -80,6 +80,9 @@ class GlobalWeightRoulette(MCDCBase):
 
 
 class WeightWindows(MCDCBase):
+    # MC/DC framework metadata
+    label = "weight_windows"
+
     active: bool
 
     # energy
@@ -97,9 +100,6 @@ class WeightWindows(MCDCBase):
     upper_weights: Annotated[NDArray[np.float64], ("Ne", "Nx", "Ny", "Nz")]
 
     def __init__(self):
-        # MC/DC framework metadata
-        super().__init__("weight_windows", [])
-
         self.active = False
         self.energy_bounds = np.array([0.0, 1.0])
         self.Ne = 1
@@ -183,12 +183,12 @@ class WeightWindows(MCDCBase):
 
 
 class PopulationControl(MCDCBase):
+    # MC/DC framework metadata
+    label = "population_control"
+
     active: bool
 
     def __init__(self):
-        # MC/DC framework metadata
-        super().__init__("population_control", [])
-
         self.active = False
 
     def __call__(self, active: bool = True):

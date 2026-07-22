@@ -37,17 +37,17 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class NeutronReactionBase(MCDCPolymorphic):
-    # Annotations for Numba mode
-    label: str = "neutron_reaction"
-    #
+    # MC/DC framework metadata
+    label = "neutron_reaction"
+    sub_type = -1
+
     MT: int
     xs: NDArray[float64]
     xs_offset_: int  # "xs_offset" ir reserved for "xs"
     reference_frame: int
     q_value: float64
 
-    def __init__(self, type_, MT, xs, xs_offset, reference_frame, q_value):
-        super().__init__(type_)
+    def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
         self.MT = MT
         self.xs = xs
         self.xs_offset_ = xs_offset
@@ -78,14 +78,14 @@ def decode_reference_frame(type_):
 
 
 class NeutronReactionElasticScattering(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_elastic_scattering_reaction"
-    #
+    # MC/DC framework metadata
+    label = "neutron_elastic_scattering_reaction"
+    sub_type = NEUTRON_REACTION_ELASTIC_SCATTERING
+
     mu_table: DistributionMultiTable
 
     def __init__(self, MT, xs, xs_offset, reference_frame, mu):
-        type_ = NEUTRON_REACTION_ELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, 0.0)
+        super().__init__(MT, xs, xs_offset, reference_frame, 0.0)
         self.mu_table = mu
 
     @classmethod
@@ -106,12 +106,12 @@ class NeutronReactionElasticScattering(NeutronReactionBase):
 
 
 class NeutronReactionCapture(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_capture_reaction"
+    # MC/DC framework metadata
+    label = "neutron_capture_reaction"
+    sub_type = NEUTRON_REACTION_CAPTURE
 
     def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
-        type_ = NEUTRON_REACTION_CAPTURE
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
     @classmethod
     def from_h5_group(cls, h5_group):
@@ -125,9 +125,10 @@ class NeutronReactionCapture(NeutronReactionBase):
 
 
 class NeutronReactionInelasticScattering(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_inelastic_scattering_reaction"
-    #
+    # MC/DC framework metadata
+    label = "neutron_inelastic_scattering_reaction"
+    sub_type = NEUTRON_REACTION_INELASTIC_SCATTERING
+
     multiplicity: int
     angle_type: int
     mu: DistributionBase
@@ -153,8 +154,7 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
         spectrum_probability,
         energy_spectra,
     ):
-        type_ = NEUTRON_REACTION_INELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
         self.multiplicity = multiplicity
         self.angle_type = angle_type
@@ -219,9 +219,10 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
 
 
 class NeutronReactionFission(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_fission_reaction"
-    #
+    # MC/DC framework metadata
+    label = "neutron_fission_reaction"
+    sub_type = NEUTRON_REACTION_FISSION
+
     angle_type: int
     mu: DistributionBase
     spectrum: DistributionBase
@@ -237,8 +238,7 @@ class NeutronReactionFission(NeutronReactionBase):
         mu,
         spectrum,
     ):
-        type_ = NEUTRON_REACTION_FISSION
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
         self.angle_type = angle_type
         self.mu = mu
         self.spectrum = spectrum

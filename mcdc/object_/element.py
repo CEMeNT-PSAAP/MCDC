@@ -17,9 +17,9 @@ from mcdc.object_.electron_reaction import (
 
 
 class Element(MCDCObject):
-    # Annotations for Numba mode
-    label: str = "element"
-    #
+    # MC/DC framework metadata
+    label = "element"
+
     name: str
     atomic_weight_ratio: float
     atomic_number: int

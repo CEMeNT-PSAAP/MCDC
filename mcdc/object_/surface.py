@@ -41,6 +41,9 @@ from mcdc.print_ import print_error
 
 
 class Surface(MCDCObject):
+    # MC/DC framework metadata
+    label = "surface"
+
     type: int
     name: str
     boundary_condition: int
@@ -72,17 +75,8 @@ class Surface(MCDCObject):
     tallies: list[TallySurfaceCrossing]
 
     def __init__(self, type_, name, boundary_condition):
-        # MC/DC framework metadata
-        super().__init__("surface", [])
-
-        # Type and name
         self.type = type_
-
-        # Set name
-        if name == "":
-            self.name = "(Unnamed surface)"
-        else:
-            self.name = name
+        self.name = name or "(Unnamed surface)"
 
         # Boundary condition
         if boundary_condition == "none":

@@ -35,6 +35,9 @@ def decode_particle_type(type_):
 
 
 class Source(MCDCObject):
+    # MC/DC framework metadata
+    label = "source"
+
     """
     Define a particle source.
 
@@ -226,9 +229,6 @@ class Source(MCDCObject):
         #
         probability: float = 1.0,
     ):
-        # MC/DC framework metadata
-        super().__init__("source", [])
-
         self.name = name or "(Unnamed source)"
 
         # ==============================================================================

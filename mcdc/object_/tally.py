@@ -46,6 +46,10 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Tally(MCDCPolymorphic):
+    # MC/DC framework metadata
+    label = "tally"
+    sub_type = -1
+
     # Basic properties
     name: str
     scores: list[int]
@@ -147,10 +151,7 @@ class Tally(MCDCPolymorphic):
     ):
 
         # Set name
-        if name == "":
-            self.name = "(Unnamed tally)"
-        else:
-            self.name = name
+        self.name = name or "(Unnamed tally)"
 
         # Set scores
         self.scores = []
@@ -321,6 +322,11 @@ def decode_score_type(type_, lower_case=False):
 
 
 class TallySurfaceCrossing(Tally):
+    # MC/DC framework metadata
+    label = "surface_crossing_tally"
+    sub_type = TALLY_SURFACE_CROSSING
+    non_numba = ["surface", "cell"]
+
     surface: Surface | NoneType  # Non-numba
     surface_filtered: bool
     surface_filter_ID: int
@@ -341,14 +347,6 @@ class TallySurfaceCrossing(Tally):
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
-        # MC/DC framework metadata
-        super(Tally, self).__init__(
-            label="tally",
-            child_label="surface_crossing_tally",
-            child_type=TALLY_SURFACE_CROSSING,
-            non_numba=["surface", "cell"],
-        )
-
         super().__init__(
             name,
             scores,
@@ -415,6 +413,11 @@ class TallySurfaceCrossing(Tally):
 
 
 class TallyCollision(Tally):
+    # MC/DC framework metadata
+    label = "collision_tally"
+    sub_type = TALLY_COLLISION
+    non_numba = ["cell", "mesh"]
+
     # Spatial filters
     cell: Cell | NoneType
     cell_filtered: bool
@@ -444,14 +447,6 @@ class TallyCollision(Tally):
         spatial_shape = None
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
-
-        # MC/DC framework metadata
-        super(Tally, self).__init__(
-            label="tally",
-            child_label="collision_tally",
-            child_type=TALLY_COLLISION,
-            non_numba=["cell", "mesh"],
-        )
 
         super().__init__(
             name,
@@ -535,6 +530,11 @@ class TallyCollision(Tally):
 
 
 class TallyTracklength(Tally):
+    # MC/DC framework metadata
+    label = "tracklength_tally"
+    sub_type = TALLY_TRACKLENGTH
+    non_numba = ["cell", "mesh"]
+
     # Spatial filters
     cell: Cell | NoneType
     cell_filtered: bool
@@ -564,14 +564,6 @@ class TallyTracklength(Tally):
         spatial_shape = None
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
-
-        # MC/DC framework metadata
-        super(Tally, self).__init__(
-            label="tally",
-            child_label="tracklength_tally",
-            child_type=TALLY_TRACKLENGTH,
-            non_numba=["cell", "mesh"],
-        )
 
         super().__init__(
             name,

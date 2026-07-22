@@ -46,6 +46,19 @@ from mcdc.object_.universe import Universe, Lattice
 
 
 class Simulation(MCDCBase):
+    # MC/DC framework metadata
+    label = "simulation"
+    non_numba = [
+        "_next_compile_ID",
+        "compiled",
+        "compile_ID",
+        "regions",
+        "root_universe",
+        "bank_active",
+        "bank_census",
+        "bank_source",
+        "bank_future",
+    ]
     _next_compile_ID: int = 1  # Non-Numba
 
     # Basic parameters
@@ -68,7 +81,7 @@ class Simulation(MCDCBase):
     regions: list[Region]  # Non-Numba
     cells: list[Cell]
     universes: list[Universe]
-    root_universe: Universe
+    root_universe: Universe  # Non-Numba
     lattices: list[Lattice]
     meshes: list[MeshBase]
 
@@ -142,22 +155,6 @@ class Simulation(MCDCBase):
     source_seed: int
 
     def __init__(self, name: str = "") -> None:
-        # MC/DC framework metadata
-        super().__init__(
-            label="simulation",
-            non_numba=[
-                "regions",
-                "root_universe",
-                "bank_active",
-                "bank_census",
-                "bank_source",
-                "bank_future",
-                "_next_compile_ID",
-                "compiled",
-                "compile_ID",
-            ],
-        )
-
         self.compile_ID = 0
         self.compiled = False
 

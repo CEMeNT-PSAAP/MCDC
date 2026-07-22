@@ -34,14 +34,9 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class DistributionBase(MCDCPolymorphic):
-    def __init__(
-        self,
-        child_label: str,
-        child_type: int,
-        non_numba: list[str],
-    ) -> None:
-        # MC/DC framework metadata
-        super().__init__("distribution", child_label, child_type, non_numba)
+    # MC/DC framework metadata
+    label = "distribution"
+    sub_type = -1
 
 
 # ======================================================================================
@@ -53,9 +48,9 @@ class DistributionBase(MCDCPolymorphic):
 
 
 class DistributionNone(DistributionBase):
-    def __init__(self) -> None:
-        # MC/DC framework metadata
-        super().__init__("none_distribution", DISTRIBUTION_NONE, [])
+    # MC/DC framework metadata
+    label = "none_distribution"
+    sub_type = DISTRIBUTION_NONE
 
 
 # ======================================================================================
@@ -64,14 +59,15 @@ class DistributionNone(DistributionBase):
 
 
 class DistributionPMF(DistributionBase):
+    # MC/DC framework metadata
+    label = "pmf_distribution"
+    sub_type = DISTRIBUTION_PMF
+
     value: NDArray[float64]
     pmf: NDArray[float64]
     cmf: NDArray[float64]
 
     def __init__(self, value: ArrayLike, pmf: ArrayLike) -> None:
-        # MC/DC framework metadata
-        super().__init__("pmf_distribution", DISTRIBUTION_PMF, [])
-
         self.value = np.asarray(value, dtype=float64)
         pmf_array = np.asarray(pmf, dtype=float64)
 
@@ -100,6 +96,10 @@ class DistributionPMF(DistributionBase):
 
 
 class DistributionTabulated(DistributionBase):
+    # MC/DC framework metadata
+    label = "tabulated_distribution"
+    sub_type = DISTRIBUTION_TABULATED
+
     pdf: DataTable
 
     def __init__(
@@ -108,9 +108,6 @@ class DistributionTabulated(DistributionBase):
         pdf: ArrayLike | None = None,
         cdf: ArrayLike | None = None,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("tabulated_distribution", DISTRIBUTION_TABULATED, [])
-
         if (pdf is None) == (cdf is None):
             print_error("Exactly one of pdf or cdf must be provided.")
 
@@ -170,6 +167,10 @@ class DistributionTabulated(DistributionBase):
 
 
 class DistributionMultiTable(DistributionBase):
+    # MC/DC framework metadata
+    label = "multi_table_distribution"
+    sub_type = DISTRIBUTION_MULTITABLE
+
     grid: NDArray[float64]
     tables: list[DistributionTabulated]
 
@@ -181,9 +182,6 @@ class DistributionMultiTable(DistributionBase):
         pdf: ArrayLike | None = None,
         cdf: ArrayLike | None = None,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("multi_table_distribution", DISTRIBUTION_MULTITABLE, [])
-
         if (pdf is None) == (cdf is None):
             print_error("Exactly one of pdf or cdf must be provided.")
 
@@ -273,17 +271,14 @@ class DistributionMultiTable(DistributionBase):
 
 
 class DistributionLevelScattering(DistributionBase):
+    # MC/DC framework metadata
+    label = "level_scattering_distribution"
+    sub_type = DISTRIBUTION_LEVEL_SCATTERING
+
     C1: float
     C2: float
 
     def __init__(self, C1: float, C2: float) -> None:
-        # MC/DC framework metadata
-        super().__init__(
-            "level_scattering_distribution",
-            DISTRIBUTION_LEVEL_SCATTERING,
-            [],
-        )
-
         self.C1 = C1
         self.C2 = C2
 
@@ -301,6 +296,10 @@ class DistributionLevelScattering(DistributionBase):
 
 
 class DistributionEvaporation(DistributionBase):
+    # MC/DC framework metadata
+    label = "evaporation_distribution"
+    sub_type = DISTRIBUTION_EVAPORATION
+
     nuclear_temperature: DataTable
     restriction_energy: float
 
@@ -312,9 +311,6 @@ class DistributionEvaporation(DistributionBase):
         temperature_interpolations: int | Sequence[int],
         interpolation_boundaries: Sequence[int] | None,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("evaporation_distribution", DISTRIBUTION_EVAPORATION, [])
-
         self.restriction_energy = restriction_energy
         self.nuclear_temperature = DataTable(
             nuclear_temperature_energy_grid,
@@ -344,6 +340,10 @@ class DistributionEvaporation(DistributionBase):
 
 
 class DistributionMaxwellian(DistributionBase):
+    # MC/DC framework metadata
+    label = "maxwellian_distribution"
+    sub_type = DISTRIBUTION_MAXWELLIAN
+
     nuclear_temperature: DataTable
     restriction_energy: float
 
@@ -355,9 +355,6 @@ class DistributionMaxwellian(DistributionBase):
         temperature_interpolations: int | Sequence[int],
         interpolation_boundaries: Sequence[int] | None,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("maxwellian_distribution", DISTRIBUTION_MAXWELLIAN, [])
-
         self.restriction_energy = restriction_energy
         self.nuclear_temperature = DataTable(
             nuclear_temperature_energy_grid,
@@ -387,6 +384,10 @@ class DistributionMaxwellian(DistributionBase):
 
 
 class DistributionKalbachMann(DistributionBase):
+    # MC/DC framework metadata
+    label = "kalbach_mann_distribution"
+    sub_type = DISTRIBUTION_KALBACH_MANN
+
     energy: NDArray[float64]
     offset: NDArray[int64]
     energy_out: NDArray[float64]
@@ -404,9 +405,6 @@ class DistributionKalbachMann(DistributionBase):
         precompound_factor: ArrayLike,
         angular_slope: ArrayLike,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("kalbach_mann_distribution", DISTRIBUTION_KALBACH_MANN, [])
-
         self.energy = np.asarray(energy, dtype=float64)
         self.offset = np.asarray(offset, dtype=int64)
         self.energy_out = np.asarray(energy_out, dtype=float64)
@@ -441,6 +439,10 @@ class DistributionKalbachMann(DistributionBase):
 
 
 class DistributionTabulatedEnergyAngle(DistributionBase):
+    # MC/DC framework metadata
+    label = "tabulated_energy_angle_distribution"
+    sub_type = DISTRIBUTION_TABULATED_ENERGY_ANGLE
+
     energy: NDArray[float64]
     offset: NDArray[int64]
     energy_out: NDArray[float64]
@@ -461,13 +463,6 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
         cosine: ArrayLike,
         cosine_pdf: ArrayLike,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__(
-            child_label="tabulated_energy_angle_distribution",
-            child_type=DISTRIBUTION_TABULATED_ENERGY_ANGLE,
-            non_numba=[],
-        )
-
         self.energy = np.asarray(energy, dtype=float64)
         self.offset = np.asarray(offset, dtype=int64)
         self.energy_out = np.asarray(energy_out, dtype=float64)
@@ -538,6 +533,10 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
 
 
 class DistributionNBody(DistributionBase):
+    # MC/DC framework metadata
+    label = "nbody_distribution"
+    sub_type = DISTRIBUTION_N_BODY
+
     pdf: DataTable
 
     def __init__(
@@ -545,9 +544,6 @@ class DistributionNBody(DistributionBase):
         values: ArrayLike,
         probabilities: ArrayLike,
     ) -> None:
-        # MC/DC framework metadata
-        super().__init__("nbody_distribution", DISTRIBUTION_N_BODY, [])
-
         value_array = np.asarray(values, dtype=float64)
         probability_array = np.asarray(probabilities, dtype=float64)
 
