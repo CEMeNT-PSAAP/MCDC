@@ -371,21 +371,19 @@ class TallySurfaceCrossing(Tally):
         self.cell_filtered = False
         self.cell_filter_ID = -1
 
-        # Surface filter
-        if surface is not None:
+        # Set surface filter
+        if surface:
             self.surface_filtered = True
-            self.surface_filter_ID = surface.ID
 
-            # Attach to the surface
+            # Attach to surface
             surface.tallies.append(self)
 
-        # Cell filter
-        if cell is not None:
+        # Set cell filter
+        if cell:
             self.cell_filtered = True
-            self.cell_filter_ID = cell.ID
 
-            # Attach to all bounding surfaces of the cell if surface filter is not specified
-            if surface is None:
+            # Attach to all bounding surfaces if surface filter is not specified
+            if not self.surface_filtered:
                 for boundary_surface in cell.surfaces:
                     boundary_surface.tallies.append(self)
 
@@ -393,6 +391,18 @@ class TallySurfaceCrossing(Tally):
         # Already compiled?
         if not super()._compile_into_simulation(simulation):
             return False
+
+        # Set surface ID
+        surface = self.surface
+        if surface:
+            surface._compile_into_simulation(simulation)
+            self.surface_filter_ID = surface.ID
+
+        # Set cell ID
+        cell = self.cell
+        if cell:
+            cell._compile_into_simulation(simulation)
+            self.cell_filter_ID = cell.ID
 
         return True
 
@@ -477,24 +487,17 @@ class TallyCollision(Tally):
         self.mesh_stride_y = -1
         self.mesh_stride_x = -1
 
-        # Cell filter
-        if cell is not None:
+        # Set cell filter
+        if cell:
             self.cell_filtered = True
-            self.cell_filter_ID = cell.ID
 
-            # Attach to the cell
+            # Attach to cell
             cell.collision_tallies.append(self)
 
         # Mesh filter
-        if mesh is not None:
+        if mesh:
             self.mesh_filtered = True
-            self.mesh_filter_ID = mesh.ID
-
-            # Mesh type
-            if isinstance(mesh, MeshStructured):
-                self.mesh_filter_type = MESH_STRUCTURED
-            elif isinstance(mesh, MeshUniform):
-                self.mesh_filter_type = MESH_UNIFORM
+            self.mesh_filter_type = mesh.sub_type
 
             # Mesh strides
             N_score = len(self.scores)
@@ -507,8 +510,20 @@ class TallyCollision(Tally):
         if not super()._compile_into_simulation(simulation):
             return False
 
+        # Set cell ID
+        cell = self.cell
+        if cell:
+            cell._compile_into_simulation(simulation)
+            self.cell_filter_ID = cell.ID
+
+        # Set mesh ID
+        mesh = self.mesh
+        if mesh:
+            mesh._compile_into_simulation(simulation)
+            self.mesh_filter_ID = mesh.sub_ID
+
         # Attach to all cells if cell filter is not specified
-        if not self.cell:
+        if not self.cell_filtered:
             for cell in simulation.cells:
                 cell.collision_tallies.append(self)
 
@@ -594,24 +609,17 @@ class TallyTracklength(Tally):
         self.mesh_stride_y = -1
         self.mesh_stride_x = -1
 
-        # Cell filter
-        if cell is not None:
+        # Set cell filter
+        if cell:
             self.cell_filtered = True
-            self.cell_filter_ID = cell.ID
 
-            # Attach to the cell
+            # Attach to cell
             cell.tracklength_tallies.append(self)
 
         # Mesh filter
-        if mesh is not None:
+        if mesh:
             self.mesh_filtered = True
-            self.mesh_filter_ID = mesh.ID
-
-            # Mesh type
-            if isinstance(mesh, MeshStructured):
-                self.mesh_filter_type = MESH_STRUCTURED
-            elif isinstance(mesh, MeshUniform):
-                self.mesh_filter_type = MESH_UNIFORM
+            self.mesh_filter_type = mesh.sub_type
 
             # Mesh strides
             N_score = len(self.scores)
@@ -624,8 +632,20 @@ class TallyTracklength(Tally):
         if not super()._compile_into_simulation(simulation):
             return False
 
+        # Set cell ID
+        cell = self.cell
+        if cell:
+            cell._compile_into_simulation(simulation)
+            self.cell_filter_ID = cell.ID
+
+        # Set mesh ID
+        mesh = self.mesh
+        if mesh:
+            mesh._compile_into_simulation(simulation)
+            self.mesh_filter_ID = mesh.sub_ID
+
         # Attach to all cells if cell filter is not specified
-        if not self.cell:
+        if not self.cell_filtered:
             for cell in simulation.cells:
                 cell.tracklength_tallies.append(self)
 
