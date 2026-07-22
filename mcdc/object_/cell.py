@@ -39,10 +39,7 @@ from mcdc.print_ import print_error
 # ======================================================================================
 
 
-class Region(MCDCObject):
-    # MC/DC framework metadata
-    label = "region"
-
+class Region:
     type: str
     A: Surface | Region | NoneType
     B: Region | int | NoneType

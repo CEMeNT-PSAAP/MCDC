@@ -17,9 +17,7 @@ from mcdc.constant import (
 # ======================================================================================
 
 
-def generate_output(mcdc, data):
-    from mcdc import simulation
-
+def generate_output(mcdc, data, simulationPy):
     if not mcdc["mpi_master"]:
         return
 
@@ -37,7 +35,7 @@ def generate_output(mcdc, data):
     file["version"] = importlib.metadata.version("mcdc")
 
     # Settings
-    create_object_dataset(file, "settings", simulation.settings)
+    create_object_dataset(file, "settings", simulationPy.settings)
 
     # No need to output tally if time census-based tally is used
     if mcdc["settings"]["use_census_based_tally"]:
@@ -50,7 +48,7 @@ def generate_output(mcdc, data):
     if mcdc["settings"]["neutron_eigenvalue_mode"]:
         N_cycle = mcdc["settings"]["N_cycle"]
         file.create_dataset(
-            "k_cycle", data=mcdc_get.simulation.k_cycle_chunk(0, N_cycle, mcdc, data)
+            "k_cycle", data=mcdc_get.simulationPy.k_cycle_chunk(0, N_cycle, mcdc, data)
         )
         file.create_dataset("k_mean", data=mcdc["k_avg_running"])
         file.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
@@ -63,7 +61,9 @@ def generate_output(mcdc, data):
         if mcdc["settings"]["use_gyration_radius"]:
             file.create_dataset(
                 "gyration_radius",
-                data=mcdc_get.simulation.gyration_radius_chunk(0, N_cycle, mcdc, data),
+                data=mcdc_get.simulationPy.gyration_radius_chunk(
+                    0, N_cycle, mcdc, data
+                ),
             )
 
     # Save particle?
@@ -166,15 +166,15 @@ def create_tally_dataset(file, mcdc, data):
 
         # Mesh grid (TODO: Make mesh dataset in a separate group)
         mesh_filtered_tally = None
-        if tally["child_type"] == TALLY_TRACKLENGTH:
-            mesh_filtered_tally = mcdc["tracklength_tallies"][tally["child_ID"]]
-        elif tally["child_type"] == TALLY_COLLISION:
-            mesh_filtered_tally = mcdc["collision_tallies"][tally["child_ID"]]
+        if tally["sub_type"] == TALLY_TRACKLENGTH:
+            mesh_filtered_tally = mcdc["tracklength_tallies"][tally["sub_ID"]]
+        elif tally["sub_type"] == TALLY_COLLISION:
+            mesh_filtered_tally = mcdc["collision_tallies"][tally["sub_ID"]]
 
         if mesh_filtered_tally is not None and mesh_filtered_tally["mesh_filtered"]:
             mesh_base = mcdc["meshes"][mesh_filtered_tally["mesh_filter_ID"]]
-            mesh_type = mesh_base["child_type"]
-            mesh_ID = mesh_base["child_ID"]
+            mesh_type = mesh_base["sub_type"]
+            mesh_ID = mesh_base["sub_ID"]
             if mesh_type == MESH_UNIFORM:
                 mesh = mcdc["uniform_meshes"][mesh_ID]
                 x = np.linspace(

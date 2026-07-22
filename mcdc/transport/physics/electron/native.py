@@ -173,7 +173,7 @@ def collision(particle_container, collision_data_container, program, data):
                 mcdc_get.element.electron_ionization_reaction_IDs(i, element, data)
             )
             reaction = simulation["electron_ionization_reactions"][reaction_ID]
-            reaction_base_ID = reaction["parent_ID"]
+            reaction_base_ID = reaction["base_ID"]
             reaction_base = simulation["electron_reactions"][reaction_base_ID]
             total += reaction_micro_xs(E, reaction_base, element, data)
 
@@ -199,7 +199,7 @@ def collision(particle_container, collision_data_container, program, data):
                 )
             )
             reaction = simulation["electron_elastic_scattering_reactions"][reaction_ID]
-            reaction_base_ID = reaction["parent_ID"]
+            reaction_base_ID = reaction["base_ID"]
             reaction_base = simulation["electron_reactions"][reaction_base_ID]
             total += reaction_micro_xs(E, reaction_base, element, data)
 
@@ -218,7 +218,7 @@ def collision(particle_container, collision_data_container, program, data):
                 mcdc_get.element.electron_bremsstrahlung_reaction_IDs(i, element, data)
             )
             reaction = simulation["electron_bremsstrahlung_reactions"][reaction_ID]
-            reaction_base_ID = reaction["parent_ID"]
+            reaction_base_ID = reaction["base_ID"]
             reaction_base = simulation["electron_reactions"][reaction_base_ID]
             total += reaction_micro_xs(E, reaction_base, element, data)
 
@@ -241,7 +241,7 @@ def collision(particle_container, collision_data_container, program, data):
                 mcdc_get.element.electron_excitation_reaction_IDs(i, element, data)
             )
             reaction = simulation["electron_excitation_reactions"][reaction_ID]
-            reaction_base_ID = reaction["parent_ID"]
+            reaction_base_ID = reaction["base_ID"]
             reaction_base = simulation["electron_reactions"][reaction_base_ID]
             total += reaction_micro_xs(E, reaction_base, element, data)
 
@@ -272,7 +272,7 @@ def elastic_scattering(reaction, particle_container, element, simulation, data):
     # Total elastic xs
     # -------------------------------------------------------------------------
 
-    reaction_base_ID = int(reaction["parent_ID"])
+    reaction_base_ID = int(reaction["base_ID"])
     reaction_base = simulation["electron_reactions"][reaction_base_ID]
     xs_total = reaction_micro_xs(E, reaction_base, element, data)
 

@@ -44,8 +44,8 @@ def sample_distribution_with_scale(E, distribution, rng_state, simulation, data)
 
 @njit
 def _sample_distribution(E, distribution, rng_state, simulation, data, scale):
-    distribution_type = distribution["child_type"]
-    ID = distribution["child_ID"]
+    distribution_type = distribution["sub_type"]
+    ID = distribution["sub_ID"]
 
     if distribution_type == DISTRIBUTION_TABULATED:
         table = simulation["tabulated_distributions"][ID]
@@ -92,8 +92,8 @@ def sample_correlated_distribution_with_scale(
 def _sample_correlated_distribution(
     E, distribution, rng_state, simulation, data, scale
 ):
-    distribution_type = distribution["child_type"]
-    ID = distribution["child_ID"]
+    distribution_type = distribution["sub_type"]
+    ID = distribution["sub_ID"]
 
     if distribution_type == DISTRIBUTION_KALBACH_MANN:
         kalbach_mann = simulation["kalbach_mann_distributions"][ID]

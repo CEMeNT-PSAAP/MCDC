@@ -25,7 +25,7 @@ from mcdc.util import flatten
 
 class Universe(MCDCObject):
     # MC/DC framework metadata
-    label = "particle_bank"
+    label = "universe"
 
     name: str
     cells: list[Cell]

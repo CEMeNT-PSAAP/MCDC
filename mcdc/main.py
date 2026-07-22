@@ -79,7 +79,7 @@ def run_simulation(simulationPy: Simulation):
     time_output_start = MPI.Wtime()
 
     # Generate hdf5 output file
-    output_module.generate_output(simulation, data)
+    output_module.generate_output(simulation, data, simulationPy)
 
     # TIMER: output
     time_output_end = MPI.Wtime()

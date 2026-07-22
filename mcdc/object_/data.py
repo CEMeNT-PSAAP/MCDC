@@ -74,6 +74,8 @@ class DataTable(DataBase):
         interpolation_boundaries: Sequence[int] | None = None,
         aux: NDArray[float64] | None = None,
     ) -> None:
+        super().__init__()
+
         # Set primary data
         self.x = np.asarray(x, dtype=float64)
         self.y = np.asarray(y, dtype=float64)
@@ -240,6 +242,8 @@ class DataPolynomial(DataBase):
     coefficients: NDArray[float64]
 
     def __init__(self, coefficients: NDArray[float64]) -> None:
+        super().__init__()
+
         self.coefficients = np.asarray(coefficients, dtype=float64)
 
         if self.coefficients.ndim != 1:

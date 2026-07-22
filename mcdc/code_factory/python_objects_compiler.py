@@ -107,6 +107,14 @@ def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
         )
     object_.compile_ID = simulation.compile_ID
 
+    # Assign name if needed
+    if hasattr(object_, "name") and object_.name.startswith("(Unnamed"):
+        if isinstance(object_, MCDCPolymorphic):
+            ID = object_.sub_ID
+        else:
+            ID = object_.ID
+        object_.name = object_.label + f"_{ID}"
+
     # Register to simulation (TODO: Resolve IDE error message)
     object_list.append(object_)
 

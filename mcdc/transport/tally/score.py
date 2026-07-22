@@ -46,7 +46,7 @@ def surface_crossing_tally(
     data,
 ):
     particle = particle_container[0]
-    tally_base = simulation["tallies"][tally["parent_ID"]]
+    tally_base = simulation["tallies"][tally["base_ID"]]
 
     # Get filter indices
     MG_mode = simulation["settings"]["neutron_multigroup_mode"]
@@ -128,7 +128,7 @@ def collision_tally(
 ):
     particle = particle_container[0]
     collision_data = collision_data_container[0]
-    tally_base = simulation["tallies"][tally["parent_ID"]]
+    tally_base = simulation["tallies"][tally["base_ID"]]
 
     # Get filter indices
     MG_mode = simulation["settings"]["neutron_multigroup_mode"]
@@ -184,7 +184,7 @@ def collision_tally(
 @njit
 def tracklength_tally(particle_container, distance, tally, simulation, data):
     particle = particle_container[0]
-    tally_base = simulation["tallies"][tally["parent_ID"]]
+    tally_base = simulation["tallies"][tally["base_ID"]]
 
     # Get filter indices
     MG_mode = simulation["settings"]["neutron_multigroup_mode"]

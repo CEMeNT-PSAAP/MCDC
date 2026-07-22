@@ -26,7 +26,7 @@ from mcdc.object_.base import (
 )
 from mcdc.object_.particle import Particle, ParticleBank, ParticleData
 from mcdc.object_.tally import Tally
-from mcdc.print_ import print_error
+from mcdc.print_ import print_error, print_structure
 from mcdc.util import flatten
 
 type_map = {
@@ -162,11 +162,6 @@ def generate_numba_objects(simulation):
 
             annotations[mcdc_class.label].update(new_annotations)
 
-        print(mcdc_class.label)
-        print(mcdc_class.__annotations__)
-        print(annotations[mcdc_class.label])
-        input()
-
     # Particle banks
     for name in bank_names:
         annotations[name] = {
@@ -187,6 +182,7 @@ def generate_numba_objects(simulation):
 
     # Temporary simulation object structure
     simulation_object_structure = []
+    included_classes = []
     for field in annotations["simulation"]:
         hint = annotations["simulation"][field]
         hint_origin = get_origin(hint)
@@ -194,9 +190,11 @@ def generate_numba_objects(simulation):
 
         if hint in all_classes:
             simulation_object_structure.append((field, hint))
+            included_classes.append(hint)
             continue
         if hint_origin == list and hint_args[0] in all_classes:
             simulation_object_structure.append((field, list, hint_args[0]))
+            included_classes.append(hint_args[0])
             continue
 
     # Set the structures and accessor targets
@@ -214,10 +212,10 @@ def generate_numba_objects(simulation):
         # Set parent and child ID and type if polymorphic
         if issubclass(class_, MCDCPolymorphic):
             if class_.__name__[-4:] == "Base" or class_.__name__ == "Tally":
-                structures[class_.label].append(("child_type", type_map[int]))
-                structures[class_.label].append(("child_ID", type_map[int]))
+                structures[class_.label].append(("sub_type", type_map[int]))
+                structures[class_.label].append(("sub_ID", type_map[int]))
             else:
-                structures[class_.label].append(("parent_ID", type_map[int]))
+                structures[class_.label].append(("base_ID", type_map[int]))
 
     # Add particle data to particle banks and add particle banks to the simulation
     for name in bank_names:
@@ -304,7 +302,7 @@ def generate_numba_objects(simulation):
                         record[f"N_{class_.label}"] = N
 
         # Singleton
-        elif item[1] in mcdc_classes and issubclass(item[1], ObjectSingleton):
+        elif item[1] in mcdc_classes and issubclass(item[1], MCDCBase):
             new_structure.append((field, into_dtype(structures[item[1].label])))
 
         else:
@@ -647,7 +645,7 @@ def set_object(
             ):
                 record[f"{attribute_name}_ID"] = attribute.ID
             else:
-                record[f"{attribute_name}_ID"] = attribute.child_ID
+                record[f"{attribute_name}_ID"] = attribute.sub_ID
 
         # List of Non-singleton objects
         elif type(attribute) == list:
@@ -675,7 +673,7 @@ def set_object(
                 else:
                     data["array"][
                         data["size"] : data["size"] + len(attribute_flatten)
-                    ] = [x.child_ID for x in attribute_flatten]
+                    ] = [x.sub_ID for x in attribute_flatten]
             data["size"] += len(attribute_flatten)
 
     # Complete for simulation object
@@ -692,12 +690,12 @@ def set_object(
             # Parent
             if class_ in polymorphic_bases:
                 record["ID"] = object_.ID
-                record["child_ID"] = object_.child_ID
-                record["child_type"] = object_.type
+                record["sub_ID"] = object_.sub_ID
+                record["sub_type"] = object_.sub_type
             # Child
             else:
-                record["ID"] = object_.child_ID
-                record["parent_ID"] = object_.ID
+                record["ID"] = object_.sub_ID
+                record["base_ID"] = object_.ID
 
     # Set tally bins
     if class_ == Tally:
@@ -716,10 +714,10 @@ def set_object(
         print_error(f"Missing structure keys in record for {class_.label}: {missing}")
 
     # Register the record
-    if isinstance(object_, ObjectSingleton):
-        records[class_.label] = record
-    elif isinstance(object_, MCDCObject):
+    if isinstance(object_, MCDCObject):
         records[class_.label].append(record)
+    elif isinstance(object_, MCDCBase):
+        records[class_.label] = record
 
 
 # =============================================================================
