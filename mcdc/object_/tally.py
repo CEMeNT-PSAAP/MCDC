@@ -627,7 +627,7 @@ class TallyTracklength(Tally):
         # Attach to all cells if cell filter is not specified
         if not self.cell:
             for cell in simulation.cells:
-                cell.collision_tallies.append(self)
+                cell.tracklength_tallies.append(self)
 
         return True
 
