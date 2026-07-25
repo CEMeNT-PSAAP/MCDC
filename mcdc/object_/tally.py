@@ -376,7 +376,7 @@ class TallySurfaceCrossing(Tally):
             self.surface_filtered = True
 
             # Attach to surface
-            surface.tallies.append(self)
+            surface.surface_crossing_tallies.append(self)
 
         # Set cell filter
         if cell:
@@ -385,7 +385,7 @@ class TallySurfaceCrossing(Tally):
             # Attach to all bounding surfaces if surface filter is not specified
             if not self.surface_filtered:
                 for boundary_surface in cell.surfaces:
-                    boundary_surface.tallies.append(self)
+                    boundary_surface.surface_crossing_tallies.append(self)
 
     def _compile_into_simulation(self, simulation) -> bool:
         # Already compiled?

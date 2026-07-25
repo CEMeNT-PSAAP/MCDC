@@ -72,7 +72,7 @@ class Surface(MCDCObject):
     move_durations: Annotated[NDArray[float64], ("N_move",)]
     move_time_grid: Annotated[NDArray[float64], ("N_move_grid",)]
     move_translations: Annotated[NDArray[float64], ("N_move_grid", 3)]
-    tallies: list[TallySurfaceCrossing]
+    surface_crossing_tallies: list[TallySurfaceCrossing]
 
     def __init__(self, type_, name, boundary_condition):
         super().__init__()
@@ -123,8 +123,8 @@ class Surface(MCDCObject):
         self.move_time_grid = np.array([0.0, INF])
         self.move_translations = np.zeros((2, 3))
 
-        # Surface tallies
-        self.tallies = []
+        # Surface-crossing tallies
+        self.surface_crossing_tallies = []
 
     def _compile_into_simulation(self, simulation) -> bool:
         # Already compiled?
@@ -222,8 +222,8 @@ class Surface(MCDCObject):
             text += f"  - A, B, C: {self.A}, {self.B}, {self.C}\n"
             text += f"  - R: {self.R} cm\n"
             text += f"  - r: {self.r} cm\n"
-        if len(self.tallies) > 0:
-            text += f"  - Tallies: {[x.ID for x in self.tallies]}\n"
+        if len(self.surface_crossing_tallies) > 0:
+            text += f"  - Surface-crossing tallies: {[x.ID for x in self.surface_crossing_tallies]}\n"
 
         return text
 

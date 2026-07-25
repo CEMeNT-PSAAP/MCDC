@@ -654,8 +654,8 @@ surface = into_dtype([
     ('move_time_grid_length', int64),
     ('move_translations_offset', int64),
     ('move_translations_length', int64),
-    ('N_tally', int64),
-    ('tally_IDs_offset', int64),
+    ('N_surface_crossing_tally', int64),
+    ('surface_crossing_tally_IDs_offset', int64),
     ('ID', int64),
 ])
 

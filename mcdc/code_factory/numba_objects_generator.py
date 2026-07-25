@@ -639,13 +639,7 @@ def set_object(
 
         # Non-singleton object
         elif isinstance(attribute, MCDCObject):
-            if (
-                not isinstance(attribute, MCDCPolymorphic)
-                or annotation[attribute_name] in polymorphic_bases
-            ):
-                record[f"{attribute_name}_ID"] = attribute.ID
-            else:
-                record[f"{attribute_name}_ID"] = attribute.sub_ID
+            record[f"{attribute_name}_ID"] = attribute.ID
 
         # List of Non-singleton objects
         elif type(attribute) == list:
@@ -663,17 +657,9 @@ def set_object(
             record[f"N_{singular_name}"] = len(attribute_flatten)
             record[f"{singular_name}_IDs_offset"] = data["size"]
             if set_data:
-                if (
-                    not issubclass(inner_type, MCDCPolymorphic)
-                    or inner_type in polymorphic_bases
-                ):
-                    data["array"][
-                        data["size"] : data["size"] + len(attribute_flatten)
-                    ] = [x.ID for x in attribute_flatten]
-                else:
-                    data["array"][
-                        data["size"] : data["size"] + len(attribute_flatten)
-                    ] = [x.sub_ID for x in attribute_flatten]
+                data["array"][data["size"] : data["size"] + len(attribute_flatten)] = [
+                    x.ID for x in attribute_flatten
+                ]
             data["size"] += len(attribute_flatten)
 
     # Complete for simulation object

@@ -108,29 +108,29 @@ def move_translations_chunk(start, length, surface, data, value):
 
 
 @njit
-def tally_IDs(index, surface, data, value):
-    offset = surface["tally_IDs_offset"]
+def surface_crossing_tally_IDs(index, surface, data, value):
+    offset = surface["surface_crossing_tally_IDs_offset"]
     data[offset + index] = value
 
 
 @njit
-def tally_IDs_all(surface, data, value):
-    start = surface["tally_IDs_offset"]
-    size = surface["N_tally"]
+def surface_crossing_tally_IDs_all(surface, data, value):
+    start = surface["surface_crossing_tally_IDs_offset"]
+    size = surface["N_surface_crossing_tally"]
     end = start + size
     data[start:end] = value
 
 
 @njit
-def tally_IDs_last(surface, data, value):
-    start = surface["tally_IDs_offset"]
-    size = surface["N_tally"]
+def surface_crossing_tally_IDs_last(surface, data, value):
+    start = surface["surface_crossing_tally_IDs_offset"]
+    size = surface["N_surface_crossing_tally"]
     end = start + size
     data[end - 1] = value
 
 
 @njit
-def tally_IDs_chunk(start, length, surface, data, value):
-    start += surface["tally_IDs_offset"]
+def surface_crossing_tally_IDs_chunk(start, length, surface, data, value):
+    start += surface["surface_crossing_tally_IDs_offset"]
     end = start + length
     data[start:end] = value
