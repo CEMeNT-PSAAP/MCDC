@@ -34,22 +34,22 @@ jobs:
           # Python modes:
           - mode: Python-Serial
             python-version: '3.13'
-            run_cmd: "python -m pytest test/regression"
+            run_cmd: "python -m pytest -v test/regression"
             timeout: 10
           - mode: Python-MPI
             python-version: '3.13'
             run_cmd: |
-              python -m pytest test/regression --mpiexec=4
+              python -m pytest -v test/regression --mpiexec=4
             timeout: 30
           # Numba modes:
           - mode: Numba-Serial
             python-version: '3.13'
-            run_cmd: "python -m pytest test/regression --mode numba"
+            run_cmd: "python -m pytest -v test/regression --mode numba"
             timeout: 120
           - mode: Numba-MPI
             python-version: '3.13'
             run_cmd: |
-              python -m pytest test/regression --mode numba --mpiexec=4
+              python -m pytest -v test/regression --mode numba --mpiexec=4
             timeout: 120
 
     steps:
