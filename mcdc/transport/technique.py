@@ -157,8 +157,8 @@ def get_ww_indices(particle_container, ww_obj, simulation, data):
     ie = util.find_bin(energy, energy_bounds)
 
     # get spatial index
-    mesh_base = simulation["meshes"][ww_obj["mesh_ID"]]
-    idx, idy, idz = get_mesh_indices(particle_container, mesh_base, simulation, data)
+    mesh = simulation["meshes"][ww_obj["mesh_ID"]]
+    idx, idy, idz = get_mesh_indices(particle_container, mesh, simulation, data)
 
     return (ie, idx, idy, idz)
 
