@@ -18,14 +18,10 @@ from mcdc.constant import (
     DISTRIBUTION_TABULATED_ENERGY_ANGLE,
     INTERPOLATION_HISTOGRAM,
     INTERPOLATION_LINEAR,
-    INTERPOLATION_LOG,
-    INTERPOLATION_SEMILOGX,
-    INTERPOLATION_SEMILOGY,
-    MAX_BISECTION_ITERATIONS,
     PI,
 )
-from mcdc.transport.data import evaluate_table, get_table_interpolation_law
-from mcdc.transport.util import find_bin, linear_interpolation
+from mcdc.transport.data import evaluate_data
+from mcdc.transport.util import find_bin
 
 # ======================================================================================
 # General distribution samplers
@@ -382,7 +378,7 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
 def sample_maxwellian(E, rng_state, maxwellian, simulation, data):
     # Get nuclear temperature
     table = simulation["table_data"][maxwellian["nuclear_temperature_ID"]]
-    nuclear_temperature = evaluate_table(E, table, data)
+    nuclear_temperature = evaluate_data(E, table, simulation, data)
     restriction_energy = maxwellian["restriction_energy"]
 
     # Rejection sampling
@@ -412,7 +408,7 @@ def sample_level_scattering(E, level_scattering):
 def sample_evaporation(E, rng_state, evaporation, simulation, data):
     # Get nuclear temperature
     table = simulation["table_data"][evaporation["nuclear_temperature_ID"]]
-    nuclear_temperature = evaluate_table(E, table, data)
+    nuclear_temperature = evaluate_data(E, table, simulation, data)
     restriction_energy = evaporation["restriction_energy"]
 
     w = (E - restriction_energy) / nuclear_temperature

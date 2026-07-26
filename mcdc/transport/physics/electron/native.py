@@ -349,8 +349,8 @@ def sample_small_angle_mu_coulomb(E, Z, rng_state, mu_cut):
 
 @njit
 def elastic_large_xs(E, reaction, simulation, data):
-    data_base = simulation["data"][int(reaction["xs_large_ID"])]
-    return evaluate_data(E, data_base, simulation, data)
+    reaction_data = simulation["data"][int(reaction["xs_large_ID"])]
+    return evaluate_data(E, reaction_data, simulation, data)
 
 
 # ======================================================================================
@@ -387,8 +387,8 @@ def excitation(
 
 @njit
 def evaluate_eloss(E, reaction, simulation, data):
-    data_base = simulation["data"][int(reaction["eloss_ID"])]
-    return evaluate_data(E, data_base, simulation, data)
+    reaction_data = simulation["data"][int(reaction["eloss_ID"])]
+    return evaluate_data(E, reaction_data, simulation, data)
 
 
 # ======================================================================================

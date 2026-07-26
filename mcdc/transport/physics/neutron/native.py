@@ -980,11 +980,15 @@ def fission(
 
 @njit
 def neutron_fission_prompt_multiplicity(E, nuclide, simulation, data):
-    data_base = simulation["data"][nuclide["neutron_fission_prompt_multiplicity_ID"]]
-    return evaluate_data(E, data_base, simulation, data)
+    reaction_data = simulation["data"][
+        nuclide["neutron_fission_prompt_multiplicity_ID"]
+    ]
+    return evaluate_data(E, reaction_data, simulation, data)
 
 
 @njit
 def neutron_fission_delayed_multiplicity(E, nuclide, simulation, data):
-    data_base = simulation["data"][nuclide["neutron_fission_delayed_multiplicity_ID"]]
-    return evaluate_data(E, data_base, simulation, data)
+    reaction_data = simulation["data"][
+        nuclide["neutron_fission_delayed_multiplicity_ID"]
+    ]
+    return evaluate_data(E, reaction_data, simulation, data)
