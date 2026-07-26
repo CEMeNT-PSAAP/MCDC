@@ -24,9 +24,9 @@ from mcdc.transport.util import (
 
 
 @njit
-def evaluate_data(x, data_base, simulation, data):
-    data_type = data_base["sub_type"]
-    ID = data_base["sub_ID"]
+def evaluate_data(x, data_, simulation, data):
+    data_type = data_["sub_type"]
+    ID = data_["sub_ID"]
     if data_type == DATA_TABLE:
         table = simulation["table_data"][ID]
         return evaluate_table(x, table, data)
