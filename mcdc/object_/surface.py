@@ -223,7 +223,7 @@ class Surface(MCDCObject):
             text += f"  - R: {self.R} cm\n"
             text += f"  - r: {self.r} cm\n"
         if len(self.surface_crossing_tallies) > 0:
-            text += f"  - Surface-crossing tallies: {[x.ID for x in self.surface_crossing_tallies]}\n"
+            text += f"  - Surface-crossing tallies: {[x.name for x in self.surface_crossing_tallies]}\n"
 
         return text
 

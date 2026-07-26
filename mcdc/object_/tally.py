@@ -520,7 +520,7 @@ class TallyCollision(Tally):
         mesh = self.mesh
         if mesh:
             mesh._compile_into_simulation(simulation)
-            self.mesh_filter_ID = mesh.sub_ID
+            self.mesh_filter_ID = mesh.ID
 
         # Attach to all cells if cell filter is not specified
         if not self.cell_filtered:
@@ -642,7 +642,7 @@ class TallyTracklength(Tally):
         mesh = self.mesh
         if mesh:
             mesh._compile_into_simulation(simulation)
-            self.mesh_filter_ID = mesh.sub_ID
+            self.mesh_filter_ID = mesh.ID
 
         # Attach to all cells if cell filter is not specified
         if not self.cell_filtered:

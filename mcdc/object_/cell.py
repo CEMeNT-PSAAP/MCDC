@@ -181,13 +181,13 @@ class Cell(MCDCObject):
             text += f"  - Translation: {self.translation}\n"
         if self.fill_rotated:
             text += f"  - Rotation: {self.rotation * 180 / PI}\n"
-        # text += f"  - Bounding surfaces: {[x.ID for x in self.surfaces]}\n"
+        text += f"  - Bounding surfaces: {[x.name for x in self.surfaces]}\n"
         if len(self.collision_tallies) > 0:
-            text += f"  - Collision tallies: {[x.ID for x in self.collision_tallies]}\n"
-        if len(self.tracklength_tallies) > 0:
             text += (
-                f"  - Tracklength tallies: {[x.ID for x in self.tracklength_tallies]}\n"
+                f"  - Collision tallies: {[x.name for x in self.collision_tallies]}\n"
             )
+        if len(self.tracklength_tallies) > 0:
+            text += f"  - Tracklength tallies: {[x.name for x in self.tracklength_tallies]}\n"
         return text
 
 
