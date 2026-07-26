@@ -27,7 +27,7 @@ from mcdc.print_ import print_1d_array, print_error
 class DataBase(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "data"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
 
 # ======================================================================================

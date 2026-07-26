@@ -39,7 +39,7 @@ from mcdc.print_ import print_1d_array, print_error
 class NeutronReactionBase(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "neutron_reaction"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
     MT: int
     xs: NDArray[float64]

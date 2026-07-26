@@ -18,7 +18,7 @@ from mcdc.print_ import print_1d_array
 class MeshBase(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "mesh"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
     name: str
     N_bin: int

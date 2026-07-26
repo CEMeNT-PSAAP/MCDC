@@ -28,7 +28,7 @@ from mcdc.print_ import print_1d_array
 class ElectronReactionBase(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "electron_reaction"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
     MT: int
     xs: NDArray[float64]

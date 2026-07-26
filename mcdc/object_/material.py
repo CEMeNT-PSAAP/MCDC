@@ -23,7 +23,7 @@ from mcdc.print_ import print_1d_array, print_error
 class MaterialBase(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "material"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
     name: str
     fissionable: bool

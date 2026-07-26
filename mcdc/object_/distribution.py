@@ -36,7 +36,7 @@ from mcdc.print_ import print_1d_array, print_error
 class DistributionBase(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "distribution"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
 
 # ======================================================================================

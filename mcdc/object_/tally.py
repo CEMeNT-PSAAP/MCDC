@@ -48,7 +48,7 @@ from mcdc.print_ import print_1d_array, print_error
 class Tally(MCDCPolymorphic):
     # MC/DC framework metadata
     label = "tally"
-    sub_type = -1
+    sub_type = -1  # Polymorphic base
 
     # Basic properties
     name: str

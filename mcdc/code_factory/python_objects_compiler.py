@@ -107,7 +107,7 @@ def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
         )
     object_.compile_ID = simulation.compile_ID
 
-    # Assign name if needed
+    # Assign name if needed (TODO: Resolve IDE error message)
     if hasattr(object_, "name") and object_.name.startswith("(Unnamed"):
         if isinstance(object_, MCDCPolymorphic):
             ID = object_.sub_ID

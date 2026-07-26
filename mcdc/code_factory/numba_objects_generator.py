@@ -79,9 +79,7 @@ for file_name in file_names:
                 mcdc_classes.append(item)
 
 polymorphic_bases = [
-    x
-    for x in all_classes
-    if (x.__name__[-4:] == "Base" or x.__name__ == "Tally") and "label" in dir(x)
+    x for x in mcdc_classes if issubclass(x, MCDCPolymorphic) and x.sub_type == -1
 ]
 
 # ======================================================================================
@@ -211,7 +209,7 @@ def generate_numba_objects(simulation):
             structures[class_.label].append(("ID", type_map[int]))
         # Set parent and child ID and type if polymorphic
         if issubclass(class_, MCDCPolymorphic):
-            if class_.__name__[-4:] == "Base" or class_.__name__ == "Tally":
+            if class_ in polymorphic_bases:
                 structures[class_.label].append(("sub_type", type_map[int]))
                 structures[class_.label].append(("sub_ID", type_map[int]))
             else:
