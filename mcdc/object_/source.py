@@ -20,46 +20,6 @@ from mcdc.object_.distribution import DistributionTabulated, DistributionPMF
 from mcdc.object_.util import move_object
 from mcdc.print_ import print_error
 
-
-def _distribution_pair(
-    value: ArrayLike, name: str
-) -> tuple[NDArray[float64], NDArray[float64]]:
-    """Normalize a two-row distribution input and validate its shape."""
-    try:
-        array = np.asarray(value, dtype=float64)
-    except (TypeError, ValueError):
-        print_error(f"{name} distribution must be a rectangular array")
-
-    if array.ndim != 2 or array.shape[0] != 2:
-        print_error(f"{name} distribution must have shape (2, N)")
-
-    return array[0], array[1]
-
-
-def _time_range(value: ArrayLike) -> NDArray[float64]:
-    """Normalize and validate a source time interval."""
-    try:
-        array = np.asarray(value, dtype=float64)
-    except (TypeError, ValueError):
-        print_error("Source time interval must be an array with shape (2,)")
-
-    if array.shape != (2,):
-        print_error("Source time interval must have shape (2,)")
-
-    return array
-
-
-def decode_particle_type(type_):
-    """Return the display name for a packed particle-type code."""
-
-    if type_ == PARTICLE_NEUTRON:
-        return "Neutron"
-    elif type_ == PARTICLE_ELECTRON:
-        return "Electron"
-    elif type_ == PARTICLE_PROTON:
-        return "Proton"
-
-
 # ======================================================================================
 # Source
 # ======================================================================================
@@ -518,3 +478,47 @@ class Source(MCDCObject):
         ... )
         """
         move_object(self, velocities, durations)
+
+
+def decode_particle_type(type_):
+    """Return the display name for a packed particle-type code."""
+
+    if type_ == PARTICLE_NEUTRON:
+        return "Neutron"
+    elif type_ == PARTICLE_ELECTRON:
+        return "Electron"
+    elif type_ == PARTICLE_PROTON:
+        return "Proton"
+
+
+# ======================================================================================
+# Helper functions
+# ======================================================================================
+
+
+def _distribution_pair(
+    value: ArrayLike, name: str
+) -> tuple[NDArray[float64], NDArray[float64]]:
+    """Normalize a two-row distribution input and validate its shape."""
+    try:
+        array = np.asarray(value, dtype=float64)
+    except (TypeError, ValueError):
+        print_error(f"{name} distribution must be a rectangular array")
+
+    if array.ndim != 2 or array.shape[0] != 2:
+        print_error(f"{name} distribution must have shape (2, N)")
+
+    return array[0], array[1]
+
+
+def _time_range(value: ArrayLike) -> NDArray[float64]:
+    """Normalize and validate a source time interval."""
+    try:
+        array = np.asarray(value, dtype=float64)
+    except (TypeError, ValueError):
+        print_error("Source time interval must be an array with shape (2,)")
+
+    if array.shape != (2,):
+        print_error("Source time interval must have shape (2,)")
+
+    return array
