@@ -212,15 +212,30 @@ class Lattice(MCDCObject):
             self.dz = z[1]
             self.Nz = z[2]
 
+        self._set_universe_IDs()
+
+    def _compile_into_simulation(self, simulation) -> bool:
+        """Compile contained universes and rebuild their lattice IDs."""
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        for universe in flatten(self.universes):
+            universe._compile_into_simulation(simulation)
+
+        self._set_universe_IDs()
+        return True
+
+    def _set_universe_IDs(self) -> None:
+        """Build the packed universe-ID array from the universe layout."""
         # Set universe IDs
         get_ID = np.vectorize(lambda obj: obj.ID)
-        universe_IDs = get_ID(universes)
+        universe_IDs = get_ID(self.universes)
         ax_expand = []
-        if x is None:
+        if self.dx == 2 * INF:
             ax_expand.append(2)
-        if y is None:
+        if self.dy == 2 * INF:
             ax_expand.append(1)
-        if z is None:
+        if self.dz == 2 * INF:
             ax_expand.append(0)
         for ax in ax_expand:
             universe_IDs = np.expand_dims(universe_IDs, axis=ax)
