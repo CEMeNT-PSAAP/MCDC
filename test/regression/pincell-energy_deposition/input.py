@@ -4,6 +4,9 @@ import os
 
 os.environ["MCDC_LIB"] = "../mcdc-regression_test_data/"
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Pincell energy deposition")
+
 # Material
 fuel = mcdc.Material(
     nuclide_composition={
@@ -28,17 +31,19 @@ x1 = mcdc.Surface.PlaneX(x=pitch / 2, boundary_condition="reflective")
 y0 = mcdc.Surface.PlaneY(y=-pitch / 2, boundary_condition="reflective")
 y1 = mcdc.Surface.PlaneY(y=pitch / 2, boundary_condition="reflective")
 
-mcdc.Cell(-cylinder, fill=fuel)
-mcdc.Cell(+x0 & -x1 & +y0 & -y1 & +cylinder, fill=moderator)
+fuel_cell = mcdc.Cell(-cylinder, fill=fuel)
+moderator_cell = mcdc.Cell(+x0 & -x1 & +y0 & -y1 & +cylinder, fill=moderator)
+simulation.set_model([fuel_cell, moderator_cell])
 
 # Source
-mcdc.Source(position=[0.0, 0.0, 0.0], isotropic=True, time=0.0, energy=14.1e6)
+source = mcdc.Source(position=[0.0, 0.0, 0.0], isotropic=True, time=0.0, energy=14.1e6)
+simulation.set_sources([source])
 
 # Settings
-mcdc.settings.N_particle = 20
-mcdc.settings.N_batch = 2
-mcdc.settings.time_boundary = 1.0
-mcdc.settings.active_bank_buffer = 1000
+simulation.settings.N_particle = 20
+simulation.settings.N_batch = 2
+simulation.settings.time_boundary = 1.0
+simulation.settings.active_bank_buffer = 1000
 
 # Edep tally
 mesh = mcdc.MeshUniform(
@@ -46,6 +51,7 @@ mesh = mcdc.MeshUniform(
     y=(-pitch / 2, pitch / 8, 8),
 )
 
-mcdc.Tally(name="edep_mesh", mesh=mesh, scores=["energy_deposition"])
+tally = mcdc.Tally(name="edep_mesh", mesh=mesh, scores=["energy_deposition"])
+simulation.set_tallies([tally])
 
-mcdc.run()
+simulation.run()

@@ -2,6 +2,9 @@ import numpy as np
 
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Infinite SHEM-361 k-eigenvalue")
+
 # =============================================================================
 # Set model
 # =============================================================================
@@ -35,30 +38,33 @@ s2 = mcdc.Surface.PlaneX(x=1e10, boundary_condition="reflective")
 
 # Set cells
 c = mcdc.Cell(region=+s1 & -s2, fill=m)
+simulation.set_model([c])
 
 # =============================================================================
 # Set initial source
 # =============================================================================
 
-mcdc.Source(
+source = mcdc.Source(
     position=(0.0, 0.0, 0.0), isotropic=True, energy_group=np.array([[360], [1.0]])
 )
+simulation.set_sources([source])
 
 # =============================================================================
 # Set tallies, settings, techniques, and run MC/DC
 # =============================================================================
 
 # Tallies
-mcdc.Tally(scores=["flux"], energy="all_groups")
+tally = mcdc.Tally(scores=["flux"], energy="all_groups")
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 70
-mcdc.settings.source_bank_buffer_ratio = 2.0
-mcdc.settings.census_bank_buffer_ratio = 3.0
-mcdc.settings.set_eigenmode(N_inactive=1, N_active=2)
+simulation.settings.N_particle = 70
+simulation.settings.source_bank_buffer_ratio = 2.0
+simulation.settings.census_bank_buffer_ratio = 3.0
+simulation.settings.set_eigenmode(N_inactive=1, N_active=2)
 
 # Techniques
-mcdc.simulation.population_control()
+simulation.population_control()
 
 # Run
-mcdc.run()
+simulation.run()

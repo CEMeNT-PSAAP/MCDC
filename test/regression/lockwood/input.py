@@ -7,6 +7,9 @@ from datetime import datetime
 # Set the XS library directory
 os.environ["MCDC_LIB"] = "../mcdc-regression_test_data/"
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Lockwood")
+
 # =============================================================================
 # Set problem parameters
 # =============================================================================
@@ -56,19 +59,21 @@ s1 = mcdc.Surface.PlaneZ(z=0.0, boundary_condition="vacuum")
 
 s2 = mcdc.Surface.PlaneZ(z=L, boundary_condition="vacuum")
 
-mcdc.Cell(region=+s1 & -s2, fill=mat)
+cell = mcdc.Cell(region=+s1 & -s2, fill=mat)
+simulation.set_model([cell])
 
 # =============================================================================
 # Set source
 # =============================================================================
 # Parallel beam of 1 MeV electrons entering at z=0
 
-mcdc.Source(
+source = mcdc.Source(
     z=[z0 + TINY, z0 + TINY],
     particle_type="electron",
     energy=np.array([[ENERGY - 1, ENERGY + 1], [0.5, 0.5]]),
     direction=[math.sin(THETA), 0.0 + TINY, math.cos(THETA)],
 )
+simulation.set_sources([source])
 
 # =============================================================================
 # Set tally
@@ -77,20 +82,18 @@ mcdc.Source(
 z_bins = np.linspace(0.0, L, N_LAYERS + 1)
 mesh = mcdc.MeshStructured(z=z_bins)
 
-mcdc.Tally(name="edep", mesh=mesh, scores=["energy_deposition"])
-
-mcdc.Tally(name="flux", scores=["flux"], mesh=mesh)
-
-mcdc.Tally(name="s1_current", surface=s1, scores=["current-net"])
-
-mcdc.Tally(name="s2_current", surface=s2, scores=["current-net"])
+edep_tally = mcdc.Tally(name="edep", mesh=mesh, scores=["energy_deposition"])
+flux_tally = mcdc.Tally(name="flux", scores=["flux"], mesh=mesh)
+s1_current = mcdc.Tally(name="s1_current", surface=s1, scores=["current-net"])
+s2_current = mcdc.Tally(name="s2_current", surface=s2, scores=["current-net"])
+simulation.set_tallies([edep_tally, flux_tally, s1_current, s2_current])
 
 # =============================================================================
 # Settings and run
 # =============================================================================
 
-mcdc.settings.set_transported_particles(["electron"])
-mcdc.settings.N_particle = N_PARTICLES
-mcdc.settings.active_bank_buffer = N_PARTICLES * 10
+simulation.settings.set_transported_particles(["electron"])
+simulation.settings.N_particle = N_PARTICLES
+simulation.settings.active_bank_buffer = N_PARTICLES * 10
 
-mcdc.run()
+simulation.run()

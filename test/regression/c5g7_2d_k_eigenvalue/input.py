@@ -3,6 +3,9 @@ import numpy as np
 
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("C5G7 2-D k-eigenvalue")
+
 # =============================================================================
 # Materials
 # =============================================================================
@@ -167,18 +170,19 @@ core = mcdc.Cell(
 )
 
 # Root universe
-mcdc.simulation.set_root_universe(cells=[core])
+simulation.set_model([core])
 
 # =============================================================================
 # Set source
 # =============================================================================
 
-mcdc.Source(
+source = mcdc.Source(
     x=[0.0, pitch * 17 * 2],
     y=[-pitch * 17 * 2, 0.0],
     isotropic=True,
     energy_group=6,
 )
+simulation.set_sources([source])
 
 # =============================================================================
 # Set tallies, settings, techniques, and run MC/DC
@@ -189,19 +193,19 @@ mesh = mcdc.MeshStructured(
     x=np.linspace(0.0, pitch * 17 * 3, 17 * 3 + 1),
     y=np.linspace(-pitch * 17 * 3, 0.0, 17 * 3 + 1),
 )
-mcdc.Tally(mesh=mesh, scores=["flux"])
+tally = mcdc.Tally(mesh=mesh, scores=["flux"])
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 20
-mcdc.settings.census_bank_buffer_ratio = 4.0
-mcdc.settings.source_bank_buffer_ratio = 3.0
-mcdc.settings.set_eigenmode(N_inactive=1, N_active=2, gyration_radius="infinite-z")
+simulation.settings.N_particle = 20
+simulation.settings.census_bank_buffer_ratio = 4.0
+simulation.settings.source_bank_buffer_ratio = 3.0
+simulation.settings.set_eigenmode(
+    N_inactive=1, N_active=2, gyration_radius="infinite-z"
+)
 
 # Techniques
-mcdc.simulation.population_control()
+simulation.population_control()
 
 # Run
-mcdc.settings.set_eigenmode(N_inactive=1, N_active=2, gyration_radius="infinite-z")
-
-
-mcdc.run()
+simulation.run()

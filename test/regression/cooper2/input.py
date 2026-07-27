@@ -1,6 +1,9 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Cooper problem 2")
+
 # =============================================================================
 # Set model
 # =============================================================================
@@ -26,22 +29,24 @@ sy2 = mcdc.Surface.PlaneY(y=2.0)
 sy3 = mcdc.Surface.PlaneY(y=4.0, boundary_condition="vacuum")
 
 # Set cells
-mcdc.Cell(region=+sx1 & -sx2 & +sy1 & -sy2, fill=m_room)
-mcdc.Cell(region=+sx1 & -sx4 & +sy2 & -sy3, fill=m_room)
-mcdc.Cell(region=+sx3 & -sx4 & +sy1 & -sy2, fill=m_room)
-mcdc.Cell(region=+sx2 & -sx3 & +sy1 & -sy2, fill=m_barrier)
+room_lower_left = mcdc.Cell(region=+sx1 & -sx2 & +sy1 & -sy2, fill=m_room)
+room_upper = mcdc.Cell(region=+sx1 & -sx4 & +sy2 & -sy3, fill=m_room)
+room_lower_right = mcdc.Cell(region=+sx3 & -sx4 & +sy1 & -sy2, fill=m_room)
+barrier = mcdc.Cell(region=+sx2 & -sx3 & +sy1 & -sy2, fill=m_barrier)
+simulation.set_model([room_lower_left, room_upper, room_lower_right, barrier])
 
 # =============================================================================
 # Set source
 # =============================================================================
 
-mcdc.Source(
+source = mcdc.Source(
     x=[0.0, 1.0],
     y=[0.0, 1.0],
     isotropic=True,
     energy_group=0,
     time=0.0,
 )
+simulation.set_sources([source])
 
 # =============================================================================
 # Set tallies, settings, techniques, and run MC/DC
@@ -49,15 +54,16 @@ mcdc.Source(
 
 # Tallies
 mesh = mcdc.MeshUniform(x=(0.0, 0.1, 40), y=(0.0, 0.1, 40))
-mcdc.Tally(mesh=mesh, scores=["flux"])
+tally = mcdc.Tally(mesh=mesh, scores=["flux"])
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 1000
-mcdc.settings.N_batch = 2
+simulation.settings.N_particle = 1000
+simulation.settings.N_batch = 2
 
 # Techniques
-mcdc.simulation.implicit_capture()
-mcdc.simulation.global_weight_roulette(0.1, 1.0)
+simulation.implicit_capture()
+simulation.global_weight_roulette(0.1, 1.0)
 
 # Run
-mcdc.run()
+simulation.run()
