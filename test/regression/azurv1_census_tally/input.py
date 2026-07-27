@@ -61,6 +61,3 @@ simulation.population_control()
 
 # Run
 simulation.run()
-
-# Post-processing
-mcdc.recombine_tallies()

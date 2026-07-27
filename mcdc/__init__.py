@@ -22,4 +22,3 @@ from mcdc.object_.tally import Tally
 # ======================================================================================
 
 import mcdc.config
-from mcdc.output import recombine_tallies
