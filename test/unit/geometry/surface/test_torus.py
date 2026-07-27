@@ -26,7 +26,7 @@ particle = None
 
 
 @pytest.fixture(autouse=True)
-def setup_geometry_case():
+def setup_geometry_case(prepare_simulation):
     global axis_aligned_surface, reference_surface, oblique_surface
     global data, particle_container, particle
 
@@ -47,9 +47,13 @@ def setup_geometry_case():
         r=r,
     )
 
-    from mcdc.main import preparation
-
-    structure_container, data = preparation()
+    structure_container, data = prepare_simulation(
+        objects=[
+            axis_aligned_surface_obj,
+            reference_surface_obj,
+            oblique_surface_obj,
+        ]
+    )
     structure = structure_container[0]
     axis_aligned_surface = structure["surfaces"][axis_aligned_surface_obj.ID]
     reference_surface = structure["surfaces"][reference_surface_obj.ID]

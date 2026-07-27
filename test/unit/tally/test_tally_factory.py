@@ -75,16 +75,20 @@ def test_tally_factory_allows_combined_supported_filters(slab_plane_x):
         cell=slab_plane_x["c_right"],
         scores=["current-net"],
     )
-    assert surface_cell_tally.surface_filtered
-    assert surface_cell_tally.surface_filter_ID == slab_plane_x["s_mid"].ID
-    assert surface_cell_tally.cell_filtered
-    assert surface_cell_tally.cell_filter_ID == slab_plane_x["c_right"].ID
-
     cell_mesh_tally = mcdc.Tally(
         cell=slab_plane_x["c_right"],
         mesh=mesh,
         scores=["flux"],
     )
+
+    simulation = slab_plane_x["simulation"]
+    simulation.set_tallies([surface_cell_tally, cell_mesh_tally])
+    simulation.compile()
+
+    assert surface_cell_tally.surface_filtered
+    assert surface_cell_tally.surface_filter_ID == slab_plane_x["s_mid"].ID
+    assert surface_cell_tally.cell_filtered
+    assert surface_cell_tally.cell_filter_ID == slab_plane_x["c_right"].ID
     assert cell_mesh_tally.cell_filtered
     assert cell_mesh_tally.cell_filter_ID == slab_plane_x["c_right"].ID
     assert cell_mesh_tally.mesh_filtered

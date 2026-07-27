@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 import mcdc
-from mcdc.main import preparation
 from mcdc.transport.simulation import surface_crossing
 
 
@@ -53,16 +52,19 @@ def test_unbounded_surface_crossing_tally_scoring(
 
 
 def test_surface_crossing_tally_scores_vacuum_boundary(
-    material_mg, bin_value, crossing_particle
+    material_mg, bin_value, crossing_particle, prepare_simulation
 ):
     s_left = mcdc.Surface.PlaneX(x=-1.0, boundary_condition="vacuum")
     s_right = mcdc.Surface.PlaneX(x=1.0, boundary_condition="vacuum")
-    mcdc.Cell(region=+s_left & -s_right, fill=material_mg)
+    cell = mcdc.Cell(region=+s_left & -s_right, fill=material_mg)
     tally_obj = mcdc.Tally(surface=s_right, scores=["current-net"])
 
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(
+        cells=[cell],
+        tallies=[tally_obj],
+    )
     mcdc_struct = mcdc_container[0]
-    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.child_ID]
+    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.sub_ID]
 
     particle_container = crossing_particle(s_right.ID, x=1.0, ux=0.5)
     particle = particle_container[0]
@@ -74,16 +76,19 @@ def test_surface_crossing_tally_scores_vacuum_boundary(
 
 
 def test_surface_crossing_tally_scores_after_reflective_boundary(
-    material_mg, bin_value, crossing_particle
+    material_mg, bin_value, crossing_particle, prepare_simulation
 ):
     s_left = mcdc.Surface.PlaneX(x=-1.0, boundary_condition="vacuum")
     s_right = mcdc.Surface.PlaneX(x=1.0, boundary_condition="reflective")
-    mcdc.Cell(region=+s_left & -s_right, fill=material_mg)
+    cell = mcdc.Cell(region=+s_left & -s_right, fill=material_mg)
     tally_obj = mcdc.Tally(surface=s_right, scores=["current-net"])
 
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(
+        cells=[cell],
+        tallies=[tally_obj],
+    )
     mcdc_struct = mcdc_container[0]
-    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.child_ID]
+    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.sub_ID]
 
     particle_container = crossing_particle(s_right.ID, x=1.0, ux=0.5)
     particle = particle_container[0]

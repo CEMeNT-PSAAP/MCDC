@@ -4,16 +4,6 @@ import pytest
 import mcdc
 import mcdc.numba_types as type_
 from mcdc.constant import PARTICLE_NEUTRON
-from mcdc.main import preparation
-from mcdc.object_.simulation import simulation
-
-
-@pytest.fixture(autouse=True)
-def reset_simulation():
-    # Keep simulation state isolated per test.
-    simulation.__init__()
-    yield
-    simulation.__init__()
 
 
 @pytest.fixture
@@ -54,7 +44,11 @@ def slab_plane_x(material_mg):
     s_right = mcdc.Surface.PlaneX(x=1.0, boundary_condition="vacuum")
     c_left = mcdc.Cell(region=+s_left & -s_mid, fill=material_mg)
     c_right = mcdc.Cell(region=+s_mid & -s_right, fill=material_mg)
+    simulation = mcdc.Simulation()
+    simulation.set_model([c_left, c_right])
+    simulation.compile()
     return {
+        "simulation": simulation,
         "s_left": s_left,
         "s_mid": s_mid,
         "s_right": s_right,
@@ -64,18 +58,21 @@ def slab_plane_x(material_mg):
 
 
 @pytest.fixture
-def surface_crossing_tally_context(slab_plane_x):
+def surface_crossing_tally_context(slab_plane_x, prepare_simulation):
     s_mid = slab_plane_x["s_mid"]
 
     unbounded_tally_obj = mcdc.Tally(surface=s_mid, scores=["current-net"])
 
     # Build compiled structures.
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(
+        cells=[slab_plane_x["c_left"], slab_plane_x["c_right"]],
+        tallies=[unbounded_tally_obj],
+    )
     mcdc_struct = mcdc_container[0]
 
     # Compiled tally handles.
     unbounded_tally = mcdc_struct["surface_crossing_tallies"][
-        unbounded_tally_obj.child_ID
+        unbounded_tally_obj.sub_ID
     ]
 
     # Particle for direct crossing-based tally-kernel testing.
@@ -106,7 +103,7 @@ def surface_crossing_tally_context(slab_plane_x):
 @pytest.fixture
 def bin_value():
     def _value(surface_crossing_tally, mcdc_struct, data):
-        tally_base = mcdc_struct["tallies"][surface_crossing_tally["parent_ID"]]
+        tally_base = mcdc_struct["tallies"][surface_crossing_tally["base_ID"]]
         return data[tally_base["bin_offset"]]
 
     return _value

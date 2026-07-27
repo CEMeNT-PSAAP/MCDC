@@ -48,6 +48,10 @@ def compile_simulation(simulation: Simulation):
     for tally in tallies:
         tally._compile_into_simulation(simulation)
 
+    # Compile model objects owned by transport techniques.
+    if simulation.weight_windows.active:
+        simulation.weight_windows.mesh._compile_into_simulation(simulation)
+
     # Apply settings as needed
     settings = simulation.settings
     if simulation.settings.neutron_eigenvalue_mode:

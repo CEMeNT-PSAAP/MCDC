@@ -1,32 +1,37 @@
 import numpy as np
 
 import mcdc
-from mcdc.main import preparation
 from mcdc.transport.simulation import surface_crossing
 
 
 def _bin_value_score(tally, mcdc_struct, data, score_idx):
-    tally_base = mcdc_struct["tallies"][tally["parent_ID"]]
+    tally_base = mcdc_struct["tallies"][tally["base_ID"]]
     return data[tally_base["bin_offset"] + score_idx]
 
 
 def test_cell_filter_ignores_redundant_interior_surface_crossing(
-    material_mg, crossing_particle
+    material_mg, crossing_particle, prepare_simulation
 ):
     s3 = mcdc.Surface.PlaneX(x=3.0)
     s5 = mcdc.Surface.PlaneX(x=5.0)
 
     # This region is equivalent to x < 5, but the expression includes a surface at s3.
     c = mcdc.Cell(region=(-s5) | (-s3), fill=material_mg)
-    mcdc.Cell(region=+s5, fill=material_mg)
+    outside = mcdc.Cell(region=+s5, fill=material_mg)
+    simulation = mcdc.Simulation()
+    simulation.set_model([c, outside])
+    simulation.compile()
     tally_obj = mcdc.Tally(
         cell=c,
         scores=["current-net", "current-in", "current-out"],
     )
 
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(
+        cells=[c, outside],
+        tallies=[tally_obj],
+    )
     mcdc_struct = mcdc_container[0]
-    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.child_ID]
+    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.sub_ID]
 
     # The particle crosses s3, but it remains inside c before and after crossing
     particle_container = crossing_particle(s3.ID, x=3.0, ux=0.5, cell_ID=c.ID)
@@ -53,21 +58,30 @@ def _build_cube_with_interior_plane(material_mg):
     outside_region = -x_min | +x_max | -y_min | +y_max | -z_min | +z_max
     outside = mcdc.Cell(region=outside_region, fill=material_mg)
 
+    simulation = mcdc.Simulation()
+    simulation.set_model([cube, outside])
+    simulation.compile()
+
     return {"cube": cube, "outside": outside, "x_min": x_min, "x_mid": x_mid}
 
 
-def _cube_current_tally(geom):
+def _cube_current_tally(geom, prepare_simulation):
     tally_obj = mcdc.Tally(
         cell=geom["cube"],
         scores=["current-net", "current-in", "current-out"],
     )
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(
+        cells=[geom["cube"], geom["outside"]],
+        tallies=[tally_obj],
+    )
     mcdc_struct = mcdc_container[0]
-    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.child_ID]
+    tally = mcdc_struct["surface_crossing_tallies"][tally_obj.sub_ID]
     return tally, mcdc_struct, data
 
 
-def test_cell_filter_ignores_interior_plane_crossing(material_mg, crossing_particle):
+def test_cell_filter_ignores_interior_plane_crossing(
+    material_mg, crossing_particle, prepare_simulation
+):
     """
     A particle crossing the cube's interior plane while remaining inside the
     cube does not cross the cell boundary, so current-net/in/out must all be 0.
@@ -78,7 +92,7 @@ def test_cell_filter_ignores_interior_plane_crossing(material_mg, crossing_parti
     (net = +w, in = +w, out = +w instead of 0).
     """
     geom = _build_cube_with_interior_plane(material_mg)
-    tally, mcdc_struct, data = _cube_current_tally(geom)
+    tally, mcdc_struct, data = _cube_current_tally(geom, prepare_simulation)
 
     # The particle crosses the cube's interior plane but remains in the cube.
     particle_container = crossing_particle(
@@ -94,7 +108,9 @@ def test_cell_filter_ignores_interior_plane_crossing(material_mg, crossing_parti
     assert np.isclose(_bin_value_score(tally, mcdc_struct, data, 2), 0.0)
 
 
-def test_cell_filter_scores_real_face_entry(material_mg, crossing_particle):
+def test_cell_filter_scores_real_face_entry(
+    material_mg, crossing_particle, prepare_simulation
+):
     """
     Contrast case on the same geometry: entering the cube through a real outer
     face (x_min) from the outside cell is a genuine boundary crossing, so it
@@ -102,7 +118,7 @@ def test_cell_filter_scores_real_face_entry(material_mg, crossing_particle):
     convention).
     """
     geom = _build_cube_with_interior_plane(material_mg)
-    tally, mcdc_struct, data = _cube_current_tally(geom)
+    tally, mcdc_struct, data = _cube_current_tally(geom, prepare_simulation)
 
     # Entering through a real outer face should score incoming current.
     particle_container = crossing_particle(

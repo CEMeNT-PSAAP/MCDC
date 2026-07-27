@@ -3,7 +3,7 @@ import numpy as np
 
 import mcdc.numba_types as type_
 import mcdc.transport.distribution as dist
-from mcdc.constant import PI
+from mcdc.constant import DATA_TABLE, PI
 
 from .test_data import make_test_table_data_constant
 
@@ -18,9 +18,17 @@ def test_maxwellian_sample(mock_rng_sequence, make_distribution_record):
     )
     data = np.asarray(data, dtype=np.float64)
 
-    simulation_dtype = np.dtype([("table_data", type_.table_data, (1,))])
+    simulation_dtype = np.dtype(
+        [
+            ("data", type_.data, (1,)),
+            ("polynomial_data", type_.polynomial_data, (1,)),
+            ("table_data", type_.table_data, (1,)),
+        ]
+    )
     simulation_container = np.zeros(1, dtype=simulation_dtype)
     simulation = simulation_container[0]
+    simulation["data"][0]["sub_type"] = DATA_TABLE
+    simulation["data"][0]["sub_ID"] = 0
     simulation["table_data"][0] = table
 
     xi1, xi2, xi3 = 0.9, 0.9, 0.0
