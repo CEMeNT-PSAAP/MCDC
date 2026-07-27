@@ -315,9 +315,7 @@ def generate_RPN_tokens(region, simulation):
             ):
                 stack += ["|", token.A, token.B]
 
-            elif token.type == "complement" and (
-                isinstance(A, Region) and isinstance(B, Region)
-            ):
+            elif token.type == "complement" and (isinstance(A, Region)):
                 stack += ["~", token.A]
 
             else:
