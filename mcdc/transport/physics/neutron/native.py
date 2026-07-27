@@ -189,9 +189,12 @@ def _neutron_inelastic_scattering_production_xs(particle_container, simulation, 
                 )
             )
             reaction = simulation["neutron_reactions"][reaction_ID]
+            inelastic_scattering = simulation["neutron_inelastic_scattering_reactions"][
+                reaction["sub_ID"]
+            ]
 
             xs = reaction_micro_xs(E, reaction, nuclide, data)
-            nu = reaction["multiplicity"]
+            nu = inelastic_scattering["multiplicity"]
             total += nuclide_density * nu * xs
 
     return total
