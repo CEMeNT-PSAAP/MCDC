@@ -33,20 +33,21 @@ from mcdc.transport.geometry.surface import get_normal_component
 from mcdc.transport.tally.filter import get_filter_indices
 
 # ======================================================================================
-# Surface crossing tally
+# Surface-crossing
 # ======================================================================================
 
 
 @njit
-def surface_crossing_tally(
+def surface_crossing(
     particle_container,
     surface,
-    surface_crossing_tally,
+    tally,
     simulation,
     data,
 ):
     particle = particle_container[0]
-    tally = simulation["tallies"][surface_crossing_tally["base_ID"]]
+    sub_ID = tally["sub_ID"]
+    surface_crossing_tally = simulation["surface_crossing_tallies"][sub_ID]
 
     # Get filter indices
     MG_mode = simulation["settings"]["neutron_multigroup_mode"]
@@ -118,17 +119,16 @@ def surface_crossing_tally(
 
 
 # ======================================================================================
-# Collision tally
+# Collision
 # ======================================================================================
 
 
 @njit
-def collision_tally(
-    particle_container, collision_data_container, collision_tally, simulation, data
-):
+def collision(particle_container, collision_data_container, tally, simulation, data):
     particle = particle_container[0]
     collision_data = collision_data_container[0]
-    tally = simulation["tallies"][collision_tally["base_ID"]]
+    sub_ID = tally["sub_ID"]
+    collision_tally = simulation["collision_tallies"][sub_ID]
 
     # Get filter indices
     MG_mode = simulation["settings"]["neutron_multigroup_mode"]
@@ -182,11 +182,10 @@ def collision_tally(
 
 
 @njit
-def tracklength_tally(
-    particle_container, distance, tracklength_tally, simulation, data
-):
+def tracklength(particle_container, distance, tally, simulation, data):
     particle = particle_container[0]
-    tally = simulation["tallies"][tracklength_tally["base_ID"]]
+    sub_ID = tally["sub_ID"]
+    tracklength_tally = simulation["tracklength_tallies"][sub_ID]
 
     # Get filter indices
     MG_mode = simulation["settings"]["neutron_multigroup_mode"]

@@ -138,6 +138,10 @@ def inspect_geometry(particle_container, simulation, data):
                 particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
                 particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
 
+            else:
+                # Unreached
+                universe_ID = -1
+
             # Get inner cell
             cell_ID = get_cell(particle_container, universe_ID, simulation, data)
             if cell_ID > -1:
@@ -243,6 +247,10 @@ def locate_particle(particle_container, simulation, data):
                 particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
                 particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
                 particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
+
+            else:
+                # Unreached
+                universe_ID = -1
 
             # Get inner cell
             cell_ID = get_cell(particle_container, universe_ID, simulation, data)

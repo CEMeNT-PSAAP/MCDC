@@ -181,7 +181,8 @@ def sample_tabulated(table, rng_state, simulation, data):
     Sample a value from a tabulated distribution.
     """
 
-    pdf_table = simulation["table_data"][table["pdf_ID"]]
+    pdf_data = simulation["data"][table["pdf_ID"]]
+    pdf_table = simulation["table_data"][pdf_data["sub_ID"]]
 
     cdf = mcdc_get.table_data.aux_vector(0, pdf_table, data)
 
@@ -332,7 +333,8 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
 
     # Sample from the selected table
     ID = int(mcdc_get.multi_table_distribution.table_IDs(idx, multi_table, data))
-    table_distribution = simulation["tabulated_distributions"][ID]
+    sub_ID = simulation["distributions"][ID]["sub_ID"]
+    table_distribution = simulation["tabulated_distributions"][sub_ID]
     sample = sample_tabulated(table_distribution, rng_state, simulation, data)
 
     # No scaling needed?
@@ -343,18 +345,27 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
     if use_next_table:
         idx -= 1
 
-    # PDF table indices
+    # PDF tables
     ID0 = int(mcdc_get.multi_table_distribution.table_IDs(idx, multi_table, data))
     ID1 = int(mcdc_get.multi_table_distribution.table_IDs(idx + 1, multi_table, data))
     #
-    pdf_ID = table_distribution["pdf_ID"]
-    pdf_ID0 = simulation["tabulated_distributions"][ID0]["pdf_ID"]
-    pdf_ID1 = simulation["tabulated_distributions"][ID1]["pdf_ID"]
-
-    # The tables
-    table = simulation["table_data"][pdf_ID]
-    table0 = simulation["table_data"][pdf_ID0]
-    table1 = simulation["table_data"][pdf_ID1]
+    sub_ID0 = simulation["distributions"][ID0]["sub_ID"]
+    sub_ID1 = simulation["distributions"][ID1]["sub_ID"]
+    #
+    table_distribution0 = simulation["tabulated_distributions"][sub_ID0]
+    table_distribution1 = simulation["tabulated_distributions"][sub_ID1]
+    #
+    ID = table_distribution["pdf_ID"]
+    ID0 = table_distribution0["pdf_ID"]
+    ID1 = table_distribution1["pdf_ID"]
+    #
+    sub_ID = simulation["data"][ID]["sub_ID"]
+    sub_ID0 = simulation["data"][ID0]["sub_ID"]
+    sub_ID1 = simulation["data"][ID1]["sub_ID"]
+    #
+    table = simulation["table_data"][sub_ID]
+    table0 = simulation["table_data"][sub_ID0]
+    table1 = simulation["table_data"][sub_ID1]
 
     # Table's min
     val_min0 = mcdc_get.table_data.x(0, table0, data)

@@ -302,8 +302,8 @@ def step_particle(particle_container, program, data):
             cell = simulation["cells"][particle["cell_ID"]]
             for i in range(cell["N_collision_tally"]):
                 tally_ID = int(mcdc_get.cell.collision_tally_IDs(i, cell, data))
-                tally = simulation["collision_tallies"][tally_ID]
-                tally_module.score.collision_tally(
+                tally = simulation["tallies"][tally_ID]
+                tally_module.score.collision(
                     particle_container,
                     collision_data_container,
                     tally,
@@ -431,8 +431,8 @@ def move_to_event(particle_container, simulation, data):
         cell = simulation["cells"][particle["cell_ID"]]
         for i in range(cell["N_tracklength_tally"]):
             tally_ID = int(mcdc_get.cell.tracklength_tally_IDs(i, cell, data))
-            tally = simulation["tracklength_tallies"][tally_ID]
-            tally_module.score.tracklength_tally(
+            tally = simulation["tallies"][tally_ID]
+            tally_module.score.tracklength(
                 particle_container, distance, tally, simulation, data
             )
 
@@ -446,29 +446,29 @@ def move_to_event(particle_container, simulation, data):
 
 
 @njit
-def surface_crossing(P_arr, simulation, data):
-    P = P_arr[0]
-    crossed_surface_ID = P["surface_ID"]
+def surface_crossing(particle_container, simulation, data):
+    particle = particle_container[0]
+    crossed_surface_ID = particle["surface_ID"]
 
     surface = simulation["surfaces"][crossed_surface_ID]
     BC = surface["boundary_condition"]
 
     # Apply BC
     if BC == BC_VACUUM:
-        P["alive"] = False
+        particle["alive"] = False
     elif BC == BC_REFLECTIVE:
-        surface_module.reflect(P_arr, surface)
+        surface_module.reflect(particle_container, surface)
         return  # No score
 
     # Score tally
     for i in range(surface["N_tally"]):
         tally_ID = int(mcdc_get.surface.surface_crossing_tally_IDs(i, surface, data))
-        tally = simulation["surface_crossing_tallies"][tally_ID]
-        tally_module.score.surface_crossing_tally(
-            P_arr, surface, tally, simulation, data
+        tally = simulation["tallies"][tally_ID]
+        tally_module.score.surface_crossing(
+            particle_container, surface, tally, simulation, data
         )
 
     # Flag to check new cell later
-    if P["alive"]:
-        P["cell_ID"] = -1
-        P["material_ID"] = -1
+    if particle["alive"]:
+        particle["cell_ID"] = -1
+        particle["material_ID"] = -1
