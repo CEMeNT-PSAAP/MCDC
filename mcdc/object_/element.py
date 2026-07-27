@@ -14,10 +14,11 @@ from mcdc.object_.electron_reaction import (
     ElectronReactionExcitation,
     ElectronReactionIonization,
 )
+from mcdc.print_ import print_error
 
 
 class Element(MCDCObject):
-    """Element data loaded from the MC/DC HDF5 library.
+    """Element definition for the MC/DC HDF5 library.
 
     Parameters
     ----------
@@ -26,8 +27,10 @@ class Element(MCDCObject):
 
     Notes
     -----
-    Construction loads basic atomic properties. Electron reaction cross sections
-    and secondary distributions are loaded later by :meth:`set_electron_data`.
+    Construction records the element identity without accessing the data
+    library. Basic properties are loaded when the element is compiled into a
+    simulation. Electron reaction cross sections and secondary distributions
+    are loaded later by :meth:`set_electron_data`.
     """
 
     # MC/DC framework metadata
@@ -56,16 +59,28 @@ class Element(MCDCObject):
 
         self.name = element_name
 
-        # Basic properties
-        dir_name = os.getenv("MCDC_LIB")
-        file_name = f"{element_name}.h5"
-        file = h5py.File(f"{dir_name}/{file_name}", "r")
-        self.atomic_weight_ratio = float(file["atomic_weight_ratio"][()])
-        self.atomic_number = int(file["atomic_number"][()])
-        file.close()
+    def _compile_into_simulation(self, simulation) -> bool:
+        """Load basic properties and register with the owning simulation."""
+        if self.compile_ID == simulation.compile_ID:
+            return False
 
-    def set_electron_data(self):
-        """Load electron cross sections and reaction data from ``MCDC_LIB``."""
+        dir_name = os.getenv("MCDC_LIB")
+        if dir_name is None:
+            print_error("Environment variable MCDC_LIB is not set")
+
+        file_name = f"{self.name}.h5"
+        file_path = os.path.join(dir_name, file_name)
+        if not os.path.isfile(file_path):
+            print_error(f"Element {self.name} is not available in the library")
+
+        with h5py.File(file_path, "r") as file:
+            self.atomic_weight_ratio = float(file["atomic_weight_ratio"][()])
+            self.atomic_number = int(file["atomic_number"][()])
+
+        return super()._compile_into_simulation(simulation)
+
+    def set_electron_data(self, simulation):
+        """Load and register electron reaction data from ``MCDC_LIB``."""
         element_name = self.name
 
         # Load data library
@@ -163,6 +178,11 @@ class Element(MCDCObject):
         self.electron_ionization_subshell_binding_energy = np.asarray(binding_energy)
 
         file.close()
+
+        # Register data loaded after model compilation.
+        for reaction_container in rx_containers:
+            for reaction in reaction_container:
+                reaction._compile_into_simulation(simulation)
 
     def __repr__(self):
         text = "\n"

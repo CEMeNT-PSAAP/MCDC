@@ -1,5 +1,4 @@
 import numpy as np
-import os
 
 from numpy import float64
 from numpy.typing import NDArray
@@ -73,8 +72,9 @@ class Material(MaterialBase):
     Notes
     -----
     Exactly one of ``nuclide_composition`` or ``element_composition`` must be
-    supplied. The ``MCDC_LIB`` environment variable must point to the directory
-    containing the corresponding HDF5 data-library files.
+    supplied. Nuclide and element objects are created immediately; their
+    data-library properties are loaded when the material is compiled into a
+    simulation.
 
     Examples
     --------
@@ -129,25 +129,6 @@ class Material(MaterialBase):
         # Temperature
         self.temperature = temperature
 
-        # Dictionary connecting nuclides to respective densities
-        self.nuclide_composition = {}
-
-        # Dictionary connecting elements to respective densities
-        self.element_composition = {}
-
-        # Numba representation of nuclide_composition
-        self.nuclides = []
-        self.nuclide_densities = np.zeros(len(nuclide_composition))
-
-        # Numba representation of element_composition
-        self.elements = []
-        self.element_densities = np.zeros(len(element_composition))
-
-        # Check if library directory is set
-        lib_dir = os.getenv("MCDC_LIB")
-        if lib_dir is None:
-            print_error("Environment variable MCDC_LIB is not set")
-
         # Check that only one composition is supplied
         if len(nuclide_composition) > 0 and len(element_composition) > 0:
             print_error(
@@ -159,64 +140,65 @@ class Material(MaterialBase):
                 "Must specify either nuclide_composition or element_composition"
             )
 
-        # Loop over the items in the elemental composition
-        for i, (key, value) in enumerate(element_composition.items()):
-            element_name = key
-            element_density = value
+        # Create lightweight composition objects. Library data and simulation
+        # registration are deferred to each object's compilation.
+        nearest_temperature = _get_supported_temperature(self.temperature)
+        self.nuclide_composition = {
+            Nuclide(name, nearest_temperature): density
+            for name, density in nuclide_composition.items()
+        }
+        self.element_composition = {
+            Element(name): density for name, density in element_composition.items()
+        }
 
-            # Check if element is already created
-            found = False
-            for element in simulation.elements:
-                if element.name == element_name:
-                    found = True
-                    break
+        # Numba representations of the compositions
+        self.nuclides = list(self.nuclide_composition)
+        self.elements = list(self.element_composition)
+        self.nuclide_densities = np.asarray(
+            list(self.nuclide_composition.values()), dtype=float
+        )
+        self.element_densities = np.asarray(
+            list(self.element_composition.values()), dtype=float
+        )
 
-            # Create the element object if needed
-            if not found:
-                element = Element(element_name)
+    def _compile_into_simulation(self, simulation) -> bool:
+        """Resolve and register composition objects with the owning simulation."""
+        if not super()._compile_into_simulation(simulation):
+            return False
 
-            # Register the element composition
-            self.elements.append(element)
-            self.element_densities[i] = element_density
-            self.element_composition[element] = element_density
+        nuclide_composition = {}
+        element_composition = {}
+        self.fissionable = False
 
-        # Loop over the items in the nuclide composition
-        for i, (key, value) in enumerate(nuclide_composition.items()):
-            nuclide_name = key
-            nuclide_density = value
+        # Replace locally created elements with canonical simulation objects.
+        for element, density in self.element_composition.items():
+            element = _get_or_create_element(element.name, simulation, element)
+            element._compile_into_simulation(simulation)
+            element_composition[element] = density
 
-            # Get supported temperature
-            nearest_temperature = min(TEMPERATURES, key=lambda x: abs(x - temperature))
+        # Replace locally created nuclides with canonical simulation objects.
+        for nuclide, density in self.nuclide_composition.items():
+            nuclide = _get_or_create_nuclide(
+                nuclide.name, nuclide.temperature, simulation, nuclide
+            )
+            nuclide._compile_into_simulation(simulation)
+            nuclide_composition[nuclide] = density
 
-            # Check if nuclide-temperature is available in the library
-            file_name = f"{nuclide_name}-{nearest_temperature}K.h5"
-            if not file_name in os.listdir(lib_dir):
-                print_error(
-                    f"Nuclide {nuclide_name} at temperature {nearest_temperature} K is not available in the library"
-                )
-
-            # Check if nuclide is already created
-            found = False
-            for nuclide in simulation.nuclides:
-                if (
-                    nuclide.name == nuclide_name
-                    and nearest_temperature == nuclide.temperature
-                ):
-                    found = True
-                    break
-
-            # Create the nuclide to objects if needed
-            if not found:
-                nuclide = Nuclide(nuclide_name, nearest_temperature)
-
-            # Register the nuclide composition
-            self.nuclides.append(nuclide)
-            self.nuclide_densities[i] = nuclide_density
-            self.nuclide_composition[nuclide] = nuclide_density
-
-            # Promote nuclide flags to material
             if nuclide.fissionable:
                 self.fissionable = True
+
+        self.nuclide_composition = nuclide_composition
+        self.element_composition = element_composition
+        self.nuclides = list(nuclide_composition)
+        self.elements = list(element_composition)
+        self.nuclide_densities = np.asarray(
+            list(nuclide_composition.values()), dtype=float
+        )
+        self.element_densities = np.asarray(
+            list(element_composition.values()), dtype=float
+        )
+
+        return True
 
     def __repr__(self):
         text = super().__repr__()
@@ -494,15 +476,15 @@ class MaterialMG(MaterialBase):
         return text
 
 
-def set_nuclides_from_elements(material):
-    """Expand an elemental material composition into natural isotopes."""
+def set_nuclides_from_elements(material, simulation):
+    """Expand an elemental composition and register its natural isotopes."""
 
     material.nuclides = []
     material.nuclide_composition = {}
     nuclide_densities = []
 
     # Get supported temperature
-    nearest_temperature = min(TEMPERATURES, key=lambda x: abs(x - material.temperature))
+    nearest_temperature = _get_supported_temperature(material.temperature)
 
     for element, element_density in material.element_composition.items():
         # To make sure that the abundance is normalized
@@ -512,19 +494,10 @@ def set_nuclides_from_elements(material):
 
         # Loop over the nuclide composition
         for nuclide_name, abundance in ISOTOPIC_ABUNDANCE[element.name].items():
-            # Check if nuclide is already created
-            found = False
-            for nuclide in simulation.nuclides:
-                if (
-                    nuclide.name == nuclide_name
-                    and nearest_temperature == nuclide.temperature
-                ):
-                    found = True
-                    break
-
-            # Create the nuclide object if needed
-            if not found:
-                nuclide = Nuclide(nuclide_name, nearest_temperature)
+            nuclide = _get_or_create_nuclide(
+                nuclide_name, nearest_temperature, simulation
+            )
+            nuclide._compile_into_simulation(simulation)
 
             # Calculate nuclide density
             nuclide_density = element_density * abundance / norm
@@ -537,8 +510,8 @@ def set_nuclides_from_elements(material):
     material.nuclide_densities = np.array(nuclide_densities)
 
 
-def set_elements_from_nuclides(material):
-    """Collapse a nuclide composition into elemental atomic densities."""
+def set_elements_from_nuclides(material, simulation):
+    """Collapse a nuclide composition and register its elements."""
 
     material.elements = []
     material.element_composition = {}
@@ -555,16 +528,8 @@ def set_elements_from_nuclides(material):
 
     # Iterate over all named elements
     for i, element_name in enumerate(element_names):
-        # Check if element is already created
-        found = False
-        for element in simulation.elements:
-            if element.name == element_name:
-                found = True
-                break
-
-        # Create the element object if needed
-        if not found:
-            element = Element(element_name)
+        element = _get_or_create_element(element_name, simulation)
+        element._compile_into_simulation(simulation)
 
         material.elements.append(element)
 
@@ -582,6 +547,25 @@ def set_elements_from_nuclides(material):
         material.element_composition[element] = density
 
     material.element_densities = element_densities
+
+
+def _get_supported_temperature(temperature):
+    return min(TEMPERATURES, key=lambda value: abs(value - temperature))
+
+
+def _get_or_create_element(element_name, simulation, candidate=None):
+    for element in simulation.elements:
+        if element.name == element_name:
+            return element
+    return candidate or Element(element_name)
+
+
+def _get_or_create_nuclide(nuclide_name, temperature, simulation, candidate=None):
+    for nuclide in simulation.nuclides:
+        if nuclide.name == nuclide_name and nuclide.temperature == temperature:
+            return nuclide
+
+    return candidate or Nuclide(nuclide_name, temperature)
 
 
 def update_fissionable_from_nuclides(material):

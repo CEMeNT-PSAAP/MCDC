@@ -26,7 +26,7 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Nuclide(MCDCObject):
-    """Temperature-specific nuclide data from the MC/DC HDF5 library.
+    """Temperature-specific nuclide definition for the MC/DC HDF5 library.
 
     Parameters
     ----------
@@ -37,17 +37,15 @@ class Nuclide(MCDCObject):
 
     Notes
     -----
-    Construction loads basic nuclide properties. Neutron cross sections,
-    reactions, multiplicities, and delayed-neutron data are loaded later by
-    :meth:`set_neutron_data`.
+    Construction records the nuclide identity without accessing the data
+    library. Basic properties are loaded when the nuclide is compiled into a
+    simulation. Neutron cross sections, reactions, multiplicities, and
+    delayed-neutron data are loaded later by :meth:`set_neutron_data`.
     """
 
     # MC/DC framework metadata
     label = "nuclide"
 
-    # Annotations for Numba mode
-    label: str = "nuclide"
-    #
     name: str
     temperature: float
     atomic_number: int
@@ -81,16 +79,31 @@ class Nuclide(MCDCObject):
         self.name = nuclide_name
         self.temperature = temperature
 
-        # Basic properties
+    def _compile_into_simulation(self, simulation) -> bool:
+        """Load basic properties and register with the owning simulation."""
+        if self.compile_ID == simulation.compile_ID:
+            return False
+
         dir_name = os.getenv("MCDC_LIB")
-        file_name = f"{nuclide_name}-{temperature}K.h5"
-        file = h5py.File(f"{dir_name}/{file_name}", "r")
-        self.atomic_number = int(file["atomic_number"][()])
-        self.mass_number = int(file["mass_number"][()])
-        self.atomic_weight_ratio = file["atomic_weight_ratio"][()]
-        self.fissionable = bool(file["fissionable"][()])
-        self.excitation_level = int(file["excitation_level"][()])
-        file.close()
+        if dir_name is None:
+            print_error("Environment variable MCDC_LIB is not set")
+
+        file_name = f"{self.name}-{self.temperature}K.h5"
+        file_path = os.path.join(dir_name, file_name)
+        if not os.path.isfile(file_path):
+            print_error(
+                f"Nuclide {self.name} at temperature {self.temperature} K "
+                "is not available in the library"
+            )
+
+        with h5py.File(file_path, "r") as file:
+            self.atomic_number = int(file["atomic_number"][()])
+            self.mass_number = int(file["mass_number"][()])
+            self.atomic_weight_ratio = file["atomic_weight_ratio"][()]
+            self.fissionable = bool(file["fissionable"][()])
+            self.excitation_level = int(file["excitation_level"][()])
+
+        return super()._compile_into_simulation(simulation)
 
     def set_neutron_data(self, simulation):
         """Load and attach neutron physics data from ``MCDC_LIB``.
@@ -237,6 +250,15 @@ class Nuclide(MCDCObject):
                 )
 
         file.close()
+
+        # Register data loaded after model compilation.
+        for reaction_container in rx_containers:
+            for reaction in reaction_container:
+                reaction._compile_into_simulation(simulation)
+        self.neutron_fission_prompt_multiplicity._compile_into_simulation(simulation)
+        self.neutron_fission_delayed_multiplicity._compile_into_simulation(simulation)
+        for spectrum in self.neutron_fission_delayed_spectra:
+            spectrum._compile_into_simulation(simulation)
 
     def __repr__(self):
         text = "\n"

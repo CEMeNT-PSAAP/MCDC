@@ -150,10 +150,10 @@ def prepare(simulationPy):
             continue
 
         if settings.neutron_transport and len(material.nuclides) == 0:
-            set_nuclides_from_elements(material)
+            set_nuclides_from_elements(material, simulationPy)
 
         if settings.electron_transport and len(material.elements) == 0:
-            set_elements_from_nuclides(material)
+            set_elements_from_nuclides(material, simulationPy)
 
     # Set nuclear and atomic data for transported particles
     if settings.neutron_transport:
@@ -166,7 +166,7 @@ def prepare(simulationPy):
 
     if settings.electron_transport:
         for element in simulationPy.elements:
-            element.set_electron_data()
+            element.set_electron_data(simulationPy)
 
     # Set physics mode
     if len(simulationPy.materials) == 0:

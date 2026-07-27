@@ -151,6 +151,15 @@ class ElectronReactionIonization(ElectronReactionBase):
             subshell_product,
         )
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        for subshell_xs in self.subshell_xs:
+            subshell_xs._compile_into_simulation(simulation)
+        for subshell_product in self.subshell_product:
+            subshell_product._compile_into_simulation(simulation)
+        return True
+
     def __repr__(self):
         text = super().__repr__()
         text += f"  - Number of subshells: {self.N_subshell}\n"
@@ -220,6 +229,13 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
 
         return cls(MT, xs, xs_offset, reference_frame, xs_large, mu)
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        self.xs_large._compile_into_simulation(simulation)
+        self.mu._compile_into_simulation(simulation)
+        return True
+
     def __repr__(self):
         text = super().__repr__()
         text += f"  - Mu cut: {self.mu_cut}\n"
@@ -256,6 +272,12 @@ class ElectronReactionBremsstrahlung(ElectronReactionBase):
 
         return cls(MT, xs, xs_offset, reference_frame, eloss)
 
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        self.eloss._compile_into_simulation(simulation)
+        return True
+
     def __repr__(self):
         text = super().__repr__()
         text += f"  - Energy loss: DataTable [ID: {self.eloss.ID}]\n"
@@ -289,6 +311,12 @@ class ElectronReactionExcitation(ElectronReactionBase):
         eloss = DataTable(base["energy"][()], base["value"][()], INTERPOLATION_LINEAR)
 
         return cls(MT, xs, xs_offset, reference_frame, eloss)
+
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        self.eloss._compile_into_simulation(simulation)
+        return True
 
     def __repr__(self):
         text = super().__repr__()

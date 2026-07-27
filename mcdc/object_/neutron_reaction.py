@@ -54,6 +54,7 @@ class NeutronReactionBase(MCDCPolymorphic):
     q_value: float64
 
     def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
+        super().__init__()
         self.MT = MT
         self.xs = xs
         self.xs_offset_ = xs_offset
@@ -99,11 +100,19 @@ class NeutronReactionElasticScattering(NeutronReactionBase):
         self.mu_table = mu
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         """Build an elastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, _ = set_basic_properties(h5_group)
-        _, mu = set_angular_distribution(h5_group["angular_cosine_distribution"])
+        _, mu = set_angular_distribution(
+            h5_group["angular_cosine_distribution"], simulation
+        )
         return cls(MT, xs, xs_offset, reference_frame, mu)
+
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        self.mu_table._compile_into_simulation(simulation)
+        return True
 
     def __repr__(self):
         text = super().__repr__()
@@ -127,7 +136,7 @@ class NeutronReactionCapture(NeutronReactionBase):
         super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         """Build a capture reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         return cls(MT, xs, xs_offset, reference_frame, q_value)
@@ -182,13 +191,13 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
         self.energy_spectra = energy_spectra
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         """Build an inelastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         multiplicity = int(h5_group["multiplicity"][()])
 
         angle_type, mu = set_angular_distribution(
-            h5_group["angular_cosine_distribution"]
+            h5_group["angular_cosine_distribution"], simulation
         )
 
         # Energy spectra
@@ -214,6 +223,14 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
             spectrum_probability,
             energy_spectra,
         )
+
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        self.mu._compile_into_simulation(simulation)
+        for spectrum in self.energy_spectra:
+            spectrum._compile_into_simulation(simulation)
+        return True
 
     def __repr__(self):
         text = super().__repr__()
@@ -263,13 +280,13 @@ class NeutronReactionFission(NeutronReactionBase):
         self.spectrum = spectrum
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
         """Build a fission reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
 
         # Prompt angular distribution
         angle_type, mu = set_angular_distribution(
-            h5_group["angular_cosine_distribution"]
+            h5_group["angular_cosine_distribution"], simulation
         )
 
         # Prompt spectrum
@@ -281,6 +298,13 @@ class NeutronReactionFission(NeutronReactionBase):
         return cls(
             MT, xs, xs_offset, reference_frame, q_value, angle_type, mu, spectrum
         )
+
+    def _compile_into_simulation(self, simulation) -> bool:
+        if not super()._compile_into_simulation(simulation):
+            return False
+        self.mu._compile_into_simulation(simulation)
+        self.spectrum._compile_into_simulation(simulation)
+        return True
 
     def __repr__(self):
         text = super().__repr__()
@@ -316,7 +340,7 @@ def set_basic_properties(h5_group):
     return MT, xs, xs_offset, reference_frame, q_value
 
 
-def set_angular_distribution(h5_group):
+def set_angular_distribution(h5_group, simulation):
     """Create the packed angle type and distribution from an HDF5 group."""
 
     mu_type = h5_group.attrs["type"]
