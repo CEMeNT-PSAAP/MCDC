@@ -95,7 +95,7 @@ class Universe(MCDCObject):
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"
-        text += f"  - Cells: {", ".join([x.name for x in self.cells])}\n"
+        text += f"  - Cells: {', '.join(x.name for x in self.cells)}\n"
         return text
 
 

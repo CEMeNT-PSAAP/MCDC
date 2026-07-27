@@ -371,9 +371,7 @@ class Tally(MCDCPolymorphic):
 
     def _phasespace_filter_text(self):
         text = ""
-        text += (
-            f"  - Scores: {", ".join([decode_score_type(x) for x in self.scores])}\n"
-        )
+        text += f"  - Scores: {', '.join(decode_score_type(x) for x in self.scores)}\n"
         if self.filter_time or self.filter_energy or self.filter_direction:
             text += f"  - Phase-space filters\n"
         if self.filter_time:

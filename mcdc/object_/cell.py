@@ -261,7 +261,7 @@ class Cell(MCDCObject):
         else:
             text += f"  - {self.region}\n"
         if self.fill:
-            text += f"  - Fill [{self.fill.label.title().replace("_"," ")}]: {self.fill.name}\n"
+            text += f"  - Fill [{self.fill.label.title().replace('_', ' ')}]: {self.fill.name}\n"
         else:
             text += f"  - Fill [None]"
         if self.fill_translated:
