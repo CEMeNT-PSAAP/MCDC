@@ -35,15 +35,6 @@ def prepare_simulation():
     return _prepare
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--mode",
-        choices=["python", "numba"],
-        default="python",
-        help="MCDC execution mode for unit tests.",
-    )
-
-
 @pytest.hookimpl(tryfirst=True)
 def pytest_cmdline_main(config):
     # Outer invocation: `pytest test/unit` should run python+numba automatically.

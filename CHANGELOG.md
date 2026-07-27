@@ -8,15 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
-- Tally spatial filter and scoring upgrades from [@massimolarsen] and [@ilhamv]
-  - Add partial current scores
-  - Add cell-filtered (and surface-cell-combo) support for current scores
-  - Improved checks and error messages in tally-building user interface
-
 ### Changed
 
-- Unit test upgrade from [@massimolarsen]
-  - Combined `object_` and `transport` unit test for more efficient fixture reuse
+- Move regression tests from the custom `run.py` harness to pytest-based collection and reporting from [@massimolarsen]
 
 ### Deprecated
 
@@ -25,6 +19,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Fixed
 
 ### Security
+
+## [0.14.2] - 2026-07-15
+
+### Added
+
+- Add layered documentation philosophy
+- Tally spatial filter and scoring upgrades from [@massimolarsen] and [@ilhamv]
+  - Add partial current scores
+  - Add cell-filtered (and surface-cell-combo) support for current scores
+  - Improved checks and error messages in tally-building user interface
+
+### Changed
+
+- Unit test upgrades
+  - Combined `object_` and `transport` unit test for more efficient fixture reuse from [@massimolarsen]
+  - Replace bare assert np.isclose with proper np.testing.assert_allclose from [@steps-re]
+
+### Fixed
+
+- Fix 2D-vector setter writes nothing (- instead of =) from [@steps-re]
+- Fix delayed neutrons are never sampled (transport/physics/neutron/native.py, fission()) from [@steps-re]
+- Fix delayed emission time uses β instead of λ (transport/physics/neutron/native.py, fission())from [@steps-re]
+- Fix swapped transverse-basis branches (transport/distribution.py, sample_direction()) from [@steps-re]
+- Fix divide-by-zero for a -z reference (transport/distribution.py, sample_white_direction()) from [@steps-re]
+- Fix tally polar_reference corrupted (object_/tally.py) from [@steps-re]
 
 ## [0.14.1] - 2026-07-04
 
@@ -111,6 +130,7 @@ The pre-refactor implementation remains available in the `cement` branch as a re
 - Multi-table distribution table selection sampling from [@melekderman]
 
 [Unreleased]: https://github.com/mcdc-project/mcdc/tree/dev
+[0.14.2]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.2
 [0.14.1]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.1
 [0.14.0]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.0
 [0.13.0]: https://github.com/mcdc-project/mcdc/releases/tag/v0.13.0
@@ -120,3 +140,4 @@ The pre-refactor implementation remains available in the `cement` branch as a re
 [@nglaser3]: https://github.com/nglaser3
 [@gunnarrl]: https://github.com/gunnarrl
 [@Talen-Ayers]: https://github.com/Talen-Ayers
+[@steps-re]: https://github.com/steps-re

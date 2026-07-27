@@ -310,7 +310,7 @@ class Tally(MCDCPolymorphic):
             self.filter_direction = True
         if polar_reference is not None:
             polar_reference_arr = np.array(polar_reference)
-            self.polar_reference /= polar_reference_arr / np.linalg.norm(
+            self.polar_reference = polar_reference_arr / np.linalg.norm(
                 polar_reference_arr
             )
         if energy is not None:
