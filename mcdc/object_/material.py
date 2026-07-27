@@ -74,7 +74,9 @@ class Material(MaterialBase):
     Exactly one of ``nuclide_composition`` or ``element_composition`` must be
     supplied. Nuclide and element objects are created immediately; their
     data-library properties are loaded when the material is compiled into a
-    simulation.
+    simulation. Construction therefore does not access the data library.
+    Before compiling, visualizing, or running the model, ``MCDC_LIB`` must
+    identify the directory containing the required HDF5 files.
 
     Examples
     --------

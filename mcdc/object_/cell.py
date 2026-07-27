@@ -143,6 +143,13 @@ class Cell(MCDCObject):
     ...     fill=material,
     ... )
 
+    Fill the complement of that union:
+
+    >>> outside_spheres = mcdc.Cell(
+    ...     region=~(-left_sphere | -right_sphere),
+    ...     fill=material,
+    ... )
+
     Place a reusable universe with a translation and rotation:
 
     >>> assembly = mcdc.Universe(name="Assembly", cells=[cell])

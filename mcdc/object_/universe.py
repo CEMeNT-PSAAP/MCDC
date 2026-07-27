@@ -118,6 +118,12 @@ class Lattice(MCDCObject):
         Universe layout supplied in ``[z][y][x]`` order. The y and z axes are
         reversed internally to match MC/DC's Cartesian indexing convention.
 
+    Notes
+    -----
+    A lattice retains the supplied :class:`Universe` objects. When the owning
+    simulation is compiled, those universes are registered and the packed
+    lattice IDs are rebuilt from their simulation-local IDs.
+
     Examples
     --------
     Place two universes next to each other along x:
