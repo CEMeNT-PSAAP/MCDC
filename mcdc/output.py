@@ -49,7 +49,7 @@ def generate_output(mcdc, data, simulationPy):
     if mcdc["settings"]["neutron_eigenvalue_mode"]:
         N_cycle = mcdc["settings"]["N_cycle"]
         file.create_dataset(
-            "k_cycle", data=mcdc_get.simulationPy.k_cycle_chunk(0, N_cycle, mcdc, data)
+            "k_cycle", data=mcdc_get.simulation.k_cycle_chunk(0, N_cycle, mcdc, data)
         )
         file.create_dataset("k_mean", data=mcdc["k_avg_running"])
         file.create_dataset("k_sdev", data=mcdc["k_sdv_running"])
@@ -62,9 +62,7 @@ def generate_output(mcdc, data, simulationPy):
         if mcdc["settings"]["use_gyration_radius"]:
             file.create_dataset(
                 "gyration_radius",
-                data=mcdc_get.simulationPy.gyration_radius_chunk(
-                    0, N_cycle, mcdc, data
-                ),
+                data=mcdc_get.simulation.gyration_radius_chunk(0, N_cycle, mcdc, data),
             )
 
     # Save particle?
