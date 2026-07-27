@@ -92,16 +92,15 @@ Techniques are enabled by calling methods on the ``mcdc.simulation`` singleton:
 - ``mcdc.simulation.weighted_emission(active=True, weight_target=1.0)``
 - ``mcdc.simulation.weight_windows(weight_windows, mesh=None, energy=None)``
 
-Running
--------
+Running simulations
+-------------------
 
 .. autosummary::
    :toctree: generated
    :nosignatures:
-   :template: omcfunction.rst
+   :template: omcclass.rst
 
-   mcdc.run
-
+   mcdc.Simulation
 
 
 

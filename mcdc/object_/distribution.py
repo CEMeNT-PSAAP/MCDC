@@ -34,6 +34,8 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class DistributionBase(MCDCPolymorphic):
+    """Base class for probability distributions sampled during transport."""
+
     # MC/DC framework metadata
     label = "distribution"
     sub_type = -1  # Polymorphic base
@@ -48,6 +50,8 @@ class DistributionBase(MCDCPolymorphic):
 
 
 class DistributionNone(DistributionBase):
+    """Placeholder for an implicit or externally stored distribution."""
+
     # MC/DC framework metadata
     label = "none_distribution"
     sub_type = DISTRIBUTION_NONE
@@ -59,6 +63,16 @@ class DistributionNone(DistributionBase):
 
 
 class DistributionPMF(DistributionBase):
+    """Discrete probability mass function.
+
+    Parameters
+    ----------
+    value : array_like
+        Values that may be sampled.
+    pmf : array_like
+        Nonnegative relative masses, normalized internally.
+    """
+
     # MC/DC framework metadata
     label = "pmf_distribution"
     sub_type = DISTRIBUTION_PMF
@@ -98,6 +112,13 @@ class DistributionPMF(DistributionBase):
 
 
 class DistributionTabulated(DistributionBase):
+    """One-dimensional continuous tabulated distribution.
+
+    Exactly one of ``pdf`` or ``cdf`` must be supplied alongside ``value``.
+    PDF input is treated as piecewise linear; CDF input produces a histogram
+    density. The distribution is normalized internally.
+    """
+
     # MC/DC framework metadata
     label = "tabulated_distribution"
     sub_type = DISTRIBUTION_TABULATED
@@ -171,6 +192,12 @@ class DistributionTabulated(DistributionBase):
 
 
 class DistributionMultiTable(DistributionBase):
+    """Family of tabulated distributions indexed by another grid.
+
+    ``offset`` marks the first entry of each table in the flattened ``value``
+    and probability arrays. Exactly one of ``pdf`` or ``cdf`` is required.
+    """
+
     # MC/DC framework metadata
     label = "multi_table_distribution"
     sub_type = DISTRIBUTION_MULTITABLE
@@ -277,6 +304,14 @@ class DistributionMultiTable(DistributionBase):
 
 
 class DistributionLevelScattering(DistributionBase):
+    """Discrete-level inelastic-scattering energy distribution.
+
+    Parameters
+    ----------
+    C1, C2 : float
+        Level-scattering law coefficients.
+    """
+
     # MC/DC framework metadata
     label = "level_scattering_distribution"
     sub_type = DISTRIBUTION_LEVEL_SCATTERING
@@ -304,6 +339,8 @@ class DistributionLevelScattering(DistributionBase):
 
 
 class DistributionEvaporation(DistributionBase):
+    """Evaporation spectrum with incident-energy-dependent temperature."""
+
     # MC/DC framework metadata
     label = "evaporation_distribution"
     sub_type = DISTRIBUTION_EVAPORATION
@@ -350,6 +387,8 @@ class DistributionEvaporation(DistributionBase):
 
 
 class DistributionMaxwellian(DistributionBase):
+    """Maxwellian spectrum with incident-energy-dependent temperature."""
+
     # MC/DC framework metadata
     label = "maxwellian_distribution"
     sub_type = DISTRIBUTION_MAXWELLIAN
@@ -396,6 +435,12 @@ class DistributionMaxwellian(DistributionBase):
 
 
 class DistributionKalbachMann(DistributionBase):
+    """Correlated Kalbach-Mann outgoing energy-angle distribution.
+
+    Incident-energy tables are stored in flattened arrays delimited by
+    ``offset``. Probability densities are normalized per table.
+    """
+
     # MC/DC framework metadata
     label = "kalbach_mann_distribution"
     sub_type = DISTRIBUTION_KALBACH_MANN
@@ -453,6 +498,12 @@ class DistributionKalbachMann(DistributionBase):
 
 
 class DistributionTabulatedEnergyAngle(DistributionBase):
+    """Correlated tabulated outgoing energy and scattering-angle distribution.
+
+    ``offset`` delimits outgoing-energy tables and ``cosine_offset`` delimits
+    conditional cosine tables in the flattened arrays.
+    """
+
     # MC/DC framework metadata
     label = "tabulated_energy_angle_distribution"
     sub_type = DISTRIBUTION_TABULATED_ENERGY_ANGLE
@@ -549,6 +600,14 @@ class DistributionTabulatedEnergyAngle(DistributionBase):
 
 
 class DistributionNBody(DistributionBase):
+    """N-body phase-space outgoing-energy distribution.
+
+    Parameters
+    ----------
+    values, probabilities : array_like
+        Outgoing values and their piecewise-linear relative density.
+    """
+
     # MC/DC framework metadata
     label = "nbody_distribution"
     sub_type = DISTRIBUTION_N_BODY

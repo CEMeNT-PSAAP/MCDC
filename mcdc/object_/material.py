@@ -21,6 +21,14 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class MaterialBase(MCDCPolymorphic):
+    """Base class shared by continuous-energy and multigroup materials.
+
+    Parameters
+    ----------
+    name : str
+        User-facing material name.
+    """
+
     # MC/DC framework metadata
     label = "material"
     sub_type = -1  # Polymorphic base
@@ -48,6 +56,54 @@ class MaterialBase(MCDCPolymorphic):
 
 
 class Material(MaterialBase):
+    """Define a continuous-energy material from a data-library composition.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing material name.
+    nuclide_composition : dict of str to float, optional
+        Nuclide names and atomic densities in atoms/(barn cm).
+    element_composition : dict of str to float, optional
+        Element symbols and atomic densities in atoms/(barn cm).
+    temperature : float, optional
+        Material temperature in kelvin. Each nuclide uses the closest
+        temperature available in the data library.
+
+    Notes
+    -----
+    Exactly one of ``nuclide_composition`` or ``element_composition`` must be
+    supplied. The ``MCDC_LIB`` environment variable must point to the directory
+    containing the corresponding HDF5 data-library files.
+
+    Examples
+    --------
+    Define uranium dioxide from nuclide atomic densities:
+
+    >>> import mcdc
+    >>> fuel = mcdc.Material(
+    ...     name="UO2",
+    ...     nuclide_composition={"U235": 5.0e-4, "U238": 2.2e-2, "O16": 4.5e-2},
+    ...     temperature=293.6,
+    ... )
+
+    Define a material from natural elemental compositions:
+
+    >>> steel = mcdc.Material(
+    ...     name="Steel",
+    ...     element_composition={"Fe": 8.0e-2, "C": 8.0e-4},
+    ...     temperature=600.0,
+    ... )
+
+    Define a single-isotope material at another supported temperature:
+
+    >>> moderator = mcdc.Material(
+    ...     name="Hydrogen",
+    ...     nuclide_composition={"H1": 6.7e-2},
+    ...     temperature=273.15,
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "native_material"
     sub_type = MATERIAL
@@ -191,6 +247,76 @@ TEMPERATURES = [0.1, 233.15, 273.15, 293.6, 600.0, 900.0, 1200.0, 2500.0]
 
 
 class MaterialMG(MaterialBase):
+    """Define a material with multigroup neutron data.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing material name.
+    capture : ndarray, optional
+        Capture macroscopic cross section by incident group.
+    scatter : ndarray, optional
+        Scattering production matrix in ``[outgoing_group, incident_group]``
+        order. Column sums define the scattering cross section.
+    fission : ndarray, optional
+        Fission macroscopic cross section by incident group.
+    nu_s : ndarray, optional
+        Mean number of neutrons emitted per scattering event by incident group.
+    nu_p : ndarray, optional
+        Prompt-fission neutron yield by incident group.
+    nu_d : ndarray, optional
+        Delayed-fission neutron yield in
+        ``[delayed_group, incident_group]`` order.
+    chi_p : ndarray, optional
+        Prompt-fission spectrum. A one-dimensional spectrum is shared by all
+        incident groups; a matrix uses
+        ``[outgoing_group, incident_group]`` order.
+    chi_d : ndarray, optional
+        Delayed-fission spectrum in ``[outgoing_group, delayed_group]`` order.
+    speed : ndarray, optional
+        Particle speed by energy group.
+    decay_rate : ndarray, optional
+        Delayed-neutron precursor decay rate by delayed group.
+
+    Notes
+    -----
+    At least one of ``capture``, ``scatter``, or ``fission`` is required and
+    determines the number of energy groups. Cross sections are expected in
+    inverse centimetres.
+
+    Examples
+    --------
+    Define a one-group purely absorbing material:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> absorber = mcdc.MaterialMG(
+    ...     name="Absorber",
+    ...     capture=np.array([1.0]),
+    ... )
+
+    Define a two-group scattering material:
+
+    >>> scatterer = mcdc.MaterialMG(
+    ...     name="Scatterer",
+    ...     capture=np.array([0.05, 0.10]),
+    ...     scatter=np.array([
+    ...         [0.70, 0.10],
+    ...         [0.20, 0.50],
+    ...     ]),
+    ...     nu_s=np.array([1.0, 1.0]),
+    ... )
+
+    Define a one-group prompt-fission material:
+
+    >>> fuel = mcdc.MaterialMG(
+    ...     name="Fuel",
+    ...     capture=np.array([0.10]),
+    ...     fission=np.array([0.20]),
+    ...     nu_p=np.array([2.50]),
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "multigroup_material"
     sub_type = MATERIAL_MG
@@ -369,6 +495,8 @@ class MaterialMG(MaterialBase):
 
 
 def set_nuclides_from_elements(material):
+    """Expand an elemental material composition into natural isotopes."""
+
     material.nuclides = []
     material.nuclide_composition = {}
     nuclide_densities = []
@@ -410,6 +538,8 @@ def set_nuclides_from_elements(material):
 
 
 def set_elements_from_nuclides(material):
+    """Collapse a nuclide composition into elemental atomic densities."""
+
     material.elements = []
     material.element_composition = {}
 
@@ -455,6 +585,8 @@ def set_elements_from_nuclides(material):
 
 
 def update_fissionable_from_nuclides(material):
+    """Update a material's fissionable flag from its constituent nuclides."""
+
     material.fissionable = False
     for nuclide in material.nuclides:
         if nuclide.fissionable:

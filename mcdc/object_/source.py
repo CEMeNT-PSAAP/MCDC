@@ -21,6 +21,8 @@ from mcdc.print_ import print_error
 
 
 def decode_particle_type(type_):
+    """Return the display name for a packed particle-type code."""
+
     if type_ == PARTICLE_NEUTRON:
         return "Neutron"
     elif type_ == PARTICLE_ELECTRON:
@@ -35,11 +37,7 @@ def decode_particle_type(type_):
 
 
 class Source(MCDCObject):
-    # MC/DC framework metadata
-    label = "source"
-
-    """
-    Define a particle source.
+    """Define a particle source.
 
     A source specifies the initial position, direction, energy, time, particle
     type, and relative sampling probability for emitted particles.
@@ -74,15 +72,14 @@ class Source(MCDCObject):
         Bounds for the sampled azimuthal angle,
         ``[azi_min, azi_max]`` in radians, measured about ``direction``.
         Defaults to ``[0.0, 2π]``.
-    energy : float or ndarray, optional
-        Source energy in eV. A float defines a mono-energetic source. An array
-        defines a tabulated energy distribution. Defaults to a mono-energetic
-        source at **1 MeV**.
-
-    energy_group : int or ndarray, optional
-        Source energy group. An integer defines a mono-group source. An array
-        defines a discrete group probability mass function. In multigroup
-        simulations, the default is **group 0**.
+    energy : float or two-item sequence, optional
+        Source energy in eV. A float defines a mono-energetic source. A sequence
+        ``[values, pdf]`` defines a tabulated energy distribution. Defaults to a
+        mono-energetic source at **1 MeV**.
+    energy_group : int or two-item sequence, optional
+        Source energy group. An integer defines a mono-group source. A sequence
+        ``[groups, probabilities]`` defines a discrete probability mass
+        function. In multigroup simulations, the default is **group 0**.
     time : float or array_like of float, optional
         Emission time in seconds. A float defines a discrete emission time.
         A two-entry array-like value defines a time interval
@@ -115,6 +112,8 @@ class Source(MCDCObject):
     --------
     Point source at the origin emitting mono-energetic neutrons isotropically:
 
+    >>> import numpy as np
+    >>> import mcdc
     >>> src = mcdc.Source(position=[0.0, 0.0, 0.0], isotropic=True)
 
     Uniform box source distributed along z:
@@ -163,6 +162,9 @@ class Source(MCDCObject):
     ...     time=[0.0, 1.0e-3],
     ... )
     """
+
+    # MC/DC framework metadata
+    label = "source"
 
     name: str
 

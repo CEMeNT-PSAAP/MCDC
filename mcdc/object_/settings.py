@@ -19,6 +19,14 @@ from mcdc.print_ import print_error
 
 @dataclass
 class Settings(MCDCBase):
+    """Simulation controls compiled into the transport state.
+
+    Settings are owned by a :class:`~mcdc.object_.simulation.Simulation` and
+    configure histories, batches, random-number generation, time censuses,
+    eigenvalue mode, transported particle species, output, particle banks, and
+    GPU execution.
+    """
+
     # MC/DC framework metadata
     label = "settings"
 
@@ -72,6 +80,17 @@ class Settings(MCDCBase):
     gpu_storage: int = GPU_STORAGE_SEPARATE
 
     def set_time_census(self, time, tally_frequency=None):
+        """Configure census times for time-dependent transport.
+
+        Parameters
+        ----------
+        time : array_like of float
+            Positive, nondecreasing census times in seconds. An infinite final
+            census is appended automatically.
+        tally_frequency : int, optional
+            Number of tally intervals per census period. A positive value enables
+            census-based tally output.
+        """
         # Make sure that the time grid points are sorted
         if not is_sorted(time):
             print_error("Time census: Time grid points have to be sorted.")
@@ -101,6 +120,23 @@ class Settings(MCDCBase):
         gyration_radius=None,
         save_particle=False,
     ):
+        """Enable neutron k-eigenvalue mode.
+
+        Parameters
+        ----------
+        N_inactive : int, optional
+            Number of inactive cycles.
+        N_active : int, optional
+            Number of active cycles used for statistics.
+        k_init : float, optional
+            Initial multiplication-factor estimate.
+        gyration_radius : str, optional
+            Gyration-radius mode: ``"all"``, ``"infinite-x"``,
+            ``"infinite-y"``, ``"infinite-z"``, ``"only-x"``, ``"only-y"``,
+            or ``"only-z"``.
+        save_particle : bool, optional
+            Whether to save source-bank particles.
+        """
         # Update setting self
         self.N_inactive = N_inactive
         self.N_active = N_active
@@ -130,6 +166,15 @@ class Settings(MCDCBase):
                 print_error("Unknown gyration radius type")
 
     def set_source_file(self, source_file_name):
+        """Use particles from an HDF5 source file.
+
+        The particle count is read from the file's ``particles_size`` dataset.
+
+        Parameters
+        ----------
+        source_file_name : str or path-like
+            Source-particle HDF5 file.
+        """
         self.use_source_file = True
         self.source_file_name = source_file_name
 
@@ -138,6 +183,13 @@ class Settings(MCDCBase):
             self.N_particle = int(f["particles_size"][()])
 
     def set_transported_particles(self, transported_particles: List[str]):
+        """Select the particle species enabled during transport.
+
+        Parameters
+        ----------
+        transported_particles : list of {"neutron", "electron", "proton"}
+            Particle species to enable. Species not listed are disabled.
+        """
         # Reset the flags
         self.neutron_transport = False
         self.electron_transport = False

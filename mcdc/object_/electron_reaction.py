@@ -26,6 +26,12 @@ from mcdc.print_ import print_1d_array
 
 
 class ElectronReactionBase(MCDCPolymorphic):
+    """Base electron reaction data loaded from the HDF5 physics library.
+
+    Stores the ENDF reaction identifier, cross-section segment and its offset
+    into the element energy grid, and the reaction reference frame.
+    """
+
     # MC/DC framework metadata
     label = "electron_reaction"
     sub_type = -1  # Polymorphic base
@@ -53,6 +59,8 @@ class ElectronReactionBase(MCDCPolymorphic):
 
 
 def decode_reference_frame(type_):
+    """Return the display name for a packed reference-frame code."""
+
     if type_ == REFERENCE_FRAME_LAB:
         return "Laboratory"
     elif type_ == REFERENCE_FRAME_COM:
@@ -65,6 +73,8 @@ def decode_reference_frame(type_):
 
 
 class ElectronReactionIonization(ElectronReactionBase):
+    """Electron ionization reaction with subshell cross sections and products."""
+
     # MC/DC framework metadata
     label = "electron_ionization_reaction"
     sub_type = ELECTRON_REACTION_IONIZATION
@@ -90,6 +100,7 @@ class ElectronReactionIonization(ElectronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an ionization reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         subshells = h5_group["subshells"]
@@ -157,6 +168,8 @@ class ElectronReactionIonization(ElectronReactionBase):
 
 
 class ElectronReactionElasticScattering(ElectronReactionBase):
+    """Elastic electron scattering with large-angle cross section and cosine law."""
+
     # MC/DC framework metadata
     label = "electron_elastic_scattering_reaction"
     sub_type = ELECTRON_REACTION_ELASTIC_SCATTERING
@@ -181,6 +194,7 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an elastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         large_angle = h5_group["large_angle"]
@@ -220,6 +234,8 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
 
 
 class ElectronReactionBremsstrahlung(ElectronReactionBase):
+    """Electron bremsstrahlung reaction with tabulated energy loss."""
+
     # MC/DC framework metadata
     label = "electron_bremsstrahlung_reaction"
     sub_type = ELECTRON_REACTION_BREMSSTRAHLUNG
@@ -232,6 +248,7 @@ class ElectronReactionBremsstrahlung(ElectronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build a bremsstrahlung reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         base = h5_group["energy_loss"]
@@ -251,6 +268,8 @@ class ElectronReactionBremsstrahlung(ElectronReactionBase):
 
 
 class ElectronReactionExcitation(ElectronReactionBase):
+    """Electron excitation reaction with tabulated energy loss."""
+
     # MC/DC framework metadata
     label = "electron_excitation_reaction"
     sub_type = ELECTRON_REACTION_EXCITATION
@@ -263,6 +282,7 @@ class ElectronReactionExcitation(ElectronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an excitation reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         base = h5_group["energy_loss"]
@@ -282,6 +302,8 @@ class ElectronReactionExcitation(ElectronReactionBase):
 
 
 def set_basic_properties(h5_group):
+    """Read properties shared by all electron reactions from an HDF5 group."""
+
     MT = h5_group.attrs["MT"][()]
     xs = h5_group["xs"][()]
     xs_offset = h5_group["xs"].attrs["offset"]

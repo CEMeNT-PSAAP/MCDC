@@ -26,6 +26,22 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Nuclide(MCDCObject):
+    """Temperature-specific nuclide data from the MC/DC HDF5 library.
+
+    Parameters
+    ----------
+    nuclide_name : str
+        Nuclide identifier, such as ``"U235"``.
+    temperature : float
+        Library temperature in kelvin.
+
+    Notes
+    -----
+    Construction loads basic nuclide properties. Neutron cross sections,
+    reactions, multiplicities, and delayed-neutron data are loaded later by
+    :meth:`set_neutron_data`.
+    """
+
     # MC/DC framework metadata
     label = "nuclide"
 
@@ -77,6 +93,13 @@ class Nuclide(MCDCObject):
         file.close()
 
     def set_neutron_data(self, simulation):
+        """Load and attach neutron physics data from ``MCDC_LIB``.
+
+        Parameters
+        ----------
+        simulation : Simulation
+            Simulation that owns placeholder data and compiled distributions.
+        """
         nuclide_name = self.name
         temperature = self.temperature
 
@@ -250,6 +273,8 @@ class Nuclide(MCDCObject):
 
 
 def set_fission_multiplicity(h5_group):
+    """Build tabulated or polynomial fission multiplicity from HDF5 data."""
+
     multiplicity_type = h5_group.attrs["type"]
 
     if multiplicity_type == "tabulated":

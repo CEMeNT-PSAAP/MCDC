@@ -16,6 +16,8 @@ from mcdc.print_ import print_1d_array
 
 
 class MeshBase(MCDCPolymorphic):
+    """Base class for spatial meshes used by tallies and techniques."""
+
     # MC/DC framework metadata
     label = "mesh"
     sub_type = -1  # Polymorphic base
@@ -46,6 +48,39 @@ class MeshBase(MCDCPolymorphic):
 
 
 class MeshUniform(MeshBase):
+    """Define a Cartesian mesh with uniform spacing on each axis.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing mesh name.
+    x, y, z : tuple of (float, float, int), optional
+        ``(origin, spacing, number_of_bins)`` for each axis, in cm. Omitted
+        axes default to one effectively unbounded bin.
+
+    Examples
+    --------
+    Create 100 uniform bins along z from 0 to 10 cm:
+
+    >>> import mcdc
+    >>> mesh = mcdc.MeshUniform(z=(0.0, 0.1, 100))
+
+    Create a two-dimensional x-y mesh:
+
+    >>> mesh_xy = mcdc.MeshUniform(
+    ...     x=(-5.0, 0.5, 20),
+    ...     y=(-5.0, 0.5, 20),
+    ... )
+
+    Create a three-dimensional mesh with different axis spacings:
+
+    >>> mesh_xyz = mcdc.MeshUniform(
+    ...     x=(0.0, 1.0, 10),
+    ...     y=(0.0, 2.0, 5),
+    ...     z=(-3.0, 0.25, 24),
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "uniform_mesh"
     sub_type = MESH_UNIFORM
@@ -99,6 +134,40 @@ class MeshUniform(MeshBase):
 
 
 class MeshStructured(MeshBase):
+    """Define a Cartesian mesh from explicit grid boundaries.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing mesh name.
+    x, y, z : sequence of float, optional
+        Strictly ordered grid boundaries in cm. Each omitted axis defaults to
+        one effectively unbounded bin.
+
+    Examples
+    --------
+    Create nonuniform bins along z:
+
+    >>> import mcdc
+    >>> mesh = mcdc.MeshStructured(z=[0.0, 0.5, 2.0, 10.0])
+
+    Create a two-dimensional mesh from explicit boundaries:
+
+    >>> mesh_xy = mcdc.MeshStructured(
+    ...     x=[-2.0, -1.0, 0.0, 2.0],
+    ...     y=[-3.0, 0.0, 1.0, 3.0],
+    ... )
+
+    Mix uniformly generated and explicitly listed boundaries:
+
+    >>> import numpy as np
+    >>> mesh_xyz = mcdc.MeshStructured(
+    ...     x=np.linspace(-5.0, 5.0, 21),
+    ...     y=[-1.0, 0.0, 1.0],
+    ...     z=np.linspace(0.0, 10.0, 101),
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "structured_mesh"
     sub_type = MESH_STRUCTURED

@@ -25,6 +25,8 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class DataBase(MCDCPolymorphic):
+    """Base class for scalar data evaluated by transport kernels."""
+
     # MC/DC framework metadata
     label = "data"
     sub_type = -1  # Polymorphic base
@@ -38,6 +40,8 @@ class DataBase(MCDCPolymorphic):
 
 
 class DataNone(DataBase):
+    """Placeholder used when a reaction has no associated evaluable data."""
+
     # MC/DC framework metadata
     label = "none_data"
     sub_type = DATA_NONE
@@ -49,6 +53,25 @@ class DataNone(DataBase):
 
 
 class DataTable(DataBase):
+    """One-dimensional table with one or more interpolation regions.
+
+    Parameters
+    ----------
+    x, y : ndarray
+        One-dimensional abscissa and ordinate arrays of equal nonzero length.
+    interpolations : int or sequence of int
+        Packed interpolation code for each region. A scalar applies to the full
+        table.
+    interpolation_boundaries : sequence of int, optional
+        Exclusive end index of each interpolation region. Required when
+        ``interpolations`` contains multiple codes; the final value must equal
+        ``len(x)``.
+    aux : ndarray, optional
+        Additional values aligned with ``x``. A one-dimensional array is stored
+        as one auxiliary row; a two-dimensional array must have shape
+        ``(N_aux, len(x))``.
+    """
+
     # MC/DC framework metadata
     label = "table_data"
     sub_type = DATA_TABLE
@@ -200,6 +223,8 @@ class DataTable(DataBase):
 
 
 def decode_interpolation(type_: int) -> str:
+    """Return the name associated with a packed interpolation code."""
+
     if type_ == INTERPOLATION_HISTOGRAM:
         return "histogram"
     if type_ == INTERPOLATION_LINEAR:
@@ -215,6 +240,8 @@ def decode_interpolation(type_: int) -> str:
 
 
 def encode_interpolation(name: str) -> int:
+    """Return the packed code associated with an interpolation name."""
+
     if name == "histogram":
         return INTERPOLATION_HISTOGRAM
     if name == "linear":
@@ -235,6 +262,14 @@ def encode_interpolation(name: str) -> int:
 
 
 class DataPolynomial(DataBase):
+    """Polynomial coefficients evaluated in ascending power order.
+
+    Parameters
+    ----------
+    coefficients : ndarray
+        One-dimensional coefficient array.
+    """
+
     # MC/DC framework metadata
     label = "polynomial_data"
     sub_type = DATA_POLYNOMIAL

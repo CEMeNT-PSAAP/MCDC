@@ -46,6 +46,94 @@ from mcdc.object_.universe import Universe, Lattice
 
 
 class Simulation(MCDCBase):
+    """Own a complete MC/DC model, settings, techniques, and runtime state.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing simulation name.
+
+    Notes
+    -----
+    Geometry, sources, and tallies are supplied with :meth:`set_model`,
+    :meth:`set_sources`, and :meth:`set_tallies`. :meth:`compile` walks the
+    resulting object graph, assigns IDs, and prepares it for conversion to the
+    packed arrays consumed by :mod:`mcdc.transport`.
+
+    Examples
+    --------
+    Assemble a minimal one-group slab simulation:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> left = mcdc.Surface.PlaneX(x=0.0, boundary_condition="vacuum")
+    >>> right = mcdc.Surface.PlaneX(x=1.0, boundary_condition="vacuum")
+    >>> cell = mcdc.Cell(region=+left & -right, fill=material)
+    >>> source = mcdc.Source(x=[0.0, 1.0], isotropic=True, energy_group=0)
+    >>> tally = mcdc.Tally(cell=cell, scores=["flux"])
+    >>> simulation = mcdc.Simulation(name="Slab")
+    >>> simulation.set_model([cell])
+    >>> simulation.set_sources([source])
+    >>> simulation.set_tallies([tally])
+    >>> simulation.settings.N_particle = 1_000
+
+    Visualize an x-z slice of the model:
+
+    >>> simulation.visualize_model(
+    ...     vis_plane="xz",
+    ...     x=[0.0, 1.0],
+    ...     y=0.0,
+    ...     z=[-0.5, 0.5],
+    ...     pixels=(100, 100),
+    ...     colors=None,
+    ...     time=[0.0],
+    ...     save_as="slab",
+    ... )
+
+    Run particle transport and write the configured output:
+
+    >>> simulation.run()
+
+    Configure a time-dependent calculation with census times:
+
+    >>> transient = mcdc.Simulation(name="Transient slab")
+    >>> transient.set_model([cell])
+    >>> transient.set_sources([source])
+    >>> transient.set_tallies([tally])
+    >>> transient.settings.N_particle = 10_000
+    >>> transient.settings.set_time_census(
+    ...     time=[1.0e-6, 2.0e-6, 5.0e-6],
+    ...     tally_frequency=10,
+    ... )
+
+    Configure a k-eigenvalue calculation:
+
+    >>> fuel = mcdc.MaterialMG(
+    ...     capture=np.array([0.10]),
+    ...     fission=np.array([0.20]),
+    ...     nu_p=np.array([2.50]),
+    ... )
+    >>> fuel_cell = mcdc.Cell(region=+left & -right, fill=fuel)
+    >>> eigenvalue = mcdc.Simulation(name="Critical slab")
+    >>> eigenvalue.set_model([fuel_cell])
+    >>> eigenvalue.set_sources([source])
+    >>> eigenvalue.settings.N_particle = 10_000
+    >>> eigenvalue.settings.set_eigenmode(
+    ...     N_inactive=20,
+    ...     N_active=100,
+    ...     k_init=1.0,
+    ... )
+
+    Enable common variance-reduction techniques:
+
+    >>> simulation.implicit_capture()
+    >>> simulation.global_weight_roulette(
+    ...     weight_threshold=0.25,
+    ...     weight_target=1.0,
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "simulation"
     non_numba = [
@@ -267,14 +355,17 @@ class Simulation(MCDCBase):
     # ==================================================================================
 
     def set_model(self, cells: Sequence[Cell]) -> None:
+        """Set the cells in the root universe and invalidate compiled state."""
         self.root_universe.cells = list(cells)
         self.compiled = False
 
     def set_sources(self, sources: Sequence[Source]) -> None:
+        """Set particle sources and invalidate compiled state."""
         self.sources = list(sources)
         self.compiled = False
 
     def set_tallies(self, tallies: Sequence[Tally]) -> None:
+        """Set requested tallies and invalidate compiled state."""
         self.tallies = list(tallies)
         self.compiled = False
 
@@ -283,6 +374,7 @@ class Simulation(MCDCBase):
     # ==================================================================================
 
     def compile(self) -> None:
+        """Compile the Python object graph into registered simulation objects."""
         from mcdc.code_factory.python_objects_compiler import compile_simulation
 
         self.compile_ID = type(self)._next_compile_ID
@@ -302,6 +394,11 @@ class Simulation(MCDCBase):
         time,
         save_as,
     ) -> None:
+        """Render a two-dimensional material map of the compiled model.
+
+        Parameters are forwarded to :func:`mcdc.visualize.visualize_model`.
+        The model is compiled first when necessary.
+        """
         if not self.compiled:
             self.compile()
 
@@ -310,6 +407,7 @@ class Simulation(MCDCBase):
         visualize_model(self, vis_plane, x, y, z, pixels, colors, time, save_as)
 
     def run(self) -> None:
+        """Compile if needed, execute particle transport, and write output."""
         from mcdc.main import run_simulation
 
         if not self.compiled:

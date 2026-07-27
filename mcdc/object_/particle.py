@@ -13,6 +13,8 @@ from mcdc.object_.base import MCDCBase, MCDCBase
 
 @dataclass
 class ParticleData(MCDCBase):
+    """Serializable phase-space state stored in particle banks."""
+
     # MC/DC framework metadata
     label = "particle_data"
 
@@ -32,6 +34,8 @@ class ParticleData(MCDCBase):
 
 @dataclass
 class CollisionData(MCDCBase):
+    """Per-collision values passed from physics to tally scoring."""
+
     # MC/DC framework metadata
     label = "collision_data"
 
@@ -40,6 +44,8 @@ class CollisionData(MCDCBase):
 
 @dataclass
 class Particle(ParticleData):
+    """Active transport particle with geometry and event-tracking state."""
+
     # MC/DC framework metadata
     label = "particle"
 
@@ -52,6 +58,15 @@ class Particle(ParticleData):
 
 
 class ParticleBank(MCDCBase):
+    """Particle storage metadata used by the compiled runtime.
+
+    Parameters
+    ----------
+    tag : str
+        Bank role, such as ``"active"``, ``"source"``, ``"census"``, or
+        ``"future"``.
+    """
+
     # MC/DC framework metadata
     label = "particle_bank"
     non_numba = ["particles"]

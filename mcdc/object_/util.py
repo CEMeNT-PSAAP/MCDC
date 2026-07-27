@@ -137,6 +137,21 @@ def pdf_from_cdf(
 
 
 def multi_cdf_from_pdf(offset, value, pdf):
+    """Normalize multiple flattened PDFs and construct their CDFs.
+
+    Parameters
+    ----------
+    offset : array_like of int
+        Start index of each table.
+    value, pdf : ndarray
+        Flattened sample values and probability densities.
+
+    Returns
+    -------
+    pdf, cdf : ndarray
+        Per-table normalized densities and cumulative distributions.
+    """
+
     cdf = np.zeros_like(pdf)
 
     for i in range(len(offset)):
@@ -159,6 +174,7 @@ def multi_cdf_from_pdf(offset, value, pdf):
 
 
 def is_sorted(a):
+    """Return whether an array is monotonically nondecreasing."""
     return np.all(a[:-1] <= a[1:])
 
 
@@ -625,6 +641,13 @@ ISOTOPIC_ABUNDANCE = {
 
 
 def move_object(object_, velocities, durations):
+    """Populate the shared piecewise-constant motion representation.
+
+    A zero-velocity segment of infinite duration is appended after the supplied
+    segments. The input lists are therefore mutated; array inputs are converted
+    to lists first.
+    """
+
     object_.moving = True
     object_.N_move = len(durations) + 1
     object_.N_move_grid = len(durations) + 2
@@ -656,4 +679,5 @@ def move_object(object_, velocities, durations):
 
 
 def subtype_size(main_list, subtype: str):
+    """Count objects whose framework label matches ``subtype``."""
     return len([x for x in main_list if x.label == subtype])

@@ -41,6 +41,60 @@ from mcdc.print_ import print_error
 
 
 class Surface(MCDCObject):
+    """Implicit surface used to bound cells.
+
+    Surfaces are created with class methods such as :meth:`PlaneX`,
+    :meth:`CylinderZ`, and :meth:`Sphere`. Unary ``+`` and ``-`` return the
+    corresponding positive and negative half-space
+    :class:`~mcdc.object_.cell.Region`.
+
+    Boundary conditions may be ``"none"``, ``"vacuum"``, or ``"reflective"``.
+    A surface can also undergo piecewise-constant translational motion configured
+    with :meth:`move`.
+
+    Examples
+    --------
+    Create a vacuum x plane and select its positive half-space:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> plane = mcdc.Surface.PlaneX(x=0.0, boundary_condition="vacuum")
+    >>> region = +plane
+
+    Create a sphere and select its interior:
+
+    >>> sphere = mcdc.Surface.Sphere(center=[0.0, 0.0, 0.0], radius=2.0)
+    >>> interior = -sphere
+
+    Create a cylinder parallel to the z axis:
+
+    >>> cylinder = mcdc.Surface.CylinderZ(
+    ...     center=[1.0, -1.0],
+    ...     radius=0.5,
+    ... )
+
+    Create an oblique plane from its equation coefficients:
+
+    >>> oblique = mcdc.Surface.Plane(A=1.0, B=1.0, C=0.0, D=-2.0)
+
+    Create a torus with an arbitrary symmetry axis:
+
+    >>> torus = mcdc.Surface.Torus(
+    ...     center=[0.0, 0.0, 0.0],
+    ...     axis=[1.0, 1.0, 0.0],
+    ...     R=2.0,
+    ...     r=0.5,
+    ... )
+
+    Define piecewise-constant motion for a plane:
+
+    >>> moving_plane = mcdc.Surface.PlaneX(x=0.0)
+    >>> moving_plane.move(
+    ...     velocities=np.array([[1.0, 0.0, 0.0]]),
+    ...     durations=np.array([0.5]),
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "surface"
 
@@ -238,6 +292,17 @@ class Surface(MCDCObject):
         x: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create the plane ``x = constant``.
+
+        Parameters
+        ----------
+        name : str, optional
+            User-facing surface name.
+        x : float, optional
+            Plane position in cm.
+        boundary_condition : {"none", "vacuum", "reflective"}, optional
+            Boundary condition applied when a particle crosses the plane.
+        """
         type_ = SURFACE_PLANE_X
         surface = cls(type_, name, boundary_condition)
 
@@ -258,6 +323,12 @@ class Surface(MCDCObject):
         y: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create the plane ``y = constant``.
+
+        Parameters are the surface ``name``, position ``y`` in cm, and a
+        ``boundary_condition`` of ``"none"``, ``"vacuum"``, or
+        ``"reflective"``.
+        """
         type_ = SURFACE_PLANE_Y
         surface = cls(type_, name, boundary_condition)
 
@@ -278,6 +349,12 @@ class Surface(MCDCObject):
         z: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create the plane ``z = constant``.
+
+        Parameters are the surface ``name``, position ``z`` in cm, and a
+        ``boundary_condition`` of ``"none"``, ``"vacuum"``, or
+        ``"reflective"``.
+        """
         type_ = SURFACE_PLANE_Z
         surface = cls(type_, name, boundary_condition)
 
@@ -301,6 +378,11 @@ class Surface(MCDCObject):
         D: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a general plane ``A*x + B*y + C*z + D = 0``.
+
+        The coefficients are normalized internally. ``(A, B, C)`` must be a
+        nonzero normal vector.
+        """
         type_ = SURFACE_PLANE
         surface = cls(type_, name, boundary_condition)
 
@@ -335,6 +417,10 @@ class Surface(MCDCObject):
         radius: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create an infinite cylinder parallel to the x axis.
+
+        ``center`` gives ``[y, z]`` in cm and ``radius`` is in cm.
+        """
         type_ = SURFACE_CYLINDER_X
         surface = cls(type_, name, boundary_condition)
 
@@ -362,6 +448,10 @@ class Surface(MCDCObject):
         radius: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create an infinite cylinder parallel to the y axis.
+
+        ``center`` gives ``[x, z]`` in cm and ``radius`` is in cm.
+        """
         type_ = SURFACE_CYLINDER_Y
         surface = cls(type_, name, boundary_condition)
 
@@ -389,6 +479,10 @@ class Surface(MCDCObject):
         radius: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create an infinite cylinder parallel to the z axis.
+
+        ``center`` gives ``[x, y]`` in cm and ``radius`` is in cm.
+        """
         type_ = SURFACE_CYLINDER_Z
         surface = cls(type_, name, boundary_condition)
 
@@ -418,6 +512,17 @@ class Surface(MCDCObject):
         point: Sequence[float] = [0.0, 0.0, 0.0],
         boundary_condition: str = "none",
     ):
+        """Create an infinite cylinder with an arbitrary axis.
+
+        Parameters
+        ----------
+        radius : float, optional
+            Cylinder radius in cm.
+        axis : sequence of 3 float, optional
+            Nonzero vector parallel to the cylinder axis.
+        point : sequence of 3 float, optional
+            A point on the cylinder axis, in cm.
+        """
         type_ = SURFACE_CYLINDER
         surface = cls(type_, name, boundary_condition)
 
@@ -458,6 +563,7 @@ class Surface(MCDCObject):
         radius: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a sphere from its center and radius in cm."""
         type_ = SURFACE_SPHERE
         surface = cls(type_, name, boundary_condition)
 
@@ -487,6 +593,11 @@ class Surface(MCDCObject):
         t_sq: float = 1.0,
         boundary_condition: str = "none",
     ):
+        """Create a double cone aligned with the x axis.
+
+        ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
+        half-angle.
+        """
         type_ = SURFACE_CONE_X
         surface = cls(type_, name, boundary_condition)
 
@@ -514,6 +625,11 @@ class Surface(MCDCObject):
         t_sq: float = 1.0,
         boundary_condition: str = "none",
     ):
+        """Create a double cone aligned with the y axis.
+
+        ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
+        half-angle.
+        """
         type_ = SURFACE_CONE_Y
         surface = cls(type_, name, boundary_condition)
 
@@ -541,6 +657,11 @@ class Surface(MCDCObject):
         t_sq: float = 1.0,
         boundary_condition: str = "none",
     ):
+        """Create a double cone aligned with the z axis.
+
+        ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
+        half-angle.
+        """
         type_ = SURFACE_CONE_Z
         surface = cls(type_, name, boundary_condition)
 
@@ -576,6 +697,12 @@ class Surface(MCDCObject):
         J: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a general second-degree surface.
+
+        The coefficients define
+        ``A*x**2 + B*y**2 + C*z**2 + D*x*y + E*x*z + F*y*z
+        + G*x + H*y + I*z + J = 0``.
+        """
         type_ = SURFACE_QUADRIC
         surface = cls(type_, name, boundary_condition)
 
@@ -607,6 +734,10 @@ class Surface(MCDCObject):
         r: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a torus centered at ``(A, B, C)`` and aligned with x.
+
+        ``R`` is the major radius and ``r`` the minor radius, both in cm.
+        """
         type_ = SURFACE_TORUS_X
         surface = cls(type_, name, boundary_condition)
 
@@ -634,6 +765,10 @@ class Surface(MCDCObject):
         r: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a torus centered at ``(A, B, C)`` and aligned with y.
+
+        ``R`` is the major radius and ``r`` the minor radius, both in cm.
+        """
         type_ = SURFACE_TORUS_Y
         surface = cls(type_, name, boundary_condition)
 
@@ -661,6 +796,10 @@ class Surface(MCDCObject):
         r: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a torus centered at ``(A, B, C)`` and aligned with z.
+
+        ``R`` is the major radius and ``r`` the minor radius, both in cm.
+        """
         type_ = SURFACE_TORUS_Z
         surface = cls(type_, name, boundary_condition)
 
@@ -687,6 +826,19 @@ class Surface(MCDCObject):
         r: float = 0.0,
         boundary_condition: str = "none",
     ):
+        """Create a torus with an arbitrary axis.
+
+        Parameters
+        ----------
+        center : sequence of 3 float, optional
+            Torus center in cm.
+        axis : sequence of 3 float, optional
+            Nonzero symmetry-axis vector.
+        R : float, optional
+            Major radius in cm.
+        r : float, optional
+            Minor radius in cm.
+        """
         x, y, z = center
         ax, ay, az = axis
         norm = (ax**2 + ay**2 + az**2) ** 0.5
@@ -728,10 +880,22 @@ class Surface(MCDCObject):
     # ==================================================================================
 
     def move(self, velocities, durations):
+        """Define piecewise-constant translational motion.
+
+        Parameters
+        ----------
+        velocities : array_like, shape (N, 3)
+            Velocity vector for each segment in cm/s.
+        durations : array_like, shape (N,)
+            Segment durations in seconds. A final stationary segment is appended
+            automatically.
+        """
         move_object(self, velocities, durations)
 
 
 def decode_BC_type(type_):
+    """Return the display name for a packed boundary-condition code."""
+
     if type_ == BC_NONE:
         return "None"
     elif type_ == BC_VACUUM:

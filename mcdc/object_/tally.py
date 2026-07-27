@@ -46,6 +46,120 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Tally(MCDCPolymorphic):
+    """Create a tally and select its estimator from the requested scores.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing tally name.
+    scores : list of str, optional
+        Scores to accumulate. Track-length scores are ``"flux"``, ``"density"``,
+        ``"collision"``, ``"capture"``, and ``"fission"``; surface-crossing
+        scores are ``"current-net"``, ``"current-in"``, and ``"current-out"``;
+        the collision score is ``"energy_deposition"``. Scores from different
+        estimator families cannot be mixed.
+    surface : Surface, optional
+        Surface filter. Required for a surface-crossing tally unless ``cell`` is
+        provided.
+    cell : Cell, optional
+        Cell filter.
+    mesh : MeshBase, optional
+        Spatial mesh filter for track-length or collision tallies.
+    mu : sequence of float, optional
+        Polar-cosine bin boundaries.
+    azi : sequence of float, optional
+        Azimuthal-angle bin boundaries in radians.
+    polar_reference : sequence of 3 float, optional
+        Reference direction for the angular filters.
+    energy : sequence of float or "all_groups", optional
+        Energy-bin boundaries in eV, or ``"all_groups"`` in multigroup mode.
+    time : sequence of float, optional
+        Time-bin boundaries in seconds.
+
+    Returns
+    -------
+    TallySurfaceCrossing, TallyTracklength, or TallyCollision
+        Concrete tally selected from ``scores``.
+
+    Examples
+    --------
+    Score flux and fission on a structured mesh:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> mesh = mcdc.MeshStructured(z=np.linspace(0.0, 10.0, 101))
+    >>> tally = mcdc.Tally(
+    ...     name="Axial flux",
+    ...     mesh=mesh,
+    ...     scores=["flux", "fission"],
+    ...     energy=[0.0, 1.0e6, 20.0e6],
+    ... )
+
+    Score net current crossing a surface:
+
+    >>> boundary = mcdc.Surface.PlaneZ(z=10.0)
+    >>> current = mcdc.Tally(surface=boundary, scores=["current-net"])
+
+    Filter a track-length tally by cell, angle, and time:
+
+    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> lower = mcdc.Surface.PlaneZ(z=0.0)
+    >>> upper = mcdc.Surface.PlaneZ(z=10.0)
+    >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)
+    >>> filtered_flux = mcdc.Tally(
+    ...     cell=cell,
+    ...     scores=["flux", "capture"],
+    ...     mu=np.linspace(-1.0, 1.0, 11),
+    ...     azi=np.linspace(-np.pi, np.pi, 17),
+    ...     time=[0.0, 1.0e-6, 2.0e-6],
+    ... )
+
+    Compile the geometry to resolve the cell's bounding surfaces:
+
+    >>> model = mcdc.Simulation(name="Cell-current example")
+    >>> model.set_model([cell])
+    >>> model.compile()
+
+    Score current entering and leaving the cell through any of its boundaries:
+
+    >>> cell_current = mcdc.Tally(
+    ...     cell=cell,
+    ...     scores=["current-net", "current-in", "current-out"],
+    ... )
+
+    A cell-only surface-crossing filter scores genuine changes in cell membership.
+    Crossings of surfaces inside the cell that do not enter or leave the cell are
+    not scored.
+
+    Restrict the cell current to one particular boundary surface:
+
+    >>> upper_surface_current = mcdc.Tally(
+    ...     surface=upper,
+    ...     cell=cell,
+    ...     scores=["current-net", "current-in", "current-out"],
+    ... )
+    >>> model.set_tallies([cell_current, upper_surface_current])
+
+    With both filters, the surface selects where crossings are scored, while the
+    cell determines whether each crossing is incoming or outgoing.
+
+    Score energy deposition with both cell and mesh filters:
+
+    >>> deposition = mcdc.Tally(
+    ...     cell=cell,
+    ...     mesh=mesh,
+    ...     scores=["energy_deposition"],
+    ... )
+
+    Use one energy bin per multigroup energy group:
+
+    >>> group_flux = mcdc.Tally(
+    ...     cell=cell,
+    ...     scores=["flux"],
+    ...     energy="all_groups",
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "tally"
     sub_type = -1  # Polymorphic base
@@ -294,6 +408,8 @@ class Tally(MCDCPolymorphic):
 
 
 def decode_score_type(type_, lower_case=False):
+    """Return the display or input name for a packed tally-score code."""
+
     if type_ == SCORE_FLUX:
         return "Flux" if not lower_case else "flux"
     elif type_ == SCORE_DENSITY:
@@ -323,6 +439,12 @@ def decode_score_type(type_, lower_case=False):
 
 
 class TallySurfaceCrossing(Tally):
+    """Surface-crossing current tally.
+
+    Instances are normally created through :class:`Tally`, which selects this
+    estimator for current scores.
+    """
+
     # MC/DC framework metadata
     label = "surface_crossing_tally"
     sub_type = TALLY_SURFACE_CROSSING
@@ -424,6 +546,12 @@ class TallySurfaceCrossing(Tally):
 
 
 class TallyCollision(Tally):
+    """Collision-estimator tally.
+
+    Instances are normally created through :class:`Tally`, which selects this
+    estimator for the ``"energy_deposition"`` score.
+    """
+
     # MC/DC framework metadata
     label = "collision_tally"
     sub_type = TALLY_COLLISION
@@ -546,6 +674,12 @@ class TallyCollision(Tally):
 
 
 class TallyTracklength(Tally):
+    """Track-length estimator tally.
+
+    Instances are normally created through :class:`Tally`, which selects this
+    estimator for flux, density, reaction-rate, and collision scores.
+    """
+
     # MC/DC framework metadata
     label = "tracklength_tally"
     sub_type = TALLY_TRACKLENGTH

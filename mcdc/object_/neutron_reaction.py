@@ -37,6 +37,12 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class NeutronReactionBase(MCDCPolymorphic):
+    """Base neutron reaction data loaded from the HDF5 physics library.
+
+    Stores the ENDF reaction identifier, cross-section segment and offset,
+    reaction reference frame, and Q value.
+    """
+
     # MC/DC framework metadata
     label = "neutron_reaction"
     sub_type = -1  # Polymorphic base
@@ -66,6 +72,8 @@ class NeutronReactionBase(MCDCPolymorphic):
 
 
 def decode_reference_frame(type_):
+    """Return the display name for a packed reference-frame code."""
+
     if type_ == REFERENCE_FRAME_LAB:
         return "Laboratory"
     elif type_ == REFERENCE_FRAME_COM:
@@ -78,6 +86,8 @@ def decode_reference_frame(type_):
 
 
 class NeutronReactionElasticScattering(NeutronReactionBase):
+    """Elastic neutron scattering with incident-energy-dependent cosine data."""
+
     # MC/DC framework metadata
     label = "neutron_elastic_scattering_reaction"
     sub_type = NEUTRON_REACTION_ELASTIC_SCATTERING
@@ -90,6 +100,7 @@ class NeutronReactionElasticScattering(NeutronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an elastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, _ = set_basic_properties(h5_group)
         _, mu = set_angular_distribution(h5_group["angular_cosine_distribution"])
         return cls(MT, xs, xs_offset, reference_frame, mu)
@@ -106,6 +117,8 @@ class NeutronReactionElasticScattering(NeutronReactionBase):
 
 
 class NeutronReactionCapture(NeutronReactionBase):
+    """Neutron capture reaction."""
+
     # MC/DC framework metadata
     label = "neutron_capture_reaction"
     sub_type = NEUTRON_REACTION_CAPTURE
@@ -115,6 +128,7 @@ class NeutronReactionCapture(NeutronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build a capture reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         return cls(MT, xs, xs_offset, reference_frame, q_value)
 
@@ -125,6 +139,8 @@ class NeutronReactionCapture(NeutronReactionBase):
 
 
 class NeutronReactionInelasticScattering(NeutronReactionBase):
+    """Inelastic scattering with angular data and one or more energy spectra."""
+
     # MC/DC framework metadata
     label = "neutron_inelastic_scattering_reaction"
     sub_type = NEUTRON_REACTION_INELASTIC_SCATTERING
@@ -167,6 +183,7 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an inelastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         multiplicity = int(h5_group["multiplicity"][()])
 
@@ -219,6 +236,8 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
 
 
 class NeutronReactionFission(NeutronReactionBase):
+    """Fission reaction with prompt angular and energy distributions."""
+
     # MC/DC framework metadata
     label = "neutron_fission_reaction"
     sub_type = NEUTRON_REACTION_FISSION
@@ -245,6 +264,7 @@ class NeutronReactionFission(NeutronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build a fission reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
 
         # Prompt angular distribution
@@ -282,6 +302,8 @@ class NeutronReactionFission(NeutronReactionBase):
 
 
 def set_basic_properties(h5_group):
+    """Read properties shared by all neutron reactions from an HDF5 group."""
+
     MT = h5_group.attrs["MT"][()]
     xs = h5_group["xs"][()]
     xs_offset = h5_group["xs"].attrs["offset"]
@@ -295,6 +317,8 @@ def set_basic_properties(h5_group):
 
 
 def set_angular_distribution(h5_group):
+    """Create the packed angle type and distribution from an HDF5 group."""
+
     mu_type = h5_group.attrs["type"]
     if mu_type == "isotropic":
         angle_type = ANGLE_ISOTROPIC
@@ -314,6 +338,8 @@ def set_angular_distribution(h5_group):
 
 
 def set_energy_distribution(h5_group):
+    """Create an outgoing-energy distribution from an HDF5 group."""
+
     spectrum_type = h5_group.attrs["type"]
 
     if spectrum_type == "tabulated":

@@ -24,6 +24,50 @@ from mcdc.util import flatten
 
 
 class Universe(MCDCObject):
+    """Group cells into a reusable geometry.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing universe name.
+    cells : list of Cell, optional
+        Cells belonging to the universe. Cells are tested in list order by the
+        geometry search.
+
+    Examples
+    --------
+    Group two cells into a reusable universe:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> left = mcdc.Surface.PlaneX(x=-1.0)
+    >>> middle = mcdc.Surface.PlaneX(x=0.0)
+    >>> right = mcdc.Surface.PlaneX(x=1.0)
+    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> cells = [
+    ...     mcdc.Cell(region=+left & -middle, fill=material),
+    ...     mcdc.Cell(region=+middle & -right, fill=material),
+    ... ]
+    >>> universe = mcdc.Universe(name="Two regions", cells=cells)
+
+    Create a universe for a spherical inclusion and its surrounding material:
+
+    >>> sphere = mcdc.Surface.Sphere(radius=0.5)
+    >>> fuel = mcdc.MaterialMG(fission=np.array([0.2]), nu_p=np.array([2.5]))
+    >>> water = mcdc.MaterialMG(capture=np.array([0.01]))
+    >>> pin = mcdc.Universe(
+    ...     name="Pin",
+    ...     cells=[
+    ...         mcdc.Cell(region=-sphere, fill=fuel),
+    ...         mcdc.Cell(region=+sphere, fill=water),
+    ...     ],
+    ... )
+
+    Use a universe as a cell fill:
+
+    >>> placed_pin = mcdc.Cell(fill=pin, translation=[1.0, 0.0, 0.0])
+    """
+
     # MC/DC framework metadata
     label = "universe"
 
@@ -61,6 +105,51 @@ class Universe(MCDCObject):
 
 
 class Lattice(MCDCObject):
+    """Arrange universes on a uniform Cartesian lattice.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing lattice name.
+    x, y, z : tuple of (float, float, int), optional
+        ``(origin, spacing, number_of_bins)`` for each finite lattice axis, in
+        cm. An omitted axis is treated as a single unbounded bin.
+    universes : nested list of Universe, optional
+        Universe layout supplied in ``[z][y][x]`` order. The y and z axes are
+        reversed internally to match MC/DC's Cartesian indexing convention.
+
+    Examples
+    --------
+    Place two universes next to each other along x:
+
+    >>> import mcdc
+    >>> left = mcdc.Universe(name="Left")
+    >>> right = mcdc.Universe(name="Right")
+    >>> lattice = mcdc.Lattice(
+    ...     x=(-1.0, 1.0, 2),
+    ...     universes=[[left, right]],
+    ... )
+
+    Build a two-dimensional 2-by-2 lattice:
+
+    >>> u00 = mcdc.Universe(name="Lower left")
+    >>> u10 = mcdc.Universe(name="Lower right")
+    >>> u01 = mcdc.Universe(name="Upper left")
+    >>> u11 = mcdc.Universe(name="Upper right")
+    >>> lattice_xy = mcdc.Lattice(
+    ...     x=(-1.0, 1.0, 2),
+    ...     y=(-1.0, 1.0, 2),
+    ...     universes=[
+    ...         [u00, u10],
+    ...         [u01, u11],
+    ...     ],
+    ... )
+
+    Place the lattice inside a cell:
+
+    >>> lattice_cell = mcdc.Cell(fill=lattice_xy)
+    """
+
     # MC/DC framework metadata
     label = "lattice"
     non_numba = ["universes"]

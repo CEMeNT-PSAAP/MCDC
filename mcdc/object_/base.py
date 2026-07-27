@@ -2,6 +2,13 @@ from mcdc.print_ import print_error
 
 
 class MCDCBase:
+    """Base class for Python-side MC/DC model and runtime objects.
+
+    Subclasses declare a :attr:`label` and type-annotated fields. Assignments to
+    annotated fields are checked at runtime so invalid model data is rejected
+    before the simulation is packed for transport.
+    """
+
     label: str
 
     def __init_subclass__(cls):
@@ -18,6 +25,14 @@ class MCDCBase:
 
 
 class MCDCObject(MCDCBase):
+    """Base class for model objects registered during simulation compilation.
+
+    ``ID`` identifies an object in its heterogeneous simulation collection.
+    ``compile_ID`` records the compilation pass in which the object was most
+    recently registered, preventing duplicate registration when objects are
+    shared by multiple parts of a model.
+    """
+
     # MC/DC framework metadata
     label = "object"
 
@@ -44,6 +59,13 @@ class MCDCObject(MCDCBase):
 
 
 class MCDCPolymorphic(MCDCObject):
+    """Base class for model objects with multiple packed representations.
+
+    In addition to the global :attr:`~MCDCObject.ID`, polymorphic objects carry
+    a subtype code and a subtype-local ``sub_ID``. The transport kernels use
+    these values to dispatch to the correct packed object representation.
+    """
+
     # MC/DC framework metadata
     label = "polymorphic"
 

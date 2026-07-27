@@ -17,6 +17,19 @@ from mcdc.object_.electron_reaction import (
 
 
 class Element(MCDCObject):
+    """Element data loaded from the MC/DC HDF5 library.
+
+    Parameters
+    ----------
+    element_name : str
+        Chemical symbol used to locate ``<element_name>.h5`` under ``MCDC_LIB``.
+
+    Notes
+    -----
+    Construction loads basic atomic properties. Electron reaction cross sections
+    and secondary distributions are loaded later by :meth:`set_electron_data`.
+    """
+
     # MC/DC framework metadata
     label = "element"
 
@@ -52,6 +65,7 @@ class Element(MCDCObject):
         file.close()
 
     def set_electron_data(self):
+        """Load electron cross sections and reaction data from ``MCDC_LIB``."""
         element_name = self.name
 
         # Load data library

@@ -40,6 +40,14 @@ from mcdc.print_ import print_error
 
 
 class Region:
+    """Boolean combination of oriented surface half-spaces.
+
+    Regions are normally built with unary ``+`` and ``-`` on
+    :class:`~mcdc.object_.surface.Surface` objects, followed by ``&`` (intersection),
+    ``|`` (union), and ``~`` (complement). During compilation, the expression is
+    converted to reverse Polish notation for evaluation by the geometry kernels.
+    """
+
     type: str
     A: Surface | Region | NoneType
     B: Region | int | NoneType
@@ -51,6 +59,21 @@ class Region:
 
     @classmethod
     def make_halfspace(cls, surface, sense):
+        """Create the positive or negative half-space of a surface.
+
+        Parameters
+        ----------
+        surface : Surface
+            Bounding surface.
+        sense : int
+            Positive for the positive half-space and negative for the negative
+            half-space.
+
+        Returns
+        -------
+        Region
+            Half-space region used to build a cell expression.
+        """
         region = Region("halfspace", surface, sense)
         return region
 
@@ -73,6 +96,63 @@ class Region:
 
 
 class Cell(MCDCObject):
+    """Define a geometric region and the object that fills it.
+
+    Parameters
+    ----------
+    region : Region, optional
+        Boolean region expression. If omitted, the cell covers all space.
+    fill : MaterialBase, Universe, Lattice, or None, optional
+        Material or nested geometry placed in the cell. ``None`` creates a void
+        cell.
+    name : str, optional
+        User-facing name. An automatic name is assigned during compilation when
+        omitted.
+    translation : sequence of 3 float, optional
+        Translation, in cm, applied when entering a universe or lattice fill.
+    rotation : sequence of 3 float, optional
+        Rotation angles about the x, y, and z axes, in degrees, applied when
+        entering a universe or lattice fill.
+
+    Notes
+    -----
+    A cell region is commonly written as ``+left & -right``. Surface signs select
+    half-spaces; intersections, unions, and complements may be combined freely.
+
+    Examples
+    --------
+    Fill a slab between two z planes with a one-group material:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> lower = mcdc.Surface.PlaneZ(z=0.0)
+    >>> upper = mcdc.Surface.PlaneZ(z=2.0)
+    >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)
+
+    Create a void cell outside the slab:
+
+    >>> void = mcdc.Cell(name="Upper void", region=+upper)
+
+    Combine regions with a union:
+
+    >>> left_sphere = mcdc.Surface.Sphere(center=[-1.0, 0.0, 0.0], radius=0.5)
+    >>> right_sphere = mcdc.Surface.Sphere(center=[1.0, 0.0, 0.0], radius=0.5)
+    >>> two_spheres = mcdc.Cell(
+    ...     region=-left_sphere | -right_sphere,
+    ...     fill=material,
+    ... )
+
+    Place a reusable universe with a translation and rotation:
+
+    >>> assembly = mcdc.Universe(name="Assembly", cells=[cell])
+    >>> placed_assembly = mcdc.Cell(
+    ...     fill=assembly,
+    ...     translation=[5.0, 0.0, 0.0],
+    ...     rotation=[0.0, 0.0, 90.0],
+    ... )
+    """
+
     # MC/DC framework metadata
     label = "cell"
     non_numba = ["region", "region_RPN", "fill"]
@@ -192,6 +272,11 @@ class Cell(MCDCObject):
 
 
 def generate_RPN_tokens(region, simulation):
+    """Compile a region expression into geometry-kernel RPN tokens.
+
+    Surface objects encountered in the expression are registered with
+    ``simulation`` as part of this operation.
+    """
     from mcdc.object_.surface import Surface
 
     # The RPN tokens
@@ -255,6 +340,7 @@ def generate_RPN_tokens(region, simulation):
 
 
 def generate_RPN(rpn_tokens):
+    """Convert region RPN tokens to a simplified SymPy Boolean expression."""
     stack = []
 
     for token in rpn_tokens:
@@ -280,6 +366,7 @@ def generate_RPN(rpn_tokens):
 
 
 def list_surfaces(rpn_tokens, simulation):
+    """Return the registered surfaces referenced by a token sequence."""
     surfaces = []
 
     for token in rpn_tokens:

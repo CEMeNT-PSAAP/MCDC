@@ -13,6 +13,8 @@ from typing import Annotated
 
 
 class ImplicitCapture(MCDCBase):
+    """Configuration for implicit capture."""
+
     # MC/DC framework metadata
     label = "implicit_capture"
 
@@ -22,6 +24,7 @@ class ImplicitCapture(MCDCBase):
         self.active = False
 
     def __call__(self, active: bool = True):
+        """Enable or disable implicit capture."""
         self.active = active
 
 
@@ -31,6 +34,8 @@ class ImplicitCapture(MCDCBase):
 
 
 class WeightedEmission(MCDCBase):
+    """Configuration for weighted secondary-particle emission."""
+
     # MC/DC framework metadata
     label = "weighted_emission"
 
@@ -42,6 +47,15 @@ class WeightedEmission(MCDCBase):
         self.weight_target = 0.0
 
     def __call__(self, active: bool = True, weight_target: float = 1.0):
+        """Configure weighted emission.
+
+        Parameters
+        ----------
+        active : bool, optional
+            Whether the technique is active.
+        weight_target : float, optional
+            Target statistical weight for emitted particles.
+        """
         self.active = active
         self.weight_target = weight_target
 
@@ -52,6 +66,8 @@ class WeightedEmission(MCDCBase):
 
 
 class GlobalWeightRoulette(MCDCBase):
+    """Configuration for global low-weight particle roulette."""
+
     # MC/DC framework metadata
     label = "global_weight_roulette"
 
@@ -65,6 +81,10 @@ class GlobalWeightRoulette(MCDCBase):
         self.weight_target = 1.0
 
     def __call__(self, weight_threshold: float = 0.0, weight_target: float = 1.0):
+        """Enable roulette below a global weight threshold.
+
+        ``weight_threshold`` must not exceed ``weight_target``.
+        """
         if weight_threshold > weight_target:
             print_error(
                 "For weight roulette, weight threshold has to be smaller than the target"
@@ -80,6 +100,8 @@ class GlobalWeightRoulette(MCDCBase):
 
 
 class WeightWindows(MCDCBase):
+    """Space- and energy-dependent particle weight-window configuration."""
+
     # MC/DC framework metadata
     label = "weight_windows"
 
@@ -112,6 +134,18 @@ class WeightWindows(MCDCBase):
         self.upper_weights = np.array([1.0]).reshape(*shape)
 
     def __call__(self, weight_windows, mesh=None, energy=None):
+        """Configure lower, target, and upper particle weights.
+
+        Parameters
+        ----------
+        weight_windows : ndarray, shape (Ne, Nx, Ny, Nz, 3)
+            Lower, target, and upper weights in the final dimension.
+        mesh : MeshUniform or MeshStructured, optional
+            Spatial mesh. The default is one unbounded uniform bin.
+        energy : ndarray, optional
+            Strictly increasing energy-group boundaries. The default is one
+            all-energy bin.
+        """
         # fill in defaults
         if mesh is None:
             mesh = MeshUniform()
@@ -183,6 +217,8 @@ class WeightWindows(MCDCBase):
 
 
 class PopulationControl(MCDCBase):
+    """Configuration for source-bank population control."""
+
     # MC/DC framework metadata
     label = "population_control"
 
@@ -192,4 +228,5 @@ class PopulationControl(MCDCBase):
         self.active = False
 
     def __call__(self, active: bool = True):
+        """Enable or disable population control."""
         self.active = active
