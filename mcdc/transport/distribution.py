@@ -388,7 +388,7 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
 @njit
 def sample_maxwellian(E, rng_state, maxwellian, simulation, data):
     # Get nuclear temperature
-    table = simulation["table_data"][maxwellian["nuclear_temperature_ID"]]
+    table = simulation["data"][maxwellian["nuclear_temperature_ID"]]
     nuclear_temperature = evaluate_data(E, table, simulation, data)
     restriction_energy = maxwellian["restriction_energy"]
 
@@ -418,7 +418,7 @@ def sample_level_scattering(E, level_scattering):
 @njit
 def sample_evaporation(E, rng_state, evaporation, simulation, data):
     # Get nuclear temperature
-    table = simulation["table_data"][evaporation["nuclear_temperature_ID"]]
+    table = simulation["data"][evaporation["nuclear_temperature_ID"]]
     nuclear_temperature = evaluate_data(E, table, simulation, data)
     restriction_energy = evaporation["restriction_energy"]
 

@@ -287,9 +287,7 @@ def sample_elastic_scattering(reaction, particle_container, element, simulation,
         # Large-angle elastic scattering
         # ---------------------------------------------------------------------
 
-        mu_distribution = simulation["multi_table_distributions"][
-            elastic_scattering["mu_ID"]
-        ]
+        mu_distribution = simulation["distributions"][elastic_scattering["mu_ID"]]
         mu0 = sample_distribution(
             E, mu_distribution, particle_container, simulation, data
         )
