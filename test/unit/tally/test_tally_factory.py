@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 import mcdc
@@ -93,6 +94,27 @@ def test_tally_factory_allows_combined_supported_filters(slab_plane_x):
     assert cell_mesh_tally.cell_filter_ID == slab_plane_x["c_right"].ID
     assert cell_mesh_tally.mesh_filtered
     assert cell_mesh_tally.mesh_filter_ID == mesh.ID
+
+
+def test_all_groups_filter_resizes_compiled_tally_bins(prepare_simulation):
+    material = mcdc.MaterialMG(capture=np.ones(3))
+    cell = mcdc.Cell(fill=material)
+    tally = mcdc.Tally(scores=["flux"], energy="all_groups")
+
+    simulation_container, data = prepare_simulation(cells=[cell], tallies=[tally])
+    simulation = simulation_container[0]
+    tally_record = simulation["tallies"][tally.ID]
+
+    np.testing.assert_array_equal(tally.energy, [-0.5, 0.5, 1.5, 2.5])
+    assert tally.bin_shape == [1, 1, 3, 1, 1]
+    assert tally.stride_energy == 1
+    assert tally.stride_azi == 3
+    assert tally.stride_mu == 3
+    assert tally_record["bin_length"] == 3
+
+    bin_start = tally_record["bin_offset"]
+    bin_stop = bin_start + tally_record["bin_length"]
+    assert len(data[bin_start:bin_stop]) == 3
 
 
 def test_tally_factory_rejects_mixed_estimator_scores(capsys):

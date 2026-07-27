@@ -301,6 +301,7 @@ class Tally(MCDCPolymorphic):
         self.filter_direction = False
         self.filter_energy = False
         self.filter_time = False
+        self.energy_all_groups = False
         if mu is not None:
             self.mu = np.array(mu)
             self.filter_direction = True
@@ -314,6 +315,7 @@ class Tally(MCDCPolymorphic):
             )
         if energy is not None:
             if type(energy) == str and energy == "all_groups":
+                self.energy_all_groups = True
                 self.energy = np.array([0])  # A placeholder
             else:
                 self.energy = np.array(energy)
@@ -377,7 +379,7 @@ class Tally(MCDCPolymorphic):
         if self.filter_time:
             text += f"    - Time {print_1d_array(self.time)} s\n"
         if self.filter_energy:
-            if len(self.energy) == 1:
+            if self.energy_all_groups:
                 text += f"    - Energy: All groups\n"
             else:
                 text += f"    - Energy {print_1d_array(self.energy)} eV\n"
@@ -393,10 +395,13 @@ class Tally(MCDCPolymorphic):
         if not super()._compile_into_simulation(simulation):
             return False
 
-        # Set "all_group" energy filter
-        if len(self.energy) == 1:
+        # Resolve the "all_groups" energy filter and resize its tally bins.
+        if self.energy_all_groups:
             G = simulation.materials[0].G
             self.energy = np.linspace(0, G, G + 1) - 0.5
+            shape = list(self.bin_shape)
+            shape[2] = G
+            self._set_bin_shape_and_strides(tuple(shape))
 
         return True
 
