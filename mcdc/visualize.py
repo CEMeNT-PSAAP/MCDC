@@ -1,8 +1,6 @@
 from numba import njit
 import numpy as np
-from mcdc.main import preparation
-
-_visualize_cache = None
+from mcdc.main import prepare
 
 
 def visualize_model(
@@ -42,11 +40,7 @@ def visualize_model(
 
     from matplotlib import colors as mpl_colors
 
-    # Use cached preparation if available
-    global _visualize_cache
-    if _visualize_cache is None:
-        _visualize_cache = preparation(simulationPy)
-    simulation_container, data = _visualize_cache
+    simulation_container, data = prepare(simulationPy)
     simulation = simulation_container[0]
 
     # ==================================================================================
