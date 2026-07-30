@@ -1,14 +1,49 @@
 .. _pythonapi:
 
-================
-Input Definition
-================
+====================
+Python API Reference
+====================
 
-Full API documentation.
+The MC/DC public API is centered on :class:`mcdc.Simulation`. A simulation owns
+the model geometry and material, sources, tallies, settings, transport
+techniques, and runtime state needed for one calculation.
+
+Build the model with the public objects listed below, attach its root cells,
+sources, and tallies to a simulation, and then visualize or run that simulation:
+
+.. code-block:: python
+
+   simulation = mcdc.Simulation(name="Example")
+   simulation.set_model([cell])
+   simulation.set_sources([source])
+   simulation.set_tallies([tally])
+   simulation.settings.N_particle = 10_000
+   simulation.run()
+
+The complete public interfaces and additional examples are documented on each
+linked API page.
 
 
-Defining materials
-------------------
+Simulation
+----------
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+   :template: omcclass.rst
+
+   mcdc.Simulation
+
+
+Model building blocks
+---------------------
+
+Materials
+^^^^^^^^^
+
+Materials define the interaction data used by cells. Use
+:class:`mcdc.Material` for continuous-energy transport and
+:class:`mcdc.MaterialMG` for multigroup transport.
 
 .. autosummary::
    :toctree: generated
@@ -19,21 +54,55 @@ Defining materials
    mcdc.MaterialMG
 
 
-Defining geometry
------------------
+Geometry
+^^^^^^^^
+
+Surfaces bound spatial regions, cells pair those regions with materials or
+universes, and universes and lattices organize repeated geometry.
 
 .. autosummary::
    :toctree: generated
    :nosignatures:
    :template: omcclass.rst
 
-   mcdc.Cell
-   mcdc.Lattice
    mcdc.Surface
+   mcdc.Cell
    mcdc.Universe
+   mcdc.Lattice
 
-Defining meshes
----------------
+
+Sources
+^^^^^^^
+
+Sources describe the initial particle population.
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+   :template: omcclass.rst
+
+   mcdc.Source
+
+
+Tallies
+^^^^^^^
+
+Tallies define the quantities to score and the filters over which those scores
+are accumulated.
+
+.. autosummary::
+   :toctree: generated
+   :nosignatures:
+   :template: omcclass.rst
+
+   mcdc.Tally
+
+
+Meshes
+^^^^^^
+
+Meshes provide spatial bins for mesh-filtered tallies and transport
+techniques.
 
 .. autosummary::
    :toctree: generated
@@ -43,68 +112,27 @@ Defining meshes
    mcdc.MeshUniform
    mcdc.MeshStructured
 
-Defining sources
-----------------
 
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
-   :template: omcclass.rst
+Configuration and execution
+---------------------------
 
-   mcdc.Source
+Each :class:`mcdc.Simulation` owns its settings at ``simulation.settings``.
+Settings control particle histories, batches, random-number generation,
+transport modes, census times, particle banks, output, and GPU execution.
+Specialized modes are configured through methods such as
+``simulation.settings.set_eigenmode(...)`` and
+``simulation.settings.set_time_census(...)``.
 
-Defining tallies
-----------------
+Transport techniques are also configured on the simulation instance:
 
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
-   :template: omcclass.rst
+- ``simulation.implicit_capture(...)``
+- ``simulation.weighted_emission(...)``
+- ``simulation.global_weight_roulette(...)``
+- ``simulation.weight_windows(...)``
+- ``simulation.population_control(...)``
 
-   mcdc.Tally
-
-Defining simulation settings
------------------------------
-
-Settings are configured by assigning attributes on the ``mcdc.settings`` singleton.
-Key attributes include:
-
-- ``mcdc.settings.N_particle`` — Number of particles.
-- ``mcdc.settings.N_batch`` — Number of batches.
-- ``mcdc.settings.rng_seed`` — RNG seed.
-- ``mcdc.settings.output_name`` — Output file name (default: ``"output"``).
-- ``mcdc.settings.time_boundary`` — Time boundary.
-
-Methods:
-
-- ``mcdc.settings.set_eigenmode(N_inactive=..., N_active=..., k_init=...)`` — Enable k-eigenvalue mode.
-- ``mcdc.settings.set_time_census(time, tally_frequency=...)`` — Set time census parameters.
-- ``mcdc.settings.set_source_file(source_file_name)`` — Load source particles from file.
-
-Defining techniques
--------------------
-
-Techniques are enabled by calling methods on the ``mcdc.simulation`` singleton:
-
-- ``mcdc.simulation.implicit_capture(active=True)``
-- ``mcdc.simulation.global_weight_roulette(weight_threshold=0.0, weight_target=1.0)``
-- ``mcdc.simulation.population_control(active=True)``
-- ``mcdc.simulation.weighted_emission(active=True, weight_target=1.0)``
-- ``mcdc.simulation.weight_windows(weight_windows, mesh=None, energy=None)``
-
-Running simulations
--------------------
-
-.. autosummary::
-   :toctree: generated
-   :nosignatures:
-   :template: omcclass.rst
-
-   mcdc.Simulation
-
-
-
-
-
-
-
+Calling ``simulation.run()`` compiles the current Python object graph when
+needed, executes particle transport, and writes the configured output.
+``simulation.visualize_model(...)`` similarly compiles when needed before
+rendering the model. Use ``simulation.compile()`` when an explicit compiled
+snapshot is required before either operation.
