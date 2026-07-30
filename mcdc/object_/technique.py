@@ -13,7 +13,7 @@ from typing import Annotated
 
 
 class ImplicitCapture(MCDCBase):
-    """Configuration for implicit capture."""
+    """Simulation-owned implicit-capture configuration."""
 
     # MC/DC framework metadata
     label = "implicit_capture"
@@ -24,7 +24,25 @@ class ImplicitCapture(MCDCBase):
         self.active = False
 
     def __call__(self, active: bool = True):
-        """Enable or disable implicit capture."""
+        """Configure implicit capture.
+
+        Parameters
+        ----------
+        active : bool, optional
+            Whether implicit capture is enabled.
+
+        Examples
+        --------
+        Enable implicit capture:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.implicit_capture()
+
+        Disable implicit capture:
+
+        >>> simulation.implicit_capture(active=False)
+        """
         self.active = active
 
 
@@ -34,7 +52,7 @@ class ImplicitCapture(MCDCBase):
 
 
 class WeightedEmission(MCDCBase):
-    """Configuration for weighted secondary-particle emission."""
+    """Simulation-owned weighted-emission configuration."""
 
     # MC/DC framework metadata
     label = "weighted_emission"
@@ -55,6 +73,22 @@ class WeightedEmission(MCDCBase):
             Whether the technique is active.
         weight_target : float, optional
             Target statistical weight for emitted particles.
+
+        Examples
+        --------
+        Enable weighted emission with unit target weight:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.weighted_emission(weight_target=1.0)
+
+        Select a different target weight:
+
+        >>> simulation.weighted_emission(weight_target=0.5)
+
+        Disable weighted emission:
+
+        >>> simulation.weighted_emission(active=False)
         """
         self.active = active
         self.weight_target = weight_target
@@ -66,7 +100,7 @@ class WeightedEmission(MCDCBase):
 
 
 class GlobalWeightRoulette(MCDCBase):
-    """Configuration for global low-weight particle roulette."""
+    """Simulation-owned global weight-roulette configuration."""
 
     # MC/DC framework metadata
     label = "global_weight_roulette"
@@ -83,7 +117,32 @@ class GlobalWeightRoulette(MCDCBase):
     def __call__(self, weight_threshold: float = 0.0, weight_target: float = 1.0):
         """Enable roulette below a global weight threshold.
 
-        ``weight_threshold`` must not exceed ``weight_target``.
+        Parameters
+        ----------
+        weight_threshold : float, optional
+            Particle weight below which roulette is applied.
+        weight_target : float, optional
+            Statistical weight assigned to particles that survive roulette.
+            Must be greater than or equal to ``weight_threshold``.
+
+        Examples
+        --------
+        Apply roulette below a particle weight of 0.25 and raise surviving
+        particles to unit weight:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.global_weight_roulette(
+        ...     weight_threshold=0.25,
+        ...     weight_target=1.0,
+        ... )
+
+        Use a lower target weight:
+
+        >>> simulation.global_weight_roulette(
+        ...     weight_threshold=0.1,
+        ...     weight_target=0.5,
+        ... )
         """
         if weight_threshold > weight_target:
             print_error(
@@ -100,7 +159,7 @@ class GlobalWeightRoulette(MCDCBase):
 
 
 class WeightWindows(MCDCBase):
-    """Space- and energy-dependent particle weight-window configuration."""
+    """Simulation-owned particle weight-window configuration."""
 
     # MC/DC framework metadata
     label = "weight_windows"
@@ -139,12 +198,40 @@ class WeightWindows(MCDCBase):
         Parameters
         ----------
         weight_windows : ndarray, shape (Ne, Nx, Ny, Nz, 3)
-            Lower, target, and upper weights in the final dimension.
+            Lower, target, and upper weights in the final dimension. Every
+            lower weight must be positive, and each window must satisfy
+            ``lower <= target <= upper``.
         mesh : MeshUniform or MeshStructured, optional
             Spatial mesh. The default is one unbounded uniform bin.
         energy : ndarray, optional
             Strictly increasing energy-group boundaries. The default is one
             all-energy bin.
+
+        Examples
+        --------
+        Apply one weight window over all space and energy:
+
+        >>> import numpy as np
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> windows = np.array([0.5, 1.0, 2.0]).reshape(1, 1, 1, 1, 3)
+        >>> simulation.weight_windows(windows)
+
+        Configure weight windows on a uniform spatial mesh:
+
+        >>> mesh = mcdc.MeshUniform(x=(-5.0, 1.0, 10))
+        >>> windows = np.tile([0.25, 0.5, 1.0], (1, 10, 1, 1, 1))
+        >>> simulation.weight_windows(windows, mesh=mesh)
+
+        Configure both energy- and space-dependent windows:
+
+        >>> energy = np.array([0.0, 0.625e-6, 20.0])
+        >>> windows = np.tile([0.25, 0.5, 1.0], (2, 10, 1, 1, 1))
+        >>> simulation.weight_windows(
+        ...     windows,
+        ...     mesh=mesh,
+        ...     energy=energy,
+        ... )
         """
         # fill in defaults
         if mesh is None:
@@ -217,7 +304,7 @@ class WeightWindows(MCDCBase):
 
 
 class PopulationControl(MCDCBase):
-    """Configuration for source-bank population control."""
+    """Simulation-owned source-bank population-control configuration."""
 
     # MC/DC framework metadata
     label = "population_control"
@@ -228,5 +315,23 @@ class PopulationControl(MCDCBase):
         self.active = False
 
     def __call__(self, active: bool = True):
-        """Enable or disable population control."""
+        """Configure source-bank population control.
+
+        Parameters
+        ----------
+        active : bool, optional
+            Whether source-bank population control is enabled.
+
+        Examples
+        --------
+        Enable source-bank population control:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.population_control()
+
+        Disable source-bank population control:
+
+        >>> simulation.population_control(active=False)
+        """
         self.active = active

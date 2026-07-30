@@ -30,7 +30,7 @@ Simulation
 .. autosummary::
    :toctree: generated
    :nosignatures:
-   :template: omcclass.rst
+   :template: simulationclass.rst
 
    mcdc.Simulation
 
@@ -116,20 +116,25 @@ techniques.
 Configuration and execution
 ---------------------------
 
+Simulation settings
+^^^^^^^^^^^^^^^^^^^
+
 Each :class:`mcdc.Simulation` owns its settings at ``simulation.settings``.
 Settings control particle histories, batches, random-number generation,
 transport modes, census times, particle banks, output, and GPU execution.
 Specialized modes are configured through methods such as
 ``simulation.settings.set_eigenmode(...)`` and
-``simulation.settings.set_time_census(...)``.
+``simulation.settings.set_time_census(...)``. See :class:`mcdc.Simulation` for
+the complete settings interface.
 
-Transport techniques are also configured on the simulation instance:
+Transport techniques
+^^^^^^^^^^^^^^^^^^^^
 
-- ``simulation.implicit_capture(...)``
-- ``simulation.weighted_emission(...)``
-- ``simulation.global_weight_roulette(...)``
-- ``simulation.weight_windows(...)``
-- ``simulation.population_control(...)``
+Transport techniques are configured directly on the simulation instance. See
+:class:`mcdc.Simulation` for their signatures and examples.
+
+Compiling and running
+^^^^^^^^^^^^^^^^^^^^^
 
 Calling ``simulation.run()`` compiles the current Python object graph when
 needed, executes particle transport, and writes the configured output.

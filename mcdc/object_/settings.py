@@ -19,20 +19,20 @@ from mcdc.print_ import print_error
 
 @dataclass
 class Settings(MCDCBase):
-    """Simulation controls compiled into the transport state.
-
-    Settings are owned by a :class:`~mcdc.object_.simulation.Simulation` and
-    configure histories, batches, random-number generation, time censuses,
-    eigenvalue mode, transported particle species, output, particle banks, and
-    GPU execution.
-    """
+    """Execution and transport settings owned by a simulation."""
 
     # MC/DC framework metadata
     label = "settings"
 
     # Basic
+    #: Number of particle histories simulated per batch or eigenvalue cycle.
+    #: The default is ``0``.
     N_particle: int = 0
+    #: Number of statistically independent fixed-source batches. The default
+    #: is ``1``.
     N_batch: int = 1
+    #: Seed used to initialize the pseudorandom-number generator. The default
+    #: is ``1``.
     rng_seed: int = 1
 
     # k-eigenvalue
@@ -48,8 +48,12 @@ class Settings(MCDCBase):
     source_file_name: str = ""
 
     # Misc.
+    #: Time in seconds at which particle transport terminates. The default is
+    #: infinity.
     time_boundary: float = np.inf
+    #: Base name used for the HDF5 output file. The default is ``"output"``.
     output_name: str = "output"
+    #: Whether to display transport progress. The default is ``True``.
     use_progress_bar: bool = True
 
     # Time census
@@ -60,9 +64,17 @@ class Settings(MCDCBase):
 
     # Particle bank-related
     save_particle: bool = False
+    #: Additional particle capacity allocated for the active bank. The default
+    #: is ``100``.
     active_bank_buffer: int = 100
+    #: Capacity multiplier used when allocating the census bank. The default
+    #: is ``2.0``.
     census_bank_buffer_ratio: float = 2.0
+    #: Capacity multiplier used when allocating the source bank. The default
+    #: is ``2.0``.
     source_bank_buffer_ratio: float = 2.0
+    #: Capacity multiplier used when allocating the future bank. The default
+    #: is ``1.5``.
     future_bank_buffer_ratio: float = 1.5
 
     # Multi-particle options
@@ -88,8 +100,25 @@ class Settings(MCDCBase):
             Positive, nondecreasing census times in seconds. An infinite final
             census is appended automatically.
         tally_frequency : int, optional
-            Number of tally intervals per census period. A positive value enables
-            census-based tally output.
+            Number of tally intervals per census period. A positive value
+            enables census-based tally output.
+
+        Examples
+        --------
+        Configure explicit census times:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.settings.set_time_census(
+        ...     time=[1.0e-6, 2.0e-6, 5.0e-6],
+        ... )
+
+        Enable census-based tallies with ten intervals per census period:
+
+        >>> simulation.settings.set_time_census(
+        ...     time=[1.0e-6, 2.0e-6, 5.0e-6],
+        ...     tally_frequency=10,
+        ... )
         """
         # Make sure that the time grid points are sorted
         if not is_sorted(time):
@@ -136,6 +165,27 @@ class Settings(MCDCBase):
             or ``"only-z"``.
         save_particle : bool, optional
             Whether to save source-bank particles.
+
+        Examples
+        --------
+        Configure a standard eigenvalue calculation:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.settings.set_eigenmode(
+        ...     N_inactive=20,
+        ...     N_active=100,
+        ...     k_init=1.0,
+        ... )
+
+        Score the source gyration radius and save source particles:
+
+        >>> simulation.settings.set_eigenmode(
+        ...     N_inactive=20,
+        ...     N_active=100,
+        ...     gyration_radius="all",
+        ...     save_particle=True,
+        ... )
         """
         # Update setting self
         self.N_inactive = N_inactive
@@ -174,6 +224,14 @@ class Settings(MCDCBase):
         ----------
         source_file_name : str or path-like
             Source-particle HDF5 file.
+
+        Examples
+        --------
+        Initialize a simulation from a previously written particle source:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.settings.set_source_file("source.h5")
         """
         self.use_source_file = True
         self.source_file_name = source_file_name
@@ -189,6 +247,20 @@ class Settings(MCDCBase):
         ----------
         transported_particles : list of {"neutron", "electron", "proton"}
             Particle species to enable. Species not listed are disabled.
+
+        Examples
+        --------
+        Transport neutrons only:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.settings.set_transported_particles(["neutron"])
+
+        Enable coupled neutron and electron transport:
+
+        >>> simulation.settings.set_transported_particles(
+        ...     ["neutron", "electron"],
+        ... )
         """
         # Reset the flags
         self.neutron_transport = False

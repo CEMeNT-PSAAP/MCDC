@@ -60,78 +60,26 @@ class Simulation(MCDCBase):
     resulting object graph, assigns IDs, and prepares it for conversion to the
     packed arrays consumed by :mod:`mcdc.transport`.
 
+    Each simulation owns its execution settings. Access them through
+    ``simulation.settings`` by assigning values such as
+    :attr:`settings.N_particle <mcdc.Simulation.settings.N_particle>` or by
+    calling configuration methods such as
+    :meth:`settings.set_eigenmode <mcdc.Simulation.settings.set_eigenmode>`.
+
+    Transport techniques are configured directly on the simulation through
+    methods such as :meth:`implicit_capture <mcdc.Simulation.implicit_capture>`
+    and :meth:`weight_windows <mcdc.Simulation.weight_windows>`.
+
     Examples
     --------
-    Assemble a minimal one-group slab simulation:
+    Configure commonly adjusted settings:
 
-    >>> import numpy as np
     >>> import mcdc
-    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
-    >>> left = mcdc.Surface.PlaneX(x=0.0, boundary_condition="vacuum")
-    >>> right = mcdc.Surface.PlaneX(x=1.0, boundary_condition="vacuum")
-    >>> cell = mcdc.Cell(region=+left & -right, fill=material)
-    >>> source = mcdc.Source(x=[0.0, 1.0], isotropic=True, energy_group=0)
-    >>> tally = mcdc.Tally(cell=cell, scores=["flux"])
     >>> simulation = mcdc.Simulation(name="Slab")
-    >>> simulation.set_model([cell])
-    >>> simulation.set_sources([source])
-    >>> simulation.set_tallies([tally])
-    >>> simulation.settings.N_particle = 1_000
-
-    Visualize an x-z slice of the model:
-
-    >>> simulation.visualize_model(
-    ...     vis_plane="xz",
-    ...     x=[0.0, 1.0],
-    ...     y=0.0,
-    ...     z=[-0.5, 0.5],
-    ...     pixels=(100, 100),
-    ...     colors=None,
-    ...     time=[0.0],
-    ...     save_as="slab",
-    ... )
-
-    Run particle transport and write the configured output:
-
-    >>> simulation.run()
-
-    Configure a time-dependent calculation with census times:
-
-    >>> transient = mcdc.Simulation(name="Transient slab")
-    >>> transient.set_model([cell])
-    >>> transient.set_sources([source])
-    >>> transient.set_tallies([tally])
-    >>> transient.settings.N_particle = 10_000
-    >>> transient.settings.set_time_census(
-    ...     time=[1.0e-6, 2.0e-6, 5.0e-6],
-    ...     tally_frequency=10,
-    ... )
-
-    Configure a k-eigenvalue calculation:
-
-    >>> fuel = mcdc.MaterialMG(
-    ...     capture=np.array([0.10]),
-    ...     fission=np.array([0.20]),
-    ...     nu_p=np.array([2.50]),
-    ... )
-    >>> fuel_cell = mcdc.Cell(region=+left & -right, fill=fuel)
-    >>> eigenvalue = mcdc.Simulation(name="Critical slab")
-    >>> eigenvalue.set_model([fuel_cell])
-    >>> eigenvalue.set_sources([source])
-    >>> eigenvalue.settings.N_particle = 10_000
-    >>> eigenvalue.settings.set_eigenmode(
-    ...     N_inactive=20,
-    ...     N_active=100,
-    ...     k_init=1.0,
-    ... )
-
-    Enable common variance-reduction techniques:
-
-    >>> simulation.implicit_capture()
-    >>> simulation.global_weight_roulette(
-    ...     weight_threshold=0.25,
-    ...     weight_target=1.0,
-    ... )
+    >>> simulation.settings.N_particle = 10_000
+    >>> simulation.settings.N_batch = 20
+    >>> simulation.settings.rng_seed = 12345
+    >>> simulation.settings.output_name = "slab"
     """
 
     # MC/DC framework metadata
@@ -352,17 +300,53 @@ class Simulation(MCDCBase):
     # ==================================================================================
 
     def set_model(self, cells: Sequence[Cell]) -> None:
-        """Set the cells in the root universe and invalidate compiled state."""
+        """Set the cells in the root universe and invalidate compiled state.
+
+        Parameters
+        ----------
+        cells : sequence of Cell
+            Cells to place in the root universe.
+
+        Examples
+        --------
+        Attach previously constructed cells:
+
+        >>> simulation.set_model([fuel_cell, moderator_cell])
+        """
         self.root_universe.cells = list(cells)
         self.compiled = False
 
     def set_sources(self, sources: Sequence[Source]) -> None:
-        """Set particle sources and invalidate compiled state."""
+        """Set particle sources and invalidate compiled state.
+
+        Parameters
+        ----------
+        sources : sequence of Source
+            Particle sources to sample during transport.
+
+        Examples
+        --------
+        Attach previously constructed sources:
+
+        >>> simulation.set_sources([volume_source, boundary_source])
+        """
         self.sources = list(sources)
         self.compiled = False
 
     def set_tallies(self, tallies: Sequence[Tally]) -> None:
-        """Set requested tallies and invalidate compiled state."""
+        """Set requested tallies and invalidate compiled state.
+
+        Parameters
+        ----------
+        tallies : sequence of Tally
+            Tallies to score during transport.
+
+        Examples
+        --------
+        Attach previously constructed tallies:
+
+        >>> simulation.set_tallies([flux_tally, current_tally])
+        """
         self.tallies = list(tallies)
         self.compiled = False
 
@@ -400,6 +384,21 @@ class Simulation(MCDCBase):
 
         Parameters are forwarded to :func:`mcdc.visualize.visualize_model`.
         The model is compiled first when necessary.
+
+        Examples
+        --------
+        Render an x-z slice of the model:
+
+        >>> simulation.visualize_model(
+        ...     vis_plane="xz",
+        ...     x=[0.0, 1.0],
+        ...     y=0.0,
+        ...     z=[-0.5, 0.5],
+        ...     pixels=(100, 100),
+        ...     colors=None,
+        ...     time=[0.0],
+        ...     save_as="slab",
+        ... )
         """
         if not self.compiled:
             self.compile()
@@ -409,7 +408,14 @@ class Simulation(MCDCBase):
         visualize_model(self, vis_plane, x, y, z, pixels, colors, time, save_as)
 
     def run(self) -> None:
-        """Compile if needed, execute particle transport, and write output."""
+        """Compile if needed, execute particle transport, and write output.
+
+        Examples
+        --------
+        Run a fully configured simulation:
+
+        >>> simulation.run()
+        """
         from mcdc.main import run_simulation
 
         if not self.compiled:
