@@ -19,6 +19,7 @@ Getting Started
    :maxdepth: 1
 
    first_mcdc
+   tallies
 
 Execution Modes
 ---------------

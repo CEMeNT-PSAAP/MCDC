@@ -24,6 +24,7 @@ Basic Examples
 .. toctree::
    :maxdepth: 1
 
+   slab_shielding
    kobayashi_dog_leg
    kobayashi_td
 

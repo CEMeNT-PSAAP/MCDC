@@ -178,9 +178,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/fuel_array_packaged`` run::
 
-  python examples/fuel_array_packaged/input.py
+  python input.py
 
 Expected Output
 ===============

@@ -156,9 +156,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/moving_source`` run::
 
-  python examples/moving_source/input.py
+  python input.py
 
 Expected Output
 ===============

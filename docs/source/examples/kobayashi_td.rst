@@ -63,9 +63,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/kobayashi-TD`` run::
 
-   python examples/kobayashi-TD/input.py
+   python input.py
 
 Expected Output
 ===============
