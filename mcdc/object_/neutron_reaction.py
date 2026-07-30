@@ -108,12 +108,6 @@ class NeutronReactionElasticScattering(NeutronReactionBase):
         )
         return cls(MT, xs, xs_offset, reference_frame, mu)
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.mu_table._compile_into_simulation(simulation)
-        return True
-
     def __repr__(self):
         text = super().__repr__()
         text += f"  - Scattering cosine: {distribution.decode_type(self.mu_table.type)} [ID: {self.mu_table.ID}]\n"
@@ -224,14 +218,6 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
             energy_spectra,
         )
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.mu._compile_into_simulation(simulation)
-        for spectrum in self.energy_spectra:
-            spectrum._compile_into_simulation(simulation)
-        return True
-
     def __repr__(self):
         text = super().__repr__()
         if self.angle_type == ANGLE_ISOTROPIC:
@@ -298,13 +284,6 @@ class NeutronReactionFission(NeutronReactionBase):
         return cls(
             MT, xs, xs_offset, reference_frame, q_value, angle_type, mu, spectrum
         )
-
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.mu._compile_into_simulation(simulation)
-        self.spectrum._compile_into_simulation(simulation)
-        return True
 
     def __repr__(self):
         text = super().__repr__()

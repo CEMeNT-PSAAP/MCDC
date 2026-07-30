@@ -80,17 +80,6 @@ class Universe(MCDCObject):
         self.name = name or "(Unnamed universe)"
         self.cells = cells
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        # Already compiled?
-        if not super()._compile_into_simulation(simulation):
-            return False
-
-        # Compile cells
-        for cell in self.cells:
-            cell._compile_into_simulation(simulation)
-
-        return True
-
     def __repr__(self):
         text = super().__repr__()
 

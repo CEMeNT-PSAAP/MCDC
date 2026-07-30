@@ -164,31 +164,29 @@ class Material(MaterialBase):
         )
 
     def _compile_into_simulation(self, simulation) -> bool:
-        """Resolve and register composition objects with the owning simulation."""
-        if not super()._compile_into_simulation(simulation):
+        """Canonicalize the composition and register it with the simulation."""
+        # Skip composition work when this material is already compiled
+        if self.compile_ID == simulation.compile_ID:
             return False
 
+        # Resolve composition objects before generic member traversal so only
+        # canonical simulation objects are registered.
         nuclide_composition = {}
         element_composition = {}
-        self.fissionable = False
 
-        # Replace locally created elements with canonical simulation objects.
+        # Replace locally created elements with canonical simulation objects
         for element, density in self.element_composition.items():
             element = _get_or_create_element(element.name, simulation, element)
-            element._compile_into_simulation(simulation)
             element_composition[element] = density
 
-        # Replace locally created nuclides with canonical simulation objects.
+        # Replace locally created nuclides with canonical simulation objects
         for nuclide, density in self.nuclide_composition.items():
             nuclide = _get_or_create_nuclide(
                 nuclide.name, nuclide.temperature, simulation, nuclide
             )
-            nuclide._compile_into_simulation(simulation)
             nuclide_composition[nuclide] = density
 
-            if nuclide.fissionable:
-                self.fissionable = True
-
+        # Synchronize the packed composition fields with the canonical objects
         self.nuclide_composition = nuclide_composition
         self.element_composition = element_composition
         self.nuclides = list(nuclide_composition)
@@ -199,6 +197,13 @@ class Material(MaterialBase):
         self.element_densities = np.asarray(
             list(element_composition.values()), dtype=float
         )
+
+        # Register the material and compile its canonical composition members
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        # Resolve derived properties after nuclide library data has been loaded
+        self.fissionable = any(nuclide.fissionable for nuclide in self.nuclides)
 
         return True
 

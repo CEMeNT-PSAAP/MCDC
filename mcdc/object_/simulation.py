@@ -139,7 +139,6 @@ class Simulation(MCDCBase):
     non_numba = [
         "_next_compile_ID",
         "compiled",
-        "compile_ID",
         "regions",
         "root_universe",
         "bank_active",
@@ -151,7 +150,6 @@ class Simulation(MCDCBase):
 
     # Basic parameters
     name: str
-    compile_ID: int  # Non-Numba
     compiled: bool  # Non-Numba
 
     # Physics
@@ -243,7 +241,6 @@ class Simulation(MCDCBase):
     source_seed: int
 
     def __init__(self, name: str = "") -> None:
-        self.compile_ID = 0
         self.compiled = False
 
         self.name = name or "(Unnamed simulation)"
@@ -374,7 +371,12 @@ class Simulation(MCDCBase):
     # ==================================================================================
 
     def compile(self) -> None:
-        """Compile the Python object graph into registered simulation objects."""
+        """Compile the Python object graph into a new simulation snapshot.
+
+        A globally unique ``compile_ID`` identifies the snapshot. Every
+        embedded or registered :class:`~mcdc.object_.base.MCDCBase` reached
+        during compilation records that ID.
+        """
         from mcdc.code_factory.python_objects_compiler import compile_simulation
 
         self.compile_ID = type(self)._next_compile_ID

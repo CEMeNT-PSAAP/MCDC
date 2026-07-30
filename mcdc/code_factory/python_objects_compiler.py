@@ -21,8 +21,16 @@ NONE_OBJECT_CLASSES = (DataNone, DistributionNone)  # Has customized compilation
 
 
 def compile_simulation(simulation: Simulation):
+    # Preserve explicitly configured roots before resetting their registered
+    # object lists. Geometry members may reference these objects and compile
+    # them while the model graph is traversed.
+    sources = simulation.sources
+    tallies = simulation.tallies
+
     # Reset model
     simulation._reset_model()
+    simulation.sources = []
+    simulation.tallies = []
 
     # Reserved ojects
     none_data = DataNone()
@@ -37,20 +45,16 @@ def compile_simulation(simulation: Simulation):
     root_universe._compile_into_simulation(simulation)
 
     # Compile source
-    sources = simulation.sources
-    simulation.sources = []
     for source in sources:
         source._compile_into_simulation(simulation)
 
     # Compile tally
-    tallies = simulation.tallies
-    simulation.tallies = []
     for tally in tallies:
         tally._compile_into_simulation(simulation)
 
-    # Compile model objects owned by transport techniques.
-    if simulation.weight_windows.active:
-        simulation.weight_windows.mesh._compile_into_simulation(simulation)
+    # Compile remaining object members, including those owned by embedded
+    # simulation configuration objects such as transport techniques.
+    simulation._compile_members_into_simulation(simulation)
 
     # Apply settings as needed
     settings = simulation.settings

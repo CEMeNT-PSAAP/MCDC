@@ -180,13 +180,6 @@ class Surface(MCDCObject):
         # Surface-crossing tallies
         self.surface_crossing_tallies = []
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        # Already compiled?
-        if not super()._compile_into_simulation(simulation):
-            return False
-
-        return True
-
     def __repr__(self):
         text = super().__repr__()
 

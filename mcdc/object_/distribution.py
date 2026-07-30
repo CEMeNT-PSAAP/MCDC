@@ -177,12 +177,6 @@ class DistributionTabulated(DistributionBase):
             aux=cdf_normalized,
         )
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.pdf._compile_into_simulation(simulation)
-        return True
-
     def __repr__(self) -> str:
         text = super().__repr__()
 
@@ -292,13 +286,6 @@ class DistributionMultiTable(DistributionBase):
 
             self.tables.append(table)
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        for table in self.tables:
-            table._compile_into_simulation(simulation)
-        return True
-
     def __repr__(self) -> str:
         text = super().__repr__()
 
@@ -379,12 +366,6 @@ class DistributionEvaporation(DistributionBase):
             interpolation_boundaries,
         )
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.nuclear_temperature._compile_into_simulation(simulation)
-        return True
-
     def __repr__(self) -> str:
         text = super().__repr__()
 
@@ -432,12 +413,6 @@ class DistributionMaxwellian(DistributionBase):
             temperature_interpolations,
             interpolation_boundaries,
         )
-
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.nuclear_temperature._compile_into_simulation(simulation)
-        return True
 
     def __repr__(self) -> str:
         text = super().__repr__()
@@ -667,12 +642,6 @@ class DistributionNBody(DistributionBase):
             INTERPOLATION_LINEAR,
             aux=cdf_normalized,
         )
-
-    def _compile_into_simulation(self, simulation) -> bool:
-        if not super()._compile_into_simulation(simulation):
-            return False
-        self.pdf._compile_into_simulation(simulation)
-        return True
 
     def __repr__(self) -> str:
         text = super().__repr__()

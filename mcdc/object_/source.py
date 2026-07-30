@@ -373,17 +373,6 @@ class Source(MCDCObject):
         self.move_time_grid = np.array([0.0, INF])
         self.move_translations = np.zeros((2, 3))
 
-    def _compile_into_simulation(self, simulation) -> bool:
-        # Already compiled?
-        if not super()._compile_into_simulation(simulation):
-            return False
-
-        # Compile distributions
-        self.energy_group_pmf._compile_into_simulation(simulation)
-        self.energy_pdf._compile_into_simulation(simulation)
-
-        return True
-
     def __repr__(self):
         text = super().__repr__()
 
