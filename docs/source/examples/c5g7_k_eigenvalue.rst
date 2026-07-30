@@ -42,7 +42,7 @@ section (materials, pins, assemblies, core, source, tallies, settings).
 Full Input
 ==========
 
-Click here to view the input file: `examples/c5g7/k-eigenvalue/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/c5g7/k-eigenvalue/input.py>`_.
+Click here to view the input file: `examples/c5g7/k-eigenvalue/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/c5g7/k-eigenvalue/input.py>`_.
 
 The complete input used for this example is embedded below:
 

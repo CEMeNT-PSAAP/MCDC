@@ -41,7 +41,7 @@ Refer to the embedded code below for the full implementation.
 Full Input
 ==========
 
-Click here to view the input file: `examples/c5g7/transient/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/c5g7/transient/input.py>`_.
+Click here to view the input file: `examples/c5g7/transient/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/c5g7/transient/input.py>`_.
 
 The complete input used for this example is embedded below:
 

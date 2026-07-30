@@ -6,7 +6,8 @@ Slab Shielding
 
 This one-group fixed-source problem introduces the complete MC/DC workflow
 with two materials, two slab cells, an isotropic source, and a mesh flux
-tally. The :doc:`../user/first_mcdc` guide explains the input step by step.
+tally. The :doc:`../user_guide/getting_started/first_simulation` guide explains the input
+step by step.
 
 Full Input
 ----------

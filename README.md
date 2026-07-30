@@ -36,17 +36,18 @@ pip install mcdc
 ```
 
 For development installation and additional options, see the
-[Installation Guide](https://mcdc.readthedocs.io/en/latest/install.html).
+[Installation Guide](https://mcdc.readthedocs.io/en/latest/user_guide/getting_started/installation.html).
 
 ## Documentation
 
 Complete documentation is available on
 [Read the Docs](https://mcdc.readthedocs.io/), including:
 
-- [Installation](https://mcdc.readthedocs.io/en/latest/install.html)
-- [User Guide](https://mcdc.readthedocs.io/en/latest/user/index.html)
-- [Python API Reference](https://mcdc.readthedocs.io/en/latest/pythonapi/index.html)
-- [Contribution Guide](https://mcdc.readthedocs.io/en/latest/contribution/index.html)
+- [User Guide](https://mcdc.readthedocs.io/en/latest/user_guide/index.html)
+- [Getting Started](https://mcdc.readthedocs.io/en/latest/user_guide/getting_started/index.html)
+- [API Reference](https://mcdc.readthedocs.io/en/latest/reference/python_api/index.html)
+- [Developer Guide](https://mcdc.readthedocs.io/en/latest/developer_guide/index.html)
+- [Contributing](https://mcdc.readthedocs.io/en/latest/contributing/index.html)
 
 ## Citing
 
@@ -56,7 +57,7 @@ references as appropriate:
 - **MC/DC Origins**
   I. Variansyah, et al. (2023). *Development of MC/DC: a performant,
   scalable, and portable Python-based Monte Carlo neutron transport code.*
-  Proceedings of the ANS Mathematics & Computation Conference 2025,
+  Proceedings of the ANS Mathematics & Computation Conference 2023,
   Niagara Falls, Canada.
   https://doi.org/10.48550/arXiv.2305.07636
 

@@ -18,6 +18,10 @@ the code shipped in-tree.  A **Step-by-Step Walkthrough** section breaks
 the input into annotated blocks, and a **What to try** box suggests
 parameter changes for further exploration.
 
+If you are learning MC/DC for the first time, complete the
+:doc:`../user_guide/getting_started/first_simulation` before using these examples as
+templates. For individual API details, consult the :doc:`../reference/index`.
+
 Basic Examples
 --------------
 

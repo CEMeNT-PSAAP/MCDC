@@ -120,7 +120,7 @@ time-dependent) target weights and bounds.  They combine splitting and
 roulette to focus computational effort in regions of high importance.
 
 MC/DC supports both user-defined and automatically generated weight
-windows.  See :ref:`ww` for a full description of the available
+windows. See :ref:`weight_windows` for a full description of the available
 strategies (``WW_USER`` and ``WW_PREVIOUS``) and modification schemes
 (``WW_MIN`` and ``WW_WOLLABER``).
 
