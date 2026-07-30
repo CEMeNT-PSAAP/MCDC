@@ -91,7 +91,7 @@ Reference Solution
 ==================
 
 No analytical reference.  The geometry can be verified using MC/DC's
-built-in ``mcdc.visualize()`` function to render the CSG model.
+built-in ``simulation.visualize_model()`` method to render the CSG model.
 
 Step-by-Step Walkthrough
 ========================
@@ -133,7 +133,7 @@ The assembly universe is placed twice using ``mcdc.Cell(..., fill=assembly)``:
 - **Left** — translated to :math:`(-5, 0, 0)`.
 - **Right** — translated to :math:`(+5, 0, 0)` and rotated 10° about :math:`y`.
 
-``set_root_universe()`` tells MC/DC these are the top-level cells.
+``simulation.set_model()`` tells MC/DC these are the top-level cells.
 
 **4. Source, Tallies, Settings, and Run (lines 82–105)**
 
@@ -156,7 +156,7 @@ The ``active_bank_buffer`` accommodates fission-born particles.
    :lineno-match:
 
 Set ``visualize = True`` to render the CSG geometry with
-``mcdc.visualize()`` instead of running the transport.
+``simulation.visualize_model()`` instead of running the transport.
 
 **What to try:**
 
@@ -186,4 +186,4 @@ Expected Output
 ===============
 
 An HDF5 mesh tally and optional visualization images produced by the
-``mcdc.visualize()`` helper when run with visualization enabled.
+``simulation.visualize_model()`` method when run with visualization enabled.

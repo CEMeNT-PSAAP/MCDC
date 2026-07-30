@@ -10,8 +10,8 @@ MC/DC provides several **variance reduction** (VR) techniques that
 reduce the statistical uncertainty per particle history without
 introducing bias.
 
-All techniques below are activated through the ``mcdc.simulation``
-interface.
+All techniques below are configured on an explicit
+:class:`mcdc.Simulation` instance.
 
 Implicit Capture
 -----------------
@@ -33,7 +33,7 @@ effective in highly absorbing media.
 
 .. code-block:: python3
 
-   mcdc.simulation.implicit_capture()
+   simulation.implicit_capture()
 
 .. note::
 
@@ -59,7 +59,10 @@ preserving the expected weight (unbiased).
 
 .. code-block:: python3
 
-   mcdc.simulation.global_weight_roulette(weight_threshold=0.25, weight_target=1.0)
+   simulation.global_weight_roulette(
+       weight_threshold=0.25,
+       weight_target=1.0,
+   )
 
 ``weight_threshold`` and ``weight_target`` should be chosen so that
 :math:`w_{\text{thresh}} < w_{\text{target}}`; a common ratio is
@@ -85,7 +88,7 @@ This reduces the variance of the fission source weight distribution.
 
 .. code-block:: python3
 
-   mcdc.simulation.weighted_emission(active=True, weight_target=1.0)
+   simulation.weighted_emission(active=True, weight_target=1.0)
 
 
 Population Control
@@ -102,7 +105,7 @@ rouletting low-weight ones, targeting a uniform weight close to
 
 .. code-block:: python3
 
-   mcdc.simulation.population_control()
+   simulation.population_control()
 
 Population control is typically combined with a time census
 (``set_time_census``) that checkpoints the particle population at
@@ -130,16 +133,19 @@ setup might use:
 
 .. code-block:: python3
 
-   mcdc.simulation.implicit_capture()
-   mcdc.simulation.global_weight_roulette(weight_threshold=0.25, weight_target=1.0)
+   simulation.implicit_capture()
+   simulation.global_weight_roulette(
+       weight_threshold=0.25,
+       weight_target=1.0,
+   )
 
 For time-dependent fission problems:
 
 .. code-block:: python3
 
-   mcdc.simulation.implicit_capture()
-   mcdc.simulation.weighted_emission(active=True, weight_target=1.0)
-   mcdc.simulation.population_control()
+   simulation.implicit_capture()
+   simulation.weighted_emission(active=True, weight_target=1.0)
+   simulation.population_control()
 
 The order of activation does not matter — MC/DC applies them in the
 correct transport-physics order internally.
