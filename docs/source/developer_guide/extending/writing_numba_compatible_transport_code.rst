@@ -4,16 +4,18 @@
 Writing Numba-Compatible Transport Code
 =======================================
 
-Transport code in MC/DC is written in Python but may execute as Python,
-Numba-compiled CPU code, or Numba-compiled GPU device code. A successful
-extension begins with correct Python behavior, then preserves that behavior
-while moving through the increasingly restrictive CPU and GPU compilation
-targets.
+Integrated transport code in MC/DC is written in Python but may execute as
+Python, Numba-compiled CPU code, or Numba-compiled GPU device code. A method may
+begin as a disposable pure-Python prototype before being ported into this
+shared execution path.
 
 Read :doc:`../architecture/python_first_numba_accelerated_design` first for the
 reason behind this development model. If the change introduces new model
 state, also read :doc:`extending_the_object_model` and
 :doc:`../architecture/runtime_data_layout`.
+
+The rules below apply when a prototype is being integrated and maintained as
+part of MC/DC. They are not restrictions on initial pure-Python exploration.
 
 Choose the Host or Transport Layer
 ----------------------------------
@@ -45,6 +47,22 @@ data structures make the algorithm easiest to understand and verify. This
 prototype is a valid stopping point for a small study that does not need
 compiled performance.
 
+At this stage, use module-level global state, arbitrary Python objects, ad hoc
+imports, dynamic behavior, file I/O, callbacks, visualization, hard-coded
+assumptions, or direct transport edits whenever they help answer the research
+question. Calls to packages such as SciPy and Matplotlib are acceptable even
+during transport. A formal prototype service or abstraction is not required.
+
+Keep prototype-only dependencies local to the experiment rather than adding
+them to MC/DC's required dependencies. The prototype is allowed to be
+disposable and is not expected to compile unchanged.
+
+Unrestricted prototyping is optional. A developer already familiar with MC/DC
+and Numba may begin with packed runtime inputs, stable types, and supported
+operations, producing an implementation that is nearly Numba-compatible from
+the start. This can minimize the deliberate porting work while preserving the
+freedom to use ordinary Python whenever it helps establish the method.
+
 Integration into MC/DC begins by adapting the verified method to the packed
 runtime inputs used by transport. Decorate the integrated function with
 ``@njit`` like the surrounding transport functions; in Python mode, MC/DC
@@ -69,10 +87,10 @@ that were irrelevant to the preceding implementation.
 Use Runtime Data, Not Model Objects
 -----------------------------------
 
-A transport function should accept scalars, NumPy arrays, structured records,
-one-element record containers, and the packed ``simulation`` and ``data``
-state. It should not accept an ``MCDCObject`` instance or follow Python object
-references.
+An integrated transport function should accept scalars, NumPy arrays,
+structured records, one-element record containers, and the packed
+``simulation`` and ``data`` state. It should not accept an ``MCDCObject``
+instance or follow Python object references.
 
 Use the representation appropriate to each field:
 

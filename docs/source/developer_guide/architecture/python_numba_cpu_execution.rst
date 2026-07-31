@@ -59,6 +59,20 @@ Python mode is best for:
 Python mode does not bypass simulation compilation or runtime packing. It
 bypasses machine-code generation for the CPU transport functions.
 
+Exploratory Python Prototypes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The description above is the standard MC/DC Python execution path. During
+initial methods development, researchers may temporarily depart from it in a
+standalone prototype or a locally modified MC/DC checkout. Prototype transport
+may access arbitrary Python objects or global state, import external packages,
+perform I/O or visualization, and use hard-coded or dynamic behavior.
+
+Such code is intentionally outside the common execution architecture and is
+not expected to compile with Numba unchanged. Advancing the method to
+Numba-CPU requires porting it back to the packed runtime representation and
+compiler-compatible interfaces.
+
 Before Numba Acceleration
 -------------------------
 
