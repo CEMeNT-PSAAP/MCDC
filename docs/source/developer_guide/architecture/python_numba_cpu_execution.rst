@@ -51,7 +51,7 @@ and packed runtime inputs used by accelerated execution.
 
 Python mode is best for:
 
-- Developing and inspecting transport logic.
+- Prototyping, developing, and inspecting transport logic.
 - Checking model construction and object compilation.
 - Obtaining ordinary Python tracebacks.
 - Running small smoke tests before enabling acceleration.
@@ -59,28 +59,28 @@ Python mode is best for:
 Python mode does not bypass simulation compilation or runtime packing. It
 bypasses machine-code generation for the CPU transport functions.
 
-Exploratory Python Prototypes
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Python Prototyping
+^^^^^^^^^^^^^^^^^^
 
-The description above is the standard MC/DC Python execution path. During
-initial methods development, researchers may temporarily depart from it in a
-standalone prototype or a locally modified MC/DC checkout. Prototype transport
-may access arbitrary Python objects or global state, import external packages,
-perform I/O or visualization, and use hard-coded or dynamic behavior.
+The standard MC/DC Python execution path is also the environment for initial
+methods development. A prototype remains a complete MC/DC calculation and
+does not bypass model compilation, runtime preparation, or transport. Because
+JIT compilation is disabled, its transport code may temporarily access
+arbitrary Python objects or global state, import external packages, perform I/O
+or visualization, and use hard-coded or dynamic behavior.
 
-Such code is intentionally outside the common execution architecture and is
-not expected to compile with Numba unchanged. Advancing the method to
-Numba-CPU requires porting it back to the packed runtime representation and
-compiler-compatible interfaces.
+These freedoms do not form a separate execution architecture. Advancing the
+method to Numba-CPU requires adapting the parts used by accelerated transport
+to the packed runtime representation and compiler-compatible interfaces.
 
 Before Numba Acceleration
 -------------------------
 
-At this transition, :doc:`python_first_numba_accelerated_design` becomes the
-main conceptual guide. It explains why MC/DC converts its flexible Python
-model into typed runtime data, which parts remain shared across execution
-backends, and which constraints follow from supporting Numba-CPU and
-Numba-GPU.
+At the transition from an MC/DC-Python-only method to Numba acceleration,
+:doc:`python_first_numba_accelerated_design` is the main conceptual guide. It
+explains why MC/DC converts its flexible Python model into typed runtime data,
+which parts remain shared across execution backends, and which constraints
+follow from supporting Numba-CPU and Numba-GPU.
 
 If you have not already read that design page as an overview, read it before
 continuing when developing MC/DC or studying its acceleration architecture.

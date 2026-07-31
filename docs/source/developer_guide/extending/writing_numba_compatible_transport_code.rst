@@ -4,18 +4,19 @@
 Writing Numba-Compatible Transport Code
 =======================================
 
-Integrated transport code in MC/DC is written in Python but may execute as
+Maintained transport code in MC/DC is written in Python but may execute as
 Python, Numba-compiled CPU code, or Numba-compiled GPU device code. A method may
-begin as a disposable pure-Python prototype before being ported into this
-shared execution path.
+be prototyped within the MC/DC Python backend before it is adapted for the two
+accelerated backends.
 
 Read :doc:`../architecture/python_first_numba_accelerated_design` first for the
 reason behind this development model. If the change introduces new model
 state, also read :doc:`extending_the_object_model` and
 :doc:`../architecture/runtime_data_layout`.
 
-The rules below apply when a prototype is being integrated and maintained as
-part of MC/DC. They are not restrictions on initial pure-Python exploration.
+The rules below apply when an MC/DC Python prototype is being made portable and
+maintained as part of MC/DC. They are not restrictions on temporary
+Python-only behavior during initial exploration.
 
 Choose the Host or Transport Layer
 ----------------------------------
@@ -42,9 +43,10 @@ inside a frequently called kernel.
 Work Python First
 -----------------
 
-An exploratory method may begin as unrestricted pure Python, using whichever
-data structures make the algorithm easiest to understand and verify. This
-prototype is a valid stopping point for a small study that does not need
+An exploratory method may begin in MC/DC Python, using whichever Python data
+structures make the algorithm easiest to understand and verify. It still runs
+through MC/DC's normal model preparation and transport path. This Python-only
+implementation is a valid stopping point for a small study that does not need
 compiled performance.
 
 At this stage, use module-level global state, arbitrary Python objects, ad hoc
@@ -63,10 +65,11 @@ operations, producing an implementation that is nearly Numba-compatible from
 the start. This can minimize the deliberate porting work while preserving the
 freedom to use ordinary Python whenever it helps establish the method.
 
-Integration into MC/DC begins by adapting the verified method to the packed
-runtime inputs used by transport. Decorate the integrated function with
-``@njit`` like the surrounding transport functions; in Python mode, MC/DC
-disables JIT compilation and calls the same function as Python.
+Porting for accelerated execution begins by adapting the verified method so
+that the required information and behavior use the packed runtime inputs
+available to transport. Decorate the maintained function with ``@njit`` like
+the surrounding transport functions; in Python mode, MC/DC disables JIT
+compilation and calls the same function as Python.
 
 .. code-block:: python
 
