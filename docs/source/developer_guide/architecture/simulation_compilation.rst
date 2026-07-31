@@ -221,10 +221,6 @@ The common lifecycle defined by the object hierarchy makes this traversal
 uniform: embedded ``MCDCBase`` members are visited in place, while
 ``MCDCObject`` members are registered before their descendants are explored.
 
-.. image:: ../../images/developer_guide/architecture/object_graph_compilation.svg
-   :width: 100%
-   :alt: Shared Python model objects discovered recursively from simulation roots and registered once in simulation-local collections.
-
 Discovery follows actual Python references. For example, a root cell reaches
 its region, the region reaches its surfaces, and the cell's fill reaches its
 material or child universe. Users therefore attach root cells rather than
