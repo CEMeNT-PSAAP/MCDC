@@ -4,8 +4,8 @@
 Release Policy
 ==============
 
-MC/DC follows `Semantic Versioning <https://semver.org/>`_ and maintains its
-release history in
+MC/DC follows `Semantic Versioning <https://semver.org/>`_ and maintains a
+human-readable release history in
 `CHANGELOG.md <https://github.com/mcdc-project/mcdc/blob/dev/CHANGELOG.md>`_.
 
 Minor Releases
