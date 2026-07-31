@@ -34,8 +34,8 @@ environments that run the integrated functions:
 - **Python** executes the functions through the interpreter with JIT
   compilation disabled.
 - **Numba-CPU** compiles the functions into machine code for the host CPU.
-- **Numba-GPU** compiles device functions for an accelerator, while Harmonize
-  provides the GPU runtime that schedules particle work.
+- **Numba-GPU** compiles device functions for an accelerator, while a
+  supporting runtime called Harmonize schedules particle work.
 
 Why MC/DC Uses Numba
 --------------------
@@ -82,26 +82,26 @@ packages do not need to become MC/DC dependencies, and the prototype is not
 expected to remain in its original form.
 
 This freedom is permission, not a required style. A developer familiar with
-MC/DC and Numba may voluntarily use typed data, the packed representation, and
-compiler-compatible operations from the beginning. A nearly Numba-compatible
-prototype can substantially reduce later porting work without turning
-Python-first development into a compiler-first requirement.
+MC/DC and Numba may voluntarily begin with simple numerical data and
+predictable operations that are already close to the compiled form. This can
+substantially reduce later porting work without turning Python-first
+development into a compiler-first requirement. Practical guidance is provided
+in :doc:`../extending/writing_numba_compatible_transport_code`.
 
 MC/DC Integration and Python Execution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Integration begins when the method adopts MC/DC's standard execution path.
-User-facing model objects are compiled into an ordered, simulation-owned model
-and then packed into numerical runtime state. Here, *model compilation* means
-discovering connected Python objects and assigning simulation-local integer
-IDs; it is distinct from Numba JIT compilation.
+MC/DC first gathers the complete user-defined model into a consistent snapshot
+for one simulation. This process is called *model compilation* and is distinct
+from Numba JIT compilation. See :doc:`simulation_compilation` for model
+ownership, discovery, and finalization.
 
-The packed runtime has two main parts: a structured ``simulation`` record for
-fixed-layout state and a flat ``data`` array for variable-length values. MC/DC
-Python mode runs the integrated transport functions against this
-representation with JIT compilation disabled. It therefore provides ordinary
-Python tracebacks while exercising the same data flow and function interfaces
-used by the accelerated backends.
+MC/DC then converts that snapshot into compact numerical execution data shared
+by all backends. Python mode runs the integrated transport functions against
+this data with JIT compilation disabled, providing ordinary Python tracebacks
+while exercising the same data flow used by acceleration. The conversion is
+described in :doc:`runtime_data_layout`.
 
 Numba-CPU Compilation
 ^^^^^^^^^^^^^^^^^^^^^
@@ -110,18 +110,21 @@ Once the method is verified and larger calculations require more performance,
 Numba JIT compilation can be enabled for the CPU. Unless the prototype was
 already written against the compatible subset, reaching this stage requires
 deliberate porting rather than simply changing an execution option. Python
-constructs that Numba cannot type or compile are removed or replaced with
-explicit numerical types, stable control flow, packed runtime data, and
-supported operations.
+features that Numba cannot compile are replaced with supported numerical forms
+and predictable control flow. See :doc:`python_numba_cpu_execution` for the
+execution path and
+:doc:`../extending/writing_numba_compatible_transport_code` for coding
+guidance.
 
 Numba-GPU Compilation
 ^^^^^^^^^^^^^^^^^^^^^
 
 GPU execution is a further stage. Device code typically imposes additional
-constraints involving memory placement, allocation, interaction with the host
-CPU, synchronized updates, and Harmonize scheduling. Some code that works with
-Numba-CPU therefore requires further adaptation before it can execute on a
-GPU.
+constraints on how data is stored and moved, how the GPU interacts with the
+host CPU, and how concurrent particle work is coordinated. Some code that
+works with Numba-CPU therefore requires further adaptation before it can
+execute on a GPU. These additional layers are described in
+:doc:`numba_gpu_execution`.
 
 Valid Stopping Points
 ^^^^^^^^^^^^^^^^^^^^^
@@ -157,16 +160,16 @@ from constrained transport execution:
      - Representation
      - Execution environment
    * - Model definition
-     - User-facing Python objects and references
+     - Flexible Python objects and relationships
      - Python
    * - Model compilation
-     - Simulation-owned, ordered object graph
+     - Complete, internally consistent model snapshot
      - Python
    * - Runtime preparation
-     - Structured ``simulation`` state and flat ``data``
+     - Compact numerical execution data
      - Python and NumPy
    * - Transport
-     - Typed functions operating on packed state
+     - Shared numerical algorithms
      - Python, Numba-CPU, or Numba-GPU
    * - Output and postprocessing
      - HDF5 output and analysis objects
@@ -175,7 +178,10 @@ from constrained transport execution:
 Model construction and preparation may use object-oriented interfaces,
 variable-length collections, validation, and other expressive Python features.
 The boundary occurs at integrated transport, where compilation targets require
-stable numerical types, arrays, integer IDs, and explicit function calls.
+predictable numerical data and explicit behavior. See
+:doc:`simulation_compilation` and :doc:`runtime_data_layout` for the two
+preparation stages, then :doc:`python_numba_cpu_execution` and
+:doc:`numba_gpu_execution` for backend execution.
 
 Architectural Consequences
 --------------------------
@@ -184,66 +190,55 @@ Once a method enters the integrated path, Numba shapes the boundary between
 MC/DC's model and execution layers. The following requirements do not constrain
 the initial prototype, but they are fundamental to maintained transport code.
 
-Model Objects Are Not Runtime Objects
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Model Description Becomes Execution Data
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Materials, cells, sources, tallies, and related objects are convenient
-descriptions of a model. Before integrated transport, MC/DC discovers the
-complete object graph and converts Python references into simulation-local
-IDs. The maintained transport path receives packed records and arrays, not
-instances of ``MCDCObject``, the base class for independently registered model
-entities.
+Python objects are well suited for describing materials, geometry, sources,
+tallies, and their relationships. Compiled transport instead needs numerical
+data with predictable types and connections. MC/DC therefore turns the
+complete Python model into a simulation-specific numerical representation
+before execution.
 
-See :doc:`simulation_compilation` for the owning ``Simulation`` context,
-recursive discovery, and the ``MCDCBase``--``MCDCObject``--
-``MCDCPolymorphic`` hierarchy.
+The ownership and finalization of the Python model are explained in
+:doc:`simulation_compilation`. Its numerical representation is explained in
+:doc:`runtime_data_layout`.
 
-Execution Data Has a Stable Layout
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The Execution Structure Is Fixed Before Transport
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The types and collection sizes needed by a run are finalized before transport.
-Fixed-layout values are stored in the structured ``simulation`` record.
-Variable-length numerical values, including nested arrays whose lengths differ,
-are flattened into ``data`` and described by offsets, lengths, and shapes.
+Preparation determines which model entities and data arrays exist for a run.
+Transport can update particle state, scores, banks, and counters, but it does
+not add new model entities or resize the model structure. Changing the model
+requires preparing a new execution snapshot.
 
-This representation avoids dynamic Python containers in transport and gives
-all backends the same logical state. Generated ``mcdc_get`` and ``mcdc_set``
-helpers centralize the corresponding indexing rules. See
-:doc:`runtime_data_layout` for the complete representation.
+See :doc:`simulation_compilation` for the snapshot lifecycle and
+:doc:`runtime_data_layout` for what transport may read and update.
 
-Dispatch Is Explicit
-^^^^^^^^^^^^^^^^^^^^
+Dynamic Choices Become Explicit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Python dynamic dispatch is replaced by integer type codes and explicit
-branches in transport interfaces. For a model category with several concrete
-representations, its common record stores ``sub_type`` and ``sub_ID``.
-Transport uses those values to select the concrete packed record and
-implementation.
+Ordinary Python can choose behavior dynamically from object types and methods.
+Compiled transport makes those choices visible through numerical tags,
+explicit branches, and stable function interfaces. This allows Numba to see
+the possible execution paths before generating machine code.
 
-This makes the possible execution paths visible to Numba and keeps runtime
-behavior independent of Python object identity.
-
-Mutation Is Bounded
-^^^^^^^^^^^^^^^^^^^
-
-Transport updates particle state, banks, tallies, and counters in storage
-allocated during preparation. It does not add model objects or resize the
-model's runtime layout. A model change therefore produces a new compilation
-snapshot and a newly prepared runtime representation.
+The object relationships behind this conversion are covered in
+:doc:`simulation_compilation`. Contributors adding a new representation should
+follow :doc:`../extending/extending_the_object_model` and
+:doc:`../extending/writing_numba_compatible_transport_code`.
 
 CPU and GPU Share a Deliberate Subset
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Numba-CPU supports some operations that are unavailable or unsuitable inside a
-GPU device function. Code shared by the two targets must use explicit numeric
-types, supported NumPy operations, predictable control flow, and preallocated
-state. Host callbacks, Python objects, and Numba ``objmode`` blocks—which
-temporarily return compiled CPU code to the Python interpreter—must remain
-outside GPU transport paths.
+Some operations accepted by Numba-CPU are unavailable or unsuitable in GPU
+device code. Transport shared by both targets therefore uses a common set of
+numerical operations and predictable control flow. Hardware-specific memory,
+synchronization, and scheduling behavior is isolated where the targets truly
+differ.
 
-MC/DC may use target-specific modules when execution, memory, atomics, or
-scheduling genuinely differs. The common transport path should remain the
-default so that backend implementations do not drift apart.
+Read :doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution` for the
+two compiled backends. Practical compatibility rules belong in
+:doc:`../extending/writing_numba_compatible_transport_code`.
 
 Design Tradeoffs
 ----------------
@@ -254,27 +249,33 @@ cost until a method has demonstrated enough value to justify integration.
 An unrestricted Python prototype maximizes scientific expressiveness and
 minimizes the effort required to test an idea. The tradeoff is that parts of
 the prototype may need to be redesigned or rewritten for Numba-CPU. Beginning
-with MC/DC's packed runtime representation and Numba-compatible operations can
-reduce that porting effort, but introduces implementation constraints earlier
-in the research process.
+with simple numerical data and operations that Numba supports can reduce that
+porting effort, but introduces implementation constraints earlier in the
+research process. See
+:doc:`../extending/writing_numba_compatible_transport_code` for the practical
+constraints.
 
 Once integrated, the shared execution architecture introduces additional
 costs:
 
-- Runtime-visible state must be declared and packed before execution.
-- Dynamic Python behavior must be removed from compiled transport paths.
-- New model concepts may require coordinated changes to objects, layouts,
-  accessors, transport functions, and tests.
+- Information needed during transport must be prepared before execution.
+- Dynamic Python behavior cannot remain inside accelerated transport code.
+- A new model concept may require coordinated changes to the user interface,
+  preparation steps, transport algorithms, and tests.
 - Supporting Python, Numba-CPU, and Numba-GPU increases validation work.
 - Just-in-time compilation adds startup time and compiler-specific failure
   modes.
-- GPU execution may require additional memory management, code generation,
-  atomics, and scheduling support.
+- GPU execution may require additional work for data movement, synchronized
+  updates, and particle scheduling.
 
 MC/DC accepts possible prototype rework so that early methods development
 remains unconstrained. It accepts the stricter integrated architecture so that
 maintained features can share transport logic across execution backends rather
 than becoming separate Python, CPU, and GPU implementations.
+
+The preparation costs are detailed in :doc:`simulation_compilation` and
+:doc:`runtime_data_layout`. The backend-specific costs are detailed in
+:doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution`.
 
 Related Design Choices
 ----------------------
@@ -295,10 +296,11 @@ accelerator data movement difficult to control.
 MC/DC instead uses staged convergence. A prototype may begin anywhere on the
 spectrum from an ad hoc Python experiment to a nearly Numba-compatible
 implementation. When the method needs compiled performance or becomes a
-maintained MC/DC capability, it converges on the shared typed transport path.
-The generated structured and flat runtime representation provides that common
-execution boundary without dictating how the original prototype must be
-written.
+maintained MC/DC capability, it converges on common numerical data and
+transport interfaces. This provides a shared execution path without dictating
+how the original prototype must be written. The data boundary is described in
+:doc:`runtime_data_layout`; contributor guidance is provided in
+:doc:`../extending/writing_numba_compatible_transport_code`.
 
 These are design-space comparisons, not a claim that every alternative was
 implemented and benchmarked by the project.
@@ -315,21 +317,20 @@ Potential improvements fall into three areas:
 - **Prototype access** -- optionally make the active Python model and arbitrary
   prototype state easier to reach during Python execution without requiring a
   formal prototype framework.
-- **Integration assistance** -- improve inspection and conversion of model
-  state, generated layouts and accessors, and diagnostics that identify
-  compiler-incompatible code.
-- **Execution infrastructure** -- evolve where compilation state is stored,
-  when generated runtime layers are created and refreshed, how Numba typed
-  containers are used, and the boundary between shared and backend-specific
-  transport.
+- **Integration assistance** -- provide better tools for inspecting a Python
+  model, preparing its numerical data, and identifying code that an
+  accelerated backend cannot run.
+- **Execution infrastructure** -- make the creation and ownership of prepared
+  data clearer, and keep hardware-specific behavior separated from the common
+  transport algorithms.
 
 Future changes should preserve the ability to stop at any development stage,
 keep the transition into maintained execution state explicit and reviewable,
 and retain equivalent physical behavior across the supported backends of an
 integrated feature.
 
-For the mechanisms behind this boundary, see :doc:`simulation_compilation` and
-:doc:`runtime_data_layout`. If following the main Architecture path, return to
-the Numba-CPU section of :doc:`python_numba_cpu_execution`, then continue with
-:doc:`numba_gpu_execution`. When implementing a transport change, use
+For the preparation process, see :doc:`simulation_compilation` and
+:doc:`runtime_data_layout`. For execution, continue with
+:doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution`. When
+implementing a transport change, use
 :doc:`../extending/writing_numba_compatible_transport_code`.
