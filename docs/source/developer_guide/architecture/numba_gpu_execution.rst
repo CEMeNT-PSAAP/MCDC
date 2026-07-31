@@ -1,14 +1,30 @@
-.. _architecture_gpu:
+.. _numba_gpu_execution:
 
-=================
-GPU Functionality
-=================
+===================
+Numba-GPU Execution
+===================
+
+GPU execution is the final layer in MC/DC's execution model. MC/DC first
+compiles the Python model and creates the same logical runtime representation
+used on the CPU. It then adapts the transport functions for device execution,
+allocates or transfers runtime state, and uses Harmonize to schedule particle
+work.
+
+Read :doc:`simulation_compilation`, :doc:`runtime_data_layout`, and
+:doc:`python_numba_cpu_execution` first. This page focuses on the additional
+GPU-specific compilation and runtime machinery.
 
 GPU Compilation
 ---------------
 
-When targeting GPUs, MC/DC functions are just-in-time (JIT) compiled with Harmonize.
-To JIT compile and execute on AMD or Nvidia GPUs, MC/DC users need only to append their terminal launches with a ``--target=gpu`` option.
+When targeting GPUs, MC/DC functions are just-in-time (JIT) compiled with
+Numba and integrated with Harmonize. A GPU run selects Numba mode and the GPU
+target:
+
+.. code-block:: sh
+
+   python input.py --mode=numba --target=gpu
+
 When considered in totality the MC/DC+Numba+Harmonize JIT compilation structure is akin to "portability framework", in that it allows dynamic targeting and developer abstraction of hardware architectures, like OpenMP target-offloading used by OpenMC.
 This JIT compilation process allows MC/DC to pair the idea of a portability framework with a high-level language in an effort to enable more rapid methods development on Exascale systems.
 
@@ -27,7 +43,7 @@ Nvidia Targets
 To compile to Nvidia GPU hardware-targets at runtime, we rely entirely on the Nvidia C-Compiler (`nvcc`).
 Current versions of Numba come with CUDA operability natively, but this is set to be deprecated in future releases in favor of a more modular approach where the Numba-CUDA package will be an optional separate feature.
 
-.. image:: ../../images/theory/gpu_comp/nvcc_flow.png
+.. image:: ../../images/developer_guide/architecture/numba_gpu_nvidia_flow.png
    :width: 800
    :alt: Simple proxy example describing how to compile device functions in Numba-Python with external C++ code for targeting Nvidia GPUs. In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize.
 
@@ -70,7 +86,7 @@ Every GPU program is technically a bound set of two complementary applications: 
 To link external device code together for AMD hardware-targets, we have to unbundle these two programs, link the extra device functions (coming from Python) to the device side, then re-bundle the device and host functions back together.
 This process is done in LLVM-IR.
 
-.. image:: ../../images/theory/gpu_comp/amd_flow.png
+.. image:: ../../images/developer_guide/architecture/numba_gpu_amd_flow.png
    :width: 800
    :alt: Simple proxy example describing how to compile device functions in Numba-HIP with external C++ code to AMD GPU targets. In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize.
 

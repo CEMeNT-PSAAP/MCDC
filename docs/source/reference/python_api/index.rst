@@ -21,7 +21,9 @@ sources, and tallies to a simulation, and then visualize or run that simulation:
    simulation.run()
 
 The complete public interfaces and additional examples are documented on each
-linked API page.
+linked API page. For a task-oriented explanation of how these objects move
+through construction, compilation, execution, and output, see
+:doc:`../../user_guide/simulation_lifecycle`.
 
 
 Simulation
@@ -141,3 +143,7 @@ needed, executes particle transport, and writes the configured output.
 ``simulation.visualize_model(...)`` similarly compiles when needed before
 rendering the model. Use ``simulation.compile()`` when an explicit compiled
 snapshot is required before either operation.
+
+The internal compilation and packing stages are documented in
+:doc:`../../developer_guide/architecture/simulation_compilation` and
+:doc:`../../developer_guide/architecture/runtime_data_layout`.

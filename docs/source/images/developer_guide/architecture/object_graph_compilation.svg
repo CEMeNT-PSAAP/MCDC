@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Simulation object graph compilation</title>
+  <desc id="desc">A Simulation owns root cells, sources, tallies, settings, and techniques. Recursive traversal discovers shared model objects, uses compile IDs to register each once, and creates simulation-local collections and IDs.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#566573"/>
+    </marker>
+    <style>
+      .title { font-family: system-ui, sans-serif; font-size: 23px; font-weight: 700; fill: #17202a; }
+      .label { font-family: system-ui, sans-serif; font-size: 17px; font-weight: 650; fill: #17202a; }
+      .body { font-family: system-ui, sans-serif; font-size: 14px; fill: #273746; }
+      .box { stroke: #34495e; stroke-width: 2; rx: 10; }
+      .edge { stroke: #7f8c8d; stroke-width: 2.5; fill: none; }
+      .shared { stroke: #b03a2e; stroke-width: 3; stroke-dasharray: 7 5; fill: none; }
+    </style>
+  </defs>
+
+  <text x="600" y="35" text-anchor="middle" class="title">Compile the reachable Python object graph</text>
+
+  <rect x="465" y="65" width="270" height="75" class="box" fill="#eaf2f8"/>
+  <text x="600" y="98" text-anchor="middle" class="label">Simulation</text>
+  <text x="600" y="121" text-anchor="middle" class="body">new compile_ID for this snapshot</text>
+
+  <rect x="45" y="190" width="205" height="75" class="box" fill="#edf6ff"/>
+  <text x="147" y="222" text-anchor="middle" class="label">Root cells</text>
+  <text x="147" y="245" text-anchor="middle" class="body">root universe</text>
+
+  <rect x="280" y="190" width="205" height="75" class="box" fill="#edf6ff"/>
+  <text x="382" y="222" text-anchor="middle" class="label">Sources</text>
+  <text x="382" y="245" text-anchor="middle" class="body">explicit root list</text>
+
+  <rect x="515" y="190" width="205" height="75" class="box" fill="#edf6ff"/>
+  <text x="617" y="222" text-anchor="middle" class="label">Tallies</text>
+  <text x="617" y="245" text-anchor="middle" class="body">explicit root list</text>
+
+  <rect x="750" y="190" width="205" height="75" class="box" fill="#edf6ff"/>
+  <text x="852" y="222" text-anchor="middle" class="label">Settings</text>
+  <text x="852" y="245" text-anchor="middle" class="body">embedded configuration</text>
+
+  <rect x="985" y="190" width="170" height="75" class="box" fill="#edf6ff"/>
+  <text x="1070" y="222" text-anchor="middle" class="label">Techniques</text>
+  <text x="1070" y="245" text-anchor="middle" class="body">embedded objects</text>
+
+  <line x1="545" y1="140" x2="147" y2="180" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="572" y1="140" x2="382" y2="180" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="600" y1="140" x2="617" y2="180" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="630" y1="140" x2="852" y2="180" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="655" y1="140" x2="1070" y2="180" style="stroke:#7f8c8d;stroke-width:2.5"/>
+
+  <rect x="95" y="335" width="185" height="70" class="box" fill="#e8f8f5"/>
+  <text x="187" y="365" text-anchor="middle" class="label">Regions / surfaces</text>
+  <text x="187" y="388" text-anchor="middle" class="body">geometry references</text>
+
+  <rect x="330" y="335" width="185" height="70" class="box" fill="#e8f8f5"/>
+  <text x="422" y="365" text-anchor="middle" class="label">Materials / data</text>
+  <text x="422" y="388" text-anchor="middle" class="body">shared model objects</text>
+
+  <rect x="565" y="335" width="185" height="70" class="box" fill="#e8f8f5"/>
+  <text x="657" y="365" text-anchor="middle" class="label">Meshes</text>
+  <text x="657" y="388" text-anchor="middle" class="body">tallies and techniques</text>
+
+  <rect x="800" y="335" width="185" height="70" class="box" fill="#e8f8f5"/>
+  <text x="892" y="365" text-anchor="middle" class="label">Universes / lattices</text>
+  <text x="892" y="388" text-anchor="middle" class="body">nested geometry</text>
+
+  <line x1="147" y1="265" x2="187" y2="325" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="147" y1="265" x2="422" y2="325" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="382" y1="265" x2="422" y2="325" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="617" y1="265" x2="657" y2="325" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="1070" y1="265" x2="657" y2="325" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="147" y1="265" x2="892" y2="325" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <rect x="350" y="460" width="500" height="65" class="box" fill="#fef9e7"/>
+  <text x="600" y="488" text-anchor="middle" class="label">compile_ID guard</text>
+  <text x="600" y="511" text-anchor="middle" class="body">register each Python object once; stop cycles</text>
+
+  <line x1="187" y1="405" x2="500" y2="450" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="422" y1="405" x2="555" y2="450" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="657" y1="405" x2="645" y2="450" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <line x1="892" y1="405" x2="700" y2="450" style="stroke:#7f8c8d;stroke-width:2.5"/>
+
+  <rect x="90" y="570" width="1020" height="55" class="box" fill="#f4ecf7"/>
+  <text x="600" y="594" text-anchor="middle" class="label">Simulation-local registries</text>
+  <text x="600" y="615" text-anchor="middle" class="body">cells · surfaces · materials · sources · tallies · meshes · universes · data · distributions · …</text>
+  <line x1="600" y1="525" x2="600" y2="560" style="stroke:#7f8c8d;stroke-width:2.5"/>
+  <text x="930" y="548" class="body">assign ID · sub_type · sub_ID</text>
+</svg>

@@ -11,6 +11,9 @@ The instructions below assume you have an existing MC/DC installation.
 MPI can be quite tricky to configure if on an HPC; if you're having trouble,
 consult our :ref:`installation`, your HPC admin, or our `GitHub issues page <https://github.com/mcdc-project/mcdc/issues>`_.
 
+For the architectural relationship between Python and Numba-CPU execution, see
+:doc:`../../developer_guide/architecture/python_numba_cpu_execution`.
+
 Pure Python Mode
 ----------------
 
@@ -29,7 +32,8 @@ Numba Mode
 
 When running in Numba mode a significant amount of time is taken compiling Python functions to performant binaries.
 Only the functions used in a specific simulation will be compiled.
-These binaries will be cached, meaning that in subsequent runs of the same simulation the compilation step can be avoided.
+When ``--caching`` is enabled, compiled binaries can be reused by subsequent
+runs of a compatible simulation.
 The cache can be used as an effective ahead-of-time compilation scheme where binaries can be compiled once and shared between machines.
 For more information on caching, see :ref:`contributing/index:Caching` and
 `Numba Caching <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.

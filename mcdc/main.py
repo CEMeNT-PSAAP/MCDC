@@ -235,15 +235,15 @@ def prepare(simulationPy):
     simulationPy.bank_future.size[0] = size_future
 
     # ==================================================================================
-    # Generate Numba-supported "Objects"
+    # Generate Numba runtime layers
     # ==================================================================================
 
-    from mcdc.code_factory.numba_objects_generator import generate_numba_objects
+    from mcdc.code_factory.numba_layers_generator import generate_numba_layers
     from mcdc.code_factory.literals_generator import make_literals
 
     make_literals(simulationPy)
 
-    simulation_container, data = generate_numba_objects(simulationPy)
+    simulation_container, data = generate_numba_layers(simulationPy)
     simulation = simulation_container[0]
 
     # Reload mcdc getters and setters

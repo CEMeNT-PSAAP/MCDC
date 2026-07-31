@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="590" viewBox="0 0 1200 590" role="img" aria-labelledby="title desc">
+  <title id="title">MC/DC runtime data layout</title>
+  <desc id="desc">Variable-sized Python arrays are flattened into a one-dimensional data array. Structured simulation records retain fixed fields and offsets, lengths, and shape metadata used by generated getters and setters.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#566573"/>
+    </marker>
+    <style>
+      .title { font-family: system-ui, sans-serif; font-size: 23px; font-weight: 700; fill: #17202a; }
+      .label { font-family: system-ui, sans-serif; font-size: 17px; font-weight: 650; fill: #17202a; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; fill: #273746; }
+      .body { font-family: system-ui, sans-serif; font-size: 14px; fill: #273746; }
+      .box { stroke: #34495e; stroke-width: 2; rx: 10; }
+      .arrow { stroke: #566573; stroke-width: 2.5; fill: none; }
+    </style>
+  </defs>
+
+  <text x="600" y="35" text-anchor="middle" class="title">Fixed-layout metadata describes variable-length payloads</text>
+
+  <rect x="35" y="75" width="300" height="330" class="box" fill="#eaf2f8"/>
+  <text x="185" y="108" text-anchor="middle" class="label">Python model objects</text>
+
+  <rect x="65" y="140" width="240" height="95" class="box" fill="#ffffff"/>
+  <text x="85" y="168" class="mono">MeshStructured</text>
+  <text x="85" y="195" class="mono">z = [0, 1, 2, 3]</text>
+  <text x="85" y="218" class="body">problem-dependent length</text>
+
+  <rect x="65" y="265" width="240" height="110" class="box" fill="#ffffff"/>
+  <text x="85" y="293" class="mono">MaterialMG</text>
+  <text x="85" y="320" class="mono">capture = [0.1, 0.2]</text>
+  <text x="85" y="345" class="mono">scatter = [[…], […]]</text>
+  <text x="85" y="367" class="body">problem-dependent shape</text>
+
+  <rect x="450" y="75" width="315" height="330" class="box" fill="#fef9e7"/>
+  <text x="607" y="108" text-anchor="middle" class="label">structured simulation</text>
+
+  <rect x="480" y="140" width="255" height="120" class="box" fill="#ffffff"/>
+  <text x="500" y="168" class="mono">structured_mesh[0]</text>
+  <text x="500" y="195" class="mono">ID = 0</text>
+  <text x="500" y="220" class="mono">z_offset = 0</text>
+  <text x="500" y="245" class="mono">z_length = 4</text>
+
+  <rect x="480" y="285" width="255" height="90" class="box" fill="#ffffff"/>
+  <text x="500" y="313" class="mono">material[0]</text>
+  <text x="500" y="338" class="mono">capture_offset = 4</text>
+  <text x="500" y="363" class="mono">capture_length = 2</text>
+
+  <line x1="335" y1="190" x2="440" y2="190" style="stroke:#566573;stroke-width:2.5"/>
+  <line x1="335" y1="320" x2="440" y2="320" style="stroke:#566573;stroke-width:2.5"/>
+  <text x="387" y="175" text-anchor="middle" class="body">metadata</text>
+
+  <rect x="875" y="75" width="290" height="330" class="box" fill="#e8f8f5"/>
+  <text x="1020" y="108" text-anchor="middle" class="label">flat data array</text>
+
+  <rect x="905" y="145" width="230" height="54" class="box" fill="#d6eaf8"/>
+  <text x="1020" y="168" text-anchor="middle" class="mono">0 · 1 · 2 · 3</text>
+  <text x="1020" y="190" text-anchor="middle" class="body">mesh.z</text>
+
+  <rect x="905" y="215" width="230" height="54" class="box" fill="#d5f5e3"/>
+  <text x="1020" y="238" text-anchor="middle" class="mono">0.1 · 0.2</text>
+  <text x="1020" y="260" text-anchor="middle" class="body">material.capture</text>
+
+  <rect x="905" y="285" width="230" height="54" class="box" fill="#f5eef8"/>
+  <text x="1020" y="308" text-anchor="middle" class="mono">… flattened scatter …</text>
+  <text x="1020" y="330" text-anchor="middle" class="body">next payload</text>
+
+  <text x="1020" y="370" text-anchor="middle" class="mono">data[0:N]</text>
+  <line x1="765" y1="190" x2="865" y2="190" style="stroke:#566573;stroke-width:2.5"/>
+  <line x1="765" y1="330" x2="865" y2="330" style="stroke:#566573;stroke-width:2.5"/>
+  <text x="815" y="175" text-anchor="middle" class="body">offsets</text>
+
+  <rect x="180" y="465" width="840" height="90" class="box" fill="#f4ecf7"/>
+  <text x="600" y="495" text-anchor="middle" class="label">generated mcdc_get / mcdc_set helpers</text>
+  <text x="600" y="523" text-anchor="middle" class="mono">z(i, mesh, data) → data[mesh["z_offset"] + i]</text>
+  <text x="600" y="546" text-anchor="middle" class="body">transport uses logical fields without embedding Python references</text>
+
+  <line x1="607" y1="405" x2="607" y2="455" style="stroke:#566573;stroke-width:2.5"/>
+  <path d="M1020 405 C1020 445, 900 450, 845 465" style="stroke:#566573;stroke-width:2.5;fill:none"/>
+</svg>

@@ -60,6 +60,11 @@ class Simulation(MCDCBase):
     resulting object graph, assigns IDs, and prepares it for conversion to the
     packed arrays consumed by :mod:`mcdc.transport`.
 
+    MC/DC uses one active simulation context per Python process. A model-object
+    instance belongs to one simulation, although it may be referenced multiple
+    times within that model. Construct independent object graphs and use
+    separate processes for concurrent simulations.
+
     Each simulation owns its execution settings. Access them through
     ``simulation.settings`` by assigning values such as
     :attr:`settings.N_particle <mcdc.Simulation.settings.N_particle>` or by

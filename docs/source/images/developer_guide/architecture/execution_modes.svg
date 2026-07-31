@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">Progressive MC/DC execution modes</title>
+  <desc id="desc">Shared model compilation, runtime packing, and transport functions feed Python-only execution first, Numba CPU compilation second, and Numba GPU device compilation with Harmonize third.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#566573"/>
+    </marker>
+    <style>
+      .title { font-family: system-ui, sans-serif; font-size: 23px; font-weight: 700; fill: #17202a; }
+      .label { font-family: system-ui, sans-serif; font-size: 18px; font-weight: 650; fill: #17202a; }
+      .body { font-family: system-ui, sans-serif; font-size: 14px; fill: #273746; }
+      .box { stroke: #34495e; stroke-width: 2; rx: 10; }
+      .arrow { stroke: #566573; stroke-width: 3; fill: none; }
+    </style>
+  </defs>
+
+  <text x="600" y="35" text-anchor="middle" class="title">Add acceleration without changing model semantics</text>
+
+  <rect x="80" y="75" width="1040" height="85" class="box" fill="#fef9e7"/>
+  <text x="600" y="108" text-anchor="middle" class="label">Shared preparation</text>
+  <text x="600" y="135" text-anchor="middle" class="body">Simulation.compile → prepare → structured simulation + flat data → mcdc/transport</text>
+
+  <line x1="600" y1="160" x2="600" y2="195" style="stroke:#566573;stroke-width:3"/>
+
+  <rect x="110" y="205" width="980" height="75" class="box" fill="#eaf2f8"/>
+  <text x="285" y="237" text-anchor="middle" class="label">1 · Python-only</text>
+  <text x="680" y="237" text-anchor="middle" class="body">@njit functions execute with JIT disabled</text>
+  <text x="680" y="260" text-anchor="middle" class="body">inspectable baseline for model and algorithm development</text>
+
+  <line x1="600" y1="280" x2="600" y2="315" style="stroke:#566573;stroke-width:3"/>
+
+  <rect x="110" y="325" width="980" height="75" class="box" fill="#e8f8f5"/>
+  <text x="285" y="357" text-anchor="middle" class="label">2 · Numba-CPU</text>
+  <text x="680" y="357" text-anchor="middle" class="body">the same functions specialize to machine code for CPU types</text>
+  <text x="680" y="380" text-anchor="middle" class="body">the model, packed layout, and transport decisions stay the same</text>
+
+  <line x1="600" y1="400" x2="600" y2="435" style="stroke:#566573;stroke-width:3"/>
+
+  <rect x="110" y="445" width="980" height="60" class="box" fill="#f4ecf7"/>
+  <text x="285" y="481" text-anchor="middle" class="label">3 · Numba-GPU</text>
+  <text x="715" y="472" text-anchor="middle" class="body">adapt device functions and place runtime state on the GPU</text>
+  <text x="715" y="493" text-anchor="middle" class="body">Harmonize supplies scheduling and the NVIDIA/AMD integration layer</text>
+</svg>

@@ -24,9 +24,13 @@ complete your first transport calculation.
 Modeling and Results
 --------------------
 
+Follow :doc:`simulation_lifecycle` for the complete construct, compile,
+visualize, execute, and post-process workflow.
+
 .. toctree::
    :maxdepth: 1
 
+   simulation_lifecycle
    tallies
 
 Execution

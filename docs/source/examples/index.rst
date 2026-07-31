@@ -20,7 +20,9 @@ parameter changes for further exploration.
 
 If you are learning MC/DC for the first time, complete the
 :doc:`../user_guide/getting_started/first_simulation` before using these examples as
-templates. For individual API details, consult the :doc:`../reference/index`.
+templates. The :doc:`../user_guide/simulation_lifecycle` explains the workflow
+shared by every input. For individual API details, consult the
+:doc:`../reference/index`.
 
 Basic Examples
 --------------
@@ -29,6 +31,7 @@ Basic Examples
    :maxdepth: 1
 
    slab_shielding
+   iterative_source_reweighting
    kobayashi_dog_leg
    kobayashi_td
 

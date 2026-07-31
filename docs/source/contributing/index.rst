@@ -10,8 +10,13 @@ project maintainers.
 
 Start with the setup steps below. Use :doc:`continuous_integration` to
 understand automated checks and :doc:`container_development` when developing in
-the project container. For software architecture and documentation practices,
-see the :doc:`../developer_guide/index`.
+the project container. Use :doc:`example_validation` when changing the public
+API or example problems. Read :doc:`pull_requests` before preparing a
+contribution. For software architecture and documentation practices, see the
+:doc:`../developer_guide/index`.
+
+For implementation guidance specific to compiled transport functions, see
+:doc:`../developer_guide/extending/writing_numba_compatible_transport_code`.
 
 Contributions target the ``dev`` branch. To prepare a development checkout:
 
@@ -28,6 +33,8 @@ Development Workflow
 
    continuous_integration
    container_development
+   example_validation
+   pull_requests
 
 MC/DC documentation is an important part of the project and evolves alongside
 the codebase. The :doc:`../developer_guide/documentation/index` guide describes
@@ -108,9 +115,11 @@ However if absolutely required by users numba does allow for some `cache sharing
 Adding a New Input
 ------------------
 
-To add a new keyword argument such that a user can interface with it in an input deck 
-there are a few different places a dev will need to make alterations.
-The input objects are defined as dataclasses in the ``mcdc/object_/`` directory:
+For architectural guidance on adding a model field, embedded configuration,
+registered object category, or polymorphic subtype, see
+:doc:`../developer_guide/extending/extending_the_object_model`. Public model
+classes and configuration are primarily defined in ``mcdc/object_/``. Common
+input-related locations include:
 
 #. ``mcdc/object_/settings.py`` — simulation settings and k-eigenvalue parameters
 #. ``mcdc/object_/material.py`` — material definitions (``Material``, ``MaterialMG``)
@@ -195,26 +204,3 @@ the relevant documentation accordingly.
 See the :doc:`../developer_guide/documentation/index` guide for documentation
 philosophy, writing
 guidelines, and instructions for contributing to the documentation.
-
-
--------------
-Pull Requests
--------------
-
-
-MC/DC works off of a fork workflow in which contributors fork our repo, make alterations, and submit a pull requests.
-You should only submit a pull request once your code passes all tests, is properly linted, you have edited documentation (if necessary), and added any new tests (if needed).
-Open a PR to the ``dev`` branch in Github.
-MC/DC's main branch is only updated for version releases at which time a PR from dev to main is opened, tagged, archived, and published automatically.
-
-Within your pull request documentation please list:
-
-#. Type of PR (e.g. enhancement, bugfix, etc);
-#. Link to any theory to understand what you are doing;
-#. Link to any open/closed issues if applicable;
-#. New functionalities implemented
-#. Depreciated functionalities
-#. New dependencies needed (we don't add these lightly)
-#. Anything else we need to give you the thorough code review you deserve!
-
-If these things aren't listed we will ask for clarifying questions!

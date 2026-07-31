@@ -1,0 +1,335 @@
+.. _extending_the_object_model:
+
+==========================
+Extending the Object Model
+==========================
+
+MC/DC extensions normally begin as ordinary Python model objects, but an
+extension is complete only when its state and behavior are available in every
+required execution mode. This page describes how to extend the object model
+without breaking simulation-local compilation or the generated runtime layout.
+
+Read :doc:`../architecture/simulation_compilation` first for the
+``MCDCBase``--``MCDCObject``--``MCDCPolymorphic`` hierarchy. Read
+:doc:`../architecture/runtime_data_layout` for the structured ``simulation``
+record, flat ``data`` array, and generated accessors.
+
+When the new state is consumed during particle transport, continue with
+:doc:`writing_numba_compatible_transport_code` for type, dispatch, allocation,
+CPU/GPU compatibility, and verification guidance.
+
+Choose the Extension Type
+-------------------------
+
+Choose the narrowest extension that represents the new concept:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 24 52
+
+   * - Change
+     - Starting point
+     - Use when
+   * - Add a field
+     - Existing class
+     - The concept already belongs to an existing model or configuration
+       object.
+   * - Add embedded state
+     - ``MCDCBase``
+     - The state belongs to one parent and does not need an independently
+       addressable entry in a simulation registry.
+   * - Add a registered category
+     - ``MCDCObject``
+     - Transport must refer to independently registered instances by
+       simulation-local ``ID``.
+   * - Add a representation to an existing category
+     - ``MCDCPolymorphic``
+     - The extension shares a category interface but needs a distinct packed
+       layout and dispatch code.
+
+Prefer adding a subtype to an existing polymorphic family over creating a new
+registered category when the new object has the same conceptual role. A new
+tally estimator, for example, belongs under ``Tally``; it does not need an
+unrelated top-level registry.
+
+The Common Class Contract
+-------------------------
+
+Every MC/DC model class must follow the conventions used by the compiler and
+Numba-layer generator.
+
+``label``
+   Provide a unique, stable, lower-case label such as ``structured_mesh``. The
+   label names generated structured layouts and the corresponding modules
+   under ``mcdc_get`` and ``mcdc_set``.
+
+Type annotations
+   Annotate every field that must be represented at runtime. Annotations define
+   scalar fields, embedded structures, object-ID references, and
+   variable-length payloads.
+
+Initialization
+   Assign every runtime-visible field a valid initial value. Subclasses of
+   ``MCDCObject`` must call ``super().__init__()`` so ``ID`` is initialized;
+   subclasses of ``MCDCPolymorphic`` must do the same so both ``ID`` and
+   ``sub_ID`` are initialized.
+
+``non_numba``
+   List Python-only fields that should not be traversed or packed
+   automatically. The class must explicitly convert any required information
+   from those fields into annotated runtime-visible fields before packing.
+
+Compilation hook
+   Use the inherited ``_compile_into_simulation`` implementation unless the
+   class must canonicalize objects, compile excluded references, or derive
+   fields from assigned object IDs.
+
+Ownership boundary
+   Design each model-object instance for one ``Simulation`` context. Reuse the
+   instance within that model when sharing is intentional, but construct a new
+   object graph for another simulation or process. Extension code must not keep
+   process-wide singleton model objects that can be attached to several
+   simulations.
+
+Represent Fields Deliberately
+-----------------------------
+
+The layer generator interprets annotations according to the field's role:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 30 36
+
+   * - Example annotation
+     - Runtime representation
+     - Access pattern
+   * - ``active: bool`` or ``count: int``
+     - Scalar structured field
+     - Direct structured access
+   * - ``vector: Annotated[NDArray[float64], (3,)]``
+     - Fixed-size embedded array
+     - Direct structured access
+   * - ``grid: NDArray[float64]``
+     - Offset and length plus values in ``data``
+     - Generated accessor
+   * - ``table: Annotated[NDArray[float64], ("N", 3)]``
+     - Offset, length, and shape metadata plus flattened values
+     - Generated multidimensional accessor
+   * - ``mesh: MeshBase``
+     - Simulation-local object ID
+     - Lookup through the mesh collection
+   * - ``tallies: list[Tally]``
+     - Count and offset to IDs stored in ``data``
+     - Generated ID accessor
+
+Use an integer-only shape when an array is always the same size. Use symbolic
+dimensions when a shape depends on the model. Do not store a Python reference
+in transport-visible state; annotate it as an ``MCDCObject`` or polymorphic
+base so the packed layer records an ID.
+
+Adding a Field to an Existing Class
+-----------------------------------
+
+#. Add the annotation to the class that owns the concept.
+#. Initialize the field for every construction path.
+#. Decide whether it is fixed-size, variable-length, an embedded
+   ``MCDCBase``, or an ``MCDCObject`` reference.
+#. Update any compile hook that derives the field or converts a Python-only
+   input into its runtime representation.
+#. Consume the field through direct structured access or its generated
+   ``mcdc_get`` and ``mcdc_set`` helpers.
+#. Update the public docstring and API documentation when users can configure
+   the field.
+
+Avoid adding parallel state in several classes. If a value belongs to the
+simulation as a whole, place it in ``Simulation`` or one of its embedded
+configuration objects and pass or access that representation consistently.
+
+Adding Embedded ``MCDCBase`` State
+----------------------------------
+
+Use ``MCDCBase`` for configuration or runtime state that is owned by one
+parent. A minimal class has a label, annotated fields, and initialized values:
+
+.. code-block:: python
+
+   class NewTechnique(MCDCBase):
+       label = "new_technique"
+
+       active: bool
+       strength: float
+
+       def __init__(self) -> None:
+           super().__init__()
+           self.active = False
+           self.strength = 1.0
+
+Add an annotated field for the object to its owner and instantiate it with the
+owner. For simulation-wide configuration, this normally means adding the field
+to ``Simulation`` and constructing it in ``Simulation.__init__``. The embedded
+object participates in recursive compilation but does not require a registry
+branch or object ID.
+
+If the embedded object refers to an ``MCDCObject``, annotate that reference.
+The default traversal will register the referenced object when compilation
+reaches the embedded configuration.
+
+Adding a New ``MCDCObject`` Category
+------------------------------------
+
+A genuinely new registered category requires coordinated changes:
+
+#. Define the class with a unique ``label``, annotations, initialized fields,
+   and a call to ``super().__init__()``.
+#. Add the category collection to ``Simulation`` annotations and initialize or
+   reset it in ``Simulation._reset_model``.
+#. Import the category in
+   ``mcdc/code_factory/python_objects_compiler.py`` and add an
+   ``isinstance`` branch in ``register_object`` that selects its simulation
+   collection.
+#. Ensure the object is reachable from an existing simulation root or add an
+   explicit root and compilation step.
+#. Ensure the class's module is imported before
+   ``numba_layers_generator.py`` discovers the classes. A public class is
+   normally imported through ``mcdc/__init__.py``; an internal class must be
+   imported by another module in the compilation path.
+#. Add the collection and lookup behavior required by transport.
+
+Do not add a fallback registration branch that silently accepts unknown
+objects. An explicit category branch keeps registry ownership and runtime
+layout reviewable.
+
+Adding a Polymorphic Subtype
+----------------------------
+
+Adding a concrete subtype to an existing family is more localized than adding
+a category:
+
+#. Add a unique integer constant for the subtype.
+#. Inherit from the existing polymorphic base, such as ``MeshBase`` or
+   ``Tally``.
+#. Set a unique concrete ``label`` and the new ``sub_type`` constant.
+#. Call the base initializer so shared fields, ``ID``, and ``sub_ID`` are
+   initialized.
+#. Annotate and initialize subtype-specific fields.
+#. Import the subtype before layer generation and expose it from
+   ``mcdc/__init__.py`` when it is public.
+#. Add transport dispatch for the new ``sub_type`` and implement the
+   subtype-specific behavior.
+
+For example, the structural part of a mesh subtype follows this pattern:
+
+.. code-block:: python
+
+   class MeshNew(MeshBase):
+       label = "new_mesh"
+       sub_type = MESH_NEW
+
+       boundaries: NDArray[float64]
+
+       def __init__(self, boundaries, name="") -> None:
+           super().__init__(name)
+           self.boundaries = np.asarray(boundaries, dtype=float64)
+
+No new ``register_object`` branch is needed for a subtype of an already
+registered family. The existing ``isinstance(..., MeshBase)`` or corresponding
+category check places it in the base collection, while ``sub_type`` and
+``sub_ID`` connect it to its concrete packed collection.
+
+Custom Compilation Hooks
+------------------------
+
+Override ``_compile_into_simulation`` only when the default recursive traversal
+is insufficient. The common post-registration pattern is:
+
+.. code-block:: python
+
+   def _compile_into_simulation(self, simulation) -> bool:
+       if not super()._compile_into_simulation(simulation):
+           return False
+
+       # Referenced objects now have simulation-local IDs.
+       self.runtime_field = self.python_reference.ID
+       return True
+
+Calling ``super`` first registers an ``MCDCObject`` and recursively compiles its
+ordinary members. The Boolean return prevents repeated work when the same
+object is reached again.
+
+Some classes must canonicalize or replace members before the default traversal.
+In that case, check ``compile_ID`` before doing the work, update the
+runtime-visible members, and then call ``super`` exactly once:
+
+.. code-block:: python
+
+   def _compile_into_simulation(self, simulation) -> bool:
+       if self.compile_ID == simulation.compile_ID:
+           return False
+
+       self._resolve_python_inputs(simulation)
+
+       if not super()._compile_into_simulation(simulation):
+           return False
+
+       self._derive_post_registration_fields()
+       return True
+
+Do not assign ``compile_ID``, ``ID``, or ``sub_ID`` manually. The shared
+compiler owns those values.
+
+Generated Runtime Layers and Accessors
+--------------------------------------
+
+``numba_layers_generator.py`` derives the structured dtypes, flat-data
+metadata, and accessor targets from the completed model classes. It writes:
+
+- ``mcdc/numba_types.py`` for structured dtype definitions.
+- ``mcdc/mcdc_get/<label>.py`` for generated reads.
+- ``mcdc/mcdc_set/<label>.py`` for generated writes.
+- ``mcdc_get/__init__.py`` and ``mcdc_set/__init__.py`` for generated module
+  imports.
+
+Do not implement a generated accessor by hand. Express the field correctly in
+the class annotation, prepare a representative simulation, and allow the layer
+generator to regenerate the modules. Then use the generated helper from
+transport code. Fixed-size fields do not need helpers and can be accessed
+directly from the structured record.
+
+Public API and Documentation
+----------------------------
+
+For a user-facing class or constructor:
+
+#. Export the class from ``mcdc/__init__.py``.
+#. Add it to the appropriate autosummary group in
+   ``docs/source/reference/python_api/index.rst``.
+#. Document parameters, units, defaults, constraints, and at least one usable
+   example in the class docstring.
+#. Update the User Guide when the extension changes how users construct or run
+   a model.
+
+Internal helper classes should remain under ``mcdc.object_`` and should not be
+exported merely to make discovery work. Import them explicitly in the
+compilation path instead.
+
+Verification Checklist
+----------------------
+
+An object-model extension should verify all affected layers:
+
+- Construction accepts valid input and rejects invalid shapes or types.
+- Compilation discovers the object from the intended root.
+- Shared references register once, and recompilation produces a valid new
+  snapshot.
+- Separate simulations use independently constructed model-object instances.
+- Packed fields, object IDs, offsets, and generated accessors contain the
+  expected values.
+- Python and Numba-CPU modes produce equivalent behavior.
+- GPU execution is covered when the changed transport path supports GPUs.
+- Public examples compile under the example validator when the API changes.
+- API and developer documentation build without warnings.
+
+Add focused unit tests near ``test/unit/test_object_compilation.py`` for
+compilation behavior and near the relevant transport tests for runtime
+behavior. Use :doc:`../../contributing/example_validation` when an extension
+changes public examples.

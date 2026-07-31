@@ -12,6 +12,9 @@ components: materials, geometry, particle sources, tallies, and simulation
 settings. In MC/DC, these components are represented by Python objects and
 assembled into a :class:`mcdc.Simulation`.
 
+This tutorial applies the general :doc:`../simulation_lifecycle` to one
+complete problem.
+
 The example uses multigroup data defined directly in the input, so it does not
 require an external nuclear-data library. Its complete, executable source is
 available in ``examples/slab_shielding``.
@@ -19,12 +22,13 @@ available in ``examples/slab_shielding``.
 MC/DC Workflow
 --------------
 
-An MC/DC calculation follows four main steps:
+An MC/DC calculation follows five main steps:
 
 #. Construct the materials, geometry, sources, and tallies.
 #. Create a simulation and attach the model objects to it.
-#. Configure settings and transport techniques.
-#. Run particle transport and analyze the output.
+#. Configure settings and compile the connected object graph.
+#. Visualize or run the prepared model.
+#. Generate and post-process the output.
 
 .. important::
 
