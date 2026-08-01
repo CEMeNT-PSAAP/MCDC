@@ -45,7 +45,7 @@ The source tree follows the same separation of responsibilities. Model-facing
 components define and collect the simulation, generated-data components prepare
 the representation used during transport, and transport components implement
 the numerical algorithms shared by the execution backends. The middle column
-of the table maps each component to the corresponding role in the figure.
+of the table below maps each component to the corresponding role in the figure above.
 
 .. list-table::
    :header-rows: 1

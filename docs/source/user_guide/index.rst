@@ -25,12 +25,15 @@ Modeling and Results
 --------------------
 
 Follow :doc:`simulation_lifecycle` for the complete construct, compile,
-visualize, execute, and post-process workflow.
+visualize, execute, and post-process workflow. Use
+:doc:`iterative_simulations` when several runs reuse most of a model while
+changing selected inputs.
 
 .. toctree::
    :maxdepth: 1
 
    simulation_lifecycle
+   iterative_simulations
    tallies
 
 Execution

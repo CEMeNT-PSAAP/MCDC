@@ -170,6 +170,9 @@ and its analysis remains clear:
 
 The tally is then available under ``tallies/slab_flux`` in ``slab.h5``.
 
+For workflows that reuse most of a model while changing selected inputs between
+runs, continue with :doc:`iterative_simulations`.
+
 Complete Workflows
 ------------------
 
