@@ -81,6 +81,8 @@ of the table below maps each component to the corresponding role in the figure a
      - Implements the particle-transport algorithms consumed by every
        execution backend.
 
+.. rst-class:: architecture-component-followup
+
 The ``mcdc/object_`` modules, :class:`mcdc.Simulation`, and
 ``python_objects_compiler.py`` form the Python model and compilation side of
 the architecture, corresponding to the first two boxes in the upper flow.
