@@ -31,6 +31,34 @@ MC/DC separates fixed-layout metadata from variable-length values:
    :width: 100%
    :alt: A cell, its boundary surfaces, and a surface-crossing tally become connected runtime records whose variable-length fields are stored in a flat data array.
 
+An Explicit Runtime Object Model
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+At a high level, MC/DC's prepared representation recreates machinery that an object system normally provides behind a class interface.
+A conventional object runtime stores fixed fields with the object while references point to separately allocated objects and variable-length values.
+Accessing an attribute follows those references without requiring application code to know where the referenced memory resides.
+
+MC/DC makes comparable operations explicit.
+Fixed fields become structured-record fields, Python object references become simulation-local IDs, variable-length fields become offsets into ``data``, and generated accessors perform the corresponding lookup or offset calculation.
+The combination of ``simulation`` and ``data`` can therefore be understood as a purpose-built runtime object model backed by explicit records and a flat data arena.
+
+Seen narrowly, this design reinvents facilities already supplied by Python and other language runtimes.
+MC/DC derives schemas, assigns object identities, packs values, represents relationships, dispatches among concrete representations, and generates field accessors.
+Maintaining this machinery adds implementation complexity and requires MC/DC to define rules that an ordinary class system would otherwise manage automatically.
+
+The duplication is necessary because the Python object model does not satisfy MC/DC's execution requirements.
+Python objects may contain interpreter-managed references, dynamic types, arbitrary inheritance behavior, and separately allocated containers that Numba cannot generally compile or transfer to an accelerator.
+Host pointers also cannot serve as portable references to state allocated in a GPU address space.
+MC/DC instead needs a complete representation with predictable types, explicit ownership, stable relationships, and equivalent access patterns across Python, Numba-CPU, and Numba-GPU execution.
+
+The current single ``float64`` data arena is a simplifying choice within this design rather than an inherent requirement of an explicit runtime object model.
+It gives MC/DC one variable-length allocation, one offset space, and consistent function signatures across execution modes.
+Integer values stored in the arena, including lists of object IDs, are exactly representable for practical MC/DC model sizes but must be cast back to integers when accessed.
+Separate typed arenas could preserve integer types and avoid those conversions, but would introduce additional allocations, offsets, generated accessors, function arguments, and GPU memory management.
+
+MC/DC's implementation should therefore be viewed neither as an ordinary Python class layout nor as a general-purpose replacement for one.
+It is a specialized, arena-backed object model that exchanges language-level generality for the predictable representation required by portable particle-transport execution.
+
 Object Collections
 ^^^^^^^^^^^^^^^^^^
 

@@ -130,6 +130,7 @@ Preparing a method for acceleration narrows the freedom available inside transpo
 
 **Flexible models become predictable execution data.**
 Python objects remain the natural way to describe a problem, but accelerated transport operates on a numerical representation prepared for one simulation.
+MC/DC therefore replaces Python's implicit object machinery with a purpose-built runtime object model based on structured records, simulation-local IDs, offsets, and generated accessors.
 Mutable runtime records are passed in one-element array containers, providing stable shared storage across Python, Numba-CPU, and Numba-GPU execution.
 The transformation is covered in :doc:`simulation_compilation` and :doc:`runtime_data_layout`.
 
