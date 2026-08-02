@@ -130,6 +130,7 @@ Preparing a method for acceleration narrows the freedom available inside transpo
 
 **Flexible models become predictable execution data.**
 Python objects remain the natural way to describe a problem, but accelerated transport operates on a numerical representation prepared for one simulation.
+Mutable runtime records are passed in one-element array containers, providing stable shared storage across Python, Numba-CPU, and Numba-GPU execution.
 The transformation is covered in :doc:`simulation_compilation` and :doc:`runtime_data_layout`.
 
 **Transport behavior becomes explicit.**
