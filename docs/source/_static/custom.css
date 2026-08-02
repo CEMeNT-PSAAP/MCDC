@@ -10,6 +10,11 @@ dt.sig.sig-object.py > em.property {
     margin-left: 30px;
 }
 
+/* Separate the architecture flow figure from its introductory discussion. */
+.architecture-flow-figure {
+    margin-bottom: 1.5rem;
+}
+
 /* Separate the architecture component table from its follow-up discussion. */
 .architecture-component-followup {
     margin-top: 1.5rem;

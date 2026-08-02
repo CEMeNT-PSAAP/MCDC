@@ -16,9 +16,13 @@ The representation has two complementary parts:
    A contiguous one-dimensional NumPy array containing variable-length
    numerical payloads and lists of object IDs.
 
-The same logical representation is used by Python, Numba-CPU, and Numba-GPU
-execution. It should therefore be understood as MC/DC's transport runtime
-model, not as a separate Numba-only model.
+The same logical representation is supplied to Python, Numba-CPU, and
+Numba-GPU execution. It should therefore be understood as MC/DC's transport
+runtime model, not as a separate Numba-only model. During Python-only
+prototyping, transport code may also access arbitrary Python state alongside
+this representation. A method intended for portable, maintained execution must
+express the state required by transport through the prepared representation.
+See :doc:`python_first_numba_accelerated_design` for this development model.
 
 Why Two Structures?
 -------------------
@@ -32,21 +36,67 @@ MC/DC separates fixed-layout metadata from variable-length values:
 
 .. image:: ../../images/developer_guide/architecture/runtime_data_layout.svg
    :width: 100%
-   :alt: A structured simulation record using offsets, lengths, and shapes to describe fields stored in a flat data array.
+   :alt: A cell, its boundary surfaces, and a surface-crossing tally become connected runtime records whose variable-length fields are stored in a flat data array.
 
-For a variable-length field such as ``mesh.z``, the mesh record stores values
-equivalent to:
+Object Collections
+^^^^^^^^^^^^^^^^^^
+
+Registered model objects are stored in collections on ``simulation``. The
+figure follows a cell, its boundary surfaces, and a surface-crossing tally.
+It demonstrates both forms of runtime collection.
+
+For a non-polymorphic category, an object's simulation-local ID directly
+indexes its collection. A particle's current cell and one of its boundary
+surfaces are therefore retrieved with:
+
+.. code-block:: python
+
+   cell = simulation["cells"][particle["cell_ID"]]
+   surface_ID = int(mcdc_get.cell.surface_IDs(0, cell, data))
+   surface = simulation["surfaces"][surface_ID]
+
+A polymorphic category has both a common base collection and a collection for
+each concrete representation. A surface stores the IDs of the surface-crossing
+tallies attached to it. Each ID first selects a base tally record, whose
+``sub_type`` and ``sub_ID`` identify the concrete surface-crossing record:
+
+.. code-block:: python
+
+   from mcdc.constant import TALLY_SURFACE_CROSSING
+
+
+   tally_ID = int(
+       mcdc_get.surface.surface_crossing_tally_IDs(0, surface, data)
+   )
+   tally = simulation["tallies"][tally_ID]
+
+   if tally["sub_type"] == TALLY_SURFACE_CROSSING:
+       surface_crossing_tally = simulation["surface_crossing_tallies"][
+           tally["sub_ID"]
+       ]
+
+The concrete tally record retains ``surface_filter_ID`` and ``cell_filter_ID``,
+connecting it back to the selected surface and cell. All IDs are assigned
+during model compilation and identify objects only within the current
+simulation snapshot. The hierarchy and ID assignment are described in
+:doc:`simulation_compilation`.
+
+Variable-Length Fields
+^^^^^^^^^^^^^^^^^^^^^^
+
+For a variable-length list such as a cell's boundary surfaces, the cell record
+stores values equivalent to:
 
 .. code-block:: text
 
-   z_offset = 120
-   z_length = 61
+   surface_IDs_offset = 120
+   N_surface = 2
 
-and the values occupy:
+and the two surface IDs occupy:
 
 .. code-block:: text
 
-   data[120:181]
+   data[120:122]
 
 For multidimensional arrays, annotated shape metadata supplies the strides used
 to reconstruct logical indexing. The payload itself is flattened when packed.
@@ -67,10 +117,6 @@ maps them to runtime fields:
   ``<object>_IDs_offset`` metadata plus IDs in ``data``.
 - Members named in a class's ``non_numba`` list are excluded from the packed
   representation or handled specially.
-
-Polymorphic base and subtype collections receive separate structured dtypes.
-The base ``ID``, ``sub_type``, ``sub_ID``, and child ``base_ID`` fields connect
-those collections without Python references.
 
 Packing is performed in two passes:
 
@@ -109,8 +155,8 @@ Conceptually, a generated element getter performs:
 
 .. code-block:: python
 
-   def z(index, mesh, data):
-       offset = mesh["z_offset"]
+   def surface_IDs(index, cell, data):
+       offset = cell["surface_IDs_offset"]
        return data[offset + index]
 
 Generated helpers also provide operations for complete arrays, final elements,
@@ -119,15 +165,16 @@ can therefore express logical access such as:
 
 .. code-block:: python
 
-   boundary = mcdc_get.structured_mesh.z(index, mesh, data)
+   surface_ID = int(mcdc_get.cell.surface_IDs(index, cell, data))
 
-without depending on where that mesh's z-grid happens to reside in ``data``.
+without depending on where that cell's surface IDs happen to reside in
+``data``.
 
 Transport Consumption
 ---------------------
 
-Modules under ``mcdc/transport`` consume only the runtime representation and
-primitive transport records. They use:
+Portable transport functions shared across the execution backends consume the
+runtime representation and primitive transport records. They use:
 
 - Direct structured-field access for fixed-size values and metadata.
 - Base and subtype IDs to navigate registered objects.
@@ -136,8 +183,10 @@ primitive transport records. They use:
 
 The layout is fixed for the duration of a prepared run. Transport may update
 allocated values, tally bins, particle banks, and runtime counters, but it
-cannot resize a field or introduce a new model object. Changing the model
-requires a new model compilation and runtime-preparation pass.
+cannot resize a field or introduce a new model object. A Python-only prototype
+may temporarily read or modify external Python state, but that state is not
+part of the portable runtime layout. Changing the prepared MC/DC model requires
+a new model compilation and runtime preparation pass.
 
 Execution Backends
 ------------------
