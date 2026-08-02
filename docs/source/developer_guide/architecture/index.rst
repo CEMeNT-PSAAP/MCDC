@@ -4,39 +4,24 @@
 Architecture
 ============
 
-Architecture documentation explains how MC/DC translates flexible Python model
-definitions into particle-transport executions. The main path follows the model
-through compilation, runtime preparation, Python execution, Numba-CPU
-acceleration, and finally the Numba-GPU and Harmonize layers.
-
-Begin with :doc:`python_first_numba_accelerated_design` for the rationale,
-boundaries, and tradeoffs behind this path. It explains why methods development
-begins with unrestricted MC/DC Python and may progress through Numba-CPU to
-Numba-GPU. The discussion below gives an overview on how the major stages and source
-components support that design.
-
-Architecture Flow
------------------
-
-MC/DC begins with a Python model definition, then follows one preparation path
-and a choice of execution backend. The flow has three major processing stages:
-
-#. **Model compilation** discovers the Python objects owned by a
-   :class:`mcdc.Simulation`, deduplicates them, and assigns simulation-local
-   identifiers. :doc:`simulation_compilation` explains the model's ownership,
-   discovery, and finalization.
-#. **Runtime preparation** converts the compiled model into the structured
-   ``simulation`` state and flat ``data`` array consumed by transport.
-   :doc:`runtime_data_layout` explains this numerical representation and its
-   generated access helpers.
-#. **Backend execution** runs the shared transport implementation through
-   Python, Numba-CPU, or Numba-GPU. The first two paths are described in
-   :doc:`python_numba_cpu_execution`; :doc:`numba_gpu_execution` continues into
-   GPU code generation, memory placement, and Harmonize scheduling.
+Architecture documentation explains how MC/DC translates flexible Python model definitions into particle-transport execution:
 
 .. image:: ../../images/developer_guide/architecture/architecture_flow.svg
    :width: 100%
-   :alt: Flow from model definition through model compilation and runtime preparation to shared transport, which runs with Python, Numba-CPU, or Numba-GPU.
+   :alt: MC/DC's architecture flow from model definition through simulation compilation and runtime preparation to shared transport, which runs with Python, Numba-CPU, or Numba-GPU execution modes.
+
+The architecture flow follows a Monte Carlo transport model from definition through one common preparation path, then branches into the Python, Numba-CPU, or Numba-GPU execution modes.
+The flow has three major processing stages:
+
+#. **Simulation compilation** discovers the Python objects owned by a :class:`mcdc.Simulation`, deduplicates them, and assigns simulation-local identifiers.
+   :doc:`simulation_compilation` explains model ownership, discovery, and finalization.
+#. **Runtime preparation** converts the compiled model into the structured ``simulation`` state and flat ``data`` array consumed by transport.
+   :doc:`runtime_data_layout` explains this numerical representation and its generated access helpers.
+#. **Transport execution** runs the common, adaptable transport implementation in the selected execution mode.
+   :doc:`python_numba_cpu_execution` describes Python and Numba-CPU execution, while :doc:`numba_gpu_execution` continues into GPU code generation, memory placement, and Harmonize scheduling.
+
+Visit :doc:`python_first_numba_accelerated_design` for the rationale, boundaries, and tradeoffs that shape MC/DC's architecture.
+It explains why method development begins in unrestricted Python mode and may progress through Numba-CPU to Numba-GPU.
 
 Component Responsibility
 ------------------------
@@ -45,7 +30,7 @@ The source tree follows the same separation of responsibilities. Model-facing
 components define and collect the simulation, generated-data components prepare
 the representation used during transport, and transport components implement
 the numerical algorithms shared by the execution backends. The middle column
-of the table below maps each component to the corresponding role in the figure
+of the table below maps each component to the corresponding role in the architecture flow shown in the figure
 above. Paths in the component column are relative to the top-level ``mcdc/``
 package.
 
@@ -64,7 +49,7 @@ package.
      - Owns model roots and configuration and controls compilation,
        visualization, and execution.
    * - ``code_factory/python_objects_compiler.py``
-     - Model compilation
+     - Simulation compilation
      - Discovers and registers the connected Python object graph.
    * - ``code_factory/numba_layers_generator.py``
      - Runtime preparation
