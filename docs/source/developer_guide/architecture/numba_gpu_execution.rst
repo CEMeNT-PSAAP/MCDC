@@ -4,22 +4,18 @@
 Numba-GPU Execution
 ===================
 
-GPU execution is the final layer in MC/DC's execution model. MC/DC first
-compiles the Python model and creates the same logical runtime representation
-used on the CPU. It then adapts the transport functions for device execution,
-allocates or transfers runtime state, and uses Harmonize to schedule particle
-work.
+GPU execution is the final layer in MC/DC's execution model.
+MC/DC first compiles the Python model and creates the same logical runtime representation used on the CPU.
+It then adapts the transport functions for device execution, allocates or transfers runtime state, and uses Harmonize to schedule particle work.
 
-Read :doc:`simulation_compilation`, :doc:`runtime_data_layout`, and
-:doc:`python_numba_cpu_execution` first. This page focuses on the additional
-GPU-specific compilation and runtime machinery.
+Read :doc:`simulation_compilation`, :doc:`runtime_data_layout`, and :doc:`python_numba_cpu_execution` first.
+This page focuses on the additional GPU-specific compilation and runtime machinery.
 
 GPU Compilation
 ---------------
 
-When targeting GPUs, MC/DC functions are just-in-time (JIT) compiled with
-Numba and integrated with Harmonize. A GPU run selects Numba mode and the GPU
-target:
+When targeting GPUs, MC/DC functions are just-in-time (JIT) compiled with Numba and integrated with Harmonize.
+A GPU run selects Numba mode and the GPU target:
 
 .. code-block:: sh
 
@@ -45,10 +41,12 @@ Current versions of Numba come with CUDA operability natively, but this is set t
 
 .. image:: ../../images/developer_guide/architecture/numba_gpu_nvidia_flow.png
    :width: 800
-   :alt: Simple proxy example describing how to compile device functions in Numba-Python with external C++ code for targeting Nvidia GPUs. In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize.
+   :alt: Simple proxy example describing how to compile device functions in Numba-Python with external C++ code for targeting Nvidia GPUs.
+         In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize.
 
 
-Simple proxy example describing how to compile device functions in Numba-Python with external C++ code for targeting Nvidia GPUs. In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize
+Simple proxy example describing how to compile device functions in Numba-Python with external C++ code for targeting Nvidia GPUs.
+In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize
 
 We begin by
 
@@ -56,7 +54,7 @@ We begin by
 #. Compiling PTX to relocatable device code using ``nvcc -rdc=true -dc -arch=<arch> --cudart shared --compiler-options -fPIC add.ptx -o add.o`` where ``-dc`` asks the compiler for device code, ``-rdc`` asks to make that device code relocatable, ``--cudart shared`` asks for shared CUDA runtime libraries and ``-fPIC`` generates position-independent code;
 #. Compiling that relocatable byte code into a library of executable device functions is done with ``nvcc -dlink add.o -arch=<arch> --cudart shared -o device.o --compiler-options -fPIC`` where ``-dlink`` asks the compiler for relocatable device code; and finally
 #. Compiling the C-CUDA file containing the global function and linking with the library of device functions originating from Python with ``nvcc -shared add.o device.o -arch=<arch> --cudart shared``.
-    
+
 
 While the complexity of the functions both from MC/DC (Python) and Harmonize (C++) increases dramatically when moving toward implementation in MC/DC, this compilation strategy remains mostly the same.
 The exact compilation commands Harmonize calls when compiling MC/DC functions can be viewed by setting ``VERBOSE=True`` in ``harmonize/python/config.py``.
@@ -88,21 +86,23 @@ This process is done in LLVM-IR.
 
 .. image:: ../../images/developer_guide/architecture/numba_gpu_amd_flow.png
    :width: 800
-   :alt: Simple proxy example describing how to compile device functions in Numba-HIP with external C++ code to AMD GPU targets. In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize.
+   :alt: Simple proxy example describing how to compile device functions in Numba-HIP with external C++ code to AMD GPU targets.
+         In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize.
 
-Simple proxy example describing how to compile device functions in Numba-HIP with external C++ code to AMD GPU targets. In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize
+Simple proxy example describing how to compile device functions in Numba-HIP with external C++ code to AMD GPU targets.
+In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize
 
 Figure fig:codeclang shows the compilation structure.
 We begin compilation by
 
-#. Compiling C++ source in ``dep.cpp`` to LLVM-IR with host and device code bundled together with ``hipcc -c -fgpu-rdc -S -emit-llvm -o dep.ll -x hip dep.cpp -g`` where ``-fgpu-rdc`` asks the compiler for relocatable device code ``-emit-llvm`` requests the LLVM-IR, ``-c`` only runs preprocess, compile, and assemble steps, and ``-x hip`` specifies that ``dep.cpp`` is HIP code; 
+#. Compiling C++ source in ``dep.cpp`` to LLVM-IR with host and device code bundled together with ``hipcc -c -fgpu-rdc -S -emit-llvm -o dep.ll -x hip dep.cpp -g`` where ``-fgpu-rdc`` asks the compiler for relocatable device code ``-emit-llvm`` requests the LLVM-IR, ``-c`` only runs preprocess, compile, and assemble steps, and ``-x hip`` specifies that ``dep.cpp`` is HIP code;
 #. Unbundling the LLVM-IR:
-    
+
  a. first the device half ``clang-offload-bundler --type=ll --unbundle --input=dep.ll --output=dep_gpu.ll --targets=hip-amdgcn-amd-amdhsa--gfx90a`` where ``amdgcn-amd-amdhsa`` is the LLVM target-tipple and ``gfx90a`` is compiler designation for an MI250X
  b. then the host half ``clang-offload-bundler --type=ll --unbundle --input=dep.ll --output=dep_cpu.ll --targets=host-x86_64-unknown-linux-gnu``; then
 
 #. Compiling device functions from Python source with ``numba.hip.generate_llvmir()`` and place into ``add_one.ll``;
-#. Linking the now unbundled device code in ``dep_gpu.ll`` and the device code from Python in ``add_one.ll`` together with ``llvm-link dep_gpu.ll add_one.ll -S -o dep_gpu_linked.ll``; 
+#. Linking the now unbundled device code in ``dep_gpu.ll`` and the device code from Python in ``add_one.ll`` together with ``llvm-link dep_gpu.ll add_one.ll -S -o dep_gpu_linked.ll``;
 #. Rebundling the now combined Python/C++ device LLVM-IR back to the host LLVM-IR with ``clang-offload-bundler --type=ll --input=dep_gpu_linked.ll --input=dep_cpu.ll --output=dep_bundled.ll --targets=hip-amdgcn-amd-amdhsa--gfx90a, host-x86_64-unknown-linux-gnu``; and finally
 #. Compiling to an executable with ``hipcc -v -fgpu-rdc --hip-link dep_bundled.ll-o program`` where ``--hip-link`` links clang-offload-bundles for HIP
 
