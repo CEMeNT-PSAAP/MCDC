@@ -72,14 +72,15 @@ The setter calls identify the roots of the user model:
 - Settings and transport techniques are embedded objects already owned by the simulation.
 
 There is no process-wide model singleton.
-Multiple ``Simulation`` instances can be constructed and configured in the same Python process, provided each owns a distinct object graph.
-Model objects are included only when they are reachable from a simulation's roots or embedded configuration.
+Each ``Simulation`` owns the model objects reachable from its roots or embedded configuration.
 
 Ownership Boundary and Process Model
 ------------------------------------
 
 MC/DC intentionally uses a serial-in-process execution model: one ``Simulation`` is compiled, prepared, or executed at a time within a Python process.
 A model-object instance belongs to one simulation context.
+Repeated in-process calculations should update and recompile the same ``Simulation``.
+See :ref:`example_iterative_source_reweighting` for a complete iterative simulation and result-comparison example.
 
 References may be shared freely within that context.
 For example, several cells may use the same material, and compilation will register that material once.
@@ -249,7 +250,6 @@ For example, two sources can be reweighted while the geometry, materials, and ta
 
 Each call to ``compile`` assigns a new ``compile_ID`` and rebuilds a complete, consistent snapshot even though only the source probabilities changed.
 The objects remain owned by the same ``Simulation`` throughout the study.
-See :ref:`example_iterative_source_reweighting` for a complete executable example and comparison script.
 
 From Objects to Runtime Data
 ----------------------------

@@ -134,22 +134,6 @@ Compilation hook
 
    Do not assign ``compile_ID``, ``ID``, or ``sub_ID`` manually.
 
-Ownership boundary
-   Design each model-object instance for one ``Simulation`` context.
-   Reuse the instance within that model when sharing is intentional, but construct a new object graph for another simulation or process.
-   Extension code must not keep process-wide singleton model objects that can be attached to several simulations.
-
-   .. code-block:: python
-
-      surface_a = mcdc.Surface.PlaneZ(z=0.0)
-      surface_b = mcdc.Surface.PlaneZ(z=0.0)
-
-      simulation_a = mcdc.Simulation()
-      simulation_b = mcdc.Simulation()
-
-      simulation_a.set_model([mcdc.Cell(region=+surface_a)])
-      simulation_b.set_model([mcdc.Cell(region=+surface_b)])
-
 Represent Fields Deliberately
 -----------------------------
 
@@ -371,7 +355,6 @@ An object-model extension should verify all affected layers:
 - Construction accepts valid input and rejects invalid shapes or types.
 - Compilation discovers the object from the intended root.
 - Shared references register once, and recompilation produces a valid new snapshot.
-- Separate simulations use independently constructed model-object instances.
 - Packed fields, object IDs, offsets, and generated accessors contain the expected values.
 - Python and Numba-CPU modes produce equivalent behavior.
 - GPU execution is covered when the changed transport path supports GPUs.
