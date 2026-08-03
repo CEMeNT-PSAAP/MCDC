@@ -19,7 +19,7 @@ The flow has three major processing stages:
 #. **Runtime preparation** converts the compiled model into the structured ``simulation`` state and flat ``data`` array consumed by transport.
    :doc:`runtime_data_layout` explains this numerical representation and its generated access helpers, ``mcdc_get`` and ``mcdc_set``.
 #. **Transport execution** runs the common, adaptable transport implementation in the selected execution mode.
-   :doc:`python_numba_cpu_execution` describes Python and Numba-CPU execution, while :doc:`numba_gpu_execution` continues into GPU code generation, memory placement, and Harmonize scheduling.
+   :doc:`transport_execution` explains how Python, Numba-CPU, and Numba-GPU execute it, including GPU code generation, memory placement, and Harmonize scheduling.
 
 Visit :doc:`python_first_numba_accelerated_design` for the rationale, boundaries, and tradeoffs that shape MC/DC's architecture.
 It explains why method development begins in unrestricted Python mode and may progress through Numba-CPU to Numba-GPU.
@@ -72,7 +72,7 @@ The ``numba_layers_generator.py``, runtime ``simulation`` and ``data``, and gene
 :doc:`runtime_data_layout` explains their roles.
 
 The ``mcdc/transport`` package implements the shared-transport stage.
-:doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution` explain how the execution modes run it.
+:doc:`transport_execution` explains how the execution modes run it.
 :doc:`../extending/writing_numba_compatible_transport_code` provides practical rules for extending its algorithms.
 
 .. toctree::
@@ -82,5 +82,4 @@ The ``mcdc/transport`` package implements the shared-transport stage.
    python_first_numba_accelerated_design
    simulation_compilation
    runtime_data_layout
-   python_numba_cpu_execution
-   numba_gpu_execution
+   transport_execution

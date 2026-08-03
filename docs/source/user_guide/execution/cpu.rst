@@ -12,7 +12,7 @@ MPI can be quite tricky to configure if on an HPC; if you're having trouble,
 consult our :ref:`installation`, your HPC admin, or our `GitHub issues page <https://github.com/mcdc-project/mcdc/issues>`_.
 
 For the architectural relationship between Python and Numba-CPU execution, see
-:doc:`../../developer_guide/architecture/python_numba_cpu_execution`.
+:doc:`../../developer_guide/architecture/transport_execution`.
 
 Pure Python Mode
 ----------------

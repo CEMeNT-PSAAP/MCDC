@@ -237,5 +237,4 @@ Changing the prepared MC/DC model requires a new model compilation and runtime p
 Execution Backends
 ------------------
 
-Continue with :doc:`python_numba_cpu_execution` to see how Python mode and Numba-CPU mode consume this shared layout.
-GPU allocation and Harmonize integration are described in :doc:`numba_gpu_execution`.
+Continue with :doc:`transport_execution` to see how Python, Numba-CPU, and Numba-GPU consume this shared layout.

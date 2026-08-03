@@ -11,7 +11,7 @@ Harmonize acts as the GPU runtime for MC/DC and has two major scheduling schemes
 For more information on Harmonize and how we compile MC/DC with it see our publications in M&C 2025.
 
 For the developer-level compilation and runtime design, see
-:doc:`../../developer_guide/architecture/numba_gpu_execution`.
+:doc:`../../developer_guide/architecture/transport_execution`.
 
 Single GPU Launches
 -------------------

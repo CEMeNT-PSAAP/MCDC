@@ -67,14 +67,14 @@ Numba-CPU Compilation
 
 Once the method is verified and larger calculations require more performance, it can be adapted for Numba-CPU.
 Unless the Python implementation was already written against the compatible subset, reaching this stage requires deliberate porting rather than simply changing an execution option.
-See :doc:`python_numba_cpu_execution` for the execution path and :doc:`../extending/writing_numba_compatible_transport_code` for the practical porting requirements.
+See :doc:`transport_execution` for the execution architecture and :doc:`../extending/writing_numba_compatible_transport_code` for the practical porting requirements.
 
 Numba-GPU Compilation
 ^^^^^^^^^^^^^^^^^^^^^
 
 GPU execution is a further stage with additional hardware constraints.
 Some code that works with Numba-CPU therefore requires further adaptation before it can execute on a GPU.
-These additional layers are described in :doc:`numba_gpu_execution`.
+These additional layers are described in :doc:`transport_execution`.
 
 Valid Stopping Points
 ^^^^^^^^^^^^^^^^^^^^^
@@ -121,7 +121,7 @@ What changes between development stages is how transport runs and which Python f
 Model construction and preparation may use object-oriented interfaces, variable-length collections, validation, and other expressive Python features.
 Transport in the Python backend may also use ordinary Python facilities beyond the prepared execution data.
 The accelerated backends require predictable numerical data and explicit behavior.
-See :doc:`simulation_compilation` and :doc:`runtime_data_layout` for the two preparation stages, then :doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution` for backend execution.
+See :doc:`simulation_compilation` and :doc:`runtime_data_layout` for the two preparation stages, then :doc:`transport_execution` for execution.
 
 Architectural Consequences
 --------------------------
@@ -140,7 +140,7 @@ Contributor guidance belongs in :doc:`../extending/writing_numba_compatible_tran
 
 **CPU and GPU share a portable core.**
 Common transport algorithms use behavior supported by both accelerated targets, while hardware-specific concerns remain isolated.
-The two execution paths are described in :doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution`.
+The execution modes are described in :doc:`transport_execution`.
 
 Design Tradeoffs
 ----------------
@@ -153,7 +153,7 @@ Beginning with simple numerical data and operations that Numba supports can redu
 
 Portability also increases compiler, backend, and validation work.
 MC/DC accepts these costs so that maintained features can share transport logic across Python, CPU, and GPU execution rather than becoming separate implementations that may drift apart.
-Practical constraints are covered in :doc:`../extending/writing_numba_compatible_transport_code`; backend-specific costs are covered in :doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution`.
+Practical constraints are covered in :doc:`../extending/writing_numba_compatible_transport_code`; mode-specific execution mechanisms are covered in :doc:`transport_execution`.
 
 Related Design Choices
 ----------------------
@@ -187,5 +187,5 @@ Where to Go Next
 ----------------
 
 For model preparation, continue with :doc:`simulation_compilation` and :doc:`runtime_data_layout`.
-For execution, read :doc:`python_numba_cpu_execution` and :doc:`numba_gpu_execution`.
+For execution, read :doc:`transport_execution`.
 Contributors implementing a transport change should use :doc:`../extending/writing_numba_compatible_transport_code`.

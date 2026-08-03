@@ -1,25 +1,32 @@
-.. _numba_gpu_execution:
+.. _transport_execution:
 
 ===================
-Numba-GPU Execution
+Transport Execution
 ===================
 
-GPU execution is the final layer in MC/DC's execution model.
-MC/DC first compiles the Python model and creates the same logical runtime representation used on the CPU.
-It then adapts the transport functions for device execution, allocates or transfers runtime state, and uses Harmonize to schedule particle work.
+MC/DC uses one adaptable transport implementation with the runtime representation described in :doc:`runtime_data_layout`.
+The selected execution mode determines how that implementation runs after the common model-preparation stages.
+See :doc:`python_first_numba_accelerated_design` for the rationale behind this design.
 
-Read :doc:`simulation_compilation`, :doc:`runtime_data_layout`, and :doc:`python_numba_cpu_execution` first.
-This page focuses on the additional GPU-specific compilation and runtime machinery.
+Execution Modes
+---------------
+
+In **Python mode**, MC/DC disables Numba just-in-time (JIT) compilation, and functions decorated with ``@njit`` execute as ordinary Python functions.
+This mode provides the most inspectable execution of the shared transport implementation.
+
+In **Numba-CPU mode**, Numba specializes those transport functions for the prepared runtime types and compiles them into machine code for the host CPU.
+The first call includes compilation work, while subsequent calls use the compiled functions.
+
+In **Numba-GPU mode**, MC/DC adapts the transport functions for device execution, places runtime state in GPU-accessible memory, and uses Harmonize to schedule particle work.
+The remaining sections describe this additional GPU-specific compilation machinery.
+
+Contributor-facing constraints, porting guidance, and staged verification are discussed in in :doc:`../extending/writing_numba_compatible_transport_code`.
+Operational commands are detailed in the :doc:`../../user_guide/execution/index`.
 
 GPU Compilation
 ---------------
 
 When targeting GPUs, MC/DC functions are just-in-time (JIT) compiled with Numba and integrated with Harmonize.
-A GPU run selects Numba mode and the GPU target:
-
-.. code-block:: sh
-
-   python input.py --mode=numba --target=gpu
 
 When considered in totality the MC/DC+Numba+Harmonize JIT compilation structure is akin to "portability framework", in that it allows dynamic targeting and developer abstraction of hardware architectures, like OpenMP target-offloading used by OpenMC.
 This JIT compilation process allows MC/DC to pair the idea of a portability framework with a high-level language in an effort to enable more rapid methods development on Exascale systems.
