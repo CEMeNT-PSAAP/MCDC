@@ -37,7 +37,7 @@ This supports several project goals:
 - Common transport interfaces provide a shared foundation for CPU and GPU execution, with backend-specific adaptation where the hardware requires it.
 
 The choice therefore preserves an expressive starting point while providing a path to compiled execution.
-It also introduces the constraints discussed in the remainder of this page.
+Those goals introduce the constraints discussed below.
 
 Staged Methods Development
 --------------------------
@@ -132,11 +132,11 @@ Preparing a method for acceleration narrows the freedom available inside transpo
 Python objects remain the natural way to describe a problem, but accelerated transport operates on a numerical representation prepared for one simulation.
 MC/DC therefore replaces Python's implicit object machinery with a purpose-built runtime object model based on structured records, simulation-local IDs, offsets, and generated accessors.
 Mutable runtime records are passed in one-element array containers, providing stable shared storage across Python, Numba-CPU, and Numba-GPU execution.
-The transformation is covered in :doc:`simulation_compilation` and :doc:`runtime_data_layout`.
+See :doc:`simulation_compilation` and :doc:`runtime_data_layout` for this transformation.
 
 **Transport behavior becomes explicit.**
 Dynamic Python techniques that are useful during prototyping must be expressed in forms the compiler can understand when the method is accelerated.
-Contributor guidance belongs in :doc:`../extending/writing_numba_compatible_transport_code` and :doc:`../extending/extending_the_object_model`.
+Use :doc:`../extending/writing_numba_compatible_transport_code` and :doc:`../extending/extending_the_object_model` when implementing these changes.
 
 **CPU and GPU share a portable core.**
 Common transport algorithms use behavior supported by both accelerated targets, while hardware-specific concerns remain isolated.
@@ -153,7 +153,7 @@ Beginning with simple numerical data and operations that Numba supports can redu
 
 Portability also increases compiler, backend, and validation work.
 MC/DC accepts these costs so that maintained features can share transport logic across Python, CPU, and GPU execution rather than becoming separate implementations that may drift apart.
-Practical constraints are covered in :doc:`../extending/writing_numba_compatible_transport_code`; mode-specific execution mechanisms are covered in :doc:`transport_execution`.
+Use :doc:`../extending/writing_numba_compatible_transport_code` for practical constraints and :doc:`transport_execution` for mode-specific execution mechanisms.
 
 Related Design Choices
 ----------------------

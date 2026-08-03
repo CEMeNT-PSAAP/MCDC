@@ -5,9 +5,8 @@ Writing Numba-Compatible Transport Code
 =======================================
 
 Use this page when verified Python transport behavior is being prepared for Numba-CPU, Numba-GPU, and long-term maintenance in MC/DC.
-The development rationale and execution mechanisms belong in :doc:`../architecture/python_first_numba_accelerated_design` and :doc:`../architecture/transport_execution`.
+Read :doc:`../architecture/python_first_numba_accelerated_design` for the development rationale and :doc:`../architecture/transport_execution` for the execution mechanisms.
 If the change introduces new model state, begin with :doc:`extending_the_object_model`.
-The rules below start at the portability boundary and do not restrict temporary Python-only exploration.
 
 Choose the Host or Transport Layer
 ----------------------------------
@@ -231,7 +230,7 @@ When a change fails, isolate the layer:
 Do not begin by diagnosing a GPU compiler error if the same calculation is already incorrect in Python.
 Conversely, a passing Python test does not prove that the function is type-stable or device compatible.
 
-For example, an unexpected physical result in Python belongs in the Python transport layer, a Numba ``TypingError`` belongs in Numba-CPU porting, and a device-link or unsupported-atomic error belongs in the Numba-GPU layer.
+For example, investigate an unexpected physical result in Python transport, a Numba ``TypingError`` during Numba-CPU porting, and a device-link or unsupported-atomic error in the Numba-GPU layer.
 
 Verification Checklist
 ----------------------
@@ -247,5 +246,5 @@ Before considering a transport extension complete:
 - Existing examples still construct successfully when the public API or model compilation changed.
 - User and developer documentation describe any new behavior or limitation.
 
-Repository commands, continuous-integration coverage, and regression-test options belong in the :doc:`../../contributing/index`.
+Use the :doc:`../../contributing/index` for repository commands, continuous-integration coverage, and regression-test options.
 For changes affecting public inputs, follow :doc:`../../contributing/example_validation`.

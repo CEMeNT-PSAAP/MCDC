@@ -20,30 +20,27 @@ The first call includes compilation work, while subsequent calls use the compile
 In **Numba-GPU mode**, MC/DC adapts the transport functions for device execution, places runtime state in GPU-accessible memory, and uses Harmonize to schedule particle work.
 The remaining sections describe this additional GPU-specific compilation machinery.
 
-Contributor-facing constraints, porting guidance, and staged verification are discussed in in :doc:`../extending/writing_numba_compatible_transport_code`.
-Operational commands are detailed in the :doc:`../../user_guide/execution/index`.
+Use :doc:`../extending/writing_numba_compatible_transport_code` for contributor constraints, porting guidance, and staged verification.
+Use the :doc:`../../user_guide/execution/index` for operational commands.
 
 GPU Compilation
 ---------------
 
 When targeting GPUs, MC/DC functions are just-in-time (JIT) compiled with Numba and integrated with Harmonize.
 
-When considered in totality the MC/DC+Numba+Harmonize JIT compilation structure is akin to "portability framework", in that it allows dynamic targeting and developer abstraction of hardware architectures, like OpenMP target-offloading used by OpenMC.
-This JIT compilation process allows MC/DC to pair the idea of a portability framework with a high-level language in an effort to enable more rapid methods development on Exascale systems.
+Together, MC/DC, Numba, and Harmonize form a JIT portability framework that dynamically targets different hardware architectures.
+This framework combines hardware portability with high-level Python methods development for exascale systems.
 
-Monte Carlo transport functions from MC/DC are treated as device functions with global, host, and additional device functions coming from Harmonize.
-Mixing codes from various sources (Python and C++) requires the user to provide an *exacting* set of compiler options to achieve an operable executable.
-We provide in-depth descriptions of these sets of commands as we found the definition of this JIT compilation process one of the most difficult parts to get the MC/DC+Harmonize software engineering structure operable.
-
-To examine the compilation strategy in-depth, a simple proxy problem is provided in Figures figcodenvcc and figcodeclang.
-The figures show a simple Python function that does integer addition on a provided value (representing MC/DC transport operations) and a C++ snippet (representing Harmonize) showing first the declaration of an extern device function (eventually coming from Python) and a global function which will act as the GPU runtime for our Python device function.
-Note that for the operability of these examples, extra functions are required in ``dep.cpp`` and ``add_one.py`` but are truncated for brevity.
+MC/DC transport functions become device functions, while Harmonize supplies the associated global, host, and additional device functions.
+Linking device code generated from Python with the C++ Harmonize runtime requires an exact set of compiler options.
+The NVIDIA and AMD proxy examples below demonstrate this process with a Python integer-addition function representing MC/DC transport and a C++ declaration and global function representing Harmonize.
+Supporting functions in ``dep.cpp`` and ``add_one.py`` are omitted from the illustrations.
 
 --------------
 Nvidia Targets
 --------------
 
-To compile to Nvidia GPU hardware-targets at runtime, we rely entirely on the Nvidia C-Compiler (`nvcc`).
+MC/DC uses Numba to produce PTX and the NVIDIA CUDA compiler (``nvcc``) for NVIDIA device compilation and linking.
 Current versions of Numba come with CUDA operability natively, but this is set to be deprecated in future releases in favor of a more modular approach where the Numba-CUDA package will be an optional separate feature.
 
 .. image:: ../../images/developer_guide/architecture/numba_gpu_nvidia_flow.png
@@ -55,7 +52,7 @@ Current versions of Numba come with CUDA operability natively, but this is set t
 Simple proxy example describing how to compile device functions in Numba-Python with external C++ code for targeting Nvidia GPUs.
 In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize
 
-We begin by
+The NVIDIA compilation sequence is:
 
 #. Compiling Python device code to Nvidia PTX by ``numba.cuda.compile_ptx_for_current_device`` (which requires typed function signatures), then place that output into ``add_one.ptx`` file; next
 #. Compiling PTX to relocatable device code using ``nvcc -rdc=true -dc -arch=<arch> --cudart shared --compiler-options -fPIC add.ptx -o add.o`` where ``-dc`` asks the compiler for device code, ``-rdc`` asks to make that device code relocatable, ``--cudart shared`` asks for shared CUDA runtime libraries and ``-fPIC`` generates position-independent code;
@@ -73,8 +70,8 @@ AMD Targets
 
 Just in time compilation and execution to AMD devices are enabled as of `MC/DC v0.11.0 <https://github.com/mcdc-project/mcdc/tree/v0.11.0>`_.
 Significant adaptations from the process of Nvidia compilation are required to target AMD GPUs.
-PTX is a proprietary Nvidia standard, so when targeting AMD GPUs, we rely on intermediate compiler representation (IR) from LLVM for an AMD GPU hardware-target (also called an LLVM target triple).
-AMD's compiler toolchain is based in the LLVM-Clang ecosystem, so we will be calling LLVM-Clang-based tools (e.g., ``hipcc`` is a wrapper function for ``clang``).
+PTX is a proprietary NVIDIA standard, so AMD targets use an LLVM intermediate representation (IR) generated for the selected AMD GPU target triple.
+AMD's compiler toolchain is based on LLVM and Clang, and MC/DC invokes tools such as ``hipcc``, which wraps ``clang``.
 Note that while the LLVM-Clang commands are generic, AMD variations of compilers, linkers, etc. must be invoked.
 For example, to invoke the correct Clang compiler point to the ROCm installed variation (often on LinuxOS at ``opt/rocm/llvm/bin/clang``).
 
@@ -84,11 +81,11 @@ As this patch is a port of AMD's Heterogeneous-computing Interface for Portabili
 The Numba-HIP development team has gone as far as to provide a ``numba.hip.pose_as_cuda()`` function, which, after being called in Python script, will alias all supported Numba-CUDA functions to Numba-HIP ones and compile/run automatically.
 
 
-When moving to compile and execute full MC/DC+Harmonize, we must again enable the compilation of device functions from Numba-HIP and device, global, and host functions from C++.
-To show that process, we again explore a simple proxy application shown in figure fig:codeclang where a Numba-HIP function adds one to an integer value and a C++ function declares an extern function by the same name and runs that function for all values of an array.
+Full MC/DC+Harmonize compilation combines device functions from Numba-HIP with device, global, and host functions from C++.
+The AMD proxy example pairs a Numba-HIP integer-addition function with a C++ declaration and global function that applies it to an array.
 
 Every GPU program is technically a bound set of two complementary applications: one that runs on the host side (CPU) and the other on the device side (GPU), with global functions linking them together.
-To link external device code together for AMD hardware-targets, we have to unbundle these two programs, link the extra device functions (coming from Python) to the device side, then re-bundle the device and host functions back together.
+Linking external device code for AMD hardware requires unbundling the host and device programs, linking the Python-generated functions into the device program, and rebundling both programs.
 This process is done in LLVM-IR.
 
 .. image:: ../../images/developer_guide/architecture/numba_gpu_amd_flow.png
@@ -100,7 +97,7 @@ Simple proxy example describing how to compile device functions in Numba-HIP wit
 In this simplified proxy, the Python function corresponds to MC/DC, and the C++ code corresponds to Harmonize
 
 Figure fig:codeclang shows the compilation structure.
-We begin compilation by
+The AMD compilation sequence is:
 
 #. Compiling C++ source in ``dep.cpp`` to LLVM-IR with host and device code bundled together with ``hipcc -c -fgpu-rdc -S -emit-llvm -o dep.ll -x hip dep.cpp -g`` where ``-fgpu-rdc`` asks the compiler for relocatable device code ``-emit-llvm`` requests the LLVM-IR, ``-c`` only runs preprocess, compile, and assemble steps, and ``-x hip`` specifies that ``dep.cpp`` is HIP code;
 #. Unbundling the LLVM-IR:
@@ -115,5 +112,5 @@ We begin compilation by
 
 As in the Nvidia compilation, non-implemented functions can be brought into the final program via the C++ source.
 This was required for MC/DC on AMD GPUs as vector operable atomics are not currently implemented in the Numba HIP port and thus must come from the C++ side.
-We hope that these more generic adaptations (relying on LLVM-Clang infrastructure instead of CUDA) will allow for greater extensibility as we move to target future accelerator platforms---namely, Intel GPUs.
-For compilation to Nvidia hardware-targets, we will still keep the PTX-based compilation structure.
+The LLVM-Clang-based path is designed to remain extensible to future accelerator platforms, including Intel GPUs.
+NVIDIA compilation continues to use the PTX-based path.

@@ -40,7 +40,7 @@ Choose the narrowest extension that represents the new concept:
      - Add a concrete ``MeshBase`` representation.
 
 Prefer adding a subtype to an existing polymorphic family over creating a new registered category when the new object has the same conceptual role.
-A new tally estimator, for example, belongs under ``Tally``; it does not need an unrelated top-level registry.
+For example, implement a new tally estimator as a ``Tally`` subtype.
 
 The Common Class Contract
 -------------------------
@@ -349,8 +349,8 @@ For a user-facing class or constructor:
 #. Document parameters, units, defaults, constraints, and at least one usable example in the class docstring.
 #. Update the User Guide when the extension changes how users construct or run a model.
 
-Internal helper classes should remain under ``mcdc.object_`` and should not be exported merely to make discovery work.
-Import them explicitly in the compilation path instead.
+Keep internal helper classes under ``mcdc.object_`` and import them explicitly in the compilation path.
+Export only classes that form part of the public API.
 
 For example, a public ``Detector`` is re-exported from the package and listed by its qualified name in the API autosummary:
 
