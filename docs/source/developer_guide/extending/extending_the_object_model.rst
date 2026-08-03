@@ -91,7 +91,7 @@ Initialization
    List Python-only fields that should not be traversed or packed automatically.
    The class must explicitly convert any required information from those fields into annotated runtime-visible fields before packing.
 
-   For example, ``Cell`` keeps its expressive ``region`` and ``fill`` objects on the Python side, then derives RPN tokens and a fill ID for transport:
+   For example, ``Cell`` keeps its expressive ``region`` and ``fill`` objects on the Python side, then derives RPN tokens, a fill-type code, and a fill ID for transport:
 
    .. code-block:: python
 
@@ -100,6 +100,7 @@ Initialization
       region: Region
       fill: MaterialBase | Universe | Lattice | None
       region_RPN_tokens: list[int]
+      fill_type: int
       fill_ID: int
 
 Compilation hook
