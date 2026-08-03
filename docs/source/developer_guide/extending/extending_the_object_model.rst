@@ -5,8 +5,7 @@ Extending the Object Model
 ==========================
 
 Use this page when an extension changes a model class, introduces runtime-visible state, or adds a registered or polymorphic object type.
-It assumes the hierarchy and data representation described in :doc:`../architecture/simulation_compilation` and :doc:`../architecture/runtime_data_layout`.
-The guidance below applies those designs as implementation recipes instead of restating them.
+It assumes the hierarchy and data representation described in :doc:`../architecture/simulation_compilation` and :doc:`../architecture/runtime_data_layout` and applies those designs as implementation recipes.
 
 When the new state is consumed during particle transport, continue with :doc:`writing_numba_compatible_transport_code` for type, dispatch, allocation, CPU/GPU compatibility, and verification guidance.
 
