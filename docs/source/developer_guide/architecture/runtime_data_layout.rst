@@ -4,7 +4,7 @@
 Runtime Data Layout
 ===================
 
-After model compilation has discovered and ordered the Python object graph, ``mcdc.main.prepare`` creates the runtime representation used by transport.
+After model compilation has discovered and ordered the Python object graph, ``mcdc.main.prepare`` calls ``generate_numba_layers`` in ``mcdc.code_factory`` to create the runtime representation used by transport.
 The representation has two complementary parts:
 
 ``simulation``
@@ -14,7 +14,6 @@ The representation has two complementary parts:
    A contiguous one-dimensional NumPy array containing variable-length numerical payloads and lists of object IDs.
 
 The same logical representation is supplied to Python, Numba-CPU, and Numba-GPU execution.
-It should therefore be understood as MC/DC's transport runtime model, not as a separate Numba-only model.
 During Python-only prototyping, transport code may also access arbitrary Python state alongside this representation.
 A method intended for portable, maintained execution must express the state required by transport through the prepared representation.
 See :doc:`python_first_numba_accelerated_design` for this development model.
@@ -23,18 +22,24 @@ Why Two Structures?
 -------------------
 
 Python model objects may contain arrays whose sizes depend on the problem: energy grids, cross sections, mesh boundaries, motion tables, tally filters, and many others.
-Nested Python references and arbitrary array shapes cannot be embedded directly in a stable structured dtype.
+Nested Python object references and variable-sized arrays cannot be embedded directly in the stable NumPy structured dtype required by the Numba execution modes.
 
 MC/DC separates fixed-layout metadata from variable-length values:
 
 .. image:: ../../images/developer_guide/architecture/runtime_data_layout.png
    :width: 100%
-   :alt: A cell, its boundary surfaces, and a surface-crossing tally become connected runtime records whose variable-length fields are stored in a flat data array.
+   :alt: Runtime preparation turns a cell, its three boundary surfaces, and a surface-crossing tally into structured records whose metadata points into a flat data array through generated accessors.
+
+The figure follows one connected example from Python model objects into the two runtime layers.
+The cell record locates its three surface IDs in ``data``, the selected surface record locates an attached tally ID, and the base tally record identifies its concrete surface-crossing record.
+Tally scores, bins, and other variable-length payloads share the same flat arena.
+Generated ``mcdc_get`` and ``mcdc_set`` accessors translate logical field access into the required offset calculation.
+The IDs and offsets shown in the figure are illustrative; their values depend on the compiled model and its packed layout.
 
 An Explicit Runtime Object Model
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-At a high level, MC/DC's prepared representation recreates machinery that an object system normally provides behind a class interface.
+Together, the structured records, flat data arena, and generated accessors form an explicit runtime object model.
 A conventional object runtime stores fixed fields with the object while references point to separately allocated objects and variable-length values.
 Accessing an attribute follows those references without requiring application code to know where the referenced memory resides.
 
@@ -46,7 +51,7 @@ Seen narrowly, this design reinvents facilities already supplied by Python and o
 MC/DC derives schemas, assigns object identities, packs values, represents relationships, dispatches among concrete representations, and generates field accessors.
 Maintaining this machinery adds implementation complexity and requires MC/DC to define rules that an ordinary class system would otherwise manage automatically.
 
-The duplication is necessary because the Python object model does not satisfy MC/DC's execution requirements.
+The duplication is necessary because the Python object model does not satisfy Numba execution requirements.
 Python objects may contain interpreter-managed references, dynamic types, arbitrary inheritance behavior, and separately allocated containers that Numba cannot generally compile or transfer to an accelerator.
 Host pointers also cannot serve as portable references to state allocated in a GPU address space.
 MC/DC instead needs a complete representation with predictable types, explicit ownership, stable relationships, and equivalent access patterns across Python, Numba-CPU, and Numba-GPU execution.
@@ -63,8 +68,7 @@ Object Collections
 ^^^^^^^^^^^^^^^^^^
 
 Registered model objects are stored in collections on ``simulation``.
-The figure follows a cell, its boundary surfaces, and a surface-crossing tally.
-It demonstrates both forms of runtime collection.
+The figure demonstrates both forms of runtime collection: direct indexing for non-polymorphic objects and base-to-concrete dispatch for polymorphic objects.
 
 For a non-polymorphic category, an object's simulation-local ID directly indexes its collection.
 A particle's current cell and one of its boundary surfaces are therefore retrieved with:
@@ -84,15 +88,12 @@ Each ID first selects a base tally record, whose ``sub_type`` and ``sub_ID`` ide
    from mcdc.constant import TALLY_SURFACE_CROSSING
 
 
-   tally_ID = int(
-       mcdc_get.surface.surface_crossing_tally_IDs(0, surface, data)
-   )
+   tally_ID = int(mcdc_get.surface.surface_crossing_tally_IDs(0, surface, data))
    tally = simulation["tallies"][tally_ID]
 
-   if tally["sub_type"] == TALLY_SURFACE_CROSSING:
-       surface_crossing_tally = simulation["surface_crossing_tallies"][
-           tally["sub_ID"]
-       ]
+   tally["sub_type"] == TALLY_SURFACE_CROSSING  # True
+
+   surface_crossing_tally = simulation["surface_crossing_tallies"][tally["sub_ID"]]
 
 The concrete tally record retains ``surface_filter_ID`` and ``cell_filter_ID``, connecting it back to the selected surface and cell.
 All IDs are assigned during model compilation and identify objects only within the current simulation snapshot.
@@ -101,18 +102,22 @@ The hierarchy and ID assignment are described in :doc:`simulation_compilation`.
 Variable-Length Fields
 ^^^^^^^^^^^^^^^^^^^^^^
 
-For a variable-length list such as a cell's boundary surfaces, the cell record stores values equivalent to:
+Using the illustrative values in the figure, the cell and selected surface records store metadata equivalent to:
 
 .. code-block:: text
 
-   surface_IDs_offset = 120
-   N_surface = 2
+   cell.surface_IDs_offset = 0
+   cell.N_surface = 3
 
-and the two surface IDs occupy:
+   surface.surface_crossing_tally_IDs_offset = 3
+   surface.N_surface_crossing_tally = 1
+
+The corresponding ID lists occupy adjacent regions of ``data`` in the simplified layout:
 
 .. code-block:: text
 
-   data[120:122]
+   data[0:3] = [0, 1, 2]  # Cell's surface IDs
+   data[3:4] = [0]        # Surface's tally ID
 
 For multidimensional arrays, annotated shape metadata supplies the strides used to reconstruct logical indexing.
 The payload itself is flattened when packed.
