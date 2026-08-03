@@ -129,9 +129,7 @@ def inspect_geometry(particle_container, simulation, data):
                 if ix == -1 or iy == -1 or iz == -1:
                     event = EVENT_LOST
                     continue
-                universe_ID = int(
-                    mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
-                )
+                universe_ID = mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
 
                 # Lattice-translate the particle
                 particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
@@ -239,9 +237,7 @@ def locate_particle(particle_container, simulation, data):
                 if ix == -1 or iy == -1 or iz == -1:
                     particle_is_lost = True
                     continue
-                universe_ID = int(
-                    mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
-                )
+                universe_ID = mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
 
                 # Lattice-translate the particle
                 particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
@@ -347,7 +343,7 @@ def get_cell(particle_container, universe_ID, simulation, data):
 
     # Check over all cells in the universe
     for i in range(universe["N_cell"]):
-        cell_ID = int(mcdc_get.universe.cell_IDs(i, universe, data))
+        cell_ID = mcdc_get.universe.cell_IDs(i, universe, data)
         cell = simulation["cells"][cell_ID]
         if check_cell(particle_container, cell, simulation, data):
             return cell_ID
@@ -377,7 +373,7 @@ def check_cell(particle_container, cell, simulation, data):
 
     # March forward through RPN tokens
     for idx in range(N_token):
-        token = int(mcdc_get.cell.region_RPN_tokens(idx, cell, data))
+        token = mcdc_get.cell.region_RPN_tokens(idx, cell, data)
 
         if token >= 0:
             surface = simulation["surfaces"][token]
@@ -435,7 +431,7 @@ def distance_to_nearest_surface(particle_container, cell, simulation, data):
 
     # Iterate over all surfaces and find the minimum distance
     for i in range(cell["N_surface"]):
-        candidate_surface_ID = int(mcdc_get.cell.surface_IDs(i, cell, data))
+        candidate_surface_ID = mcdc_get.cell.surface_IDs(i, cell, data)
         surface = simulation["surfaces"][candidate_surface_ID]
         d = get_distance(particle_container, speed, surface, data)
         if d < distance:

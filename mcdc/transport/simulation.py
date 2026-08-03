@@ -301,7 +301,7 @@ def step_particle(particle_container, program, data):
         if simulation["cycle_active"]:
             cell = simulation["cells"][particle["cell_ID"]]
             for i in range(cell["N_collision_tally"]):
-                tally_ID = int(mcdc_get.cell.collision_tally_IDs(i, cell, data))
+                tally_ID = mcdc_get.cell.collision_tally_IDs(i, cell, data)
                 tally = simulation["tallies"][tally_ID]
                 tally_module.score.collision(
                     particle_container,
@@ -430,7 +430,7 @@ def move_to_event(particle_container, simulation, data):
     if simulation["cycle_active"]:
         cell = simulation["cells"][particle["cell_ID"]]
         for i in range(cell["N_tracklength_tally"]):
-            tally_ID = int(mcdc_get.cell.tracklength_tally_IDs(i, cell, data))
+            tally_ID = mcdc_get.cell.tracklength_tally_IDs(i, cell, data)
             tally = simulation["tallies"][tally_ID]
             tally_module.score.tracklength(
                 particle_container, distance, tally, simulation, data
@@ -462,7 +462,7 @@ def surface_crossing(particle_container, simulation, data):
 
     # Score tally
     for i in range(surface["N_surface_crossing_tally"]):
-        tally_ID = int(mcdc_get.surface.surface_crossing_tally_IDs(i, surface, data))
+        tally_ID = mcdc_get.surface.surface_crossing_tally_IDs(i, surface, data)
         tally = simulation["tallies"][tally_ID]
         tally_module.score.surface_crossing(
             particle_container, surface, tally, simulation, data

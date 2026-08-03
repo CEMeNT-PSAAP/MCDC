@@ -58,7 +58,7 @@ MC/DC instead needs a complete representation with predictable types, explicit o
 
 The current single ``float64`` data arena is a simplifying choice within this design rather than an inherent requirement of an explicit runtime object model.
 It gives MC/DC one variable-length allocation, one offset space, and consistent function signatures across execution modes.
-Integer values stored in the arena, including lists of object IDs, are exactly representable for practical MC/DC model sizes but must be cast back to integers when accessed.
+Integer values stored in the arena, including lists of object IDs, are exactly representable for practical MC/DC model sizes, and generated scalar getters cast them back to integers when accessed.
 Separate typed arenas could preserve integer types and avoid those conversions, but would introduce additional allocations, offsets, generated accessors, function arguments, and GPU memory management.
 
 MC/DC's implementation should therefore be viewed neither as an ordinary Python class layout nor as a general-purpose replacement for one.
@@ -76,7 +76,7 @@ A particle's current cell and one of its boundary surfaces are therefore retriev
 .. code-block:: python
 
    cell = simulation["cells"][particle["cell_ID"]]
-   surface_ID = int(mcdc_get.cell.surface_IDs(0, cell, data))
+   surface_ID = mcdc_get.cell.surface_IDs(0, cell, data)
    surface = simulation["surfaces"][surface_ID]
 
 A polymorphic category has both a common base collection and a collection for each concrete representation.
@@ -88,7 +88,7 @@ Each ID first selects a base tally record, whose ``sub_type`` and ``sub_ID`` ide
    from mcdc.constant import TALLY_SURFACE_CROSSING
 
 
-   tally_ID = int(mcdc_get.surface.surface_crossing_tally_IDs(0, surface, data))
+   tally_ID = mcdc_get.surface.surface_crossing_tally_IDs(0, surface, data)
    tally = simulation["tallies"][tally_ID]
 
    tally["sub_type"] == TALLY_SURFACE_CROSSING  # True
@@ -150,15 +150,18 @@ Conceptually, a generated element getter for the cell's surface IDs performs:
 
 .. code-block:: python
 
+   from numpy import int64
+
+
    def surface_IDs(index, cell, data):
        offset = cell["surface_IDs_offset"]
-       return data[offset + index]
+       return int64(data[offset + index])
 
 Transport code can therefore express logical access without depending on where the values reside in ``data``:
 
 .. code-block:: python
 
-   surface_ID = int(mcdc_get.cell.surface_IDs(index, cell, data))
+   surface_ID = mcdc_get.cell.surface_IDs(index, cell, data)
 
 For ``move_velocities``, the generated accessor uses the fixed trailing dimension as the row stride and reconstructs logical two-dimensional indexing:
 
@@ -179,6 +182,8 @@ For ``mgxs_nu_d``, the generated element getter reads the named trailing dimensi
 
 In the row-major flattened layout, ``J`` determines the stride between energy groups, while ``G`` determines the number of rows.
 Generated helpers also provide operations for complete arrays, final elements, chunks, vectors, and multidimensional elements as appropriate.
+Scalar getters restore the integer type declared by an annotation or implied by an object-ID list.
+Bulk getters continue to return zero-copy ``float64`` views into ``data`` and therefore require explicit conversion when an integer array is needed outside transport.
 
 Deriving the Layout
 -------------------

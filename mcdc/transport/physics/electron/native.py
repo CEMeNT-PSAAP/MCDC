@@ -58,7 +58,7 @@ def macro_xs(reaction_type, particle_container, simulation, data):
 
     total = 0.0
     for i in range(material["N_element"]):
-        element_ID = int(mcdc_get.native_material.element_IDs(i, material, data))
+        element_ID = mcdc_get.native_material.element_IDs(i, material, data)
         element = simulation["elements"][element_ID]
 
         element_density = mcdc_get.native_material.element_densities(i, material, data)
@@ -136,7 +136,7 @@ def collision(particle_container, collision_data_container, program, data):
     xi = rng.lcg(particle_container) * SigmaT
     total = 0.0
     for i in range(material["N_element"]):
-        element_ID = int(mcdc_get.native_material.element_IDs(i, material, data))
+        element_ID = mcdc_get.native_material.element_IDs(i, material, data)
         element = simulation["elements"][element_ID]
 
         element_density = mcdc_get.native_material.element_densities(i, material, data)
@@ -168,8 +168,8 @@ def collision(particle_container, collision_data_container, program, data):
     if xi < total:
         total -= sigma_ionization
         for i in range(element["N_electron_ionization_reaction"]):
-            reaction_ID = int(
-                mcdc_get.element.electron_ionization_reaction_IDs(i, element, data)
+            reaction_ID = mcdc_get.element.electron_ionization_reaction_IDs(
+                i, element, data
             )
             reaction = simulation["electron_reactions"][reaction_ID]
             total += reaction_micro_xs(E, reaction, element, data)
@@ -190,10 +190,8 @@ def collision(particle_container, collision_data_container, program, data):
     if xi < total:
         total -= sigma_elastic
         for i in range(element["N_electron_elastic_scattering_reaction"]):
-            reaction_ID = int(
-                mcdc_get.element.electron_elastic_scattering_reaction_IDs(
-                    i, element, data
-                )
+            reaction_ID = mcdc_get.element.electron_elastic_scattering_reaction_IDs(
+                i, element, data
             )
             reaction = simulation["electron_reactions"][reaction_ID]
             total += reaction_micro_xs(E, reaction, element, data)
@@ -209,8 +207,8 @@ def collision(particle_container, collision_data_container, program, data):
     if xi < total:
         total -= sigma_bremsstrahlung
         for i in range(element["N_electron_bremsstrahlung_reaction"]):
-            reaction_ID = int(
-                mcdc_get.element.electron_bremsstrahlung_reaction_IDs(i, element, data)
+            reaction_ID = mcdc_get.element.electron_bremsstrahlung_reaction_IDs(
+                i, element, data
             )
             reaction = simulation["electron_reactions"][reaction_ID]
             total += reaction_micro_xs(E, reaction, element, data)
@@ -230,8 +228,8 @@ def collision(particle_container, collision_data_container, program, data):
     if xi < total:
         total -= sigma_excitation
         for i in range(element["N_electron_excitation_reaction"]):
-            reaction_ID = int(
-                mcdc_get.element.electron_excitation_reaction_IDs(i, element, data)
+            reaction_ID = mcdc_get.element.electron_excitation_reaction_IDs(
+                i, element, data
             )
             reaction = simulation["electron_reactions"][reaction_ID]
             total += reaction_micro_xs(E, reaction, element, data)
@@ -443,8 +441,8 @@ def sample_ionization(
     N = int(ionization["N_subshell"])
     total = 0.0
     for i in range(N):
-        xs_sub_ID = int(
-            mcdc_get.electron_ionization_reaction.subshell_x_IDs(i, ionization, data)
+        xs_sub_ID = mcdc_get.electron_ionization_reaction.subshell_x_IDs(
+            i, ionization, data
         )
         xs_sub_table = simulation["data"][xs_sub_ID]
         total += evaluate_data(E, xs_sub_table, simulation, data)
@@ -453,8 +451,8 @@ def sample_ionization(
     total_acc = 0.0
     chosen = 0
     for i in range(N):
-        xs_sub_ID = int(
-            mcdc_get.electron_ionization_reaction.subshell_x_IDs(i, ionization, data)
+        xs_sub_ID = mcdc_get.electron_ionization_reaction.subshell_x_IDs(
+            i, ionization, data
         )
         xs_sub_table = simulation["data"][xs_sub_ID]
         total_acc += evaluate_data(E, xs_sub_table, simulation, data)
@@ -473,10 +471,8 @@ def sample_ionization(
         return
 
     # Sample secondary energy
-    dist_ID = int(
-        mcdc_get.electron_ionization_reaction.subshell_product_IDs(
-            chosen, ionization, data
-        )
+    dist_ID = mcdc_get.electron_ionization_reaction.subshell_product_IDs(
+        chosen, ionization, data
     )
     T_dist = simulation["distributions"][dist_ID]
     T_delta = sample_distribution(E, T_dist, particle_container, simulation, data)
