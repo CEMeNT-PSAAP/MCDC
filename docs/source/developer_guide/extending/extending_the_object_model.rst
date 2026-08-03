@@ -57,7 +57,7 @@ Every MC/DC model class must follow the conventions used by the compiler and Num
           label = "structured_mesh"
 
 ``sub_type``
-   Give every concrete ``MCDCPolymorphic`` subclass a unique integer constant within its family.
+   Give every concrete ``MCDCPolymorphic`` subclass a unique named integer constant within its family.
    The shared base uses ``sub_type = -1``.
 
    .. code-block:: python
