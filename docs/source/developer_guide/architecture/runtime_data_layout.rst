@@ -119,8 +119,66 @@ The corresponding ID lists occupy adjacent regions of ``data`` in the simplified
    data[0:3] = [0, 1, 2]  # Cell's surface IDs
    data[3:4] = [0]        # Surface's tally ID
 
-For multidimensional arrays, annotated shape metadata supplies the strides used to reconstruct logical indexing.
-The payload itself is flattened when packed.
+Array Shapes and Generated Access
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Array shape annotations determine whether an array is embedded in a structured record or stored in ``data``.
+For example, ``Cell.translation`` has a completely fixed shape:
+
+.. code-block:: python
+
+   translation: Annotated[NDArray[float64], (3,)]
+
+Because every dimension is an integer literal, the three-component array is embedded directly in the cell record and accessed through ``cell["translation"]``.
+
+``Surface.move_velocities`` combines a model-dependent dimension with a fixed trailing dimension:
+
+.. code-block:: python
+
+   move_velocities: Annotated[NDArray[float64], ("N_move", 3)]
+
+The symbolic dimension ``N_move`` names the surface record field that supplies its size at runtime.
+Because that dimension depends on the model, the array is flattened into ``data``, and the surface record stores its offset and total length.
+Fully symbolic multidimensional arrays use the same mechanism.
+For example, ``mgxs_nu_d`` is shaped ``("G", "J")`` and uses the named energy-group and delayed-neutron-group dimensions to reconstruct indexing into its flattened payload.
+Generated accessors for arrays stored in ``data`` currently support array ranks from one through four dimensions.
+
+``mcdc.code_factory`` generates modules under ``mcdc/mcdc_get`` and ``mcdc/mcdc_set`` for fields stored in ``data``.
+These helpers hide offset and stride arithmetic from transport code and remain callable from both Python and Numba-compiled functions.
+
+Conceptually, a generated element getter for the cell's surface IDs performs:
+
+.. code-block:: python
+
+   def surface_IDs(index, cell, data):
+       offset = cell["surface_IDs_offset"]
+       return data[offset + index]
+
+Transport code can therefore express logical access without depending on where the values reside in ``data``:
+
+.. code-block:: python
+
+   surface_ID = int(mcdc_get.cell.surface_IDs(index, cell, data))
+
+For ``move_velocities``, the generated accessor uses the fixed trailing dimension as the row stride and reconstructs logical two-dimensional indexing:
+
+.. code-block:: python
+
+   velocity = mcdc_get.surface.move_velocities(
+       move_index, component_index, surface, data
+   )
+
+For ``mgxs_nu_d``, the generated element getter reads the named trailing dimension ``J`` from the material record and uses it as the runtime row stride:
+
+.. code-block:: python
+
+   def mgxs_nu_d(group, delayed_group, material, data):
+       offset = material["mgxs_nu_d_offset"]
+       stride = material["J"]
+       return data[offset + group * stride + delayed_group]
+
+In the row-major flattened layout, ``J`` determines the stride between energy groups, while ``G`` determines the number of rows.
+Generated helpers also provide operations for complete arrays, final elements, chunks, vectors, and multidimensional elements as appropriate.
 
 Deriving the Layout
 -------------------
@@ -154,29 +212,6 @@ The generated simulation record is stored in a one-element NumPy array:
 
 The container gives Python, Numba, MPI, and GPU paths a consistent mutable reference to the structured state.
 Transport drivers receive the container and ``data``; individual kernels generally operate on the record or its nested objects.
-
-Generated Access Helpers
-------------------------
-
-``mcdc.code_factory`` generates modules under ``mcdc/mcdc_get`` and ``mcdc/mcdc_set`` for variable-length fields.
-These helpers hide offset and stride arithmetic from transport code and remain callable from both Python and Numba-compiled functions.
-
-Conceptually, a generated element getter performs:
-
-.. code-block:: python
-
-   def surface_IDs(index, cell, data):
-       offset = cell["surface_IDs_offset"]
-       return data[offset + index]
-
-Generated helpers also provide operations for complete arrays, final elements, chunks, vectors, and multidimensional elements as appropriate.
-Transport code can therefore express logical access such as:
-
-.. code-block:: python
-
-   surface_ID = int(mcdc_get.cell.surface_IDs(index, cell, data))
-
-without depending on where that cell's surface IDs happen to reside in ``data``.
 
 Transport Consumption
 ---------------------
