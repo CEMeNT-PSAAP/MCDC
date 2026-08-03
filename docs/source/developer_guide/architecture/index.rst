@@ -6,7 +6,7 @@ Architecture
 
 Architecture documentation explains how MC/DC translates flexible Python model definitions into particle-transport execution:
 
-.. image:: ../../images/developer_guide/architecture/architecture_flow.svg
+.. image:: ../../images/developer_guide/architecture/architecture_flow.png
    :width: 100%
    :class: architecture-flow-figure
    :alt: MC/DC's architecture flow from model definition through simulation compilation and runtime preparation to shared transport, which runs with Python, Numba-CPU, or Numba-GPU execution modes.

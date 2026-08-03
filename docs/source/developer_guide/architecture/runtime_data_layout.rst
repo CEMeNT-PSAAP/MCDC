@@ -27,7 +27,7 @@ Nested Python references and arbitrary array shapes cannot be embedded directly 
 
 MC/DC separates fixed-layout metadata from variable-length values:
 
-.. image:: ../../images/developer_guide/architecture/runtime_data_layout.svg
+.. image:: ../../images/developer_guide/architecture/runtime_data_layout.png
    :width: 100%
    :alt: A cell, its boundary surfaces, and a surface-crossing tally become connected runtime records whose variable-length fields are stored in a flat data array.
 
