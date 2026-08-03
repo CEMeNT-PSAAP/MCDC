@@ -4,11 +4,9 @@
 Extending the Object Model
 ==========================
 
-MC/DC extensions normally begin as ordinary Python model objects, but an extension is complete only when its state and behavior are available in every required execution mode.
-This page describes how to extend the object model without breaking simulation-local compilation or the generated runtime layout.
-
-Read :doc:`../architecture/simulation_compilation` first for the ``MCDCBase``--``MCDCObject``--``MCDCPolymorphic`` hierarchy.
-Read :doc:`../architecture/runtime_data_layout` for the structured ``simulation`` record, flat ``data`` array, and generated accessors.
+Use this page when an extension changes a model class, introduces runtime-visible state, or adds a registered or polymorphic object type.
+It assumes the hierarchy and data representation described in :doc:`../architecture/simulation_compilation` and :doc:`../architecture/runtime_data_layout`.
+The guidance below applies those designs as implementation recipes instead of restating them.
 
 When the new state is consumed during particle transport, continue with :doc:`writing_numba_compatible_transport_code` for type, dispatch, allocation, CPU/GPU compatibility, and verification guidance.
 
@@ -19,23 +17,28 @@ Choose the narrowest extension that represents the new concept:
 
 .. list-table::
    :header-rows: 1
-   :widths: 24 24 52
+   :widths: 20 20 36 24
 
    * - Change
      - Starting point
      - Use when
+     - Example
    * - Add a field
      - Existing class
      - The concept already belongs to an existing model or configuration object.
+     - Add a new source parameter to ``Source``.
    * - Add embedded state
      - ``MCDCBase``
      - The state belongs to one parent and does not need an independently addressable entry in a simulation registry.
+     - Add technique settings owned by ``Simulation``.
    * - Add a registered category
      - ``MCDCObject``
      - Transport must refer to independently registered instances by simulation-local ``ID``.
+     - Add a new Surface-like category with its own collection.
    * - Add a representation to an existing category
      - ``MCDCPolymorphic``
      - The extension shares a category interface but needs a distinct packed layout and dispatch code.
+     - Add a concrete ``MeshBase`` representation.
 
 Prefer adding a subtype to an existing polymorphic family over creating a new registered category when the new object has the same conceptual role.
 A new tally estimator, for example, belongs under ``Tally``; it does not need an unrelated top-level registry.
@@ -49,25 +52,103 @@ Every MC/DC model class must follow the conventions used by the compiler and Num
    Provide a unique, stable, lower-case label such as ``structured_mesh``.
    The label names generated structured layouts and the corresponding modules under ``mcdc_get`` and ``mcdc_set``.
 
+   .. code-block:: python
+
+      class MeshStructured(MeshBase):
+          label = "structured_mesh"
+
+``sub_type``
+   Give every concrete ``MCDCPolymorphic`` subclass a unique integer constant within its family.
+   The shared base uses ``sub_type = -1``.
+
+   .. code-block:: python
+
+      class MeshStructured(MeshBase):
+          sub_type = MESH_STRUCTURED
+
 Type annotations
    Annotate every field that must be represented at runtime.
    Annotations define scalar fields, embedded structures, object-ID references, and variable-length payloads.
+
+   .. code-block:: python
+
+      active: bool
+      translation: Annotated[NDArray[float64], (3,)]
+      move_velocities: Annotated[NDArray[float64], ("N_move", 3)]
+      surfaces: list[Surface]
 
 Initialization
    Assign every runtime-visible field a valid initial value.
    Subclasses of ``MCDCObject`` must call ``super().__init__()`` so ``ID`` is initialized; subclasses of ``MCDCPolymorphic`` must do the same so both ``ID`` and ``sub_ID`` are initialized.
 
+   .. code-block:: python
+
+      def __init__(self, name, boundaries):
+          super().__init__()
+          self.name = name
+          self.boundaries = np.asarray(boundaries, dtype=float64)
+
 ``non_numba``
    List Python-only fields that should not be traversed or packed automatically.
    The class must explicitly convert any required information from those fields into annotated runtime-visible fields before packing.
 
+   For example, ``Cell`` keeps its expressive ``region`` and ``fill`` objects on the Python side, then derives RPN tokens and a fill ID for transport:
+
+   .. code-block:: python
+
+      non_numba = ["region", "fill"]
+
+      region: Region
+      fill: MaterialBase | Universe | Lattice | None
+      region_RPN_tokens: list[int]
+      fill_ID: int
+
 Compilation hook
    Use the inherited ``_compile_into_simulation`` implementation unless the class must canonicalize objects, compile excluded references, or derive fields from assigned object IDs.
+
+   .. code-block:: python
+
+      def _compile_into_simulation(self, simulation):
+          if not super()._compile_into_simulation(simulation):
+              return False
+
+          self.reference._compile_into_simulation(simulation)
+          self.reference_ID = self.reference.ID
+          return True
+
+   If Python-only members must be canonicalized before ordinary traversal, guard the work with ``compile_ID`` and then call ``super`` exactly once:
+
+   .. code-block:: python
+
+      def _compile_into_simulation(self, simulation):
+          if self.compile_ID == simulation.compile_ID:
+              return False
+
+          self._resolve_python_inputs(simulation)
+
+          if not super()._compile_into_simulation(simulation):
+              return False
+
+          self._derive_post_registration_fields()
+          return True
+
+   Do not assign ``compile_ID``, ``ID``, or ``sub_ID`` manually.
 
 Ownership boundary
    Design each model-object instance for one ``Simulation`` context.
    Reuse the instance within that model when sharing is intentional, but construct a new object graph for another simulation or process.
    Extension code must not keep process-wide singleton model objects that can be attached to several simulations.
+
+   .. code-block:: python
+
+      surface_a = mcdc.Surface.PlaneZ(z=0.0)
+      surface_b = mcdc.Surface.PlaneZ(z=0.0)
+
+      simulation_a = mcdc.Simulation()
+      simulation_b = mcdc.Simulation()
+
+      simulation_a.set_model([mcdc.Cell(region=+surface_a)])
+      simulation_b.set_model([mcdc.Cell(region=+surface_b)])
 
 Represent Fields Deliberately
 -----------------------------
@@ -76,29 +157,29 @@ The layer generator interprets annotations according to the field's role:
 
 .. list-table::
    :header-rows: 1
-   :widths: 34 30 36
+   :widths: 28 27 45
 
    * - Example annotation
      - Runtime representation
-     - Access pattern
-   * - ``active: bool`` or ``count: int``
+     - Transport access
+   * - ``active: bool``
      - Scalar structured field
-     - Direct structured access
-   * - ``vector: Annotated[NDArray[float64], (3,)]``
+     - ``technique["active"]``
+   * - ``translation: Annotated[NDArray[float64], (3,)]``
      - Fixed-size embedded array
-     - Direct structured access
-   * - ``grid: NDArray[float64]``
+     - ``cell["translation"][axis]``
+   * - ``energy: NDArray[float64]``
      - Offset and length plus values in ``data``
-     - Generated accessor
-   * - ``table: Annotated[NDArray[float64], ("N", 3)]``
+     - ``mcdc_get.tally.energy(index, tally, data)``
+   * - ``move_velocities: Annotated[NDArray[float64], ("N_move", 3)]``
      - Offset, length, and shape metadata plus flattened values
-     - Generated multidimensional accessor
-   * - ``mesh: MeshBase``
+     - ``mcdc_get.surface.move_velocities(move, axis, surface, data)``
+   * - ``energy_group_pmf: DistributionPMF``
      - Simulation-local object ID
-     - Lookup through the mesh collection
-   * - ``tallies: list[Tally]``
+     - ``simulation["distributions"][source["energy_group_pmf_ID"]]``
+   * - ``collision_tallies: list[TallyCollision]``
      - Count and offset to IDs stored in ``data``
-     - Generated ID accessor
+     - ``mcdc_get.cell.collision_tally_IDs(index, cell, data)``
 
 Use an integer-only shape when an array is always the same size.
 Use symbolic dimensions when a shape depends on the model.
@@ -113,6 +194,22 @@ Adding a Field to an Existing Class
 #. Update any compile hook that derives the field or converts a Python-only input into its runtime representation.
 #. Consume the field through direct structured access or its generated ``mcdc_get`` and ``mcdc_set`` helpers.
 #. Update the public docstring and API documentation when users can configure the field.
+
+For example, a new variable-length ``energy_bias`` field on ``Source`` requires an annotation and initialized array on the model class:
+
+.. code-block:: python
+
+   # In Source annotations
+   energy_bias: NDArray[float64]
+
+   # In Source.__init__
+   self.energy_bias = np.asarray(energy_bias, dtype=float64)
+
+Transport then reads one value through the generated accessor:
+
+.. code-block:: python
+
+   bias = mcdc_get.source.energy_bias(group, source, data)
 
 Avoid adding parallel state in several classes.
 If a value belongs to the simulation as a whole, place it in ``Simulation`` or one of its embedded configuration objects and pass or access that representation consistently.
@@ -140,6 +237,14 @@ Add an annotated field for the object to its owner and instantiate it with the o
 For simulation-wide configuration, this normally means adding the field to ``Simulation`` and constructing it in ``Simulation.__init__``.
 The embedded object participates in recursive compilation but does not require a registry branch or object ID.
 
+.. code-block:: python
+
+   class Simulation(MCDCBase):
+       new_technique: NewTechnique
+
+       def __init__(self):
+           self.new_technique = NewTechnique()
+
 If the embedded object refers to an ``MCDCObject``, annotate that reference.
 The default traversal will register the referenced object when compilation reaches the embedded configuration.
 
@@ -155,6 +260,32 @@ A genuinely new registered category requires coordinated changes:
 #. Ensure the class's module is imported before ``numba_layers_generator.py`` discovers the classes.
    A public class is normally imported through ``mcdc/__init__.py``; an internal class must be imported by another module in the compilation path.
 #. Add the collection and lookup behavior required by transport.
+
+For example, the class and its simulation collection begin with:
+
+.. code-block:: python
+
+   class Detector(MCDCObject):
+       label = "detector"
+
+       name: str
+       response: NDArray[float64]
+
+       def __init__(self, name, response):
+           super().__init__()
+           self.name = name
+           self.response = np.asarray(response, dtype=float64)
+
+
+   class Simulation(MCDCBase):
+       detectors: list[Detector]
+
+The compiler then selects that collection explicitly:
+
+.. code-block:: python
+
+   elif isinstance(object_, Detector):
+       object_list = simulation.detectors
 
 Do not add a fallback registration branch that silently accepts unknown objects.
 An explicit category branch keeps registry ownership and runtime layout reviewable.
@@ -189,60 +320,25 @@ For example, the structural part of a mesh subtype follows this pattern:
 No new ``register_object`` branch is needed for a subtype of an already registered family.
 The existing ``isinstance(..., MeshBase)`` or corresponding category check places it in the base collection, while ``sub_type`` and ``sub_ID`` connect it to its concrete packed collection.
 
-Custom Compilation Hooks
-------------------------
-
-Override ``_compile_into_simulation`` only when the default recursive traversal is insufficient.
-The common post-registration pattern is:
-
-.. code-block:: python
-
-   def _compile_into_simulation(self, simulation) -> bool:
-       if not super()._compile_into_simulation(simulation):
-           return False
-
-       # Referenced objects now have simulation-local IDs.
-       self.runtime_field = self.python_reference.ID
-       return True
-
-Calling ``super`` first registers an ``MCDCObject`` and recursively compiles its ordinary members.
-The Boolean return prevents repeated work when the same object is reached again.
-
-Some classes must canonicalize or replace members before the default traversal.
-In that case, check ``compile_ID`` before doing the work, update the runtime-visible members, and then call ``super`` exactly once:
-
-.. code-block:: python
-
-   def _compile_into_simulation(self, simulation) -> bool:
-       if self.compile_ID == simulation.compile_ID:
-           return False
-
-       self._resolve_python_inputs(simulation)
-
-       if not super()._compile_into_simulation(simulation):
-           return False
-
-       self._derive_post_registration_fields()
-       return True
-
-Do not assign ``compile_ID``, ``ID``, or ``sub_ID`` manually.
-The shared compiler owns those values.
-
 Generated Runtime Layers and Accessors
 --------------------------------------
 
-``numba_layers_generator.py`` derives the structured dtypes, flat-data metadata, and accessor targets from the completed model classes.
-It writes:
+The annotation is the source of truth for generated runtime fields and accessors.
+Do not edit ``mcdc/numba_types.py``, ``mcdc_get``, or ``mcdc_set`` to introduce a field.
+Prepare a representative simulation so ``numba_layers_generator.py`` regenerates those files, then verify the access pattern predicted by the field representation chosen above.
 
-- ``mcdc/numba_types.py`` for structured dtype definitions.
-- ``mcdc/mcdc_get/<label>.py`` for generated reads.
-- ``mcdc/mcdc_set/<label>.py`` for generated writes.
-- ``mcdc_get/__init__.py`` and ``mcdc_set/__init__.py`` for generated module imports.
+For example, a variable-length ``Detector.response`` field produces element accessors associated with the ``detector`` label:
 
-Do not implement a generated accessor by hand.
-Express the field correctly in the class annotation, prepare a representative simulation, and allow the layer generator to regenerate the modules.
-Then use the generated helper from transport code.
-Fixed-size fields do not need helpers and can be accessed directly from the structured record.
+.. code-block:: python
+
+   value = mcdc_get.detector.response(index, detector, data)
+   mcdc_set.detector.response(index, detector, data, new_value)
+
+A fixed-size field such as ``Cell.translation`` remains embedded and is accessed directly:
+
+.. code-block:: python
+
+   value = cell["translation"][axis]
 
 Public API and Documentation
 ----------------------------
@@ -256,6 +352,16 @@ For a user-facing class or constructor:
 
 Internal helper classes should remain under ``mcdc.object_`` and should not be exported merely to make discovery work.
 Import them explicitly in the compilation path instead.
+
+For example, a public ``Detector`` is re-exported from the package and listed by its qualified name in the API autosummary:
+
+.. code-block:: python
+
+   from mcdc.object_.detector import Detector
+
+.. code-block:: rst
+
+   ~mcdc.Detector
 
 Verification Checklist
 ----------------------

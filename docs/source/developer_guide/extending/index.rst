@@ -10,6 +10,8 @@ It complements the :doc:`../architecture/index`, which explains the existing des
 Start with :doc:`extending_the_object_model` when adding a field to an existing model class, introducing simulation-owned configuration, creating a registered model-object category, or implementing a new polymorphic subtype.
 Continue with :doc:`writing_numba_compatible_transport_code` when the extension adds or changes code executed during particle transport.
 
+For example, a new runtime field with no transport behavior uses the object-model guide, a numerical change using existing fields starts with the transport-code guide, and a new tally subtype follows both in that order.
+
 Use the :doc:`../../contributing/index` for repository setup, test commands, continuous-integration coverage, and pull-request requirements.
 
 .. toctree::

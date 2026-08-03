@@ -4,14 +4,10 @@
 Writing Numba-Compatible Transport Code
 =======================================
 
-Maintained transport code in MC/DC is written in Python but may execute as Python, Numba-compiled CPU code, or Numba-compiled GPU device code.
-A method may be prototyped within the MC/DC Python backend before it is adapted for the two accelerated backends.
-
-Read :doc:`../architecture/python_first_numba_accelerated_design` first for the reason behind this development model.
-If the change introduces new model state, also read :doc:`extending_the_object_model` and :doc:`../architecture/runtime_data_layout`.
-
-The rules below apply when an MC/DC Python prototype is being made portable and maintained as part of MC/DC.
-They are not restrictions on temporary Python-only behavior during initial exploration.
+Use this page when verified Python transport behavior is being prepared for Numba-CPU, Numba-GPU, and long-term maintenance in MC/DC.
+The development rationale and execution mechanisms belong in :doc:`../architecture/python_first_numba_accelerated_design` and :doc:`../architecture/transport_execution`.
+If the change introduces new model state, begin with :doc:`extending_the_object_model`.
+The rules below start at the portability boundary and do not restrict temporary Python-only exploration.
 
 Choose the Host or Transport Layer
 ----------------------------------
@@ -34,25 +30,23 @@ Place work in transport when it must be performed during particle execution:
 Do as much irregular work as practical before transport.
 A small amount of host-side preparation can turn a dynamic operation into simple indexed access inside a frequently called kernel.
 
-Work Python First
------------------
+For example, derive a reusable coefficient once while preparing the model instead of recomputing it for every particle event:
 
-An exploratory method may begin in MC/DC Python, using whichever Python data structures make the algorithm easiest to understand and verify.
-It still runs through MC/DC's normal model preparation and transport path.
-This Python-only implementation is a valid stopping point for a small study that does not need compiled performance.
+.. code-block:: python
 
-At this stage, use module-level global state, arbitrary Python objects, ad hoc imports, dynamic behavior, file I/O, callbacks, visualization, hard-coded assumptions, or direct transport edits whenever they help answer the research question.
-Calls to packages such as SciPy and Matplotlib are acceptable even during transport.
-A formal prototype service or abstraction is not required.
+   # On the model class
+   inverse_dx: float
 
-Keep prototype-only dependencies local to the experiment rather than adding them to MC/DC's required dependencies.
-The prototype is allowed to be disposable and is not expected to compile unchanged.
+   def _prepare_spacing(self):
+       self.inverse_dx = 1.0 / self.dx
 
-Unrestricted prototyping is optional.
-A developer already familiar with MC/DC and Numba may begin with packed runtime inputs, stable types, and supported operations, producing an implementation that is nearly Numba-compatible from the start.
-This can minimize the deliberate porting work while preserving the freedom to use ordinary Python whenever it helps establish the method.
+   # In transport
+   index = int((particle["x"] - mesh["x0"]) * mesh["inverse_dx"])
 
-Porting for accelerated execution begins by adapting the verified method so that the required information and behavior use the packed runtime inputs available to transport.
+Port a Verified Method
+----------------------
+
+Keep the verified Python result as the behavioral baseline while adapting the method to MC/DC's packed runtime inputs and compiler-compatible operations.
 Decorate the maintained function with ``@njit`` like the surrounding transport functions; in Python mode, MC/DC disables JIT compilation and calls the same function as Python.
 
 .. code-block:: python
@@ -66,10 +60,7 @@ Decorate the maintained function with ``@njit`` like the surrounding transport f
        particle["w"] *= factor
 
 Keep the function small enough that its inputs, outputs, and mutations are clear.
-First exercise it in Python mode to verify the algorithm and obtain an ordinary traceback.
-Then run it in Numba-CPU mode to verify type inference.
-Finally, adapt and validate it for Numba-GPU.
-Each stage may reveal constraints that were irrelevant to the preceding implementation.
+Exercise the maintained function in Python mode against the baseline, then use Numba-CPU to resolve typing issues, and finally validate device compatibility in Numba-GPU.
 
 Use Runtime Data, Not Model Objects
 -----------------------------------
@@ -88,6 +79,16 @@ Use the representation appropriate to each field:
 If the required value is unavailable in this form, extend the object model and generated runtime layer before writing the transport behavior.
 Do not create a parallel Python-only lookup inside the kernel.
 
+For example, recover a prepared distribution by simulation-local ID instead of passing its Python model object into transport:
+
+.. code-block:: python
+
+   # Python model construction
+   source_object.energy_group_pmf = distribution_object
+
+   # Portable transport representation
+   distribution = simulation["distributions"][source["energy_group_pmf_ID"]]
+
 Keep Types Stable
 -----------------
 
@@ -103,6 +104,19 @@ Make those types unambiguous:
 
 Numba may accept a construct on the CPU without making it available on the GPU.
 When a function is shared, compatibility with the stricter target is the relevant standard.
+
+For example, initialize a scalar result before control flow so every path returns the same type:
+
+.. code-block:: python
+
+   @njit
+   def find_energy_bin(E, grid):
+       index = -1
+       for i in range(len(grid) - 1):
+           if grid[i] <= E < grid[i + 1]:
+               index = i
+               break
+       return index
 
 Represent Variable-Length Data Explicitly
 -----------------------------------------
@@ -157,6 +171,25 @@ Particle histories repeatedly execute transport functions, so temporary allocati
 The owner of each mutation should be evident from the function signature.
 Avoid hidden module-level mutable state.
 
+For example, select a minimum with scalar state instead of building a temporary list:
+
+.. code-block:: python
+
+   best_distance = INF
+   for i in range(cell["N_surface"]):
+       distance = distance_to_surface(i, particle, cell, simulation, data)
+       if distance < best_distance:
+           best_distance = distance
+
+When a scalar structured record must be mutated across a function boundary, pass its one-element container and recover the record inside the function:
+
+.. code-block:: python
+
+   @njit
+   def increment_counter(counter_container):
+       counter = counter_container[0]
+       counter["value"] += 1
+
 Stay Within the CPU/GPU Common Subset
 -------------------------------------
 
@@ -173,6 +206,18 @@ Backend-specific code is appropriate when the execution model truly differs.
 Keep the shared numerical operation in ``mcdc/transport`` when possible, and put only the required adaptation under ``mcdc/code_factory/gpu``.
 Document why the paths differ and test their physical equivalence.
 
+For example, keep the shared numerical operation free of reporting or device-management code:
+
+.. code-block:: python
+
+   @njit
+   def apply_survival_biasing(particle, survival_probability):
+       particle["w"] *= survival_probability
+
+
+   def report_survival_biasing(survival_probability):
+       print(f"Survival probability: {survival_probability}")
+
 Debug in Layers
 ---------------
 
@@ -185,6 +230,8 @@ When a change fails, isolate the layer:
 
 Do not begin by diagnosing a GPU compiler error if the same calculation is already incorrect in Python.
 Conversely, a passing Python test does not prove that the function is type-stable or device compatible.
+
+For example, an unexpected physical result in Python belongs in the Python transport layer, a Numba ``TypingError`` belongs in Numba-CPU porting, and a device-link or unsupported-atomic error belongs in the Numba-GPU layer.
 
 Verification Checklist
 ----------------------
@@ -199,9 +246,6 @@ Before considering a transport extension complete:
 - GPU results preserve the same physical behavior within appropriate numerical and statistical tolerances.
 - Existing examples still construct successfully when the public API or model compilation changed.
 - User and developer documentation describe any new behavior or limitation.
-
-A general feature merged and maintained as part of MC/DC must complete all three execution stages unless the maintainers explicitly accept and document a backend-specific limitation.
-Experimental or study-specific work may stop at Python or Numba-CPU when that stage already satisfies its purpose.
 
 Repository commands, continuous-integration coverage, and regression-test options belong in the :doc:`../../contributing/index`.
 For changes affecting public inputs, follow :doc:`../../contributing/example_validation`.
