@@ -4,12 +4,17 @@
 Writing Numba-Compatible Transport Code
 =======================================
 
-Use this page when verified Python transport behavior is being prepared for Numba-CPU, Numba-GPU, and long-term maintenance in MC/DC.
-Read :doc:`../architecture/python_first_numba_accelerated_design` for the development rationale and :doc:`../architecture/transport_execution` for the execution mechanisms.
+Use this page when verified Python transport behavior is being prepared for Numba-CPU execution and long-term maintenance in MC/DC.
+Read :doc:`../architecture/python_first_numba_accelerated_design` for the development rationale.
 If the change introduces new model state, begin with :doc:`extending_the_object_model`.
 
+Numba-CPU Development
+---------------------
+
+Complete the Python and Numba-CPU implementation before considering additional execution targets.
+
 Choose the Host or Transport Layer
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Place work on the host when it changes the model or prepares execution:
 
@@ -43,7 +48,7 @@ For example, derive a reusable coefficient once while preparing the model instea
    index = int((particle["x"] - mesh["x0"]) * mesh["inverse_dx"])
 
 Port a Verified Method
-----------------------
+^^^^^^^^^^^^^^^^^^^^^^
 
 Keep the verified Python result as the behavioral baseline while adapting the method to MC/DC's packed runtime inputs and compiler-compatible operations.
 Decorate the maintained function with ``@njit`` like the surrounding transport functions; in Python mode, MC/DC disables JIT compilation and calls the same function as Python.
@@ -59,10 +64,10 @@ Decorate the maintained function with ``@njit`` like the surrounding transport f
        particle["w"] *= factor
 
 Keep the function small enough that its inputs, outputs, and mutations are clear.
-Exercise the maintained function in Python mode against the baseline, then use Numba-CPU to resolve typing issues, and finally validate device compatibility in Numba-GPU.
+Exercise the maintained function in Python mode against the baseline, then use Numba-CPU to resolve typing and compiled-runtime issues.
 
 Use Runtime Data, Not Model Objects
------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An integrated transport function should accept scalars, NumPy arrays, structured records, one-element record containers, and the packed ``simulation`` and ``data`` state.
 It should not accept an ``MCDCObject`` instance or follow Python object references.
@@ -89,7 +94,7 @@ For example, recover a prepared distribution by simulation-local ID instead of p
    distribution = simulation["distributions"][source["energy_group_pmf_ID"]]
 
 Keep Types Stable
------------------
+^^^^^^^^^^^^^^^^^
 
 Numba determines a compiled function's types from its arguments and control flow.
 Make those types unambiguous:
@@ -100,9 +105,6 @@ Make those types unambiguous:
 - Use explicit integer and floating-point constants when their width or signedness affects an operation.
 - Keep structured-record field names fixed; do not compute field names at run time.
 - Avoid heterogeneous Python lists, dictionaries, sets, generators, and dynamically created classes in transport.
-
-Numba may accept a construct on the CPU without making it available on the GPU.
-When a function is shared, compatibility with the stricter target is the relevant standard.
 
 For example, initialize a scalar result before control flow so every path returns the same type:
 
@@ -118,7 +120,7 @@ For example, initialize a scalar result before control flow so every path return
        return index
 
 Represent Variable-Length Data Explicitly
------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Do not recover variable-length model data by allocating a new Python container.
 Read it from ``data`` using the metadata in its owning record.
@@ -136,7 +138,7 @@ For a new variable-length field, declare the field on the Python model class and
 Do not hand-maintain offset arithmetic in several transport modules.
 
 Use Explicit Dispatch
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 Dispatch on integer constants through a small interface function rather than using Python ``isinstance`` checks or methods on runtime records:
 
@@ -157,9 +159,9 @@ Use the actual category interface and constants already defined for that family.
 When adding a subtype, update every exhaustive dispatch site and test an unsupported value deliberately if the interface defines fallback behavior.
 
 Control Allocation and Mutation
--------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Particle histories repeatedly execute transport functions, so temporary allocation can be both expensive and difficult to support consistently across targets.
+Particle histories repeatedly execute transport functions, so temporary allocation can be expensive and difficult for Numba to optimize.
 
 - Reuse particle containers, banks, tally arrays, and scratch state allocated during preparation.
 - Update structured fields or ``data`` through explicit assignments and generated setters.
@@ -189,23 +191,59 @@ When a scalar structured record must be mutated across a function boundary, pass
        counter = counter_container[0]
        counter["value"] += 1
 
-Stay Within the CPU/GPU Common Subset
--------------------------------------
+Debug Python and Numba-CPU
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For code intended to run on both targets:
+When a change fails, isolate the layer:
 
-- Use numerical control flow and operations already established in nearby shared transport modules.
+#. **Python construction** -- confirm that the model compiles and the expected objects, IDs, offsets, and data are present.
+#. **Python transport** -- verify the algorithm and state mutation with JIT disabled.
+#. **Numba-CPU** -- resolve typing, unsupported-operation, and compiled-runtime failures.
+
+Resolve each layer before moving to the next.
+A passing Python test establishes behavior but does not establish Numba type compatibility.
+For example, investigate an unexpected physical result in Python transport and a Numba ``TypingError`` during Numba-CPU porting.
+
+Verify Numba-CPU Support
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Before considering the Numba-CPU implementation complete:
+
+- The model compiles into the expected packed representation.
+- Focused unit tests exercise the numerical behavior in Python.
+- The same tests or a representative regression case pass in Numba-CPU mode.
+- Python and Numba-CPU results agree within the test's numerical tolerance.
+- Existing examples still construct successfully when the public API or model compilation changed.
+- User and developer documentation describe the new behavior and any CPU limitation.
+
+Numba-GPU Development
+---------------------
+
+Numba-CPU is a valid final implementation when it satisfies the intended workloads and project requirements.
+Add Numba-GPU support as a later phase when those requirements call for accelerator execution.
+Begin this phase from a verified Numba-CPU implementation and retain its tests as the behavioral baseline.
+Read :doc:`../architecture/transport_execution` for MC/DC's GPU compilation and runtime architecture.
+
+Apply Additional GPU Constraints
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Numba-CPU supports Python and Numba features that may not be available in device code.
+For transport code that will execute on a GPU:
+
+- Use numerical control flow and operations established in nearby GPU-compatible transport modules.
 - Avoid Python exceptions as ordinary control flow.
 - Keep file access, printing, timing, MPI orchestration, and other host services outside device functions.
-- Do not use Numba ``objmode`` in a path that must execute on the GPU.
-- Avoid relying on a CPU-only Numba feature merely because Numba-CPU compiles it.
+- Do not use Numba ``objmode`` in a device path.
+- Replace CPU-only Numba features with device-compatible operations.
 - Keep target-specific atomics, memory operations, and scheduling behind the existing GPU adaptation layer.
 
-Backend-specific code is appropriate when the execution model truly differs.
-Keep the shared numerical operation in ``mcdc/transport`` when possible, and put only the required adaptation under ``mcdc/code_factory/gpu``.
-Document why the paths differ and test their physical equivalence.
+Separate Shared and GPU-Specific Code
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For example, keep the shared numerical operation free of reporting or device-management code:
+Keep the shared numerical operation in ``mcdc/transport`` when possible, and place only the required device adaptation under ``mcdc/code_factory/gpu``.
+Document why a GPU path differs and test its physical equivalence with Python and Numba-CPU.
+
+For example, keep reporting on the host while the numerical operation remains available to compiled transport:
 
 .. code-block:: python
 
@@ -217,34 +255,22 @@ For example, keep the shared numerical operation free of reporting or device-man
    def report_survival_biasing(survival_probability):
        print(f"Survival probability: {survival_probability}")
 
-Debug in Layers
----------------
+Debug Numba-GPU
+^^^^^^^^^^^^^^^
 
-When a change fails, isolate the layer:
+Start GPU diagnosis only after the Python and Numba-CPU tests pass.
+Then isolate device compilation, memory placement, atomics, and Harmonize scheduling.
+For example, investigate a device-link or unsupported-atomic error in this phase without reopening already verified CPU behavior.
 
-#. **Python construction** -- confirm that the model compiles and the expected objects, IDs, offsets, and data are present.
-#. **Python transport** -- verify the algorithm and state mutation with JIT disabled.
-#. **Numba-CPU** -- resolve typing, unsupported-operation, and compiled-runtime failures.
-#. **Numba-GPU** -- resolve device compilation, memory, atomic, and scheduling failures.
+Verify Numba-GPU Support
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-Do not begin by diagnosing a GPU compiler error if the same calculation is already incorrect in Python.
-Conversely, a passing Python test does not prove that the function is type-stable or device compatible.
+Before claiming Numba-GPU support:
 
-For example, investigate an unexpected physical result in Python transport, a Numba ``TypingError`` during Numba-CPU porting, and a device-link or unsupported-atomic error in the Numba-GPU layer.
-
-Verification Checklist
-----------------------
-
-Before considering a transport extension complete:
-
-- The model compiles into the expected packed representation.
-- Focused unit tests exercise the new numerical behavior in Python.
-- The same tests or representative regression case pass in Numba-CPU mode.
-- Python and Numba-CPU results agree within the test's numerical tolerance.
-- A supported GPU environment exercises the path.
+- The Python and Numba-CPU verification remains passing.
+- A supported GPU environment exercises every device path being claimed.
 - GPU results preserve the same physical behavior within appropriate numerical and statistical tolerances.
-- Existing examples still construct successfully when the public API or model compilation changed.
-- User and developer documentation describe any new behavior or limitation.
+- GPU-specific adaptations and limitations are documented.
 
 Use the :doc:`../../contributing/index` for repository commands, continuous-integration coverage, and regression-test options.
 For changes affecting public inputs, follow :doc:`../../contributing/example_validation`.
