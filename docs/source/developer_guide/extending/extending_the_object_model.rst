@@ -104,7 +104,7 @@ Initialization
       fill_ID: int
 
 Compilation hook
-   Use the inherited ``_compile_into_simulation`` implementation unless the class must canonicalize objects, compile excluded references, or derive fields from assigned object IDs.
+   Use the inherited ``_compile_into_simulation`` implementation unless the class must canonicalize objects, compile excluded references, derive fields from assigned object IDs, or otherwise finalize state owned by that object.
 
    .. code-block:: python
 
@@ -133,6 +133,16 @@ Compilation hook
           return True
 
    Do not assign ``compile_ID``, ``ID``, or ``sub_ID`` manually.
+
+Model-wide finalization
+   Object hooks should not normalize or coordinate unrelated registries.
+   When a value requires the complete discovered model, coordinate it once in ``Simulation._finalize_compilation`` instead.
+   Source-probability normalization, particle-bank capacities, and settings derived from the complete material or tally collections are examples of model-wide finalization.
+   Explicitly compile any new runtime-visible object introduced during this phase because ordinary recursive discovery has already occurred.
+
+   ``compile_simulation`` orchestrates recursive discovery and calls this model-wide finalization phase.
+   Change the compiler orchestration only when adding a new compilation phase or registered category.
+   Do not place model-specific finalization in ``mcdc.main.prepare``; that function is reserved for framework-level packing, resource allocation, backend configuration, and external runtime state.
 
 Represent Fields Deliberately
 -----------------------------

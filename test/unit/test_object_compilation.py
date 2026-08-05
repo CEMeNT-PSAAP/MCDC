@@ -99,3 +99,41 @@ def test_material_canonicalizes_composition_before_member_compilation(monkeypatc
     assert material_b.nuclides == simulation.nuclides
     assert material_a.fissionable
     assert material_b.fissionable
+
+
+def test_simulation_compilation_finalizes_model_wide_state():
+    source_a = mcdc.Source(probability=1.0)
+    source_b = mcdc.Source(probability=3.0)
+    simulation = mcdc.Simulation()
+    simulation.set_sources([source_a, source_b])
+    simulation.settings.neutron_eigenvalue_mode = True
+    simulation.settings.N_inactive = 2
+    simulation.settings.N_cycle = 4
+    simulation.settings.k_init = 1.25
+
+    simulation.compile()
+
+    assert np.allclose([source_a.probability, source_b.probability], [0.25, 0.75])
+    assert simulation.settings.neutron_multigroup_mode
+    assert simulation.k_eff == 1.25
+    assert not simulation.cycle_active
+    assert simulation.k_cycle.shape == (4,)
+    assert simulation.gyration_radius.shape == (4,)
+
+
+def test_simulation_compilation_sets_particle_bank_capacities():
+    simulation = mcdc.Simulation()
+    simulation.settings.N_particle = 100
+    simulation.settings.N_census = 2
+    simulation.settings.active_bank_buffer = 11
+    simulation.settings.census_bank_buffer_ratio = 2.0
+    simulation.settings.source_bank_buffer_ratio = 3.0
+    simulation.settings.future_bank_buffer_ratio = 4.0
+
+    simulation.compile()
+
+    N_work = int(np.ceil(100 / simulation.mpi_size))
+    assert simulation.bank_active.size[0] == 11
+    assert simulation.bank_census.size[0] == 2 * N_work
+    assert simulation.bank_source.size[0] == 3 * N_work
+    assert simulation.bank_future.size[0] == 4 * N_work

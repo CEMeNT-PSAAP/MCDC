@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Changed
 
 - Move regression tests from the custom `run.py` harness to pytest-based collection and reporting from [@massimolarsen]
+- Modernize and reorganize the documentation around distinct user, API reference, theory, project, and developer paths; adopt the PyData Sphinx Theme; and expand the architecture and extension guidance from [@ilhamv]
+- Move model-specific finalization into simulation compilation and reserve runtime preparation for framework-level packing and execution setup from [@ilhamv]
 - **Breaking:** Redesign model construction around explicit `mcdc.Simulation`
   instances, replacing the global simulation, settings, run, and visualization
   interfaces. Each simulation now owns and compiles its complete object graph,

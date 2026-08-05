@@ -14,9 +14,10 @@ if TYPE_CHECKING:
 
 ####
 
-import numpy as np
-
+import math
 from collections.abc import Sequence
+
+import numpy as np
 from mpi4py import MPI
 from numpy import float64, int64
 from numpy.typing import NDArray
@@ -57,8 +58,9 @@ class Simulation(MCDCBase):
     -----
     Geometry, sources, and tallies are supplied with :meth:`set_model`,
     :meth:`set_sources`, and :meth:`set_tallies`. :meth:`compile` walks the
-    resulting object graph, assigns IDs, and prepares it for conversion to the
-    packed arrays consumed by :mod:`mcdc.transport`.
+    resulting object graph, assigns IDs, and finalizes object-local and
+    model-wide state before conversion to the packed arrays consumed by
+    :mod:`mcdc.transport`.
 
     MC/DC uses one active simulation context per Python process. A model-object
     instance belongs to one simulation, although it may be referenced multiple
@@ -300,6 +302,92 @@ class Simulation(MCDCBase):
         self.lattices = []
         self.meshes = []
 
+    def _finalize_compilation(self) -> None:
+        """Finalize model-wide state after object discovery.
+
+        Object-specific compilation hooks register dependencies and derive
+        fields owned by one object. This method handles relationships and
+        invariants that require the complete simulation, before the model is
+        packed into the runtime representation. Any runtime-visible object
+        created here must be compiled explicitly because recursive discovery
+        has already completed.
+        """
+        from mcdc.object_.material import (
+            Material,
+            MaterialMG,
+            set_elements_from_nuclides,
+            set_nuclides_from_elements,
+            update_fissionable_from_nuclides,
+        )
+
+        settings = self.settings
+
+        # Limit transport to the latest requested tally boundary
+        settings.time_boundary = min(
+            [settings.time_boundary] + [tally.time[-1] for tally in self.tallies]
+        )
+
+        # Complete native-material compositions for the transported particles
+        for material in self.materials:
+            if not isinstance(material, Material):
+                continue
+            if settings.neutron_transport and len(material.nuclides) == 0:
+                set_nuclides_from_elements(material, self)
+            if settings.electron_transport and len(material.elements) == 0:
+                set_elements_from_nuclides(material, self)
+
+        # Load the physics data required by the completed material model
+        if settings.neutron_transport:
+            for nuclide in self.nuclides:
+                nuclide.set_neutron_data(self)
+            for material in self.materials:
+                if isinstance(material, Material):
+                    update_fissionable_from_nuclides(material)
+
+        if settings.electron_transport:
+            for element in self.elements:
+                element.set_electron_data(self)
+
+        # Determine the neutron physics representation
+        if len(self.materials) == 0:
+            settings.neutron_multigroup_mode = True
+        else:
+            settings.neutron_multigroup_mode = isinstance(self.materials[0], MaterialMG)
+
+        # Derive tally shapes that depend on simulation-wide settings
+        if settings.use_census_based_tally:
+            for tally in self.tallies:
+                tally._use_census_based_tally(settings.census_tally_frequency, self)
+
+        # Normalize source-selection probabilities across the complete source set
+        source_probability = sum(source.probability for source in self.sources)
+        for source in self.sources:
+            source.probability /= source_probability
+
+        # Derive particle-bank capacities from settings and the MPI decomposition
+        N_work = math.ceil(settings.N_particle / self.mpi_size)
+        N_census = settings.N_census
+
+        if settings.neutron_eigenvalue_mode or N_census == 1:
+            settings.future_bank_buffer_ratio = 0.0
+        if not settings.neutron_eigenvalue_mode and N_census == 1:
+            settings.census_bank_buffer_ratio = 0.0
+            settings.source_bank_buffer_ratio = 0.0
+
+        self.bank_active.size[0] = settings.active_bank_buffer
+        self.bank_census.size[0] = int(settings.census_bank_buffer_ratio * N_work)
+        self.bank_source.size[0] = int(settings.source_bank_buffer_ratio * N_work)
+        self.bank_future.size[0] = int(settings.future_bank_buffer_ratio * N_work)
+
+        # Initialize run state derived from the compiled settings
+        self.k_eff = settings.k_init
+        self.cycle_active = (
+            not settings.neutron_eigenvalue_mode or settings.N_inactive == 0
+        )
+        if settings.neutron_eigenvalue_mode:
+            self.k_cycle = np.zeros(settings.N_cycle)
+            self.gyration_radius = np.zeros(settings.N_cycle)
+
     # ==================================================================================
     # Simulation object setters
     # ==================================================================================
@@ -360,16 +448,21 @@ class Simulation(MCDCBase):
     # ==================================================================================
 
     def compile(self) -> None:
-        """Compile the Python object graph into a new simulation snapshot.
+        """Compile and finalize the Python model into a simulation snapshot.
 
-        A globally unique ``compile_ID`` identifies the snapshot. Every
-        embedded or registered :class:`~mcdc.object_.base.MCDCBase` reached
-        during compilation records that ID.
+        A globally unique ``compile_ID`` identifies the snapshot. Command-line overrides
+        are applied before any derived state is resolved. Every embedded or registered
+        :class:`~mcdc.object_.base.MCDCBase` reached during compilation records that ID.
+        Object-local hooks discover and prepare their dependencies, then model-wide
+        finalization resolves state that requires the complete simulation.
         """
+        from mcdc.config import override_settings
         from mcdc.code_factory.python_objects_compiler import compile_simulation
 
         self.compile_ID = type(self)._next_compile_ID
         type(self)._next_compile_ID += 1
+
+        override_settings(self)
 
         compile_simulation(self)
         self.compiled = True
@@ -413,7 +506,7 @@ class Simulation(MCDCBase):
         visualize_model(self, vis_plane, x, y, z, pixels, colors, time, save_as)
 
     def run(self) -> None:
-        """Compile if needed, execute particle transport, and write output.
+        """Compile when needed, execute transport, and write output.
 
         Examples
         --------
@@ -421,10 +514,10 @@ class Simulation(MCDCBase):
 
         >>> simulation.run()
         """
-        from mcdc.main import run_simulation
-
         if not self.compiled:
             self.compile()
+
+        from mcdc.main import run_simulation
 
         run_simulation(self)
         self.compiled = False

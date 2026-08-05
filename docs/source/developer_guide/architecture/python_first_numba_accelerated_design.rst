@@ -186,6 +186,6 @@ Future changes should preserve the ability to stop at any development stage, kee
 Where to Go Next
 ----------------
 
-For model preparation, continue with :doc:`simulation_compilation` and :doc:`runtime_data_layout`.
+For model compilation and runtime preparation, continue with :doc:`simulation_compilation` and :doc:`runtime_data_layout`.
 For execution, read :doc:`transport_execution`.
 Contributors implementing a transport change should use :doc:`../extending/writing_numba_compatible_transport_code`.

@@ -9,7 +9,7 @@ Materials, surfaces, cells, sources, tallies, settings, and techniques can conta
 A :class:`mcdc.Simulation` owns the roots of one model and turns that connected object graph into a deterministic, simulation-local snapshot.
 
 This first compilation stage is entirely a Python operation.
-It establishes the model that later runtime preparation will pack for Python, Numba-CPU, or Numba-GPU execution.
+It discovers the model, finalizes object-local and model-wide state, and establishes the snapshot that runtime preparation will pack for Python, Numba-CPU, or Numba-GPU execution.
 
 Why a Simulation Context Is Needed
 ----------------------------------
@@ -41,10 +41,10 @@ MC/DC uses several related forms of compilation:
      - Responsibility
      - Primary implementation
    * - Model compilation
-     - Discover objects, register them once, and assign local IDs.
-     - ``Simulation.compile`` and ``mcdc/code_factory/python_objects_compiler.py``
+     - Discover objects, register them once, assign local IDs, and finalize model-dependent state.
+     - ``mcdc/object_/``, ``Simulation.compile``, and ``mcdc/code_factory/python_objects_compiler.py``
    * - Runtime preparation
-     - Derive run state and pack the model into ``simulation`` and ``data``.
+     - Pack the finalized model, allocate execution resources, and configure the selected backend.
      - ``mcdc.main.prepare`` and ``mcdc/code_factory/numba_layers_generator.py``
    * - Backend compilation
      - Compile shared transport functions for a CPU or GPU target.
@@ -174,6 +174,19 @@ Discovery follows actual Python references.
 For example, a root cell reaches its region, the region reaches its surfaces, and the cell's fill reaches its material or child universe.
 Users therefore attach root cells rather than manually registering every referenced object.
 
+Object and Model Finalization
+-----------------------------
+
+Discovery and finalization occur within the same model-compilation snapshot.
+An object's ``_compile_into_simulation`` hook handles work owned by that object, including canonicalizing Python inputs, compiling excluded references, and deriving fields from assigned IDs.
+
+Some values require the complete discovered model rather than one object.
+After the explicit model roots have been traversed, ``Simulation._finalize_compilation`` resolves these model-wide relationships and invariants, such as completing material data, normalizing source probabilities, adapting tally shapes, deriving particle-bank capacities, and initializing state from the final settings and MPI decomposition.
+The compiler traverses embedded simulation configuration before model-wide finalization, and finalization logic explicitly compiles any runtime-visible dependencies it creates.
+
+This boundary keeps scientific model rules in ``mcdc/object_/``.
+The orchestration in ``python_objects_compiler.py`` changes only when the compilation framework gains a new phase or registered category, while ``mcdc.main.prepare`` remains responsible for framework-level runtime setup after the model is complete.
+
 Deduplication and Cycles
 ------------------------
 
@@ -212,6 +225,7 @@ Snapshot Lifecycle
 
 ``set_model``, ``set_sources``, and ``set_tallies`` invalidate the compiled state.
 ``run`` and ``visualize_model`` call ``compile`` automatically when the simulation is not compiled, so most user inputs do not need an explicit call.
+Command-line overrides are applied before this compilation so model-wide derived state reflects the effective settings.
 
 An explicit call is useful for inspecting discovered objects and assigned IDs:
 
@@ -254,8 +268,8 @@ The objects remain owned by the same ``Simulation`` throughout the study.
 From Objects to Runtime Data
 ----------------------------
 
-Model compilation leaves the original Python objects intact and populates the simulation's ordered registries.
-Runtime preparation then reads those objects, derives structured dtypes from their annotations, and packs their values.
+Model compilation finalizes the original Python objects and populates the simulation's ordered registries.
+Runtime preparation then reads that complete snapshot, derives structured dtypes from its annotations, and packs its values while allocating framework-owned execution resources.
 
 Continue with :doc:`runtime_data_layout` for that conversion.
 For the user-facing construct-to-output workflow, see :doc:`../../user_guide/simulation_lifecycle`.

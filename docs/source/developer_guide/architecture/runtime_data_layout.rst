@@ -4,7 +4,7 @@
 Runtime Data Layout
 ===================
 
-After model compilation has discovered and ordered the Python object graph, ``mcdc.main.prepare`` calls ``generate_numba_layers`` in ``mcdc.code_factory`` to create the runtime representation used by transport.
+After model compilation has discovered, finalized, and ordered the Python object graph, ``mcdc.main.prepare`` calls ``generate_numba_layers`` in ``mcdc.code_factory`` to create the runtime representation used by transport.
 The representation has two complementary parts:
 
 ``simulation``

@@ -179,7 +179,7 @@ class Element(MCDCObject):
 
         file.close()
 
-        # Register data loaded after model compilation.
+        # Register data loaded during object-model finalization.
         for reaction_container in rx_containers:
             for reaction in reaction_container:
                 reaction._compile_into_simulation(simulation)

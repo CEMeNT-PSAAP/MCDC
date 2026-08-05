@@ -13,36 +13,49 @@ Numba-CPU Development
 
 Complete the Python and Numba-CPU implementation before considering additional execution targets.
 
-Choose the Host or Transport Layer
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Choose Between Model Compilation and Particle Transport
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Place work on the host when it changes the model or prepares execution:
+First decide whether the change belongs to the Python model or to the algorithms executed during particle transport.
+
+Place model definition and model-finalization work in ``mcdc/object_/`` when it changes or completes the model before execution:
 
 - Validate and normalize user input.
 - Traverse Python objects or inspect their classes.
 - Add, remove, or resize model data.
 - Read files, construct tables, or derive run-wide configuration.
-- Allocate the packed state needed by transport.
+- Define the state that must later be available to transport.
 
-Place work in transport when it must be performed during particle execution:
+Use an object's ``_compile_into_simulation`` hook when the work belongs to that object and use ``Simulation._finalize_compilation`` when it requires the complete discovered model.
+``compile_simulation`` coordinates those phases and should change only when the compilation framework itself gains a new phase or registered category.
+
+``mcdc.main.prepare`` and the runtime generators in ``mcdc/code_factory/`` are framework-level machinery that pack the finalized model, allocate execution resources, and configure execution backends.
+Most scientific-method additions should not change them; extend them only when the runtime representation or execution framework cannot express the required behavior.
+See :doc:`extending_the_object_model` for the model-compilation workflow.
+
+Place event-time numerical work in ``mcdc/transport/`` when it must be performed during particle execution:
 
 - Inspect or mutate particle records.
 - Evaluate geometry or physics from prepared numerical data.
 - Sample distributions and update the random-number state.
 - Score tallies or update preallocated banks and counters.
 
-Do as much irregular work as practical before transport.
-A small amount of host-side preparation can turn a dynamic operation into simple indexed access inside a frequently called kernel.
+Do as much irregular work as practical during model compilation.
+A small amount of object-side finalization can turn a dynamic operation into simple indexed access inside a frequently called kernel.
 
-For example, derive a reusable coefficient once while preparing the model instead of recomputing it for every particle event:
+For example, derive a reusable coefficient in the model object's compilation hook instead of recomputing it for every particle event:
 
 .. code-block:: python
 
    # On the model class
    inverse_dx: float
 
-   def _prepare_spacing(self):
+   def _compile_into_simulation(self, simulation):
+       if not super()._compile_into_simulation(simulation):
+           return False
+
        self.inverse_dx = 1.0 / self.dx
+       return True
 
    # In transport
    index = int((particle["x"] - mesh["x0"]) * mesh["inverse_dx"])

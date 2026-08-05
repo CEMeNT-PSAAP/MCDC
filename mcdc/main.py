@@ -1,7 +1,4 @@
-from mcdc.object_.material import MaterialBase
 from mcdc.object_.simulation import Simulation
-from mcdc.object_.base import MCDCObject
-from mcdc.object_.universe import Lattice, Universe
 
 # ======================================================================================
 # Run Simulation
@@ -9,6 +6,7 @@ from mcdc.object_.universe import Lattice, Universe
 
 
 def run_simulation(simulationPy: Simulation):
+    """Compile when needed, prepare runtime state, and execute a simulation."""
     import mcdc.print_ as print_module
     from mpi4py import MPI
 
@@ -25,9 +23,6 @@ def run_simulation(simulationPy: Simulation):
 
     # TIMER: preparation
     time_prep_start = MPI.Wtime()
-
-    # Override settings with command-line arguments
-    override_settings(simulationPy)
 
     # Generate the program state:
     #   - `simulation`: the simulation structure, storing fixed side data and meta data
@@ -115,124 +110,16 @@ def run_simulation(simulationPy: Simulation):
 # ======================================================================================
 
 
-def prepare(simulationPy):
-    import math
+def prepare(simulationPy: Simulation):
+    """Create framework-owned runtime state for a compiled simulation.
 
+    Model-specific finalization occurs during :meth:`mcdc.Simulation.compile`.
+    This function packs that model, allocates execution resources, configures
+    the selected backend, and loads any external source-particle state.
+    """
     from mpi4py import MPI
 
-    from mcdc.object_.material import (
-        Material,
-        MaterialMG,
-        set_elements_from_nuclides,
-        set_nuclides_from_elements,
-        update_fissionable_from_nuclides,
-    )
-
-    # ==================================================================================
-    # Adjust simulation settings as needed
-    # ==================================================================================
-
-    # Get settings
     settings = simulationPy.settings
-
-    # Set appropriate time boundary
-    settings.time_boundary = min(
-        [settings.time_boundary] + [tally.time[-1] for tally in simulationPy.tallies]
-    )
-
-    # ==================================================================================
-    # Set material data as needed
-    # ==================================================================================
-
-    # Set material compositions based on transported particles
-    for material in simulationPy.materials:
-        if not isinstance(material, Material):
-            continue
-
-        if settings.neutron_transport and len(material.nuclides) == 0:
-            set_nuclides_from_elements(material, simulationPy)
-
-        if settings.electron_transport and len(material.elements) == 0:
-            set_elements_from_nuclides(material, simulationPy)
-
-    # Set nuclear and atomic data for transported particles
-    if settings.neutron_transport:
-        for nuclide in simulationPy.nuclides:
-            nuclide.set_neutron_data(simulationPy)
-
-        for material in simulationPy.materials:
-            if isinstance(material, Material):
-                update_fissionable_from_nuclides(material)
-
-    if settings.electron_transport:
-        for element in simulationPy.elements:
-            element.set_electron_data(simulationPy)
-
-    # Set physics mode
-    if len(simulationPy.materials) == 0:
-        # Default physics in dummy mode
-        settings.neutron_multigroup_mode = True
-    else:
-        settings.neutron_multigroup_mode = isinstance(
-            simulationPy.materials[0], MaterialMG
-        )
-
-    # ==================================================================================
-    # Adjust simulation parameters as needed
-    # ==================================================================================
-
-    # Reset time grid size of all tallies if census-based tally is desired
-    if settings.use_census_based_tally:
-        N_bin = settings.census_tally_frequency
-        for tally in simulationPy.tallies:
-            tally._use_census_based_tally(N_bin, simulationPy)
-
-    # Normalize source probability
-    norm = 0.0
-    for source in simulationPy.sources:
-        norm += source.probability
-    for source in simulationPy.sources:
-        source.probability /= norm
-
-    # Create root universe if not defined
-    if len(simulationPy.universes[0].cells) == 0:
-        simulationPy.universes[0].cells = simulationPy.cells
-
-    # Initial guess
-    simulationPy.k_eff = settings.k_init
-
-    # Activate tally scoring for fixed-source
-    if not settings.neutron_eigenvalue_mode:
-        simulationPy.cycle_active = True
-    # All active eigenvalue cycle?
-    elif settings.N_inactive == 0:
-        simulationPy.cycle_active = True
-
-    # ==================================================================================
-    # Set particle bank sizes
-    # ==================================================================================
-
-    # Some sizes
-    N_particle = settings.N_particle
-    N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
-    N_census = settings.N_census
-
-    # Determine bank size
-    if settings.neutron_eigenvalue_mode or N_census == 1:
-        settings.future_bank_buffer_ratio = 0.0
-    if not settings.neutron_eigenvalue_mode and N_census == 1:
-        settings.census_bank_buffer_ratio = 0.0
-        settings.source_bank_buffer_ratio = 0.0
-    size_active = settings.active_bank_buffer
-    size_census = int((settings.census_bank_buffer_ratio) * N_work)
-    size_source = int((settings.source_bank_buffer_ratio) * N_work)
-    size_future = int((settings.future_bank_buffer_ratio) * N_work)
-
-    # Set bank size
-    simulationPy.bank_active.size[0] = size_active
-    simulationPy.bank_census.size[0] = size_census
-    simulationPy.bank_source.size[0] = size_source
-    simulationPy.bank_future.size[0] = size_future
 
     # ==================================================================================
     # Generate Numba runtime layers
@@ -318,43 +205,6 @@ def prepare(simulationPy):
 # ======================================================================================
 # Misc.
 # ======================================================================================
-
-
-def override_settings(simulationPy):
-    import mcdc.config as config
-
-    settings = simulationPy.settings
-
-    if config.args.N_particle is not None:
-        settings.N_particle = config.args.N_particle
-    if config.args.N_batch is not None:
-        settings.N_batch = config.args.N_batch
-    if config.args.output is not None:
-        settings.output_name = config.args.output
-    if config.args.progress_bar is not None:
-        settings.use_progress_bar = config.args.progress_bar
-
-    # GPU settings
-    if config.target == "gpu":
-        from mcdc.constant import (
-            GPU_STRATEGY_ASYNC,
-            GPU_STRATEGY_EVENT,
-            GPU_STORAGE_SEPARATE,
-            GPU_STORAGE_MANAGED,
-            GPU_STORAGE_UNITED,
-        )
-
-        if config.args.gpu_strategy == "async":
-            settings.gpu_strategy = GPU_STRATEGY_ASYNC
-        elif config.args.gpu_strategy == "event":
-            settings.gpu_strategy = GPU_STRATEGY_EVENT
-
-        if config.args.gpu_state_storage == "separate":
-            settings.gpu_storage = GPU_STORAGE_SEPARATE
-        elif config.args.gpu_state_storage == "managed":
-            settings.gpu_storage = GPU_STORAGE_MANAGED
-        elif config.args.gpu_state_storage == "united":
-            settings.gpu_storage = GPU_STORAGE_UNITED
 
 
 def finalize(simulation):

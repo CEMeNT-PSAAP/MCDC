@@ -88,6 +88,7 @@ polymorphic_bases = [
 
 
 def generate_numba_layers(simulation):
+    """Pack a finalized Python model into the shared runtime data layers."""
     # ==================================================================================
     # Allocate key items for the Numba runtime layers:
     #   - Python annotations
@@ -112,7 +113,7 @@ def generate_numba_layers(simulation):
         else:
             records[mcdc_class.label] = {}
 
-    # Particle banks
+    # Allocate particle banks from capacities finalized during simulation compilation
     for name in bank_names:
         annotations[name] = {}
         structures[name] = []

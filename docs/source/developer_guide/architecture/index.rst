@@ -28,8 +28,8 @@ Component Responsibility
 ------------------------
 
 The source tree follows the same separation of responsibilities shown in the architecture flow.
-Model-facing components define and collect the simulation.
-Code-factory components compile the model and prepare its runtime representation.
+Model-facing components define, collect, and finalize the simulation.
+Code-factory components coordinate object discovery and generate its runtime representation.
 Transport components implement the numerical algorithms shared by all execution modes.
 The table maps each component to its corresponding architecture role.
 Paths in the component column are relative to the top-level ``mcdc/`` package.
@@ -42,14 +42,17 @@ Paths in the component column are relative to the top-level ``mcdc/`` package.
      - Architecture role
      - Responsibility
    * - ``object_/``
-     - Model definition
-     - Defines the Python-side model, configuration, and runtime-state classes.
+     - Model definition and compilation
+     - Defines Python-side model classes and their object-local finalization hooks.
    * - :class:`mcdc.Simulation` in ``object_/simulation.py``
      - Model definition and control
-     - Owns model roots and configuration and controls compilation, visualization, and execution.
+     - Owns model roots and configuration, resolves model-wide finalization, and controls compilation, visualization, and execution.
    * - ``code_factory/python_objects_compiler.py``
      - Simulation compilation
-     - Discovers and registers the connected Python object graph.
+     - Coordinates recursive discovery, registration, and model-wide finalization.
+   * - ``main.prepare``
+     - Runtime preparation
+     - Coordinates framework-level packing, execution-resource allocation, backend configuration, and external runtime state.
    * - ``code_factory/numba_layers_generator.py``
      - Runtime preparation
      - Derives structured dtypes, packs runtime state, generates accessors, and initiates GPU-specific preparation when requested.
@@ -68,7 +71,7 @@ Paths in the component column are relative to the top-level ``mcdc/`` package.
 The ``mcdc/object_`` modules, :class:`mcdc.Simulation`, and ``python_objects_compiler.py`` implement the model-definition and simulation-compilation stages.
 :doc:`simulation_compilation` explains their relationships, while :doc:`../extending/extending_the_object_model` explains how contributors can extend them.
 
-The ``numba_layers_generator.py``, runtime ``simulation`` and ``data``, and generated ``mcdc_get`` and ``mcdc_set`` modules implement runtime preparation and form the data boundary between model construction and transport.
+``main.prepare``, ``numba_layers_generator.py``, runtime ``simulation`` and ``data``, and generated ``mcdc_get`` and ``mcdc_set`` implement framework-level runtime preparation and form the data boundary between model compilation and transport.
 :doc:`runtime_data_layout` explains their roles.
 
 The ``mcdc/transport`` package implements the shared-transport stage.
