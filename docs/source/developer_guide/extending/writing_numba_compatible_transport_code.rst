@@ -174,18 +174,12 @@ When adding a subtype, update every exhaustive dispatch site and test an unsuppo
 Control Allocation and Mutation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Particle histories repeatedly execute transport functions, so temporary allocation can be expensive and difficult for Numba to optimize.
+Transport functions execute repeatedly for every particle history, so they should normally operate on storage prepared before transport begins.
+Reuse particle banks, tally arrays, and other prepared runtime state instead of rebuilding them inside the particle loop.
+Update structured fields or ``data`` through explicit assignments and generated setters, and do not append model entities or change field shapes during transport.
 
-- Reuse particle containers, banks, tally arrays, and scratch state allocated during preparation.
-- Update structured fields or ``data`` through explicit assignments and generated setters.
-- Prefer scalar calculations or bounded loops over constructing intermediate Python collections.
-- Do not append a new model entity or change a field's shape during transport.
-- Preserve the one-element container convention when a mutable record must be shared across function boundaries.
-
-The owner of each mutation should be evident from the function signature.
-Avoid hidden module-level mutable state.
-
-For example, select a minimum with scalar state instead of building a temporary list:
+Prefer scalar state and bounded loops when an intermediate container is unnecessary.
+For example, select a minimum directly instead of building a temporary list of distances:
 
 .. code-block:: python
 
@@ -195,14 +189,78 @@ For example, select a minimum with scalar state instead of building a temporary 
        if distance < best_distance:
            best_distance = distance
 
-When a scalar structured record must be mutated across a function boundary, pass its one-element container and recover the record inside the function:
+Some transport operations genuinely require new local storage.
+Fission and scattering create secondary-particle records during transport, while geometry and physics routines may require small bounded work arrays.
+Use ``util.local_array`` with a known shape and stable dtype for these cases.
+In Numba-CPU mode, it provides a NumPy array that Numba can compile and mutate within the transport function.
+
+For example, fission allocates one reusable record for newly generated particles, initializes it for each secondary, and passes its container to a particle bank:
 
 .. code-block:: python
 
-   @njit
-   def increment_counter(counter_container):
-       counter = counter_container[0]
-       counter["value"] += 1
+   particle_container_new = util.local_array(1, type_.particle_data)
+   particle_new = particle_container_new[0]
+
+   for _ in range(N):
+       particle_module.copy_as_child(
+           particle_container_new, particle_container
+       )
+       particle_new["w"] = weight_product
+       particle_bank_module.bank_census_particle(
+           particle_container_new, program
+       )
+
+Use generated structured dtypes from ``mcdc.numba_types`` for local transport records.
+Keep local work arrays small and predictable, and reuse the same allocation within a loop when its contents can be overwritten.
+Make every mutation visible through function arguments rather than hidden module-level mutable state.
+The one-element container preserves the mutable record across function boundaries; the next section explains when functions should receive such a container and when they should receive the record itself.
+
+Use Runtime Arguments Deliberately
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+MC/DC uses ``particle_container``, ``simulation_container``, and ``program`` for different purposes.
+They are calling conventions that preserve mutation and backend portability, not interchangeable names for simulation state.
+
+``particle_container``
+   A one-element structured array that owns one mutable particle record.
+   Pass the container when a function must mutate the particle and recover the record locally for field access.
+   The container may be caller-owned, a one-element view into a particle bank, or local storage created with ``util.local_array``.
+
+   .. code-block:: python
+
+      @njit
+      def reduce_weight(particle_container, factor):
+          particle = particle_container[0]
+          particle["w"] *= factor
+
+``simulation_container``
+   A one-element structured array that owns the mutable top-level ``simulation`` record.
+   It establishes storage and lifetime at an execution entry point; ordinary transport functions normally receive the recovered record rather than the container.
+
+   .. code-block:: python
+
+      def fixed_source_simulation(simulation_container, data):
+          simulation = simulation_container[0]
+          settings = simulation["settings"]
+          for idx_batch in range(settings["N_batch"]):
+              simulation["idx_batch"] = idx_batch
+
+``program``
+   A backend-neutral execution handle used when an operation requires execution services such as particle banking or scheduling.
+   In Python and Numba-CPU modes, ``program`` is the ``simulation`` record and ``util.access_simulation(program)`` returns it unchanged.
+   Treat the handle as opaque even in these modes so the same transport function can later use a GPU implementation.
+
+   .. code-block:: python
+
+      @njit
+      def bank_active_particle(particle_container, program):
+          simulation = util.access_simulation(program)
+          bank = simulation["bank_active"]
+          _bank_particle(particle_container, bank)
+
+Accept ``simulation`` when a function only needs prepared simulation state.
+Accept ``program`` when it needs backend-dependent execution services, and recover ``simulation`` through ``util.access_simulation``.
+Create one-element containers only at ownership or local-storage boundaries; do not wrap every structured record passed between helpers.
 
 Debug Python and Numba-CPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -249,6 +307,27 @@ For transport code that will execute on a GPU:
 - Do not use Numba ``objmode`` in a device path.
 - Replace CPU-only Numba features with device-compatible operations.
 - Keep target-specific atomics, memory operations, and scheduling behind the existing GPU adaptation layer.
+
+Use the GPU Program Handle
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In Numba-GPU execution, ``program`` is a Harmonize program handle rather than the ``simulation`` record itself.
+The GPU adaptation replaces ``util.access_simulation`` so shared transport functions can recover the device-resident simulation state without knowing how the handle stores it.
+Do not index ``program`` directly or assume its CPU representation.
+The same adaptation replaces ``util.local_array`` with device-local allocation, which is why shared code should use the utility consistently before GPU porting begins.
+
+For example, a GPU entry point recovers state from the handle before calling shared transport behavior:
+
+.. code-block:: python
+
+   def step(program: nb.uintp, particle_input: particle_gpu):
+       simulation = access_simulation(program)
+       data_ptr = access_data_ptr(program)
+       data = harmonize.array_from_ptr(data_ptr, shape, nb.float64)
+
+       particle_container = util.local_array(1, type_.particle)
+       particle_container[0] = particle_input
+       step_particle(particle_container, program, data)
 
 Separate Shared and GPU-Specific Code
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
