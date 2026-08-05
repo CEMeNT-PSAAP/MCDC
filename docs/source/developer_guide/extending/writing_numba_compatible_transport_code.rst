@@ -27,7 +27,7 @@ Place model definition and model-finalization work in ``mcdc/object_/`` when it 
 - Define the state that must later be available to transport.
 
 Use an object's ``_compile_into_simulation`` hook when the work belongs to that object and use ``Simulation._finalize_compilation`` when it requires the complete discovered model.
-``compile_simulation`` coordinates those phases and should change only when the compilation framework itself gains a new phase or registered category.
+``compile_simulation`` in ``mcdc/code_factory/`` coordinates those phases and should change only when the compilation framework itself gains a new phase or registered category.
 
 ``mcdc.main.prepare`` and the runtime generators in ``mcdc/code_factory/`` are framework-level machinery that pack the finalized model, allocate execution resources, and configure execution backends.
 Most scientific-method additions should not change them; extend them only when the runtime representation or execution framework cannot express the required behavior.
@@ -161,11 +161,11 @@ Dispatch on integer constants through a small interface function rather than usi
    def get_mesh_x(index, mesh, simulation, data):
        sub_ID = mesh["sub_ID"]
        if mesh["sub_type"] == MESH_STRUCTURED:
-           concrete = simulation["structured_meshes"][sub_ID]
-           return mcdc_get.structured_mesh.x(index, concrete, data)
+           structured_mesh = simulation["structured_meshes"][sub_ID]
+           return mcdc_get.structured_mesh.x(index, structured_mesh, data)
        if mesh["sub_type"] == MESH_UNIFORM:
-           concrete = simulation["uniform_meshes"][sub_ID]
-           return concrete["x0"] + index * concrete["dx"]
+           uniform_mesh = simulation["uniform_meshes"][sub_ID]
+           return uniform_mesh["x0"] + index * uniform_mesh["dx"]
        return 0.0
 
 Use the actual category interface and constants already defined for that family.
