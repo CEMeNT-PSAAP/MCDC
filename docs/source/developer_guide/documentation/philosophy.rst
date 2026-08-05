@@ -17,28 +17,28 @@ This philosophy applies to all forms of MC/DC documentation, including Getting S
 The Layered Documentation Philosophy
 ------------------------------------
 
-MC/DC documentation is written for three complementary audiences.
-Rather than maintaining separate documentation for each audience, individual documents should progressively layer information from high-level usage to mathematical concepts and implementation details.
+MC/DC documentation supports three complementary kinds of work.
+Individual documents should progressively layer information from high-level usage to mathematical concepts and implementation details.
 Readers can naturally stop at the level of detail appropriate for their needs.
 
-Users
-^^^^^
+Using MC/DC
+^^^^^^^^^^^
 
-Users build geometry, define materials and sources, configure simulations, execute transport calculations, and analyze results.
+Using MC/DC involves building geometry, defining materials and sources, configuring simulations, executing transport calculations, and analyzing results.
 
-Documentation for users should emphasize:
+Documentation supporting this work should emphasize:
 
 - What MC/DC provides.
 - How to use the public API.
 - Tutorials, examples, and recommended workflows.
 - Best practices for building transport models.
 
-Method Developers
-^^^^^^^^^^^^^^^^^
+Developing Methods
+^^^^^^^^^^^^^^^^^^
 
-Method Developers use MC/DC as a platform for developing and evaluating new transport methods and computational algorithms.
+Developing methods in MC/DC includes creating and evaluating new transport methods and computational algorithms.
 
-Documentation for Method Developers should explain:
+Documentation supporting this work should explain:
 
 - Mathematical formulations.
 - Numerical algorithms.
@@ -47,12 +47,12 @@ Documentation for Method Developers should explain:
 - Extensibility points.
 - Relationships between the public API and transport algorithms.
 
-Framework Developers
-^^^^^^^^^^^^^^^^^^^^
+Developing the Framework
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-Framework Developers extend and maintain the MC/DC software framework itself.
+Developing the framework includes extending and maintaining MC/DC's software infrastructure.
 
-Documentation for Framework Developers should describe:
+Documentation supporting this work should describe:
 
 - Software architecture.
 - Internal APIs.
@@ -89,7 +89,7 @@ In general:
 
 - The opening description should explain the public purpose of the object, function, or module.
 - Parameters, return values, attributes, and examples should focus on the public interface.
-- Mathematical representations, algorithms, and design rationale should be documented in the ``Notes`` section when they help Method Developers.
+- Mathematical representations, algorithms, and design rationale should be documented in the ``Notes`` section when they support methods development.
 - Framework-specific implementation details should be documented separately as implementation notes when appropriate.
 
 Not every API requires all of these sections.

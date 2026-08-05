@@ -35,6 +35,8 @@ Model-facing components define, collect, and finalize the simulation.
 Code-factory components coordinate object discovery and generate its runtime representation.
 Transport components implement the numerical algorithms shared by all execution modes.
 Output components aggregate and serialize completed results.
+For :ref:`methods development <development_areas>`, ``object_/`` and ``transport/`` form the primary extension surface.
+The ``code_factory/`` package implements the framework-level compilation and generation bridge between them.
 The table maps each component to its corresponding architecture role.
 Paths in the component column are relative to the top-level ``mcdc/`` package.
 
@@ -115,7 +117,7 @@ Changes to the user-visible HDF5 structure should also update the corresponding 
 Utility Module Scope
 --------------------
 
-``util`` denotes helpers shared within the package that contains the module; it does not identify one codebase-wide utility layer.
+``util`` denotes helpers shared within the package that contains the module.
 The complete import path therefore defines the helper's architectural scope.
 
 .. list-table::
@@ -137,7 +139,7 @@ The complete import path therefore defines the helper's architectural scope.
 
 Place a new helper in the narrowest package that contains all of its consumers.
 Model-construction helpers may use ordinary Python and NumPy behavior, while helpers reachable from ``transport/`` must follow the compiled-execution constraints described in :doc:`../extending/writing_numba_compatible_transport_code`.
-Hardware-specific replacements belong in the corresponding backend adaptation rather than the shared transport utility module.
+Hardware-specific replacements belong in the corresponding backend adaptation.
 Promote a helper to a broader ``util.py`` only when multiple sibling components genuinely share it, and avoid treating any utility module as a collection for otherwise unrelated code.
 
 .. toctree::

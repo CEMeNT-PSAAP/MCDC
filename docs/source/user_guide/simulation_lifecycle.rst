@@ -187,6 +187,6 @@ The example suite demonstrates the lifecycle in complete inputs:
 - :ref:`example_c5g7_transient` — a larger reactor transient.
 
 For exact public signatures, use the :doc:`../reference/python_api/index`.
-Framework developers can continue with
+For framework implementation details, continue with
 :doc:`../developer_guide/architecture/simulation_compilation` and
 :doc:`../developer_guide/architecture/runtime_data_layout`.
