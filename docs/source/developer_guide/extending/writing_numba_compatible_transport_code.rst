@@ -269,6 +269,42 @@ Accept ``simulation`` when a function only needs prepared simulation state.
 Accept ``program`` when it needs backend-dependent execution services, and recover ``simulation`` through ``util.access_simulation``.
 Create one-element containers only at ownership or local-storage boundaries; do not wrap every structured record passed between helpers.
 
+Cross the Python Boundary with ``objmode``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Numba's ``objmode`` temporarily returns from compiled Numba-CPU execution to the Python interpreter for one bounded block.
+MC/DC uses this boundary when compiled orchestration must invoke a Python service that Numba cannot compile and moving the complete operation outside the compiled driver would obscure its ownership or timing.
+
+Current uses include:
+
+- MPI collectives and particle-bank communication.
+- Wall-clock timing through ``MPI.Wtime``.
+- Progress and fatal diagnostics provided by ``mcdc.print_``.
+- Census-based HDF5 output performed between transport stages.
+
+Keep the ``objmode`` block as small and infrequent as possible because entering the interpreter interrupts compiled execution and adds conversion and dispatch overhead.
+Perform the surrounding numerical work in compiled code, and do not use ``objmode`` merely to avoid expressing a maintained numerical algorithm in Numba-compatible form.
+
+If a value produced in Python is used after the block, declare its Numba type on the context manager:
+
+.. code-block:: python
+
+   time_start = 0.0
+   with objmode(time_start="float64"):
+       time_start = MPI.Wtime()
+
+No output declaration is needed when the block only performs a side effect or mutates an array that was allocated before entering it:
+
+.. code-block:: python
+
+   local_total = np.array([particle_weight], dtype=np.float64)
+   global_total = np.zeros(1, dtype=np.float64)
+   with objmode():
+       MPI.COMM_WORLD.Allreduce(local_total, global_total, MPI.SUM)
+
+``objmode`` is a deliberate Numba-CPU escape hatch, not part of the GPU execution model.
+Code intended for Numba-GPU must keep the Python service outside device execution or provide a backend-specific implementation.
+
 Debug Python and Numba-CPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 

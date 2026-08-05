@@ -63,6 +63,9 @@ Paths in the component column are relative to the top-level ``mcdc/`` package.
    * - ``main.run_simulation``
      - Calculation orchestration
      - Coordinates runtime preparation, transport execution, result generation, runtime reporting, and backend finalization.
+   * - ``print_.py``
+     - Diagnostics and reporting
+     - Centralizes fatal errors, master-rank messages, calculation progress, and runtime summaries used across the model, transport, and output stages.
    * - ``main.prepare``
      - Runtime preparation
      - Coordinates framework-level packing, execution-resource allocation, backend configuration, and external runtime state.
