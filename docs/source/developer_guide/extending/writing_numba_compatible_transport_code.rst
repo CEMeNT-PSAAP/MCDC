@@ -150,10 +150,15 @@ Do not resize the returned view or retain it beyond the prepared run.
 For a new variable-length field, declare the field on the Python model class and regenerate its accessors as described in :doc:`extending_the_object_model`.
 Do not hand-maintain offset arithmetic in several transport modules.
 
-Use Explicit Dispatch
-^^^^^^^^^^^^^^^^^^^^^
+Use Named Constants and Explicit Dispatch
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Dispatch on integer constants through a small interface function rather than using Python ``isinstance`` checks or methods on runtime records:
+The packed runtime representation expresses categories, events, and other discrete states as primitive numerical values rather than Python types.
+``mcdc.constant`` gives those values shared names and also defines common numerical limits and tolerances.
+These definitions form a static implementation contract and retain the same meaning across simulations.
+Use the named constants instead of repeating their numerical values in model, transport, scoring, or output code.
+
+Dispatch on those constants through a small interface function rather than using Python ``isinstance`` checks or methods on runtime records:
 
 .. code-block:: python
 
@@ -169,7 +174,9 @@ Dispatch on integer constants through a small interface function rather than usi
        return 0.0
 
 Use the actual category interface and constants already defined for that family.
-When adding a subtype, update every exhaustive dispatch site and test an unsupported value deliberately if the interface defines fallback behavior.
+When introducing a new subtype, event, or score, give its constant a unique value within the corresponding family and update every consumer of that family.
+Test an unsupported value deliberately when the interface defines fallback behavior.
+Do not place a size or setting derived from one simulation in ``constant.py``; simulation-specific values that must be visible to Numba as compile-time values use the generated literals described in :ref:`simulation_specific_literals`.
 
 Control Allocation and Mutation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

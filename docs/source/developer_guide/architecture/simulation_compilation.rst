@@ -52,6 +52,21 @@ MC/DC uses several related forms of compilation:
 
 Unless otherwise qualified, this page uses *compilation* to mean model compilation.
 
+Configuration Boundary
+----------------------
+
+``mcdc.config`` connects command-line execution controls to the simulation lifecycle.
+When imported, it parses the command-line arguments known to MC/DC, establishes process-wide choices such as Python or Numba mode, CPU or GPU target, caching behavior, and GPU execution options, then configures Numba and generated-code caches accordingly.
+Unknown arguments are retained rather than rejected so MC/DC can run under notebooks, test runners, and higher-level Python drivers.
+
+Simulation settings remain owned by :class:`mcdc.Simulation` and its embedded ``Settings`` object.
+At the beginning of ``Simulation.compile``, ``config.override_settings`` applies the supported command-line overrides before object discovery and model-wide finalization.
+Consequently, derived state such as particle-bank capacities is calculated from the effective settings that will be used for the run.
+
+This separation distinguishes process-wide execution configuration from simulation-owned model configuration.
+A new physical or numerical setting should normally be added to ``Settings`` or another simulation-owned object.
+Add a ``config.py`` option only when that setting also needs a command-line override or when the choice controls the execution framework itself.
+
 Ownership and Roots
 -------------------
 

@@ -205,6 +205,32 @@ Packing is performed in two passes:
 
 The structured ``simulation`` dtype can then be finalized because collection sizes, particle-bank sizes, and nested record types are known.
 
+.. _simulation_specific_literals:
+
+Static Constants and Simulation-Specific Literals
+-------------------------------------------------
+
+MC/DC distinguishes static implementation constants from values derived for one prepared simulation.
+``mcdc.constant`` defines stable codes, event flags, numerical limits, and tolerances that have the same meaning for every simulation.
+These values can be imported directly by the model, transport, and output layers.
+
+Some compiled operations instead require a simulation-dependent value to be known as a Numba literal.
+During ``mcdc.main.prepare``, ``make_literals`` in ``mcdc.code_factory.literals_generator`` derives those values from the compiled Python model and replaces the placeholder functions in ``mcdc.literals`` with JIT-compatible implementations that return them.
+
+The current example is the work-array size used to evaluate cell-region reverse Polish notation.
+The generator finds the largest required evaluation buffer in the compiled model, and geometry transport obtains that value through:
+
+.. code-block:: python
+
+   value = util.local_array(
+       literals.rpn_evaluation_buffer_size(),
+       np.bool_,
+   )
+
+Use a generated literal only for a single simulation-wide value that compiled code must treat as fixed during the prepared run.
+Store values that vary by object or particle in the structured ``simulation`` state or ``data`` instead.
+Because literals are derived from a particular model snapshot, runtime preparation regenerates them whenever that simulation is prepared again.
+
 The One-element Container
 -------------------------
 
