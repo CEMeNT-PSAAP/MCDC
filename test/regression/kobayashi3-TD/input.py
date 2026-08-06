@@ -11,8 +11,8 @@ simulation = mcdc.Simulation("Kobayashi 3-D time dependent")
 # (PNE 2001, https://doi.org/10.1016/S0149-1970(01)00007-5)
 
 # Set materials
-m = mcdc.MaterialMG(capture=np.array([0.05]), scatter=np.array([[0.05]]))
-m_void = mcdc.MaterialMG(capture=np.array([5e-5]), scatter=np.array([[5e-5]]))
+m = mcdc.Material.multigroup(capture=np.array([0.05]), scatter=np.array([[0.05]]))
+m_void = mcdc.Material.multigroup(capture=np.array([5e-5]), scatter=np.array([[5e-5]]))
 
 # Set surfaces
 sx1 = mcdc.Surface.PlaneX(x=0.0, boundary_condition="reflective")

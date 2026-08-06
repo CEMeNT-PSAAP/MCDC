@@ -13,11 +13,13 @@ simulation = mcdc.Simulation("Cooper problem 2")
 # Set materials
 SigmaT = 5.0
 c = 0.8
-m_barrier = mcdc.MaterialMG(
+m_barrier = mcdc.Material.multigroup(
     capture=np.array([SigmaT]), scatter=np.array([[SigmaT * c]])
 )
 SigmaT = 1.0
-m_room = mcdc.MaterialMG(capture=np.array([SigmaT]), scatter=np.array([[SigmaT * c]]))
+m_room = mcdc.Material.multigroup(
+    capture=np.array([SigmaT]), scatter=np.array([[SigmaT * c]])
+)
 
 # Set surfaces
 sx1 = mcdc.Surface.PlaneX(x=0.0, boundary_condition="reflective")

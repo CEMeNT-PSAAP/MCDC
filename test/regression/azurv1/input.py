@@ -12,7 +12,7 @@ simulation = mcdc.Simulation("AZURV1")
 # Effective scattering ratio c = 1.1
 
 # Materials
-m = mcdc.MaterialMG(
+m = mcdc.Material.multigroup(
     capture=np.array([1.0 / 3.0]),
     scatter=np.array([[1.0 / 3.0]]),
     fission=np.array([1.0 / 3.0]),

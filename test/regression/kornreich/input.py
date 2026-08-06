@@ -11,13 +11,13 @@ simulation = mcdc.Simulation("Kornreich")
 # DOI: 10.1016/j.anucene.2004.03.012
 
 # Set materials
-m1 = mcdc.MaterialMG(
+m1 = mcdc.Material.multigroup(
     capture=np.array([0.0]),
     scatter=np.array([[0.9]]),
     fission=np.array([0.1]),
     nu_p=np.array([6.0]),
 )
-m2 = mcdc.MaterialMG(
+m2 = mcdc.Material.multigroup(
     capture=np.array([0.68]),
     scatter=np.array([[0.2]]),
     fission=np.array([0.12]),

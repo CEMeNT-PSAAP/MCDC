@@ -10,9 +10,9 @@ simulation = mcdc.Simulation("Slab absorbium")
 # Three slab layers with different purely-absorbing materials
 
 # Set materials
-m1 = mcdc.MaterialMG(capture=np.array([1.0]))
-m2 = mcdc.MaterialMG(capture=np.array([1.5]))
-m3 = mcdc.MaterialMG(capture=np.array([2.0]))
+m1 = mcdc.Material.multigroup(capture=np.array([1.0]))
+m2 = mcdc.Material.multigroup(capture=np.array([1.5]))
+m3 = mcdc.Material.multigroup(capture=np.array([2.0]))
 
 # Set surfaces
 s1 = mcdc.Surface.PlaneZ(z=0.0, boundary_condition="vacuum")

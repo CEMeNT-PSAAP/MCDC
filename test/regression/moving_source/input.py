@@ -10,7 +10,7 @@ simulation = mcdc.Simulation("Moving source")
 # ======================================================================================
 
 # Set materials
-air = mcdc.MaterialMG(
+air = mcdc.Material.multigroup(
     capture=np.array([0.002]),
     scatter=np.array([[0.008]]),
     speed=np.array([200000.0]),

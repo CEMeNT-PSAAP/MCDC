@@ -23,7 +23,7 @@ with np.load("SHEM-361.npz") as data:
     lamd = data["lamd"]
 
 # Set material
-m = mcdc.MaterialMG(
+m = mcdc.Material.multigroup(
     capture=SigmaC,
     scatter=SigmaS,
     fission=SigmaF,
