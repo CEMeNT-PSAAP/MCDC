@@ -117,10 +117,6 @@ def prepare(simulationPy: Simulation):
     This function packs that model, allocates execution resources, configures
     the selected backend, and loads any external source-particle state.
     """
-    from mpi4py import MPI
-
-    settings = simulationPy.settings
-
     # ==================================================================================
     # Generate Numba runtime layers
     # ==================================================================================
@@ -155,30 +151,26 @@ def prepare(simulationPy: Simulation):
     # ==================================================================================
     # Source particles from file
     # ==================================================================================
-    # TODO: Use parallel h5py, may need to compile for speed
-
-    import h5py
-
-    # All ranks, take turn
-    for i in range(simulation["mpi_size"]):
-        if simulation["mpi_rank"] == i:
-            if settings.use_source_file:
-                with h5py.File(settings.source_file_name, "r") as f:
-                    # Get source particle size
-                    N_particle = f["particles_size"][()]
-
-                    # Redistribute work
-                    mpi.distribute_work(N_particle, simulation)
-                    N_local = simulation["mpi_work_size"]
-                    start = simulation["mpi_work_start"]
-                    end = start + N_local
-
-                    # Add particles to source bank
-                    simulation["bank_source"]["particles"][:N_local] = f["particles"][
-                        start:end
-                    ]
-                    simulation["bank_source"]["size"] = N_local
-        MPI.COMM_WORLD.Barrier()
+    # TODO: Re-enable file-backed source initialization after its particle-bank
+    # schema and MPI redistribution path are updated.
+    #
+    # import h5py
+    # import mcdc.transport.mpi as mpi
+    # from mpi4py import MPI
+    #
+    # for i in range(simulation["mpi_size"]):
+    #     if simulation["mpi_rank"] == i and settings.use_source_file:
+    #         with h5py.File(settings.source_file_name, "r") as f:
+    #             N_particle = f["particles_size"][()]
+    #             mpi.distribute_work(N_particle, simulation)
+    #             N_local = simulation["mpi_work_size"]
+    #             start = simulation["mpi_work_start"]
+    #             end = start + N_local
+    #             simulation["bank_source"]["particle_data"][:N_local] = f[
+    #                 "particles"
+    #             ][start:end]
+    #             simulation["bank_source"]["size"] = N_local
+    #     MPI.COMM_WORLD.Barrier()
 
     # ==================================================================================
     # Finalize
