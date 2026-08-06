@@ -26,7 +26,7 @@ from mcdc.print_ import print_error
 
 
 class Source(MCDCObject):
-    """Define a particle source.
+    """Distributions of particles introduced into the simulation.
 
     A source specifies the position, direction, energy, time, particle type,
     transport-mode group, and relative sampling probability for emitted particles.

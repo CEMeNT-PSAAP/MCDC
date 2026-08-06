@@ -50,7 +50,7 @@ from mcdc.print_ import print_1d_array, print_error
 
 
 class Tally(MCDCPolymorphic):
-    """Create a tally and select its estimator from the requested scores.
+    """Quantities measured during the simulation.
 
     Parameters
     ----------

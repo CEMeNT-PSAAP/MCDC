@@ -43,7 +43,7 @@ from mcdc.object_.universe import Universe, Lattice
 
 
 class Simulation(MCDCBase):
-    """Own a complete MC/DC model, settings, techniques, and runtime state.
+    """The complete model and configuration for one MC/DC calculation.
 
     Parameters
     ----------

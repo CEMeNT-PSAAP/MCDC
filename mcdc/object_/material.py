@@ -18,7 +18,7 @@ from mcdc.print_ import print_error
 
 
 class Material(MCDCObject):
-    """Define a material from native compositions and/or multigroup data.
+    """Particle-interaction properties assigned to simulation cells.
 
     Parameters
     ----------

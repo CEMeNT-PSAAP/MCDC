@@ -44,8 +44,7 @@ Materials
 ^^^^^^^^^
 
 Materials define the interaction data used by cells. :class:`mcdc.Material`
-accepts native compositions and particle-specific transport-mode data.
-:class:`mcdc.NeutronMultigroupData` stores reduced multigroup neutron data.
+accepts native compositions and particle-specific transport-model data (e.g., neutron multigroup cross-sections).
 
 .. autosummary::
    :toctree: generated
@@ -76,7 +75,7 @@ universes, and universes and lattices organize repeated geometry.
 Sources
 ^^^^^^^
 
-Sources describe the initial particle population.
+Sources describe the distribution of the initial particle population in the simulation.
 
 .. autosummary::
    :toctree: generated
@@ -133,7 +132,9 @@ Transport techniques
 ^^^^^^^^^^^^^^^^^^^^
 
 Transport techniques are grouped under ``simulation.technique``. For example,
-enable implicit capture with ``simulation.technique.implicit_capture()``. See
+enable implicit capture with ``simulation.technique.implicit_capture()`` or
+allow material-local neutron group structures with
+``simulation.technique.neutron_multigroup(multigrid=True)``. See
 :class:`mcdc.Simulation` for the ownership model and examples.
 
 Compiling and running

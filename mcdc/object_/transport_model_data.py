@@ -27,7 +27,7 @@ _NEUTRON_MULTIGROUP_LOG_ENERGY_REPRESENTATIONS = {
 
 
 class NeutronMultigroupData(MCDCObject):
-    """Store the cross-section data for multigroup neutron transport.
+    """Multigroup neutron-interaction properties assigned to a material.
 
     Materials may use ``NeutronMultigroupData`` alone for multigroup transport or
     alongside a native composition over the energy range defined by

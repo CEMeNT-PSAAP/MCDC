@@ -96,7 +96,7 @@ class Region:
 
 
 class Cell(MCDCObject):
-    """Define a geometric region and the object that fills it.
+    """Material- or universe-filled regions of the simulation geometry.
 
     Parameters
     ----------
