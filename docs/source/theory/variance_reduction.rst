@@ -33,7 +33,7 @@ effective in highly absorbing media.
 
 .. code-block:: python3
 
-   simulation.implicit_capture()
+   simulation.technique.implicit_capture()
 
 .. note::
 
@@ -59,7 +59,7 @@ preserving the expected weight (unbiased).
 
 .. code-block:: python3
 
-   simulation.global_weight_roulette(
+   simulation.technique.global_weight_roulette(
        weight_threshold=0.25,
        weight_target=1.0,
    )
@@ -88,7 +88,7 @@ This reduces the variance of the fission source weight distribution.
 
 .. code-block:: python3
 
-   simulation.weighted_emission(active=True, weight_target=1.0)
+   simulation.technique.weighted_emission(active=True, weight_target=1.0)
 
 
 Population Control
@@ -105,7 +105,7 @@ rouletting low-weight ones, targeting a uniform weight close to
 
 .. code-block:: python3
 
-   simulation.population_control()
+   simulation.technique.population_control()
 
 Population control is typically combined with a time census
 (``set_time_census``) that checkpoints the particle population at
@@ -133,8 +133,8 @@ setup might use:
 
 .. code-block:: python3
 
-   simulation.implicit_capture()
-   simulation.global_weight_roulette(
+   simulation.technique.implicit_capture()
+   simulation.technique.global_weight_roulette(
        weight_threshold=0.25,
        weight_target=1.0,
    )
@@ -143,9 +143,9 @@ For time-dependent fission problems:
 
 .. code-block:: python3
 
-   simulation.implicit_capture()
-   simulation.weighted_emission(active=True, weight_target=1.0)
-   simulation.population_control()
+   simulation.technique.implicit_capture()
+   simulation.technique.weighted_emission(active=True, weight_target=1.0)
+   simulation.technique.population_control()
 
 The order of activation does not matter — MC/DC applies them in the
 correct transport-physics order internally.

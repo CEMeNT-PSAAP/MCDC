@@ -90,23 +90,25 @@ The ``Simulation`` instance collects the model and controls its execution:
 Materials
 ~~~~~~~~~
 
-``MaterialMG`` represents multigroup interaction data. A one-element capture
-array and a :math:`1 \times 1` scattering matrix define a one-group material:
+``NeutronMultigroupData`` stores the underlying multigroup neutron data.
+``Material.multigroup()`` conveniently constructs that model and attaches it to
+a ``Material``. A one-element capture array and a :math:`1 \times 1` scattering
+matrix define one-group neutron data:
 
 .. code-block:: python3
 
-   source_region_material = mcdc.MaterialMG(
+   source_region_material = mcdc.Material.multigroup(
        capture=np.array([0.1]),
        scatter=np.array([[0.9]]),
    )
-   shield_material = mcdc.MaterialMG(
+   shield_material = mcdc.Material.multigroup(
        capture=np.array([0.7]),
        scatter=np.array([[0.3]]),
    )
 
-Continuous-energy calculations instead use :class:`mcdc.Material` and require
-an MC/DC nuclear-data library. See :ref:`install-data-library` for
-configuration instructions.
+Native compositions use the same :class:`mcdc.Material` interface and require
+an MC/DC nuclear-data library. See :ref:`install-data-library` for configuration
+instructions.
 
 Geometry
 ~~~~~~~~

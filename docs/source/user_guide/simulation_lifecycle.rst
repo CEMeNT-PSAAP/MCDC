@@ -27,7 +27,7 @@ objects:
 
 .. code-block:: python
 
-   material = mcdc.MaterialMG(
+   material = mcdc.Material.multigroup(
        capture=np.array([0.1]),
        scatter=np.array([[0.9]]),
    )
@@ -63,7 +63,7 @@ simulation:
 
    simulation.settings.N_particle = 10_000
    simulation.settings.N_batch = 20
-   simulation.implicit_capture()
+   simulation.technique.implicit_capture()
 
 This explicit ownership replaces the former process-wide singleton workflow.
 

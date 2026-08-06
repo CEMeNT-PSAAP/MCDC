@@ -98,7 +98,7 @@ Initialization
       non_numba = ["region", "fill"]
 
       region: Region
-      fill: MaterialBase | Universe | Lattice | None
+      fill: Material | Universe | Lattice | None
       region_RPN_tokens: list[int]
       fill_type: int
       fill_ID: int
@@ -158,7 +158,7 @@ The layer generator interprets annotations according to the field's role:
      - Transport access
    * - ``active: bool``
      - Scalar structured field
-     - ``technique["active"]``
+     - ``simulation["technique"]["new_technique"]["active"]``
    * - ``translation: Annotated[NDArray[float64], (3,)]``
      - Fixed-size embedded array
      - ``cell["translation"][axis]``
@@ -228,16 +228,23 @@ A minimal class has a label, annotated fields, and initialized values:
            self.strength = 1.0
 
 Add an annotated field for the object to its owner and instantiate it with the owner.
-For simulation-wide configuration, this normally means adding the field to ``Simulation`` and constructing it in ``Simulation.__init__``.
+Simulation-wide transport techniques belong to the ``Technique`` aggregate,
+which is itself owned by ``Simulation``.
 The embedded object participates in recursive compilation but does not require a registry branch or object ID.
+This Python ownership hierarchy is preserved under the packed
+``simulation["technique"]`` record.
 
 .. code-block:: python
 
-   class Simulation(MCDCBase):
+   class Technique(MCDCBase):
        new_technique: NewTechnique
 
        def __init__(self):
            self.new_technique = NewTechnique()
+
+The corresponding user and runtime interfaces are
+``simulation.technique.new_technique(...)`` and
+``simulation["technique"]["new_technique"]``.
 
 If the embedded object refers to an ``MCDCObject``, annotate that reference.
 The default traversal will register the referenced object when compilation reaches the embedded configuration.

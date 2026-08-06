@@ -72,18 +72,18 @@ Within MC/DC's source code, we document functions and classes using docstrings.
 For ``autodoc`` and ``autosummary`` to work, the docstrings within MC/DC's source code must be written in correct rst.
 
 The ``autodoc`` extension includes a set of directives to document different chunks of code (e.g., modules, functions, classes).
-For example, below is the entire rst file that generates the :doc:`../../reference/python_api/generated/mcdc.MaterialMG` page:
+For example, below is the entire rst file that generates the :doc:`../../reference/python_api/generated/mcdc.NeutronMultigroupData` page:
 
 .. code-block::
 
-   mcdc.MaterialMG
-   ===============
+   mcdc.NeutronMultigroupData
+   ======================
 
    .. currentmodule:: mcdc
 
-   .. autoclass:: MaterialMG
+   .. autoclass:: NeutronMultigroupData
 
-(That in-line reference was created using :code:`:doc:\`../../reference/python_api/generated/mcdc.MaterialMG\``, by the way).
+(That in-line reference was created using :code:`:doc:\`../../reference/python_api/generated/mcdc.NeutronMultigroupData\``, by the way).
 
 A rst file with an ``autodoc`` directive is required for each module or function that we would like to document.
 Rather than create all of these rst files by hand, we use the ``autosummary`` extension to do it for us.
@@ -95,12 +95,12 @@ For example, consider the first ``autosummary`` directive in ``source/reference/
    .. autosummary::
 
       mcdc.Material
-      mcdc.MaterialMG
+      mcdc.NeutronMultigroupData
 
 This directive:
-  #. Generates two files in ``reference/python_api/generated/``: ``mcdc.Material.rst`` and ``mcdc.MaterialMG.rst``.
+  #. Generates two files in ``reference/python_api/generated/``: ``mcdc.Material.rst`` and ``mcdc.NeutronMultigroupData.rst``.
   #. Populates each file with the proper autoclass directive.
-  #. Creates a table on :doc:`../../reference/python_api/index` with entries mcdc.Material and mcdc.MaterialMG that link to the respective generated pages.
+  #. Creates a table on :doc:`../../reference/python_api/index` with entries mcdc.Material and mcdc.NeutronMultigroupData that link to the respective generated pages.
 
 
 Building Locally

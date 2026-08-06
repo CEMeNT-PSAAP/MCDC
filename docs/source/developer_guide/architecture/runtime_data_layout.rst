@@ -140,7 +140,9 @@ Because every dimension is an integer literal, the three-component array is embe
 The symbolic dimension ``N_move`` names the surface record field that supplies its size at runtime.
 Because that dimension depends on the model, the array is flattened into ``data``, and the surface record stores its offset and total length.
 Fully symbolic multidimensional arrays use the same mechanism.
-For example, ``mgxs_nu_d`` is shaped ``("G", "J")`` and uses the named energy-group and delayed-neutron-group dimensions to reconstruct indexing into its flattened payload.
+For example, ``NeutronMultigroupData.nu_d`` is shaped ``("G", "J")`` and uses the
+named energy-group and delayed-neutron-group dimensions to reconstruct indexing
+into its flattened payload.
 Generated accessors for arrays stored in ``data`` currently support array ranks from one through four dimensions.
 
 ``mcdc.code_factory`` generates modules under ``mcdc/mcdc_get`` and ``mcdc/mcdc_set`` for fields stored in ``data``.
@@ -171,13 +173,15 @@ For ``move_velocities``, the generated accessor uses the fixed trailing dimensio
        move_index, component_index, surface, data
    )
 
-For ``mgxs_nu_d``, the generated element getter reads the named trailing dimension ``J`` from the material record and uses it as the runtime row stride:
+For ``NeutronMultigroupData.nu_d``, the generated element getter reads the named
+trailing dimension ``J`` from the neutron-model record and uses it as the
+runtime row stride:
 
 .. code-block:: python
 
-   def mgxs_nu_d(group, delayed_group, material, data):
-       offset = material["mgxs_nu_d_offset"]
-       stride = material["J"]
+   def nu_d(group, delayed_group, neutron_multigroup, data):
+       offset = neutron_multigroup["nu_d_offset"]
+       stride = neutron_multigroup["J"]
        return data[offset + group * stride + delayed_group]
 
 In the row-major flattened layout, ``J`` determines the stride between energy groups, while ``G`` determines the number of rows.

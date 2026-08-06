@@ -43,10 +43,9 @@ Model building blocks
 Materials
 ^^^^^^^^^
 
-Materials define the interaction data used by cells. Use
-:class:`mcdc.Material` for continuous-energy transport and
-:class:`mcdc.MaterialMG` for multigroup transport. :class:`mcdc.MGXS` stores
-particle-agnostic groupwise interaction data for the unified material model.
+Materials define the interaction data used by cells. :class:`mcdc.Material`
+accepts native compositions and particle-specific transport-mode data.
+:class:`mcdc.NeutronMultigroupData` stores reduced multigroup neutron data.
 
 .. autosummary::
    :toctree: generated
@@ -54,8 +53,7 @@ particle-agnostic groupwise interaction data for the unified material model.
    :template: omcclass.rst
 
    mcdc.Material
-   mcdc.MaterialMG
-   mcdc.MGXS
+   mcdc.NeutronMultigroupData
 
 
 Geometry
@@ -134,8 +132,9 @@ the complete settings interface.
 Transport techniques
 ^^^^^^^^^^^^^^^^^^^^
 
-Transport techniques are configured directly on the simulation instance. See
-:class:`mcdc.Simulation` for their signatures and examples.
+Transport techniques are grouped under ``simulation.technique``. For example,
+enable implicit capture with ``simulation.technique.implicit_capture()``. See
+:class:`mcdc.Simulation` for the ownership model and examples.
 
 Compiling and running
 ^^^^^^^^^^^^^^^^^^^^^

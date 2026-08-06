@@ -21,8 +21,8 @@ using MC/DC’s lattice and universe system.
 
 Key concepts demonstrated:
 
-- **Multi-group materials** loaded from an external HDF5 library via
-  ``mcdc.MaterialMG(library=...)``.
+- **Multigroup data** loaded from an external HDF5 library and used to construct
+  materials through ``mcdc.Material.multigroup(...)``.
 - **Pin-cell universes** built from cylindrical fuel pins in square
   moderator cells.
 - **Lattice assemblies** that tile pin-cell universes into fuel
