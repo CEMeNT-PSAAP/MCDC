@@ -23,6 +23,7 @@ from mcdc.constant import (
     MESH_STRUCTURED,
     MESH_UNIFORM,
     PI,
+    PARTICLE_ANY,
     PARTICLE_NEUTRON,
     PARTICLE_ELECTRON,
     PARTICLE_PROTON,
@@ -78,9 +79,9 @@ class Tally(MCDCPolymorphic):
         Particle type selected by the tally. If omitted, compilation infers it
         when exactly one particle type is transported per the simulation settings.
         It must be specified when multiple particle types are transported.
-    group : sequence of float or "all_groups", optional
+    group : sequence of float or "all", optional
         Transport-mode group-bin boundaries. These bins may collapse several
-        transport groups into one tally bin. ``"all_groups"`` creates one
+        transport groups into one tally bin. ``"all"`` creates one
         tally bin per group during compilation. For neutron multigroup transport, this
         corresponds to energy group.
     energy : sequence of float, optional
@@ -168,7 +169,7 @@ class Tally(MCDCPolymorphic):
     >>> group_flux = mcdc.Tally(
     ...     cell=cell,
     ...     scores=["flux"],
-    ...     group="all_groups",
+    ...     group="all",
     ... )
     """
 
@@ -314,7 +315,7 @@ class Tally(MCDCPolymorphic):
 
         # Particle filter
         if particle_type is None:
-            self.particle_type = -1
+            self.particle_type = PARTICLE_ANY
         elif particle_type == "neutron":
             self.particle_type = PARTICLE_NEUTRON
         elif particle_type == "electron":
@@ -348,7 +349,9 @@ class Tally(MCDCPolymorphic):
                 polar_reference_arr
             )
         if group is not None:
-            if type(group) == str and group == "all_groups":
+            if isinstance(group, str):
+                if group != "all":
+                    print_error(f"Unsupported tally group filter: {group}")
                 self.all_groups = True
                 self.group = np.array([0])  # Compilation placeholder
             else:
@@ -417,6 +420,7 @@ class Tally(MCDCPolymorphic):
         text = ""
         text += f"  - Scores: {', '.join(decode_score_type(x) for x in self.scores)}\n"
         particle_name = {
+            PARTICLE_ANY: "Any",
             PARTICLE_NEUTRON: "Neutron",
             PARTICLE_ELECTRON: "Electron",
             PARTICLE_PROTON: "Proton",
@@ -456,12 +460,12 @@ class Tally(MCDCPolymorphic):
         """Resolve group filters that require the complete material model."""
         if self.all_groups:
             if self.particle_type != PARTICLE_NEUTRON:
-                print_error("The all_groups filter currently supports only neutrons.")
+                print_error('The group="all" filter currently supports only neutrons.')
             if not simulation.materials or any(
                 not material.has_neutron_multigroup for material in simulation.materials
             ):
                 print_error(
-                    "The all_groups neutron filter requires multigroup data for "
+                    'The neutron group="all" filter requires multigroup data for '
                     "every material."
                 )
             shared_grid = simulation.materials[0].neutron_multigroup.energy_grid
@@ -470,7 +474,7 @@ class Tally(MCDCPolymorphic):
                 for material in simulation.materials[1:]
             ):
                 print_error(
-                    "The all_groups neutron filter requires one shared multigroup "
+                    'The neutron group="all" filter requires one shared multigroup '
                     "energy grid."
                 )
             G = simulation.materials[0].neutron_multigroup.G
@@ -481,7 +485,7 @@ class Tally(MCDCPolymorphic):
 
     def _resolve_particle_type(self, settings) -> None:
         """Infer an unspecified tally particle type from transport settings."""
-        if self.particle_type != -1:
+        if self.particle_type != PARTICLE_ANY:
             return
 
         transported = []
