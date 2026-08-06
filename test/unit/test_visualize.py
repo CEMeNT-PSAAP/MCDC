@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 
 
 def test_visualize_model(tmp_path):
-    material = mcdc.MaterialMG(capture=np.array([1.0]))
+    material = mcdc.Material.multigroup(capture=np.array([1.0]))
     left = mcdc.Surface.PlaneZ(z=0.0, boundary_condition="vacuum")
     right = mcdc.Surface.PlaneZ(z=1.0, boundary_condition="vacuum")
     cell = mcdc.Cell(region=+left & -right, fill=material)

@@ -97,7 +97,7 @@ def test_tally_factory_allows_combined_supported_filters(slab_plane_x):
 
 
 def test_all_groups_filter_resizes_compiled_tally_bins(prepare_simulation):
-    material = mcdc.MaterialMG(capture=np.ones(3))
+    material = mcdc.Material.multigroup(capture=np.ones(3))
     cell = mcdc.Cell(fill=material)
     tally = mcdc.Tally(scores=["flux"], energy="all_groups")
 

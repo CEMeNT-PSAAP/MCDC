@@ -1,10 +1,12 @@
 import numpy as np
+import pytest
 
 import mcdc
 
 from mcdc.object_.base import MCDCBase, MCDCObject
 from mcdc.object_.data import DataPolynomial
-from mcdc.object_.mgxs import MGXS
+from mcdc.object_.transport_model_data import NeutronMultigroupData
+from mcdc.object_.technique import Technique
 from mcdc.object_.nuclide import Nuclide
 from mcdc.object_.universe import Universe
 
@@ -30,16 +32,47 @@ class EmbeddedConfiguration(MCDCBase):
         self.member = None
 
 
-def test_simulation_reserves_zero_group_mgxs_as_id_zero():
+def test_simulation_reserves_zero_group_mg_as_id_zero():
     simulation = mcdc.Simulation()
+
+    assert isinstance(simulation.technique, Technique)
 
     simulation.compile()
 
-    assert len(simulation.mgxs) == 1
-    assert isinstance(simulation.mgxs[0], MGXS)
-    assert simulation.mgxs[0].ID == 0
-    assert simulation.mgxs[0].G == 0
-    assert simulation.mgxs[0].compile_ID == simulation.compile_ID
+    assert len(simulation.neutron_multigroup_data) == 1
+    assert isinstance(simulation.neutron_multigroup_data[0], NeutronMultigroupData)
+    assert simulation.neutron_multigroup_data[0].ID == 0
+    assert simulation.neutron_multigroup_data[0].G == 0
+    assert simulation.neutron_multigroup_data[0].compile_ID == simulation.compile_ID
+
+
+def test_simulation_requires_a_shared_neutron_multigroup_grid(capsys):
+    material_a = mcdc.Material.multigroup(capture=[0.1], energy_grid=[1.0, 2.0])
+    material_b = mcdc.Material.multigroup(capture=[0.2], energy_grid=[2.0, 3.0])
+    simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)])
+
+    with pytest.raises(SystemExit):
+        simulation.compile()
+
+    assert "energy grids must be identical" in capsys.readouterr().out
+
+
+def test_neutron_multigroup_technique_allows_and_packs_multigrid(
+    prepare_simulation,
+):
+    material_a = mcdc.Material.multigroup(capture=[0.1], energy_grid=[1.0, 2.0])
+    material_b = mcdc.Material.multigroup(capture=[0.2], energy_grid=[2.0, 3.0])
+
+    simulation_container, _ = prepare_simulation(
+        cells=[mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)],
+        configure=lambda simulation: simulation.technique.neutron_multigroup(
+            multigrid=True
+        ),
+    )
+
+    simulation = simulation_container[0]
+    assert simulation["technique"]["neutron_multigroup"]["multigrid"]
 
 
 def test_mcdc_object_compiles_object_members_and_lists():
@@ -62,12 +95,13 @@ def test_simulation_compiles_objects_owned_by_embedded_configuration():
     mesh = mcdc.MeshUniform()
     weight_windows = np.ones((1, 1, 1, 1, 3))
     simulation = mcdc.Simulation()
-    simulation.weight_windows(weight_windows, mesh=mesh)
+    simulation.technique.weight_windows(weight_windows, mesh=mesh)
 
     simulation.compile()
 
     assert simulation.meshes == [mesh]
-    assert simulation.weight_windows.compile_ID == simulation.compile_ID
+    assert simulation.technique.compile_ID == simulation.compile_ID
+    assert simulation.technique.weight_windows.compile_ID == simulation.compile_ID
 
 
 def test_embedded_compile_id_prevents_cycles_and_supports_recompilation():
@@ -127,7 +161,6 @@ def test_simulation_compilation_finalizes_model_wide_state():
     simulation.compile()
 
     assert np.allclose([source_a.probability, source_b.probability], [0.25, 0.75])
-    assert simulation.settings.neutron_multigroup_mode
     assert simulation.k_eff == 1.25
     assert not simulation.cycle_active
     assert simulation.k_cycle.shape == (4,)

@@ -9,7 +9,7 @@ from mcdc.constant import PARTICLE_NEUTRON
 @pytest.fixture
 def material_mg():
     # Minimal multigroup material so particle speed is defined.
-    return mcdc.MaterialMG(capture=np.array([1.0]))
+    return mcdc.Material.multigroup(capture=np.array([1.0]))
 
 
 @pytest.fixture

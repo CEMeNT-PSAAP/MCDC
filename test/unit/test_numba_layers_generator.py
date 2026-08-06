@@ -12,11 +12,42 @@ from mcdc.code_factory.numba_layers_generator import (
     _accessor_2d_element,
     _accessor_3d_element,
     _accessor_4d_element,
+    set_object,
     set_structure,
+    validate_unique_class_labels,
     validate_accessor_targets,
 )
 from mcdc.mcdc_get import cell as get_cell
+from mcdc.object_.base import MCDCBase
 from mcdc.object_.surface import Surface
+
+
+class EmbeddedLeaf(MCDCBase):
+    label = "child"
+
+    active: bool
+    values: NDArray[np.float64]
+
+    def __init__(self):
+        self.active = True
+        self.values = np.array([2.0, 3.0])
+
+
+class EmbeddedOwner(MCDCBase):
+    label = "embedded_owner_test"
+
+    child: EmbeddedLeaf
+
+    def __init__(self):
+        self.child = EmbeddedLeaf()
+
+
+class DuplicateLabelA(MCDCBase):
+    label = "duplicate_label"
+
+
+class DuplicateLabelB(MCDCBase):
+    label = "duplicate_label"
 
 
 def test_set_structure_tracks_logical_accessor_types():
@@ -39,6 +70,46 @@ def test_set_structure_tracks_logical_accessor_types():
         ("integer_grid", ("Nx", "Ny", "Nz"), True),
         ("surface_IDs", ("N_surface",), True),
     ]
+
+
+def test_embedded_mcdc_base_structures_and_records_are_recursive():
+    annotations = {
+        EmbeddedOwner.label: {"child": EmbeddedLeaf},
+        EmbeddedLeaf.label: {
+            "active": bool,
+            "values": NDArray[np.float64],
+        },
+    }
+    structures = {label: [] for label in annotations}
+    accessor_targets = {label: [] for label in annotations}
+    records = {label: {} for label in annotations}
+    order = []
+
+    set_structure(
+        EmbeddedOwner.label,
+        structures,
+        accessor_targets,
+        annotations,
+        order=order,
+    )
+
+    owner = EmbeddedOwner()
+    data = {"size": 0}
+    set_object(owner, annotations, structures, records, data)
+    data = {"size": 0, "array": np.zeros(data["size"])}
+    set_object(owner, annotations, structures, records, data, set_data=True)
+
+    assert order == [EmbeddedLeaf.label, EmbeddedOwner.label]
+    assert structures[EmbeddedOwner.label][0][0] == "child"
+    assert records[EmbeddedOwner.label]["child"]["active"]
+    np.testing.assert_array_equal(data["array"], owner.child.values)
+
+
+def test_runtime_class_labels_must_be_unique(capsys):
+    with pytest.raises(SystemExit):
+        validate_unique_class_labels([DuplicateLabelA, DuplicateLabelB])
+
+    assert "Duplicate MC/DC class label 'duplicate_label'" in capsys.readouterr().out
 
 
 def test_scalar_integer_getters_cast_values_from_data():
