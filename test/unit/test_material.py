@@ -68,6 +68,24 @@ def test_material_accepts_native_multigroup_and_hybrid_data():
             {"neutron_multigroup": object()},
             "neutron_multigroup must be a NeutronMultigroupData object",
         ),
+        (
+            {"neutron_multigroup": mcdc.NeutronMultigroupData()},
+            "must define at least one energy group",
+        ),
+        (
+            {
+                "nuclide_composition": {"H1": 0.1},
+                "neutron_multigroup": mcdc.NeutronMultigroupData(capture=[0.2]),
+            },
+            "requires an explicit neutron multigroup energy_grid",
+        ),
+        (
+            {
+                "element_composition": {"H": 0.1},
+                "neutron_multigroup": mcdc.NeutronMultigroupData(capture=[0.2]),
+            },
+            "requires an explicit neutron multigroup energy_grid",
+        ),
     ],
 )
 def test_material_rejects_invalid_representations(kwargs, expected_message, capsys):
@@ -86,6 +104,7 @@ def test_absent_mg_points_to_the_reserved_simulation_object(monkeypatch):
     monkeypatch.setattr(Nuclide, "_compile_into_simulation", compile_nuclide)
 
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.compile()
     material = Material(nuclide_composition={"H1": 0.1})
 
@@ -103,6 +122,7 @@ def test_shared_mg_is_registered_once_for_multiple_materials():
     material_a = Material(neutron_multigroup=neutron_multigroup)
     material_b = Material(neutron_multigroup=neutron_multigroup)
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.compile()
 
     material_a._compile_into_simulation(simulation)
@@ -131,3 +151,10 @@ def test_material_mg_reference_is_packed(prepare_simulation):
     assert packed["neutron_multigroup_ID"] == 1
     assert packed_cell["fill_type"] == FILL_MATERIAL
     assert packed_cell["fill_ID"] == 0
+
+
+def test_multigroup_factory_rejects_zero_group_data(capsys):
+    with pytest.raises(SystemExit):
+        Material.multigroup()
+
+    assert "must define at least one energy group" in capsys.readouterr().out

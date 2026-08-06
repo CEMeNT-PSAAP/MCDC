@@ -31,6 +31,8 @@ def test_zero_group_placeholder():
     assert (
         neutron_multigroup.energy_representation == NEUTRON_MULTIGROUP_ENERGY_MIDPOINT
     )
+    assert neutron_multigroup._uses_default_energy_grid
+    assert "_uses_default_energy_grid" in neutron_multigroup.non_numba
 
     np.testing.assert_array_equal(neutron_multigroup.energy_grid, [-0.499999])
     np.testing.assert_array_equal(neutron_multigroup.speed, [])
@@ -165,7 +167,9 @@ def test_standalone_mg_registration_and_packing(prepare_simulation):
         energy_grid=[1.0e-5, 1.0, 20.0e6],
     )
 
-    simulation_container, data = prepare_simulation(objects=[neutron_multigroup])
+    simulation_container, data = prepare_simulation(
+        cells=[mcdc.Cell()], objects=[neutron_multigroup]
+    )
     simulation = simulation_container[0]
     reserved = simulation["neutron_multigroup_data"][0]
     packed = simulation["neutron_multigroup_data"][1]
@@ -218,6 +222,7 @@ def test_energy_grid_and_representation(policy, expected):
     )
 
     assert neutron_multigroup.energy_representation == expected
+    assert not neutron_multigroup._uses_default_energy_grid
     np.testing.assert_array_equal(neutron_multigroup.energy_grid, [1.0e-5, 1.0, 20.0e6])
 
 
@@ -243,6 +248,10 @@ def test_energy_grid_and_representation(policy, expected):
         (
             {"capture": [0.1], "energy_representation": "average"},
             "Unknown NeutronMultigroupData energy representation",
+        ),
+        (
+            {"capture": [0.1], "energy_representation": "uniform"},
+            "requires an explicit energy_grid",
         ),
         (
             {"fission": [0.1]},

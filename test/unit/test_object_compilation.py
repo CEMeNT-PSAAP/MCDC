@@ -34,6 +34,7 @@ class EmbeddedConfiguration(MCDCBase):
 
 def test_simulation_reserves_zero_group_mg_as_id_zero():
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
 
     assert isinstance(simulation.technique, Technique)
 
@@ -84,6 +85,7 @@ def test_mcdc_object_compiles_object_members_and_lists():
     ignored = DataPolynomial(np.array([4.0]))
     simulation = mcdc.Simulation()
     simulation.root_universe = ObjectOwner(child, children, ignored)
+    simulation.root_universe.cells = [mcdc.Cell()]
 
     simulation.compile()
 
@@ -95,6 +97,7 @@ def test_simulation_compiles_objects_owned_by_embedded_configuration():
     mesh = mcdc.MeshUniform()
     weight_windows = np.ones((1, 1, 1, 1, 3))
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.technique.weight_windows(weight_windows, mesh=mesh)
 
     simulation.compile()
@@ -110,6 +113,7 @@ def test_embedded_compile_id_prevents_cycles_and_supports_recompilation():
     configuration_a.member = configuration_b
     configuration_b.member = configuration_a
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.configuration = configuration_a
 
     simulation.compile()
@@ -136,6 +140,7 @@ def test_material_canonicalizes_composition_before_member_compilation(monkeypatc
     material_a = mcdc.Material(nuclide_composition={"U235": 1.0})
     material_b = mcdc.Material(nuclide_composition={"U235": 2.0})
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.compile()
 
     material_a._compile_into_simulation(simulation)
@@ -152,6 +157,7 @@ def test_simulation_compilation_finalizes_model_wide_state():
     source_a = mcdc.Source(probability=1.0)
     source_b = mcdc.Source(probability=3.0)
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.set_sources([source_a, source_b])
     simulation.settings.neutron_eigenvalue_mode = True
     simulation.settings.N_inactive = 2
@@ -169,6 +175,7 @@ def test_simulation_compilation_finalizes_model_wide_state():
 
 def test_simulation_compilation_sets_particle_bank_capacities():
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.settings.N_particle = 100
     simulation.settings.N_census = 2
     simulation.settings.active_bank_buffer = 11
@@ -183,3 +190,12 @@ def test_simulation_compilation_sets_particle_bank_capacities():
     assert simulation.bank_census.size[0] == 2 * N_work
     assert simulation.bank_source.size[0] == 3 * N_work
     assert simulation.bank_future.size[0] == 4 * N_work
+
+
+def test_simulation_rejects_an_empty_root_universe(capsys):
+    simulation = mcdc.Simulation()
+
+    with pytest.raises(SystemExit):
+        simulation.compile()
+
+    assert "root universe is empty" in capsys.readouterr().out

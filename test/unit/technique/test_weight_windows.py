@@ -200,7 +200,6 @@ def test_query_weight_window(prepare_simulation):
 
     program, data = make_ww_model_distinct(prepare_simulation)
     simulation = util.access_simulation(program)
-    simulation["settings"]["neutron_multigroup_mode"] = False
     # hardcode mesh params
     pitch, height, N = 2.0, 10.0, 3
     nx, ny, nz = N, N, N

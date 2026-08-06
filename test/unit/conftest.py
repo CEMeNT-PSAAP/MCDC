@@ -9,6 +9,7 @@ import pytest
 def prepare_simulation():
     """Compile and pack an explicit simulation for kernel-level unit tests."""
     from mcdc.main import prepare
+    from mcdc.object_.cell import Cell
     from mcdc.object_.simulation import Simulation
 
     def _prepare(
@@ -20,7 +21,7 @@ def prepare_simulation():
         configure=None,
     ):
         simulation = Simulation()
-        simulation.set_model(cells)
+        simulation.set_model(cells or (Cell(),))
         simulation.set_tallies(tallies)
         simulation.set_sources(sources)
         if configure is not None:

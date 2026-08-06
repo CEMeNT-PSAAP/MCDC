@@ -11,6 +11,7 @@ def test_collision_tally_with_mesh_filter():
     )
     tally = mcdc.Tally(mesh=mesh, scores=["energy_deposition"])
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.set_tallies([tally])
     simulation.compile()
 

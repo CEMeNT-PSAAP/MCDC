@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import mcdc
+from mcdc.constant import PARTICLE_ANY
 
 from mcdc.object_.tally import (
     TallyCollision,
@@ -96,17 +97,19 @@ def test_tally_factory_allows_combined_supported_filters(slab_plane_x):
     assert cell_mesh_tally.mesh_filter_ID == mesh.ID
 
 
-def test_all_groups_filter_resizes_compiled_tally_bins(prepare_simulation):
+def test_all_group_filter_resizes_compiled_tally_bins(prepare_simulation):
     material = mcdc.Material.multigroup(capture=np.ones(3))
     cell = mcdc.Cell(fill=material)
-    tally = mcdc.Tally(scores=["flux"], energy="all_groups")
+    tally = mcdc.Tally(scores=["flux"], group="all")
 
     simulation_container, data = prepare_simulation(cells=[cell], tallies=[tally])
     simulation = simulation_container[0]
     tally_record = simulation["tallies"][tally.ID]
 
-    np.testing.assert_array_equal(tally.energy, [-0.5, 0.5, 1.5, 2.5])
-    assert tally.bin_shape == [1, 1, 3, 1, 1]
+    assert tally.particle_type == PARTICLE_ANY
+    np.testing.assert_array_equal(tally.group, [-0.5, 0.5, 1.5, 2.5])
+    assert tally.bin_shape == [1, 1, 3, 1, 1, 1]
+    assert tally.stride_group == 1
     assert tally.stride_energy == 1
     assert tally.stride_azi == 3
     assert tally.stride_mu == 3
