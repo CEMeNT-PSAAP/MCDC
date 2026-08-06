@@ -684,6 +684,7 @@ tally = into_dtype([
     ('name', 'U32'),
     ('scores_offset', int64),
     ('scores_length', int64),
+    ('particle_type', int64),
     ('filter_direction', bool),
     ('filter_group', bool),
     ('filter_energy', bool),
