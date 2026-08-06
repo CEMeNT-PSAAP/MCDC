@@ -83,6 +83,10 @@ class MCDCBase:
             for item in value:
                 MCDCBase._compile_member_value(item, simulation)
 
+        # Scalar, array, and other non-object members require no compilation.
+        else:
+            return
+
 
 class MCDCObject(MCDCBase):
     """Base class for model objects registered during simulation compilation.
