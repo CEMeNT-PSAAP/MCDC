@@ -71,8 +71,13 @@ class Tally(MCDCPolymorphic):
         Azimuthal-angle bin boundaries in radians.
     polar_reference : sequence of 3 float, optional
         Reference direction for the angular filters.
-    energy : sequence of float or "all_groups", optional
-        Energy-bin boundaries in eV, or ``"all_groups"`` in multigroup mode.
+    group : sequence of float or "all_groups", optional
+        Transport-mode group-bin boundaries. These bins may collapse several
+        transport groups into one tally bin. ``"all_groups"`` creates one
+        tally bin per group during compilation. For neutron multigroup transport, this
+        corresponds to energy group.
+    energy : sequence of float, optional
+        Continuous-energy bin boundaries in eV.
     time : sequence of float, optional
         Time-bin boundaries in seconds.
 
@@ -151,12 +156,12 @@ class Tally(MCDCPolymorphic):
     ...     scores=["energy_deposition"],
     ... )
 
-    Use one energy bin per multigroup energy group:
+    Use one bin per (energy, for neutron) group:
 
     >>> group_flux = mcdc.Tally(
     ...     cell=cell,
     ...     scores=["flux"],
-    ...     energy="all_groups",
+    ...     group="all_groups",
     ... )
     """
 
@@ -170,11 +175,13 @@ class Tally(MCDCPolymorphic):
 
     # Non-spatial filters
     filter_direction: bool
+    filter_group: bool
     filter_energy: bool
     filter_time: bool
     mu: NDArray[float64]
     azi: NDArray[float64]
     polar_reference: Annotated[NDArray[float64], (3,)]
+    group: NDArray[float64]
     energy: NDArray[float64]
     time: NDArray[float64]
 
@@ -187,6 +194,7 @@ class Tally(MCDCPolymorphic):
     # Filter strides
     stride_mu: int
     stride_azi: int
+    stride_group: int
     stride_energy: int
     stride_time: int
 
@@ -200,7 +208,8 @@ class Tally(MCDCPolymorphic):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
-        energy: Sequence[float] | str | NoneType = None,
+        group: Sequence[float] | str | NoneType = None,
+        energy: Sequence[float] | NoneType = None,
         time: Sequence[float] | NDArray[float64] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
     ) -> TallySurfaceCrossing | TallyTracklength | TallyCollision:
@@ -259,7 +268,8 @@ class Tally(MCDCPolymorphic):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
-        energy: Sequence[float] | str | NoneType = None,
+        group: Sequence[float] | str | NoneType = None,
+        energy: Sequence[float] | NoneType = None,
         time: Sequence[float] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
     ):
@@ -296,12 +306,14 @@ class Tally(MCDCPolymorphic):
         self.mu = np.array([-1.0, 1.0])
         self.azi = np.array([-PI, PI])
         self.polar_reference = np.array([0.0, 0.0, 1.0])
+        self.group = np.array([-INF, INF])
         self.energy = np.array([-1.0, INF])
         self.time = np.array([0.0, INF])
         self.filter_direction = False
+        self.filter_group = False
         self.filter_energy = False
         self.filter_time = False
-        self.energy_all_groups = False
+        self.all_groups = False
         if mu is not None:
             self.mu = np.array(mu)
             self.filter_direction = True
@@ -313,12 +325,15 @@ class Tally(MCDCPolymorphic):
             self.polar_reference = polar_reference_arr / np.linalg.norm(
                 polar_reference_arr
             )
-        if energy is not None:
-            if type(energy) == str and energy == "all_groups":
-                self.energy_all_groups = True
-                self.energy = np.array([0])  # A placeholder
+        if group is not None:
+            if type(group) == str and group == "all_groups":
+                self.all_groups = True
+                self.group = np.array([0])  # Compilation placeholder
             else:
-                self.energy = np.array(energy)
+                self.group = np.array(group)
+            self.filter_group = True
+        if energy is not None:
+            self.energy = np.array(energy)
             self.filter_energy = True
         if time is not None:
             self.time = np.array(time)
@@ -327,14 +342,17 @@ class Tally(MCDCPolymorphic):
         # Determine bin shape
         N_mu = len(self.mu) - 1
         N_azi = len(self.azi) - 1
+        N_group = len(self.group) - 1
         N_energy = len(self.energy) - 1
         N_time = len(self.time) - 1
         N_score = len(self.scores)
         #
         if spatial_shape is None:
-            shape = (N_mu, N_azi, N_energy, N_time, N_score)
+            shape = (N_mu, N_azi, N_group, N_energy, N_time, N_score)
         else:
-            shape = (N_mu, N_azi, N_energy, N_time) + spatial_shape + (N_score,)
+            shape = (
+                (N_mu, N_azi, N_group, N_energy, N_time) + spatial_shape + (N_score,)
+            )
 
         # Set bins and strides
         self._set_bin_shape_and_strides(shape)
@@ -344,8 +362,9 @@ class Tally(MCDCPolymorphic):
         self.bin_shape = list(shape)
 
         # Set strides
-        self.stride_time = reduce(operator.mul, shape[4:])
-        self.stride_energy = reduce(operator.mul, shape[3:])
+        self.stride_time = reduce(operator.mul, shape[5:])
+        self.stride_energy = reduce(operator.mul, shape[4:])
+        self.stride_group = reduce(operator.mul, shape[3:])
         self.stride_azi = reduce(operator.mul, shape[2:])
         self.stride_mu = reduce(operator.mul, shape[1:])
 
@@ -355,32 +374,42 @@ class Tally(MCDCPolymorphic):
 
         N_mu = len(self.mu) - 1
         N_azi = len(self.azi) - 1
+        N_group = len(self.group) - 1
         N_energy = len(self.energy) - 1
         N_score = len(self.scores)
 
         spatial_shape = None
-        if len(self.bin_shape) > 5:
-            spatial_shape = tuple(self.bin_shape[4:-1])
+        if len(self.bin_shape) > 6:
+            spatial_shape = tuple(self.bin_shape[5:-1])
 
         if spatial_shape is None:
-            shape = (N_mu, N_azi, N_energy, frequency, N_score)
+            shape = (N_mu, N_azi, N_group, N_energy, frequency, N_score)
         else:
-            shape = (N_mu, N_azi, N_energy, frequency) + spatial_shape + (N_score,)
+            shape = (
+                (N_mu, N_azi, N_group, N_energy, frequency) + spatial_shape + (N_score,)
+            )
 
         self._set_bin_shape_and_strides(shape)
 
     def _phasespace_filter_text(self):
         text = ""
         text += f"  - Scores: {', '.join(decode_score_type(x) for x in self.scores)}\n"
-        if self.filter_time or self.filter_energy or self.filter_direction:
+        if (
+            self.filter_time
+            or self.filter_energy
+            or self.filter_group
+            or self.filter_direction
+        ):
             text += f"  - Phase-space filters\n"
         if self.filter_time:
             text += f"    - Time {print_1d_array(self.time)} s\n"
-        if self.filter_energy:
-            if self.energy_all_groups:
-                text += f"    - Energy: All groups\n"
+        if self.filter_group:
+            if self.all_groups:
+                text += f"    - Group: All groups\n"
             else:
-                text += f"    - Energy {print_1d_array(self.energy)} eV\n"
+                text += f"    - Group {print_1d_array(self.group)}\n"
+        if self.filter_energy:
+            text += f"    - Energy {print_1d_array(self.energy)} eV\n"
         if self.filter_direction:
             text += f"    - Direction\n"
             text += f"    -   Polar reference: {self.polar_reference}\n"
@@ -393,15 +422,16 @@ class Tally(MCDCPolymorphic):
         if not super()._compile_into_simulation(simulation):
             return False
 
-        # Resolve the "all_groups" energy filter and resize its tally bins.
-        if self.energy_all_groups:
+        return True
+
+    def _resolve_group_filter(self, simulation) -> None:
+        """Resolve group filters that require the complete material model."""
+        if self.all_groups:
             G = simulation.materials[0].neutron_multigroup.G
-            self.energy = np.linspace(0, G, G + 1) - 0.5
+            self.group = np.linspace(0, G, G + 1) - 0.5
             shape = list(self.bin_shape)
             shape[2] = G
             self._set_bin_shape_and_strides(tuple(shape))
-
-        return True
 
     def __repr__(self):
         text = super().__repr__()
@@ -470,7 +500,8 @@ class TallySurfaceCrossing(Tally):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
-        energy: Sequence[float] | str | NoneType = None,
+        group: Sequence[float] | str | NoneType = None,
+        energy: Sequence[float] | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
         super().__init__(
@@ -479,6 +510,7 @@ class TallySurfaceCrossing(Tally):
             mu=mu,
             azi=azi,
             polar_reference=polar_reference,
+            group=group,
             energy=energy,
             time=time,
         )
@@ -539,7 +571,9 @@ class TallySurfaceCrossing(Tally):
         if isinstance(self.cell, Cell):
             text += f"  - Cell filter: {self.cell.name}\n"
         text += super()._phasespace_filter_text()
-        text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
+        text += (
+            f"  - Bin shape [mu, azi, group, energy, time, score]: {self.bin_shape} \n"
+        )
         return text
 
 
@@ -583,7 +617,8 @@ class TallyCollision(Tally):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
-        energy: Sequence[float] | str | NoneType = None,
+        group: Sequence[float] | str | NoneType = None,
+        energy: Sequence[float] | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
         spatial_shape = None
@@ -596,6 +631,7 @@ class TallyCollision(Tally):
             mu=mu,
             azi=azi,
             polar_reference=polar_reference,
+            group=group,
             energy=energy,
             time=time,
             spatial_shape=spatial_shape,
@@ -667,7 +703,9 @@ class TallyCollision(Tally):
         if self.mesh:
             text += f"  - Mesh: {self.mesh.name}\n"
         text += super()._phasespace_filter_text()
-        text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
+        text += (
+            f"  - Bin shape [mu, azi, group, energy, time, score]: {self.bin_shape} \n"
+        )
         return text
 
 
@@ -711,7 +749,8 @@ class TallyTracklength(Tally):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
-        energy: Sequence[float] | str | NoneType = None,
+        group: Sequence[float] | str | NoneType = None,
+        energy: Sequence[float] | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
         spatial_shape = None
@@ -724,6 +763,7 @@ class TallyTracklength(Tally):
             mu=mu,
             azi=azi,
             polar_reference=polar_reference,
+            group=group,
             energy=energy,
             time=time,
             spatial_shape=spatial_shape,
@@ -796,5 +836,7 @@ class TallyTracklength(Tally):
         if self.mesh:
             text += f"  - Mesh: {self.mesh.name}\n"
         text += super()._phasespace_filter_text()
-        text += f"  - Bin shape [mu, azi, energy, time, score]: {self.bin_shape} \n"
+        text += (
+            f"  - Bin shape [mu, azi, group, energy, time, score]: {self.bin_shape} \n"
+        )
         return text

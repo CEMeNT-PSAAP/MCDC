@@ -92,6 +92,35 @@ def azi_chunk(start, length, tally, data):
 
 
 @njit
+def group(index, tally, data):
+    offset = tally["group_offset"]
+    return data[offset + index]
+
+
+@njit
+def group_all(tally, data):
+    start = tally["group_offset"]
+    size = tally["group_length"]
+    end = start + size
+    return data[start:end]
+
+
+@njit
+def group_last(tally, data):
+    start = tally["group_offset"]
+    size = tally["group_length"]
+    end = start + size
+    return data[end - 1]
+
+
+@njit
+def group_chunk(start, length, tally, data):
+    start += tally["group_offset"]
+    end = start + length
+    return data[start:end]
+
+
+@njit
 def energy(index, tally, data):
     offset = tally["energy_offset"]
     return data[offset + index]

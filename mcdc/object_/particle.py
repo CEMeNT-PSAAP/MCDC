@@ -13,7 +13,11 @@ from mcdc.object_.base import MCDCBase, MCDCBase
 
 @dataclass
 class ParticleData(MCDCBase):
-    """Serializable phase-space state stored in particle banks."""
+    """Serializable phase-space state stored in particle banks.
+
+    ``group`` is an integer state interpreted by the active transport mode. Neutron
+    multigroup transport uses it as the neutron energy-group index.
+    """
 
     # MC/DC framework metadata
     label = "particle_data"
@@ -25,7 +29,7 @@ class ParticleData(MCDCBase):
     ux: float = 0.0
     uy: float = 0.0
     uz: float = 0.0
-    g: int = -1
+    group: int = -1
     E: float = 0.0
     w: float = 0.0
     particle_type: int = PARTICLE_NEUTRON

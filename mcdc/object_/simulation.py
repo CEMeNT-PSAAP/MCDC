@@ -360,7 +360,10 @@ class Simulation(MCDCBase):
             for element in self.elements:
                 element.set_electron_data(self)
 
-        # Derive tally shapes that depend on simulation-wide settings
+        # Resolve tally filters and shapes that require the complete model
+        for tally in self.tallies:
+            tally._resolve_group_filter(self)
+
         if settings.use_census_based_tally:
             for tally in self.tallies:
                 tally._use_census_based_tally(settings.census_tally_frequency, self)

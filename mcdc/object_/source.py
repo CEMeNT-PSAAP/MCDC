@@ -28,8 +28,8 @@ from mcdc.print_ import print_error
 class Source(MCDCObject):
     """Define a particle source.
 
-    A source specifies the initial position, direction, energy, time, particle
-    type, and relative sampling probability for emitted particles.
+    A source specifies the position, direction, energy, time, particle type,
+    transport-mode group, and relative sampling probability for emitted particles.
 
     Parameters
     ----------
@@ -67,12 +67,14 @@ class Source(MCDCObject):
         a tabulated distribution: the first row contains energy values and the
         second row contains their probability density. Defaults to a
         mono-energetic source at **1 MeV**.
-    energy_group : int or array_like, optional
-        Source energy group. A Python or NumPy integer defines a mono-group
-        source. An array-like value with shape ``(2, N)`` defines a discrete
-        probability mass function: the first row contains group IDs and the
-        second row contains their probabilities. In multigroup simulations,
-        the default is **group 0**.
+    group : int or array_like, optional
+        Transport-mode group number. A Python or NumPy integer defines a
+        mono-group source. An array-like value with shape ``(2, N)`` defines a
+        discrete probability mass function: the first row contains integer
+        group numbers and the second row contains their probabilities. The
+        interpretation belongs to the active transport mode; neutron
+        multigroup transport interprets it as an energy-group index. The
+        default is **group 0**.
     time : real or array_like of float, optional
         Emission time in seconds. A real scalar, including a NumPy scalar,
         defines a discrete emission time. An array-like value with shape
@@ -100,7 +102,9 @@ class Source(MCDCObject):
       source;
     - otherwise, the default direction behavior is used.
 
-    ``energy_group`` takes precedence over ``energy`` when both are provided.
+    ``energy`` and ``group`` are independent source variables and may both be supplied.
+    If ``energy`` and ``group`` are related, such as in neutron multigroup mode,
+    ``group`` takes precedence over ``energy`` when both are provided.
     Array-like inputs may be supplied as lists, tuples, or NumPy arrays.
 
     Examples
@@ -145,10 +149,10 @@ class Source(MCDCObject):
     ...     azimuthal=[0.0, np.pi / 2],
     ... )
 
-    Discrete energy-group source:
+    Source with a discrete group:
 
     >>> src = mcdc.Source(
-    ...     energy_group=3,
+    ...     group=3,
     ... )
 
     Sample a continuous-energy source from a tabulated probability density:
@@ -162,10 +166,10 @@ class Source(MCDCObject):
     ...     direction=[0.0, 0.0, 1.0],
     ... )
 
-    Sample between two multigroup energy groups:
+    Sample between two groups:
 
     >>> multigroup_source = mcdc.Source(
-    ...     energy_group=(
+    ...     group=(
     ...         [0, 1],
     ...         [0.25, 0.75],
     ...     ),
@@ -198,11 +202,14 @@ class Source(MCDCObject):
     polar_cosine: Annotated[NDArray[float64], (2,)]
     azimuthal: Annotated[NDArray[float64], (2,)]
 
+    # Group
+    mono_group: bool
+    group: int
+    group_pmf: DistributionPMF
+
     # Energy
     mono_energetic: bool
-    energy_group: int
     energy: float
-    energy_group_pmf: DistributionPMF
     energy_pdf: DistributionTabulated
 
     # Time
@@ -238,7 +245,7 @@ class Source(MCDCObject):
         azimuthal: Sequence[float] | NoneType = None,
         #
         energy: ArrayLike | NoneType = None,
-        energy_group: ArrayLike | NoneType = None,
+        group: ArrayLike | NoneType = None,
         #
         time: ArrayLike = 0.0,
         #
@@ -252,7 +259,8 @@ class Source(MCDCObject):
 
         # ==============================================================================
         # Default attributes
-        #   Point source at origin, isotropic, mono-energetic at 1 MeV or at group 0,
+        #   Point source at origin, isotropic, mono-group at 0,
+        #   mono-energetic at 1 MeV,
         #   time = 0, neutron
         # ==============================================================================
 
@@ -271,11 +279,14 @@ class Source(MCDCObject):
         self.polar_cosine = np.array([-1.0, 1.0])
         self.azimuthal = np.array([0.0, 2.0 * PI])
 
+        # Group
+        self.mono_group = True
+        self.group = 0
+        self.group_pmf = DistributionPMF(np.array([0.0]), np.array([1.0]))
+
         # Energy
         self.mono_energetic = True
-        self.energy_group = 0
         self.energy = 1.0e6
-        self.energy_group_pmf = DistributionPMF(np.array([0.0]), np.array([1.0]))
         self.energy_pdf = DistributionTabulated(
             np.array([1.0e6 - 1.0, 1.0e6 + 1.0]),
             np.array([1.0, 1.0]),
@@ -329,17 +340,17 @@ class Source(MCDCObject):
         # Normalize direction
         self.direction /= np.linalg.norm(self.direction)
 
-        # Energy
-        if energy_group is not None:
-            if isinstance(energy_group, Integral) and not isinstance(
-                energy_group, (bool, np.bool_)
-            ):
-                self.energy_group = int(energy_group)
+        # Group
+        if group is not None:
+            if isinstance(group, Integral) and not isinstance(group, (bool, np.bool_)):
+                self.group = int(group)
             else:
-                values, probabilities = _distribution_pair(energy_group, "Energy-group")
-                self.mono_energetic = False
-                self.energy_group_pmf = DistributionPMF(values, probabilities)
-        elif energy is not None:
+                values, probabilities = _distribution_pair(group, "Group")
+                self.mono_group = False
+                self.group_pmf = DistributionPMF(values, probabilities)
+
+        # Energy
+        if energy is not None:
             if isinstance(energy, Real) and not isinstance(energy, (bool, np.bool_)):
                 self.energy = float(energy)
             else:
@@ -392,12 +403,8 @@ class Source(MCDCObject):
             text += f"  - Direction [ux, uy, yz]: {self.direction}\n"
         elif self.white_direction:
             text += f"  - Isotropic halfspace: {self.direction}\n"
-        if self.mono_energetic:
-            text += (
-                f"  - Energy / energy group: {self.energy} eV / {self.energy_group}\n"
-            )
-        else:
-            text += f"  - Energy / energy group: PDF / PMF\n"
+        text += f"  - Group: {self.group if self.mono_group else 'PMF'}\n"
+        text += f"  - Energy: {f'{self.energy} eV' if self.mono_energetic else 'PDF'}\n"
         if self.discrete_time:
             text += f"  - Time: {self.time} s\n"
         else:

@@ -95,7 +95,7 @@ def visualize_model(
 
         # Set time and energy
         particle["t"] = time_val
-        particle["g"] = 0
+        particle["group"] = 0
         particle["E"] = 1e6
         particle["ux"] = 0.0
         particle["uy"] = 0.0
