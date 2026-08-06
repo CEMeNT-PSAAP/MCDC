@@ -168,9 +168,9 @@ The layer generator interprets annotations according to the field's role:
    * - ``move_velocities: Annotated[NDArray[float64], ("N_move", 3)]``
      - Offset, length, and shape metadata plus flattened values
      - ``mcdc_get.surface.move_velocities(move, axis, surface, data)``
-   * - ``energy_group_pmf: DistributionPMF``
+   * - ``group_pmf: DistributionPMF``
      - Simulation-local object ID
-     - ``simulation["distributions"][source["energy_group_pmf_ID"]]``
+     - ``simulation["distributions"][source["group_pmf_ID"]]``
    * - ``collision_tallies: list[TallyCollision]``
      - Count and offset to IDs stored in ``data``
      - ``mcdc_get.cell.collision_tally_IDs(index, cell, data)``
