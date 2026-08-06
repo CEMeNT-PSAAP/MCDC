@@ -71,11 +71,7 @@ class MCDCBase:
     @staticmethod
     def _compile_member_value(value, simulation) -> None:
         # Register direct object members
-        if isinstance(value, MCDCObject):
-            value._compile_into_simulation(simulation)
-
-        # Compile embedded configuration objects
-        elif isinstance(value, MCDCBase):
+        if isinstance(value, MCDCBase):
             value._compile_into_simulation(simulation)
 
         # Compile object members stored in lists
