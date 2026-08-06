@@ -102,7 +102,9 @@ class Tally(MCDCPolymorphic):
 
     Filter a track-length tally by cell, angle, and time:
 
-    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> material = mcdc.Material(
+    ...     neutron_multigroup=mcdc.NeutronMultigroup(capture=np.array([1.0]))
+    ... )
     >>> lower = mcdc.Surface.PlaneZ(z=0.0)
     >>> upper = mcdc.Surface.PlaneZ(z=10.0)
     >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)
@@ -395,7 +397,7 @@ class Tally(MCDCPolymorphic):
 
         # Resolve the "all_groups" energy filter and resize its tally bins.
         if self.energy_all_groups:
-            G = simulation.materials[0].G
+            G = simulation.materials[0].neutron_multigroup.G
             self.energy = np.linspace(0, G, G + 1) - 0.5
             shape = list(self.bin_shape)
             shape[2] = G

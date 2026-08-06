@@ -60,9 +60,7 @@ import mcdc.mcdc_set.element as element
 
 import mcdc.mcdc_set.gpu_meta as gpu_meta
 
-import mcdc.mcdc_set.native_material as native_material
-
-import mcdc.mcdc_set.multigroup_material as multigroup_material
+import mcdc.mcdc_set.neutron_multigroup as neutron_multigroup
 
 import mcdc.mcdc_set.nuclide as nuclide
 
@@ -71,8 +69,6 @@ import mcdc.mcdc_set.mesh as mesh
 import mcdc.mcdc_set.structured_mesh as structured_mesh
 
 import mcdc.mcdc_set.uniform_mesh as uniform_mesh
-
-import mcdc.mcdc_set.mgxs as mgxs
 
 import mcdc.mcdc_set.neutron_reaction as neutron_reaction
 

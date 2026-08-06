@@ -5,8 +5,8 @@ if TYPE_CHECKING:
     from mcdc.object_.cell import Cell, Region
     from mcdc.object_.element import Element
     from mcdc.object_.electron_reaction import ElectronReactionBase
-    from mcdc.object_.material import MaterialBase
-    from mcdc.object_.mgxs import MGXS
+    from mcdc.object_.material import Material
+    from mcdc.object_.transport_model import NeutronMultigroup
     from mcdc.object_.nuclide import Nuclide
     from mcdc.object_.neutron_reaction import NeutronReactionBase
     from mcdc.object_.source import Source
@@ -115,8 +115,8 @@ class Simulation(MCDCBase):
     electron_reactions: list[ElectronReactionBase]
     nuclides: list[Nuclide]
     elements: list[Element]
-    materials: list[MaterialBase]
-    mgxs: list[MGXS]
+    materials: list[Material]
+    neutron_multigroup: list[NeutronMultigroup]
     sources: list[Source]
 
     # Geometry
@@ -295,7 +295,7 @@ class Simulation(MCDCBase):
         self.nuclides = []
         self.elements = []
         self.materials = []
-        self.mgxs = []
+        self.neutron_multigroup = []
 
         # Geometry
         self.surfaces = []
@@ -316,8 +316,6 @@ class Simulation(MCDCBase):
         has already completed.
         """
         from mcdc.object_.material import (
-            Material,
-            MaterialMG,
             set_elements_from_nuclides,
             set_nuclides_from_elements,
             update_fissionable_from_nuclides,
@@ -332,11 +330,17 @@ class Simulation(MCDCBase):
 
         # Complete native-material compositions for the transported particles
         for material in self.materials:
-            if not isinstance(material, Material):
-                continue
-            if settings.neutron_transport and len(material.nuclides) == 0:
+            if (
+                settings.neutron_transport
+                and material.element_composition
+                and len(material.nuclides) == 0
+            ):
                 set_nuclides_from_elements(material, self)
-            if settings.electron_transport and len(material.elements) == 0:
+            if (
+                settings.electron_transport
+                and material.nuclide_composition
+                and len(material.elements) == 0
+            ):
                 set_elements_from_nuclides(material, self)
 
         # Load the physics data required by the completed material model
@@ -344,18 +348,17 @@ class Simulation(MCDCBase):
             for nuclide in self.nuclides:
                 nuclide.set_neutron_data(self)
             for material in self.materials:
-                if isinstance(material, Material):
-                    update_fissionable_from_nuclides(material)
+                update_fissionable_from_nuclides(material)
 
         if settings.electron_transport:
             for element in self.elements:
                 element.set_electron_data(self)
 
-        # Determine the neutron physics representation
-        if len(self.materials) == 0:
-            settings.neutron_multigroup_mode = True
-        else:
-            settings.neutron_multigroup_mode = isinstance(self.materials[0], MaterialMG)
+        # Preserve the current full-MG transport switch until collision-level
+        # dispatch can select neutron multigroup physics by material and energy.
+        settings.neutron_multigroup_mode = len(self.materials) == 0 or all(
+            material.neutron_multigroup.G > 0 for material in self.materials
+        )
 
         # Derive tally shapes that depend on simulation-wide settings
         if settings.use_census_based_tally:
