@@ -15,7 +15,7 @@ lib = h5py.File("../MGXS-C5G7-TD.h5", "r")
 
 # Setter
 def set_mat(mat):
-    return mcdc.MaterialMG(
+    return mcdc.Material.multigroup(
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],

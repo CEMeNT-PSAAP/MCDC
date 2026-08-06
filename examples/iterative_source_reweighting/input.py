@@ -5,7 +5,7 @@ import mcdc
 simulation = mcdc.Simulation("Iterative source reweighting")
 
 # Homogeneous one-group slab
-material = mcdc.MaterialMG(
+material = mcdc.Material.multigroup(
     capture=np.array([0.2]),
     scatter=np.array([[0.8]]),
 )

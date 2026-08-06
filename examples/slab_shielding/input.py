@@ -5,11 +5,11 @@ import mcdc
 simulation = mcdc.Simulation("One-group slab shielding")
 
 # Materials
-source_region_material = mcdc.MaterialMG(
+source_region_material = mcdc.Material.multigroup(
     capture=np.array([0.1]),
     scatter=np.array([[0.9]]),
 )
-shield_material = mcdc.MaterialMG(
+shield_material = mcdc.Material.multigroup(
     capture=np.array([0.7]),
     scatter=np.array([[0.3]]),
 )

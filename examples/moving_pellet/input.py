@@ -9,13 +9,13 @@ simulation = mcdc.Simulation("Moving pellet")
 # ======================================================================================
 
 # Set materials
-fuel = mcdc.MaterialMG(
+fuel = mcdc.Material.multigroup(
     capture=np.array([0.5]),
     fission=np.array([0.25]),
     nu_p=np.array([1.5]),
     speed=np.array([200000.0]),
 )
-air = mcdc.MaterialMG(
+air = mcdc.Material.multigroup(
     capture=np.array([0.002]),
     scatter=np.array([[0.008]]),
     speed=np.array([200000.0]),
