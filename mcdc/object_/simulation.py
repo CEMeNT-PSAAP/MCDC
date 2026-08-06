@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from mcdc.object_.element import Element
     from mcdc.object_.electron_reaction import ElectronReactionBase
     from mcdc.object_.material import MaterialBase
+    from mcdc.object_.mgxs import MGXS
     from mcdc.object_.nuclide import Nuclide
     from mcdc.object_.neutron_reaction import NeutronReactionBase
     from mcdc.object_.source import Source
@@ -115,6 +116,7 @@ class Simulation(MCDCBase):
     nuclides: list[Nuclide]
     elements: list[Element]
     materials: list[MaterialBase]
+    mgxs: list[MGXS]
     sources: list[Source]
 
     # Geometry
@@ -293,6 +295,7 @@ class Simulation(MCDCBase):
         self.nuclides = []
         self.elements = []
         self.materials = []
+        self.mgxs = []
 
         # Geometry
         self.surfaces = []

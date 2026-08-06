@@ -847,6 +847,8 @@ def set_simulation(N: dict):
         ('N_native_material', int64),
         ('multigroup_materials', multigroup_material, (N['multigroup_material'])),
         ('N_multigroup_material', int64),
+        ('mgxs', mgxs, (N['mgxs'])),
+        ('N_mgxs', int64),
         ('sources', source, (N['source'])),
         ('N_source', int64),
         ('surfaces', surface, (N['surface'])),

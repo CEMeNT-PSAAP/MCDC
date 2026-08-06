@@ -4,6 +4,7 @@ import mcdc
 
 from mcdc.object_.base import MCDCBase, MCDCObject
 from mcdc.object_.data import DataPolynomial
+from mcdc.object_.mgxs import MGXS
 from mcdc.object_.nuclide import Nuclide
 from mcdc.object_.universe import Universe
 
@@ -27,6 +28,18 @@ class EmbeddedConfiguration(MCDCBase):
 
     def __init__(self):
         self.member = None
+
+
+def test_simulation_reserves_zero_group_mgxs_as_id_zero():
+    simulation = mcdc.Simulation()
+
+    simulation.compile()
+
+    assert len(simulation.mgxs) == 1
+    assert isinstance(simulation.mgxs[0], MGXS)
+    assert simulation.mgxs[0].ID == 0
+    assert simulation.mgxs[0].G == 0
+    assert simulation.mgxs[0].compile_ID == simulation.compile_ID
 
 
 def test_mcdc_object_compiles_object_members_and_lists():

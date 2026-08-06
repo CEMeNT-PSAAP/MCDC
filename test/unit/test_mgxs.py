@@ -8,6 +8,7 @@ from mcdc.constant import (
     MULTIGROUP_NEUTRON_ENERGY_UNIFORM,
     MULTIGROUP_NEUTRON_ENERGY_UNIFORM_LOG,
 )
+from mcdc.mcdc_get import mgxs as get_mgxs
 from mcdc.object_.base import MCDCObject, MCDCPolymorphic
 from mcdc.object_.mgxs import MGXS
 
@@ -147,6 +148,39 @@ def test_one_group_fission_spectra_default_to_one():
     np.testing.assert_array_equal(mgxs.chi_d, [[1.0], [1.0]])
     np.testing.assert_array_equal(mgxs.nu_f, [2.7])
     np.testing.assert_array_equal(mgxs.decay_rate, [np.inf, np.inf])
+
+
+def test_standalone_mgxs_registration_and_packing(prepare_simulation):
+    mgxs = MGXS(
+        capture=[0.1, 0.2],
+        scatter=[[1.0, 2.0], [3.0, 0.0]],
+        energy_grid=[1.0e-5, 1.0, 20.0e6],
+    )
+
+    simulation_container, data = prepare_simulation(objects=[mgxs])
+    simulation = simulation_container[0]
+    reserved = simulation["mgxs"][0]
+    packed = simulation["mgxs"][1]
+
+    assert simulation["N_mgxs"] == 2
+    assert reserved["ID"] == 0
+    assert reserved["G"] == 0
+    assert mgxs.ID == 1
+    assert packed["ID"] == 1
+    assert packed["G"] == 2
+    assert packed["has_energy_grid"]
+
+    np.testing.assert_array_equal(get_mgxs.energy_grid_all(reserved, data), [0.0])
+    np.testing.assert_array_equal(
+        get_mgxs.energy_grid_all(packed, data),
+        [1.0e-5, 1.0, 20.0e6],
+    )
+    np.testing.assert_array_equal(get_mgxs.capture_all(packed, data), [0.1, 0.2])
+    np.testing.assert_array_equal(get_mgxs.scatter_all(packed, data), [4.0, 2.0])
+    np.testing.assert_allclose(
+        get_mgxs.chi_s_vector(0, packed, data),
+        [0.25, 0.75],
+    )
 
 
 @pytest.mark.parametrize(

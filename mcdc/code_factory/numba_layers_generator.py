@@ -1315,6 +1315,7 @@ def plural_to_singular(word: str) -> str:
         "matrices": "matrix",
         "criteria": "criterion",
         "data": "data",  # invariant
+        "mgxs": "mgxs",  # invariant
         "spectra": "spectrum",
     }
 
@@ -1356,6 +1357,7 @@ def singular_to_plural(word: str) -> str:
         "matrix": "matrices",
         "criterion": "criteria",
         "data": "data",  # invariant
+        "mgxs": "mgxs",  # invariant
         "spectrum": "spectra",
     }
 

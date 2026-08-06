@@ -5,6 +5,7 @@ from mcdc.object_.distribution import DistributionBase, DistributionNone
 from mcdc.object_.electron_reaction import ElectronReactionBase
 from mcdc.object_.element import Element
 from mcdc.object_.material import MaterialBase
+from mcdc.object_.mgxs import MGXS
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.neutron_reaction import NeutronReactionBase
 from mcdc.object_.nuclide import Nuclide
@@ -36,13 +37,15 @@ def compile_simulation(simulation: Simulation):
     simulation.sources = []
     simulation.tallies = []
 
-    # Reserved ojects
+    # Reserved objects
     none_data = DataNone()
     none_distribution = DistributionNone()
+    none_mgxs = MGXS()
 
     # Compile reserved objects
     none_data._compile_into_simulation(simulation)
     none_distribution._compile_into_simulation(simulation)
+    none_mgxs._compile_into_simulation(simulation)
 
     # Compile model
     root_universe = simulation.root_universe
@@ -80,6 +83,8 @@ def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
         object_list = simulation.lattices
     elif isinstance(object_, MaterialBase):
         object_list = simulation.materials
+    elif isinstance(object_, MGXS):
+        object_list = simulation.mgxs
     elif isinstance(object_, MeshBase):
         object_list = simulation.meshes
     elif isinstance(object_, Element):
