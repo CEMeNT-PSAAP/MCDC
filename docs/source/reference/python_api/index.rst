@@ -45,7 +45,8 @@ Materials
 
 Materials define the interaction data used by cells. Use
 :class:`mcdc.Material` for continuous-energy transport and
-:class:`mcdc.MaterialMG` for multigroup transport.
+:class:`mcdc.MaterialMG` for multigroup transport. :class:`mcdc.MGXS` stores
+particle-agnostic groupwise interaction data for the unified material model.
 
 .. autosummary::
    :toctree: generated
@@ -54,6 +55,7 @@ Materials define the interaction data used by cells. Use
 
    mcdc.Material
    mcdc.MaterialMG
+   mcdc.MGXS
 
 
 Geometry

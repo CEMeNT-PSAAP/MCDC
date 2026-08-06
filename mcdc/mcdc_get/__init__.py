@@ -72,6 +72,8 @@ import mcdc.mcdc_get.structured_mesh as structured_mesh
 
 import mcdc.mcdc_get.uniform_mesh as uniform_mesh
 
+import mcdc.mcdc_get.mgxs as mgxs
+
 import mcdc.mcdc_get.neutron_reaction as neutron_reaction
 
 import mcdc.mcdc_get.neutron_capture_reaction as neutron_capture_reaction
