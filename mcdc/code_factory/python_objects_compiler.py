@@ -1,5 +1,3 @@
-import numpy as np
-
 from mcdc.object_.base import MCDCObject, MCDCPolymorphic
 from mcdc.object_.cell import Region, Cell
 from mcdc.object_.data import DataBase, DataNone
@@ -21,6 +19,12 @@ NONE_OBJECT_CLASSES = (DataNone, DistributionNone)  # Has customized compilation
 
 
 def compile_simulation(simulation: Simulation):
+    """Discover, register, and finalize one simulation's Python model.
+
+    Recursive object hooks perform object-local compilation. Once discovery is
+    complete, the owning :class:`~mcdc.object_.simulation.Simulation` resolves
+    model-wide state before runtime packing begins.
+    """
     # Preserve explicitly configured roots before resetting their registered
     # object lists. Geometry members may reference these objects and compile
     # them while the model graph is traversed.
@@ -56,11 +60,8 @@ def compile_simulation(simulation: Simulation):
     # simulation configuration objects such as transport techniques.
     simulation._compile_members_into_simulation(simulation)
 
-    # Apply settings as needed
-    settings = simulation.settings
-    if simulation.settings.neutron_eigenvalue_mode:
-        simulation.k_cycle = np.zeros(settings.N_cycle)
-        simulation.gyration_radius = np.zeros(settings.N_cycle)
+    # Resolve state that depends on the complete discovered model
+    simulation._finalize_compilation()
 
 
 def register_object(object_: MCDCObject, simulation: Simulation) -> bool:

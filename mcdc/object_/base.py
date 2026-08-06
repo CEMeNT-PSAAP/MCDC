@@ -36,6 +36,9 @@ class MCDCBase:
         Embedded ``MCDCBase`` objects participate in compilation without being
         registered in a simulation object collection. Registered
         :class:`MCDCObject` subclasses extend this lifecycle with an object ID.
+        Subclasses may extend this hook to validate or normalize their state,
+        compile excluded references, and derive fields that require the owning
+        simulation.
 
         Returns
         -------

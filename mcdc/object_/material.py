@@ -55,7 +55,7 @@ class MaterialBase(MCDCPolymorphic):
 
 
 class Material(MaterialBase):
-    """Define a continuous-energy material from a data-library composition.
+    """Continuous-energy particle-interaction properties assigned to simulation cells.
 
     Parameters
     ----------
@@ -236,7 +236,7 @@ TEMPERATURES = [0.1, 233.15, 273.15, 293.6, 600.0, 900.0, 1200.0, 2500.0]
 
 
 class MaterialMG(MaterialBase):
-    """Define a material with multigroup neutron data.
+    """Multigroup neutron-interaction properties assigned to simulation cells.
 
     Parameters
     ----------

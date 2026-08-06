@@ -145,7 +145,7 @@ generates an animated GIF.
 Full Input
 ==========
 
-Click here to view the input file: `examples/moving_source/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/moving_source/input.py>`_.
+Click here to view the input file: `examples/moving_source/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/moving_source/input.py>`_.
 
 The complete input used for this example is embedded below:
 

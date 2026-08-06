@@ -48,7 +48,7 @@ class MeshBase(MCDCPolymorphic):
 
 
 class MeshUniform(MeshBase):
-    """Define a Cartesian mesh with uniform spacing on each axis.
+    """Uniform spatial bins for simulation tallies and transport techniques.
 
     Parameters
     ----------
@@ -134,7 +134,7 @@ class MeshUniform(MeshBase):
 
 
 class MeshStructured(MeshBase):
-    """Define a Cartesian mesh from explicit grid boundaries.
+    """Structured spatial bins for simulation tallies and transport techniques.
 
     Parameters
     ----------

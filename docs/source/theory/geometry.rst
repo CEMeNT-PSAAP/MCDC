@@ -197,7 +197,7 @@ argument:
        save_as="geo_animation",
    )
 
-For details on moving surfaces and sources, see :ref:`cont_movement`.
+For details on moving surfaces and sources, see :ref:`continuous_movement`.
 
 
 Moving Surfaces
@@ -212,4 +212,4 @@ Any surface can be given a piecewise-constant velocity using the
 
 MC/DC solves for the exact intersection of a particle trajectory with
 the moving surface — no time-step discretization error is introduced.
-For the mathematical formulation, see :ref:`cont_movement`.
+For the mathematical formulation, see :ref:`continuous_movement`.

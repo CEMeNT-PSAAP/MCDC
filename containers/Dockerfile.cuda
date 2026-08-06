@@ -1,6 +1,6 @@
 FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
-LABEL org.opencontainers.image.source="https://github.com/CEMeNT-PSAAP/MCDC"
+LABEL org.opencontainers.image.source="https://github.com/mcdc-project/mcdc"
 LABEL org.opencontainers.image.description="MC/DC: Monte Carlo Dynamic Code (CUDA/GPU)"
 LABEL org.opencontainers.image.licenses="BSD-3-Clause"
 

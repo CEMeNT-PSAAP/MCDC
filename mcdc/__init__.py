@@ -16,9 +16,3 @@ from mcdc.object_.simulation import Simulation
 from mcdc.object_.source import Source
 from mcdc.object_.surface import Surface
 from mcdc.object_.tally import Tally
-
-# ======================================================================================
-# Misc.
-# ======================================================================================
-
-import mcdc.config

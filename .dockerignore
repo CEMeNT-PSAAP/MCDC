@@ -58,7 +58,6 @@ htmlcov
 
 # Documentation builds
 docs/build
-docs/source/pythonapi/generated/
 docs
 
 # Container artifacts
@@ -135,7 +134,6 @@ htmlcov
 
 # Documentation builds
 docs/build
-docs/source/pythonapi/generated/
 docs
 
 # Container artifacts

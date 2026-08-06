@@ -52,7 +52,7 @@ population over time.
 Full Input
 ==========
 
-Click here to view the input file: `examples/kobayashi-TD/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/kobayashi-TD/input.py>`_.
+Click here to view the input file: `examples/kobayashi-TD/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/kobayashi-TD/input.py>`_.
 
 The complete input used for this example is embedded below:
 

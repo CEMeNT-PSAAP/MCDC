@@ -1,13 +1,15 @@
 .. _theory:
 
-============
-Theory Guide
-============
+==================
+Theory and Methods
+==================
 
-We provided a brief theory guide into the methods, algorithms, and compilation
-schemes in MC/DC.
+Theory and Methods explains the physical models, mathematical formulations, and
+numerical algorithms implemented in MC/DC. Use these pages to understand why a
+method works; use the :doc:`../user_guide/index` to learn how to configure it
+and the :doc:`../developer_guide/index` for software implementation details.
 
-New to Monte Carlo transport?  Start with :ref:`mc_basics` for the
+New to Monte Carlo transport? Start with :ref:`monte_carlo` for the
 fundamentals and :ref:`geometry` for how MC/DC represents problem domains.
 Then explore the advanced topics below.
 
@@ -20,7 +22,7 @@ Fundamentals
 .. toctree::
    :maxdepth: 1
 
-   mc_basics
+   monte_carlo
    geometry
    k_eigenvalue
 
@@ -31,19 +33,17 @@ Advanced Methods
    :maxdepth: 1
 
    variance_reduction
-   ana
    iqmc
-   ww
-   uq
+   weight_windows
+   uncertainty_quantification
    compressed_sensing
 
-Implementation
---------------
+Transport Models
+----------------
 
 .. toctree::
    :maxdepth: 1
 
-   gpu
-   cont_energy
-   domain_decomp
-   cont_movement
+   continuous_energy
+   domain_decomposition
+   continuous_movement

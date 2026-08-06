@@ -167,7 +167,7 @@ Set ``visualize = True`` to render the CSG geometry with
 Full Input
 ==========
 
-Click here to view the input file: `examples/fuel_array_packaged/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/fuel_array_packaged/input.py>`_.
+Click here to view the input file: `examples/fuel_array_packaged/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/fuel_array_packaged/input.py>`_.
 
 The complete input used for this example is embedded below:
 

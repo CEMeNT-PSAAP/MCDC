@@ -10,18 +10,12 @@ dt.sig.sig-object.py > em.property {
     margin-left: 30px;
 }
 
-/* Container styling */
-.admonition.tip {
-    border-left: 5px solid #ffde57; /* Python Yellow border */
+/* Separate the architecture flow figure from its introductory discussion. */
+.architecture-flow-figure {
+    margin-bottom: 1.5rem;
 }
 
-/* Adding the Green Circle to the title */
-.admonition.tip > .admonition-title::before {
-    background-color: #ffde57;
-}
-
-/* Optional: Change title background to a light Python Yellow */
-.admonition.tip > .admonition-title {
-    background-color: #3776ab;
-    color: #ffffff;
+/* Separate the architecture component table from its follow-up discussion. */
+.architecture-component-followup {
+    margin-top: 1.5rem;
 }

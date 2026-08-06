@@ -41,7 +41,7 @@ from mcdc.print_ import print_error
 
 
 class Surface(MCDCObject):
-    """Implicit surface used to bound cells.
+    """Geometric boundaries of simulation cells.
 
     Surfaces are created with class methods such as :meth:`PlaneX`,
     :meth:`CylinderZ`, and :meth:`Sphere`. Unary ``+`` and ``-`` return the

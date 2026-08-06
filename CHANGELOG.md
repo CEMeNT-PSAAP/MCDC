@@ -10,10 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
+- Modernize and reorganize the documentation around distinct user, API reference, theory, project, and developer paths; adopt the PyData Sphinx Theme; and expand the architecture and extension guidance from [@ilhamv]
+- Move model-specific finalization into simulation compilation and reserve runtime preparation for framework-level packing and execution setup from [@ilhamv]
+- **Breaking:** Encapsulate MC/DC model building and execution within an explicit `mcdc.Simulation` instance, replacing the global simulation state and interface from [@ilhamv]
 - Move regression tests from the custom `run.py` harness to pytest-based collection and reporting from [@massimolarsen]
-- **Breaking:** Encapsulate MC/DC model building and execution within an explicit
-  `mcdc.Simulation` instance, replacing the global simulation state and interface
-  from [@ilhamv]
 
 ### Deprecated
 
