@@ -36,6 +36,13 @@ class MCDCBase:
         Embedded ``MCDCBase`` objects participate in compilation without being
         registered in a simulation object collection. Registered
         :class:`MCDCObject` subclasses extend this lifecycle with an object ID.
+
+        Returns
+        -------
+        bool
+            ``True`` if the object was compiled for the current simulation
+            compilation, or ``False`` if it had already been compiled and was
+            skipped.
         """
         # Compile each embedded object once per simulation compilation
         if self.compile_ID == simulation.compile_ID:
