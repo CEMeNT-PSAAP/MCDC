@@ -205,7 +205,7 @@ simulation.settings.set_eigenmode(
 )
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

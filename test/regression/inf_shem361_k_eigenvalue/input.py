@@ -64,7 +64,7 @@ simulation.settings.census_bank_buffer_ratio = 3.0
 simulation.settings.set_eigenmode(N_inactive=1, N_active=2)
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

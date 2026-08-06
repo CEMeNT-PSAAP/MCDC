@@ -64,7 +64,7 @@ simulation.settings.N_particle = 100
 simulation.settings.N_batch = 2
 
 # Techniques
-simulation.implicit_capture()
+simulation.technique.implicit_capture()
 
 # Run
 simulation.run()

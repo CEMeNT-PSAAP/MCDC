@@ -73,7 +73,7 @@ simulation.settings.census_bank_buffer_ratio = 5.0
 simulation.settings.source_bank_buffer_ratio = 5.0
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

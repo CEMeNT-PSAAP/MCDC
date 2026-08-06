@@ -64,8 +64,8 @@ simulation.settings.N_particle = 1000
 simulation.settings.N_batch = 2
 
 # Techniques
-simulation.implicit_capture()
-simulation.global_weight_roulette(0.1, 1.0)
+simulation.technique.implicit_capture()
+simulation.technique.global_weight_roulette(0.1, 1.0)
 
 # Run
 simulation.run()

@@ -54,7 +54,7 @@ simulation.settings.source_bank_buffer_ratio = 5.0
 simulation.settings.set_time_census(np.linspace(0.0, 5.0, 6)[1:])
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()
