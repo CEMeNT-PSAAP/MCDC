@@ -26,6 +26,7 @@ from mcdc.object_.base import (
 )
 from mcdc.object_.particle import Particle, ParticleBank, ParticleData
 from mcdc.object_.tally import Tally
+from mcdc.object_.util import parse_dimension_expression
 from mcdc.print_ import print_error, print_structure
 from mcdc.util import flatten
 
@@ -1123,7 +1124,13 @@ def accessor_return(expression, cast_to_int):
 
 def accessor_dimension(variable_name, dimension, object_name):
     if isinstance(dimension, str):
-        return f'    {variable_name} = {object_name}["{dimension}"]\n'
+        attribute, offset = parse_dimension_expression(dimension)
+        expression = f'{object_name}["{attribute}"]'
+        if offset > 0:
+            expression += f" + {offset}"
+        elif offset < 0:
+            expression += f" - {-offset}"
+        return f"    {variable_name} = {expression}\n"
     return f"    {variable_name} = {dimension}\n"
 
 
@@ -1148,10 +1155,7 @@ def _accessor_1d_all(object_name, attribute_name, size, setter=False):
     else:
         text += f"def {attribute_name}_all({object_name}, data):\n"
     text += f'    start = {object_name}["{attribute_name}_offset"]\n'
-    if type(size) == str:
-        text += f'    size = {object_name}["{size}"]\n'
-    else:
-        text += f"    size = {size}\n"
+    text += accessor_dimension("size", size, object_name)
     text += f"    end = start + size\n"
     if setter:
         text += f"    data[start:end] = value\n\n\n"
@@ -1169,10 +1173,7 @@ def _accessor_1d_last(
     else:
         text += f"def {attribute_name}_last({object_name}, data):\n"
     text += f'    start = {object_name}["{attribute_name}_offset"]\n'
-    if type(size) == str:
-        text += f'    size = {object_name}["{size}"]\n'
-    else:
-        text += f"    size = {size}\n"
+    text += accessor_dimension("size", size, object_name)
     text += f"    end = start + size\n"
     if setter:
         text += f"    data[end - 1] = value\n\n\n"
