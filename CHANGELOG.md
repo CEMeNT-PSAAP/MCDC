@@ -11,12 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Changed
 
 - Move regression tests from the custom `run.py` harness to pytest-based collection and reporting from [@massimolarsen]
-- **Breaking:** Redesign model construction around explicit `mcdc.Simulation`
-  instances, replacing the global simulation, settings, run, and visualization
-  interfaces. Each simulation now owns and compiles its complete object graph,
-  handles associated input and output workflows, and can be independently
-  visualized or run. Regression problems, public API documentation, and unit
-  tests have been updated for the new workflow from [@ilhamv]
+- **Breaking:** Encapsulate MC/DC model building and execution within an explicit
+  `mcdc.Simulation` instance, replacing the global simulation state and interface
+  from [@ilhamv]
 
 ### Deprecated
 
