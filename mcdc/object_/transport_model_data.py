@@ -26,10 +26,10 @@ _NEUTRON_MULTIGROUP_LOG_ENERGY_REPRESENTATIONS = {
 }
 
 
-class NeutronMultigroup(MCDCObject):
-    """Define a multigroup transport model for neutrons.
+class NeutronMultigroupData(MCDCObject):
+    """Store the cross-section data for multigroup neutron transport.
 
-    Materials may use ``NeutronMultigroup`` alone for multigroup transport or
+    Materials may use ``NeutronMultigroupData`` alone for multigroup transport or
     alongside a native composition over the energy range defined by
     ``energy_grid``.
 
@@ -74,20 +74,20 @@ class NeutronMultigroup(MCDCObject):
     energy_grid : array_like of float, optional
         Strictly increasing energy-group boundaries with shape ``(G + 1,)``.
         Group ``g`` spans ``energy_grid[g] <= E < energy_grid[g + 1]``. The
-        array may be omitted before compilation when a shared grid will be
-        supplied.
+        default is the group-coordinate grid
+        ``[1.0e-6 - 0.5, 0.5, 1.5, ...]``.
     energy_representation : str or int, optional
         Policy used to reconstruct continuous energy from a group. Midpoint
         policies select the arithmetic or geometric midpoint; uniform policies
         sample uniformly in energy or log-energy. The default is
-        ``"log_midpoint"``. Logarithmic policies require positive boundaries.
+        ``"midpoint"``. Logarithmic policies require positive boundaries.
         The corresponding ``NEUTRON_MULTIGROUP_ENERGY_*`` integer constants
         are also accepted.
 
     Notes
     -----
     ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. Calling
-    ``NeutronMultigroup()`` without any cross sections creates the reserved
+    ``NeutronMultigroupData()`` without any cross sections creates the reserved
     zero-group placeholder used by materials without multigroup data. Cross
     sections are macroscopic and use inverse-length units.
 
@@ -97,7 +97,7 @@ class NeutronMultigroup(MCDCObject):
 
     >>> import mcdc
     >>> import numpy as np
-    >>> neutron_multigroup = mcdc.NeutronMultigroup(
+    >>> neutron_multigroup = mcdc.NeutronMultigroupData(
     ...     capture=np.array([1.0 / 3.0]),
     ...     scatter=np.array([[1.0 / 3.0]]),
     ...     fission=np.array([1.0 / 3.0]),
@@ -108,7 +108,7 @@ class NeutronMultigroup(MCDCObject):
     Construct data with two energy groups. Scattering is indexed by outgoing
     then incoming group:
 
-    >>> two_group = mcdc.NeutronMultigroup(
+    >>> two_group = mcdc.NeutronMultigroupData(
     ...     capture=np.array([0.1, 0.2]),
     ...     scatter=np.array([
     ...         [1.0, 2.0],
@@ -122,7 +122,7 @@ class NeutronMultigroup(MCDCObject):
     delayed yield is indexed by precursor then incoming energy group, while
     the delayed spectrum is indexed by outgoing energy then precursor group:
 
-    >>> multiple_precursors = mcdc.NeutronMultigroup(
+    >>> multiple_precursors = mcdc.NeutronMultigroupData(
     ...     fission=np.array([0.2, 0.3]),
     ...     nu_d=np.array([
     ...         [0.1, 0.2],
@@ -137,12 +137,11 @@ class NeutronMultigroup(MCDCObject):
     """
 
     # MC/DC framework metadata
-    label = "neutron_multigroup"
+    label = "neutron_multigroup_data"
 
     G: int
     J: int
 
-    has_energy_grid: bool
     energy_grid: Annotated[NDArray[float64], ("G+1",)]
     energy_representation: int
 
@@ -179,7 +178,7 @@ class NeutronMultigroup(MCDCObject):
         speed: ArrayLike | NoneType = None,
         decay_rate: ArrayLike | NoneType = None,
         energy_grid: ArrayLike | NoneType = None,
-        energy_representation: str | int = "log_midpoint",
+        energy_representation: str | int = "midpoint",
     ) -> None:
         super().__init__()
 
@@ -230,31 +229,31 @@ class NeutronMultigroup(MCDCObject):
 
         # Validate relationships between fission yields and spectra
         if fission is not None and nu_p is None and nu_d is None:
-            print_error("NeutronMultigroup fission data requires nu_p or nu_d.")
+            print_error("NeutronMultigroupData fission data requires nu_p or nu_d.")
         if fission is None and (nu_p is not None or nu_d is not None):
             print_error(
-                "NeutronMultigroup fission yields require fission cross sections."
+                "NeutronMultigroupData fission yields require fission cross sections."
             )
         if chi_p is not None and nu_p is None:
-            print_error("NeutronMultigroup chi_p requires nu_p.")
+            print_error("NeutronMultigroupData chi_p requires nu_p.")
         if chi_d is not None and nu_d is None:
-            print_error("NeutronMultigroup chi_d requires nu_d.")
+            print_error("NeutronMultigroupData chi_d requires nu_d.")
         if decay_rate is not None and nu_d is None:
-            print_error("NeutronMultigroup decay_rate requires nu_d.")
+            print_error("NeutronMultigroupData decay_rate requires nu_d.")
 
         # Resolve the energy grid and continuous-energy reconstruction policy
         self.energy_representation = _resolve_energy_representation(
             energy_representation
         )
-        self.has_energy_grid = energy_grid is not None
         if energy_grid is None:
-            self.energy_grid = np.zeros(self.G + 1, dtype=float64)
+            self.energy_grid = np.arange(self.G + 1, dtype=float64) - 0.5
+            self.energy_grid[0] += 1.0e-6
         else:
             if not np.all(np.isfinite(energy_grid)):
-                print_error("NeutronMultigroup energy grid entries must be finite.")
+                print_error("NeutronMultigroupData energy grid entries must be finite.")
             if np.any(np.diff(energy_grid) <= 0.0):
                 print_error(
-                    "NeutronMultigroup energy grid must be strictly increasing."
+                    "NeutronMultigroupData energy grid must be strictly increasing."
                 )
             if (
                 self.energy_representation
@@ -262,7 +261,7 @@ class NeutronMultigroup(MCDCObject):
                 and energy_grid[0] <= 0.0
             ):
                 print_error(
-                    "NeutronMultigroup logarithmic energy representation requires positive "
+                    "NeutronMultigroupData logarithmic energy representation requires positive "
                     "energy boundaries."
                 )
             self.energy_grid = energy_grid
@@ -303,7 +302,7 @@ class NeutronMultigroup(MCDCObject):
             if self.G == 1:
                 self.chi_p[:] = 1.0
             elif chi_p is None:
-                print_error("NeutronMultigroup with nu_p and G > 1 requires chi_p.")
+                print_error("NeutronMultigroupData with nu_p and G > 1 requires chi_p.")
             else:
                 if chi_p.ndim == 1:
                     chi_p = np.tile(chi_p[:, np.newaxis], (1, self.G))
@@ -315,7 +314,7 @@ class NeutronMultigroup(MCDCObject):
             if self.G == 1:
                 self.chi_d[:] = 1.0
             elif chi_d is None:
-                print_error("NeutronMultigroup with nu_d and G > 1 requires chi_d.")
+                print_error("NeutronMultigroupData with nu_d and G > 1 requires chi_d.")
             else:
                 self.chi_d = np.swapaxes(chi_d, 0, 1).copy()
                 active_delayed_groups = np.any(nu_d > 0.0, axis=1)
@@ -325,8 +324,7 @@ class NeutronMultigroup(MCDCObject):
         text = super().__repr__()
         text += f"  - G: {self.G}\n"
         text += f"  - J: {self.J}\n"
-        if self.has_energy_grid:
-            text += f"  - Energy grid {print_1d_array(self.energy_grid)}\n"
+        text += f"  - Energy grid {print_1d_array(self.energy_grid)}\n"
         text += f"  - Sigma_c {print_1d_array(self.capture)}\n"
         text += f"  - Sigma_s {print_1d_array(self.scatter)}\n"
         text += f"  - Sigma_f {print_1d_array(self.fission)}\n"
@@ -348,7 +346,7 @@ def _as_array(name, value):
     try:
         return np.asarray(value, dtype=float64)
     except (TypeError, ValueError):
-        print_error(f"NeutronMultigroup {name} must be numeric array-like data.")
+        print_error(f"NeutronMultigroupData {name} must be numeric array-like data.")
 
 
 def _infer_group_count(capture, scatter, fission) -> int:
@@ -359,11 +357,11 @@ def _infer_group_count(capture, scatter, fission) -> int:
         return 0
     if defining.ndim == 0:
         print_error(
-            "NeutronMultigroup cross sections must be arrays with an energy-group axis."
+            "NeutronMultigroupData cross sections must be arrays with an energy-group axis."
         )
     if defining.shape[0] == 0:
         print_error(
-            "NeutronMultigroup cross sections must define at least one energy group."
+            "NeutronMultigroupData cross sections must define at least one energy group."
         )
     return defining.shape[0]
 
@@ -373,19 +371,21 @@ def _infer_delayed_group_count(nu_d, G: int) -> int:
     if nu_d is None:
         return 0
     if nu_d.ndim != 2:
-        print_error(f"NeutronMultigroup nu_d must have shape (J, G); got {nu_d.shape}.")
+        print_error(
+            f"NeutronMultigroupData nu_d must have shape (J, G); got {nu_d.shape}."
+        )
     if nu_d.shape[1] != G:
         print_error(
-            f"NeutronMultigroup nu_d must have shape (J, G) with G = {G}; got {nu_d.shape}."
+            f"NeutronMultigroupData nu_d must have shape (J, G) with G = {G}; got {nu_d.shape}."
         )
     return nu_d.shape[0]
 
 
 def _validate_shape(name, array, expected) -> None:
-    """Require an optional array to have its declared NeutronMultigroup shape."""
+    """Require an optional array to have its declared NeutronMultigroupData shape."""
     if array is not None and array.shape != expected:
         print_error(
-            f"NeutronMultigroup {name} must have shape {expected}; got {array.shape}."
+            f"NeutronMultigroupData {name} must have shape {expected}; got {array.shape}."
         )
 
 
@@ -395,7 +395,7 @@ def _validate_prompt_spectrum_shape(chi_p, G: int) -> None:
         return
     if chi_p.shape not in ((G,), (G, G)):
         print_error(
-            f"NeutronMultigroup chi_p must have shape ({G},) or ({G}, {G}); got {chi_p.shape}."
+            f"NeutronMultigroupData chi_p must have shape ({G},) or ({G}, {G}); got {chi_p.shape}."
         )
 
 
@@ -404,7 +404,9 @@ def _validate_nonnegative(name, array) -> None:
     if array is None:
         return
     if not np.all(np.isfinite(array)) or np.any(array < 0.0):
-        print_error(f"NeutronMultigroup {name} entries must be finite and nonnegative.")
+        print_error(
+            f"NeutronMultigroupData {name} entries must be finite and nonnegative."
+        )
 
 
 def _validate_positive(name, array) -> None:
@@ -412,7 +414,9 @@ def _validate_positive(name, array) -> None:
     if array is None:
         return
     if not np.all(np.isfinite(array)) or np.any(array <= 0.0):
-        print_error(f"NeutronMultigroup {name} entries must be finite and positive.")
+        print_error(
+            f"NeutronMultigroupData {name} entries must be finite and positive."
+        )
 
 
 def _validate_decay_rate(array) -> None:
@@ -420,7 +424,7 @@ def _validate_decay_rate(array) -> None:
     if array is None:
         return
     if np.any(np.isnan(array)) or np.any(array < 0.0):
-        print_error("NeutronMultigroup decay_rate entries must be nonnegative.")
+        print_error("NeutronMultigroupData decay_rate entries must be nonnegative.")
 
 
 def _resolve_energy_representation(policy) -> int:
@@ -429,7 +433,7 @@ def _resolve_energy_representation(policy) -> int:
         if policy not in _NEUTRON_MULTIGROUP_ENERGY_REPRESENTATIONS:
             expected = ", ".join(_NEUTRON_MULTIGROUP_ENERGY_REPRESENTATIONS)
             print_error(
-                f"Unknown NeutronMultigroup energy representation {policy!r}. "
+                f"Unknown NeutronMultigroupData energy representation {policy!r}. "
                 f"Expected one of: {expected}."
             )
         return _NEUTRON_MULTIGROUP_ENERGY_REPRESENTATIONS[policy]
@@ -441,7 +445,7 @@ def _resolve_energy_representation(policy) -> int:
     ):
         return int(policy)
 
-    print_error(f"Unknown NeutronMultigroup energy representation {policy!r}.")
+    print_error(f"Unknown NeutronMultigroupData energy representation {policy!r}.")
 
 
 def _normalize_rows(array, required, name) -> None:
@@ -450,7 +454,7 @@ def _normalize_rows(array, required, name) -> None:
         norm = np.sum(array[index])
         if required[index] and norm <= 0.0:
             print_error(
-                f"NeutronMultigroup {name} spectrum {index} must have positive mass."
+                f"NeutronMultigroupData {name} spectrum {index} must have positive mass."
             )
         if norm > 0.0:
             array[index] /= norm

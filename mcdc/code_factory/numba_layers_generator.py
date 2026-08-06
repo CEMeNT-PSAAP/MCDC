@@ -45,6 +45,20 @@ type_map = {
 
 bank_names = ["bank_active", "bank_census", "bank_source", "bank_future"]
 
+
+def validate_unique_class_labels(classes):
+    """Reject distinct runtime classes that use the same structure label."""
+    classes_by_label = {}
+    for class_ in classes:
+        existing = classes_by_label.get(class_.label)
+        if existing is not None and existing is not class_:
+            print_error(
+                f"Duplicate MC/DC class label '{class_.label}' used by "
+                f"{existing.__name__} and {class_.__name__}."
+            )
+        classes_by_label[class_.label] = class_
+
+
 # ======================================================================================
 # Gather and group the classes
 # ======================================================================================
@@ -78,6 +92,8 @@ for file_name in file_names:
                 and item not in mcdc_classes
             ):
                 mcdc_classes.append(item)
+
+validate_unique_class_labels(mcdc_classes)
 
 polymorphic_bases = [
     x for x in mcdc_classes if issubclass(x, MCDCPolymorphic) and x.sub_type == -1
@@ -197,9 +213,20 @@ def generate_numba_layers(simulation):
             included_classes.append(hint_args[0])
             continue
 
-    # Set the structures and accessor targets
+    # Build child structures before structures that embed them
+    completed_structures = set()
+    active_structures = set()
+    structure_order = []
     for label in annotations.keys():
-        set_structure(label, structures, accessor_targets, annotations)
+        set_structure(
+            label,
+            structures,
+            accessor_targets,
+            annotations,
+            completed_structures,
+            active_structures,
+            structure_order,
+        )
 
     # Generate the accessor helper
     if MPI.COMM_WORLD.Get_rank() == 0:
@@ -327,14 +354,13 @@ def generate_numba_layers(simulation):
                 "from mcdc.code_factory.numba_layers_generator import into_dtype\n\n"
             )
 
-            for label in structures.keys():
+            for label in structure_order:
                 # Skip special types
                 if label in ["gpu_meta"] + bank_names + ["simulation"]:
                     continue
 
                 text += f"{label} = into_dtype([\n"
                 structure = structures[label]
-
                 for item in structure:
                     text += decode_structure_item(item)
                 text += "])\n\n"
@@ -474,7 +500,37 @@ def generate_numba_layers(simulation):
     return mcdc_simulation_container, data["array"]
 
 
-def set_structure(label, structures, accessor_targets, annotations):
+def is_embedded_mcdc_base(hint):
+    """Return whether a field is an inline, simulation-owned MC/DC object."""
+    return (
+        isinstance(hint, type)
+        and issubclass(hint, MCDCBase)
+        and not issubclass(hint, MCDCObject)
+    )
+
+
+def set_structure(
+    label,
+    structures,
+    accessor_targets,
+    annotations,
+    completed=None,
+    active=None,
+    order=None,
+):
+    # Track dependencies so embedded structures are complete before their owners
+    if completed is None:
+        completed = set()
+    if active is None:
+        active = set()
+    if order is None:
+        order = []
+    if label in completed:
+        return
+    if label in active:
+        print_error(f"Cyclic embedded MCDCBase structure involving '{label}'.")
+    active.add(label)
+
     structure = structures[label]
     annotation = annotations[label]
     accessor_target = accessor_targets[label]
@@ -483,9 +539,17 @@ def set_structure(label, structures, accessor_targets, annotations):
         hint = annotation[field]
         hint_origin = get_origin(hint)
         hint_args = get_args(hint)
+        embedded_mcdc_base = is_embedded_mcdc_base(hint)
         hint_origin_shape = None
         hint_inner_dtype = None
         fixed_size_array = False
+
+        # Inline runtime fields use their class label as their field name
+        if embedded_mcdc_base and field != hint.label:
+            print_error(
+                f"Embedded MCDCBase field '{label}.{field}' must match the "
+                f"class label '{hint.label}'."
+            )
 
         # Process annotation
         if hint_origin is Annotated:
@@ -546,7 +610,24 @@ def set_structure(label, structures, accessor_targets, annotations):
         # ==========================================================================
 
         # Basics
-        if fixed_size_array:
+        if embedded_mcdc_base:
+            child_label = hint.label
+            if child_label not in annotations:
+                print_error(
+                    f"Missing annotations for embedded MCDCBase {label}/{field}: "
+                    f"{child_label}"
+                )
+            set_structure(
+                child_label,
+                structures,
+                accessor_targets,
+                annotations,
+                completed,
+                active,
+                order,
+            )
+            structure.append((field, into_dtype(structures[child_label])))
+        elif fixed_size_array:
             structure.append((field, type_map[hint_inner_dtype], hint_origin_shape))
         elif simple_scalar:
             structure.append((field, type_map[hint]))
@@ -586,6 +667,11 @@ def set_structure(label, structures, accessor_targets, annotations):
         else:
             print_error(f"Unknown type hint for {label}/{field}: {hint}")
 
+    # Record a dependency-safe declaration order for generated Numba types
+    active.remove(label)
+    completed.add(label)
+    order.append(label)
+
 
 def set_object(
     object_, annotations, structures, records, data, class_=None, set_data=False
@@ -613,6 +699,28 @@ def set_object(
 
     if class_.label == "simulation":
         record = records["simulation"]
+
+    # Recursively pack inline MCDCBase members before packing their owner
+    if class_.label != "simulation":
+        for field, child_class in annotation.items():
+            if not is_embedded_mcdc_base(child_class):
+                continue
+            child = getattr(object_, field)
+            set_object(
+                child,
+                annotations,
+                structures,
+                records,
+                data,
+                set_data=set_data,
+            )
+            child_structure = structures[child_class.label]
+            child_container = np.zeros(1, dtype=into_dtype(child_structure))
+            child_record = child_container[0]
+            for child_item in child_structure:
+                child_field = child_item[0]
+                child_record[child_field] = records[child_class.label][child_field]
+            record[field] = child_record
 
     # Straightforwardly set up attributes
     for key in [x[0] for x in structure]:

@@ -7,7 +7,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from mcdc.object_.base import MCDCObject
 from mcdc.object_.element import Element
-from mcdc.object_.transport_model import NeutronMultigroup
+from mcdc.object_.transport_model_data import NeutronMultigroupData
 from mcdc.object_.nuclide import Nuclide
 from mcdc.object_.util import ISOTOPIC_ABUNDANCE
 from mcdc.print_ import print_error
@@ -31,10 +31,10 @@ class Material(MCDCObject):
     temperature : float, optional
         Material temperature in kelvin. Each nuclide uses the closest
         temperature available in the data library.
-    neutron_multigroup : NeutronMultigroup, optional
+    neutron_multigroup : NeutronMultigroupData, optional
         Multigroup cross sections for neutron transport. When supplied with a
-        native composition, its ``energy_grid`` is required and defines the
-        energy range over which multigroup physics applies.
+        native composition, its ``energy_grid`` defines the energy range over
+        which multigroup physics applies.
 
     Notes
     -----
@@ -42,9 +42,8 @@ class Material(MCDCObject):
     Nuclide and element compositions cannot both be specified because they are
     alternative native representations of the same material. A native
     composition may be supplied together with ``neutron_multigroup`` for hybrid
-    neutron physics. Hybrid materials require an explicit ``NeutronMultigroup``
-    energy grid so collision physics can select between native and multigroup
-    data.
+    neutron physics. An omitted multigroup energy grid uses the default
+    group-coordinate boundaries.
 
     Nuclide and element objects are created immediately; their data-library
     properties are loaded when the material is compiled into a simulation.
@@ -73,7 +72,7 @@ class Material(MCDCObject):
     >>> hybrid_fuel = mcdc.Material(
     ...     name="Hybrid fuel",
     ...     nuclide_composition={"U235": 5.0e-4, "U238": 2.2e-2},
-    ...     neutron_multigroup=mcdc.NeutronMultigroup(
+    ...     neutron_multigroup=mcdc.NeutronMultigroupData(
     ...         capture=np.array([0.10]),
     ...         fission=np.array([0.20]),
     ...         nu_p=np.array([2.50]),
@@ -93,7 +92,7 @@ class Material(MCDCObject):
 
     nuclide_composition: dict[Nuclide, float]  # Non-Numba
     element_composition: dict[Element, float]  # Non-Numba
-    neutron_multigroup: NeutronMultigroup
+    neutron_multigroup: NeutronMultigroupData
 
     nuclides: list[Nuclide]
     elements: list[Element]
@@ -106,7 +105,7 @@ class Material(MCDCObject):
         nuclide_composition: dict[str, float] | NoneType = None,
         element_composition: dict[str, float] | NoneType = None,
         temperature: float = 293.6,
-        neutron_multigroup: NeutronMultigroup | NoneType = None,
+        neutron_multigroup: NeutronMultigroupData | NoneType = None,
     ) -> None:
         super().__init__()
 
@@ -129,21 +128,9 @@ class Material(MCDCObject):
                 "or neutron_multigroup."
             )
         if neutron_multigroup is not None and not isinstance(
-            neutron_multigroup, NeutronMultigroup
+            neutron_multigroup, NeutronMultigroupData
         ):
-            print_error("neutron_multigroup must be a NeutronMultigroup object.")
-        native_composition_supplied = bool(nuclide_composition or element_composition)
-        if (
-            native_composition_supplied
-            and neutron_multigroup is not None
-            and neutron_multigroup.G > 0
-            and not neutron_multigroup.has_energy_grid
-        ):
-            print_error(
-                "Material with both a native composition and neutron_multigroup "
-                "requires neutron_multigroup.energy_grid."
-            )
-
+            print_error("neutron_multigroup must be a NeutronMultigroupData object.")
         # Initialize shared material state
         self.name = name or "(Unnamed material)"
         self.temperature = float(temperature)
@@ -152,7 +139,7 @@ class Material(MCDCObject):
         self.neutron_multigroup = (
             neutron_multigroup
             if neutron_multigroup is not None
-            else NeutronMultigroup()
+            else NeutronMultigroupData()
         )
         self.has_neutron_multigroup = self.neutron_multigroup.G > 0
         self.fissionable = self.neutron_multigroup.fissionable
@@ -194,16 +181,16 @@ class Material(MCDCObject):
         speed: ArrayLike | NoneType = None,
         decay_rate: ArrayLike | NoneType = None,
         energy_grid: ArrayLike | NoneType = None,
-        energy_representation: str | int = "log_midpoint",
+        energy_representation: str | int = "midpoint",
     ) -> Self:
         """Construct a material containing only multigroup neutron data.
 
-        The transport arguments are forwarded to :class:`NeutronMultigroup`.
+        The transport arguments are forwarded to :class:`NeutronMultigroupData`.
         Use the regular constructor when combining multigroup data with a
         native nuclide or element composition.
         """
-        # Build the transport model while preserving Material as the sole type
-        neutron_multigroup = NeutronMultigroup(
+        # Build the transport-mode data while preserving Material as the sole type
+        neutron_multigroup = NeutronMultigroupData(
             capture=capture,
             scatter=scatter,
             fission=fission,
@@ -253,7 +240,7 @@ class Material(MCDCObject):
 
         # Point absent multigroup data to the reserved neutron model
         if self.neutron_multigroup.G == 0:
-            self.neutron_multigroup = simulation.neutron_multigroup[0]
+            self.neutron_multigroup = simulation.neutron_multigroup_data[0]
         self.has_neutron_multigroup = self.neutron_multigroup.G > 0
 
         # Register the material, then compile only canonical owned members

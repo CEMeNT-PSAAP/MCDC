@@ -141,21 +141,6 @@ def prepare(simulationPy: Simulation):
     importlib.reload(mcdc_get)
     importlib.reload(mcdc_set)
 
-    # ==================================================================================
-    # Adapt functions as needed
-    # ==================================================================================
-
-    # Pick physics model
-    import mcdc.transport.physics as physics
-
-    if settings.neutron_multigroup_mode:
-        physics.neutron.particle_speed = physics.neutron.multigroup.particle_speed
-        physics.neutron.macro_xs = physics.neutron.multigroup.macro_xs
-        physics.neutron.neutron_production_xs = (
-            physics.neutron.multigroup.neutron_production_xs
-        )
-        physics.neutron.collision = physics.neutron.multigroup.collision
-
     # Pick Python-version RNG if needed
     import mcdc.config as config
     import mcdc.transport.rng as rng

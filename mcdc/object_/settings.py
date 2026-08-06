@@ -83,7 +83,6 @@ class Settings(MCDCBase):
     proton_transport: bool = False
 
     # Neutron transport modes
-    neutron_multigroup_mode: bool = False
     neutron_eigenvalue_mode: bool = False
 
     # GPU mode

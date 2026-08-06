@@ -342,10 +342,9 @@ element = into_dtype([
     ('ID', int64),
 ])
 
-neutron_multigroup = into_dtype([
+neutron_multigroup_data = into_dtype([
     ('G', int64),
     ('J', int64),
-    ('has_energy_grid', bool),
     ('energy_grid_offset', int64),
     ('energy_grid_length', int64),
     ('energy_representation', int64),
@@ -541,25 +540,29 @@ settings = into_dtype([
     ('neutron_transport', bool),
     ('electron_transport', bool),
     ('proton_transport', bool),
-    ('neutron_multigroup_mode', bool),
     ('neutron_eigenvalue_mode', bool),
     ('gpu_strategy', int64),
     ('gpu_async_type', int64),
     ('gpu_storage', int64),
 ])
 
-global_weight_roulette = into_dtype([
-    ('active', bool),
-    ('weight_threshold', float64),
-    ('weight_target', float64),
+neutron_multigroup = into_dtype([
+    ('multigrid', bool),
 ])
 
 implicit_capture = into_dtype([
     ('active', bool),
 ])
 
-population_control = into_dtype([
+weighted_emission = into_dtype([
     ('active', bool),
+    ('weight_target', float64),
+])
+
+global_weight_roulette = into_dtype([
+    ('active', bool),
+    ('weight_threshold', float64),
+    ('weight_target', float64),
 ])
 
 weight_windows = into_dtype([
@@ -579,9 +582,17 @@ weight_windows = into_dtype([
     ('upper_weights_length', int64),
 ])
 
-weighted_emission = into_dtype([
+population_control = into_dtype([
     ('active', bool),
-    ('weight_target', float64),
+])
+
+technique = into_dtype([
+    ('neutron_multigroup', neutron_multigroup),
+    ('implicit_capture', implicit_capture),
+    ('weighted_emission', weighted_emission),
+    ('global_weight_roulette', global_weight_roulette),
+    ('weight_windows', weight_windows),
+    ('population_control', population_control),
 ])
 
 source = into_dtype([
@@ -804,8 +815,8 @@ def set_simulation(N: dict):
         ('N_element', int64),
         ('materials', material, (N['material'])),
         ('N_material', int64),
-        ('neutron_multigroup', neutron_multigroup, (N['neutron_multigroup'])),
-        ('N_neutron_multigroup', int64),
+        ('neutron_multigroup_data', neutron_multigroup_data, (N['neutron_multigroup_data'])),
+        ('N_neutron_multigroup_data', int64),
         ('sources', source, (N['source'])),
         ('N_source', int64),
         ('surfaces', surface, (N['surface'])),
@@ -831,11 +842,7 @@ def set_simulation(N: dict):
         ('tallies', tally, (N['tally'])),
         ('N_tally', int64),
         ('settings', settings),
-        ('implicit_capture', implicit_capture),
-        ('weighted_emission', weighted_emission),
-        ('global_weight_roulette', global_weight_roulette),
-        ('weight_windows', weight_windows),
-        ('population_control', population_control),
+        ('technique', technique),
         ('gpu_meta', gpu_meta),
         ('bank_future', bank_future),
         ('bank_source', bank_source),

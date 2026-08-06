@@ -60,7 +60,7 @@ import mcdc.mcdc_get.element as element
 
 import mcdc.mcdc_get.gpu_meta as gpu_meta
 
-import mcdc.mcdc_get.neutron_multigroup as neutron_multigroup
+import mcdc.mcdc_get.neutron_multigroup_data as neutron_multigroup_data
 
 import mcdc.mcdc_get.nuclide as nuclide
 
@@ -86,15 +86,7 @@ import mcdc.mcdc_get.particle_bank as particle_bank
 
 import mcdc.mcdc_get.settings as settings
 
-import mcdc.mcdc_get.global_weight_roulette as global_weight_roulette
-
-import mcdc.mcdc_get.implicit_capture as implicit_capture
-
-import mcdc.mcdc_get.population_control as population_control
-
-import mcdc.mcdc_get.weight_windows as weight_windows
-
-import mcdc.mcdc_get.weighted_emission as weighted_emission
+import mcdc.mcdc_get.technique as technique
 
 import mcdc.mcdc_get.source as source
 
@@ -103,6 +95,18 @@ import mcdc.mcdc_get.surface as surface
 import mcdc.mcdc_get.surface_crossing_tally as surface_crossing_tally
 
 import mcdc.mcdc_get.tally as tally
+
+import mcdc.mcdc_get.global_weight_roulette as global_weight_roulette
+
+import mcdc.mcdc_get.implicit_capture as implicit_capture
+
+import mcdc.mcdc_get.neutron_multigroup as neutron_multigroup
+
+import mcdc.mcdc_get.population_control as population_control
+
+import mcdc.mcdc_get.weight_windows as weight_windows
+
+import mcdc.mcdc_get.weighted_emission as weighted_emission
 
 import mcdc.mcdc_get.bank_active as bank_active
 

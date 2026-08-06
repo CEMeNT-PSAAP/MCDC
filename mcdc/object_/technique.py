@@ -8,6 +8,42 @@ from numpy.typing import NDArray
 from typing import Annotated
 
 # ======================================================================================
+# Neutron multigroup
+# ======================================================================================
+
+
+class NeutronMultigroupTechnique(MCDCBase):
+    """Configure simulation-wide neutron multigroup behavior."""
+
+    # MC/DC framework metadata
+    label = "neutron_multigroup"
+
+    multigrid: bool
+
+    def __init__(self):
+        self.multigrid = False
+
+    def __call__(self, multigrid: bool = False):
+        """Configure whether multiple neutron energy grids are allowed.
+
+        Parameters
+        ----------
+        multigrid : bool, optional
+            Allow materials to use different neutron multigroup energy grids.
+            By default, compilation requires one shared grid.
+
+        Examples
+        --------
+        Allow material-local neutron multigroup grids:
+
+        >>> import mcdc
+        >>> simulation = mcdc.Simulation()
+        >>> simulation.technique.neutron_multigroup(multigrid=True)
+        """
+        self.multigrid = multigrid
+
+
+# ======================================================================================
 # Implicit capture
 # ======================================================================================
 
@@ -37,11 +73,11 @@ class ImplicitCapture(MCDCBase):
 
         >>> import mcdc
         >>> simulation = mcdc.Simulation()
-        >>> simulation.implicit_capture()
+        >>> simulation.technique.implicit_capture()
 
         Disable implicit capture:
 
-        >>> simulation.implicit_capture(active=False)
+        >>> simulation.technique.implicit_capture(active=False)
         """
         self.active = active
 
@@ -80,15 +116,15 @@ class WeightedEmission(MCDCBase):
 
         >>> import mcdc
         >>> simulation = mcdc.Simulation()
-        >>> simulation.weighted_emission(weight_target=1.0)
+        >>> simulation.technique.weighted_emission(weight_target=1.0)
 
         Select a different target weight:
 
-        >>> simulation.weighted_emission(weight_target=0.5)
+        >>> simulation.technique.weighted_emission(weight_target=0.5)
 
         Disable weighted emission:
 
-        >>> simulation.weighted_emission(active=False)
+        >>> simulation.technique.weighted_emission(active=False)
         """
         self.active = active
         self.weight_target = weight_target
@@ -132,14 +168,14 @@ class GlobalWeightRoulette(MCDCBase):
 
         >>> import mcdc
         >>> simulation = mcdc.Simulation()
-        >>> simulation.global_weight_roulette(
+        >>> simulation.technique.global_weight_roulette(
         ...     weight_threshold=0.25,
         ...     weight_target=1.0,
         ... )
 
         Use a lower target weight:
 
-        >>> simulation.global_weight_roulette(
+        >>> simulation.technique.global_weight_roulette(
         ...     weight_threshold=0.1,
         ...     weight_target=0.5,
         ... )
@@ -215,19 +251,19 @@ class WeightWindows(MCDCBase):
         >>> import mcdc
         >>> simulation = mcdc.Simulation()
         >>> windows = np.array([0.5, 1.0, 2.0]).reshape(1, 1, 1, 1, 3)
-        >>> simulation.weight_windows(windows)
+        >>> simulation.technique.weight_windows(windows)
 
         Configure weight windows on a uniform spatial mesh:
 
         >>> mesh = mcdc.MeshUniform(x=(-5.0, 1.0, 10))
         >>> windows = np.tile([0.25, 0.5, 1.0], (1, 10, 1, 1, 1))
-        >>> simulation.weight_windows(windows, mesh=mesh)
+        >>> simulation.technique.weight_windows(windows, mesh=mesh)
 
         Configure both energy- and space-dependent windows:
 
         >>> energy = np.array([0.0, 0.625e-6, 20.0])
         >>> windows = np.tile([0.25, 0.5, 1.0], (2, 10, 1, 1, 1))
-        >>> simulation.weight_windows(
+        >>> simulation.technique.weight_windows(
         ...     windows,
         ...     mesh=mesh,
         ...     energy=energy,
@@ -328,10 +364,43 @@ class PopulationControl(MCDCBase):
 
         >>> import mcdc
         >>> simulation = mcdc.Simulation()
-        >>> simulation.population_control()
+        >>> simulation.technique.population_control()
 
         Disable source-bank population control:
 
-        >>> simulation.population_control(active=False)
+        >>> simulation.technique.population_control(active=False)
         """
         self.active = active
+
+
+# ======================================================================================
+# Simulation technique collection
+# ======================================================================================
+
+
+class Technique(MCDCBase):
+    """Own all simulation-wide transport-technique configurations.
+
+    Access the individual callable configurations through
+    ``simulation.technique``. The same hierarchy is retained in the packed
+    runtime simulation.
+    """
+
+    # MC/DC framework metadata
+    label = "technique"
+
+    neutron_multigroup: NeutronMultigroupTechnique
+    implicit_capture: ImplicitCapture
+    weighted_emission: WeightedEmission
+    global_weight_roulette: GlobalWeightRoulette
+    weight_windows: WeightWindows
+    population_control: PopulationControl
+
+    def __init__(self):
+        # Construct every simulation-wide technique configuration
+        self.neutron_multigroup = NeutronMultigroupTechnique()
+        self.implicit_capture = ImplicitCapture()
+        self.weighted_emission = WeightedEmission()
+        self.global_weight_roulette = GlobalWeightRoulette()
+        self.weight_windows = WeightWindows()
+        self.population_control = PopulationControl()

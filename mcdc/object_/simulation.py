@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from mcdc.object_.element import Element
     from mcdc.object_.electron_reaction import ElectronReactionBase
     from mcdc.object_.material import Material
-    from mcdc.object_.transport_model import NeutronMultigroup
+    from mcdc.object_.transport_model_data import NeutronMultigroupData
     from mcdc.object_.nuclide import Nuclide
     from mcdc.object_.neutron_reaction import NeutronReactionBase
     from mcdc.object_.source import Source
@@ -32,13 +32,8 @@ from mcdc.object_.gpu_tools import GPUMeta
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.particle import ParticleBank
 from mcdc.object_.settings import Settings
-from mcdc.object_.technique import (
-    ImplicitCapture,
-    PopulationControl,
-    GlobalWeightRoulette,
-    WeightWindows,
-    WeightedEmission,
-)
+from mcdc.object_.technique import Technique
+from mcdc.print_ import print_error
 
 from mcdc.object_.universe import Universe, Lattice
 
@@ -74,9 +69,10 @@ class Simulation(MCDCBase):
     calling configuration methods such as
     :meth:`settings.set_eigenmode <mcdc.Simulation.settings.set_eigenmode>`.
 
-    Transport techniques are configured directly on the simulation through
-    methods such as :meth:`implicit_capture <mcdc.Simulation.implicit_capture>`
-    and :meth:`weight_windows <mcdc.Simulation.weight_windows>`.
+    Transport techniques are grouped under ``simulation.technique`` and are
+    configured through callable members such as
+    ``simulation.technique.implicit_capture()`` and
+    ``simulation.technique.weight_windows(...)``.
 
     Examples
     --------
@@ -116,7 +112,7 @@ class Simulation(MCDCBase):
     nuclides: list[Nuclide]
     elements: list[Element]
     materials: list[Material]
-    neutron_multigroup: list[NeutronMultigroup]
+    neutron_multigroup_data: list[NeutronMultigroupData]
     sources: list[Source]
 
     # Geometry
@@ -135,11 +131,7 @@ class Simulation(MCDCBase):
     settings: Settings
 
     # Techniques
-    implicit_capture: ImplicitCapture
-    weighted_emission: WeightedEmission
-    global_weight_roulette: GlobalWeightRoulette
-    weight_windows: WeightWindows
-    population_control: PopulationControl
+    technique: Technique
 
     # Particle banks
     bank_active: ParticleBank  # Non-Numba
@@ -216,12 +208,7 @@ class Simulation(MCDCBase):
 
         self.settings = Settings()
 
-        # Techniques
-        self.implicit_capture = ImplicitCapture()
-        self.weighted_emission = WeightedEmission()
-        self.global_weight_roulette = GlobalWeightRoulette()
-        self.weight_windows = WeightWindows()
-        self.population_control = PopulationControl()
+        self.technique = Technique()
 
         # ==============================================================================
         # Particle banks
@@ -295,7 +282,7 @@ class Simulation(MCDCBase):
         self.nuclides = []
         self.elements = []
         self.materials = []
-        self.neutron_multigroup = []
+        self.neutron_multigroup_data = []
 
         # Geometry
         self.surfaces = []
@@ -322,6 +309,25 @@ class Simulation(MCDCBase):
         )
 
         settings = self.settings
+
+        # Require one shared grid unless multigrid was explicitly enabled
+        neutron_multigroup_data = [
+            model for model in self.neutron_multigroup_data if model.G > 0
+        ]
+        if (
+            not self.technique.neutron_multigroup.multigrid
+            and len(neutron_multigroup_data) > 1
+        ):
+            shared_grid = neutron_multigroup_data[0].energy_grid
+            if any(
+                not np.array_equal(model.energy_grid, shared_grid)
+                for model in neutron_multigroup_data[1:]
+            ):
+                print_error(
+                    "Neutron multigroup energy grids must be identical unless "
+                    "simulation.technique.neutron_multigroup(multigrid=True) is "
+                    "configured."
+                )
 
         # Limit transport to the latest requested tally boundary
         settings.time_boundary = min(
@@ -353,12 +359,6 @@ class Simulation(MCDCBase):
         if settings.electron_transport:
             for element in self.elements:
                 element.set_electron_data(self)
-
-        # Preserve the current full-MG transport switch until collision-level
-        # dispatch can select neutron multigroup physics by material and energy.
-        settings.neutron_multigroup_mode = len(self.materials) == 0 or all(
-            material.neutron_multigroup.G > 0 for material in self.materials
-        )
 
         # Derive tally shapes that depend on simulation-wide settings
         if settings.use_census_based_tally:

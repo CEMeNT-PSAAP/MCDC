@@ -5,7 +5,7 @@ from mcdc.object_.distribution import DistributionBase, DistributionNone
 from mcdc.object_.electron_reaction import ElectronReactionBase
 from mcdc.object_.element import Element
 from mcdc.object_.material import Material
-from mcdc.object_.transport_model import NeutronMultigroup
+from mcdc.object_.transport_model_data import NeutronMultigroupData
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.neutron_reaction import NeutronReactionBase
 from mcdc.object_.nuclide import Nuclide
@@ -40,7 +40,7 @@ def compile_simulation(simulation: Simulation):
     # Reserved objects
     none_data = DataNone()
     none_distribution = DistributionNone()
-    none_neutron_multigroup = NeutronMultigroup()
+    none_neutron_multigroup = NeutronMultigroupData()
 
     # Compile reserved objects
     none_data._compile_into_simulation(simulation)
@@ -83,8 +83,8 @@ def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
         object_list = simulation.lattices
     elif isinstance(object_, Material):
         object_list = simulation.materials
-    elif isinstance(object_, NeutronMultigroup):
-        object_list = simulation.neutron_multigroup
+    elif isinstance(object_, NeutronMultigroupData):
+        object_list = simulation.neutron_multigroup_data
     elif isinstance(object_, MeshBase):
         object_list = simulation.meshes
     elif isinstance(object_, Element):
