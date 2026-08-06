@@ -76,7 +76,7 @@ universes, and universes and lattices organize repeated geometry.
 Sources
 ^^^^^^^
 
-Sources describe the initial particle population.
+Sources describe the distribution of the initial particle population in the simulation.
 
 .. autosummary::
    :toctree: generated

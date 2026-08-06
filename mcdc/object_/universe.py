@@ -24,7 +24,7 @@ from mcdc.util import flatten
 
 
 class Universe(MCDCObject):
-    """Group cells into a reusable geometry.
+    """Reusable collections of cells in the simulation geometry.
 
     Parameters
     ----------
@@ -94,7 +94,7 @@ class Universe(MCDCObject):
 
 
 class Lattice(MCDCObject):
-    """Arrange universes on a uniform Cartesian lattice.
+    """Repeated arrangements of universes in the simulation geometry.
 
     Parameters
     ----------
