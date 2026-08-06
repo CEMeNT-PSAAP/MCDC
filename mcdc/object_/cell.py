@@ -125,9 +125,7 @@ class Cell(MCDCObject):
 
     >>> import numpy as np
     >>> import mcdc
-    >>> material = mcdc.Material(
-    ...     neutron_multigroup=mcdc.NeutronMultigroup(capture=np.array([1.0]))
-    ... )
+    >>> material = mcdc.Material.multigroup(capture=np.array([1.0]))
     >>> lower = mcdc.Surface.PlaneZ(z=0.0)
     >>> upper = mcdc.Surface.PlaneZ(z=2.0)
     >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)

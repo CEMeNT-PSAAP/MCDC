@@ -102,9 +102,7 @@ class Tally(MCDCPolymorphic):
 
     Filter a track-length tally by cell, angle, and time:
 
-    >>> material = mcdc.Material(
-    ...     neutron_multigroup=mcdc.NeutronMultigroup(capture=np.array([1.0]))
-    ... )
+    >>> material = mcdc.Material.multigroup(capture=np.array([1.0]))
     >>> lower = mcdc.Surface.PlaneZ(z=0.0)
     >>> upper = mcdc.Surface.PlaneZ(z=10.0)
     >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)

@@ -1,8 +1,9 @@
 from types import NoneType
+from typing import Self
 
 import numpy as np
 from numpy import float64
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from mcdc.object_.base import MCDCObject
 from mcdc.object_.element import Element
@@ -63,9 +64,8 @@ class Material(MCDCObject):
     Define a one-group multigroup material:
 
     >>> import numpy as np
-    >>> absorber = mcdc.Material(
-    ...     name="Absorber",
-    ...     neutron_multigroup=mcdc.NeutronMultigroup(capture=np.array([1.0])),
+    >>> absorber = mcdc.Material.multigroup(
+    ...     name="Absorber", capture=np.array([1.0])
     ... )
 
     Attach native and multigroup neutron data to the same material:
@@ -177,6 +177,47 @@ class Material(MCDCObject):
         self.element_densities = np.asarray(
             list(self.element_composition.values()), dtype=float64
         )
+
+    @classmethod
+    def multigroup(
+        cls,
+        *,
+        name: str = "",
+        capture: ArrayLike | NoneType = None,
+        scatter: ArrayLike | NoneType = None,
+        fission: ArrayLike | NoneType = None,
+        nu_s: ArrayLike | NoneType = None,
+        nu_p: ArrayLike | NoneType = None,
+        nu_d: ArrayLike | NoneType = None,
+        chi_p: ArrayLike | NoneType = None,
+        chi_d: ArrayLike | NoneType = None,
+        speed: ArrayLike | NoneType = None,
+        decay_rate: ArrayLike | NoneType = None,
+        energy_grid: ArrayLike | NoneType = None,
+        energy_representation: str | int = "log_midpoint",
+    ) -> Self:
+        """Construct a material containing only multigroup neutron data.
+
+        The transport arguments are forwarded to :class:`NeutronMultigroup`.
+        Use the regular constructor when combining multigroup data with a
+        native nuclide or element composition.
+        """
+        # Build the transport model while preserving Material as the sole type
+        neutron_multigroup = NeutronMultigroup(
+            capture=capture,
+            scatter=scatter,
+            fission=fission,
+            nu_s=nu_s,
+            nu_p=nu_p,
+            nu_d=nu_d,
+            chi_p=chi_p,
+            chi_d=chi_d,
+            speed=speed,
+            decay_rate=decay_rate,
+            energy_grid=energy_grid,
+            energy_representation=energy_representation,
+        )
+        return cls(name=name, neutron_multigroup=neutron_multigroup)
 
     def _compile_into_simulation(self, simulation) -> bool:
         """Canonicalize owned data and register the unified material."""
