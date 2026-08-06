@@ -76,9 +76,8 @@ class Tally(MCDCPolymorphic):
     polar_reference : sequence of 3 float, optional
         Reference direction for the angular filters.
     particle_type : {"neutron", "electron", "proton"}, optional
-        Particle type selected by the tally. If omitted, compilation infers it
-        when exactly one particle type is transported per the simulation settings.
-        It must be specified when multiple particle types are transported.
+        Particle type selected by the tally. If omitted, the tally accepts any
+        transported particle type.
     group : sequence of float or "all", optional
         Transport-mode group-bin boundaries. These bins may collapse several
         transport groups into one tally bin. ``"all"`` creates one
@@ -482,31 +481,6 @@ class Tally(MCDCPolymorphic):
             shape = list(self.bin_shape)
             shape[2] = G
             self._set_bin_shape_and_strides(tuple(shape))
-
-    def _resolve_particle_type(self, settings) -> None:
-        """Infer an unspecified tally particle type from transport settings."""
-        if self.particle_type != PARTICLE_ANY:
-            return
-
-        transported = []
-        if settings.neutron_transport:
-            transported.append(PARTICLE_NEUTRON)
-        if settings.electron_transport:
-            transported.append(PARTICLE_ELECTRON)
-        if settings.proton_transport:
-            transported.append(PARTICLE_PROTON)
-
-        if len(transported) > 1:
-            print_error(
-                "Tally particle_type must be specified when multiple particle "
-                "types are transported."
-            )
-        if len(transported) == 0:
-            print_error(
-                "Tally particle_type cannot be inferred because no particle type "
-                "is transported."
-            )
-        self.particle_type = transported[0]
 
     def __repr__(self):
         text = super().__repr__()
