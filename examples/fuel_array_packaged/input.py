@@ -77,7 +77,7 @@ simulation.set_model([assembly_left, assembly_right])
 # Set source
 # ======================================================================================
 
-source = mcdc.Source(x=[-0.1, 0.1], isotropic=True, energy_group=0)
+source = mcdc.Source(x=[-0.1, 0.1], isotropic=True, group=0)
 simulation.set_sources([source])
 
 # ======================================================================================

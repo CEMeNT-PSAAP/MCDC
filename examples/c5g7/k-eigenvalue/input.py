@@ -279,7 +279,7 @@ source = mcdc.Source(
     y=[-pitch * 17 * 2, 0.0],
     z=[-core_height / 2, core_height / 2],
     isotropic=True,
-    energy_group=0,  # Highest energy
+    group=0,  # Highest energy
 )
 simulation.set_sources([source])
 
@@ -295,7 +295,7 @@ z_grid = np.linspace(
 )
 g_grid = np.array([-0.5, 3.5, 6.5])  # Collapsing to fast (1-4) and slow (5-7)
 mesh = mcdc.MeshStructured(x=x_grid, y=y_grid, z=z_grid)
-tally = mcdc.Tally(mesh=mesh, scores=["flux"], energy=g_grid)
+tally = mcdc.Tally(mesh=mesh, scores=["flux"], group=g_grid)
 simulation.set_tallies([tally])
 
 # Settings
