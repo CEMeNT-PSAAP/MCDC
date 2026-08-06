@@ -45,7 +45,7 @@ simulation.set_model([c])
 # =============================================================================
 
 source = mcdc.Source(
-    position=(0.0, 0.0, 0.0), isotropic=True, energy_group=np.array([[360], [1.0]])
+    position=(0.0, 0.0, 0.0), isotropic=True, group=np.array([[360], [1.0]])
 )
 simulation.set_sources([source])
 
@@ -54,7 +54,7 @@ simulation.set_sources([source])
 # =============================================================================
 
 # Tallies
-tally = mcdc.Tally(scores=["flux"], energy="all_groups")
+tally = mcdc.Tally(scores=["flux"], group="all")
 simulation.set_tallies([tally])
 
 # Settings

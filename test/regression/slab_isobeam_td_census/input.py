@@ -29,7 +29,7 @@ simulation.set_model([cell])
 source = mcdc.Source(
     position=(1e-10, 0.0, 0.0),
     white_direction=(1.0, 0.0, 0.0),
-    energy_group=0,
+    group=0,
     time=[0.0, 5.0],
 )
 simulation.set_sources([source])

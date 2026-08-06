@@ -48,7 +48,7 @@ simulation.set_model([c])
 # ======================================================================================
 
 source = mcdc.Source(
-    position=(0.0, 0.0, 0.0), isotropic=True, energy_group=np.array([[360], [1.0]])
+    position=(0.0, 0.0, 0.0), isotropic=True, group=np.array([[360], [1.0]])
 )
 simulation.set_sources([source])
 
@@ -60,7 +60,7 @@ simulation.set_sources([source])
 tally = mcdc.Tally(
     scores=["flux"],
     time=np.insert(np.logspace(-8, 1, 100), 0, 0.0),
-    energy="all_groups",
+    group="all",
 )
 simulation.set_tallies([tally])
 

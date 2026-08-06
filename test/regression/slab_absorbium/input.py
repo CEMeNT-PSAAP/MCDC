@@ -31,7 +31,7 @@ simulation.set_model([cell_1, cell_2, cell_3])
 # ======================================================================================
 # Uniform isotropic source throughout the domain
 
-source = mcdc.Source(z=[0.0, 6.0], isotropic=True, energy_group=0)
+source = mcdc.Source(z=[0.0, 6.0], isotropic=True, group=0)
 simulation.set_sources([source])
 
 # ======================================================================================
