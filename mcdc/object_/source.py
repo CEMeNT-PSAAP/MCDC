@@ -346,6 +346,10 @@ class Source(MCDCObject):
                 self.group = int(group)
             else:
                 values, probabilities = _distribution_pair(group, "Group")
+                if not np.all(np.isfinite(values)) or not np.all(
+                    values == np.floor(values)
+                ):
+                    print_error("Group distribution values must be integers")
                 self.mono_group = False
                 self.group_pmf = DistributionPMF(values, probabilities)
 
