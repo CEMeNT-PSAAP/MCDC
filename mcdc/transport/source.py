@@ -26,6 +26,7 @@ def source_particle(particle_container, seed, simulation, data):
     # TODO: use cdf and binary search instead
     xi = rng.lcg(particle_container)
     tot = 0.0
+    source = simulation["sources"][0]
     for source in simulation["sources"]:
         tot += source["probability"]
         if tot >= xi:
@@ -68,7 +69,8 @@ def source_particle(particle_container, seed, simulation, data):
             g = source["energy_group"]
         else:
             ID = source["energy_group_pmf_ID"]
-            pmf = simulation["pmf_distributions"][ID]
+            sub_ID = simulation["distributions"][ID]["sub_ID"]
+            pmf = simulation["pmf_distributions"][sub_ID]
             g = sample_pmf(pmf, particle_container, data)
     else:
         g = 0
@@ -76,7 +78,8 @@ def source_particle(particle_container, seed, simulation, data):
             E = source["energy"]
         else:
             ID = source["energy_pdf_ID"]
-            table = simulation["tabulated_distributions"][ID]
+            sub_ID = simulation["distributions"][ID]["sub_ID"]
+            table = simulation["tabulated_distributions"][sub_ID]
             E = sample_tabulated(table, particle_container, simulation, data)
 
     # Time

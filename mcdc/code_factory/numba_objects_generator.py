@@ -20,10 +20,9 @@ import mcdc.object_ as object_module
 import mcdc.object_.base as base
 
 from mcdc.object_.base import (
-    ObjectBase,
-    ObjectNonSingleton,
-    ObjectPolymorphic,
-    ObjectSingleton,
+    MCDCBase,
+    MCDCObject,
+    MCDCPolymorphic,
 )
 from mcdc.object_.particle import Particle, ParticleBank, ParticleData
 from mcdc.object_.tally import Tally
@@ -52,7 +51,7 @@ bank_names = ["bank_active", "bank_census", "bank_source", "bank_future"]
 base_classes = [
     getattr(base, x)
     for x in dir(base)
-    if isinstance(getattr(base, x), type) and issubclass(getattr(base, x), ObjectBase)
+    if isinstance(getattr(base, x), type) and issubclass(getattr(base, x), MCDCBase)
 ]
 
 all_classes = [ParticleData, Particle]
@@ -67,7 +66,7 @@ for file_name in file_names:
         item = getattr(file, item_name)
         if (
             isinstance(item, type)
-            and issubclass(item, ObjectBase)
+            and issubclass(item, MCDCBase)
             and item not in all_classes
         ):
             all_classes.append(item)
@@ -80,9 +79,7 @@ for file_name in file_names:
                 mcdc_classes.append(item)
 
 polymorphic_bases = [
-    x
-    for x in all_classes
-    if (x.__name__[-4:] == "Base" or x.__name__ == "Tally") and "label" in dir(x)
+    x for x in mcdc_classes if issubclass(x, MCDCPolymorphic) and x.sub_type == -1
 ]
 
 # ======================================================================================
@@ -110,7 +107,7 @@ def generate_numba_objects(simulation):
         annotations[mcdc_class.label] = {}
         structures[mcdc_class.label] = []
         accessor_targets[mcdc_class.label] = []
-        if issubclass(mcdc_class, ObjectNonSingleton):
+        if issubclass(mcdc_class, MCDCObject):
             records[mcdc_class.label] = []
         else:
             records[mcdc_class.label] = {}
@@ -140,7 +137,7 @@ def generate_numba_objects(simulation):
             classes.append(item)
 
         # If polymorphic, don't include the polymorphic base
-        if issubclass(mcdc_class, ObjectPolymorphic):
+        if issubclass(mcdc_class, MCDCPolymorphic):
             classes = [mcdc_class]
 
         # Get the annotations
@@ -183,6 +180,7 @@ def generate_numba_objects(simulation):
 
     # Temporary simulation object structure
     simulation_object_structure = []
+    included_classes = []
     for field in annotations["simulation"]:
         hint = annotations["simulation"][field]
         hint_origin = get_origin(hint)
@@ -190,9 +188,11 @@ def generate_numba_objects(simulation):
 
         if hint in all_classes:
             simulation_object_structure.append((field, hint))
+            included_classes.append(hint)
             continue
         if hint_origin == list and hint_args[0] in all_classes:
             simulation_object_structure.append((field, list, hint_args[0]))
+            included_classes.append(hint_args[0])
             continue
 
     # Set the structures and accessor targets
@@ -205,15 +205,15 @@ def generate_numba_objects(simulation):
 
     # Add ID for non-singleton
     for class_ in mcdc_classes:
-        if issubclass(class_, ObjectNonSingleton):
+        if issubclass(class_, MCDCObject):
             structures[class_.label].append(("ID", type_map[int]))
         # Set parent and child ID and type if polymorphic
-        if issubclass(class_, ObjectPolymorphic):
-            if class_.__name__[-4:] == "Base" or class_.__name__ == "Tally":
-                structures[class_.label].append(("child_type", type_map[int]))
-                structures[class_.label].append(("child_ID", type_map[int]))
+        if issubclass(class_, MCDCPolymorphic):
+            if class_ in polymorphic_bases:
+                structures[class_.label].append(("sub_type", type_map[int]))
+                structures[class_.label].append(("sub_ID", type_map[int]))
             else:
-                structures[class_.label].append(("parent_ID", type_map[int]))
+                structures[class_.label].append(("base_ID", type_map[int]))
 
     # Add particle data to particle banks and add particle banks to the simulation
     for name in bank_names:
@@ -241,7 +241,7 @@ def generate_numba_objects(simulation):
         if (
             not x.startswith("__")
             and (
-                isinstance(getattr(simulation, x), ObjectBase)
+                isinstance(getattr(simulation, x), MCDCBase)
                 or not callable(getattr(simulation, x))
             )
             and x not in simulation.non_numba
@@ -300,7 +300,7 @@ def generate_numba_objects(simulation):
                         record[f"N_{class_.label}"] = N
 
         # Singleton
-        elif item[1] in mcdc_classes and issubclass(item[1], ObjectSingleton):
+        elif item[1] in mcdc_classes and issubclass(item[1], MCDCBase):
             new_structure.append((field, into_dtype(structures[item[1].label])))
 
         else:
@@ -515,10 +515,10 @@ def set_structure(label, structures, accessor_targets, annotations):
 
         # MC/DC class
         def non_polymorphic(x):
-            # Only treat real classes that inherit from ObjectNonSingleton
+            # Only treat real classes that inherit from MCDCObject
             return (
                 isinstance(x, type)
-                and issubclass(x, ObjectNonSingleton)
+                and issubclass(x, MCDCObject)
                 and x not in polymorphic_bases
             )
 
@@ -575,7 +575,7 @@ def set_object(
         class_ = object_.__class__
 
     # Set the parent first if polymorphics
-    if isinstance(object_, ObjectPolymorphic) and class_ not in polymorphic_bases:
+    if isinstance(object_, MCDCPolymorphic) and class_ not in polymorphic_bases:
         for parent_class in polymorphic_bases:
             if issubclass(class_, parent_class):
                 set_object(
@@ -636,14 +636,8 @@ def set_object(
             data["size"] += len(attribute_flatten)
 
         # Non-singleton object
-        elif isinstance(attribute, ObjectNonSingleton):
-            if (
-                not isinstance(attribute, ObjectPolymorphic)
-                or annotation[attribute_name] in polymorphic_bases
-            ):
-                record[f"{attribute_name}_ID"] = attribute.ID
-            else:
-                record[f"{attribute_name}_ID"] = attribute.child_ID
+        elif isinstance(attribute, MCDCObject):
+            record[f"{attribute_name}_ID"] = attribute.ID
 
         # List of Non-singleton objects
         elif type(attribute) == list:
@@ -653,7 +647,7 @@ def set_object(
             attribute_flatten = list(flatten(attribute))
             singular_name = plural_to_singular(attribute_name)
 
-            if not issubclass(inner_type, ObjectNonSingleton):
+            if not issubclass(inner_type, MCDCObject):
                 print_error(
                     f"[ERROR] Get a list of non-object for {attribute_name}: {attribute}"
                 )
@@ -661,17 +655,9 @@ def set_object(
             record[f"N_{singular_name}"] = len(attribute_flatten)
             record[f"{singular_name}_IDs_offset"] = data["size"]
             if set_data:
-                if (
-                    not issubclass(inner_type, ObjectPolymorphic)
-                    or inner_type in polymorphic_bases
-                ):
-                    data["array"][
-                        data["size"] : data["size"] + len(attribute_flatten)
-                    ] = [x.ID for x in attribute_flatten]
-                else:
-                    data["array"][
-                        data["size"] : data["size"] + len(attribute_flatten)
-                    ] = [x.child_ID for x in attribute_flatten]
+                data["array"][data["size"] : data["size"] + len(attribute_flatten)] = [
+                    x.ID for x in attribute_flatten
+                ]
             data["size"] += len(attribute_flatten)
 
     # Complete for simulation object
@@ -679,8 +665,8 @@ def set_object(
         return
 
     # Set ID of non-singleton
-    if isinstance(object_, ObjectNonSingleton):
-        if not isinstance(object_, ObjectPolymorphic):
+    if isinstance(object_, MCDCObject):
+        if not isinstance(object_, MCDCPolymorphic):
             record["ID"] = object_.ID
 
         # Set parent and child ID and type if polymorphic
@@ -688,12 +674,12 @@ def set_object(
             # Parent
             if class_ in polymorphic_bases:
                 record["ID"] = object_.ID
-                record["child_ID"] = object_.child_ID
-                record["child_type"] = object_.type
+                record["sub_ID"] = object_.sub_ID
+                record["sub_type"] = object_.sub_type
             # Child
             else:
-                record["ID"] = object_.child_ID
-                record["parent_ID"] = object_.ID
+                record["ID"] = object_.sub_ID
+                record["base_ID"] = object_.ID
 
     # Set tally bins
     if class_ == Tally:
@@ -712,10 +698,10 @@ def set_object(
         print_error(f"Missing structure keys in record for {class_.label}: {missing}")
 
     # Register the record
-    if isinstance(object_, ObjectSingleton):
-        records[class_.label] = record
-    elif isinstance(object_, ObjectNonSingleton):
+    if isinstance(object_, MCDCObject):
         records[class_.label].append(record)
+    elif isinstance(object_, MCDCBase):
+        records[class_.label] = record
 
 
 # =============================================================================

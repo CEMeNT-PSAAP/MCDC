@@ -169,7 +169,7 @@ captures the fission rate as the pellet moves.
 
 - Change the pellet velocities to create different trajectories.
 - Set ``visualize = True`` to watch the geometry evolve with
-  ``mcdc.visualize(..., time=...)``.
+  ``simulation.visualize_model(..., time=...)``.
 - Compare with ``moving_source`` to see source motion vs. geometry motion.
 
 Full Input
@@ -186,9 +186,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/moving_pellet`` run::
 
-  python examples/moving_pellet/input.py
+  python input.py
 
 Expected Output
 ===============

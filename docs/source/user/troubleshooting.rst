@@ -202,7 +202,7 @@ Also ensure that the number of MPI ranks does not exceed available cores:
 
    srun -n <ncores> python input.py --mode=numba
 
-**"AttributeError: 'list' object has no attribute 'ID'" in** ``mcdc.cell()``
+**"AttributeError: 'list' object has no attribute 'ID'" in** ``mcdc.Cell()``
 
 This error occurs when passing a Python list instead of using the ``&`` (intersection)
 and ``|`` (union) region operators.

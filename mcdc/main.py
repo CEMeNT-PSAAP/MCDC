@@ -1,19 +1,14 @@
+from mcdc.object_.material import MaterialBase
+from mcdc.object_.simulation import Simulation
+from mcdc.object_.base import MCDCObject
+from mcdc.object_.universe import Lattice, Universe
+
 # ======================================================================================
-# Run
+# Run Simulation
 # ======================================================================================
 
 
-def run():
-    """
-    Execute the MC/DC simulation.
-
-    Runs the transport simulation defined by the current problem
-    (materials, geometry, sources, tallies, and settings).
-    Results are written to an HDF5 output file.
-
-    Command-line arguments (``--N_particle``, ``--output``, etc.) override
-    the corresponding settings when provided.
-    """
+def run_simulation(simulationPy: Simulation):
     import mcdc.print_ as print_module
     from mpi4py import MPI
 
@@ -21,8 +16,6 @@ def run():
     time_total_start = MPI.Wtime()
 
     # Get settings and MPI master status
-    from mcdc.object_.simulation import simulation as simulationPy
-
     settings = simulationPy.settings
     master = MPI.COMM_WORLD.Get_rank() == 0
 
@@ -34,7 +27,7 @@ def run():
     time_prep_start = MPI.Wtime()
 
     # Override settings with command-line arguments
-    override_settings()
+    override_settings(simulationPy)
 
     # Generate the program state:
     #   - `simulation`: the simulation structure, storing fixed side data and meta data
@@ -44,7 +37,7 @@ def run():
     #       The use of container is necessary to ensure proper mutability and tracking
     #       of the structure when running in different kinds of machines supported by
     #       the Numba-based compilation framework.
-    simulation_container, data = preparation()
+    simulation_container, data = prepare(simulationPy)
     simulation = simulation_container[0]
 
     # Print headers
@@ -86,7 +79,11 @@ def run():
     time_output_start = MPI.Wtime()
 
     # Generate hdf5 output file
-    output_module.generate_output(simulation, data)
+    output_module.generate_output(simulation, data, simulationPy)
+
+    # Combine per-batch, per-census tally files into the main output
+    if settings.use_census_based_tally:
+        output_module.recombine_tallies(simulationPy, simulation)
 
     # TIMER: output
     time_output_end = MPI.Wtime()
@@ -114,16 +111,15 @@ def run():
 
 
 # ======================================================================================
-# Preparation
+# Prepare
 # ======================================================================================
 
 
-def preparation():
+def prepare(simulationPy):
     import math
 
     from mpi4py import MPI
 
-    from mcdc.object_.simulation import simulation as simulationPy
     from mcdc.object_.material import (
         Material,
         MaterialMG,
@@ -154,15 +150,15 @@ def preparation():
             continue
 
         if settings.neutron_transport and len(material.nuclides) == 0:
-            set_nuclides_from_elements(material)
+            set_nuclides_from_elements(material, simulationPy)
 
         if settings.electron_transport and len(material.elements) == 0:
-            set_elements_from_nuclides(material)
+            set_elements_from_nuclides(material, simulationPy)
 
     # Set nuclear and atomic data for transported particles
     if settings.neutron_transport:
         for nuclide in simulationPy.nuclides:
-            nuclide.set_neutron_data()
+            nuclide.set_neutron_data(simulationPy)
 
         for material in simulationPy.materials:
             if isinstance(material, Material):
@@ -170,7 +166,7 @@ def preparation():
 
     if settings.electron_transport:
         for element in simulationPy.elements:
-            element.set_electron_data()
+            element.set_electron_data(simulationPy)
 
     # Set physics mode
     if len(simulationPy.materials) == 0:
@@ -189,7 +185,7 @@ def preparation():
     if settings.use_census_based_tally:
         N_bin = settings.census_tally_frequency
         for tally in simulationPy.tallies:
-            tally._use_census_based_tally(N_bin)
+            tally._use_census_based_tally(N_bin, simulationPy)
 
     # Normalize source probability
     norm = 0.0
@@ -324,9 +320,8 @@ def preparation():
 # ======================================================================================
 
 
-def override_settings():
+def override_settings(simulationPy):
     import mcdc.config as config
-    from mcdc.object_.simulation import simulation as simulationPy
 
     settings = simulationPy.settings
 

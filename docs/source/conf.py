@@ -18,6 +18,9 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+EXTENSIONS_ROOT = os.path.join(HERE, "_ext")
+if EXTENSIONS_ROOT not in sys.path:
+    sys.path.insert(0, EXTENSIONS_ROOT)
 
 # -- Project information -----------------------------------------------------
 project = "MC/DC"
@@ -40,6 +43,7 @@ extensions = [
     "sphinx_toolbox.github",
     "sphinx_toolbox.sidebar_links",
     "sphinx.ext.autosectionlabel",
+    "simulation_members",
 ]
 autosummary_generate = True
 autosectionlabel_prefix_document = True

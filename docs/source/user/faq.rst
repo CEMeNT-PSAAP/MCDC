@@ -140,5 +140,5 @@ See the post-processing section in :ref:`user/first_mcdc:First MC/DC Simulation`
 **What visualization tools work with MC/DC output?**
 
 - ``matplotlib`` for quick 1-D / 2-D plots.
-- MC/DC's built-in ``mcdc.visualize()`` for geometry inspection.
+- ``simulation.visualize_model(...)`` for built-in geometry inspection.
 - `ParaView <https://www.paraview.org/>`_ or `VisIt <https://sd.llnl.gov/simulation/computer-codes/visit>`_ for 3-D data.

@@ -1,46 +1,32 @@
 import numpy as np
 
-from numpy import float64, int64
-from numpy.typing import NDArray
+from numbers import Integral, Real
+from numpy import float64
+from numpy.typing import ArrayLike, NDArray
 from types import NoneType
 from typing import Annotated, Sequence
 
 ####
 
-import mcdc.object_.distribution as distribution
-
 from mcdc.constant import (
-    INTERPOLATION_LINEAR,
     PARTICLE_NEUTRON,
     PARTICLE_ELECTRON,
     PARTICLE_PROTON,
     INF,
     PI,
 )
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.distribution import DistributionTabulated, DistributionPMF
-from mcdc.object_.simulation import simulation
 from mcdc.object_.util import move_object
 from mcdc.print_ import print_error
-
-
-def decode_particle_type(type_):
-    if type_ == PARTICLE_NEUTRON:
-        return "Neutron"
-    elif type_ == PARTICLE_ELECTRON:
-        return "Electron"
-    elif type_ == PARTICLE_PROTON:
-        return "Proton"
-
 
 # ======================================================================================
 # Source
 # ======================================================================================
 
 
-class Source(ObjectNonSingleton):
-    """
-    Define a particle source.
+class Source(MCDCObject):
+    """Define a particle source.
 
     A source specifies the initial position, direction, energy, time, particle
     type, and relative sampling probability for emitted particles.
@@ -75,19 +61,23 @@ class Source(ObjectNonSingleton):
         Bounds for the sampled azimuthal angle,
         ``[azi_min, azi_max]`` in radians, measured about ``direction``.
         Defaults to ``[0.0, 2π]``.
-    energy : float or ndarray, optional
-        Source energy in eV. A float defines a mono-energetic source. An array
-        defines a tabulated energy distribution. Defaults to a mono-energetic
-        source at **1 MeV**.
-
-    energy_group : int or ndarray, optional
-        Source energy group. An integer defines a mono-group source. An array
-        defines a discrete group probability mass function. In multigroup
-        simulations, the default is **group 0**.
-    time : float or array_like of float, optional
-        Emission time in seconds. A float defines a discrete emission time.
-        A two-entry array-like value defines a time interval
-        ``[t_min, t_max]``. Defaults to ``0.0``.
+    energy : real or array_like of float, optional
+        Source energy in eV. A real scalar, including a NumPy scalar, defines a
+        mono-energetic source. An array-like value with shape ``(2, N)`` defines
+        a tabulated distribution: the first row contains energy values and the
+        second row contains their probability density. Defaults to a
+        mono-energetic source at **1 MeV**.
+    energy_group : int or array_like, optional
+        Source energy group. A Python or NumPy integer defines a mono-group
+        source. An array-like value with shape ``(2, N)`` defines a discrete
+        probability mass function: the first row contains group IDs and the
+        second row contains their probabilities. In multigroup simulations,
+        the default is **group 0**.
+    time : real or array_like of float, optional
+        Emission time in seconds. A real scalar, including a NumPy scalar,
+        defines a discrete emission time. An array-like value with shape
+        ``(2,)`` defines a uniform interval ``[t_min, t_max]``. Defaults to
+        ``0.0``.
     particle_type : {"neutron", "electron", "proton"}, optional
         Type of emitted particle. Defaults to ``"neutron"``.
     probability : float, optional
@@ -111,11 +101,14 @@ class Source(ObjectNonSingleton):
     - otherwise, the default direction behavior is used.
 
     ``energy_group`` takes precedence over ``energy`` when both are provided.
+    Array-like inputs may be supplied as lists, tuples, or NumPy arrays.
 
     Examples
     --------
     Point source at the origin emitting mono-energetic neutrons isotropically:
 
+    >>> import numpy as np
+    >>> import mcdc
     >>> src = mcdc.Source(position=[0.0, 0.0, 0.0], isotropic=True)
 
     Uniform box source distributed along z:
@@ -158,6 +151,26 @@ class Source(ObjectNonSingleton):
     ...     energy_group=3,
     ... )
 
+    Sample a continuous-energy source from a tabulated probability density:
+
+    >>> electron_source = mcdc.Source(
+    ...     particle_type="electron",
+    ...     energy=np.array([
+    ...         [9_999.0, 10_001.0],
+    ...         [0.5, 0.5],
+    ...     ]),
+    ...     direction=[0.0, 0.0, 1.0],
+    ... )
+
+    Sample between two multigroup energy groups:
+
+    >>> multigroup_source = mcdc.Source(
+    ...     energy_group=(
+    ...         [0, 1],
+    ...         [0.25, 0.75],
+    ...     ),
+    ... )
+
     Time-dependent source:
 
     >>> src = mcdc.Source(
@@ -165,16 +178,18 @@ class Source(ObjectNonSingleton):
     ... )
     """
 
-    # Annotations for Numba mode
-    label: str = "source"
-    #
+    # MC/DC framework metadata
+    label = "source"
+
     name: str
+
     # Position
     point_source: bool
     point: Annotated[NDArray[float64], (3,)]
     x: Annotated[NDArray[float64], (2,)]
     y: Annotated[NDArray[float64], (2,)]
     z: Annotated[NDArray[float64], (2,)]
+
     # Direction
     isotropic_direction: bool
     mono_direction: bool
@@ -182,19 +197,24 @@ class Source(ObjectNonSingleton):
     direction: Annotated[NDArray[float64], (3,)]
     polar_cosine: Annotated[NDArray[float64], (2,)]
     azimuthal: Annotated[NDArray[float64], (2,)]
+
     # Energy
     mono_energetic: bool
     energy_group: int
     energy: float
     energy_group_pmf: DistributionPMF
     energy_pdf: DistributionTabulated
+
     # Time
     discrete_time: bool
     time: float
     time_range: Annotated[NDArray[float64], (2,)]
-    #
+
+    # Misc.
     particle_type: int
     probability: float
+
+    # Movement
     moving: bool
     N_move: int
     N_move_grid: int
@@ -217,23 +237,18 @@ class Source(ObjectNonSingleton):
         polar_cosine: Sequence[float] | NoneType = None,
         azimuthal: Sequence[float] | NoneType = None,
         #
-        energy: float | NDArray[float64] | NoneType = None,
-        energy_group: int | NDArray[int64] | NoneType = None,
+        energy: ArrayLike | NoneType = None,
+        energy_group: ArrayLike | NoneType = None,
         #
-        time: float | Sequence[float] = 0.0,
+        time: ArrayLike = 0.0,
         #
         particle_type: str = "neutron",
         #
         probability: float = 1.0,
     ):
-
         super().__init__()
 
-        # Set name
-        if name != "":
-            self.name = name
-        else:
-            self.name = f"{self.label}_{self.ID}"
+        self.name = name or "(Unnamed source)"
 
         # ==============================================================================
         # Default attributes
@@ -316,28 +331,28 @@ class Source(ObjectNonSingleton):
 
         # Energy
         if energy_group is not None:
-            if type(energy_group) == int:
-                self.energy_group = energy_group
+            if isinstance(energy_group, Integral) and not isinstance(
+                energy_group, (bool, np.bool_)
+            ):
+                self.energy_group = int(energy_group)
             else:
+                values, probabilities = _distribution_pair(energy_group, "Energy-group")
                 self.mono_energetic = False
-                self.energy_group_pmf = DistributionPMF(
-                    energy_group[0], energy_group[1]
-                )
+                self.energy_group_pmf = DistributionPMF(values, probabilities)
         elif energy is not None:
-            if type(energy) == float:
-                self.energy = energy
+            if isinstance(energy, Real) and not isinstance(energy, (bool, np.bool_)):
+                self.energy = float(energy)
             else:
+                values, pdf = _distribution_pair(energy, "Energy")
                 self.mono_energetic = False
-                self.energy_pdf = DistributionTabulated(
-                    np.array(energy[0]), np.array(energy[1])
-                )
+                self.energy_pdf = DistributionTabulated(values, pdf)
 
         # Time
-        if type(time) == float:
-            self.time = time
+        if isinstance(time, Real) and not isinstance(time, (bool, np.bool_)):
+            self.time = float(time)
         else:
             self.discrete_time = False
-            self.time_range = np.array(time)
+            self.time_range = _time_range(time)
 
         # Particle type
         if particle_type == "neutron":
@@ -359,9 +374,8 @@ class Source(ObjectNonSingleton):
         self.move_translations = np.zeros((2, 3))
 
     def __repr__(self):
-        text = "\n"
-        text += f"Source\n"
-        text += f"  - ID: {self.ID}\n"
+        text = super().__repr__()
+
         text += f"  - Name: {self.name}\n"
         text += f"  - Particle: {decode_particle_type(self.particle_type)}\n"
         text += f"  - Probability: {self.probability * 100}%\n"
@@ -378,16 +392,12 @@ class Source(ObjectNonSingleton):
             text += f"  - Direction [ux, uy, yz]: {self.direction}\n"
         elif self.white_direction:
             text += f"  - Isotropic halfspace: {self.direction}\n"
-        if simulation.materials[0].label == "multigroup_material":
-            if self.mono_energetic:
-                text += f"  - Energy group: {self.energy_group} \n"
-            else:
-                text += f"  - Energy group: {distribution.decode_type(self.energy_group_pmf.type)} [ID: {self.energy_group_pmf.ID}]\n"
+        if self.mono_energetic:
+            text += (
+                f"  - Energy / energy group: {self.energy} eV / {self.energy_group}\n"
+            )
         else:
-            if self.mono_energetic:
-                text += f"  - Energy: {self.energy} eV\n"
-            else:
-                text += f"  - Energy: {distribution.decode_type(self.energy_pdf)} [ID: {self.energy_pdf.ID}]\n"
+            text += f"  - Energy / energy group: PDF / PMF\n"
         if self.discrete_time:
             text += f"  - Time: {self.time} s\n"
         else:
@@ -457,3 +467,47 @@ class Source(ObjectNonSingleton):
         ... )
         """
         move_object(self, velocities, durations)
+
+
+def decode_particle_type(type_):
+    """Return the display name for a packed particle-type code."""
+
+    if type_ == PARTICLE_NEUTRON:
+        return "Neutron"
+    elif type_ == PARTICLE_ELECTRON:
+        return "Electron"
+    elif type_ == PARTICLE_PROTON:
+        return "Proton"
+
+
+# ======================================================================================
+# Helper functions
+# ======================================================================================
+
+
+def _distribution_pair(
+    value: ArrayLike, name: str
+) -> tuple[NDArray[float64], NDArray[float64]]:
+    """Normalize a two-row distribution input and validate its shape."""
+    try:
+        array = np.asarray(value, dtype=float64)
+    except (TypeError, ValueError):
+        print_error(f"{name} distribution must be a rectangular array")
+
+    if array.ndim != 2 or array.shape[0] != 2:
+        print_error(f"{name} distribution must have shape (2, N)")
+
+    return array[0], array[1]
+
+
+def _time_range(value: ArrayLike) -> NDArray[float64]:
+    """Normalize and validate a source time interval."""
+    try:
+        array = np.asarray(value, dtype=float64)
+    except (TypeError, ValueError):
+        print_error("Source time interval must be an array with shape (2,)")
+
+    if array.shape != (2,):
+        print_error("Source time interval must have shape (2,)")
+
+    return array

@@ -15,7 +15,7 @@ from mcdc.constant import (
     REFERENCE_FRAME_COM,
     REFERENCE_FRAME_LAB,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.object_.data import DataBase, DataTable
 from mcdc.object_.distribution import DistributionBase, DistributionMultiTable
 from mcdc.print_ import print_1d_array
@@ -25,25 +25,32 @@ from mcdc.print_ import print_1d_array
 # ======================================================================================
 
 
-class ElectronReactionBase(ObjectPolymorphic):
-    # Annotations for Numba mode
-    label: str = "electron_reaction"
-    #
+class ElectronReactionBase(MCDCPolymorphic):
+    """Base electron reaction data loaded from the HDF5 physics library.
+
+    Stores the ENDF reaction identifier, cross-section segment and its offset
+    into the element energy grid, and the reaction reference frame.
+    """
+
+    # MC/DC framework metadata
+    label = "electron_reaction"
+    sub_type = -1  # Polymorphic base
+
     MT: int
     xs: NDArray[float64]
     xs_offset_: int  # "xs_offset" is reserved for "xs"
     reference_frame: int
 
-    def __init__(self, type_, MT, xs, xs_offset, reference_frame):
-        super().__init__(type_)
+    def __init__(self, MT, xs, xs_offset, reference_frame):
+        super().__init__()
         self.MT = MT
         self.xs = xs
         self.xs_offset_ = xs_offset
         self.reference_frame = reference_frame
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text = super().__repr__()
+
         text += f"  - ID: {self.ID}\n"
         text += f"  - MT: {self.MT}\n"
         text += f"  - XS {print_1d_array(self.xs)} barn\n"
@@ -51,18 +58,9 @@ class ElectronReactionBase(ObjectPolymorphic):
         return text
 
 
-def decode_type(type_):
-    if type_ == ELECTRON_REACTION_IONIZATION:
-        return "Electron ionization"
-    elif type_ == ELECTRON_REACTION_ELASTIC_SCATTERING:
-        return "Electron elastic scattering"
-    elif type_ == ELECTRON_REACTION_BREMSSTRAHLUNG:
-        return "Electron bremsstrahlung"
-    elif type_ == ELECTRON_REACTION_EXCITATION:
-        return "Electron excitation"
-
-
 def decode_reference_frame(type_):
+    """Return the display name for a packed reference-frame code."""
+
     if type_ == REFERENCE_FRAME_LAB:
         return "Laboratory"
     elif type_ == REFERENCE_FRAME_COM:
@@ -75,9 +73,12 @@ def decode_reference_frame(type_):
 
 
 class ElectronReactionIonization(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_ionization_reaction"
-    #
+    """Electron ionization reaction with subshell cross sections and products."""
+
+    # MC/DC framework metadata
+    label = "electron_ionization_reaction"
+    sub_type = ELECTRON_REACTION_IONIZATION
+
     N_subshell: int
     subshell_xs: list[DataBase]
     subshell_product: list[DistributionBase]
@@ -91,8 +92,7 @@ class ElectronReactionIonization(ElectronReactionBase):
         subshell_xs,
         subshell_product,
     ):
-        type_ = ELECTRON_REACTION_IONIZATION
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
 
         self.N_subshell = len(subshell_xs)
         self.subshell_xs = subshell_xs
@@ -100,6 +100,7 @@ class ElectronReactionIonization(ElectronReactionBase):
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an ionization reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         subshells = h5_group["subshells"]
@@ -167,9 +168,12 @@ class ElectronReactionIonization(ElectronReactionBase):
 
 
 class ElectronReactionElasticScattering(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_elastic_scattering_reaction"
-    #
+    """Elastic electron scattering with large-angle cross section and cosine law."""
+
+    # MC/DC framework metadata
+    label = "electron_elastic_scattering_reaction"
+    sub_type = ELECTRON_REACTION_ELASTIC_SCATTERING
+
     mu_cut: float
     xs_large: DataBase
     mu: DistributionMultiTable
@@ -183,14 +187,14 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
         xs_large,
         mu,
     ):
-        type_ = ELECTRON_REACTION_ELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
         self.mu_cut = MU_CUTOFF
         self.xs_large = xs_large
         self.mu = mu
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an elastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         large_angle = h5_group["large_angle"]
@@ -230,18 +234,21 @@ class ElectronReactionElasticScattering(ElectronReactionBase):
 
 
 class ElectronReactionBremsstrahlung(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_bremsstrahlung_reaction"
-    #
+    """Electron bremsstrahlung reaction with tabulated energy loss."""
+
+    # MC/DC framework metadata
+    label = "electron_bremsstrahlung_reaction"
+    sub_type = ELECTRON_REACTION_BREMSSTRAHLUNG
+
     eloss: DataBase
 
     def __init__(self, MT, xs, xs_offset, reference_frame, eloss):
-        type_ = ELECTRON_REACTION_BREMSSTRAHLUNG
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
         self.eloss = eloss
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build a bremsstrahlung reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         base = h5_group["energy_loss"]
@@ -261,18 +268,21 @@ class ElectronReactionBremsstrahlung(ElectronReactionBase):
 
 
 class ElectronReactionExcitation(ElectronReactionBase):
-    # Annotations for Numba mode
-    label: str = "electron_excitation_reaction"
-    #
+    """Electron excitation reaction with tabulated energy loss."""
+
+    # MC/DC framework metadata
+    label = "electron_excitation_reaction"
+    sub_type = ELECTRON_REACTION_EXCITATION
+
     eloss: DataBase
 
     def __init__(self, MT, xs, xs_offset, reference_frame, eloss):
-        type_ = ELECTRON_REACTION_EXCITATION
-        super().__init__(type_, MT, xs, xs_offset, reference_frame)
+        super().__init__(MT, xs, xs_offset, reference_frame)
         self.eloss = eloss
 
     @classmethod
     def from_h5_group(cls, h5_group):
+        """Build an excitation reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame = set_basic_properties(h5_group)
 
         base = h5_group["energy_loss"]
@@ -292,6 +302,8 @@ class ElectronReactionExcitation(ElectronReactionBase):
 
 
 def set_basic_properties(h5_group):
+    """Read properties shared by all electron reactions from an HDF5 group."""
+
     MT = h5_group.attrs["MT"][()]
     xs = h5_group["xs"][()]
     xs_offset = h5_group["xs"].attrs["offset"]

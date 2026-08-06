@@ -1,14 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated
 
-from mcdc.object_.technique import (
-    ImplicitCapture,
-    PopulationControl,
-    GlobalWeightRoulette,
-    WeightWindows,
-    WeightedEmission,
-)
-
 if TYPE_CHECKING:
     from mcdc.object_.cell import Cell, Region
     from mcdc.object_.element import Element
@@ -24,19 +16,28 @@ if TYPE_CHECKING:
 
 import numpy as np
 
+from collections.abc import Sequence
 from mpi4py import MPI
 from numpy import float64, int64
 from numpy.typing import NDArray
 
 ####
 
-from mcdc.object_.base import ObjectSingleton
-from mcdc.object_.data import DataBase, DataNone
-from mcdc.object_.distribution import DistributionBase, DistributionNone
+from mcdc.object_.base import MCDCBase
+from mcdc.object_.data import DataBase
+from mcdc.object_.distribution import DistributionBase
 from mcdc.object_.gpu_tools import GPUMeta
-from mcdc.object_.mesh import MeshBase, MeshUniform
+from mcdc.object_.mesh import MeshBase
 from mcdc.object_.particle import ParticleBank
 from mcdc.object_.settings import Settings
+from mcdc.object_.technique import (
+    ImplicitCapture,
+    PopulationControl,
+    GlobalWeightRoulette,
+    WeightWindows,
+    WeightedEmission,
+)
+
 from mcdc.object_.universe import Universe, Lattice
 
 # ======================================================================================
@@ -44,33 +45,78 @@ from mcdc.object_.universe import Universe, Lattice
 # ======================================================================================
 
 
-class Simulation(ObjectSingleton):
-    # Annotations for Numba mode
-    label: str = "simulation"
-    non_numba: list[str] = [
+class Simulation(MCDCBase):
+    """Own a complete MC/DC model, settings, techniques, and runtime state.
+
+    Parameters
+    ----------
+    name : str, optional
+        User-facing simulation name.
+
+    Notes
+    -----
+    Geometry, sources, and tallies are supplied with :meth:`set_model`,
+    :meth:`set_sources`, and :meth:`set_tallies`. :meth:`compile` walks the
+    resulting object graph, assigns IDs, and prepares it for conversion to the
+    packed arrays consumed by :mod:`mcdc.transport`.
+
+    Each simulation owns its execution settings. Access them through
+    ``simulation.settings`` by assigning values such as
+    :attr:`settings.N_particle <mcdc.Simulation.settings.N_particle>` or by
+    calling configuration methods such as
+    :meth:`settings.set_eigenmode <mcdc.Simulation.settings.set_eigenmode>`.
+
+    Transport techniques are configured directly on the simulation through
+    methods such as :meth:`implicit_capture <mcdc.Simulation.implicit_capture>`
+    and :meth:`weight_windows <mcdc.Simulation.weight_windows>`.
+
+    Examples
+    --------
+    Configure commonly adjusted settings:
+
+    >>> import mcdc
+    >>> simulation = mcdc.Simulation(name="Slab")
+    >>> simulation.settings.N_particle = 10_000
+    >>> simulation.settings.N_batch = 20
+    >>> simulation.settings.rng_seed = 12345
+    >>> simulation.settings.output_name = "slab"
+    """
+
+    # MC/DC framework metadata
+    label = "simulation"
+    non_numba = [
+        "_next_compile_ID",
+        "compiled",
         "regions",
+        "root_universe",
         "bank_active",
         "bank_census",
         "bank_source",
         "bank_future",
     ]
+    _next_compile_ID: int = 1  # Non-Numba
+
+    # Basic parameters
+    name: str
+    compiled: bool  # Non-Numba
 
     # Physics
     data: list[DataBase]
     distributions: list[DistributionBase]
-    materials: list[MaterialBase]
-    elements: list[Element]
+    neutron_reactions: list[NeutronReactionBase]
     electron_reactions: list[ElectronReactionBase]
     nuclides: list[Nuclide]
-    neutron_reactions: list[NeutronReactionBase]
+    elements: list[Element]
+    materials: list[MaterialBase]
     sources: list[Source]
 
     # Geometry
-    cells: list[Cell]
-    lattices: list[Lattice]
-    regions: list[Region]
     surfaces: list[Surface]
+    regions: list[Region]  # Non-Numba
+    cells: list[Cell]
     universes: list[Universe]
+    root_universe: Universe  # Non-Numba
+    lattices: list[Lattice]
     meshes: list[MeshBase]
 
     # Tallies
@@ -87,36 +133,42 @@ class Simulation(ObjectSingleton):
     population_control: PopulationControl
 
     # Particle banks
-    bank_active: ParticleBank
-    bank_census: ParticleBank
-    bank_source: ParticleBank
-    bank_future: ParticleBank
+    bank_active: ParticleBank  # Non-Numba
+    bank_census: ParticleBank  # Non-Numba
+    bank_source: ParticleBank  # Non-Numba
+    bank_future: ParticleBank  # Non-Numba
 
-    # Simulation parameters
+    # Simulation indices
     idx_work: int
     idx_cycle: int
     idx_census: int
     idx_batch: int
-    dd_idx: int
-    dd_N_local_source: int
-    dd_local_rank: int
+
+    # k-eigenvalue globals
     k_eff: float
     k_cycle: NDArray[float64]
     k_avg: float
     k_sdv: float
+    k_avg_running: float
+    k_sdv_running: float
+    #
     n_avg: float
     n_sdv: float
     n_max: float
+    #
     C_avg: float
     C_sdv: float
     C_max: float
-    k_avg_running: float
-    k_sdv_running: float
-    gyration_radius: NDArray[float64]
-    cycle_active: bool
+    #
     eigenvalue_tally_nuSigmaF: Annotated[NDArray[float64], (1,)]
     eigenvalue_tally_n: Annotated[NDArray[float64], (1,)]
     eigenvalue_tally_C: Annotated[NDArray[float64], (1,)]
+    #
+    gyration_radius: NDArray[float64]
+    #
+    cycle_active: bool
+
+    # MPI parameters
     mpi_size: int
     mpi_rank: int
     mpi_master: bool
@@ -124,6 +176,8 @@ class Simulation(ObjectSingleton):
     mpi_work_size: int
     mpi_work_size_total: int
     mpi_work_iter: Annotated[NDArray[int64], (1,)]
+
+    # Runtimes
     runtime_total: float
     runtime_preparation: float
     runtime_simulation: float
@@ -134,35 +188,23 @@ class Simulation(ObjectSingleton):
     gpu_meta: GPUMeta
     source_seed: int
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str = "") -> None:
+        self.compiled = False
 
-        # ==============================================================================
-        # Simulation objects
-        # ==============================================================================
+        self.name = name or "(Unnamed simulation)"
+        self.root_universe = Universe("Root Universe")
 
-        # Physics
-        self.data = [DataNone()]
-        self.distributions = [DistributionNone()]
-        self.materials = []
-        self.elements = []
-        self.electron_reactions = []
-        self.nuclides = []
-        self.neutron_reactions = []
+        # Initialize with empty model objects
+        self._reset_model()
+
+        # Also empty sources and tallies
         self.sources = []
-
-        # Geometry
-        self.cells = []
-        self.lattices = []
-        self.regions = []
-        self.surfaces = []
-        self.universes = [Universe("Root Universe", root=True)]
-        self.meshes = []
-
-        # Tallies
         self.tallies = []
 
-        # Settings
+        # ==============================================================================
+        # Simulation settings and techniques
+        # ==============================================================================
+
         self.settings = Settings()
 
         # Techniques
@@ -182,7 +224,7 @@ class Simulation(ObjectSingleton):
         self.bank_future = ParticleBank(tag="future")
 
         # ==============================================================================
-        # Simulation parameters
+        # Simulation variables and parameters
         # ==============================================================================
 
         # Simulation indices
@@ -191,29 +233,29 @@ class Simulation(ObjectSingleton):
         self.idx_census = 0
         self.idx_batch = 0
 
-        # Domain decomposition
-        self.dd_idx = 0
-        self.dd_N_local_source = 0
-        self.dd_local_rank = 0
-
         # Eigenvalue simulation
         self.k_eff = 0.0
         self.k_cycle = np.ones(1)
         self.k_avg = 0.0
         self.k_sdv = 0.0
+        self.k_avg_running = 0.0
+        self.k_sdv_running = 0.0
+        #
         self.n_avg = 0.0  # Neutron density
         self.n_sdv = 0.0
         self.n_max = 0.0
+        #
         self.C_avg = 0.0  # Precursor density
         self.C_sdv = 0.0
         self.C_max = 0.0
-        self.k_avg_running = 0.0
-        self.k_sdv_running = 0.0
-        self.gyration_radius = np.zeros(1)
-        self.cycle_active = False
+        #
         self.eigenvalue_tally_nuSigmaF = np.zeros(1)
         self.eigenvalue_tally_n = np.zeros(1)
         self.eigenvalue_tally_C = np.zeros(1)
+        #
+        self.gyration_radius = np.zeros(1)
+        #
+        self.cycle_active = False
 
         # MPI parameters
         self.mpi_size = MPI.COMM_WORLD.Get_size()
@@ -224,7 +266,7 @@ class Simulation(ObjectSingleton):
         self.mpi_work_size_total = 0
         self.mpi_work_iter = np.zeros(1, dtype=int64)
 
-        # Runtime records
+        # Runtimes
         self.runtime_total = 0.0
         self.runtime_preparation = 0.0
         self.runtime_simulation = 0.0
@@ -235,8 +277,162 @@ class Simulation(ObjectSingleton):
         self.gpu_meta = GPUMeta()
         self.source_seed = 0
 
-    def set_root_universe(self, cells=[]):
-        self.universes[0].cells = cells
+    def _reset_model(self) -> None:
+        # Physics
+        self.data = []
+        self.distributions = []
+        self.neutron_reactions = []
+        self.electron_reactions = []
+        self.nuclides = []
+        self.elements = []
+        self.materials = []
 
+        # Geometry
+        self.surfaces = []
+        self.regions = []
+        self.cells = []
+        self.universes = []
+        self.lattices = []
+        self.meshes = []
 
-simulation = Simulation()
+    # ==================================================================================
+    # Simulation object setters
+    # ==================================================================================
+
+    def set_model(self, cells: Sequence[Cell]) -> None:
+        """Set the root cells that define a complete model (geometry and materials) of
+        the simulation.
+
+        Pass only cells that belong directly to the root universe. Do not include
+        cells nested inside subuniverses; they are discovered automatically during
+        model traversal as long as they are reachable through the root cells.
+
+        Parameters
+        ----------
+        cells : sequence of Cell
+            Cells to place in the root universe.
+
+        Examples
+        --------
+        Attach previously constructed cells:
+
+        >>> simulation.set_model([fuel_cell, moderator_cell])
+        """
+        self.root_universe.cells = list(cells)
+        self.compiled = False
+
+    def set_sources(self, sources: Sequence[Source]) -> None:
+        """Set particle sources for the simulation.
+
+        Parameters
+        ----------
+        sources : sequence of Source
+            Particle sources to sample during transport.
+
+        Examples
+        --------
+        Attach previously constructed sources:
+
+        >>> simulation.set_sources([volume_source, boundary_source])
+        """
+        self.sources = list(sources)
+        self.compiled = False
+
+    def set_tallies(self, tallies: Sequence[Tally]) -> None:
+        """Set requested tallies for the simulation.
+
+        Parameters
+        ----------
+        tallies : sequence of Tally
+            Tallies to score during transport.
+
+        Examples
+        --------
+        Attach previously constructed tallies:
+
+        >>> simulation.set_tallies([flux_tally, current_tally])
+        """
+        self.tallies = list(tallies)
+        self.compiled = False
+
+    # ==================================================================================
+    # Operations
+    # ==================================================================================
+
+    def compile(self) -> None:
+        """Compile the Python object graph into a new simulation snapshot.
+
+        A globally unique ``compile_ID`` identifies the snapshot. Every
+        embedded or registered :class:`~mcdc.object_.base.MCDCBase` reached
+        during compilation records that ID.
+        """
+        from mcdc.code_factory.python_objects_compiler import compile_simulation
+
+        self.compile_ID = type(self)._next_compile_ID
+        type(self)._next_compile_ID += 1
+
+        compile_simulation(self)
+        self.compiled = True
+
+    def visualize_model(
+        self,
+        vis_plane,
+        x,
+        y,
+        z,
+        pixels,
+        colors,
+        time,
+        save_as,
+    ) -> None:
+        """Render a two-dimensional material map of the compiled model.
+
+        Parameters are forwarded to :func:`mcdc.visualize.visualize_model`.
+        The model is compiled first when necessary.
+
+        Examples
+        --------
+        Render an x-z slice of the model:
+
+        >>> simulation.visualize_model(
+        ...     vis_plane="xz",
+        ...     x=[0.0, 1.0],
+        ...     y=0.0,
+        ...     z=[-0.5, 0.5],
+        ...     pixels=(100, 100),
+        ...     colors=None,
+        ...     time=[0.0],
+        ...     save_as="slab",
+        ... )
+        """
+        if not self.compiled:
+            self.compile()
+
+        from mcdc.visualize import visualize_model
+
+        visualize_model(self, vis_plane, x, y, z, pixels, colors, time, save_as)
+
+    def run(self) -> None:
+        """Compile if needed, execute particle transport, and write output.
+
+        Examples
+        --------
+        Run a fully configured simulation:
+
+        >>> simulation.run()
+        """
+        from mcdc.main import run_simulation
+
+        if not self.compiled:
+            self.compile()
+
+        run_simulation(self)
+        self.compiled = False
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"name={self.name!r}, "
+            f"compiled={self.compiled}, "
+            f"compile_ID={self.compile_ID})"
+        )

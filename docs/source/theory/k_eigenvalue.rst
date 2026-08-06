@@ -53,7 +53,7 @@ Users configure eigenmode via:
 
 .. code-block:: python3
 
-   mcdc.settings.set_eigenmode(N_inactive=50, N_active=200, k_init=1.0)
+   simulation.settings.set_eigenmode(N_inactive=50, N_active=200, k_init=1.0)
 
 - ``N_inactive`` — Cycles discarded for fission source convergence.
 - ``N_active`` — Cycles used for tally accumulation.

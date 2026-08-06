@@ -1,6 +1,8 @@
 import numpy as np
 import mcdc
 
+simulation = mcdc.Simulation("Kobayashi dog-leg benchmark")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
@@ -30,30 +32,30 @@ sz5 = mcdc.Surface.PlaneZ(z=60.0, boundary_condition="vacuum")
 
 # Set cells
 # Source
-mcdc.Cell(region=+sx1 & -sx2 & +sy1 & -sy2 & +sz1 & -sz2, fill=m)
+source_cell = mcdc.Cell(region=+sx1 & -sx2 & +sy1 & -sy2 & +sz1 & -sz2, fill=m)
 # Voids
 channel_1 = +sx1 & -sx2 & +sy2 & -sy3 & +sz1 & -sz2
 channel_2 = +sx1 & -sx3 & +sy3 & -sy4 & +sz1 & -sz2
 channel_3 = +sx3 & -sx4 & +sy3 & -sy4 & +sz1 & -sz3
 channel_4 = +sx3 & -sx4 & +sy3 & -sy5 & +sz3 & -sz4
 void_channel = channel_1 | channel_2 | channel_3 | channel_4
-mcdc.Cell(region=void_channel, fill=m_void)
+void_cell = mcdc.Cell(region=void_channel, fill=m_void)
 # Shield
 box = +sx1 & -sx5 & +sy1 & -sy5 & +sz1 & -sz5
-mcdc.Cell(region=box & ~void_channel, fill=m)
+shield_cell = mcdc.Cell(region=box & ~void_channel, fill=m)
+simulation.set_model([source_cell, void_cell, shield_cell])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
-# The source pulses in t=[0,5]
-
-mcdc.Source(
+source = mcdc.Source(
     x=[0.0, 10.0],
     y=[0.0, 10.0],
     z=[0.0, 10.0],
     isotropic=True,
     energy_group=0,
 )
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, techniques, and run MC/DC
@@ -61,14 +63,15 @@ mcdc.Source(
 
 # Tallies
 mesh = mcdc.MeshUniform(x=(0.0, 1.0, 60), y=(0.0, 1.0, 100), z=(0.0, 1.0, 60))
-mcdc.Tally(mesh=mesh, scores=["flux"])
+tally = mcdc.Tally(mesh=mesh, scores=["flux"])
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 1000
-mcdc.settings.N_batch = 2
+simulation.settings.N_particle = 1000
+simulation.settings.N_batch = 2
 
 # Techniques
-mcdc.simulation.implicit_capture()
+simulation.implicit_capture()
 
 # Run
-mcdc.run()
+simulation.run()

@@ -45,7 +45,7 @@ Complete documentation is available on
 
 - [Installation](https://mcdc.readthedocs.io/en/latest/install.html)
 - [User Guide](https://mcdc.readthedocs.io/en/latest/user/index.html)
-- [API Reference](https://mcdc.readthedocs.io/en/latest/pythonapi/index.html)
+- [Python API Reference](https://mcdc.readthedocs.io/en/latest/pythonapi/index.html)
 - [Contribution Guide](https://mcdc.readthedocs.io/en/latest/contribution/index.html)
 
 ## Citing

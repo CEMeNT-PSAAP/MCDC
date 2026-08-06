@@ -1,6 +1,9 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Kobayashi 3-D time dependent")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
@@ -41,13 +44,14 @@ void_cell = mcdc.Cell(region=void_channel, fill=m_void)
 # Shield
 box = +sx1 & -sx5 & +sy1 & -sy5 & +sz1 & -sz5
 shield_cell = mcdc.Cell(region=box & ~void_channel, fill=m)
+simulation.set_model([source_cell, void_cell, shield_cell])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 # The source pulses in t=[0,5]
 
-mcdc.Source(
+source = mcdc.Source(
     x=[0.0, 10.0],
     y=[0.0, 10.0],
     z=[0.0, 10.0],
@@ -55,6 +59,7 @@ mcdc.Source(
     energy_group=0,
     time=[0.0, 50.0],
 )
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, techniques, and run MC/DC
@@ -62,18 +67,21 @@ mcdc.Source(
 
 # Tallies
 time_grid = np.linspace(0.0, 200.0, 21)
-mcdc.Tally(cell=source_cell, scores=["flux"], time=time_grid)
-mcdc.Tally(cell=void_cell, scores=["flux"], time=time_grid)
-mcdc.Tally(cell=shield_cell, scores=["flux"], time=time_grid)
+source_tally = mcdc.Tally(cell=source_cell, scores=["flux"], time=time_grid)
+void_tally = mcdc.Tally(cell=void_cell, scores=["flux"], time=time_grid)
+shield_tally = mcdc.Tally(cell=shield_cell, scores=["flux"], time=time_grid)
 mesh = mcdc.MeshUniform(x=(0.0, 1.0, 60), y=(0.0, 1.0, 100))
-mcdc.Tally(mesh=mesh, scores=["flux"], time=time_grid)
-mcdc.Tally(scores=["density"], time=time_grid)
+mesh_tally = mcdc.Tally(mesh=mesh, scores=["flux"], time=time_grid)
+density_tally = mcdc.Tally(scores=["density"], time=time_grid)
+simulation.set_tallies(
+    [source_tally, void_tally, shield_tally, mesh_tally, density_tally]
+)
 
 # Settings
-mcdc.settings.N_particle = 25
+simulation.settings.N_particle = 25
 
 # Techniques
-mcdc.simulation.implicit_capture()
+simulation.implicit_capture()
 
 # Run
-mcdc.run()
+simulation.run()

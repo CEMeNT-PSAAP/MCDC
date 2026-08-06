@@ -5,6 +5,11 @@ dt.sig.sig-object.py > em.property {
     display: none;
 }
 
+/* Align Simulation-owned settings and techniques with regular class members. */
+.simulation-members {
+    margin-left: 30px;
+}
+
 /* Container styling */
 .admonition.tip {
     border-left: 5px solid #ffde57; /* Python Yellow border */

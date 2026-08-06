@@ -2,16 +2,14 @@ from numba import njit
 
 ####
 
-import mcdc.mcdc_get as mcdc_get
-
-from mcdc.constant import COINCIDENCE_TOLERANCE, COINCIDENCE_TOLERANCE_TIME, INF
+from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 from mcdc.transport.util import find_bin_with_rules
 
 
 @njit
-def get_indices(particle_container, mesh, data):
+def get_indices(particle_container, structured_mesh, data):
     """
-    Get mesh indices given the particle coordinate
+    Get structured_mesh indices given the particle coordinate
     """
     particle = particle_container[0]
 
@@ -23,12 +21,24 @@ def get_indices(particle_container, mesh, data):
     uy = particle["uy"]
     uz = particle["uz"]
 
-    grid_x = data[mesh["x_offset"] : (mesh["x_offset"] + mesh["x_length"])]
-    # Above is equivalent to: grid_x = mcdc_get.structured_mesh.x_all(mesh, data)
-    grid_y = data[mesh["y_offset"] : (mesh["y_offset"] + mesh["y_length"])]
-    # Above is equivalent to: grid_y = mcdc_get.structured_mesh.y_all(mesh, data)
-    grid_z = data[mesh["z_offset"] : (mesh["z_offset"] + mesh["z_length"])]
-    # Above is equivalent to: grid_z = mcdc_get.structured_mesh.z_all(mesh, data)
+    grid_x = data[
+        structured_mesh["x_offset"] : (
+            structured_mesh["x_offset"] + structured_mesh["x_length"]
+        )
+    ]
+    # Above is equivalent to: grid_x = mcdc_get.structured_mesh.x_all(structured_mesh, data)
+    grid_y = data[
+        structured_mesh["y_offset"] : (
+            structured_mesh["y_offset"] + structured_mesh["y_length"]
+        )
+    ]
+    # Above is equivalent to: grid_y = mcdc_get.structured_structured_mesh.y_all(structured_mesh, data)
+    grid_z = data[
+        structured_mesh["z_offset"] : (
+            structured_mesh["z_offset"] + structured_mesh["z_length"]
+        )
+    ]
+    # Above is equivalent to: grid_z = mcdc_get.structured_structured_mesh.z_all(structured_mesh, data)
 
     tolerance = COINCIDENCE_TOLERANCE
     ux_go_lower = ux < 0.0
@@ -43,10 +53,10 @@ def get_indices(particle_container, mesh, data):
 
 
 @njit
-def get_crossing_distance(particle_arr, speed, mesh):
+def get_crossing_distance(particle_arr, speed, structured_mesh):
     """
     Get distance for the particle, moving with the given speed,
-    to cross the nearest grid of the mesh
+    to cross the nearest grid of the structured_mesh
     """
     particle = particle_arr[0]
 
@@ -59,25 +69,31 @@ def get_crossing_distance(particle_arr, speed, mesh):
     uz = particle["uz"]
 
     # Mesh parameters
-    Nx = mesh["Nx"]
-    Ny = mesh["Ny"]
-    Nz = mesh["Nz"]
+    Nx = structured_mesh["Nx"]
+    Ny = structured_mesh["Ny"]
+    Nz = structured_mesh["Nz"]
 
-    # Check if particle is outside the mesh grid and moving away
+    # Check if particle is outside the structured_mesh grid and moving away
     if (
-        (x < mesh["x"][0] + COINCIDENCE_TOLERANCE and ux < 0.0)
-        or (x > mesh["x"][Nx] - COINCIDENCE_TOLERANCE and ux > 0.0)
-        or (y < mesh["y"][0] + COINCIDENCE_TOLERANCE and uy < 0.0)
-        or (y > mesh["y"][Ny] - COINCIDENCE_TOLERANCE and uy > 0.0)
-        or (z < mesh["z"][0] + COINCIDENCE_TOLERANCE and uz < 0.0)
-        or (z > mesh["z"][Nz] - COINCIDENCE_TOLERANCE and uz > 0.0)
+        (x < structured_mesh["x"][0] + COINCIDENCE_TOLERANCE and ux < 0.0)
+        or (x > structured_mesh["x"][Nx] - COINCIDENCE_TOLERANCE and ux > 0.0)
+        or (y < structured_mesh["y"][0] + COINCIDENCE_TOLERANCE and uy < 0.0)
+        or (y > structured_mesh["y"][Ny] - COINCIDENCE_TOLERANCE and uy > 0.0)
+        or (z < structured_mesh["z"][0] + COINCIDENCE_TOLERANCE and uz < 0.0)
+        or (z > structured_mesh["z"][Nz] - COINCIDENCE_TOLERANCE and uz > 0.0)
     ):
         return INF
 
     d = INF
-    d = min(d, _grid_distance(x, ux, mesh["x"], Nx + 1, COINCIDENCE_TOLERANCE))
-    d = min(d, _grid_distance(y, uy, mesh["y"], Ny + 1, COINCIDENCE_TOLERANCE))
-    d = min(d, _grid_distance(z, uz, mesh["z"], Nz + 1, COINCIDENCE_TOLERANCE))
+    d = min(
+        d, _grid_distance(x, ux, structured_mesh["x"], Nx + 1, COINCIDENCE_TOLERANCE)
+    )
+    d = min(
+        d, _grid_distance(y, uy, structured_mesh["y"], Ny + 1, COINCIDENCE_TOLERANCE)
+    )
+    d = min(
+        d, _grid_distance(z, uz, structured_mesh["z"], Nz + 1, COINCIDENCE_TOLERANCE)
+    )
     return d
 
 

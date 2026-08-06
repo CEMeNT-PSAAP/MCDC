@@ -48,20 +48,20 @@ particle = into_dtype([
 
 cell = into_dtype([
     ('name', 'U32'),
-    ('fill_translated', bool),
-    ('fill_rotated', bool),
-    ('translation', float64, (3,)),
-    ('rotation', float64, (3,)),
     ('region_RPN_tokens_offset', int64),
     ('region_RPN_tokens_length', int64),
     ('N_surface', int64),
     ('surface_IDs_offset', int64),
+    ('fill_type', int64),
+    ('fill_ID', int64),
+    ('fill_translated', bool),
+    ('fill_rotated', bool),
+    ('translation', float64, (3,)),
+    ('rotation', float64, (3,)),
     ('N_collision_tally', int64),
     ('collision_tally_IDs_offset', int64),
     ('N_tracklength_tally', int64),
     ('tracklength_tally_IDs_offset', int64),
-    ('fill_type', int64),
-    ('fill_ID', int64),
     ('ID', int64),
 ])
 
@@ -85,8 +85,8 @@ material = into_dtype([
     ('name', 'U32'),
     ('fissionable', bool),
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 collision_tally = into_dtype([
@@ -99,7 +99,7 @@ collision_tally = into_dtype([
     ('mesh_stride_y', int64),
     ('mesh_stride_x', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 tracklength_tally = into_dtype([
@@ -112,7 +112,7 @@ tracklength_tally = into_dtype([
     ('mesh_stride_y', int64),
     ('mesh_stride_x', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 universe = into_dtype([
@@ -124,20 +124,20 @@ universe = into_dtype([
 
 data = into_dtype([
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 none_data = into_dtype([
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 polynomial_data = into_dtype([
     ('coefficients_offset', int64),
     ('coefficients_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 table_data = into_dtype([
@@ -154,20 +154,20 @@ table_data = into_dtype([
     ('aux_offset', int64),
     ('aux_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 distribution = into_dtype([
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 evaporation_distribution = into_dtype([
     ('nuclear_temperature_ID', int64),
     ('restriction_energy', float64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 kalbach_mann_distribution = into_dtype([
@@ -186,21 +186,21 @@ kalbach_mann_distribution = into_dtype([
     ('angular_slope_offset', int64),
     ('angular_slope_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 level_scattering_distribution = into_dtype([
     ('C1', float64),
     ('C2', float64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 maxwellian_distribution = into_dtype([
     ('nuclear_temperature_ID', int64),
     ('restriction_energy', float64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 multi_table_distribution = into_dtype([
@@ -209,18 +209,18 @@ multi_table_distribution = into_dtype([
     ('N_table', int64),
     ('table_IDs_offset', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 nbody_distribution = into_dtype([
     ('pdf_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 none_distribution = into_dtype([
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 pmf_distribution = into_dtype([
@@ -231,13 +231,13 @@ pmf_distribution = into_dtype([
     ('cmf_offset', int64),
     ('cmf_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 tabulated_distribution = into_dtype([
     ('pdf_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 tabulated_energy_angle_distribution = into_dtype([
@@ -260,7 +260,7 @@ tabulated_energy_angle_distribution = into_dtype([
     ('cosine_cdf_offset', int64),
     ('cosine_cdf_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 electron_reaction = into_dtype([
@@ -270,14 +270,14 @@ electron_reaction = into_dtype([
     ('xs_offset_', int64),
     ('reference_frame', int64),
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 electron_bremsstrahlung_reaction = into_dtype([
     ('eloss_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 electron_elastic_scattering_reaction = into_dtype([
@@ -285,13 +285,13 @@ electron_elastic_scattering_reaction = into_dtype([
     ('xs_large_ID', int64),
     ('mu_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 electron_excitation_reaction = into_dtype([
     ('eloss_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 electron_ionization_reaction = into_dtype([
@@ -301,7 +301,7 @@ electron_ionization_reaction = into_dtype([
     ('N_subshell_product', int64),
     ('subshell_product_IDs_offset', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 element = into_dtype([
@@ -343,7 +343,7 @@ native_material = into_dtype([
     ('element_densities_offset', int64),
     ('element_densities_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 multigroup_material = into_dtype([
@@ -378,7 +378,7 @@ multigroup_material = into_dtype([
     ('mgxs_chi_d_offset', int64),
     ('mgxs_chi_d_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 nuclide = into_dtype([
@@ -428,8 +428,8 @@ mesh = into_dtype([
     ('Ny', int64),
     ('Nz', int64),
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 structured_mesh = into_dtype([
@@ -440,7 +440,7 @@ structured_mesh = into_dtype([
     ('z_offset', int64),
     ('z_length', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 uniform_mesh = into_dtype([
@@ -454,7 +454,7 @@ uniform_mesh = into_dtype([
     ('dz', float64),
     ('Nz', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 neutron_reaction = into_dtype([
@@ -465,19 +465,19 @@ neutron_reaction = into_dtype([
     ('reference_frame', int64),
     ('q_value', float64),
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 neutron_capture_reaction = into_dtype([
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 neutron_elastic_scattering_reaction = into_dtype([
     ('mu_table_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 neutron_fission_reaction = into_dtype([
@@ -485,7 +485,7 @@ neutron_fission_reaction = into_dtype([
     ('mu_ID', int64),
     ('spectrum_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 neutron_inelastic_scattering_reaction = into_dtype([
@@ -501,7 +501,7 @@ neutron_inelastic_scattering_reaction = into_dtype([
     ('N_energy_spectrum', int64),
     ('energy_spectrum_IDs_offset', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 collision_data = into_dtype([
@@ -654,8 +654,8 @@ surface = into_dtype([
     ('move_time_grid_length', int64),
     ('move_translations_offset', int64),
     ('move_translations_length', int64),
-    ('N_tally', int64),
-    ('tally_IDs_offset', int64),
+    ('N_surface_crossing_tally', int64),
+    ('surface_crossing_tally_IDs_offset', int64),
     ('ID', int64),
 ])
 
@@ -665,7 +665,7 @@ surface_crossing_tally = into_dtype([
     ('cell_filtered', bool),
     ('cell_filter_ID', int64),
     ('ID', int64),
-    ('parent_ID', int64),
+    ('base_ID', int64),
 ])
 
 tally = into_dtype([
@@ -697,8 +697,8 @@ tally = into_dtype([
     ('stride_energy', int64),
     ('stride_time', int64),
     ('ID', int64),
-    ('child_type', int64),
-    ('child_ID', int64),
+    ('sub_type', int64),
+    ('sub_ID', int64),
 ])
 
 gpu_meta = into_dtype([
@@ -778,14 +778,16 @@ def set_simulation(N: dict):
         ('N_tabulated_distribution', int64),
         ('tabulated_energy_angle_distributions', tabulated_energy_angle_distribution, (N['tabulated_energy_angle_distribution'])),
         ('N_tabulated_energy_angle_distribution', int64),
-        ('materials', material, (N['material'])),
-        ('N_material', int64),
-        ('native_materials', native_material, (N['native_material'])),
-        ('N_native_material', int64),
-        ('multigroup_materials', multigroup_material, (N['multigroup_material'])),
-        ('N_multigroup_material', int64),
-        ('elements', element, (N['element'])),
-        ('N_element', int64),
+        ('neutron_reactions', neutron_reaction, (N['neutron_reaction'])),
+        ('N_neutron_reaction', int64),
+        ('neutron_capture_reactions', neutron_capture_reaction, (N['neutron_capture_reaction'])),
+        ('N_neutron_capture_reaction', int64),
+        ('neutron_elastic_scattering_reactions', neutron_elastic_scattering_reaction, (N['neutron_elastic_scattering_reaction'])),
+        ('N_neutron_elastic_scattering_reaction', int64),
+        ('neutron_fission_reactions', neutron_fission_reaction, (N['neutron_fission_reaction'])),
+        ('N_neutron_fission_reaction', int64),
+        ('neutron_inelastic_scattering_reactions', neutron_inelastic_scattering_reaction, (N['neutron_inelastic_scattering_reaction'])),
+        ('N_neutron_inelastic_scattering_reaction', int64),
         ('electron_reactions', electron_reaction, (N['electron_reaction'])),
         ('N_electron_reaction', int64),
         ('electron_bremsstrahlung_reactions', electron_bremsstrahlung_reaction, (N['electron_bremsstrahlung_reaction'])),
@@ -798,26 +800,24 @@ def set_simulation(N: dict):
         ('N_electron_ionization_reaction', int64),
         ('nuclides', nuclide, (N['nuclide'])),
         ('N_nuclide', int64),
-        ('neutron_reactions', neutron_reaction, (N['neutron_reaction'])),
-        ('N_neutron_reaction', int64),
-        ('neutron_capture_reactions', neutron_capture_reaction, (N['neutron_capture_reaction'])),
-        ('N_neutron_capture_reaction', int64),
-        ('neutron_elastic_scattering_reactions', neutron_elastic_scattering_reaction, (N['neutron_elastic_scattering_reaction'])),
-        ('N_neutron_elastic_scattering_reaction', int64),
-        ('neutron_fission_reactions', neutron_fission_reaction, (N['neutron_fission_reaction'])),
-        ('N_neutron_fission_reaction', int64),
-        ('neutron_inelastic_scattering_reactions', neutron_inelastic_scattering_reaction, (N['neutron_inelastic_scattering_reaction'])),
-        ('N_neutron_inelastic_scattering_reaction', int64),
+        ('elements', element, (N['element'])),
+        ('N_element', int64),
+        ('materials', material, (N['material'])),
+        ('N_material', int64),
+        ('native_materials', native_material, (N['native_material'])),
+        ('N_native_material', int64),
+        ('multigroup_materials', multigroup_material, (N['multigroup_material'])),
+        ('N_multigroup_material', int64),
         ('sources', source, (N['source'])),
         ('N_source', int64),
-        ('cells', cell, (N['cell'])),
-        ('N_cell', int64),
-        ('lattices', lattice, (N['lattice'])),
-        ('N_lattice', int64),
         ('surfaces', surface, (N['surface'])),
         ('N_surface', int64),
+        ('cells', cell, (N['cell'])),
+        ('N_cell', int64),
         ('universes', universe, (N['universe'])),
         ('N_universe', int64),
+        ('lattices', lattice, (N['lattice'])),
+        ('N_lattice', int64),
         ('meshes', mesh, (N['mesh'])),
         ('N_mesh', int64),
         ('structured_meshes', structured_mesh, (N['structured_mesh'])),
@@ -843,32 +843,30 @@ def set_simulation(N: dict):
         ('bank_source', bank_source),
         ('bank_census', bank_census),
         ('bank_active', bank_active),
+        ('name', 'U32'),
         ('idx_work', int64),
         ('idx_cycle', int64),
         ('idx_census', int64),
         ('idx_batch', int64),
-        ('dd_idx', int64),
-        ('dd_N_local_source', int64),
-        ('dd_local_rank', int64),
         ('k_eff', float64),
         ('k_cycle_offset', int64),
         ('k_cycle_length', int64),
         ('k_avg', float64),
         ('k_sdv', float64),
+        ('k_avg_running', float64),
+        ('k_sdv_running', float64),
         ('n_avg', float64),
         ('n_sdv', float64),
         ('n_max', float64),
         ('C_avg', float64),
         ('C_sdv', float64),
         ('C_max', float64),
-        ('k_avg_running', float64),
-        ('k_sdv_running', float64),
-        ('gyration_radius_offset', int64),
-        ('gyration_radius_length', int64),
-        ('cycle_active', bool),
         ('eigenvalue_tally_nuSigmaF', float64, (1,)),
         ('eigenvalue_tally_n', float64, (1,)),
         ('eigenvalue_tally_C', float64, (1,)),
+        ('gyration_radius_offset', int64),
+        ('gyration_radius_length', int64),
+        ('cycle_active', bool),
         ('mpi_size', int64),
         ('mpi_rank', int64),
         ('mpi_master', bool),

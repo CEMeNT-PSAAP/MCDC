@@ -4,9 +4,13 @@
 User's Guide
 ============
 
-We include a simple "first simulation guide" as well as more in-depth descriptions on how to execute MC/DC in compiled modes to CPUs and GPUs with or without MPI.
+The User's Guide explains how to build a model with MC/DC's public Python
+objects, attach it to a :class:`mcdc.Simulation`, configure settings and 
+transport techniques, and run it. Additional guides describe how
+to execute the same input script on CPUs and GPUs, with or without MPI.
 
-These instructions all assume you have an operable and working version of MC/DC installed in an appropriate environment for your system.
+These instructions assume MC/DC is installed in an active Python environment
+appropriate for your system.
 
 Getting Started
 ---------------
@@ -15,6 +19,7 @@ Getting Started
    :maxdepth: 1
 
    first_mcdc
+   tallies
 
 Execution Modes
 ---------------

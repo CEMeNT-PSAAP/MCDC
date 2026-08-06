@@ -52,9 +52,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/c5g7/transient`` run::
 
-   python examples/c5g7/transient/input.py
+   python input.py
 
 Expected Output
 ===============

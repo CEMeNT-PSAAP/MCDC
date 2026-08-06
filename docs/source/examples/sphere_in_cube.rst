@@ -143,9 +143,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/sphere_in_cube`` run::
 
-  python examples/sphere_in_cube/input.py
+  python input.py
 
 Expected Output
 ===============

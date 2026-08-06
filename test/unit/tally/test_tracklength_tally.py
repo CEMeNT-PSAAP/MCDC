@@ -4,6 +4,9 @@ from mcdc.object_.tally import TallyTracklength
 
 def test_tracklength_tally_with_cell_filter(slab_plane_x):
     tally = mcdc.Tally(cell=slab_plane_x["c_left"], scores=["flux", "capture"])
+    simulation = slab_plane_x["simulation"]
+    simulation.set_tallies([tally])
+    simulation.compile()
 
     assert isinstance(tally, TallyTracklength)
     assert tally.cell_filtered
@@ -20,6 +23,9 @@ def test_tracklength_tally_with_mesh_filter():
         z=(-1.0, 1.0, 1),
     )
     tally = mcdc.Tally(mesh=mesh, scores=["flux"])
+    simulation = mcdc.Simulation()
+    simulation.set_tallies([tally])
+    simulation.compile()
 
     assert isinstance(tally, TallyTracklength)
     assert not tally.cell_filtered

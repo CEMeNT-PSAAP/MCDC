@@ -151,12 +151,14 @@ for a full-core lattice example.
 Root Universe
 ^^^^^^^^^^^^^
 
-When using universes or lattices, the top-level cell collection is
-registered as the **root universe**:
+When using universes or lattices, attach the top-level cell collection
+to a simulation. MC/DC registers these cells in the simulation's
+**root universe**:
 
 .. code-block:: python3
 
-   mcdc.simulation.set_root_universe(cells=[cell_left, cell_right])
+   simulation = mcdc.Simulation()
+   simulation.set_model([cell_left, cell_right])
 
 
 Geometry Visualization
@@ -167,13 +169,15 @@ geometries before running a full transport simulation:
 
 .. code-block:: python3
 
-   mcdc.visualize(
-       "xz",                         # projection plane
+   simulation.visualize_model(
+       vis_plane="xz",               # projection plane
        y=0.0,                        # slice position
        x=[-10.0, 10.0],              # plot range
        z=[-5.0, 5.0],
        pixels=(400, 400),
        colors={fuel: "red", water: "blue"},
+       time=[0.0],
+       save_as=None,
    )
 
 This produces a pixel map showing which material fills each pixel.
@@ -182,7 +186,16 @@ argument:
 
 .. code-block:: python3
 
-   mcdc.visualize(..., time=np.linspace(0, 9, 19), save_as="geo_animation")
+   simulation.visualize_model(
+       vis_plane="xz",
+       y=0.0,
+       x=[-10.0, 10.0],
+       z=[-5.0, 5.0],
+       pixels=(400, 400),
+       colors={fuel: "red", water: "blue"},
+       time=np.linspace(0, 9, 19),
+       save_as="geo_animation",
+   )
 
 For details on moving surfaces and sources, see :ref:`cont_movement`.
 

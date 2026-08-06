@@ -71,7 +71,7 @@ Contents
 
    install
    user/index
-   pythonapi/index
+   Python API Reference <pythonapi/index>
    examples/index
 
 .. toctree::

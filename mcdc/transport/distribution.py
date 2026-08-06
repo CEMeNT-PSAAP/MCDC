@@ -18,14 +18,10 @@ from mcdc.constant import (
     DISTRIBUTION_TABULATED_ENERGY_ANGLE,
     INTERPOLATION_HISTOGRAM,
     INTERPOLATION_LINEAR,
-    INTERPOLATION_LOG,
-    INTERPOLATION_SEMILOGX,
-    INTERPOLATION_SEMILOGY,
-    MAX_BISECTION_ITERATIONS,
     PI,
 )
-from mcdc.transport.data import evaluate_table, get_table_interpolation_law
-from mcdc.transport.util import find_bin, linear_interpolation
+from mcdc.transport.data import evaluate_data
+from mcdc.transport.util import find_bin
 
 # ======================================================================================
 # General distribution samplers
@@ -44,8 +40,8 @@ def sample_distribution_with_scale(E, distribution, rng_state, simulation, data)
 
 @njit
 def _sample_distribution(E, distribution, rng_state, simulation, data, scale):
-    distribution_type = distribution["child_type"]
-    ID = distribution["child_ID"]
+    distribution_type = distribution["sub_type"]
+    ID = distribution["sub_ID"]
 
     if distribution_type == DISTRIBUTION_TABULATED:
         table = simulation["tabulated_distributions"][ID]
@@ -92,8 +88,8 @@ def sample_correlated_distribution_with_scale(
 def _sample_correlated_distribution(
     E, distribution, rng_state, simulation, data, scale
 ):
-    distribution_type = distribution["child_type"]
-    ID = distribution["child_ID"]
+    distribution_type = distribution["sub_type"]
+    ID = distribution["sub_ID"]
 
     if distribution_type == DISTRIBUTION_KALBACH_MANN:
         kalbach_mann = simulation["kalbach_mann_distributions"][ID]
@@ -185,7 +181,8 @@ def sample_tabulated(table, rng_state, simulation, data):
     Sample a value from a tabulated distribution.
     """
 
-    pdf_table = simulation["table_data"][table["pdf_ID"]]
+    pdf_data = simulation["data"][table["pdf_ID"]]
+    pdf_table = simulation["table_data"][pdf_data["sub_ID"]]
 
     cdf = mcdc_get.table_data.aux_vector(0, pdf_table, data)
 
@@ -336,7 +333,8 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
 
     # Sample from the selected table
     ID = int(mcdc_get.multi_table_distribution.table_IDs(idx, multi_table, data))
-    table_distribution = simulation["tabulated_distributions"][ID]
+    sub_ID = simulation["distributions"][ID]["sub_ID"]
+    table_distribution = simulation["tabulated_distributions"][sub_ID]
     sample = sample_tabulated(table_distribution, rng_state, simulation, data)
 
     # No scaling needed?
@@ -347,18 +345,27 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
     if use_next_table:
         idx -= 1
 
-    # PDF table indices
+    # PDF tables
     ID0 = int(mcdc_get.multi_table_distribution.table_IDs(idx, multi_table, data))
     ID1 = int(mcdc_get.multi_table_distribution.table_IDs(idx + 1, multi_table, data))
     #
-    pdf_ID = table_distribution["pdf_ID"]
-    pdf_ID0 = simulation["tabulated_distributions"][ID0]["pdf_ID"]
-    pdf_ID1 = simulation["tabulated_distributions"][ID1]["pdf_ID"]
-
-    # The tables
-    table = simulation["table_data"][pdf_ID]
-    table0 = simulation["table_data"][pdf_ID0]
-    table1 = simulation["table_data"][pdf_ID1]
+    sub_ID0 = simulation["distributions"][ID0]["sub_ID"]
+    sub_ID1 = simulation["distributions"][ID1]["sub_ID"]
+    #
+    table_distribution0 = simulation["tabulated_distributions"][sub_ID0]
+    table_distribution1 = simulation["tabulated_distributions"][sub_ID1]
+    #
+    ID = table_distribution["pdf_ID"]
+    ID0 = table_distribution0["pdf_ID"]
+    ID1 = table_distribution1["pdf_ID"]
+    #
+    sub_ID = simulation["data"][ID]["sub_ID"]
+    sub_ID0 = simulation["data"][ID0]["sub_ID"]
+    sub_ID1 = simulation["data"][ID1]["sub_ID"]
+    #
+    table = simulation["table_data"][sub_ID]
+    table0 = simulation["table_data"][sub_ID0]
+    table1 = simulation["table_data"][sub_ID1]
 
     # Table's min
     val_min0 = mcdc_get.table_data.x(0, table0, data)
@@ -381,8 +388,8 @@ def _sample_multi_table(E, rng_state, multi_table, simulation, data, scale):
 @njit
 def sample_maxwellian(E, rng_state, maxwellian, simulation, data):
     # Get nuclear temperature
-    table = simulation["table_data"][maxwellian["nuclear_temperature_ID"]]
-    nuclear_temperature = evaluate_table(E, table, data)
+    table = simulation["data"][maxwellian["nuclear_temperature_ID"]]
+    nuclear_temperature = evaluate_data(E, table, simulation, data)
     restriction_energy = maxwellian["restriction_energy"]
 
     # Rejection sampling
@@ -411,8 +418,8 @@ def sample_level_scattering(E, level_scattering):
 @njit
 def sample_evaporation(E, rng_state, evaporation, simulation, data):
     # Get nuclear temperature
-    table = simulation["table_data"][evaporation["nuclear_temperature_ID"]]
-    nuclear_temperature = evaluate_table(E, table, data)
+    table = simulation["data"][evaporation["nuclear_temperature_ID"]]
+    nuclear_temperature = evaluate_data(E, table, simulation, data)
     restriction_energy = evaporation["restriction_energy"]
 
     w = (E - restriction_energy) / nuclear_temperature

@@ -156,7 +156,7 @@ An isotropic, uniformly distributed source fills the
 - A uniform :math:`60 \times 100 \times 60` mesh tally records scalar flux.
 - 1 000 source particles in 2 batches (increase for production).
 - Implicit capture prevents particles from being absorbed prematurely.
-- ``mcdc.run()`` launches the simulation.
+- ``simulation.run()`` launches the simulation.
 
 **What to try:**
 
@@ -178,9 +178,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/kobayashi`` run::
 
-  python examples/kobayashi/input.py
+  python input.py
 
 Expected Output
 ===============
