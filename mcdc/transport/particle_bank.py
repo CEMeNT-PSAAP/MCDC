@@ -200,7 +200,7 @@ def manage_particle_banks(simulation):
         )
 
     # Population control
-    if simulation["population_control"]["active"]:
+    if simulation["technique"]["population_control"]["active"]:
         technique.population_control(simulation)
     else:
         # Swap census and source bank

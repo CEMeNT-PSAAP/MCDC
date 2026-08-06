@@ -60,8 +60,8 @@ def global_weight_roulette(particle_container, simulation):
     simulation : object
         Simulation state containing global weight roulette parameters.
     """
-    w_threshold = simulation["global_weight_roulette"]["weight_threshold"]
-    w_target = simulation["global_weight_roulette"]["weight_target"]
+    w_threshold = simulation["technique"]["global_weight_roulette"]["weight_threshold"]
+    w_target = simulation["technique"]["global_weight_roulette"]["weight_target"]
     weight_roulette(particle_container, w_threshold, w_target)
 
 
@@ -116,7 +116,7 @@ def query_weight_window(particle_container, simulation, data):
         Upper weight bound.
     """
     # grab objects
-    ww_obj = simulation["weight_windows"]
+    ww_obj = simulation["technique"]["weight_windows"]
     indices = get_ww_indices(particle_container, ww_obj, simulation, data)
     # grab the actual ww parameters
     lower = ww_get.lower_weights(*indices, ww_obj, data)

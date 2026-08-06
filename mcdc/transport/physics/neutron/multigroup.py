@@ -130,7 +130,7 @@ def collision(particle_container, collision_data_container, program, data):
     SigmaF = macro_xs(NEUTRON_REACTION_FISSION, particle_container, simulation, data)
 
     # Implicit capture
-    if simulation["implicit_capture"]["active"]:
+    if simulation["technique"]["implicit_capture"]["active"]:
         particle["w"] *= (SigmaT - SigmaC) / SigmaT
         SigmaT -= SigmaC
 
@@ -173,8 +173,8 @@ def scattering(particle_container, program, data):
     # Adjust production and product weights if weighted emission
     weight_production = 1.0
     weight_product = particle["w"]
-    if simulation["weighted_emission"]["active"]:
-        weight_target = simulation["weighted_emission"]["weight_target"]
+    if simulation["technique"]["weighted_emission"]["active"]:
+        weight_target = simulation["technique"]["weighted_emission"]["weight_target"]
         weight_production = particle["w"] / weight_target
         weight_product = weight_target
 
@@ -252,8 +252,8 @@ def fission(particle_container, program, data):
     # Adjust production and product weights if weighted emission
     weight_production = 1.0
     weight_product = particle["w"]
-    if simulation["weighted_emission"]["active"]:
-        weight_target = simulation["weighted_emission"]["weight_target"]
+    if simulation["technique"]["weighted_emission"]["active"]:
+        weight_target = simulation["technique"]["weighted_emission"]["weight_target"]
         weight_production = particle["w"] / weight_target
         weight_product = weight_target
 

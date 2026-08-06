@@ -254,7 +254,7 @@ def collision(particle_container, collision_data_container, program, data):
     SigmaT = macro_xs(NEUTRON_REACTION_TOTAL, particle_container, simulation, data)
 
     # Implicit capture
-    if simulation["implicit_capture"]["active"]:
+    if simulation["technique"]["implicit_capture"]["active"]:
         # Calculate capture fraction
         SigmaC = macro_xs(
             NEUTRON_REACTION_CAPTURE, particle_container, simulation, data
@@ -297,7 +297,7 @@ def collision(particle_container, collision_data_container, program, data):
         nuclide_density = mcdc_get.native_material.nuclide_densities(i, material, data)
         sigmaT = total_micro_xs(NEUTRON_REACTION_TOTAL, E, nuclide, data)
 
-        if simulation["implicit_capture"]["active"]:
+        if simulation["technique"]["implicit_capture"]["active"]:
             sigmaC = total_micro_xs(NEUTRON_REACTION_CAPTURE, E, nuclide, data)
             sigmaT -= sigmaC
 
@@ -346,7 +346,7 @@ def collision(particle_container, collision_data_container, program, data):
                 return
 
     # Capture
-    if not simulation["implicit_capture"]["active"]:
+    if not simulation["technique"]["implicit_capture"]["active"]:
         sigma_capture = total_micro_xs(NEUTRON_REACTION_CAPTURE, E, nuclide, data)
         total += sigma_capture
         if xi < total:
@@ -769,8 +769,8 @@ def sample_fission(
     # Adjust production and product weights if weighted emission
     weight_production = 1.0
     weight_product = particle["w"]
-    if simulation["weighted_emission"]["active"]:
-        weight_target = simulation["weighted_emission"]["weight_target"]
+    if simulation["technique"]["weighted_emission"]["active"]:
+        weight_target = simulation["technique"]["weighted_emission"]["weight_target"]
         weight_production = particle["w"] / weight_target
         weight_product = weight_target
 
