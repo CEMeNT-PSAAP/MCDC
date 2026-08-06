@@ -33,8 +33,8 @@ class Material(MCDCObject):
         temperature available in the data library.
     neutron_multigroup : NeutronMultigroupData, optional
         Multigroup cross sections for neutron transport. When supplied with a
-        native composition, its ``energy_grid`` defines the energy range over
-        which multigroup physics applies.
+        native composition, an explicit ``energy_grid`` is required and defines
+        the energy range over which multigroup physics applies.
 
     Notes
     -----
@@ -42,8 +42,7 @@ class Material(MCDCObject):
     Nuclide and element compositions cannot both be specified because they are
     alternative native representations of the same material. A native
     composition may be supplied together with ``neutron_multigroup`` for hybrid
-    neutron physics. An omitted multigroup energy grid uses the default
-    group-coordinate boundaries.
+    neutron physics.
 
     Nuclide and element objects are created immediately; their data-library
     properties are loaded when the material is compiled into a simulation.
@@ -131,6 +130,20 @@ class Material(MCDCObject):
             neutron_multigroup, NeutronMultigroupData
         ):
             print_error("neutron_multigroup must be a NeutronMultigroupData object.")
+        if neutron_multigroup is not None and neutron_multigroup.G == 0:
+            print_error(
+                "Material neutron_multigroup must define at least one energy group."
+            )
+        if (
+            (nuclide_composition or element_composition)
+            and neutron_multigroup is not None
+            and neutron_multigroup.G > 0
+            and neutron_multigroup._uses_default_energy_grid
+        ):
+            print_error(
+                "Material requires an explicit neutron multigroup energy_grid "
+                "when a nuclide or element composition is supplied."
+            )
         # Initialize shared material state
         self.name = name or "(Unnamed material)"
         self.temperature = float(temperature)

@@ -80,9 +80,8 @@ class Tally(MCDCPolymorphic):
         transported particle type.
     group : sequence of float or "all", optional
         Transport-mode group-bin boundaries. These bins may collapse several
-        transport groups into one tally bin. ``"all"`` creates one
-        tally bin per group during compilation. For neutron multigroup transport, this
-        corresponds to energy group.
+        transport groups into one tally bin. ``"all"`` creates one tally bin
+        per neutron energy group during compilation.
     energy : sequence of float, optional
         Continuous-energy bin boundaries in eV.
     time : sequence of float, optional
@@ -163,7 +162,7 @@ class Tally(MCDCPolymorphic):
     ...     scores=["energy_deposition"],
     ... )
 
-    Use one bin per (energy, for neutron) group:
+    Use one bin per neutron energy group:
 
     >>> group_flux = mcdc.Tally(
     ...     cell=cell,
@@ -458,7 +457,7 @@ class Tally(MCDCPolymorphic):
     def _resolve_group_filter(self, simulation) -> None:
         """Resolve group filters that require the complete material model."""
         if self.all_groups:
-            if self.particle_type != PARTICLE_NEUTRON:
+            if self.particle_type not in (PARTICLE_ANY, PARTICLE_NEUTRON):
                 print_error('The group="all" filter currently supports only neutrons.')
             if not simulation.materials or any(
                 not material.has_neutron_multigroup for material in simulation.materials

@@ -107,6 +107,12 @@ modify an attached object after explicitly compiling or visualizing the model,
 call ``simulation.compile()`` again before inspecting or visualizing the
 change.
 
+Compilation finalizes some user-facing values in place. In particular, source
+probabilities are normalized, tally limits may reduce ``settings.time_boundary``,
+and particle-bank buffer ratios may be adjusted for the selected run mode. Set
+new raw values explicitly before recompiling when an iterative workflow changes
+one of these inputs.
+
 4. Visualize or Run
 -------------------
 

@@ -89,7 +89,8 @@ class NeutronMultigroupData(MCDCObject):
     ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. Calling
     ``NeutronMultigroupData()`` without any cross sections creates the reserved
     zero-group placeholder used by materials without multigroup data. Cross
-    sections are macroscopic and use inverse-length units.
+    sections are macroscopic and use inverse-length units. The generated default
+    energy grid supports only the default ``"midpoint"`` representation.
 
     Examples
     --------
@@ -138,10 +139,12 @@ class NeutronMultigroupData(MCDCObject):
 
     # MC/DC framework metadata
     label = "neutron_multigroup_data"
+    non_numba = ["_uses_default_energy_grid"]
 
     G: int
     J: int
 
+    _uses_default_energy_grid: bool  # Non-Numba
     energy_grid: Annotated[NDArray[float64], ("G+1",)]
     energy_representation: int
 
@@ -245,7 +248,13 @@ class NeutronMultigroupData(MCDCObject):
         self.energy_representation = _resolve_energy_representation(
             energy_representation
         )
+        self._uses_default_energy_grid = energy_grid is None
         if energy_grid is None:
+            if self.energy_representation != NEUTRON_MULTIGROUP_ENERGY_MIDPOINT:
+                print_error(
+                    "NeutronMultigroupData requires an explicit energy_grid when "
+                    "energy_representation is not 'midpoint'."
+                )
             self.energy_grid = np.arange(self.G + 1, dtype=float64) - 0.5
             self.energy_grid[0] += 1.0e-6
         else:

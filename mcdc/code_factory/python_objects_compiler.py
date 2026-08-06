@@ -26,6 +26,10 @@ def compile_simulation(simulation: Simulation):
     complete, the owning :class:`~mcdc.object_.simulation.Simulation` resolves
     model-wide state before runtime packing begins.
     """
+    # Require geometry rooted in at least one cell
+    if len(simulation.root_universe.cells) == 0:
+        print_error("Simulation model has not been set (root universe is empty).")
+
     # Preserve explicitly configured roots before resetting their registered
     # object lists. Geometry members may reference these objects and compile
     # them while the model graph is traversed.
