@@ -13,10 +13,57 @@ snippets assume NumPy has been imported as ``np``.
 Each tally combines:
 
 - one or more scores, such as flux, collision rate, or current;
-- optional spatial, angular, energy, time, surface, or cell filters; and
+- optional particle, spatial, angular, group, energy, time, surface, or cell
+  filters; and
 - a name used to identify the tally in the output file.
 
 Only tallies passed to ``simulation.set_tallies(...)`` are scored.
+
+Particle, Group, and Energy Filters
+-----------------------------------
+
+The ``particle_type``, ``group``, and ``energy`` filters are independent. If
+``particle_type`` is omitted, a tally accepts any transported particle type.
+Set it explicitly when one tally should score only neutrons, electrons, or
+protons:
+
+.. code-block:: python3
+
+   neutron_flux = mcdc.Tally(
+       name="neutron_flux",
+       scores=["flux"],
+       particle_type="neutron",
+       energy=[0.0, 1.0e6, 20.0e6],
+   )
+
+``energy`` contains continuous-energy bin boundaries in eV. ``group`` contains
+boundaries for the independent integer group state used by a transport mode.
+For neutron multigroup transport, the group state is the neutron energy-group
+index; tally boundaries can coarsen several transport groups into one bin:
+
+.. code-block:: python3
+
+   collapsed_group_flux = mcdc.Tally(
+       name="collapsed_group_flux",
+       scores=["flux"],
+       particle_type="neutron",
+       group=[-0.5, 1.5, 3.5],
+   )
+
+Use ``group="all"`` to create one tally bin per neutron energy group during
+simulation compilation:
+
+.. code-block:: python3
+
+   group_flux = mcdc.Tally(
+       name="group_flux",
+       scores=["flux"],
+       group="all",
+   )
+
+The ``"all"`` shortcut supports neutron groups when every material contains
+neutron multigroup data on one shared energy grid. ``particle_type`` may be
+omitted or set to ``"neutron"``.
 
 Mesh Tallies
 ------------

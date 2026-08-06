@@ -153,7 +153,7 @@ first cell:
    source = mcdc.Source(
        z=[0.0, 2.0],
        isotropic=True,
-       energy_group=0,
+       group=0,
    )
    simulation.set_sources([source])
 
