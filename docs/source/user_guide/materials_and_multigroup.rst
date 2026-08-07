@@ -75,8 +75,24 @@ reconstructed from a group.
 
 When no grid is supplied, MC/DC creates the group-coordinate grid
 ``[-0.5, 0.5, 1.5, 2.5, ...]`` with
-``energy_representation="midpoint"``. An explicit grid also supports
-``"log_midpoint"``, ``"uniform"``, and ``"log_uniform"`` reconstruction.
+``energy_representation="midpoint"``. Its reconstructed values are therefore
+the integer group coordinates ``0, 1, 2, ...``.
+
+For lower and upper group boundaries :math:`E_g` and :math:`E_{g+1}`, the
+energy-representation policies are:
+
+- ``"midpoint"``: use the arithmetic midpoint,
+  :math:`E=(E_g+E_{g+1})/2`;
+- ``"log_midpoint"``: use the geometric midpoint,
+  :math:`E=\sqrt{E_g E_{g+1}}`;
+- ``"uniform"``: sample :math:`E` uniformly between the two boundaries; and
+- ``"log_uniform"``: sample :math:`\log E` uniformly between their logarithms,
+  equivalently :math:`E=E_g(E_{g+1}/E_g)^\xi` for
+  :math:`\xi\sim\mathcal{U}(0,1)`.
+
+The logarithmic policies require strictly positive energy boundaries. Midpoint
+policies reconstruct one deterministic value per group, while uniform policies
+sample a new value when continuous energy is reconstructed.
 
 Neutron multigroup datasets use one shared energy grid by default. Enable the
 multigrid option when materials use different group structures:

@@ -82,9 +82,10 @@ class NeutronMultigroupData(MCDCObject):
         group-coordinate grid
         ``[-0.5, 0.5, 1.5, ...]``.
     energy_representation : str or int, optional
-        Policy used to reconstruct continuous energy from a group. Midpoint
-        policies select the arithmetic or geometric midpoint; uniform policies
-        sample uniformly in energy or log-energy. The default is
+        Policy used to reconstruct continuous energy from a group.
+        ``"midpoint"`` uses the arithmetic midpoint, ``"log_midpoint"`` uses
+        the geometric midpoint, ``"uniform"`` samples uniformly in energy,
+        and ``"log_uniform"`` samples uniformly in log-energy. The default is
         ``"midpoint"``. Logarithmic policies require positive boundaries.
         The corresponding ``NEUTRON_MULTIGROUP_ENERGY_*`` integer constants
         are also accepted.
