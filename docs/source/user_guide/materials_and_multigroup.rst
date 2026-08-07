@@ -42,7 +42,7 @@ transport physics determines when and how each dataset contributes to a
 particle interaction.
 
 Neutron Multigroup Transport
-----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Neutron multigroup transport represents neutron energy with discrete groups
 and describes interactions using groupwise macroscopic data. It is widely used
@@ -66,7 +66,7 @@ s\ :sup:`-1`:
    )
 
 Multigroup Energy Grids and Representation
-------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 An explicit ``energy_grid`` contains ``G + 1`` physical energy boundaries in
 eV. Group ``g`` covers ``energy_grid[g] <= E < energy_grid[g + 1]``. The grid
@@ -74,12 +74,19 @@ both maps continuous energy to a group and bounds continuous energy
 reconstructed from a group.
 
 When no grid is supplied, MC/DC creates the group-coordinate grid
-``[1.0e-6 - 0.5, 0.5, 1.5, 2.5, ...]`` with
+``[-0.5, 0.5, 1.5, 2.5, ...]`` with
 ``energy_representation="midpoint"``. An explicit grid also supports
 ``"log_midpoint"``, ``"uniform"``, and ``"log_uniform"`` reconstruction.
 
+Neutron multigroup datasets use one shared energy grid by default. Enable the
+multigrid option when materials use different group structures:
+
+.. code-block:: python
+
+   simulation.technique.neutron_multigroup(multigrid=True)
+
 Combining Native and Multigroup Data
-------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Construct :class:`mcdc.NeutronMultigroupData` directly when attaching it to a
 material with a :ref:`native composition <user_native_transport>`:
@@ -101,18 +108,8 @@ The explicit energy grid is required whenever a native composition and neutron
 multigroup data are combined. Its bounds identify the energy interval where
 the multigroup transport model is available.
 
-Shared and Material-local Grids
+Particle Energy and Group State
 -------------------------------
-
-Neutron multigroup datasets use one shared energy grid by default. Enable the
-multigrid option for material-local group structures:
-
-.. code-block:: python
-
-   simulation.technique.neutron_multigroup(multigrid=True)
-
-Source Energy and Group
------------------------
 
 A particle carries continuous ``energy`` and an auxiliary integer ``group`` as
 separate state. :class:`mcdc.Source` accepts an independent continuous energy

@@ -80,7 +80,7 @@ class NeutronMultigroupData(MCDCObject):
         ``(G + 1,)``. Group ``g`` spans
         ``energy_grid[g] <= E < energy_grid[g + 1]``. The default is the
         group-coordinate grid
-        ``[1.0e-6 - 0.5, 0.5, 1.5, ...]``.
+        ``[-0.5, 0.5, 1.5, ...]``.
     energy_representation : str or int, optional
         Policy used to reconstruct continuous energy from a group. Midpoint
         policies select the arithmetic or geometric midpoint; uniform policies
@@ -259,7 +259,6 @@ class NeutronMultigroupData(MCDCObject):
                     "energy_representation is not 'midpoint'."
                 )
             self.energy_grid = np.arange(self.G + 1, dtype=float64) - 0.5
-            self.energy_grid[0] += 1.0e-6
         else:
             if not np.all(np.isfinite(energy_grid)):
                 print_error("NeutronMultigroupData energy grid entries must be finite.")
