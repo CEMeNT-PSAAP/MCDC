@@ -79,9 +79,10 @@ class Tally(MCDCPolymorphic):
         Particle type selected by the tally. If omitted, the tally accepts any
         transported particle type.
     group : sequence of float or "all", optional
-        Transport-mode group-bin boundaries. These bins may collapse several
-        transport groups into one tally bin. ``"all"`` creates one tally bin
-        per neutron energy group during compilation.
+        Bin boundaries for the auxiliary integer group state. The physics using
+        the group determines its meaning. For neutron multigroup transport,
+        these bins may collapse several energy groups into one tally bin, and
+        ``"all"`` creates one bin per neutron energy group during compilation.
     energy : sequence of float, optional
         Continuous-energy bin boundaries in eV.
     time : sequence of float, optional

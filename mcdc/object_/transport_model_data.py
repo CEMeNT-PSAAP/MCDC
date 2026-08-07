@@ -27,11 +27,14 @@ _NEUTRON_MULTIGROUP_LOG_ENERGY_REPRESENTATIONS = {
 
 
 class NeutronMultigroupData(MCDCObject):
-    """Multigroup neutron-interaction properties assigned to a material.
+    """Groupwise macroscopic interaction data for neutron multigroup transport.
 
-    Materials may use ``NeutronMultigroupData`` alone for multigroup transport or
-    alongside a native composition over the energy range defined by
-    ``energy_grid``.
+    Neutron multigroup transport represents neutron energy with discrete groups
+    and describes interactions using groupwise cross sections, production
+    spectra, speeds, and delayed-precursor data. For a multigroup-only material,
+    :meth:`mcdc.Material.multigroup` provides the convenient entry point.
+    Construct ``NeutronMultigroupData`` directly to attach it alongside a native
+    composition over the energy range defined by ``energy_grid``.
 
     Parameters
     ----------
@@ -86,11 +89,9 @@ class NeutronMultigroupData(MCDCObject):
 
     Notes
     -----
-    ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. Calling
-    ``NeutronMultigroupData()`` without any cross sections creates the reserved
-    zero-group placeholder used by materials without multigroup data. Cross
-    sections are macroscopic and use inverse-length units. The generated default
-    energy grid supports only the default ``"midpoint"`` representation.
+    ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. Cross
+    sections are macroscopic and use inverse-length units. The generated
+    default energy grid uses the default ``"midpoint"`` representation.
 
     Examples
     --------

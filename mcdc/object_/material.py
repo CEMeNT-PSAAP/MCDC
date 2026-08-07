@@ -32,21 +32,20 @@ class Material(MCDCObject):
         Material temperature in kelvin. Each nuclide uses the closest
         temperature available in the data library.
     neutron_multigroup : NeutronMultigroupData, optional
-        Multigroup cross sections for neutron transport. When supplied with a
-        native composition, an explicit ``energy_grid`` is required and defines
-        the energy range over which multigroup physics applies.
+        Groupwise macroscopic cross sections and related data for neutron
+        multigroup transport, where neutron energy is represented by discrete
+        groups. When supplied with a native composition, its explicit
+        ``energy_grid`` defines the energy range where the multigroup treatment
+        applies.
 
     Notes
     -----
-    At least one native composition or multigroup dataset must be supplied.
-    Nuclide and element compositions cannot both be specified because they are
-    alternative native representations of the same material. A native
-    composition may be supplied together with ``neutron_multigroup`` for hybrid
-    neutron physics.
-
-    Nuclide and element objects are created immediately; their data-library
-    properties are loaded when the material is compiled into a simulation.
-    Construction therefore does not access the data library.
+    A nuclide or element composition connects the material to MC/DC's native
+    data libraries. Particle-specific data can augment native interaction data
+    or support specialized and reduced transport treatments.
+    ``NeutronMultigroupData`` describes discrete neutron energy groups and
+    their macroscopic interaction, production, and timing data. It can be used
+    alone or alongside a native composition.
 
     Examples
     --------
@@ -196,13 +195,13 @@ class Material(MCDCObject):
         energy_grid: ArrayLike | NoneType = None,
         energy_representation: str | int = "midpoint",
     ) -> Self:
-        """Construct a material containing only multigroup neutron data.
+        """Create a material for neutron multigroup transport.
 
-        The transport arguments are forwarded to :class:`NeutronMultigroupData`.
-        Use the regular constructor when combining multigroup data with a
-        native nuclide or element composition.
+        The supplied arguments define groupwise macroscopic interaction and
+        production data. This helper stores them in
+        :class:`NeutronMultigroupData` and attaches the data to the material.
         """
-        # Build the transport-mode data while preserving Material as the sole type
+        # Build the neutron multigroup data while preserving Material as the sole type
         neutron_multigroup = NeutronMultigroupData(
             capture=capture,
             scatter=scatter,

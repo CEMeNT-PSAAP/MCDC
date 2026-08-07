@@ -29,7 +29,8 @@ class Source(MCDCObject):
     """Distributions of particles introduced into the simulation.
 
     A source specifies the position, direction, energy, time, particle type,
-    transport-mode group, and relative sampling probability for emitted particles.
+    auxiliary group state, and relative sampling probability for emitted
+    particles.
 
     Parameters
     ----------
@@ -68,13 +69,13 @@ class Source(MCDCObject):
         second row contains their probability density. Defaults to a
         mono-energetic source at **1 MeV**.
     group : int or array_like, optional
-        Transport-mode group number. A Python or NumPy integer defines a
-        mono-group source. An array-like value with shape ``(2, N)`` defines a
-        discrete probability mass function: the first row contains integer
-        group numbers and the second row contains their probabilities. The
-        interpretation belongs to the active transport mode; neutron
-        multigroup transport interprets it as an energy-group index. The
-        default is **group 0**.
+        Auxiliary integer state assigned to an emitted particle. A Python or
+        NumPy integer defines a mono-group source. An array-like value with
+        shape ``(2, N)`` defines a discrete probability mass function: the
+        first row contains integer group values and the second row contains
+        their probabilities. The physics using the group determines its
+        meaning; neutron multigroup transport interprets it as an energy-group
+        index. The default is **group 0**.
     time : real or array_like of float, optional
         Emission time in seconds. A real scalar, including a NumPy scalar,
         defines a discrete emission time. An array-like value with shape

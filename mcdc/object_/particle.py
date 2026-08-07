@@ -15,8 +15,8 @@ from mcdc.object_.base import MCDCBase
 class ParticleData(MCDCBase):
     """Serializable phase-space state stored in particle banks.
 
-    ``group`` is an integer state interpreted by the active transport mode. Neutron
-    multigroup transport uses it as the neutron energy-group index.
+    ``group`` is an auxiliary integer state available to transport physics.
+    Neutron multigroup transport uses it as the neutron energy-group index.
     """
 
     # MC/DC framework metadata
