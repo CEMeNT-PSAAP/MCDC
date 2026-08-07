@@ -4,12 +4,10 @@
 Python API
 ==========
 
-The MC/DC public API is centered on :class:`mcdc.Simulation`. A simulation owns
-the model geometry and material, sources, tallies, settings, transport
-techniques, and runtime state needed for one calculation.
+The MC/DC public API is centered on :class:`mcdc.Simulation`.
+A simulation owns the model geometry and material, sources, tallies, settings, transport techniques, and runtime state needed for one calculation.
 
-Build the model with the public objects listed below, attach its root cells,
-sources, and tallies to a simulation, and then visualize or run that simulation:
+Build the model with the public objects listed below, attach its root cells, sources, and tallies to a simulation, and then visualize or run that simulation:
 
 .. code-block:: python
 
@@ -20,10 +18,8 @@ sources, and tallies to a simulation, and then visualize or run that simulation:
    simulation.settings.N_particle = 10_000
    simulation.run()
 
-The complete public interfaces and additional examples are documented on each
-linked API page. For a task-oriented explanation of how these objects move
-through construction, compilation, execution, and output, see
-:doc:`../../user_guide/simulation_lifecycle`.
+The complete public interfaces and additional examples are documented on each linked API page.
+For a task-oriented explanation of how these objects move through construction, compilation, execution, and output, see :doc:`../../user_guide/simulation_lifecycle`.
 
 
 Simulation
@@ -43,14 +39,10 @@ Model building blocks
 Materials
 ^^^^^^^^^
 
-Materials describe the physical media that fill cells. A
-:ref:`native composition <user_native_transport>` connects
-:class:`mcdc.Material` to MC/DC's data libraries, while optional
-particle-specific data augments native interaction data or supports specialized
-and reduced transport treatments. :class:`mcdc.NeutronMultigroupData`
-represents neutron energy with discrete groups and stores groupwise macroscopic
-cross sections and related production data. :meth:`mcdc.Material.multigroup`
-provides its convenient material interface.
+Materials describe the physical media that fill cells.
+A :ref:`native composition <user_native_transport>` connects :class:`mcdc.Material` to MC/DC's data libraries, while optional particle-specific data augments native interaction data or supports specialized and reduced transport treatments.
+:class:`mcdc.NeutronMultigroupData` represents neutron energy with discrete groups and stores groupwise macroscopic cross sections and related production data.
+:meth:`mcdc.Material.multigroup` provides its convenient material interface.
 
 .. autosummary::
    :toctree: generated
@@ -64,8 +56,7 @@ provides its convenient material interface.
 Geometry
 ^^^^^^^^
 
-Surfaces bound spatial regions, cells pair those regions with materials or
-universes, and universes and lattices organize repeated geometry.
+Surfaces bound spatial regions, cells pair those regions with materials or universes, and universes and lattices organize repeated geometry.
 
 .. autosummary::
    :toctree: generated
@@ -94,8 +85,7 @@ Sources describe the distribution of the initial particle population in the simu
 Tallies
 ^^^^^^^
 
-Tallies define the quantities to score and the filters over which those scores
-are accumulated.
+Tallies define the quantities to score and the filters over which those scores are accumulated.
 
 .. autosummary::
    :toctree: generated
@@ -108,8 +98,7 @@ are accumulated.
 Meshes
 ^^^^^^
 
-Meshes provide spatial bins for mesh-filtered tallies and transport
-techniques.
+Meshes provide spatial bins for mesh-filtered tallies and transport techniques.
 
 .. autosummary::
    :toctree: generated
@@ -127,31 +116,22 @@ Simulation settings
 ^^^^^^^^^^^^^^^^^^^
 
 Each :class:`mcdc.Simulation` owns its settings at ``simulation.settings``.
-Settings control particle histories, batches, random-number generation,
-transport modes, census times, particle banks, output, and GPU execution.
-Specialized modes are configured through methods such as
-``simulation.settings.set_eigenmode(...)`` and
-``simulation.settings.set_time_census(...)``. See :class:`mcdc.Simulation` for
-the complete settings interface.
+Settings control particle histories, batches, random-number generation, transport modes, census times, particle banks, output, and GPU execution.
+Specialized modes are configured through methods such as ``simulation.settings.set_eigenmode(...)`` and ``simulation.settings.set_time_census(...)``.
+See :class:`mcdc.Simulation` for the complete settings interface.
 
 Transport techniques
 ^^^^^^^^^^^^^^^^^^^^
 
-Transport techniques are grouped under ``simulation.technique``. For example,
-enable implicit capture with ``simulation.technique.implicit_capture()`` or
-allow material-local neutron group structures with
-``simulation.technique.neutron_multigroup(multigrid=True)``. See
-:class:`mcdc.Simulation` for the ownership model and examples.
+Transport techniques are grouped under ``simulation.technique``.
+For example, enable implicit capture with ``simulation.technique.implicit_capture()`` or allow material-local neutron group structures with ``simulation.technique.neutron_multigroup(multigrid=True)``.
+See :class:`mcdc.Simulation` for the ownership model and examples.
 
 Compiling and running
 ^^^^^^^^^^^^^^^^^^^^^
 
-Calling ``simulation.run()`` compiles the current Python object graph when
-needed, executes particle transport, and writes the configured output.
-``simulation.visualize_model(...)`` similarly compiles when needed before
-rendering the model. Use ``simulation.compile()`` when an explicit compiled
-snapshot is required before either operation.
+Calling ``simulation.run()`` compiles the current Python object graph when needed, executes particle transport, and writes the configured output.
+``simulation.visualize_model(...)`` similarly compiles when needed before rendering the model.
+Use ``simulation.compile()`` when an explicit compiled snapshot is required before either operation.
 
-The internal compilation and packing stages are documented in
-:doc:`../../developer_guide/architecture/simulation_compilation` and
-:doc:`../../developer_guide/architecture/runtime_data_layout`.
+The internal compilation and packing stages are documented in :doc:`../../developer_guide/architecture/simulation_compilation` and :doc:`../../developer_guide/architecture/runtime_data_layout`.
