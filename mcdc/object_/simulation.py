@@ -402,7 +402,12 @@ class Simulation(MCDCBase):
     # ==================================================================================
 
     def set_model(self, cells: Sequence[Cell]) -> None:
-        """Set the cells in the root universe and invalidate compiled state.
+        """Set the root cells that define a complete model (geometry and materials) of
+        the simulation.
+
+        Pass only cells that belong directly to the root universe. Do not include
+        cells nested inside subuniverses; they are discovered automatically during
+        model traversal as long as they are reachable through the root cells.
 
         Parameters
         ----------
@@ -419,7 +424,7 @@ class Simulation(MCDCBase):
         self.compiled = False
 
     def set_sources(self, sources: Sequence[Source]) -> None:
-        """Set particle sources and invalidate compiled state.
+        """Set particle sources for the simulation.
 
         Parameters
         ----------
@@ -436,7 +441,7 @@ class Simulation(MCDCBase):
         self.compiled = False
 
     def set_tallies(self, tallies: Sequence[Tally]) -> None:
-        """Set requested tallies and invalidate compiled state.
+        """Set requested tallies for the simulation.
 
         Parameters
         ----------

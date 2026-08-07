@@ -40,6 +40,13 @@ class MCDCBase:
         Subclasses may extend this hook to validate or normalize their state,
         compile excluded references, and derive fields that require the owning
         simulation.
+
+        Returns
+        -------
+        bool
+            ``True`` if the object was compiled for the current simulation
+            compilation, or ``False`` if it had already been compiled and was
+            skipped.
         """
         # Compile each embedded object once per simulation compilation
         if self.compile_ID == simulation.compile_ID:
@@ -68,17 +75,17 @@ class MCDCBase:
     @staticmethod
     def _compile_member_value(value, simulation) -> None:
         # Register direct object members
-        if isinstance(value, MCDCObject):
-            value._compile_into_simulation(simulation)
-
-        # Compile embedded configuration objects
-        elif isinstance(value, MCDCBase):
+        if isinstance(value, MCDCBase):
             value._compile_into_simulation(simulation)
 
         # Compile object members stored in lists
         elif isinstance(value, list):
             for item in value:
                 MCDCBase._compile_member_value(item, simulation)
+
+        # Scalar, array, and other non-object members require no compilation.
+        else:
+            return
 
 
 class MCDCObject(MCDCBase):

@@ -27,7 +27,7 @@ from mcdc.object_.base import (
 from mcdc.object_.particle import Particle, ParticleBank, ParticleData
 from mcdc.object_.tally import Tally
 from mcdc.object_.util import parse_dimension_expression
-from mcdc.print_ import print_error, print_structure
+from mcdc.print_ import print_error
 from mcdc.util import flatten
 
 type_map = {
