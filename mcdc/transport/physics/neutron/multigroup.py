@@ -25,6 +25,33 @@ from mcdc.transport.physics.util import scatter_direction
 from mcdc.transport.distribution import sample_isotropic_direction
 
 # ======================================================================================
+# Applicability
+# ======================================================================================
+
+
+@njit
+def applicable(particle_container, simulation, data):
+    particle = particle_container[0]
+    material = simulation["materials"][particle["material_ID"]]
+
+    if not material["has_neutron_multigroup"]:
+        return False
+
+    if simulation["technique"]["neutron_multigroup"]["hybrid"]:
+        mgxs_ID = material["neutron_multigroup_ID"]
+        mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+
+        E = particle["E"]
+        E_min = mcdc_get.neutron_multigroup_data.energy_grid(0, mgxs, data)
+        E_max = mcdc_get.neutron_multigroup_data.energy_grid_last(mgxs, data)
+
+        if E < E_min or E > E_max:
+            return False
+
+    return True
+
+
+# ======================================================================================
 # Particle attributes
 # ======================================================================================
 
@@ -32,8 +59,22 @@ from mcdc.transport.distribution import sample_isotropic_direction
 @njit
 def particle_speed(particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["multigroup_materials"][particle["material_ID"]]
-    return mcdc_get.multigroup_material.mgxs_speed(particle["g"], material, data)
+    material = simulation["materials"][particle["material_ID"]]
+
+    mgxs_ID = material["neutron_multigroup_ID"]
+    mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+
+    if simulation["technique"]["neutron_multigroup"]["hybrid"]:
+        E = particle["E"]
+        offset = mgxs["energy_grid_offset"]
+        length = mgxs["energy_grid_length"]
+        E_grid = data[offset : offset + length]
+        group = util.find_bin(E, E_grid)
+
+    else:
+        group = particle["group"]
+
+    return mcdc_get.neutron_multigroup_data.speed(group, mgxs, data)
 
 
 # ======================================================================================
