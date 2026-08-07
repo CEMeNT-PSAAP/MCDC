@@ -60,7 +60,7 @@ simulation.set_sources([source])
 tally = mcdc.Tally(
     scores=["flux"],
     time=np.insert(np.logspace(-8, 1, 100), 0, 0.0),
-    group="all",
+    energy="all",
 )
 simulation.set_tallies([tally])
 

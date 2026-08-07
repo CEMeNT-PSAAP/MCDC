@@ -375,7 +375,7 @@ class Simulation(MCDCBase):
 
         # Resolve tally filters and shapes that require the complete model
         for tally in self.tallies:
-            tally._resolve_group_filter(self)
+            tally._resolve_energy_filter(self)
 
         if settings.use_census_based_tally:
             for tally in self.tallies:

@@ -54,7 +54,7 @@ simulation.set_sources([source])
 # =============================================================================
 
 # Tallies
-tally = mcdc.Tally(scores=["flux"], group="all")
+tally = mcdc.Tally(scores=["flux"], energy="all")
 simulation.set_tallies([tally])
 
 # Settings

@@ -97,19 +97,21 @@ def test_tally_factory_allows_combined_supported_filters(slab_plane_x):
     assert cell_mesh_tally.mesh_filter_ID == mesh.ID
 
 
-def test_all_group_filter_resizes_compiled_tally_bins(prepare_simulation):
+def test_all_energy_filter_resizes_standard_multigroup_tally_bins(
+    prepare_simulation,
+):
     material = mcdc.Material.multigroup(capture=np.ones(3))
     cell = mcdc.Cell(fill=material)
-    tally = mcdc.Tally(scores=["flux"], group="all")
+    tally = mcdc.Tally(scores=["flux"], energy="all")
 
     simulation_container, data = prepare_simulation(cells=[cell], tallies=[tally])
     simulation = simulation_container[0]
     tally_record = simulation["tallies"][tally.ID]
 
     assert tally.particle_type == PARTICLE_ANY
-    np.testing.assert_array_equal(tally.group, [-0.5, 0.5, 1.5, 2.5])
-    assert tally.bin_shape == [1, 1, 3, 1, 1, 1]
-    assert tally.stride_group == 1
+    assert "_energy_all" not in tally_record.dtype.names
+    np.testing.assert_array_equal(tally.energy, [-0.5, 0.5, 1.5, 2.5])
+    assert tally.bin_shape == [1, 1, 3, 1, 1]
     assert tally.stride_energy == 1
     assert tally.stride_azi == 3
     assert tally.stride_mu == 3
@@ -118,6 +120,37 @@ def test_all_group_filter_resizes_compiled_tally_bins(prepare_simulation):
     bin_start = tally_record["bin_offset"]
     bin_stop = bin_start + tally_record["bin_length"]
     assert len(data[bin_start:bin_stop]) == 3
+
+
+def test_all_energy_filter_rejects_hybrid_multigroup_transport(
+    prepare_simulation,
+    capsys,
+):
+    material_a = mcdc.Material.multigroup(
+        capture=np.ones(2),
+        energy_grid=[0.0, 1.0, 2.0],
+    )
+    material_b = mcdc.Material.multigroup(
+        capture=np.ones(2),
+        energy_grid=[0.0, 2.0, 3.0],
+    )
+    cells = [mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)]
+    tally = mcdc.Tally(scores=["flux"], energy="all")
+
+    with pytest.raises(SystemExit):
+        prepare_simulation(cells=cells, tallies=[tally])
+
+    assert (
+        'The energy="all" filter requires standard neutron multigroup transport'
+        in capsys.readouterr().out
+    )
+
+
+def test_tally_factory_rejects_unsupported_energy_filter(capsys):
+    with pytest.raises(SystemExit):
+        mcdc.Tally(scores=["flux"], energy="groups")
+
+    assert "Unsupported tally energy filter: groups" in capsys.readouterr().out
 
 
 def test_tally_factory_rejects_mixed_estimator_scores(capsys):
