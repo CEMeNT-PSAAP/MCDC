@@ -39,7 +39,7 @@ def inspect_geometry(particle_container, simulation, data):
     event = EVENT_NONE
 
     # Find the top cell from the root universe if it is unknown.
-    cell_ID = _get_top_cell_ID(particle_container, simulation, data)
+    cell_ID = _get_top_cell_ID(particle_container, speed, simulation, data)
     if cell_ID == -1:
         event = EVENT_LOST
 
@@ -104,7 +104,9 @@ def inspect_geometry(particle_container, simulation, data):
                 continue
 
             # Get inner cell
-            cell_ID = get_cell(particle_container, universe_ID, simulation, data)
+            cell_ID = _get_cell(
+                particle_container, speed, universe_ID, simulation, data
+            )
             if cell_ID == -1:
                 event = EVENT_LOST
 
@@ -135,10 +137,15 @@ def locate_particle(particle_container, simulation, data):
     # Preserve global coordinates while traversing nested geometry.
     global_coordinates = _save_global_coordinates(particle_container)
 
+    # Use direction alone to resolve surface coincidence during location.
+    # Material-dependent speed is unavailable until location is complete.
+    direction_only_speed = INF
     particle_is_lost = False
 
     # Find the top cell from the root universe if it is unknown.
-    cell_ID = _get_top_cell_ID(particle_container, simulation, data)
+    cell_ID = _get_top_cell_ID(
+        particle_container, direction_only_speed, simulation, data
+    )
     if cell_ID == -1:
         particle_is_lost = True
 
@@ -162,7 +169,13 @@ def locate_particle(particle_container, simulation, data):
                 continue
 
             # Get inner cell
-            cell_ID = get_cell(particle_container, universe_ID, simulation, data)
+            cell_ID = _get_cell(
+                particle_container,
+                direction_only_speed,
+                universe_ID,
+                simulation,
+                data,
+            )
             if cell_ID == -1:
                 particle_is_lost = True
 
@@ -208,11 +221,11 @@ def _restore_global_coordinates(particle_container, coordinates):
 
 
 @njit
-def _get_top_cell_ID(particle_container, simulation, data):
+def _get_top_cell_ID(particle_container, speed, simulation, data):
     particle = particle_container[0]
     if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(
-            particle_container, UNIVERSE_ROOT, simulation, data
+        particle["cell_ID"] = _get_cell(
+            particle_container, speed, UNIVERSE_ROOT, simulation, data
         )
     return particle["cell_ID"]
 
@@ -318,14 +331,20 @@ def get_cell(particle_container, universe_ID, simulation, data):
     Find and return particle cell ID in the given universe
     Return -1 if particle is lost
     """
-    particle = particle_container[0]
+    speed = physics.particle_speed(particle_container, simulation, data)
+    return _get_cell(particle_container, speed, universe_ID, simulation, data)
+
+
+@njit
+def _get_cell(particle_container, speed, universe_ID, simulation, data):
+    """Find the particle cell using the supplied speed for coincidence checks."""
     universe = simulation["universes"][universe_ID]
 
     # Check over all cells in the universe
     for i in range(universe["N_cell"]):
         cell_ID = mcdc_get.universe.cell_IDs(i, universe, data)
         cell = simulation["cells"][cell_ID]
-        if check_cell(particle_container, cell, simulation, data):
+        if _check_cell(particle_container, speed, cell, simulation, data):
             return cell_ID
 
     # Particle is not found
@@ -337,8 +356,13 @@ def check_cell(particle_container, cell, simulation, data):
     """
     Check if the particle is inside the cell
     """
-    particle = particle_container[0]
+    speed = physics.particle_speed(particle_container, simulation, data)
+    return _check_cell(particle_container, speed, cell, simulation, data)
 
+
+@njit
+def _check_cell(particle_container, speed, cell, simulation, data):
+    """Check cell membership using the supplied speed for coincidence checks."""
     # Access RPN data
     N_token = cell["region_RPN_tokens_length"]
     if N_token == 0:
@@ -347,9 +371,6 @@ def check_cell(particle_container, cell, simulation, data):
     # Create local value array
     value = util.local_array(literals.rpn_evaluation_buffer_size(), np.bool_)
     N_value = 0
-
-    # Particle parameters
-    speed = physics.particle_speed(particle_container, simulation, data)
 
     # March forward through RPN tokens
     for idx in range(N_token):
