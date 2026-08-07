@@ -29,7 +29,7 @@ def copy(target_particle_container, source_particle_container):
     target_particle["ux"] = source_particle["ux"]
     target_particle["uy"] = source_particle["uy"]
     target_particle["uz"] = source_particle["uz"]
-    target_particle["g"] = source_particle["g"]
+    target_particle["group"] = source_particle["group"]
     target_particle["E"] = source_particle["E"]
     target_particle["w"] = source_particle["w"]
     target_particle["particle_type"] = source_particle["particle_type"]
