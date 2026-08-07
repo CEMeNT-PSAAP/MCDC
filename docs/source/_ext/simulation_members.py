@@ -15,7 +15,6 @@ from mcdc.object_.settings import Settings
 from mcdc.object_.technique import (
     GlobalWeightRoulette,
     ImplicitCapture,
-    NeutronMultigroupTechnique,
     PopulationControl,
     WeightedEmission,
     WeightWindows,
@@ -43,7 +42,6 @@ SETTINGS_METHODS = (
 )
 
 TECHNIQUES = (
-    ("neutron_multigroup", NeutronMultigroupTechnique),
     ("implicit_capture", ImplicitCapture),
     ("weighted_emission", WeightedEmission),
     ("global_weight_roulette", GlobalWeightRoulette),

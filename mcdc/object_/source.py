@@ -104,8 +104,8 @@ class Source(MCDCObject):
     - otherwise, the default direction behavior is used.
 
     ``energy`` and ``group`` are independent source variables and may both be
-    supplied. When shared-grid neutron multigroup transport is used, ``group``
-    takes precedence over ``energy`` when both are provided.
+    supplied. When compilation selects standard neutron multigroup transport,
+    ``group`` takes precedence over ``energy`` when both are provided.
     Array-like inputs may be supplied as lists, tuples, or NumPy arrays.
 
     Examples

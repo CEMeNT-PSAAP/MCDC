@@ -47,33 +47,74 @@ def test_simulation_reserves_zero_group_mg_as_id_zero():
     assert simulation.neutron_multigroup_data[0].compile_ID == simulation.compile_ID
 
 
-def test_simulation_requires_a_shared_neutron_multigroup_grid(capsys):
+def test_simulation_derives_hybrid_for_local_multigroup_grids():
     material_a = mcdc.Material.multigroup(capture=[0.1], energy_grid=[1.0, 2.0])
     material_b = mcdc.Material.multigroup(capture=[0.2], energy_grid=[2.0, 3.0])
     simulation = mcdc.Simulation()
     simulation.set_model([mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)])
 
+    simulation.compile()
+
+    assert simulation.technique.neutron_multigroup.hybrid
+
+
+@pytest.mark.parametrize("explicit_grid", [False, True])
+def test_simulation_derives_standard_multigroup_for_shared_grid(
+    explicit_grid, prepare_simulation
+):
+    kwargs = {"energy_grid": [1.0, 2.0]} if explicit_grid else {}
+    material_a = mcdc.Material.multigroup(capture=[0.1], **kwargs)
+    material_b = mcdc.Material.multigroup(capture=[0.2], **kwargs)
+
+    simulation_container, _ = prepare_simulation(
+        cells=[mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)]
+    )
+
+    simulation = simulation_container[0]
+    assert not simulation["technique"]["neutron_multigroup"]["hybrid"]
+
+
+def test_hybrid_multigroup_requires_explicit_energy_grids(capsys):
+    material_default = mcdc.Material.multigroup(capture=[0.1])
+    material_explicit = mcdc.Material.multigroup(capture=[0.2], energy_grid=[2.0, 3.0])
+    simulation = mcdc.Simulation()
+    simulation.set_model(
+        [mcdc.Cell(fill=material_default), mcdc.Cell(fill=material_explicit)]
+    )
+
     with pytest.raises(SystemExit):
         simulation.compile()
 
-    assert "energy grids must be identical" in capsys.readouterr().out
+    assert "requires an explicit energy_grid" in capsys.readouterr().out
 
 
-def test_neutron_multigroup_technique_allows_and_packs_multigrid(
-    prepare_simulation,
-):
+def test_native_only_simulation_remains_hybrid(monkeypatch):
+    # Isolate mode finalization from native data-library loading.
+    def compile_nuclide(nuclide, simulation):
+        nuclide.fissionable = False
+        return MCDCObject._compile_into_simulation(nuclide, simulation)
+
+    monkeypatch.setattr(Nuclide, "_compile_into_simulation", compile_nuclide)
+    monkeypatch.setattr(Nuclide, "set_neutron_data", lambda self, simulation: None)
+    material = mcdc.Material(nuclide_composition={"H1": 0.1})
+    simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell(fill=material)])
+
+    simulation.compile()
+
+    assert simulation.technique.neutron_multigroup.hybrid
+
+
+def test_local_multigroup_grids_pack_hybrid(prepare_simulation):
     material_a = mcdc.Material.multigroup(capture=[0.1], energy_grid=[1.0, 2.0])
     material_b = mcdc.Material.multigroup(capture=[0.2], energy_grid=[2.0, 3.0])
 
     simulation_container, _ = prepare_simulation(
-        cells=[mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)],
-        configure=lambda simulation: simulation.technique.neutron_multigroup(
-            multigrid=True
-        ),
+        cells=[mcdc.Cell(fill=material_a), mcdc.Cell(fill=material_b)]
     )
 
     simulation = simulation_container[0]
-    assert simulation["technique"]["neutron_multigroup"]["multigrid"]
+    assert simulation["technique"]["neutron_multigroup"]["hybrid"]
 
 
 def test_mcdc_object_compiles_object_members_and_lists():

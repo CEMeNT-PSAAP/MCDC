@@ -64,8 +64,8 @@ An explicit ``energy_grid`` contains ``G + 1`` physical energy boundaries in eV.
 Group ``g`` covers ``energy_grid[g] <= E < energy_grid[g + 1]``.
 The grid both maps continuous energy to a group and bounds continuous energy reconstructed from a group.
 
-When no grid is supplied, MC/DC creates the group-coordinate grid ``[-0.5, 0.5, 1.5, 2.5, ...]`` with ``energy_representation="midpoint"``.
-Its reconstructed values are therefore the integer group coordinates ``0, 1, 2, ...``.
+When no grid is supplied, MC/DC stores a zero-valued placeholder with length ``G + 1``.
+The placeholder does not represent physical energy boundaries and is used only for standard multigroup transport, where the particle's group is authoritative and continuous energy does not select a group.
 
 For lower and upper group boundaries :math:`E_g` and :math:`E_{g+1}`, the energy-representation policies are:
 
@@ -74,15 +74,18 @@ For lower and upper group boundaries :math:`E_g` and :math:`E_{g+1}`, the energy
 - ``"uniform"``: sample :math:`E` uniformly between the two boundaries; and
 - ``"log_uniform"``: sample :math:`\log E` uniformly between their logarithms, equivalently :math:`E=E_g(E_{g+1}/E_g)^\xi` for :math:`\xi\sim\mathcal{U}(0,1)`.
 
+The policies apply when an explicit physical energy grid is used.
 The logarithmic policies require strictly positive energy boundaries.
 Midpoint policies reconstruct one deterministic value per group, while uniform policies sample a new value when continuous energy is reconstructed.
 
-Neutron multigroup datasets use one shared energy grid by default.
-Enable the multigrid option when materials use different group structures:
+MC/DC determines the neutron multigroup transport organization when the simulation is compiled.
+Standard neutron multigroup transport means that every material uses neutron multigroup data without native composition and that all materials share one energy grid.
+MC/DC selects this organization only when every material satisfies those conditions.
+This includes materials sharing either the zero-valued placeholder or the same explicit physical grid.
 
-.. code-block:: python
-
-   simulation.technique.neutron_multigroup(multigrid=True)
+Transport is hybrid when native composition data is present or multigroup materials use different grids.
+Every multigroup dataset participating in hybrid transport requires an explicit physical energy grid because continuous energy selects the applicable material-local group.
+If a particle lies outside that grid, MC/DC uses the material's native neutron data when present; without a native composition, the material has zero interaction cross section at that energy.
 
 Combining Native and Multigroup Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -120,5 +123,5 @@ A particle carries continuous ``energy`` and an auxiliary integer ``group`` as s
 
 The physics using ``group`` determines its meaning.
 Neutron multigroup transport uses it as the neutron energy-group index.
-If both variables are supplied, the group takes precedence over energy only for shared-grid neutron multigroup transport.
+If both variables are supplied, the group takes precedence over energy only for standard neutron multigroup transport selected during compilation.
 The tally equivalents are the separate ``group`` and ``energy`` filters described in :doc:`tallies`.

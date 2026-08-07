@@ -37,7 +37,9 @@ class Material(MCDCObject):
         groups. When supplied with a
         :ref:`native composition <user_native_transport>`, its explicit
         ``energy_grid`` defines the energy range where the multigroup treatment
-        applies.
+        applies. In hybrid transport, native neutron data is used outside that
+        range when present; without native composition, the material has zero
+        interaction cross section.
 
     Notes
     -----
@@ -139,7 +141,7 @@ class Material(MCDCObject):
             (nuclide_composition or element_composition)
             and neutron_multigroup is not None
             and neutron_multigroup.G > 0
-            and neutron_multigroup._uses_default_energy_grid
+            and not np.any(neutron_multigroup.energy_grid)
         ):
             print_error(
                 "Material requires an explicit neutron multigroup energy_grid "
@@ -204,7 +206,9 @@ class Material(MCDCObject):
         :class:`NeutronMultigroupData` and attaches the data to the material.
         Macroscopic cross sections use ``cm^-1``, group speeds use cm/s,
         precursor decay rates use ``s^-1``, and explicit physical energy
-        boundaries use eV.
+        boundaries use eV. Omitting ``energy_grid`` creates a zero-valued
+        placeholder that is valid only when every material with neutron
+        multigroup data also omits its energy grid.
         """
         # Build the neutron multigroup data while preserving Material as the sole type
         neutron_multigroup = NeutronMultigroupData(

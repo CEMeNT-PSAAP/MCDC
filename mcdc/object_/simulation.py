@@ -310,24 +310,37 @@ class Simulation(MCDCBase):
 
         settings = self.settings
 
-        # Require one shared grid unless multigrid was explicitly enabled
-        neutron_multigroup_data = [
-            model for model in self.neutron_multigroup_data if model.G > 0
-        ]
-        if (
-            not self.technique.neutron_multigroup.multigrid
-            and len(neutron_multigroup_data) > 1
-        ):
-            shared_grid = neutron_multigroup_data[0].energy_grid
-            if any(
-                not np.array_equal(model.energy_grid, shared_grid)
-                for model in neutron_multigroup_data[1:]
-            ):
-                print_error(
-                    "Neutron multigroup energy grids must be identical unless "
-                    "simulation.technique.neutron_multigroup(multigrid=True) is "
-                    "configured."
-                )
+        # Select standard multigroup or hybrid neutron transport.
+        materials_have_native_composition = any(
+            material.nuclide_composition or material.element_composition
+            for material in self.materials
+        )
+        materials_have_multigroup = bool(self.materials) and all(
+            material.has_neutron_multigroup for material in self.materials
+        )
+        multigroup_grids_are_identical = False
+        if materials_have_multigroup:
+            shared_grid = self.materials[0].neutron_multigroup.energy_grid
+            multigroup_grids_are_identical = all(
+                np.array_equal(material.neutron_multigroup.energy_grid, shared_grid)
+                for material in self.materials[1:]
+            )
+
+        self.technique.neutron_multigroup.hybrid = not (
+            not materials_have_native_composition
+            and materials_have_multigroup
+            and multigroup_grids_are_identical
+        )
+
+        # Require physical energy boundaries wherever energy selects local groups.
+        if self.technique.neutron_multigroup.hybrid:
+            for material in self.materials:
+                model = material.neutron_multigroup
+                if model.G > 0 and not np.any(model.energy_grid):
+                    print_error(
+                        "Hybrid neutron multigroup transport requires an explicit "
+                        "energy_grid for every multigroup material."
+                    )
 
         # Limit transport to the latest requested tally boundary
         settings.time_boundary = min(

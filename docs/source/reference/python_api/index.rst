@@ -124,7 +124,7 @@ Transport techniques
 ^^^^^^^^^^^^^^^^^^^^
 
 Transport techniques are grouped under ``simulation.technique``.
-For example, enable implicit capture with ``simulation.technique.implicit_capture()`` or allow material-local neutron group structures with ``simulation.technique.neutron_multigroup(multigrid=True)``.
+For example, enable implicit capture with ``simulation.technique.implicit_capture()`` or configure weight windows with ``simulation.technique.weight_windows(...)``.
 See :class:`mcdc.Simulation` for the ownership model and examples.
 
 Compiling and running

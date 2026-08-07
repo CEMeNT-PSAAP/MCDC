@@ -31,10 +31,8 @@ def test_zero_group_placeholder():
     assert (
         neutron_multigroup.energy_representation == NEUTRON_MULTIGROUP_ENERGY_MIDPOINT
     )
-    assert neutron_multigroup._uses_default_energy_grid
-    assert "_uses_default_energy_grid" in neutron_multigroup.non_numba
 
-    np.testing.assert_array_equal(neutron_multigroup.energy_grid, [-0.5])
+    np.testing.assert_array_equal(neutron_multigroup.energy_grid, [0.0])
     np.testing.assert_array_equal(neutron_multigroup.speed, [])
     np.testing.assert_array_equal(neutron_multigroup.decay_rate, [])
     np.testing.assert_array_equal(neutron_multigroup.capture, [])
@@ -58,7 +56,7 @@ def test_capture_only_defaults():
     assert neutron_multigroup.J == 0
     assert not neutron_multigroup.fissionable
 
-    np.testing.assert_array_equal(neutron_multigroup.energy_grid, [-0.5, 0.5, 1.5])
+    np.testing.assert_array_equal(neutron_multigroup.energy_grid, [0.0, 0.0, 0.0])
     np.testing.assert_array_equal(neutron_multigroup.speed, [1.0, 1.0])
     np.testing.assert_array_equal(neutron_multigroup.capture, [0.1, 0.2])
     np.testing.assert_array_equal(neutron_multigroup.scatter, [0.0, 0.0])
@@ -182,7 +180,7 @@ def test_standalone_mg_registration_and_packing(prepare_simulation):
     assert packed["G"] == 2
 
     np.testing.assert_array_equal(
-        get_neutron_multigroup_data.energy_grid_all(reserved, data), [-0.5]
+        get_neutron_multigroup_data.energy_grid_all(reserved, data), [0.0]
     )
     np.testing.assert_array_equal(
         get_neutron_multigroup_data.energy_grid_all(packed, data),
@@ -222,7 +220,6 @@ def test_energy_grid_and_representation(policy, expected):
     )
 
     assert neutron_multigroup.energy_representation == expected
-    assert not neutron_multigroup._uses_default_energy_grid
     np.testing.assert_array_equal(neutron_multigroup.energy_grid, [1.0e-5, 1.0, 20.0e6])
 
 

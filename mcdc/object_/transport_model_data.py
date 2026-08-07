@@ -33,9 +33,9 @@ class NeutronMultigroupData(MCDCObject):
     and describes interactions using groupwise cross sections, production
     spectra, speeds, and delayed-precursor data. For a multigroup-only material,
     :meth:`mcdc.Material.multigroup` provides the convenient entry point.
-    Construct ``NeutronMultigroupData`` directly to attach it alongside a
-    :ref:`native composition <user_native_transport>` over the energy range
-    defined by ``energy_grid``.
+    Construct ``NeutronMultigroupData`` directly when a material needs an
+    explicit physical energy grid, including when attaching it alongside a
+    :ref:`native composition <user_native_transport>`.
 
     Parameters
     ----------
@@ -76,25 +76,28 @@ class NeutronMultigroupData(MCDCObject):
         Decay constant in ``s^-1`` for each delayed precursor group, with
         shape ``(J,)``. Defaults to infinity.
     energy_grid : array_like of float, optional
-        Strictly increasing physical energy-group boundaries in eV with shape
-        ``(G + 1,)``. Group ``g`` spans
-        ``energy_grid[g] <= E < energy_grid[g + 1]``. The default is the
-        group-coordinate grid
-        ``[-0.5, 0.5, 1.5, ...]``.
+        Physical energy-group boundaries in eV with shape ``(G + 1,)``.
+        User-supplied boundaries must be strictly increasing, and group ``g``
+        spans ``energy_grid[g] <= E < energy_grid[g + 1]``. The default is a
+        zero-valued placeholder used only when physical energy mapping is not
+        required.
     energy_representation : str or int, optional
-        Policy used to reconstruct continuous energy from a group.
+        Policy used to reconstruct continuous energy from a group when a
+        physical energy grid participates in transport.
         ``"midpoint"`` uses the arithmetic midpoint, ``"log_midpoint"`` uses
         the geometric midpoint, ``"uniform"`` samples uniformly in energy,
         and ``"log_uniform"`` samples uniformly in log-energy. The default is
-        ``"midpoint"``. Logarithmic policies require positive boundaries.
+        ``"midpoint"``. Only the default ``"midpoint"`` placeholder is
+        accepted when ``energy_grid`` is omitted. Logarithmic policies require
+        positive boundaries.
         The corresponding ``NEUTRON_MULTIGROUP_ENERGY_*`` integer constants
         are also accepted.
 
     Notes
     -----
-    ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. The
-    generated default energy grid uses the default ``"midpoint"``
-    representation.
+    ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. An
+    explicit energy grid is required whenever simulation transport needs to
+    map continuous neutron energy to material-local groups.
 
     Examples
     --------
@@ -143,12 +146,10 @@ class NeutronMultigroupData(MCDCObject):
 
     # MC/DC framework metadata
     label = "neutron_multigroup_data"
-    non_numba = ["_uses_default_energy_grid"]
 
     G: int
     J: int
 
-    _uses_default_energy_grid: bool  # Non-Numba
     energy_grid: Annotated[NDArray[float64], ("G+1",)]
     energy_representation: int
 
@@ -252,14 +253,13 @@ class NeutronMultigroupData(MCDCObject):
         self.energy_representation = _resolve_energy_representation(
             energy_representation
         )
-        self._uses_default_energy_grid = energy_grid is None
         if energy_grid is None:
             if self.energy_representation != NEUTRON_MULTIGROUP_ENERGY_MIDPOINT:
                 print_error(
                     "NeutronMultigroupData requires an explicit energy_grid when "
                     "energy_representation is not 'midpoint'."
                 )
-            self.energy_grid = np.arange(self.G + 1, dtype=float64) - 0.5
+            self.energy_grid = np.zeros(self.G + 1, dtype=float64)
         else:
             if not np.all(np.isfinite(energy_grid)):
                 print_error("NeutronMultigroupData energy grid entries must be finite.")

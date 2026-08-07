@@ -12,35 +12,16 @@ from typing import Annotated
 # ======================================================================================
 
 
-class NeutronMultigroupTechnique(MCDCBase):
-    """Configure simulation-wide neutron multigroup behavior."""
+class NeutronMultigroup(MCDCBase):
+    """Describe whether neutron multigroup transport is standard or hybrid."""
 
     # MC/DC framework metadata
     label = "neutron_multigroup"
 
-    multigrid: bool
+    hybrid: bool  # Whether neutron multigroup transport is hybrid
 
     def __init__(self):
-        self.multigrid = False
-
-    def __call__(self, multigrid: bool = False):
-        """Configure whether multiple neutron energy grids are allowed.
-
-        Parameters
-        ----------
-        multigrid : bool, optional
-            Allow materials to use different neutron multigroup energy grids.
-            By default, compilation requires one shared grid.
-
-        Examples
-        --------
-        Allow material-local neutron multigroup grids:
-
-        >>> import mcdc
-        >>> simulation = mcdc.Simulation()
-        >>> simulation.technique.neutron_multigroup(multigrid=True)
-        """
-        self.multigrid = multigrid
+        self.hybrid = True
 
 
 # ======================================================================================
@@ -389,7 +370,7 @@ class Technique(MCDCBase):
     # MC/DC framework metadata
     label = "technique"
 
-    neutron_multigroup: NeutronMultigroupTechnique
+    neutron_multigroup: NeutronMultigroup
     implicit_capture: ImplicitCapture
     weighted_emission: WeightedEmission
     global_weight_roulette: GlobalWeightRoulette
@@ -398,7 +379,7 @@ class Technique(MCDCBase):
 
     def __init__(self):
         # Construct every simulation-wide technique configuration
-        self.neutron_multigroup = NeutronMultigroupTechnique()
+        self.neutron_multigroup = NeutronMultigroup()
         self.implicit_capture = ImplicitCapture()
         self.weighted_emission = WeightedEmission()
         self.global_weight_roulette = GlobalWeightRoulette()

@@ -547,7 +547,7 @@ settings = into_dtype([
 ])
 
 neutron_multigroup = into_dtype([
-    ('multigrid', bool),
+    ('hybrid', bool),
 ])
 
 implicit_capture = into_dtype([
