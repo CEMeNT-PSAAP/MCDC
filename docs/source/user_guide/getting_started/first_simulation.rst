@@ -90,10 +90,9 @@ The ``Simulation`` instance collects the model and controls its execution:
 Materials
 ~~~~~~~~~
 
-``NeutronMultigroupData`` stores the underlying multigroup neutron data.
-``Material.multigroup()`` conveniently constructs that model and attaches it to
-a ``Material``. A one-element capture array and a :math:`1 \times 1` scattering
-matrix define one-group neutron data:
+``Material.multigroup()`` creates a material for neutron multigroup transport
+and attaches the underlying ``NeutronMultigroupData``. A one-element capture
+array and a :math:`1 \times 1` scattering matrix define one-group neutron data:
 
 .. code-block:: python3
 
@@ -106,9 +105,9 @@ matrix define one-group neutron data:
        scatter=np.array([[0.3]]),
    )
 
-Native compositions use the same :class:`mcdc.Material` interface and require
-an MC/DC nuclear-data library. See :ref:`install-data-library` for configuration
-instructions.
+:ref:`Native compositions <user_native_transport>` use the same
+:class:`mcdc.Material` interface and require an MC/DC nuclear-data library. See
+:ref:`install-data-library` for configuration instructions.
 
 Geometry
 ~~~~~~~~
@@ -160,8 +159,8 @@ first cell:
 Tallies
 ~~~~~~~
 
-The structured mesh divides the domain into 60 equal spatial bins. The tally
-scores the track-length estimate of flux in each bin:
+The structured mesh divides the 6 cm domain into 60 equal spatial bins. The
+tally scores the track-length estimate of flux in each bin:
 
 .. code-block:: python3
 
@@ -207,7 +206,8 @@ Visualizing the Model
 ---------------------
 
 Before running transport, insert the following call immediately before
-``simulation.run()`` to render an x-z slice of the material geometry:
+``simulation.run()`` to render an x-z slice of the material geometry. Spatial
+coordinates are in cm and snapshot times are in seconds:
 
 .. code-block:: python3
 

@@ -43,8 +43,14 @@ Model building blocks
 Materials
 ^^^^^^^^^
 
-Materials define the interaction data used by cells. :class:`mcdc.Material`
-accepts native compositions and particle-specific transport-model data (e.g., neutron multigroup cross-sections).
+Materials describe the physical media that fill cells. A
+:ref:`native composition <user_native_transport>` connects
+:class:`mcdc.Material` to MC/DC's data libraries, while optional
+particle-specific data augments native interaction data or supports specialized
+and reduced transport treatments. :class:`mcdc.NeutronMultigroupData`
+represents neutron energy with discrete groups and stores groupwise macroscopic
+cross sections and related production data. :meth:`mcdc.Material.multigroup`
+provides its convenient material interface.
 
 .. autosummary::
    :toctree: generated

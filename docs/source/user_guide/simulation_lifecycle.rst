@@ -23,7 +23,8 @@ the required compilation and runtime preparation automatically.
 --------------------------
 
 Materials, surfaces, cells, sources, meshes, and tallies are ordinary Python
-objects:
+objects. Here, the macroscopic cross sections are in cm\ :sup:`-1` and surface
+positions are in cm:
 
 .. code-block:: python
 
@@ -114,7 +115,8 @@ Set new raw values explicitly before recompiling when an iterative workflow chan
 4. Visualize or Run
 -------------------
 
-Visualization is a useful geometry check before transport:
+Visualization is a useful geometry check before transport. Spatial coordinates
+are in cm and snapshot times are in seconds:
 
 .. code-block:: python
 

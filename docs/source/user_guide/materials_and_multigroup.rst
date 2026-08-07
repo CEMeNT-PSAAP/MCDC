@@ -1,16 +1,26 @@
 .. _user_materials_and_multigroup:
 
-========================================
-Materials and Neutron Multigroup Data
-========================================
+============================
+Materials and Transport Data
+============================
 
-A :class:`mcdc.Material` may contain a native nuclide or element composition,
-neutron multigroup data, or both.
+A :class:`mcdc.Material` describes a physical medium. A nuclide or element
+composition establishes its :ref:`native transport data <user_native_transport>`.
+Materials can also carry particle-specific data that augments native
+interaction data, for example with semi-empirical information, or supports
+specialized and reduced transport treatments.
 
-Native Materials
-----------------
+.. _user_native_transport:
 
-Define a native material with either nuclide or element atomic densities:
+Native Composition and Data
+---------------------------
+
+In MC/DC, *native* refers to data-library-backed transport physics derived from
+a material's nuclide or element composition. The composition identifies the
+physical constituents whose library records provide the interaction data.
+
+Define a native material with either nuclide or element atomic densities in
+atoms/(barn cm). Material temperature is specified in K:
 
 .. code-block:: python
 
@@ -24,13 +34,24 @@ Define a native material with either nuclide or element atomic densities:
        temperature=293.6,
    )
 
-Multigroup Materials
---------------------
+Particle-specific Transport Data
+--------------------------------
 
-:class:`mcdc.NeutronMultigroupData` stores macroscopic neutron cross sections,
-group speeds, fission spectra, and delayed-precursor data. For a material that
-uses only this transport model, :meth:`mcdc.Material.multigroup` is the concise
-entry point:
+Particle-specific transport data is attached to the material that uses it. The
+transport physics determines when and how each dataset contributes to a
+particle interaction.
+
+Neutron Multigroup Transport
+----------------------------
+
+Neutron multigroup transport represents neutron energy with discrete groups
+and describes interactions using groupwise macroscopic data. It is widely used
+in general transport pedagogy and in nuclear engineering applications.
+:meth:`mcdc.Material.multigroup` creates a material with
+:class:`mcdc.NeutronMultigroupData`, which holds the cross sections, group
+speeds, production spectra, and delayed-precursor data. Macroscopic cross
+sections use cm\ :sup:`-1`, group speeds use cm/s, and precursor decay rates use
+s\ :sup:`-1`:
 
 .. code-block:: python
 
@@ -44,22 +65,24 @@ entry point:
        energy_grid=np.array([1.0e-5, 1.0, 20.0e6]),
    )
 
-Energy Grids and Representation
--------------------------------
+Multigroup Energy Grids and Representation
+------------------------------------------
 
-An explicit ``energy_grid`` contains ``G + 1`` boundaries. Group ``g`` covers
-``energy_grid[g] <= E < energy_grid[g + 1]``. The grid both maps continuous
-energy to a group and bounds continuous energy reconstructed from a group.
+An explicit ``energy_grid`` contains ``G + 1`` physical energy boundaries in
+eV. Group ``g`` covers ``energy_grid[g] <= E < energy_grid[g + 1]``. The grid
+both maps continuous energy to a group and bounds continuous energy
+reconstructed from a group.
 
 When no grid is supplied, MC/DC creates the group-coordinate grid
 ``[1.0e-6 - 0.5, 0.5, 1.5, 2.5, ...]`` with
 ``energy_representation="midpoint"``. An explicit grid also supports
 ``"log_midpoint"``, ``"uniform"``, and ``"log_uniform"`` reconstruction.
 
-Hybrid Materials
-----------------
+Combining Native and Multigroup Data
+------------------------------------
 
-A material can combine native and neutron multigroup data:
+Construct :class:`mcdc.NeutronMultigroupData` directly when attaching it to a
+material with a :ref:`native composition <user_native_transport>`:
 
 .. code-block:: python
 
@@ -91,9 +114,9 @@ multigrid option for material-local group structures:
 Source Energy and Group
 -----------------------
 
-A particle carries continuous ``energy`` and an integer ``group`` as separate
-state. :class:`mcdc.Source` accepts an independent continuous energy
-distribution and discrete group distribution:
+A particle carries continuous ``energy`` and an auxiliary integer ``group`` as
+separate state. :class:`mcdc.Source` accepts an independent continuous energy
+distribution in eV and discrete group distribution:
 
 .. code-block:: python
 
@@ -102,8 +125,8 @@ distribution and discrete group distribution:
        group=([0, 1], [0.25, 0.75]),
    )
 
-``group`` is a general transport-mode state; neutron multigroup transport uses
-it as the neutron energy-group index. If both variables are supplied, the
-group takes precedence over energy only for shared-grid neutron multigroup
-transport. The tally equivalents are the separate ``group`` and ``energy``
-filters described in :doc:`tallies`.
+The physics using ``group`` determines its meaning. Neutron multigroup
+transport uses it as the neutron energy-group index. If both variables are
+supplied, the group takes precedence over energy only for shared-grid neutron
+multigroup transport. The tally equivalents are the separate ``group`` and
+``energy`` filters described in :doc:`tallies`.

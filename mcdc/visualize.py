@@ -19,16 +19,19 @@ def visualize_model(
 
     Parameters
     ----------
-    vis_plane : {'xy', 'yz', 'xz', 'zx', 'yz', 'zy'}
+    vis_type : {'xy', 'xz', 'yz', 'yx', 'zx', 'zy'}
         Axis plane to visualize
     x : float or array_like
-        Plane x-position (float) for 'yz' plot. Range of x-axis for 'xy' or 'xz' plot.
+        Plane x-position (float) for 'yz' plot. Range of x-axis for 'xy' or
+        'xz' plot, in cm.
     y : float or array_like
-        Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or 'yz' plot.
+        Plane y-position (float) for 'xz' plot. Range of y-axis for 'xy' or
+        'yz' plot, in cm.
     z : float or array_like
-        Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or 'yz' plot.
+        Plane z-position (float) for 'xy' plot. Range of z-axis for 'xz' or
+        'yz' plot, in cm.
     time : array_like
-        Times at which the geometry snapshots are taken
+        Times in seconds at which the geometry snapshots are taken
     pixels : array_like
         Number of respective pixels in the two axes in vis_plane
     colors : array_like

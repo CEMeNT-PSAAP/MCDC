@@ -374,7 +374,8 @@ class Surface(MCDCObject):
         """Create a general plane ``A*x + B*y + C*z + D = 0``.
 
         The coefficients are normalized internally. ``(A, B, C)`` must be a
-        nonzero normal vector.
+        nonzero normal vector. Coordinates are evaluated in cm, so ``D`` must
+        use the corresponding length scaling.
         """
         type_ = SURFACE_PLANE
         surface = cls(type_, name, boundary_condition)
@@ -694,7 +695,8 @@ class Surface(MCDCObject):
 
         The coefficients define
         ``A*x**2 + B*y**2 + C*z**2 + D*x*y + E*x*z + F*y*z
-        + G*x + H*y + I*z + J = 0``.
+        + G*x + H*y + I*z + J = 0``. Coordinates are evaluated in cm; the
+        coefficients must therefore use mutually consistent units.
         """
         type_ = SURFACE_QUADRIC
         surface = cls(type_, name, boundary_condition)
@@ -729,7 +731,8 @@ class Surface(MCDCObject):
     ):
         """Create a torus centered at ``(A, B, C)`` and aligned with x.
 
-        ``R`` is the major radius and ``r`` the minor radius, both in cm.
+        ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
+        ``r`` the minor radius, both in cm.
         """
         type_ = SURFACE_TORUS_X
         surface = cls(type_, name, boundary_condition)
@@ -760,7 +763,8 @@ class Surface(MCDCObject):
     ):
         """Create a torus centered at ``(A, B, C)`` and aligned with y.
 
-        ``R`` is the major radius and ``r`` the minor radius, both in cm.
+        ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
+        ``r`` the minor radius, both in cm.
         """
         type_ = SURFACE_TORUS_Y
         surface = cls(type_, name, boundary_condition)
@@ -791,7 +795,8 @@ class Surface(MCDCObject):
     ):
         """Create a torus centered at ``(A, B, C)`` and aligned with z.
 
-        ``R`` is the major radius and ``r`` the minor radius, both in cm.
+        ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
+        ``r`` the minor radius, both in cm.
         """
         type_ = SURFACE_TORUS_Z
         surface = cls(type_, name, boundary_condition)

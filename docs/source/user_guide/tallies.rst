@@ -37,9 +37,10 @@ protons:
    )
 
 ``energy`` contains continuous-energy bin boundaries in eV. ``group`` contains
-boundaries for the independent integer group state used by a transport mode.
-For neutron multigroup transport, the group state is the neutron energy-group
-index; tally boundaries can coarsen several transport groups into one bin:
+boundaries for the independent auxiliary integer group state. The physics using
+the group determines its meaning. For neutron multigroup transport, it is the
+neutron energy-group index, and tally boundaries can coarsen several energy
+groups into one bin:
 
 .. code-block:: python3
 
@@ -80,7 +81,8 @@ The introductory example scores flux over a structured z mesh:
    )
    simulation.set_tallies([flux_tally])
 
-The 61 grid points define 60 spatial bins. Track-length scores include
+The grid points are positions in cm; these 61 points define 60 spatial bins.
+Track-length scores include
 ``"flux"``, ``"density"``, ``"collision"``, ``"capture"``, and
 ``"fission"``.
 
@@ -99,9 +101,10 @@ Add polar-cosine boundaries to retain angular information:
    )
    simulation.set_tallies([angular_flux_tally])
 
-The resulting tally contains 32 polar-angle bins in each spatial bin. A
-reference direction can be supplied with ``polar_reference``; its default is
-the positive z direction.
+The dimensionless polar-cosine boundaries produce 32 angular bins in each
+spatial bin. Azimuthal boundaries, when supplied with ``azi``, are in radians.
+A reference direction can be supplied with ``polar_reference``; its default is
+the positive z direction. Time-filter boundaries are in seconds.
 
 Surface-crossing Tallies
 ------------------------
@@ -205,9 +208,10 @@ Load and normalize the mesh flux with h5py:
    flux /= dz
    flux_sdev /= dz
 
-The score arrays contain values integrated over their bins. Divide by the
-applicable spatial, angular, energy, or time widths when a differential result
-is required.
+The score arrays contain values integrated over their bins. Spatial grids in
+the output retain cm, angular grids use radians or dimensionless polar cosine,
+energy grids use eV, and time grids use seconds. Divide by the applicable bin
+widths when a differential result is required.
 
 Reducing an Angular Tally
 -------------------------

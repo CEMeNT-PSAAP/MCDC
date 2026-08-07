@@ -240,7 +240,7 @@ class WeightWindows(MCDCBase):
         mesh : MeshUniform or MeshStructured, optional
             Spatial mesh. The default is one unbounded uniform bin.
         energy : ndarray, optional
-            Strictly increasing energy-group boundaries. The default is one
+            Strictly increasing energy boundaries in eV. The default is one
             all-energy bin.
 
         Examples
@@ -261,7 +261,7 @@ class WeightWindows(MCDCBase):
 
         Configure both energy- and space-dependent windows:
 
-        >>> energy = np.array([0.0, 0.625e-6, 20.0])
+        >>> energy = np.array([0.0, 0.625, 20.0e6])
         >>> windows = np.tile([0.25, 0.5, 1.0], (2, 10, 1, 1, 1))
         >>> simulation.technique.weight_windows(
         ...     windows,

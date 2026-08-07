@@ -66,8 +66,8 @@ class Source(MCDCObject):
         Source energy in eV. A real scalar, including a NumPy scalar, defines a
         mono-energetic source. An array-like value with shape ``(2, N)`` defines
         a tabulated distribution: the first row contains energy values and the
-        second row contains their probability density. Defaults to a
-        mono-energetic source at **1 MeV**.
+        second row contains their probability density in ``eV^-1``. Defaults
+        to a mono-energetic source at **1 MeV**.
     group : int or array_like, optional
         Auxiliary integer state assigned to an emitted particle. A Python or
         NumPy integer defines a mono-group source. An array-like value with

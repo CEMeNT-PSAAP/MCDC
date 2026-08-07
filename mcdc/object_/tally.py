@@ -60,8 +60,8 @@ class Tally(MCDCPolymorphic):
         Scores to accumulate. Track-length scores are ``"flux"``, ``"density"``,
         ``"collision"``, ``"capture"``, and ``"fission"``; surface-crossing
         scores are ``"current-net"``, ``"current-in"``, and ``"current-out"``;
-        the collision score is ``"energy_deposition"``. Scores from different
-        estimator families cannot be mixed.
+        the collision score is ``"energy_deposition"``, scored in eV. Scores
+        from different estimator families cannot be mixed.
     surface : Surface, optional
         Surface filter. Required for a surface-crossing tally unless ``cell`` is
         provided.

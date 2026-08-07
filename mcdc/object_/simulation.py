@@ -494,8 +494,25 @@ class Simulation(MCDCBase):
     ) -> None:
         """Render a two-dimensional material map of the compiled model.
 
-        Parameters are forwarded to :func:`mcdc.visualize.visualize_model`.
         The model is compiled first when necessary.
+
+        Parameters
+        ----------
+        vis_plane : {"xy", "xz", "yz", "yx", "zx", "zy"}
+            Coordinate plane to render. Its order sets the horizontal and
+            vertical axes.
+        x, y, z : float or sequence of 2 float
+            Slice position for the axis normal to ``vis_plane``, or plotting
+            range for an axis contained in the plane, in cm.
+        pixels : sequence of 2 int
+            Number of pixels along the two plotted axes.
+        colors : dict of Material to color or None
+            Optional material-color mapping. Matplotlib color specifications
+            are accepted.
+        time : sequence of float
+            Geometry snapshot times in seconds.
+        save_as : str or path-like or None
+            Output file name. If omitted, display the rendered image.
 
         Examples
         --------

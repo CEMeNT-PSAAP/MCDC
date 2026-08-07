@@ -33,23 +33,24 @@ class NeutronMultigroupData(MCDCObject):
     and describes interactions using groupwise cross sections, production
     spectra, speeds, and delayed-precursor data. For a multigroup-only material,
     :meth:`mcdc.Material.multigroup` provides the convenient entry point.
-    Construct ``NeutronMultigroupData`` directly to attach it alongside a native
-    composition over the energy range defined by ``energy_grid``.
+    Construct ``NeutronMultigroupData`` directly to attach it alongside a
+    :ref:`native composition <user_native_transport>` over the energy range
+    defined by ``energy_grid``.
 
     Parameters
     ----------
     capture : array_like of float, optional
-        Capture cross section for each incoming energy group, with shape
-        ``(G,)``.
+        Macroscopic capture cross section in ``cm^-1`` for each incoming
+        energy group, with shape ``(G,)``.
     scatter : array_like of float, optional
-        Scattering-production matrix with shape ``(G, G)``, indexed as
-        ``scatter[g_out, g_in]``. Column sums define the scattering cross
-        section for each incoming group. Columns are normalized internally to
-        form the scattering spectrum.
+        Macroscopic scattering-production matrix in ``cm^-1`` with shape
+        ``(G, G)``, indexed as ``scatter[g_out, g_in]``. Column sums define the
+        scattering cross section for each incoming group. Columns are
+        normalized internally to form the scattering spectrum.
     fission : array_like of float, optional
-        Fission cross section for each incoming energy group, with shape
-        ``(G,)``. Supplying fission requires at least one of ``nu_p`` or
-        ``nu_d``.
+        Macroscopic fission cross section in ``cm^-1`` for each incoming
+        energy group, with shape ``(G,)``. Supplying fission requires at least
+        one of ``nu_p`` or ``nu_d``.
     nu_s : array_like of float, optional
         Mean number of neutrons produced per scattering event in each
         incoming group, with shape ``(G,)``. Defaults to one.
@@ -69,15 +70,16 @@ class NeutronMultigroupData(MCDCObject):
         Delayed-fission spectrum with shape ``(G, J)``, indexed as
         ``chi_d[g_out, j]``. Required when ``nu_d`` is supplied and ``G > 1``.
     speed : array_like of float, optional
-        Neutron speed in each energy group, with shape ``(G,)``. Defaults to
-        one.
+        Neutron speed in cm/s for each energy group, with shape ``(G,)``.
+        Defaults to one.
     decay_rate : array_like of float, optional
-        Decay constant for each delayed precursor group, with shape ``(J,)``.
-        Defaults to infinity.
+        Decay constant in ``s^-1`` for each delayed precursor group, with
+        shape ``(J,)``. Defaults to infinity.
     energy_grid : array_like of float, optional
-        Strictly increasing energy-group boundaries with shape ``(G + 1,)``.
-        Group ``g`` spans ``energy_grid[g] <= E < energy_grid[g + 1]``. The
-        default is the group-coordinate grid
+        Strictly increasing physical energy-group boundaries in eV with shape
+        ``(G + 1,)``. Group ``g`` spans
+        ``energy_grid[g] <= E < energy_grid[g + 1]``. The default is the
+        group-coordinate grid
         ``[1.0e-6 - 0.5, 0.5, 1.5, ...]``.
     energy_representation : str or int, optional
         Policy used to reconstruct continuous energy from a group. Midpoint
@@ -89,9 +91,9 @@ class NeutronMultigroupData(MCDCObject):
 
     Notes
     -----
-    ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. Cross
-    sections are macroscopic and use inverse-length units. The generated
-    default energy grid uses the default ``"midpoint"`` representation.
+    ``G`` is inferred from ``capture``, ``scatter``, or ``fission``. The
+    generated default energy grid uses the default ``"midpoint"``
+    representation.
 
     Examples
     --------

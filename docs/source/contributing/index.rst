@@ -123,7 +123,7 @@ input-related locations include:
 
 #. ``mcdc/object_/settings.py`` — simulation settings and k-eigenvalue parameters
 #. ``mcdc/object_/material.py`` — material and composition definition
-#. ``mcdc/object_/transport_model_data.py`` — particle-specific transport-model data
+#. ``mcdc/object_/transport_model_data.py`` — particle-specific transport data
 #. ``mcdc/object_/surface.py`` — surface geometry (``Surface`` class methods)
 #. ``mcdc/object_/cell.py`` — cell definitions (``Cell``)
 #. ``mcdc/object_/source.py`` — source specifications (``Source``)

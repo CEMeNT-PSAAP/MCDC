@@ -34,15 +34,17 @@ class Material(MCDCObject):
     neutron_multigroup : NeutronMultigroupData, optional
         Groupwise macroscopic cross sections and related data for neutron
         multigroup transport, where neutron energy is represented by discrete
-        groups. When supplied with a native composition, its explicit
+        groups. When supplied with a
+        :ref:`native composition <user_native_transport>`, its explicit
         ``energy_grid`` defines the energy range where the multigroup treatment
         applies.
 
     Notes
     -----
     A nuclide or element composition connects the material to MC/DC's native
-    data libraries. Particle-specific data can augment native interaction data
-    or support specialized and reduced transport treatments.
+    transport physics through its data libraries. Particle-specific data can
+    augment native interaction data or support specialized and reduced
+    transport treatments.
     ``NeutronMultigroupData`` describes discrete neutron energy groups and
     their macroscopic interaction, production, and timing data. It can be used
     alone or alongside a native composition.
@@ -65,7 +67,7 @@ class Material(MCDCObject):
     ...     name="Absorber", capture=np.array([1.0])
     ... )
 
-    Attach native and multigroup neutron data to the same material:
+    Attach native data and multigroup neutron data to the same material:
 
     >>> hybrid_fuel = mcdc.Material(
     ...     name="Hybrid fuel",
@@ -200,6 +202,9 @@ class Material(MCDCObject):
         The supplied arguments define groupwise macroscopic interaction and
         production data. This helper stores them in
         :class:`NeutronMultigroupData` and attaches the data to the material.
+        Macroscopic cross sections use ``cm^-1``, group speeds use cm/s,
+        precursor decay rates use ``s^-1``, and explicit physical energy
+        boundaries use eV.
         """
         # Build the neutron multigroup data while preserving Material as the sole type
         neutron_multigroup = NeutronMultigroupData(
