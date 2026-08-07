@@ -1,6 +1,6 @@
 import numpy as np
 
-from numbers import Integral, Real
+from numbers import Real
 from numpy import float64
 from numpy.typing import ArrayLike, NDArray
 from types import NoneType
@@ -28,9 +28,8 @@ from mcdc.print_ import print_error
 class Source(MCDCObject):
     """Distributions of particles introduced into the simulation.
 
-    A source specifies the position, direction, energy, time, particle type,
-    auxiliary group state, and relative sampling probability for emitted
-    particles.
+    A source specifies the position, direction, energy, time, particle type, and
+    relative sampling probability for emitted particles.
 
     Parameters
     ----------
@@ -68,14 +67,12 @@ class Source(MCDCObject):
         a tabulated distribution: the first row contains energy values and the
         second row contains their probability density in ``eV^-1``. Defaults
         to a mono-energetic source at **1 MeV**.
-    group : int or array_like, optional
-        Auxiliary integer state assigned to an emitted particle. A Python or
-        NumPy integer defines a mono-group source. An array-like value with
-        shape ``(2, N)`` defines a discrete probability mass function: the
-        first row contains integer group values and the second row contains
-        their probabilities. The physics using the group determines its
-        meaning; neutron multigroup transport interprets it as an energy-group
-        index. The default is **group 0**.
+    discrete_energy : array_like of float, optional
+        Discrete source-energy distribution with shape ``(2, N)``. The first
+        row contains sampled energy values and the second row contains their
+        probabilities. Values are physical energies in eV for continuous-energy
+        transport and group-coordinate energies for standard multigroup
+        transport. Cannot be supplied with ``energy``.
     time : real or array_like of float, optional
         Emission time in seconds. A real scalar, including a NumPy scalar,
         defines a discrete emission time. An array-like value with shape
@@ -102,11 +99,6 @@ class Source(MCDCObject):
     - else if ``white_direction`` is provided, the source is a white boundary
       source;
     - otherwise, the default direction behavior is used.
-
-    ``energy`` and ``group`` are independent source variables and may both be
-    supplied. When compilation selects standard neutron multigroup transport,
-    ``group`` takes precedence over ``energy`` when both are provided.
-    Array-like inputs may be supplied as lists, tuples, or NumPy arrays.
 
     Examples
     --------
@@ -150,10 +142,14 @@ class Source(MCDCObject):
     ...     azimuthal=[0.0, np.pi / 2],
     ... )
 
-    Source with a discrete group:
+    Sample discrete emission lines in a continuous-energy calculation:
 
-    >>> src = mcdc.Source(
-    ...     group=3,
+    >>> decay_electrons = mcdc.Source(
+    ...     particle_type="electron",
+    ...     discrete_energy=(
+    ...         [1.0e5, 2.0e5],
+    ...         [0.8, 0.2],
+    ...     ),
     ... )
 
     Sample a continuous-energy source from a tabulated probability density:
@@ -167,11 +163,11 @@ class Source(MCDCObject):
     ...     direction=[0.0, 0.0, 1.0],
     ... )
 
-    Sample between two groups:
+    Sample between groups 0 and 1 in standard multigroup transport:
 
     >>> multigroup_source = mcdc.Source(
-    ...     group=(
-    ...         [0, 1],
+    ...     discrete_energy=(
+    ...         [0.0, 1.0],
     ...         [0.25, 0.75],
     ...     ),
     ... )
@@ -203,15 +199,12 @@ class Source(MCDCObject):
     polar_cosine: Annotated[NDArray[float64], (2,)]
     azimuthal: Annotated[NDArray[float64], (2,)]
 
-    # Group
-    mono_group: bool
-    group: int
-    group_pmf: DistributionPMF
-
     # Energy
     mono_energetic: bool
+    discrete_energy: bool
     energy: float
     energy_pdf: DistributionTabulated
+    energy_pmf: DistributionPMF
 
     # Time
     discrete_time: bool
@@ -246,7 +239,7 @@ class Source(MCDCObject):
         azimuthal: Sequence[float] | NoneType = None,
         #
         energy: ArrayLike | NoneType = None,
-        group: ArrayLike | NoneType = None,
+        discrete_energy: ArrayLike | NoneType = None,
         #
         time: ArrayLike = 0.0,
         #
@@ -260,9 +253,11 @@ class Source(MCDCObject):
 
         # ==============================================================================
         # Default attributes
-        #   Point source at origin, isotropic, mono-group at 0,
+        #   Point source at origin,
+        #   isotropic,
         #   mono-energetic at 1 MeV,
-        #   time = 0, neutron
+        #   time = 0,
+        #   neutron
         # ==============================================================================
 
         # Position
@@ -280,18 +275,15 @@ class Source(MCDCObject):
         self.polar_cosine = np.array([-1.0, 1.0])
         self.azimuthal = np.array([0.0, 2.0 * PI])
 
-        # Group
-        self.mono_group = True
-        self.group = 0
-        self.group_pmf = DistributionPMF(np.array([0.0]), np.array([1.0]))
-
         # Energy
         self.mono_energetic = True
+        self.discrete_energy = False
         self.energy = 1.0e6
         self.energy_pdf = DistributionTabulated(
             np.array([1.0e6 - 1.0, 1.0e6 + 1.0]),
             np.array([1.0, 1.0]),
         )
+        self.energy_pmf = DistributionPMF(np.array([1.0e6]), np.array([1.0]))
 
         # Time
         self.discrete_time = True
@@ -341,18 +333,18 @@ class Source(MCDCObject):
         # Normalize direction
         self.direction /= np.linalg.norm(self.direction)
 
-        # Group
-        if group is not None:
-            if isinstance(group, Integral) and not isinstance(group, (bool, np.bool_)):
-                self.group = int(group)
-            else:
-                values, probabilities = _distribution_pair(group, "Group")
-                if not np.all(np.isfinite(values)) or not np.all(
-                    values == np.floor(values)
-                ):
-                    print_error("Group distribution values must be integers")
-                self.mono_group = False
-                self.group_pmf = DistributionPMF(values, probabilities)
+        # Require one unambiguous source-energy representation
+        if discrete_energy is not None and energy is not None:
+            print_error("Cannot specify both energy and discrete_energy.")
+
+        # Discrete energy
+        if discrete_energy is not None:
+            values, probabilities = _distribution_pair(
+                discrete_energy, "Discrete energy"
+            )
+            self.mono_energetic = False
+            self.discrete_energy = True
+            self.energy_pmf = DistributionPMF(values, probabilities)
 
         # Energy
         if energy is not None:
@@ -408,8 +400,13 @@ class Source(MCDCObject):
             text += f"  - Direction [ux, uy, yz]: {self.direction}\n"
         elif self.white_direction:
             text += f"  - Isotropic halfspace: {self.direction}\n"
-        text += f"  - Group: {self.group if self.mono_group else 'PMF'}\n"
-        text += f"  - Energy: {f'{self.energy} eV' if self.mono_energetic else 'PDF'}\n"
+        if self.mono_energetic:
+            energy_text = f"{self.energy} eV"
+        elif self.discrete_energy:
+            energy_text = "PMF"
+        else:
+            energy_text = "PDF"
+        text += f"  - Energy: {energy_text}\n"
         if self.discrete_time:
             text += f"  - Time: {self.time} s\n"
         else:

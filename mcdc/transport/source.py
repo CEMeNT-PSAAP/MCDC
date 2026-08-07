@@ -62,18 +62,14 @@ def source_particle(particle_container, seed, simulation, data):
             particle_container,
         )
 
-    # Group
-    if source["mono_group"]:
-        group = source["group"]
-    else:
-        ID = source["group_pmf_ID"]
-        sub_ID = simulation["distributions"][ID]["sub_ID"]
-        pmf = simulation["pmf_distributions"][sub_ID]
-        group = sample_pmf(pmf, particle_container, data)
-
     # Energy
     if source["mono_energetic"]:
         E = source["energy"]
+    elif source["discrete_energy"]:
+        ID = source["energy_pmf_ID"]
+        sub_ID = simulation["distributions"][ID]["sub_ID"]
+        pmf = simulation["pmf_distributions"][sub_ID]
+        E = sample_pmf(pmf, particle_container, data)
     else:
         ID = source["energy_pdf_ID"]
         sub_ID = simulation["distributions"][ID]["sub_ID"]
@@ -133,7 +129,6 @@ def source_particle(particle_container, seed, simulation, data):
     particle["ux"] = ux
     particle["uy"] = uy
     particle["uz"] = uz
-    particle["group"] = group
     particle["E"] = E
     particle["w"] = 1.0
     particle["particle_type"] = source["particle_type"]
