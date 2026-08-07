@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 
 import mcdc
+import mcdc.numba_types as type_
+from mcdc.transport.source import source_particle
 
 
 @pytest.mark.parametrize(
@@ -70,6 +72,48 @@ def test_energy_and_group_are_stored_independently():
 
     assert source.energy == 10_000.0
     assert source.group == 3
+
+
+def test_transport_source_sets_energy_and_group_independently(prepare_simulation):
+    source = mcdc.Source(
+        position=[0.0, 0.0, 0.0],
+        direction=[0.0, 0.0, 1.0],
+        energy=10_000.0,
+        group=3,
+    )
+    simulation_container, data = prepare_simulation(sources=[source])
+    particle_container = np.zeros(1, dtype=type_.particle)
+
+    source_particle(
+        particle_container,
+        np.uint64(1),
+        simulation_container[0],
+        data,
+    )
+
+    assert particle_container[0]["E"] == 10_000.0
+    assert particle_container[0]["group"] == 3
+
+
+def test_transport_source_samples_energy_and_group_independently(prepare_simulation):
+    source = mcdc.Source(
+        position=[0.0, 0.0, 0.0],
+        direction=[0.0, 0.0, 1.0],
+        energy=([9_999.0, 10_001.0], [0.5, 0.5]),
+        group=([3], [1.0]),
+    )
+    simulation_container, data = prepare_simulation(sources=[source])
+    particle_container = np.zeros(1, dtype=type_.particle)
+
+    source_particle(
+        particle_container,
+        np.uint64(1),
+        simulation_container[0],
+        data,
+    )
+
+    assert 9_999.0 <= particle_container[0]["E"] <= 10_001.0
+    assert particle_container[0]["group"] == 3
 
 
 @pytest.mark.parametrize("time", [2, 2.0, np.int64(2), np.float64(2.0)])
