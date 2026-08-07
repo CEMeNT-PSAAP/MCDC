@@ -37,30 +37,34 @@ class Source(MCDCObject):
         User label. If omitted, a default name is generated from the source ID.
     position : array_like of float, optional
         Point-source position ``[x, y, z]`` in cm. If provided, the source is
-        treated as a point source.
+        treated as a point source. Cannot be supplied with ``x``, ``y``, or
+        ``z``.
     x, y, z : array_like of float, optional
         Spatial bounds of a box source in cm, given as ``[min, max]`` for each
-        coordinate. These are used when ``position`` is not provided.
+        coordinate. Cannot be supplied with ``position``.
     direction : array_like of float, optional
         Source direction vector ``[ux, uy, uz]``. The vector is normalized
         internally. If provided without angular bounds, the source is
-        mono-directional.
+        mono-directional. Cannot be supplied with ``isotropic=True`` or
+        ``white_direction``.
 
         When ``polar_cosine`` and/or ``azimuthal`` are specified, this vector
         defines the reference (polar) axis about which directions are sampled.
     white_direction : array_like of float, optional
         Outward normal direction for a white boundary source. The vector is
-        normalized internally.
+        normalized internally. Cannot be supplied with ``isotropic=True`` or
+        ``direction``.
     isotropic : bool, optional
-        If True, emit particles isotropically.
+        If True, emit particles isotropically. Cannot be supplied with
+        ``direction`` or ``white_direction``.
     polar_cosine : array_like of float, optional
         Bounds for the sampled polar cosine,
         ``[mu_min, mu_max]``, measured with respect to ``direction``.
-        Defaults to ``[-1.0, 1.0]``.
+        Requires ``direction``. Defaults to ``[-1.0, 1.0]``.
     azimuthal : array_like of float, optional
         Bounds for the sampled azimuthal angle,
         ``[azi_min, azi_max]`` in radians, measured about ``direction``.
-        Defaults to ``[0.0, 2π]``.
+        Requires ``direction``. Defaults to ``[0.0, 2π]``.
     energy : real or array_like of float, optional
         Source energy in eV. A real scalar, including a NumPy scalar, defines a
         mono-energetic source. An array-like value with shape ``(2, N)`` defines
@@ -85,20 +89,19 @@ class Source(MCDCObject):
 
     Notes
     -----
-    If ``position`` is provided, ``x``, ``y``, and ``z`` are ignored.
+    ``position`` and the box bounds ``x``, ``y``, and ``z`` are alternative
+    spatial specifications and cannot be combined.
 
     When ``position`` is not provided, the source is treated as a box source.
     Any unspecified coordinate range defaults to ``[0.0, 0.0]`` cm. For
     example, if only ``z=[-1.0, 1.0]`` is specified, then the source occupies
     ``x=[0.0, 0.0]``, ``y=[0.0, 0.0]``, and ``z=[-1.0, 1.0]``.
 
-    Direction options are interpreted in the following order:
-
-    - if ``isotropic=True``, the source is isotropic;
-    - else if ``direction`` is provided, the source uses that direction;
-    - else if ``white_direction`` is provided, the source is a white boundary
-      source;
-    - otherwise, the default direction behavior is used.
+    ``isotropic=True``, ``direction``, and ``white_direction`` are alternative
+    angular specifications and cannot be combined. ``polar_cosine`` and
+    ``azimuthal`` describe an angular spread about ``direction`` and therefore
+    require it. If no angular specification is provided, the source is
+    isotropic.
 
     Examples
     --------
@@ -300,6 +303,10 @@ class Source(MCDCObject):
         # Assignment
         # ==============================================================================
 
+        # Require one unambiguous source-position representation
+        if position is not None and any(value is not None for value in (x, y, z)):
+            print_error("Cannot specify position together with x, y, or z.")
+
         # Position
         if position is not None:
             self.point = np.array(position)
@@ -312,8 +319,25 @@ class Source(MCDCObject):
             if z is not None:
                 self.z = np.array(z)
 
+        # Require one unambiguous source-direction representation
+        isotropic_enabled = isotropic is not None and bool(isotropic)
+        direction_modes = sum(
+            (
+                isotropic_enabled,
+                direction is not None,
+                white_direction is not None,
+            )
+        )
+        if direction_modes > 1:
+            print_error(
+                "Cannot specify more than one of isotropic=True, direction, and "
+                "white_direction."
+            )
+        if direction is None and (polar_cosine is not None or azimuthal is not None):
+            print_error("polar_cosine and azimuthal require direction.")
+
         # Direction
-        if isotropic is not None and isotropic:
+        if isotropic_enabled:
             pass
         elif direction is not None:
             self.isotropic_direction = False

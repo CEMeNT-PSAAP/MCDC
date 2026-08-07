@@ -6,6 +6,63 @@ import mcdc.numba_types as type_
 from mcdc.transport.source import source_particle
 
 
+@pytest.mark.parametrize("coordinate", ["x", "y", "z"])
+def test_position_and_box_bounds_are_mutually_exclusive(coordinate, capsys):
+    with pytest.raises(SystemExit):
+        mcdc.Source(position=[0.0, 0.0, 0.0], **{coordinate: [-1.0, 1.0]})
+
+    assert "Cannot specify position together with x, y, or z" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"isotropic": True, "direction": [0.0, 0.0, 1.0]},
+        {"isotropic": True, "white_direction": [0.0, 0.0, 1.0]},
+        {
+            "direction": [0.0, 0.0, 1.0],
+            "white_direction": [0.0, 0.0, 1.0],
+        },
+    ],
+)
+def test_direction_representations_are_mutually_exclusive(kwargs, capsys):
+    with pytest.raises(SystemExit):
+        mcdc.Source(**kwargs)
+
+    assert "Cannot specify more than one" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"polar_cosine": [0.8, 1.0]},
+        {"azimuthal": [0.0, np.pi]},
+        {
+            "white_direction": [0.0, 0.0, 1.0],
+            "polar_cosine": [0.8, 1.0],
+        },
+    ],
+)
+def test_angular_bounds_require_direction(kwargs, capsys):
+    with pytest.raises(SystemExit):
+        mcdc.Source(**kwargs)
+
+    assert "polar_cosine and azimuthal require direction" in capsys.readouterr().out
+
+
+def test_direction_accepts_angular_bounds():
+    source = mcdc.Source(
+        direction=[0.0, 0.0, 1.0],
+        polar_cosine=[0.8, 1.0],
+        azimuthal=[0.0, np.pi],
+    )
+
+    assert not source.isotropic_direction
+    assert not source.mono_direction
+    np.testing.assert_array_equal(source.polar_cosine, [0.8, 1.0])
+    np.testing.assert_array_equal(source.azimuthal, [0.0, np.pi])
+
+
 @pytest.mark.parametrize(
     "energy",
     [
