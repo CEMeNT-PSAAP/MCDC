@@ -340,7 +340,7 @@ source = mcdc.Source(
     y=np.array([-pitch * 17 * 3 / 2] * 2) + np.array([-pitch / 2, +pitch / 2]),
     z=[-core_height / 2, core_height / 2],
     isotropic=True,
-    group=0,  # Highest energy
+    energy=0,  # Highest energy
     time=[0.0, 15.0],
 )
 simulation.set_sources([source])

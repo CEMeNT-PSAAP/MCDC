@@ -35,11 +35,11 @@ simulation.set_model([cell_1, cell_2, cell_3, cell_4])
 # ======================================================================================
 
 # Isotropic source in the absorbing medium
-source_1 = mcdc.Source(z=[0.0, 2.0], isotropic=True, group=0, probability=50.0)
+source_1 = mcdc.Source(z=[0.0, 2.0], isotropic=True, energy=0, probability=50.0)
 
 # Isotropic source in the first half of the outermost medium,
 # with 1/100 strength
-source_2 = mcdc.Source(z=[5.0, 6.0], isotropic=True, group=0, probability=0.5)
+source_2 = mcdc.Source(z=[5.0, 6.0], isotropic=True, energy=0, probability=0.5)
 simulation.set_sources([source_1, source_2])
 
 # ======================================================================================

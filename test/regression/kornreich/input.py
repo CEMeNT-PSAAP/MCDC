@@ -38,7 +38,7 @@ simulation.set_model([cell_1, cell_2])
 # Set source
 # ======================================================================================
 
-source = mcdc.Source(x=[0.0, 2.5], isotropic=True, group=0)
+source = mcdc.Source(x=[0.0, 2.5], isotropic=True, energy=0)
 simulation.set_sources([source])
 
 # ======================================================================================

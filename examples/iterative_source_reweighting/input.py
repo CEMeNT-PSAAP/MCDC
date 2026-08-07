@@ -22,13 +22,13 @@ source_left = mcdc.Source(
     name="Left source",
     z=[1.0, 2.0],
     isotropic=True,
-    group=0,
+    energy=0,
 )
 source_right = mcdc.Source(
     name="Right source",
     z=[8.0, 9.0],
     isotropic=True,
-    group=0,
+    energy=0,
 )
 simulation.set_sources([source_left, source_right])
 

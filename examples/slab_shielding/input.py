@@ -33,7 +33,7 @@ simulation.set_model([source_cell, shield_cell])
 source = mcdc.Source(
     z=[0.0, 2.0],
     isotropic=True,
-    group=0,
+    energy=0,
 )
 simulation.set_sources([source])
 

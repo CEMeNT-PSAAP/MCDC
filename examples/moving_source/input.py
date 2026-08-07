@@ -37,7 +37,7 @@ src = mcdc.Source(
     z=[-0.5, 0.5],
     direction=[1.0, 1.0, 0.0],
     polar_cosine=[-1.0, -0.9],
-    group=0,
+    energy=0,
     time=[0.0, 10.0],
 )
 src.move(

@@ -65,12 +65,14 @@ class Source(MCDCObject):
         Bounds for the sampled azimuthal angle,
         ``[azi_min, azi_max]`` in radians, measured about ``direction``.
         Requires ``direction``. Defaults to ``[0.0, 2π]``.
-    energy : real or array_like of float, optional
+    energy : float, array_like of float, or int, optional
         Source energy in eV. A real scalar, including a NumPy scalar, defines a
         mono-energetic source. An array-like value with shape ``(2, N)`` defines
         a tabulated distribution: the first row contains energy values and the
         second row contains their probability density in ``eV^-1``. Defaults
-        to a mono-energetic source at **1 MeV**.
+        to a mono-energetic source at **1 MeV**. In standard neutron multigroup
+        transport, an integer conventionally specifies a group-coordinate energy and is
+        stored internally as a float.
     discrete_energy : array_like of float, optional
         Discrete source-energy distribution with shape ``(2, N)``. The first
         row contains sampled energy values and the second row contains their
@@ -241,7 +243,7 @@ class Source(MCDCObject):
         polar_cosine: Sequence[float] | NoneType = None,
         azimuthal: Sequence[float] | NoneType = None,
         #
-        energy: ArrayLike | NoneType = None,
+        energy: float | ArrayLike | int | NoneType = None,
         discrete_energy: ArrayLike | NoneType = None,
         #
         time: ArrayLike = 0.0,

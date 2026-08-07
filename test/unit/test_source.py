@@ -76,6 +76,7 @@ def test_scalar_energy(energy):
     source = mcdc.Source(energy=energy)
 
     assert source.mono_energetic
+    assert isinstance(source.energy, float)
     assert source.energy == 10_000.0
 
 

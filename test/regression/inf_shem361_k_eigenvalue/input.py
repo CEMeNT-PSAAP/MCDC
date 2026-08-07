@@ -45,7 +45,7 @@ simulation.set_model([c])
 # =============================================================================
 
 source = mcdc.Source(
-    position=(0.0, 0.0, 0.0), isotropic=True, group=np.array([[360], [1.0]])
+    position=(0.0, 0.0, 0.0), isotropic=True, discrete_energy=np.array([[360], [1.0]])
 )
 simulation.set_sources([source])
 

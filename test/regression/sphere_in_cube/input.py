@@ -41,7 +41,7 @@ source = mcdc.Source(
     y=[0.0, 4.0],
     z=[0.0, 4.0],
     isotropic=True,
-    group=0,
+    energy=0,
     time=[0.0, 50.0],
 )
 simulation.set_sources([source])

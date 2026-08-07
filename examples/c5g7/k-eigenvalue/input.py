@@ -279,7 +279,7 @@ source = mcdc.Source(
     y=[-pitch * 17 * 2, 0.0],
     z=[-core_height / 2, core_height / 2],
     isotropic=True,
-    group=0,  # Highest energy
+    energy=0,  # Highest energy
 )
 simulation.set_sources([source])
 

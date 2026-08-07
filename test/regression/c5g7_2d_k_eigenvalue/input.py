@@ -180,7 +180,7 @@ source = mcdc.Source(
     x=[0.0, pitch * 17 * 2],
     y=[-pitch * 17 * 2, 0.0],
     isotropic=True,
-    group=6,
+    energy=6,
 )
 simulation.set_sources([source])
 
