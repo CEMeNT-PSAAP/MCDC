@@ -15,7 +15,7 @@ from mcdc.constant import *
 from mcdc.transport.geometry.surface import get_distance, check_sense
 
 # ======================================================================================
-# Geometry inspection
+# Geometry traversal
 # ======================================================================================
 
 
@@ -30,36 +30,23 @@ def inspect_geometry(particle_container, simulation, data):
     """
     particle = particle_container[0]
 
-    # Store particle global coordinate
-    # (particle will be temporarily translated and rotated)
-    x_global = particle["x"]
-    y_global = particle["y"]
-    z_global = particle["z"]
-    t_global = particle["t"]
-    ux_global = particle["ux"]
-    uy_global = particle["uy"]
-    uz_global = particle["uz"]
+    # Preserve global coordinates while traversing nested geometry.
+    global_coordinates = _save_global_coordinates(particle_container)
     speed = physics.particle_speed(particle_container, simulation, data)
 
     # Default returns
     distance = INF
     event = EVENT_NONE
 
-    # Find top cell from root universe if unknown
-    if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(
-            particle_container, UNIVERSE_ROOT, simulation, data
-        )
-
-        # Particle is lost?
-        if particle["cell_ID"] == -1:
-            event = EVENT_LOST
-
-    # The top cell
-    cell = simulation["cells"][particle["cell_ID"]]
+    # Find the top cell from the root universe if it is unknown.
+    cell_ID = _get_top_cell_ID(particle_container, simulation, data)
+    if cell_ID == -1:
+        event = EVENT_LOST
 
     # Recursively check cells until material cell is found (or the particle is lost)
     while event != EVENT_LOST:
+        cell = simulation["cells"][cell_ID]
+
         # Distance to nearest surface
         d_surface, surface_ID = distance_to_nearest_surface(
             particle_container, cell, simulation, data
@@ -86,24 +73,10 @@ def inspect_geometry(particle_container, simulation, data):
 
         else:
             # Cell is filled with universe or lattice
-
-            # Apply translation
-            if cell["fill_translated"]:
-                particle["x"] -= cell["translation"][0]
-                particle["y"] -= cell["translation"][1]
-                particle["z"] -= cell["translation"][2]
-
-            # Apply rotation
-            if cell["fill_rotated"]:
-                _rotate_particle(particle_container, cell["rotation"])
-
-            # Universe cell?
-            if cell["fill_type"] == FILL_UNIVERSE:
-                # Get universe ID
-                universe_ID = cell["fill_ID"]
+            _apply_fill_transform(particle_container, cell)
 
             # Lattice cell?
-            elif cell["fill_type"] == FILL_LATTICE:
+            if cell["fill_type"] == FILL_LATTICE:
                 # Get lattice
                 lattice = simulation["lattices"][cell["fill_ID"]]
 
@@ -124,37 +97,19 @@ def inspect_geometry(particle_container, simulation, data):
                     if not event & EVENT_LATTICE_CROSSING:
                         event += EVENT_LATTICE_CROSSING
 
-                # Get universe
-                ix, iy, iz = mesh.uniform.get_indices(particle_container, lattice)
-                if ix == -1 or iy == -1 or iz == -1:
-                    event = EVENT_LOST
-                    continue
-                universe_ID = mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
-
-                # Lattice-translate the particle
-                particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
-                particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
-                particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
-
-            else:
-                # Unreached
-                universe_ID = -1
+            # Find the filled universe and enter its local coordinates.
+            universe_ID = _enter_fill(particle_container, cell, simulation, data)
+            if universe_ID == -1:
+                event = EVENT_LOST
+                continue
 
             # Get inner cell
             cell_ID = get_cell(particle_container, universe_ID, simulation, data)
-            if cell_ID > -1:
-                cell = simulation["cells"][cell_ID]
-            else:
+            if cell_ID == -1:
                 event = EVENT_LOST
 
-    # Reassign the global coordinate
-    particle["x"] = x_global
-    particle["y"] = y_global
-    particle["z"] = z_global
-    particle["t"] = t_global
-    particle["ux"] = ux_global
-    particle["uy"] = uy_global
-    particle["uz"] = uz_global
+    # Restore the particle after traversal through local coordinates.
+    _restore_global_coordinates(particle_container, global_coordinates)
 
     # Report lost particle
     if event == EVENT_LOST:
@@ -177,33 +132,20 @@ def locate_particle(particle_container, simulation, data):
     """
     particle = particle_container[0]
 
-    # Store particle global coordinate
-    # (particle will be temporarily translated and rotated)
-    x_global = particle["x"]
-    y_global = particle["y"]
-    z_global = particle["z"]
-    t_global = particle["t"]
-    ux_global = particle["ux"]
-    uy_global = particle["uy"]
-    uz_global = particle["uz"]
+    # Preserve global coordinates while traversing nested geometry.
+    global_coordinates = _save_global_coordinates(particle_container)
 
     particle_is_lost = False
 
-    # Find top cell from root universe if unknown
-    if particle["cell_ID"] == -1:
-        particle["cell_ID"] = get_cell(
-            particle_container, UNIVERSE_ROOT, simulation, data
-        )
-
-        # Particle is lost?
-        if particle["cell_ID"] == -1:
-            particle_is_lost = True
-
-    # The top cell
-    cell = simulation["cells"][particle["cell_ID"]]
+    # Find the top cell from the root universe if it is unknown.
+    cell_ID = _get_top_cell_ID(particle_container, simulation, data)
+    if cell_ID == -1:
+        particle_is_lost = True
 
     # Recursively check cells until material cell is found (or the particle is lost)
     while not particle_is_lost:
+        cell = simulation["cells"][cell_ID]
+
         # Material cell?
         if cell["fill_type"] == FILL_MATERIAL:
             particle["material_ID"] = cell["fill_ID"]
@@ -211,64 +153,102 @@ def locate_particle(particle_container, simulation, data):
 
         else:
             # Cell is filled with universe or lattice
+            _apply_fill_transform(particle_container, cell)
 
-            # Apply translation
-            if cell["fill_translated"]:
-                particle["x"] -= cell["translation"][0]
-                particle["y"] -= cell["translation"][1]
-                particle["z"] -= cell["translation"][2]
-
-            # Apply rotation
-            if cell["fill_rotated"]:
-                _rotate_particle(particle_container, cell["rotation"])
-
-            # Universe cell?
-            if cell["fill_type"] == FILL_UNIVERSE:
-                # Get universe ID
-                universe_ID = cell["fill_ID"]
-
-            # Lattice cell?
-            elif cell["fill_type"] == FILL_LATTICE:
-                # Get lattice
-                lattice = simulation["lattices"][cell["fill_ID"]]
-
-                # Get universe
-                ix, iy, iz = mesh.uniform.get_indices(particle_container, lattice)
-                if ix == -1 or iy == -1 or iz == -1:
-                    particle_is_lost = True
-                    continue
-                universe_ID = mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
-
-                # Lattice-translate the particle
-                particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
-                particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
-                particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
-
-            else:
-                # Unreached
-                universe_ID = -1
+            # Find the filled universe and enter its local coordinates.
+            universe_ID = _enter_fill(particle_container, cell, simulation, data)
+            if universe_ID == -1:
+                particle_is_lost = True
+                continue
 
             # Get inner cell
             cell_ID = get_cell(particle_container, universe_ID, simulation, data)
-            if cell_ID > -1:
-                cell = simulation["cells"][cell_ID]
-            else:
+            if cell_ID == -1:
                 particle_is_lost = True
 
-    # Reassign the global coordinate
-    particle["x"] = x_global
-    particle["y"] = y_global
-    particle["z"] = z_global
-    particle["t"] = t_global
-    particle["ux"] = ux_global
-    particle["uy"] = uy_global
-    particle["uz"] = uz_global
+    # Restore the particle after traversal through local coordinates.
+    _restore_global_coordinates(particle_container, global_coordinates)
 
     # Report lost particle
     if particle_is_lost:
         report_lost_particle(particle_container, simulation)
 
     return not particle_is_lost
+
+
+# ======================================================================================
+# Geometry traversal helpers
+# ======================================================================================
+
+
+@njit
+def _save_global_coordinates(particle_container):
+    particle = particle_container[0]
+    return (
+        particle["x"],
+        particle["y"],
+        particle["z"],
+        particle["t"],
+        particle["ux"],
+        particle["uy"],
+        particle["uz"],
+    )
+
+
+@njit
+def _restore_global_coordinates(particle_container, coordinates):
+    particle = particle_container[0]
+    particle["x"] = coordinates[0]
+    particle["y"] = coordinates[1]
+    particle["z"] = coordinates[2]
+    particle["t"] = coordinates[3]
+    particle["ux"] = coordinates[4]
+    particle["uy"] = coordinates[5]
+    particle["uz"] = coordinates[6]
+
+
+@njit
+def _get_top_cell_ID(particle_container, simulation, data):
+    particle = particle_container[0]
+    if particle["cell_ID"] == -1:
+        particle["cell_ID"] = get_cell(
+            particle_container, UNIVERSE_ROOT, simulation, data
+        )
+    return particle["cell_ID"]
+
+
+@njit
+def _apply_fill_transform(particle_container, cell):
+    particle = particle_container[0]
+
+    if cell["fill_translated"]:
+        particle["x"] -= cell["translation"][0]
+        particle["y"] -= cell["translation"][1]
+        particle["z"] -= cell["translation"][2]
+
+    if cell["fill_rotated"]:
+        _rotate_particle(particle_container, cell["rotation"])
+
+
+@njit
+def _enter_fill(particle_container, cell, simulation, data):
+    if cell["fill_type"] == FILL_UNIVERSE:
+        return cell["fill_ID"]
+
+    if cell["fill_type"] == FILL_LATTICE:
+        particle = particle_container[0]
+        lattice = simulation["lattices"][cell["fill_ID"]]
+        ix, iy, iz = mesh.uniform.get_indices(particle_container, lattice)
+        if ix == -1 or iy == -1 or iz == -1:
+            return -1
+
+        universe_ID = mcdc_get.lattice.universe_IDs(ix, iy, iz, lattice, data)
+        particle["x"] -= lattice["x0"] + (ix + 0.5) * lattice["dx"]
+        particle["y"] -= lattice["y0"] + (iy + 0.5) * lattice["dy"]
+        particle["z"] -= lattice["z0"] + (iz + 0.5) * lattice["dz"]
+        return universe_ID
+
+    return -1
 
 
 @njit
