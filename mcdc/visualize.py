@@ -96,9 +96,8 @@ def visualize_model(
 
         particle = particle_arr[0]
 
-        # Set time and energy
+        # Set time, energy, and direction
         particle["t"] = time_val
-        particle["group"] = 0
         particle["E"] = 1e6
         particle["ux"] = 0.0
         particle["uy"] = 0.0

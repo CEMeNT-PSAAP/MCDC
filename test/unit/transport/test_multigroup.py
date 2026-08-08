@@ -39,11 +39,10 @@ def test_group_energy_representation(representation, expected, prepare_simulatio
     )
     simulation["technique"]["neutron_multigroup"]["hybrid"] = True
 
-    particle_container = np.zeros(1, dtype=type_.particle)
-    particle_container[0]["group"] = 1
-    particle_container[0]["rng_seed"] = np.uint64(1)
+    rng_state = np.zeros(1, dtype=type_.particle)
+    rng_state[0]["rng_seed"] = np.uint64(1)
 
-    energy = multigroup._get_group_energy(particle_container, mgxs, simulation, data)
+    energy = multigroup._get_group_energy(1, rng_state, mgxs, simulation, data)
 
     if expected is None:
         assert 10.0 <= energy < 100.0
@@ -51,18 +50,17 @@ def test_group_energy_representation(representation, expected, prepare_simulatio
         assert energy == pytest.approx(expected)
 
 
-def test_standard_multigroup_does_not_reconstruct_energy(prepare_simulation):
+def test_standard_multigroup_uses_group_coordinate_energy(prepare_simulation):
     simulation, mgxs, data = _prepare_multigroup(
         prepare_simulation,
         capture=[1.0, 1.0],
     )
 
-    particle_container = np.zeros(1, dtype=type_.particle)
-    particle_container[0]["group"] = 1
+    rng_state = np.zeros(1, dtype=type_.particle)
 
-    energy = multigroup._get_group_energy(particle_container, mgxs, simulation, data)
+    energy = multigroup._get_group_energy(1, rng_state, mgxs, simulation, data)
 
-    assert energy == 0.0
+    assert energy == 1.0
 
 
 def test_hybrid_energy_groups_are_left_closed(prepare_simulation):
@@ -78,10 +76,10 @@ def test_hybrid_energy_groups_are_left_closed(prepare_simulation):
 
     particle["E"] = 1.0
     assert multigroup.applicable(particle_container, simulation, data)
-    assert multigroup._get_energy_group(particle_container, mgxs, simulation, data) == 0
+    assert multigroup._get_energy_group(particle["E"], mgxs, simulation, data) == 0
 
     particle["E"] = 10.0
-    assert multigroup._get_energy_group(particle_container, mgxs, simulation, data) == 1
+    assert multigroup._get_energy_group(particle["E"], mgxs, simulation, data) == 1
 
     particle["E"] = 100.0
     assert not multigroup.applicable(particle_container, simulation, data)
@@ -102,13 +100,11 @@ def _make_particle():
 def _assert_fission_products(particle_container, simulation):
     particle = particle_container[0]
     assert particle["alive"]
-    assert particle["group"] == 1
     assert particle["E"] == pytest.approx(55.0)
 
     bank = simulation["bank_active"]
     assert bank["size"][0] == 3
     banked = bank["particle_data"][:3]
-    np.testing.assert_array_equal(banked["group"], 1)
     np.testing.assert_allclose(banked["E"], 55.0)
 
 
@@ -124,7 +120,6 @@ def test_scattering_product_uses_multigroup_data(prepare_simulation):
 
     particle = particle_container[0]
     assert particle["alive"]
-    assert particle["group"] == 1
     assert particle["E"] == pytest.approx(55.0)
 
 

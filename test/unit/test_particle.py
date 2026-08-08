@@ -16,7 +16,6 @@ def test_copy_particle_data_to_active_particle():
         "ux": 0.1,
         "uy": 0.2,
         "uz": 0.3,
-        "group": 7,
         "E": 8.0,
         "w": 9.0,
         "particle_type": 10,
