@@ -67,7 +67,7 @@ def particle_speed(particle_container, simulation, data):
     mgxs_ID = material["neutron_multigroup_ID"]
     mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
 
-    group = _get_energy_group(particle_container, mgxs, simulation, data)
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     return mcdc_get.neutron_multigroup_data.speed(group, mgxs, data)
 
@@ -85,7 +85,7 @@ def macro_xs(reaction_type, particle_container, simulation, data):
     mgxs_ID = material["neutron_multigroup_ID"]
     mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
 
-    group = _get_energy_group(particle_container, mgxs, simulation, data)
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     if reaction_type == NEUTRON_REACTION_TOTAL:
         return mcdc_get.neutron_multigroup_data.total(group, mgxs, data)
@@ -106,7 +106,7 @@ def neutron_production_xs(reaction_type, particle_container, simulation, data):
     mgxs_ID = material["neutron_multigroup_ID"]
     mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
 
-    group = _get_energy_group(particle_container, mgxs, simulation, data)
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     # Total production
     if reaction_type == NEUTRON_REACTION_TOTAL:
@@ -211,7 +211,7 @@ def scattering(particle_container, program, data):
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
-    group = _get_energy_group(particle_container, mgxs, simulation, data)
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     # Kill the current particle
     particle["alive"] = False
@@ -264,9 +264,8 @@ def scattering(particle_container, program, data):
             total += chi_s[group_out]
             if total > xi:
                 break
-        particle_new["group"] = group_out
         particle_new["E"] = _get_group_energy(
-            particle_container_new, mgxs, simulation, data
+            group_out, particle_container_new, mgxs, simulation, data
         )
 
         # Bank, but keep it if it is the last particle
@@ -275,7 +274,6 @@ def scattering(particle_container, program, data):
             particle["ux"] = particle_new["ux"]
             particle["uy"] = particle_new["uy"]
             particle["uz"] = particle_new["uz"]
-            particle["group"] = particle_new["group"]
             particle["E"] = particle_new["E"]
             particle["w"] = particle_new["w"]
         else:
@@ -296,7 +294,7 @@ def fission(particle_container, program, data):
     J = mgxs["J"]
 
     # Particle attributes
-    group = _get_energy_group(particle_container, mgxs, simulation, data)
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     # Kill the current particle
     particle["alive"] = False
@@ -376,9 +374,8 @@ def fission(particle_container, program, data):
             tot += spectrum[group_out]
             if tot > xi:
                 break
-        particle_new["group"] = group_out
         particle_new["E"] = _get_group_energy(
-            particle_container_new, mgxs, simulation, data
+            group_out, particle_container_new, mgxs, simulation, data
         )
 
         # Sample emission time
@@ -419,7 +416,6 @@ def fission(particle_container, program, data):
                 particle["uy"] = particle_new["uy"]
                 particle["uz"] = particle_new["uz"]
                 particle["t"] = particle_new["t"]
-                particle["group"] = particle_new["group"]
                 particle["E"] = particle_new["E"]
                 particle["w"] = particle_new["w"]
             else:
@@ -444,28 +440,22 @@ def fission(particle_container, program, data):
 
 
 @njit
-def _get_energy_group(particle_container, mgxs, simulation, data):
-    particle = particle_container[0]
-
+def _get_energy_group(E, mgxs, simulation, data):
     if simulation["technique"]["neutron_multigroup"]["hybrid"]:
-        E = particle["E"]
         offset = mgxs["energy_grid_offset"]
         length = mgxs["energy_grid_length"]
         E_grid = data[offset : offset + length]
         group = util.find_bin_with_rules(E, E_grid, 0.0, False)
 
     else:
-        group = particle["group"]
+        group = int(E)
 
     return group
 
 
 @njit
-def _get_group_energy(particle_container, mgxs, simulation, data):
-    particle = particle_container[0]
-
+def _get_group_energy(group, rng_state, mgxs, simulation, data):
     if simulation["technique"]["neutron_multigroup"]["hybrid"]:
-        group = particle["group"]
         E_low = mcdc_get.neutron_multigroup_data.energy_grid(group, mgxs, data)
         E_high = mcdc_get.neutron_multigroup_data.energy_grid(group + 1, mgxs, data)
         representation = mgxs["energy_representation"]
@@ -475,10 +465,10 @@ def _get_group_energy(particle_container, mgxs, simulation, data):
         elif representation == NEUTRON_MULTIGROUP_ENERGY_MIDPOINT_LOG:
             energy = math.sqrt(E_low * E_high)
         elif representation == NEUTRON_MULTIGROUP_ENERGY_UNIFORM:
-            xi = rng.lcg(particle_container)
+            xi = rng.lcg(rng_state)
             energy = E_low + xi * (E_high - E_low)
         elif representation == NEUTRON_MULTIGROUP_ENERGY_UNIFORM_LOG:
-            xi = rng.lcg(particle_container)
+            xi = rng.lcg(rng_state)
             log_E_low = math.log(E_low)
             energy = math.exp(log_E_low + xi * (math.log(E_high) - log_E_low))
         else:
@@ -486,6 +476,6 @@ def _get_group_energy(particle_container, mgxs, simulation, data):
             energy = -1.0
 
     else:
-        energy = 0.0
+        energy = float(group)
 
     return energy

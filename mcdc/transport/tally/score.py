@@ -50,10 +50,7 @@ def surface_crossing(
     surface_crossing_tally = simulation["surface_crossing_tallies"][sub_ID]
 
     # Get filter indices
-    MG_mode = simulation["settings"]["neutron_multigroup_mode"]
-    i_mu, i_azi, i_energy, i_time = get_filter_indices(
-        particle_container, tally, data, MG_mode
-    )
+    i_mu, i_azi, i_energy, i_time = get_filter_indices(particle_container, tally, data)
 
     # No score if outside non-changing phase-space bins
     if i_mu == -1 or i_azi == -1 or i_energy == -1 or i_time == -1:
@@ -131,10 +128,7 @@ def collision(particle_container, collision_data_container, tally, simulation, d
     collision_tally = simulation["collision_tallies"][sub_ID]
 
     # Get filter indices
-    MG_mode = simulation["settings"]["neutron_multigroup_mode"]
-    i_mu, i_azi, i_energy, i_time = get_filter_indices(
-        particle_container, tally, data, MG_mode
-    )
+    i_mu, i_azi, i_energy, i_time = get_filter_indices(particle_container, tally, data)
 
     # No score if outside non-changing phase-space bins
     if i_mu == -1 or i_azi == -1 or i_energy == -1 or i_time == -1:
@@ -188,10 +182,7 @@ def tracklength(particle_container, distance, tally, simulation, data):
     tracklength_tally = simulation["tracklength_tallies"][sub_ID]
 
     # Get filter indices
-    MG_mode = simulation["settings"]["neutron_multigroup_mode"]
-    i_mu, i_azi, i_energy, i_time = get_filter_indices(
-        particle_container, tally, data, MG_mode
-    )
+    i_mu, i_azi, i_energy, i_time = get_filter_indices(particle_container, tally, data)
 
     # No score if outside non-changing phase-space bins
     if i_mu == -1 or i_azi == -1 or i_energy == -1:
