@@ -5,7 +5,7 @@ Continuous Energy
 =================
 
 MC/DC supports continuous energy (CE) neutron transport using pointwise nuclear data libraries.
-In CE mode, cross sections are represented as energy-dependent tabulated data rather than multi-group averages, enabling higher-fidelity simulations.
+In CE mode, cross sections are represented as energy-dependent tabulated data rather than multigroup averages, enabling higher-fidelity simulations.
 
 Data Libraries
 --------------

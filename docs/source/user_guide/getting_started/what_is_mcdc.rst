@@ -16,7 +16,7 @@ uncertainty quantification methods, and high-performance computing algorithms.
 It also provides an accessible platform for students learning Monte Carlo
 radiation transport methods and modern code development.
 
-**Capabilities** — MC/DC supports continuous-energy and multi-group neutron
+**Capabilities** — MC/DC supports continuous-energy and multigroup neutron
 transport calculations, including fixed-source and eigenvalue simulations on
 constructive solid geometry (CSG) models. For continuous-energy transport,
 MC/DC converts `ACE <https://nucleardata.lanl.gov/ace/>`_-format nuclear data

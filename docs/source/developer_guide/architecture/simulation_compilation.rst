@@ -202,6 +202,15 @@ The compiler traverses embedded simulation configuration before model-wide final
 This boundary keeps scientific model rules in ``mcdc/object_/``.
 The orchestration in ``python_objects_compiler.py`` changes only when the compilation framework gains a new phase or registered category, while ``mcdc.main.prepare`` remains responsible for framework-level runtime setup after the model is complete.
 
+Neutron Multigroup Finalization
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For neutron multigroup transport, model-wide finalization selects standard transport only when every material has multigroup data without native composition and all multigroup energy grids are identical.
+An omitted grid is represented internally by a zero-valued ``G + 1`` placeholder, allowing materials that all omit the grid to share one standard multigroup structure.
+All other material combinations select hybrid transport, for which each multigroup dataset requires an explicit physical energy grid.
+Standard transport interprets the particle's ``E`` field as a dimensionless group coordinate, while hybrid transport interprets it as physical energy in eV and maps it through ``energy_grid`` and ``energy_representation``.
+Finalization also validates standard-multigroup source energies and resolves ``energy="all"`` tally filters.
+
 Deduplication and Cycles
 ------------------------
 

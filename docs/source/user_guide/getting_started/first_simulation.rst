@@ -133,14 +133,14 @@ MC/DC reaches their materials and surfaces when it compiles the simulation, so t
 Source
 ~~~~~~
 
-The source emits group-0 particles isotropically and uniformly throughout the first cell:
+In standard multigroup transport, ``energy=0`` emits particles at group 0 isotropically and uniformly throughout the first cell:
 
 .. code-block:: python3
 
    source = mcdc.Source(
        z=[0.0, 2.0],
        isotropic=True,
-       group=0,
+       energy=0,
    )
    simulation.set_sources([source])
 

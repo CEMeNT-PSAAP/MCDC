@@ -14,8 +14,7 @@ The representation has two complementary parts:
    A contiguous one-dimensional NumPy array containing variable-length numerical payloads and lists of object IDs.
 
 The same logical representation is supplied to Python, Numba-CPU, and Numba-GPU execution.
-During Python-only prototyping, transport code may also access arbitrary Python state alongside this representation.
-A method intended for portable, maintained execution must express the state required by transport through the prepared representation.
+Portable transport code expresses its state through this prepared representation.
 See :doc:`python_first_numba_accelerated_design` for this development model.
 
 Why Two Structures?
@@ -23,8 +22,13 @@ Why Two Structures?
 
 Python model objects may contain arrays whose sizes depend on the problem: energy grids, cross sections, mesh boundaries, motion tables, tally filters, and many others.
 Nested Python object references and variable-sized arrays cannot be embedded directly in the stable NumPy structured dtype required by the Numba execution modes.
+Separating fixed-layout metadata from variable-length values keeps the structured dtype stable while accommodating model-dependent payloads.
 
-MC/DC separates fixed-layout metadata from variable-length values:
+Runtime Object Model
+--------------------
+
+Fixed fields become structured-record fields, Python object references become simulation-local IDs, and variable-length fields become offsets into ``data``.
+Generated ``mcdc_get`` and ``mcdc_set`` accessors perform the corresponding lookups and offset calculations.
 
 .. image:: ../../images/developer_guide/architecture/runtime_data_layout.png
    :width: 100%
@@ -33,36 +37,10 @@ MC/DC separates fixed-layout metadata from variable-length values:
 The figure follows one connected example from Python model objects into the two runtime layers.
 The cell record locates its three surface IDs in ``data``, the selected surface record locates an attached tally ID, and the base tally record identifies its concrete surface-crossing record.
 Tally scores, bins, and other variable-length payloads share the same flat arena.
-Generated ``mcdc_get`` and ``mcdc_set`` accessors translate logical field access into the required offset calculation.
 The IDs and offsets shown in the figure are illustrative; their values depend on the compiled model and its packed layout.
 
-An Explicit Runtime Object Model
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Together, the structured records, flat data arena, and generated accessors form an explicit runtime object model.
-A conventional object runtime stores fixed fields with the object while references point to separately allocated objects and variable-length values.
-Accessing an attribute follows those references without requiring application code to know where the referenced memory resides.
-
-MC/DC makes comparable operations explicit.
-Fixed fields become structured-record fields, Python object references become simulation-local IDs, variable-length fields become offsets into ``data``, and generated accessors perform the corresponding lookup or offset calculation.
-The combination of ``simulation`` and ``data`` can therefore be understood as a purpose-built runtime object model backed by explicit records and a flat data arena.
-
-Seen narrowly, this design reinvents facilities already supplied by Python and other language runtimes.
-MC/DC derives schemas, assigns object identities, packs values, represents relationships, dispatches among concrete representations, and generates field accessors.
-Maintaining this machinery adds implementation complexity and requires MC/DC to define rules that an ordinary class system would otherwise manage automatically.
-
-The duplication is necessary because the Python object model does not satisfy Numba execution requirements.
-Python objects may contain interpreter-managed references, dynamic types, arbitrary inheritance behavior, and separately allocated containers that Numba cannot generally compile or transfer to an accelerator.
-Host pointers also cannot serve as portable references to state allocated in a GPU address space.
-MC/DC instead needs a complete representation with predictable types, explicit ownership, stable relationships, and equivalent access patterns across Python, Numba-CPU, and Numba-GPU execution.
-
-The current single ``float64`` data arena is a simplifying choice within this design rather than an inherent requirement of an explicit runtime object model.
-It gives MC/DC one variable-length allocation, one offset space, and consistent function signatures across execution modes.
-Integer values stored in the arena, including lists of object IDs, are exactly representable for practical MC/DC model sizes, and generated scalar getters cast them back to integers when accessed.
-Separate typed arenas could preserve integer types and avoid those conversions, but would introduce additional allocations, offsets, generated accessors, function arguments, and GPU memory management.
-
-MC/DC's implementation should therefore be viewed neither as an ordinary Python class layout nor as a general-purpose replacement for one.
-It is a specialized, arena-backed object model that exchanges language-level generality for the predictable representation required by portable particle-transport execution.
+The ``data`` arena uses ``float64`` values, one allocation, and one offset space across execution modes.
+Integer values stored in the arena, including object IDs, are restored to their declared types by generated scalar accessors.
 
 Object Collections
 ^^^^^^^^^^^^^^^^^^
@@ -261,7 +239,6 @@ They use:
 
 The layout is fixed for the duration of a prepared run.
 Transport may update allocated values, tally bins, particle banks, and runtime counters, but it cannot resize a field or introduce a new model object.
-A Python-only prototype may temporarily read or modify external Python state, but that state is not part of the portable runtime layout.
 Changing the prepared MC/DC model requires a new model compilation and runtime preparation pass.
 
 Execution Backends

@@ -168,9 +168,9 @@ The layer generator interprets annotations according to the field's role:
    * - ``move_velocities: Annotated[NDArray[float64], ("N_move", 3)]``
      - Offset, length, and shape metadata plus flattened values
      - ``mcdc_get.surface.move_velocities(move, axis, surface, data)``
-   * - ``group_pmf: DistributionPMF``
+   * - ``energy_pmf: DistributionPMF``
      - Simulation-local object ID
-     - ``simulation["distributions"][source["group_pmf_ID"]]``
+     - ``simulation["distributions"][source["energy_pmf_ID"]]``
    * - ``collision_tallies: list[TallyCollision]``
      - Count and offset to IDs stored in ``data``
      - ``mcdc_get.cell.collision_tally_IDs(index, cell, data)``
@@ -203,7 +203,7 @@ Transport then reads one value through the generated accessor:
 
 .. code-block:: python
 
-   bias = mcdc_get.source.energy_bias(group, source, data)
+   bias = mcdc_get.source.energy_bias(index, source, data)
 
 Avoid adding parallel state in several classes.
 If a value belongs to the simulation as a whole, place it in ``Simulation`` or one of its embedded configuration objects and pass or access that representation consistently.

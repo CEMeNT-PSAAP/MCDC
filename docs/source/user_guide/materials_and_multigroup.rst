@@ -58,14 +58,13 @@ Macroscopic cross sections use cm\ :sup:`-1`, group speeds use cm/s, and precurs
    )
 
 Multigroup Energy Grids and Representation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An explicit ``energy_grid`` contains ``G + 1`` physical energy boundaries in eV.
 Group ``g`` covers ``energy_grid[g] <= E < energy_grid[g + 1]``.
 The grid both maps continuous energy to a group and bounds continuous energy reconstructed from a group.
 
-When no grid is supplied, MC/DC stores a zero-valued placeholder with length ``G + 1``.
-The placeholder does not represent physical energy boundaries and is used only for standard multigroup transport, where the particle's group is authoritative and continuous energy does not select a group.
+The grid may be omitted for standard multigroup transport when every material omits ``energy_grid``.
 
 For lower and upper group boundaries :math:`E_g` and :math:`E_{g+1}`, the energy-representation policies are:
 
@@ -74,21 +73,23 @@ For lower and upper group boundaries :math:`E_g` and :math:`E_{g+1}`, the energy
 - ``"uniform"``: sample :math:`E` uniformly between the two boundaries; and
 - ``"log_uniform"``: sample :math:`\log E` uniformly between their logarithms, equivalently :math:`E=E_g(E_{g+1}/E_g)^\xi` for :math:`\xi\sim\mathcal{U}(0,1)`.
 
-The policies apply when an explicit physical energy grid is used.
+The policies apply when transport reconstructs physical energy from a group, including after a hybrid multigroup interaction.
 The logarithmic policies require strictly positive energy boundaries.
 Midpoint policies reconstruct one deterministic value per group, while uniform policies sample a new value when continuous energy is reconstructed.
+Standard multigroup transport retains the group coordinate instead and does not apply a physical-energy reconstruction policy during particle transport.
 
 MC/DC determines the neutron multigroup transport organization when the simulation is compiled.
-Standard neutron multigroup transport means that every material uses neutron multigroup data without native composition and that all materials share one energy grid.
-MC/DC selects this organization only when every material satisfies those conditions.
-This includes materials sharing either the zero-valued placeholder or the same explicit physical grid.
+Standard neutron multigroup transport applies when every material uses neutron multigroup data without native composition and all materials either omit ``energy_grid`` or share the same explicit grid.
+In standard multigroup transport, particle energy uses a dimensionless group coordinate: energy ``0.0`` represents group 0, energy ``1.0`` represents group 1, and so forth.
 
 Transport is hybrid when native composition data is present or multigroup materials use different grids.
 Every multigroup dataset participating in hybrid transport requires an explicit physical energy grid because continuous energy selects the applicable material-local group.
+In hybrid transport, particle energy remains physical energy in eV, and ``energy_grid`` maps it to a material-local group.
+The material's ``energy_representation`` policy maps an outgoing group back to physical energy.
 If a particle lies outside that grid, MC/DC uses the material's native neutron data when present; without a native composition, the material has zero interaction cross section at that energy.
 
 Combining Native and Multigroup Data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Construct :class:`mcdc.NeutronMultigroupData` directly when attaching it to a material with a :ref:`native composition <user_native_transport>`:
 
@@ -108,20 +109,4 @@ Construct :class:`mcdc.NeutronMultigroupData` directly when attaching it to a ma
 The explicit energy grid is required whenever a native composition and neutron multigroup data are combined.
 Its bounds identify the energy interval where the multigroup transport model is available.
 
-Particle Energy and Group State
--------------------------------
-
-A particle carries continuous ``energy`` and an auxiliary integer ``group`` as separate state.
-:class:`mcdc.Source` accepts an independent continuous energy distribution in eV and discrete group distribution:
-
-.. code-block:: python
-
-   source = mcdc.Source(
-       energy=1.0e6,
-       group=([0, 1], [0.25, 0.75]),
-   )
-
-The physics using ``group`` determines its meaning.
-Neutron multigroup transport uses it as the neutron energy-group index.
-If both variables are supplied, the group takes precedence over energy only for standard neutron multigroup transport selected during compilation.
-The tally equivalents are the separate ``group`` and ``energy`` filters described in :doc:`tallies`.
+See :ref:`user_standard_multigroup_sources` for the corresponding source-energy convention.

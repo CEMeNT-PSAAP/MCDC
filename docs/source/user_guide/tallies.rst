@@ -11,15 +11,15 @@ The code snippets assume NumPy has been imported as ``np``.
 Each tally combines:
 
 - one or more scores, such as flux, collision rate, or current;
-- optional particle, spatial, angular, group, energy, time, surface, or cell filters; and
+- optional particle, spatial, angular, energy, time, surface, or cell filters; and
 - a name used to identify the tally in the output file.
 
 Only tallies passed to ``simulation.set_tallies(...)`` are scored.
 
-Particle, Group, and Energy Filters
------------------------------------
+Particle and Energy Filters
+---------------------------
 
-The ``particle_type``, ``group``, and ``energy`` filters are independent.
+The ``particle_type`` and ``energy`` filters are independent.
 If ``particle_type`` is omitted, a tally accepts any transported particle type.
 Set it explicitly when one tally should score only neutrons, electrons, or protons:
 
@@ -32,10 +32,9 @@ Set it explicitly when one tally should score only neutrons, electrons, or proto
        energy=[0.0, 1.0e6, 20.0e6],
    )
 
-``energy`` contains continuous-energy bin boundaries in eV.
-``group`` contains boundaries for the independent auxiliary integer group state.
-The physics using the group determines its meaning.
-For neutron multigroup transport, it is the neutron energy-group index, and tally boundaries can coarsen several energy groups into one bin:
+For native and hybrid transport, ``energy`` contains physical energy-bin boundaries in eV.
+For standard neutron multigroup transport, ``energy`` instead contains boundaries on the dimensionless group coordinate.
+Half-integer boundaries can retain individual groups or collapse several adjacent groups into one tally bin:
 
 .. code-block:: python3
 
@@ -43,21 +42,22 @@ For neutron multigroup transport, it is the neutron energy-group index, and tall
        name="collapsed_group_flux",
        scores=["flux"],
        particle_type="neutron",
-       group=[-0.5, 1.5, 3.5],
+       energy=[-0.5, 1.5, 3.5],
    )
 
-Use ``group="all"`` to create one tally bin per neutron energy group during simulation compilation:
+Use ``energy="all"`` to create one tally bin per neutron energy group during simulation compilation:
 
 .. code-block:: python3
 
    group_flux = mcdc.Tally(
        name="group_flux",
        scores=["flux"],
-       group="all",
+       energy="all",
    )
 
-The ``"all"`` shortcut supports neutron groups when every material contains neutron multigroup data on one shared energy grid.
-``particle_type`` may be omitted or set to ``"neutron"``.
+The ``"all"`` shortcut is valid only when compilation selects standard neutron multigroup transport.
+For this shortcut, omit ``particle_type`` or set it to ``"neutron"``.
+Compilation replaces it with ``[-0.5, 0.5, ..., G - 0.5]`` for the shared ``G``-group structure.
 
 Mesh Tallies
 ------------
@@ -196,7 +196,7 @@ Load and normalize the mesh flux with h5py:
    flux_sdev /= dz
 
 The score arrays contain values integrated over their bins.
-Spatial grids in the output retain cm, angular grids use radians or dimensionless polar cosine, energy grids use eV, and time grids use seconds.
+Spatial grids in the output retain cm, angular grids use radians or dimensionless polar cosine, physical energy grids use eV, standard-multigroup group-coordinate grids are dimensionless, and time grids use seconds.
 Divide by the applicable bin widths when a differential result is required.
 
 Reducing an Angular Tally
