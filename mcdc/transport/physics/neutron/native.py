@@ -930,7 +930,6 @@ def sample_fission(
                 particle["uy"] = particle_new["uy"]
                 particle["uz"] = particle_new["uz"]
                 particle["t"] = particle_new["t"]
-                particle["g"] = particle_new["g"]
                 particle["E"] = particle_new["E"]
                 particle["w"] = particle_new["w"]
             else:

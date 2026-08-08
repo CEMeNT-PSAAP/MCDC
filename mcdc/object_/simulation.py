@@ -25,6 +25,7 @@ from numpy.typing import NDArray
 
 ####
 
+from mcdc.constant import PARTICLE_NEUTRON
 from mcdc.object_.base import MCDCBase
 from mcdc.object_.data import DataBase
 from mcdc.object_.distribution import DistributionBase
@@ -340,6 +341,37 @@ class Simulation(MCDCBase):
                     print_error(
                         "Hybrid neutron multigroup transport requires an explicit "
                         "energy_grid for every multigroup material."
+                    )
+
+        # Validate neutron source coordinates for standard multigroup transport
+        else:
+            G = self.materials[0].neutron_multigroup.G
+            for source in self.sources:
+                if source.particle_type != PARTICLE_NEUTRON:
+                    continue
+
+                if source.mono_energetic:
+                    source_energies = np.array([source.energy])
+                elif source.discrete_energy:
+                    source_energies = source.energy_pmf.value
+                else:
+                    print_error(
+                        "Standard neutron multigroup transport requires neutron "
+                        "sources to use a scalar energy or discrete_energy "
+                        "group-coordinate distribution."
+                    )
+
+                if not np.all(np.isfinite(source_energies)) or not np.all(
+                    source_energies == np.floor(source_energies)
+                ):
+                    print_error(
+                        "Standard neutron multigroup source energies must be finite, "
+                        "integer-valued group coordinates."
+                    )
+                if np.any(source_energies < 0) or np.any(source_energies >= G):
+                    print_error(
+                        "Standard neutron multigroup source energies must satisfy "
+                        f"0 <= energy < G (G={G})."
                     )
 
         # Limit transport to the latest requested tally boundary

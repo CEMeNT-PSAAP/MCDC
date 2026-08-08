@@ -150,10 +150,7 @@ def get_ww_indices(particle_container, ww_obj, simulation, data):
 
     # get energy index
     energy_bounds = ww_get.energy_bounds_all(ww_obj, data)
-    if simulation["settings"]["neutron_multigroup_mode"]:
-        energy = particle["g"]
-    else:
-        energy = particle["E"]
+    energy = particle["E"]
     ie = util.find_bin(energy, energy_bounds)
 
     # get spatial index

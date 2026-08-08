@@ -88,6 +88,85 @@ def test_hybrid_multigroup_requires_explicit_energy_grids(capsys):
     assert "requires an explicit energy_grid" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        mcdc.Source(energy=1),
+        mcdc.Source(energy=1.0),
+        mcdc.Source(discrete_energy=([0, 1], [0.25, 0.75])),
+    ],
+)
+def test_standard_multigroup_accepts_integer_group_coordinates(source):
+    material = mcdc.Material.multigroup(capture=[0.1, 0.2])
+    simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell(fill=material)])
+    simulation.set_sources([source])
+
+    simulation.compile()
+
+    assert not simulation.technique.neutron_multigroup.hybrid
+
+
+@pytest.mark.parametrize(
+    "source, expected_message",
+    [
+        (
+            mcdc.Source(energy=0.5),
+            "must be finite, integer-valued group coordinates",
+        ),
+        (
+            mcdc.Source(discrete_energy=([0, 1.5], [0.25, 0.75])),
+            "must be finite, integer-valued group coordinates",
+        ),
+        (
+            mcdc.Source(energy=np.nan),
+            "must be finite, integer-valued group coordinates",
+        ),
+        (
+            mcdc.Source(energy=-1),
+            "must satisfy 0 <= energy < G",
+        ),
+        (
+            mcdc.Source(energy=2),
+            "must satisfy 0 <= energy < G",
+        ),
+        (
+            mcdc.Source(energy=([0.0, 1.0], [1.0, 1.0])),
+            "requires neutron sources to use a scalar energy or discrete_energy",
+        ),
+    ],
+)
+def test_standard_multigroup_rejects_invalid_source_energy(
+    source,
+    expected_message,
+    capsys,
+):
+    material = mcdc.Material.multigroup(capture=[0.1, 0.2])
+    simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell(fill=material)])
+    simulation.set_sources([source])
+
+    with pytest.raises(SystemExit):
+        simulation.compile()
+
+    assert expected_message in capsys.readouterr().out
+
+
+def test_standard_neutron_multigroup_does_not_validate_electron_source_energy():
+    material = mcdc.Material.multigroup(capture=[0.1, 0.2])
+    source = mcdc.Source(
+        particle_type="electron",
+        energy=([1.0e3, 2.0e3], [1.0, 1.0]),
+    )
+    simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell(fill=material)])
+    simulation.set_sources([source])
+
+    simulation.compile()
+
+    assert not simulation.technique.neutron_multigroup.hybrid
+
+
 def test_native_only_simulation_remains_hybrid(monkeypatch):
     # Isolate mode finalization from native data-library loading.
     def compile_nuclide(nuclide, simulation):

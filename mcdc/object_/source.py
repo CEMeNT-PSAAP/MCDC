@@ -71,14 +71,17 @@ class Source(MCDCObject):
         a tabulated distribution: the first row contains energy values and the
         second row contains their probability density in ``eV^-1``. Defaults
         to a mono-energetic source at **1 MeV**. In standard neutron multigroup
-        transport, an integer conventionally specifies a group-coordinate energy and is
-        stored internally as a float.
+        transport, an integer conventionally specifies a group-coordinate
+        energy and is stored internally as a float. The coordinate must identify
+        an available group. Continuous energy distributions are not supported
+        in standard multigroup transport.
     discrete_energy : array_like of float, optional
         Discrete source-energy distribution with shape ``(2, N)``. The first
         row contains sampled energy values and the second row contains their
         probabilities. Values are physical energies in eV for continuous-energy
         transport and group-coordinate energies for standard multigroup
-        transport. Cannot be supplied with ``energy``.
+        transport. Standard-multigroup coordinates must be integer-valued and
+        identify available groups. Cannot be supplied with ``energy``.
     time : real or array_like of float, optional
         Emission time in seconds. A real scalar, including a NumPy scalar,
         defines a discrete emission time. An array-like value with shape
