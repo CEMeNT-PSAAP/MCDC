@@ -53,15 +53,15 @@ def particle_speed(particle_container):
 @njit
 def macro_xs(reaction_type, particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["native_materials"][particle["material_ID"]]
+    material = simulation["materials"][particle["material_ID"]]
     E = particle["E"]
 
     total = 0.0
     for i in range(material["N_element"]):
-        element_ID = mcdc_get.native_material.element_IDs(i, material, data)
+        element_ID = mcdc_get.material.element_IDs(i, material, data)
         element = simulation["elements"][element_ID]
 
-        element_density = mcdc_get.native_material.element_densities(i, material, data)
+        element_density = mcdc_get.material.element_densities(i, material, data)
         xs = total_micro_xs(reaction_type, E, element, data)
         total += element_density * xs
 
@@ -115,7 +115,7 @@ def collision(particle_container, collision_data_container, program, data):
     simulation = util.access_simulation(program)
     particle = particle_container[0]
     collision_data = collision_data_container[0]
-    material = simulation["native_materials"][particle["material_ID"]]
+    material = simulation["materials"][particle["material_ID"]]
 
     # Particle properties
     E = particle["E"]
@@ -136,10 +136,10 @@ def collision(particle_container, collision_data_container, program, data):
     xi = rng.lcg(particle_container) * SigmaT
     total = 0.0
     for i in range(material["N_element"]):
-        element_ID = mcdc_get.native_material.element_IDs(i, material, data)
+        element_ID = mcdc_get.material.element_IDs(i, material, data)
         element = simulation["elements"][element_ID]
 
-        element_density = mcdc_get.native_material.element_densities(i, material, data)
+        element_density = mcdc_get.material.element_densities(i, material, data)
         sigmaT = total_micro_xs(ELECTRON_REACTION_TOTAL, E, element, data)
 
         total += element_density * sigmaT
