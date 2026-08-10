@@ -4,19 +4,16 @@
 Contributing
 ============
 
-This guide describes the repository workflow and quality checks for
-contributing to MC/DC. It is intended for both occasional contributors and
-project maintainers.
+This guide describes the repository workflow and quality checks for contributing to MC/DC.
+It is intended for both occasional contributors and project maintainers.
 
-Start with the setup steps below. Use :doc:`continuous_integration` to
-understand automated checks and :doc:`container_development` when developing in
-the project container. Use :doc:`example_validation` when changing the public
-API or example problems. Read :doc:`pull_requests` before preparing a
-contribution. For software architecture and documentation practices, see the
-:doc:`../developer_guide/index`.
+Start with the setup steps below.
+Use :doc:`continuous_integration` to understand automated checks and :doc:`container_development` when developing in the project container.
+Use :doc:`example_validation` when changing the public API or example problems.
+Read :doc:`pull_requests` before preparing a contribution.
+For software architecture and documentation practices, see the :doc:`../developer_guide/index`.
 
-For implementation guidance specific to compiled transport functions, see
-:doc:`../developer_guide/extending/writing_numba_compatible_transport_code`.
+For implementation guidance specific to compiled transport functions, see :doc:`../developer_guide/extending/writing_numba_compatible_transport_code`.
 
 Contributions target the ``dev`` branch. To prepare a development checkout:
 
@@ -36,10 +33,8 @@ Development Workflow
    example_validation
    pull_requests
 
-MC/DC documentation is an important part of the project and evolves alongside
-the codebase. The :doc:`../developer_guide/documentation/index` guide describes
-the documentation philosophy, writing guidelines, and the tools used to build
-and maintain the documentation.
+MC/DC documentation is an important part of the project and evolves alongside the codebase.
+The :doc:`../developer_guide/documentation/index` guide describes the documentation philosophy, writing guidelines, and the tools used to build and maintain the documentation.
 
 Please note our `code of conduct <https://github.com/mcdc-project/mcdc/blob/dev/CODE_OF_CONDUCT.md>`_, which we take seriously.
 
@@ -115,14 +110,13 @@ However if absolutely required by users numba does allow for some `cache sharing
 Adding a New Input
 ------------------
 
-For architectural guidance on adding a model field, embedded configuration,
-registered object category, or polymorphic subtype, see
-:doc:`../developer_guide/extending/extending_the_object_model`. Public model
-classes and configuration are primarily defined in ``mcdc/object_/``. Common
-input-related locations include:
+For architectural guidance on adding a model field, embedded configuration, registered object category, or polymorphic subtype, see :doc:`../developer_guide/extending/extending_the_object_model`.
+Public model classes and configuration are primarily defined in ``mcdc/object_/``.
+Common input-related locations include:
 
 #. ``mcdc/object_/settings.py`` — simulation settings and k-eigenvalue parameters
-#. ``mcdc/object_/material.py`` — material definitions (``Material``, ``MaterialMG``)
+#. ``mcdc/object_/material.py`` — material and composition definition
+#. ``mcdc/object_/transport_model_data.py`` — particle-specific transport data
 #. ``mcdc/object_/surface.py`` — surface geometry (``Surface`` class methods)
 #. ``mcdc/object_/cell.py`` — cell definitions (``Cell``)
 #. ``mcdc/object_/source.py`` — source specifications (``Source``)
@@ -134,8 +128,7 @@ input-related locations include:
 Testing
 -------
 
-See :doc:`continuous_integration` for more information on how we run these
-tests automatically.
+See :doc:`continuous_integration` for more information on how we run these tests automatically.
 
 MC/DC has a robust testing suite that your changes must be able to pass before a PR is accepted.
 Unit tests for functions that have them are ran in a pure python from.
@@ -197,10 +190,7 @@ If you are wondering accommodations.
 Adding Documentation
 --------------------
 
-Documentation is a core part of MC/DC. Contributions that introduce new
-features, modify existing behavior, or change developer workflows should update
-the relevant documentation accordingly.
+Documentation is a core part of MC/DC.
+Contributions that introduce new features, modify existing behavior, or change developer workflows should update the relevant documentation accordingly.
 
-See the :doc:`../developer_guide/documentation/index` guide for documentation
-philosophy, writing
-guidelines, and instructions for contributing to the documentation.
+See the :doc:`../developer_guide/documentation/index` guide for documentation philosophy, writing guidelines, and instructions for contributing to the documentation.

@@ -31,6 +31,7 @@ Basic Examples
    :maxdepth: 1
 
    slab_shielding
+   hybrid_multigroup
    iterative_source_reweighting
    kobayashi_dog_leg
    kobayashi_td

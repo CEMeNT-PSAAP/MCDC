@@ -15,7 +15,7 @@ lib = h5py.File("../MGXS-C5G7-TD.h5", "r")
 
 # Setter
 def set_mat(mat):
-    return mcdc.MaterialMG(
+    return mcdc.Material.multigroup(
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],
@@ -279,7 +279,7 @@ source = mcdc.Source(
     y=[-pitch * 17 * 2, 0.0],
     z=[-core_height / 2, core_height / 2],
     isotropic=True,
-    energy_group=0,  # Highest energy
+    energy=0,  # Highest energy
 )
 simulation.set_sources([source])
 
@@ -304,7 +304,7 @@ simulation.settings.census_bank_buffer_ratio = 4.0
 simulation.settings.set_eigenmode(N_inactive=5, N_active=10, gyration_radius="all")
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

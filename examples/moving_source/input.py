@@ -9,7 +9,7 @@ simulation = mcdc.Simulation("Moving source")
 # ======================================================================================
 
 # Set materials
-air = mcdc.MaterialMG(
+air = mcdc.Material.multigroup(
     capture=np.array([0.002]),
     scatter=np.array([[0.008]]),
     speed=np.array([200000.0]),
@@ -37,7 +37,7 @@ src = mcdc.Source(
     z=[-0.5, 0.5],
     direction=[1.0, 1.0, 0.0],
     polar_cosine=[-1.0, -0.9],
-    energy_group=0,
+    energy=0,
     time=[0.0, 10.0],
 )
 src.move(

@@ -23,7 +23,7 @@ with np.load("SHEM-361.npz") as data:
     lamd = data["lamd"]
 
 # Set material
-m = mcdc.MaterialMG(
+m = mcdc.Material.multigroup(
     capture=SigmaC,
     scatter=SigmaS,
     fission=SigmaF,
@@ -48,7 +48,7 @@ simulation.set_model([c])
 # ======================================================================================
 
 source = mcdc.Source(
-    position=(0.0, 0.0, 0.0), isotropic=True, energy_group=np.array([[360], [1.0]])
+    position=(0.0, 0.0, 0.0), isotropic=True, discrete_energy=np.array([[360], [1.0]])
 )
 simulation.set_sources([source])
 
@@ -60,7 +60,7 @@ simulation.set_sources([source])
 tally = mcdc.Tally(
     scores=["flux"],
     time=np.insert(np.logspace(-8, 1, 100), 0, 0.0),
-    energy="all_groups",
+    energy="all",
 )
 simulation.set_tallies([tally])
 
@@ -73,7 +73,7 @@ simulation.settings.census_bank_buffer_ratio = 5.0
 simulation.settings.source_bank_buffer_ratio = 5.0
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

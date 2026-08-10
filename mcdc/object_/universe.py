@@ -43,7 +43,7 @@ class Universe(MCDCObject):
     >>> left = mcdc.Surface.PlaneX(x=-1.0)
     >>> middle = mcdc.Surface.PlaneX(x=0.0)
     >>> right = mcdc.Surface.PlaneX(x=1.0)
-    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> material = mcdc.Material.multigroup(capture=np.array([1.0]))
     >>> cells = [
     ...     mcdc.Cell(region=+left & -middle, fill=material),
     ...     mcdc.Cell(region=+middle & -right, fill=material),
@@ -53,8 +53,10 @@ class Universe(MCDCObject):
     Create a universe for a spherical inclusion and its surrounding material:
 
     >>> sphere = mcdc.Surface.Sphere(radius=0.5)
-    >>> fuel = mcdc.MaterialMG(fission=np.array([0.2]), nu_p=np.array([2.5]))
-    >>> water = mcdc.MaterialMG(capture=np.array([0.01]))
+    >>> fuel = mcdc.Material.multigroup(
+    ...     fission=np.array([0.2]), nu_p=np.array([2.5])
+    ... )
+    >>> water = mcdc.Material.multigroup(capture=np.array([0.01]))
     >>> pin = mcdc.Universe(
     ...     name="Pin",
     ...     cells=[

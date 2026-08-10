@@ -4,9 +4,8 @@
 Simulation Lifecycle
 ====================
 
-An MC/DC calculation is owned by a :class:`mcdc.Simulation`. The simulation
-collects one model, its sources and tallies, its settings and techniques, and
-the runtime state needed to visualize or execute it.
+An MC/DC calculation is owned by a :class:`mcdc.Simulation`.
+The simulation collects one model, its sources and tallies, its settings and techniques, and the runtime state needed to visualize or execute it.
 
 The normal workflow has five stages:
 
@@ -16,18 +15,18 @@ The normal workflow has five stages:
 #. Visualize or run the prepared model.
 #. Generate and post-process output.
 
-Most inputs call only ``visualize_model`` or ``run`` explicitly. MC/DC performs
-the required compilation and runtime preparation automatically.
+Most inputs call only ``visualize_model`` or ``run`` explicitly.
+MC/DC performs the required compilation and runtime preparation automatically.
 
 1. Construct Model Objects
 --------------------------
 
-Materials, surfaces, cells, sources, meshes, and tallies are ordinary Python
-objects:
+Materials, surfaces, cells, sources, meshes, and tallies are ordinary Python objects.
+Here, the macroscopic cross sections are in cm\ :sup:`-1` and surface positions are in cm:
 
 .. code-block:: python
 
-   material = mcdc.MaterialMG(
+   material = mcdc.Material.multigroup(
        capture=np.array([0.1]),
        scatter=np.array([[0.9]]),
    )
@@ -35,14 +34,13 @@ objects:
    right = mcdc.Surface.PlaneZ(z=2.0, boundary_condition="vacuum")
    cell = mcdc.Cell(region=+left & -right, fill=material)
 
-Objects can refer to other objects. In this example the cell retains its
-region, the region retains its surfaces, and the cell retains its material.
+Objects can refer to other objects.
+In this example the cell retains its region, the region retains its surfaces, and the cell retains its material.
 
 2. Attach Roots to a Simulation
 -------------------------------
 
-Create a simulation and attach the roots from which MC/DC can discover the
-complete model:
+Create a simulation and attach the roots from which MC/DC can discover the complete model:
 
 .. code-block:: python
 
@@ -51,19 +49,17 @@ complete model:
    simulation.set_sources([source])
    simulation.set_tallies([tally])
 
-``set_model`` accepts the cells in the root universe. Materials, surfaces,
-child universes, lattices, and meshes that are reachable from those cells do
-not need separate registration calls.
+``set_model`` accepts the cells in the root universe.
+Materials, surfaces, child universes, lattices, and meshes that are reachable from those cells do not need separate registration calls.
 
-Sources and tallies are explicit roots because they are not necessarily
-reachable from the geometry. Settings and techniques belong directly to the
-simulation:
+Sources and tallies are explicit roots because they are not necessarily reachable from the geometry.
+Settings and techniques belong directly to the simulation:
 
 .. code-block:: python
 
    simulation.settings.N_particle = 10_000
    simulation.settings.N_batch = 20
-   simulation.implicit_capture()
+   simulation.technique.implicit_capture()
 
 This explicit ownership replaces the former process-wide singleton workflow.
 
@@ -71,27 +67,22 @@ Process Ownership
 ^^^^^^^^^^^^^^^^^
 
 MC/DC runs one active simulation context at a time within a Python process.
-Objects may be shared within one model—for example, several cells may use the
-same material—but the same object instance should not be attached to different
-``Simulation`` instances.
+Objects may be shared within one model—for example, several cells may use the same material—but the same object instance should not be attached to different ``Simulation`` instances.
 
-Multiple simulations can be constructed in one process when they have
-independent object graphs and are run serially. For concurrent calculations,
-construct each model and run its simulation in a separate process. A Python
-driver, workflow system, or batch scheduler can manage those processes.
+Multiple simulations can be constructed in one process when they have independent object graphs and are run serially.
+For concurrent calculations, construct each model and run its simulation in a separate process.
+A Python driver, workflow system, or batch scheduler can manage those processes.
 
 3. Compile the Object Graph
 ---------------------------
 
-Compilation discovers every object reachable from the simulation, registers
-shared objects once, and assigns simulation-local IDs. Normally it is
-automatic:
+Compilation discovers every object reachable from the simulation, registers shared objects once, and assigns simulation-local IDs.
+Normally it is automatic:
 
 - ``simulation.visualize_model(...)`` compiles when needed.
 - ``simulation.run()`` compiles when needed.
 
-Call ``simulation.compile()`` directly only when you need to inspect the
-compiled object lists or IDs before visualization or execution:
+Call ``simulation.compile()`` directly only when you need to inspect the compiled object lists or IDs before visualization or execution:
 
 .. code-block:: python
 
@@ -99,13 +90,11 @@ compiled object lists or IDs before visualization or execution:
    print(simulation.cells)
    print(material.ID)
 
-Compiled IDs describe one snapshot and may change after recompilation. Do not
-use them as persistent identifiers in an input or post-processing workflow.
+Compiled IDs describe one snapshot and may change after recompilation.
+Do not use them as persistent identifiers in an input or post-processing workflow.
 
-The three setter methods invalidate the current snapshot. If you directly
-modify an attached object after explicitly compiling or visualizing the model,
-call ``simulation.compile()`` again before inspecting or visualizing the
-change.
+The three setter methods invalidate the current snapshot.
+If you directly modify an attached object after explicitly compiling or visualizing the model, call ``simulation.compile()`` again before inspecting or visualizing the change.
 
 Compilation finalizes some user-facing values in place.
 In particular, source probabilities are normalized, tally limits may reduce ``settings.time_boundary``, and particle-bank buffer ratios may be adjusted for the selected run mode.
@@ -114,7 +103,8 @@ Set new raw values explicitly before recompiling when an iterative workflow chan
 4. Visualize or Run
 -------------------
 
-Visualization is a useful geometry check before transport:
+Visualization is a useful geometry check before transport.
+Spatial coordinates are in cm and snapshot times are in seconds:
 
 .. code-block:: python
 
@@ -158,9 +148,8 @@ See :doc:`execution/cpu` and :doc:`execution/gpu` for operational guidance.
 5. Process Output
 -----------------
 
-``simulation.run()`` writes the configured HDF5 output. Use stable tally names
-and a companion post-processing script so the relationship between an input
-and its analysis remains clear:
+``simulation.run()`` writes the configured HDF5 output.
+Use stable tally names and a companion post-processing script so the relationship between an input and its analysis remains clear:
 
 .. code-block:: python
 
@@ -174,16 +163,14 @@ and its analysis remains clear:
 
 The tally is then available under ``tallies/slab_flux`` in ``slab.h5``.
 
-For workflows that reuse most of a model while changing selected inputs between
-runs, continue with :doc:`iterative_simulations`.
+For workflows that reuse most of a model while changing selected inputs between runs, continue with :doc:`iterative_simulations`.
 
 Complete Workflows
 ------------------
 
 The example suite demonstrates the lifecycle in complete inputs:
 
-- :ref:`example_slab_shielding` — fixed-source execution, model
-  visualization, and output processing.
+- :ref:`example_slab_shielding` — fixed-source execution, model visualization, and output processing.
 - :ref:`example_iterative_source_reweighting` — partial model updates and
   repeated compilation within one simulation.
 - :ref:`example_moving_source` — transient fixed-source transport.
@@ -191,6 +178,4 @@ The example suite demonstrates the lifecycle in complete inputs:
 - :ref:`example_c5g7_transient` — a larger reactor transient.
 
 For exact public signatures, use the :doc:`../reference/python_api/index`.
-For framework implementation details, continue with
-:doc:`../developer_guide/architecture/simulation_compilation` and
-:doc:`../developer_guide/architecture/runtime_data_layout`.
+For framework implementation details, continue with :doc:`../developer_guide/architecture/simulation_compilation` and :doc:`../developer_guide/architecture/runtime_data_layout`.

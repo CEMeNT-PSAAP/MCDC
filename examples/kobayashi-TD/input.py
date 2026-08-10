@@ -10,8 +10,8 @@ simulation = mcdc.Simulation("Time-dependent Kobayashi dog-leg benchmark")
 # (PNE 2001, https://doi.org/10.1016/S0149-1970(01)00007-5)
 
 # Set materials
-m = mcdc.MaterialMG(capture=np.array([0.05]), scatter=np.array([[0.05]]))
-m_void = mcdc.MaterialMG(capture=np.array([5e-5]), scatter=np.array([[5e-5]]))
+m = mcdc.Material.multigroup(capture=np.array([0.05]), scatter=np.array([[0.05]]))
+m_void = mcdc.Material.multigroup(capture=np.array([5e-5]), scatter=np.array([[5e-5]]))
 
 # Set surfaces
 sx1 = mcdc.Surface.PlaneX(x=0.0, boundary_condition="reflective")
@@ -55,7 +55,7 @@ source = mcdc.Source(
     y=[0.0, 10.0],
     z=[0.0, 10.0],
     isotropic=True,
-    energy_group=0,
+    energy=0,
     time=[0.0, 50.0],
 )
 simulation.set_sources([source])
@@ -76,7 +76,7 @@ simulation.settings.N_particle = 100
 simulation.settings.N_batch = 2
 
 # Techniques
-simulation.implicit_capture()
+simulation.technique.implicit_capture()
 
 # Run
 simulation.run()

@@ -6,6 +6,7 @@ from mcdc.config import override_settings
 
 def test_compilation_applies_command_line_overrides(monkeypatch):
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     monkeypatch.setattr(config, "target", "cpu")
     monkeypatch.setattr(config.args, "N_particle", 100)
     monkeypatch.setattr(config.args, "N_batch", None)

@@ -36,7 +36,8 @@ DIRECT_SETTINGS = (
 SETTINGS_METHODS = (
     "set_time_census",
     "set_eigenmode",
-    "set_source_file",
+    # TODO: Restore file-backed source setup after its compilation path is enabled.
+    # "set_source_file",
     "set_transported_particles",
 )
 
@@ -113,15 +114,15 @@ class SimulationMembersDirective(SphinxDirective):
 
         for name, technique in TECHNIQUES:
             method = technique.__call__
-            public_name = f"Simulation.{name}"
+            public_name = f"Simulation.technique.{name}"
             _append_line(
                 lines,
-                f".. py:method:: {name}{_public_signature(method)}",
+                f".. py:method:: technique.{name}{_public_signature(method)}",
             )
             _append_line(lines, "   :module:")
             _append_line(
                 lines,
-                f"   :canonical: mcdc.Simulation.{name}",
+                f"   :canonical: mcdc.Simulation.technique.{name}",
             )
             _append_line(lines)
             _append_content(

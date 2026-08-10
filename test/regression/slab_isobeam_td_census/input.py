@@ -11,7 +11,7 @@ simulation = mcdc.Simulation("Slab isotropic beam time-dependent census")
 # Finite homogeneous pure-absorbing slab
 
 # Set materials
-m = mcdc.MaterialMG(capture=np.array([1.0]))
+m = mcdc.Material.multigroup(capture=np.array([1.0]))
 
 # Set surfaces
 s1 = mcdc.Surface.PlaneX(x=0.0, boundary_condition="vacuum")
@@ -29,7 +29,7 @@ simulation.set_model([cell])
 source = mcdc.Source(
     position=(1e-10, 0.0, 0.0),
     white_direction=(1.0, 0.0, 0.0),
-    energy_group=0,
+    energy=0,
     time=[0.0, 5.0],
 )
 simulation.set_sources([source])
@@ -54,7 +54,7 @@ simulation.settings.source_bank_buffer_ratio = 5.0
 simulation.settings.set_time_census(np.linspace(0.0, 5.0, 6)[1:])
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

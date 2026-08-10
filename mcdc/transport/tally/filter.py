@@ -16,14 +16,14 @@ from mcdc.transport.util import find_bin_with_tolerance, find_bin_with_rules
 
 
 @njit
-def get_filter_indices(particle_container, tally, data, MG_mode):
+def get_filter_indices(particle_container, tally, data):
     i_mu, i_azi, i_energy, i_time = 0, 0, 0, 0
 
     if tally["filter_direction"]:
         i_mu, i_azi = get_direction_index(particle_container, tally, data)
 
     if tally["filter_energy"]:
-        i_energy = get_energy_index(particle_container, tally, data, MG_mode)
+        i_energy = get_energy_index(particle_container, tally, data)
 
     if tally["filter_time"]:
         i_time = get_time_index(particle_container, tally, data)
@@ -67,13 +67,10 @@ def get_direction_index(particle_container, tally, data):
 
 
 @njit
-def get_energy_index(particle_container, tally, data, neutron_multigroup_mode):
+def get_energy_index(particle_container, tally, data):
     particle = particle_container[0]
 
-    if neutron_multigroup_mode:
-        E = particle["g"]
-    else:
-        E = particle["E"]
+    E = particle["E"]
 
     tolerance = COINCIDENCE_TOLERANCE_ENERGY
     grid_energy = data[

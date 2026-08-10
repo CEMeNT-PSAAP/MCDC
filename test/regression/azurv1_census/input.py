@@ -12,7 +12,7 @@ simulation = mcdc.Simulation("AZURV1 census")
 # Effective scattering ratio c = 1.1
 
 # Set materials
-m = mcdc.MaterialMG(
+m = mcdc.Material.multigroup(
     capture=np.array([1.0 / 3.0]),
     scatter=np.array([[1.0 / 3.0]]),
     fission=np.array([1.0 / 3.0]),
@@ -35,7 +35,7 @@ simulation.set_model([cell])
 source = mcdc.Source(
     position=[0.0, 0.0, 0.0],
     isotropic=True,
-    energy_group=0,
+    energy=0,
     time=0.0,
 )
 simulation.set_sources([source])
@@ -57,7 +57,7 @@ simulation.settings.source_bank_buffer_ratio = 5.0
 simulation.settings.set_time_census(np.linspace(0.0, 20.0, 21)[1:-1])
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

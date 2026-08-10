@@ -24,6 +24,7 @@ def test_tracklength_tally_with_mesh_filter():
     )
     tally = mcdc.Tally(mesh=mesh, scores=["flux"])
     simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
     simulation.set_tallies([tally])
     simulation.compile()
 

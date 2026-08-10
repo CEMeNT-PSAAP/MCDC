@@ -29,7 +29,7 @@ from mcdc.constant import (
     PI,
 )
 from mcdc.object_.base import MCDCObject
-from mcdc.object_.material import MaterialBase
+from mcdc.object_.material import Material
 from mcdc.object_.tally import TallyCollision, TallyTracklength
 from mcdc.object_.universe import Universe, Lattice
 from mcdc.print_ import print_error
@@ -102,7 +102,7 @@ class Cell(MCDCObject):
     ----------
     region : Region, optional
         Boolean region expression. If omitted, the cell covers all space.
-    fill : MaterialBase, Universe, Lattice, or None, optional
+    fill : Material, Universe, Lattice, or None, optional
         Material or nested geometry placed in the cell. ``None`` creates a void
         cell.
     name : str, optional
@@ -125,7 +125,7 @@ class Cell(MCDCObject):
 
     >>> import numpy as np
     >>> import mcdc
-    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> material = mcdc.Material.multigroup(capture=np.array([1.0]))
     >>> lower = mcdc.Surface.PlaneZ(z=0.0)
     >>> upper = mcdc.Surface.PlaneZ(z=2.0)
     >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)
@@ -173,7 +173,7 @@ class Cell(MCDCObject):
     surfaces: list[Surface]
 
     # Fill definition
-    fill: MaterialBase | Universe | Lattice | NoneType  # Non-numba
+    fill: Material | Universe | Lattice | NoneType  # Non-numba
     fill_type: int
     fill_ID: int
     fill_translated: bool
@@ -188,7 +188,7 @@ class Cell(MCDCObject):
     def __init__(
         self,
         region: Region | NoneType = None,
-        fill: MaterialBase | Universe | Lattice | NoneType = None,
+        fill: Material | Universe | Lattice | NoneType = None,
         name: str = "",
         translation: Sequence[float] = [0.0, 0.0, 0.0],
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
@@ -226,7 +226,7 @@ class Cell(MCDCObject):
             fill._compile_into_simulation(simulation)
 
         # Numba representation of the cell fill
-        if isinstance(fill, MaterialBase):
+        if isinstance(fill, Material):
             self.fill_type = FILL_MATERIAL
             self.fill_ID = fill.ID
         elif isinstance(fill, Universe):

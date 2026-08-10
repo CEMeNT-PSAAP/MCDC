@@ -331,11 +331,11 @@ def step_particle(particle_container, program, data):
         return
 
     # Weight windows
-    if simulation["weight_windows"]["active"]:
+    if simulation["technique"]["weight_windows"]["active"]:
         technique.weight_windows(particle_container, program, data)
 
     # Global weight roulette
-    if simulation["global_weight_roulette"]["active"]:
+    if simulation["technique"]["global_weight_roulette"]["active"]:
         technique.global_weight_roulette(particle_container, simulation)
 
 
@@ -346,17 +346,14 @@ def move_to_event(particle_container, simulation, data):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
+
     particle = particle_container[0]
 
-    # Multigroup preparation
-    #   In MG mode, particle speed is material-dependent.
-    if settings["neutron_multigroup_mode"]:
-        # If material is not identified yet, locate the particle
-        if particle["material_ID"] == -1:
-            if not geometry.locate_particle(particle_container, simulation, data):
-                # Particle is lost
-                particle["event"] = EVENT_LOST
-                return
+    # Locate the material before evaluating material-dependent transport data.
+    if particle["material_ID"] == -1:
+        if not geometry.locate_particle(particle_container, simulation, data):
+            particle["event"] = EVENT_LOST
+            return
 
     # ==================================================================================
     # Geometry inspection

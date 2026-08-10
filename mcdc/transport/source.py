@@ -63,24 +63,18 @@ def source_particle(particle_container, seed, simulation, data):
         )
 
     # Energy
-    if simulation["settings"]["neutron_multigroup_mode"]:
-        E = 0.0
-        if source["mono_energetic"]:
-            g = source["energy_group"]
-        else:
-            ID = source["energy_group_pmf_ID"]
-            sub_ID = simulation["distributions"][ID]["sub_ID"]
-            pmf = simulation["pmf_distributions"][sub_ID]
-            g = sample_pmf(pmf, particle_container, data)
+    if source["mono_energetic"]:
+        E = source["energy"]
+    elif source["discrete_energy"]:
+        ID = source["energy_pmf_ID"]
+        sub_ID = simulation["distributions"][ID]["sub_ID"]
+        pmf = simulation["pmf_distributions"][sub_ID]
+        E = sample_pmf(pmf, particle_container, data)
     else:
-        g = 0
-        if source["mono_energetic"]:
-            E = source["energy"]
-        else:
-            ID = source["energy_pdf_ID"]
-            sub_ID = simulation["distributions"][ID]["sub_ID"]
-            table = simulation["tabulated_distributions"][sub_ID]
-            E = sample_tabulated(table, particle_container, simulation, data)
+        ID = source["energy_pdf_ID"]
+        sub_ID = simulation["distributions"][ID]["sub_ID"]
+        table = simulation["tabulated_distributions"][sub_ID]
+        E = sample_tabulated(table, particle_container, simulation, data)
 
     # Time
     if source["discrete_time"]:
@@ -135,7 +129,6 @@ def source_particle(particle_container, seed, simulation, data):
     particle["ux"] = ux
     particle["uy"] = uy
     particle["uz"] = uz
-    particle["g"] = g
     particle["E"] = E
     particle["w"] = 1.0
     particle["particle_type"] = source["particle_type"]

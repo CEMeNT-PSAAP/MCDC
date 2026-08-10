@@ -102,7 +102,7 @@ This section walks through the input file block by block.
    :linenos:
    :lineno-match:
 
-Two mono-energetic multi-group materials are created:
+Two mono-energetic multigroup materials are created:
 ``m`` for the shield (:math:`\Sigma_c = \Sigma_s = 0.05`) and
 ``m_void`` for the dog-leg channel (:math:`10^{-4}` total).
 

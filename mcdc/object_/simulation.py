@@ -5,7 +5,8 @@ if TYPE_CHECKING:
     from mcdc.object_.cell import Cell, Region
     from mcdc.object_.element import Element
     from mcdc.object_.electron_reaction import ElectronReactionBase
-    from mcdc.object_.material import MaterialBase
+    from mcdc.object_.material import Material
+    from mcdc.object_.transport_model_data import NeutronMultigroupData
     from mcdc.object_.nuclide import Nuclide
     from mcdc.object_.neutron_reaction import NeutronReactionBase
     from mcdc.object_.source import Source
@@ -24,6 +25,7 @@ from numpy.typing import NDArray
 
 ####
 
+from mcdc.constant import PARTICLE_NEUTRON
 from mcdc.object_.base import MCDCBase
 from mcdc.object_.data import DataBase
 from mcdc.object_.distribution import DistributionBase
@@ -31,13 +33,8 @@ from mcdc.object_.gpu_tools import GPUMeta
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.particle import ParticleBank
 from mcdc.object_.settings import Settings
-from mcdc.object_.technique import (
-    ImplicitCapture,
-    PopulationControl,
-    GlobalWeightRoulette,
-    WeightWindows,
-    WeightedEmission,
-)
+from mcdc.object_.technique import Technique
+from mcdc.print_ import print_error
 
 from mcdc.object_.universe import Universe, Lattice
 
@@ -73,9 +70,10 @@ class Simulation(MCDCBase):
     calling configuration methods such as
     :meth:`settings.set_eigenmode <mcdc.Simulation.settings.set_eigenmode>`.
 
-    Transport techniques are configured directly on the simulation through
-    methods such as :meth:`implicit_capture <mcdc.Simulation.implicit_capture>`
-    and :meth:`weight_windows <mcdc.Simulation.weight_windows>`.
+    Transport techniques are grouped under ``simulation.technique`` and are
+    configured through callable members such as
+    ``simulation.technique.implicit_capture()`` and
+    ``simulation.technique.weight_windows(...)``.
 
     Examples
     --------
@@ -114,7 +112,8 @@ class Simulation(MCDCBase):
     electron_reactions: list[ElectronReactionBase]
     nuclides: list[Nuclide]
     elements: list[Element]
-    materials: list[MaterialBase]
+    materials: list[Material]
+    neutron_multigroup_data: list[NeutronMultigroupData]
     sources: list[Source]
 
     # Geometry
@@ -133,11 +132,7 @@ class Simulation(MCDCBase):
     settings: Settings
 
     # Techniques
-    implicit_capture: ImplicitCapture
-    weighted_emission: WeightedEmission
-    global_weight_roulette: GlobalWeightRoulette
-    weight_windows: WeightWindows
-    population_control: PopulationControl
+    technique: Technique
 
     # Particle banks
     bank_active: ParticleBank  # Non-Numba
@@ -214,12 +209,7 @@ class Simulation(MCDCBase):
 
         self.settings = Settings()
 
-        # Techniques
-        self.implicit_capture = ImplicitCapture()
-        self.weighted_emission = WeightedEmission()
-        self.global_weight_roulette = GlobalWeightRoulette()
-        self.weight_windows = WeightWindows()
-        self.population_control = PopulationControl()
+        self.technique = Technique()
 
         # ==============================================================================
         # Particle banks
@@ -293,6 +283,7 @@ class Simulation(MCDCBase):
         self.nuclides = []
         self.elements = []
         self.materials = []
+        self.neutron_multigroup_data = []
 
         # Geometry
         self.surfaces = []
@@ -313,14 +304,75 @@ class Simulation(MCDCBase):
         has already completed.
         """
         from mcdc.object_.material import (
-            Material,
-            MaterialMG,
             set_elements_from_nuclides,
             set_nuclides_from_elements,
             update_fissionable_from_nuclides,
         )
 
         settings = self.settings
+
+        # Select standard multigroup or hybrid neutron transport.
+        materials_have_native_composition = any(
+            material.nuclide_composition or material.element_composition
+            for material in self.materials
+        )
+        materials_have_multigroup = bool(self.materials) and all(
+            material.has_neutron_multigroup for material in self.materials
+        )
+        multigroup_grids_are_identical = False
+        if materials_have_multigroup:
+            shared_grid = self.materials[0].neutron_multigroup.energy_grid
+            multigroup_grids_are_identical = all(
+                np.array_equal(material.neutron_multigroup.energy_grid, shared_grid)
+                for material in self.materials[1:]
+            )
+
+        self.technique.neutron_multigroup.hybrid = not (
+            not materials_have_native_composition
+            and materials_have_multigroup
+            and multigroup_grids_are_identical
+        )
+
+        # Require physical energy boundaries wherever energy selects local groups.
+        if self.technique.neutron_multigroup.hybrid:
+            for material in self.materials:
+                model = material.neutron_multigroup
+                if model.G > 0 and not np.any(model.energy_grid):
+                    print_error(
+                        "Hybrid neutron multigroup transport requires an explicit "
+                        "energy_grid for every multigroup material."
+                    )
+
+        # Validate neutron source coordinates for standard multigroup transport
+        else:
+            G = self.materials[0].neutron_multigroup.G
+            for source in self.sources:
+                if source.particle_type != PARTICLE_NEUTRON:
+                    continue
+
+                if source.mono_energetic:
+                    source_energies = np.array([source.energy])
+                elif source.discrete_energy:
+                    source_energies = source.energy_pmf.value
+                else:
+                    print_error(
+                        "Standard neutron multigroup transport requires neutron "
+                        "sources to use a scalar energy or discrete_energy "
+                        "group-coordinate distribution."
+                    )
+
+                if not np.all(np.isfinite(source_energies)) or not np.all(
+                    source_energies == np.floor(source_energies)
+                ):
+                    print_error(
+                        "Standard neutron multigroup source energies must be finite, "
+                        "integer-valued group coordinates."
+                    )
+                if np.any(source_energies < 0) or np.any(source_energies >= G):
+                    print_error(
+                        "Standard neutron multigroup source energies must satisfy "
+                        f"0 <= energy < G (G={G})."
+                    )
 
         # Limit transport to the latest requested tally boundary
         settings.time_boundary = min(
@@ -329,11 +381,17 @@ class Simulation(MCDCBase):
 
         # Complete native-material compositions for the transported particles
         for material in self.materials:
-            if not isinstance(material, Material):
-                continue
-            if settings.neutron_transport and len(material.nuclides) == 0:
+            if (
+                settings.neutron_transport
+                and material.element_composition
+                and len(material.nuclides) == 0
+            ):
                 set_nuclides_from_elements(material, self)
-            if settings.electron_transport and len(material.elements) == 0:
+            if (
+                settings.electron_transport
+                and material.nuclide_composition
+                and len(material.elements) == 0
+            ):
                 set_elements_from_nuclides(material, self)
 
         # Load the physics data required by the completed material model
@@ -341,20 +399,16 @@ class Simulation(MCDCBase):
             for nuclide in self.nuclides:
                 nuclide.set_neutron_data(self)
             for material in self.materials:
-                if isinstance(material, Material):
-                    update_fissionable_from_nuclides(material)
+                update_fissionable_from_nuclides(material)
 
         if settings.electron_transport:
             for element in self.elements:
                 element.set_electron_data(self)
 
-        # Determine the neutron physics representation
-        if len(self.materials) == 0:
-            settings.neutron_multigroup_mode = True
-        else:
-            settings.neutron_multigroup_mode = isinstance(self.materials[0], MaterialMG)
+        # Resolve tally filters and shapes that require the complete model
+        for tally in self.tallies:
+            tally._resolve_energy_filter(self)
 
-        # Derive tally shapes that depend on simulation-wide settings
         if settings.use_census_based_tally:
             for tally in self.tallies:
                 tally._use_census_based_tally(settings.census_tally_frequency, self)
@@ -485,8 +539,25 @@ class Simulation(MCDCBase):
     ) -> None:
         """Render a two-dimensional material map of the compiled model.
 
-        Parameters are forwarded to :func:`mcdc.visualize.visualize_model`.
         The model is compiled first when necessary.
+
+        Parameters
+        ----------
+        vis_plane : {"xy", "xz", "yz", "yx", "zx", "zy"}
+            Coordinate plane to render. Its order sets the horizontal and
+            vertical axes.
+        x, y, z : float or sequence of 2 float
+            Slice position for the axis normal to ``vis_plane``, or plotting
+            range for an axis contained in the plane, in cm.
+        pixels : sequence of 2 int
+            Number of pixels along the two plotted axes.
+        colors : dict of Material to color or None
+            Optional material-color mapping. Matplotlib color specifications
+            are accepted.
+        time : sequence of float
+            Geometry snapshot times in seconds.
+        save_as : str or path-like or None
+            Output file name. If omitted, display the rendered image.
 
         Examples
         --------

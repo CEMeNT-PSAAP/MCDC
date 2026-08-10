@@ -10,8 +10,8 @@ simulation = mcdc.Simulation("Sphere in cube")
 # Homogeneous pure-fission sphere inside a pure-scattering cube
 
 # Set materials
-pure_f = mcdc.MaterialMG(fission=np.array([1.0]), nu_p=np.array([1.2]))
-pure_s = mcdc.MaterialMG(scatter=np.array([[1.0]]))
+pure_f = mcdc.Material.multigroup(fission=np.array([1.0]), nu_p=np.array([1.2]))
+pure_s = mcdc.Material.multigroup(scatter=np.array([[1.0]]))
 
 # Set surfaces
 sx1 = mcdc.Surface.PlaneX(x=0.0, boundary_condition="vacuum")
@@ -41,7 +41,7 @@ source = mcdc.Source(
     y=[0.0, 4.0],
     z=[0.0, 4.0],
     isotropic=True,
-    energy_group=0,
+    energy=0,
     time=[0.0, 50.0],
 )
 simulation.set_sources([source])
@@ -64,7 +64,7 @@ simulation.settings.N_particle = 100
 simulation.settings.N_batch = 2
 
 # Techniques
-simulation.implicit_capture()
+simulation.technique.implicit_capture()
 
 # Run
 simulation.run()

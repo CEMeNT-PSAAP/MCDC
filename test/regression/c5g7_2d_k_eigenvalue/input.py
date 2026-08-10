@@ -16,7 +16,7 @@ lib = h5py.File("c5g7_xs.h5", "r")
 
 # Materials
 def set_mat(mat):
-    return mcdc.MaterialMG(
+    return mcdc.Material.multigroup(
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],
@@ -180,7 +180,7 @@ source = mcdc.Source(
     x=[0.0, pitch * 17 * 2],
     y=[-pitch * 17 * 2, 0.0],
     isotropic=True,
-    energy_group=6,
+    energy=6,
 )
 simulation.set_sources([source])
 
@@ -205,7 +205,7 @@ simulation.settings.set_eigenmode(
 )
 
 # Techniques
-simulation.population_control()
+simulation.technique.population_control()
 
 # Run
 simulation.run()

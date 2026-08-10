@@ -5,7 +5,7 @@ import mcdc
 simulation = mcdc.Simulation("Iterative source reweighting")
 
 # Homogeneous one-group slab
-material = mcdc.MaterialMG(
+material = mcdc.Material.multigroup(
     capture=np.array([0.2]),
     scatter=np.array([[0.8]]),
 )
@@ -22,13 +22,13 @@ source_left = mcdc.Source(
     name="Left source",
     z=[1.0, 2.0],
     isotropic=True,
-    energy_group=0,
+    energy=0,
 )
 source_right = mcdc.Source(
     name="Right source",
     z=[8.0, 9.0],
     isotropic=True,
-    energy_group=0,
+    energy=0,
 )
 simulation.set_sources([source_left, source_right])
 

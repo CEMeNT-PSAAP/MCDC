@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Annotated
 from numpy import int64, uint64
 from numpy.typing import NDArray
@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 ####
 
 from mcdc.constant import PARTICLE_NEUTRON
-from mcdc.object_.base import MCDCBase, MCDCBase
+from mcdc.object_.base import MCDCBase
 
 
 @dataclass
@@ -25,7 +25,6 @@ class ParticleData(MCDCBase):
     ux: float = 0.0
     uy: float = 0.0
     uz: float = 0.0
-    g: int = -1
     E: float = 0.0
     w: float = 0.0
     particle_type: int = PARTICLE_NEUTRON

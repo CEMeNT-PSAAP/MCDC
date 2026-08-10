@@ -10,9 +10,9 @@ simulation = mcdc.Simulation("Slab absorbium")
 # Three slab layers with different purely-absorbing materials
 
 # Set materials
-m1 = mcdc.MaterialMG(capture=np.array([1.0]))
-m2 = mcdc.MaterialMG(capture=np.array([1.5]))
-m3 = mcdc.MaterialMG(capture=np.array([2.0]))
+m1 = mcdc.Material.multigroup(capture=np.array([1.0]))
+m2 = mcdc.Material.multigroup(capture=np.array([1.5]))
+m3 = mcdc.Material.multigroup(capture=np.array([2.0]))
 
 # Set surfaces
 s1 = mcdc.Surface.PlaneZ(z=0.0, boundary_condition="vacuum")
@@ -31,7 +31,7 @@ simulation.set_model([cell_1, cell_2, cell_3])
 # ======================================================================================
 # Uniform isotropic source throughout the domain
 
-source = mcdc.Source(z=[0.0, 6.0], isotropic=True, energy_group=0)
+source = mcdc.Source(z=[0.0, 6.0], isotropic=True, energy=0)
 simulation.set_sources([source])
 
 # ======================================================================================

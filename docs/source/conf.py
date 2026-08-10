@@ -61,7 +61,7 @@ exclude_patterns = []
 html_theme = "pydata_sphinx_theme"
 html_title = "MC/DC Documentation"
 html_logo = "images/home/mcdc.svg"
-html_favicon = "images/home/mcdc.svg"
+html_favicon = "images/home/mcdc_square.svg"
 
 # Read the Docs provides the active version slug during hosted builds. Use the
 # development docs as the local-build default.

@@ -9,7 +9,7 @@ from mcdc.constant import PARTICLE_NEUTRON
 @pytest.fixture
 def material_mg():
     # Minimal multigroup material so particle speed is defined.
-    return mcdc.MaterialMG(capture=np.array([1.0]))
+    return mcdc.Material.multigroup(capture=np.array([1.0]))
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def crossing_particle():
         particle["surface_ID"] = surface_ID
         particle["cell_ID"] = cell_ID
         particle["material_ID"] = 0
-        particle["g"] = 0
+        particle["E"] = 0.0
         particle["x"] = x
         particle["y"] = 0.0
         particle["z"] = 0.0
@@ -80,7 +80,7 @@ def surface_crossing_tally_context(slab_plane_x, prepare_simulation):
     particle = particle_container[0]
     particle["particle_type"] = PARTICLE_NEUTRON
     particle["material_ID"] = 0
-    particle["g"] = 0
+    particle["E"] = 0.0
     particle["x"] = 0.0
     particle["y"] = 0.0
     particle["z"] = 0.0

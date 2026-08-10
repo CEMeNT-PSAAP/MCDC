@@ -101,10 +101,10 @@ For example, recover a prepared distribution by simulation-local ID instead of p
 .. code-block:: python
 
    # Python model construction
-   source_object.energy_group_pmf = distribution_object
+   source_object.energy_pmf = distribution_object
 
    # Portable transport representation
-   distribution = simulation["distributions"][source["energy_group_pmf_ID"]]
+   distribution = simulation["distributions"][source["energy_pmf_ID"]]
 
 Keep Types Stable
 ^^^^^^^^^^^^^^^^^

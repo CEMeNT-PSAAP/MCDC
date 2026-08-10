@@ -8,18 +8,18 @@ simulation = mcdc.Simulation("Packaged fuel array")
 # Materials
 # ======================================================================================
 
-fuel = mcdc.MaterialMG(
+fuel = mcdc.Material.multigroup(
     capture=np.array([0.45]),
     fission=np.array([0.55]),
     nu_p=np.array([2.5]),
 )
 
-cover = mcdc.MaterialMG(
+cover = mcdc.Material.multigroup(
     capture=np.array([0.05]),
     scatter=np.array([[0.95]]),
 )
 
-water = mcdc.MaterialMG(
+water = mcdc.Material.multigroup(
     capture=np.array([0.02]),
     scatter=np.array([[0.08]]),
 )
@@ -78,7 +78,7 @@ simulation.set_model([assembly_left, assembly_right])
 # Set source
 # ======================================================================================
 
-source = mcdc.Source(x=[-0.1, 0.1], isotropic=True, energy_group=0)
+source = mcdc.Source(x=[-0.1, 0.1], isotropic=True, energy=0)
 simulation.set_sources([source])
 
 # ======================================================================================

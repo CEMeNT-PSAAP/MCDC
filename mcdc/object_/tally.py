@@ -23,6 +23,10 @@ from mcdc.constant import (
     MESH_STRUCTURED,
     MESH_UNIFORM,
     PI,
+    PARTICLE_ANY,
+    PARTICLE_NEUTRON,
+    PARTICLE_ELECTRON,
+    PARTICLE_PROTON,
     SCORE_FLUX,
     SCORE_DENSITY,
     SCORE_COLLISION,
@@ -56,8 +60,8 @@ class Tally(MCDCPolymorphic):
         Scores to accumulate. Track-length scores are ``"flux"``, ``"density"``,
         ``"collision"``, ``"capture"``, and ``"fission"``; surface-crossing
         scores are ``"current-net"``, ``"current-in"``, and ``"current-out"``;
-        the collision score is ``"energy_deposition"``. Scores from different
-        estimator families cannot be mixed.
+        the collision score is ``"energy_deposition"``, scored in eV. Scores
+        from different estimator families cannot be mixed.
     surface : Surface, optional
         Surface filter. Required for a surface-crossing tally unless ``cell`` is
         provided.
@@ -71,8 +75,14 @@ class Tally(MCDCPolymorphic):
         Azimuthal-angle bin boundaries in radians.
     polar_reference : sequence of 3 float, optional
         Reference direction for the angular filters.
-    energy : sequence of float or "all_groups", optional
-        Energy-bin boundaries in eV, or ``"all_groups"`` in multigroup mode.
+    particle_type : {"neutron", "electron", "proton"}, optional
+        Particle type selected by the tally. If omitted, the tally accepts any
+        transported particle type.
+    energy : sequence of float or "all", optional
+        Physical energy-bin boundaries in eV. In standard neutron multigroup
+        transport, boundaries instead use the group-coordinate energy, and
+        ``"all"`` creates one tally bin per energy group during simulation
+        compilation.
     time : sequence of float, optional
         Time-bin boundaries in seconds.
 
@@ -102,7 +112,7 @@ class Tally(MCDCPolymorphic):
 
     Filter a track-length tally by cell, angle, and time:
 
-    >>> material = mcdc.MaterialMG(capture=np.array([1.0]))
+    >>> material = mcdc.Material.multigroup(capture=np.array([1.0]))
     >>> lower = mcdc.Surface.PlaneZ(z=0.0)
     >>> upper = mcdc.Surface.PlaneZ(z=10.0)
     >>> cell = mcdc.Cell(region=+lower & -upper, fill=material)
@@ -151,24 +161,26 @@ class Tally(MCDCPolymorphic):
     ...     scores=["energy_deposition"],
     ... )
 
-    Use one energy bin per multigroup energy group:
+    Use one energy bin per group in standard neutron multigroup transport:
 
-    >>> group_flux = mcdc.Tally(
+    >>> multigroup_flux = mcdc.Tally(
     ...     cell=cell,
     ...     scores=["flux"],
-    ...     energy="all_groups",
+    ...     energy="all",
     ... )
     """
 
     # MC/DC framework metadata
     label = "tally"
     sub_type = -1  # Polymorphic base
+    non_numba = ["_energy_all"]
 
     # Basic properties
     name: str
     scores: list[int]
 
     # Non-spatial filters
+    particle_type: int
     filter_direction: bool
     filter_energy: bool
     filter_time: bool
@@ -177,6 +189,7 @@ class Tally(MCDCPolymorphic):
     polar_reference: Annotated[NDArray[float64], (3,)]
     energy: NDArray[float64]
     time: NDArray[float64]
+    _energy_all: bool  # Non-numba
 
     # Score bins
     bin: NDArray[float64]
@@ -200,6 +213,7 @@ class Tally(MCDCPolymorphic):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
+        particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NDArray[float64] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
@@ -259,6 +273,7 @@ class Tally(MCDCPolymorphic):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
+        particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
@@ -292,6 +307,18 @@ class Tally(MCDCPolymorphic):
             else:
                 print_error(f"Unknown tally score: {score}")
 
+        # Particle filter
+        if particle_type is None:
+            self.particle_type = PARTICLE_ANY
+        elif particle_type == "neutron":
+            self.particle_type = PARTICLE_NEUTRON
+        elif particle_type == "electron":
+            self.particle_type = PARTICLE_ELECTRON
+        elif particle_type == "proton":
+            self.particle_type = PARTICLE_PROTON
+        else:
+            print_error(f"Unsupported tally particle type: {particle_type}")
+
         # Phase-space filters
         self.mu = np.array([-1.0, 1.0])
         self.azi = np.array([-PI, PI])
@@ -301,7 +328,7 @@ class Tally(MCDCPolymorphic):
         self.filter_direction = False
         self.filter_energy = False
         self.filter_time = False
-        self.energy_all_groups = False
+        self._energy_all = False
         if mu is not None:
             self.mu = np.array(mu)
             self.filter_direction = True
@@ -314,9 +341,11 @@ class Tally(MCDCPolymorphic):
                 polar_reference_arr
             )
         if energy is not None:
-            if type(energy) == str and energy == "all_groups":
-                self.energy_all_groups = True
-                self.energy = np.array([0])  # A placeholder
+            if isinstance(energy, str):
+                if energy != "all":
+                    print_error(f"Unsupported tally energy filter: {energy}")
+                self._energy_all = True
+                self.energy = np.array([0.0])  # Compilation placeholder
             else:
                 self.energy = np.array(energy)
             self.filter_energy = True
@@ -372,13 +401,20 @@ class Tally(MCDCPolymorphic):
     def _phasespace_filter_text(self):
         text = ""
         text += f"  - Scores: {', '.join(decode_score_type(x) for x in self.scores)}\n"
+        particle_name = {
+            PARTICLE_ANY: "Any",
+            PARTICLE_NEUTRON: "Neutron",
+            PARTICLE_ELECTRON: "Electron",
+            PARTICLE_PROTON: "Proton",
+        }.get(self.particle_type, "Unspecified")
+        text += f"  - Particle: {particle_name}\n"
         if self.filter_time or self.filter_energy or self.filter_direction:
             text += f"  - Phase-space filters\n"
         if self.filter_time:
             text += f"    - Time {print_1d_array(self.time)} s\n"
         if self.filter_energy:
-            if self.energy_all_groups:
-                text += f"    - Energy: All groups\n"
+            if self._energy_all:
+                text += f"    - Energy: All multigroup energy groups\n"
             else:
                 text += f"    - Energy {print_1d_array(self.energy)} eV\n"
         if self.filter_direction:
@@ -393,15 +429,21 @@ class Tally(MCDCPolymorphic):
         if not super()._compile_into_simulation(simulation):
             return False
 
-        # Resolve the "all_groups" energy filter and resize its tally bins.
-        if self.energy_all_groups:
-            G = simulation.materials[0].G
+        return True
+
+    def _resolve_energy_filter(self, simulation) -> None:
+        """Resolve energy filters that require the complete material model."""
+        if self._energy_all:
+            if simulation.technique.neutron_multigroup.hybrid:
+                print_error(
+                    'The energy="all" filter requires standard neutron multigroup '
+                    "transport."
+                )
+            G = simulation.materials[0].neutron_multigroup.G
             self.energy = np.linspace(0, G, G + 1) - 0.5
             shape = list(self.bin_shape)
             shape[2] = G
             self._set_bin_shape_and_strides(tuple(shape))
-
-        return True
 
     def __repr__(self):
         text = super().__repr__()
@@ -470,6 +512,7 @@ class TallySurfaceCrossing(Tally):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
+        particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
@@ -479,6 +522,7 @@ class TallySurfaceCrossing(Tally):
             mu=mu,
             azi=azi,
             polar_reference=polar_reference,
+            particle_type=particle_type,
             energy=energy,
             time=time,
         )
@@ -583,6 +627,7 @@ class TallyCollision(Tally):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
+        particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
@@ -596,6 +641,7 @@ class TallyCollision(Tally):
             mu=mu,
             azi=azi,
             polar_reference=polar_reference,
+            particle_type=particle_type,
             energy=energy,
             time=time,
             spatial_shape=spatial_shape,
@@ -711,6 +757,7 @@ class TallyTracklength(Tally):
         mu: Sequence[float] | NoneType = None,
         azi: Sequence[float] | NoneType = None,
         polar_reference: Sequence[float] | NoneType = None,
+        particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
     ):
@@ -724,6 +771,7 @@ class TallyTracklength(Tally):
             mu=mu,
             azi=azi,
             polar_reference=polar_reference,
+            particle_type=particle_type,
             energy=energy,
             time=time,
             spatial_shape=spatial_shape,

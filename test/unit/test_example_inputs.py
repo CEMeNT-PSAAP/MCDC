@@ -6,7 +6,14 @@ import pytest
 import mcdc
 
 EXAMPLES_ROOT = Path(__file__).parents[2] / "examples"
-EXAMPLE_INPUTS = tuple(sorted(EXAMPLES_ROOT.glob("**/input.py")))
+EXCLUDED_EXAMPLES = ["hybrid_multigroup"]
+
+# Leave data-library-dependent examples to regression testing
+EXAMPLE_INPUTS = tuple(
+    input_path
+    for input_path in sorted(EXAMPLES_ROOT.glob("**/input.py"))
+    if input_path.parent.name not in EXCLUDED_EXAMPLES
+)
 assert EXAMPLE_INPUTS, "No example inputs found"
 
 

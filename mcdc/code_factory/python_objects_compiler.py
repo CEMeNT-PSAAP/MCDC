@@ -4,7 +4,8 @@ from mcdc.object_.data import DataBase, DataNone
 from mcdc.object_.distribution import DistributionBase, DistributionNone
 from mcdc.object_.electron_reaction import ElectronReactionBase
 from mcdc.object_.element import Element
-from mcdc.object_.material import MaterialBase
+from mcdc.object_.material import Material
+from mcdc.object_.transport_model_data import NeutronMultigroupData
 from mcdc.object_.mesh import MeshBase
 from mcdc.object_.neutron_reaction import NeutronReactionBase
 from mcdc.object_.nuclide import Nuclide
@@ -25,6 +26,10 @@ def compile_simulation(simulation: Simulation):
     complete, the owning :class:`~mcdc.object_.simulation.Simulation` resolves
     model-wide state before runtime packing begins.
     """
+    # Require geometry rooted in at least one cell
+    if len(simulation.root_universe.cells) == 0:
+        print_error("Simulation model has not been set (root universe is empty).")
+
     # Preserve explicitly configured roots before resetting their registered
     # object lists. Geometry members may reference these objects and compile
     # them while the model graph is traversed.
@@ -36,13 +41,15 @@ def compile_simulation(simulation: Simulation):
     simulation.sources = []
     simulation.tallies = []
 
-    # Reserved ojects
+    # Reserved objects
     none_data = DataNone()
     none_distribution = DistributionNone()
+    none_neutron_multigroup = NeutronMultigroupData()
 
     # Compile reserved objects
     none_data._compile_into_simulation(simulation)
     none_distribution._compile_into_simulation(simulation)
+    none_neutron_multigroup._compile_into_simulation(simulation)
 
     # Compile model
     root_universe = simulation.root_universe
@@ -78,8 +85,10 @@ def register_object(object_: MCDCObject, simulation: Simulation) -> bool:
         object_list = simulation.distributions
     elif isinstance(object_, Lattice):
         object_list = simulation.lattices
-    elif isinstance(object_, MaterialBase):
+    elif isinstance(object_, Material):
         object_list = simulation.materials
+    elif isinstance(object_, NeutronMultigroupData):
+        object_list = simulation.neutron_multigroup_data
     elif isinstance(object_, MeshBase):
         object_list = simulation.meshes
     elif isinstance(object_, Element):

@@ -1,6 +1,6 @@
 import numpy as np
 
-from numbers import Integral, Real
+from numbers import Real
 from numpy import float64
 from numpy.typing import ArrayLike, NDArray
 from types import NoneType
@@ -28,8 +28,8 @@ from mcdc.print_ import print_error
 class Source(MCDCObject):
     """Distributions of particles introduced into the simulation.
 
-    A source specifies the initial position, direction, energy, time, particle
-    type, and relative sampling probability for emitted particles.
+    A source specifies the position, direction, energy, time, particle type, and
+    relative sampling probability for emitted particles.
 
     Parameters
     ----------
@@ -37,42 +37,51 @@ class Source(MCDCObject):
         User label. If omitted, a default name is generated from the source ID.
     position : array_like of float, optional
         Point-source position ``[x, y, z]`` in cm. If provided, the source is
-        treated as a point source.
+        treated as a point source. Cannot be supplied with ``x``, ``y``, or
+        ``z``.
     x, y, z : array_like of float, optional
         Spatial bounds of a box source in cm, given as ``[min, max]`` for each
-        coordinate. These are used when ``position`` is not provided.
+        coordinate. Cannot be supplied with ``position``.
     direction : array_like of float, optional
         Source direction vector ``[ux, uy, uz]``. The vector is normalized
         internally. If provided without angular bounds, the source is
-        mono-directional.
+        mono-directional. Cannot be supplied with ``isotropic=True`` or
+        ``white_direction``.
 
         When ``polar_cosine`` and/or ``azimuthal`` are specified, this vector
         defines the reference (polar) axis about which directions are sampled.
     white_direction : array_like of float, optional
         Outward normal direction for a white boundary source. The vector is
-        normalized internally.
+        normalized internally. Cannot be supplied with ``isotropic=True`` or
+        ``direction``.
     isotropic : bool, optional
-        If True, emit particles isotropically.
+        If True, emit particles isotropically. Cannot be supplied with
+        ``direction`` or ``white_direction``.
     polar_cosine : array_like of float, optional
         Bounds for the sampled polar cosine,
         ``[mu_min, mu_max]``, measured with respect to ``direction``.
-        Defaults to ``[-1.0, 1.0]``.
+        Requires ``direction``. Defaults to ``[-1.0, 1.0]``.
     azimuthal : array_like of float, optional
         Bounds for the sampled azimuthal angle,
         ``[azi_min, azi_max]`` in radians, measured about ``direction``.
-        Defaults to ``[0.0, 2π]``.
-    energy : real or array_like of float, optional
+        Requires ``direction``. Defaults to ``[0.0, 2π]``.
+    energy : float, array_like of float, or int, optional
         Source energy in eV. A real scalar, including a NumPy scalar, defines a
         mono-energetic source. An array-like value with shape ``(2, N)`` defines
         a tabulated distribution: the first row contains energy values and the
-        second row contains their probability density. Defaults to a
-        mono-energetic source at **1 MeV**.
-    energy_group : int or array_like, optional
-        Source energy group. A Python or NumPy integer defines a mono-group
-        source. An array-like value with shape ``(2, N)`` defines a discrete
-        probability mass function: the first row contains group IDs and the
-        second row contains their probabilities. In multigroup simulations,
-        the default is **group 0**.
+        second row contains their probability density in ``eV^-1``. Defaults
+        to a mono-energetic source at **1 MeV**. In standard neutron multigroup
+        transport, an integer conventionally specifies a group-coordinate
+        energy and is stored internally as a float. The coordinate must identify
+        an available group. Continuous energy distributions are not supported
+        in standard multigroup transport.
+    discrete_energy : array_like of float, optional
+        Discrete source-energy distribution with shape ``(2, N)``. The first
+        row contains sampled energy values and the second row contains their
+        probabilities. Values are physical energies in eV for continuous-energy
+        transport and group-coordinate energies for standard multigroup
+        transport. Standard-multigroup coordinates must be integer-valued and
+        identify available groups. Cannot be supplied with ``energy``.
     time : real or array_like of float, optional
         Emission time in seconds. A real scalar, including a NumPy scalar,
         defines a discrete emission time. An array-like value with shape
@@ -85,23 +94,19 @@ class Source(MCDCObject):
 
     Notes
     -----
-    If ``position`` is provided, ``x``, ``y``, and ``z`` are ignored.
+    ``position`` and the box bounds ``x``, ``y``, and ``z`` are alternative
+    spatial specifications and cannot be combined.
 
     When ``position`` is not provided, the source is treated as a box source.
     Any unspecified coordinate range defaults to ``[0.0, 0.0]`` cm. For
     example, if only ``z=[-1.0, 1.0]`` is specified, then the source occupies
     ``x=[0.0, 0.0]``, ``y=[0.0, 0.0]``, and ``z=[-1.0, 1.0]``.
 
-    Direction options are interpreted in the following order:
-
-    - if ``isotropic=True``, the source is isotropic;
-    - else if ``direction`` is provided, the source uses that direction;
-    - else if ``white_direction`` is provided, the source is a white boundary
-      source;
-    - otherwise, the default direction behavior is used.
-
-    ``energy_group`` takes precedence over ``energy`` when both are provided.
-    Array-like inputs may be supplied as lists, tuples, or NumPy arrays.
+    ``isotropic=True``, ``direction``, and ``white_direction`` are alternative
+    angular specifications and cannot be combined. ``polar_cosine`` and
+    ``azimuthal`` describe an angular spread about ``direction`` and therefore
+    require it. If no angular specification is provided, the source is
+    isotropic.
 
     Examples
     --------
@@ -145,10 +150,14 @@ class Source(MCDCObject):
     ...     azimuthal=[0.0, np.pi / 2],
     ... )
 
-    Discrete energy-group source:
+    Sample discrete emission lines in a continuous-energy calculation:
 
-    >>> src = mcdc.Source(
-    ...     energy_group=3,
+    >>> decay_electrons = mcdc.Source(
+    ...     particle_type="electron",
+    ...     discrete_energy=(
+    ...         [1.0e5, 2.0e5],
+    ...         [0.8, 0.2],
+    ...     ),
     ... )
 
     Sample a continuous-energy source from a tabulated probability density:
@@ -162,11 +171,11 @@ class Source(MCDCObject):
     ...     direction=[0.0, 0.0, 1.0],
     ... )
 
-    Sample between two multigroup energy groups:
+    Sample between groups 0 and 1 in standard multigroup transport:
 
     >>> multigroup_source = mcdc.Source(
-    ...     energy_group=(
-    ...         [0, 1],
+    ...     discrete_energy=(
+    ...         [0.0, 1.0],
     ...         [0.25, 0.75],
     ...     ),
     ... )
@@ -200,10 +209,10 @@ class Source(MCDCObject):
 
     # Energy
     mono_energetic: bool
-    energy_group: int
+    discrete_energy: bool
     energy: float
-    energy_group_pmf: DistributionPMF
     energy_pdf: DistributionTabulated
+    energy_pmf: DistributionPMF
 
     # Time
     discrete_time: bool
@@ -237,8 +246,8 @@ class Source(MCDCObject):
         polar_cosine: Sequence[float] | NoneType = None,
         azimuthal: Sequence[float] | NoneType = None,
         #
-        energy: ArrayLike | NoneType = None,
-        energy_group: ArrayLike | NoneType = None,
+        energy: float | ArrayLike | int | NoneType = None,
+        discrete_energy: ArrayLike | NoneType = None,
         #
         time: ArrayLike = 0.0,
         #
@@ -252,8 +261,11 @@ class Source(MCDCObject):
 
         # ==============================================================================
         # Default attributes
-        #   Point source at origin, isotropic, mono-energetic at 1 MeV or at group 0,
-        #   time = 0, neutron
+        #   Point source at origin,
+        #   isotropic,
+        #   mono-energetic at 1 MeV,
+        #   time = 0,
+        #   neutron
         # ==============================================================================
 
         # Position
@@ -273,13 +285,13 @@ class Source(MCDCObject):
 
         # Energy
         self.mono_energetic = True
-        self.energy_group = 0
+        self.discrete_energy = False
         self.energy = 1.0e6
-        self.energy_group_pmf = DistributionPMF(np.array([0.0]), np.array([1.0]))
         self.energy_pdf = DistributionTabulated(
             np.array([1.0e6 - 1.0, 1.0e6 + 1.0]),
             np.array([1.0, 1.0]),
         )
+        self.energy_pmf = DistributionPMF(np.array([1.0e6]), np.array([1.0]))
 
         # Time
         self.discrete_time = True
@@ -296,6 +308,10 @@ class Source(MCDCObject):
         # Assignment
         # ==============================================================================
 
+        # Require one unambiguous source-position representation
+        if position is not None and any(value is not None for value in (x, y, z)):
+            print_error("Cannot specify position together with x, y, or z.")
+
         # Position
         if position is not None:
             self.point = np.array(position)
@@ -308,8 +324,25 @@ class Source(MCDCObject):
             if z is not None:
                 self.z = np.array(z)
 
+        # Require one unambiguous source-direction representation
+        isotropic_enabled = isotropic is not None and bool(isotropic)
+        direction_modes = sum(
+            (
+                isotropic_enabled,
+                direction is not None,
+                white_direction is not None,
+            )
+        )
+        if direction_modes > 1:
+            print_error(
+                "Cannot specify more than one of isotropic=True, direction, and "
+                "white_direction."
+            )
+        if direction is None and (polar_cosine is not None or azimuthal is not None):
+            print_error("polar_cosine and azimuthal require direction.")
+
         # Direction
-        if isotropic is not None and isotropic:
+        if isotropic_enabled:
             pass
         elif direction is not None:
             self.isotropic_direction = False
@@ -329,17 +362,21 @@ class Source(MCDCObject):
         # Normalize direction
         self.direction /= np.linalg.norm(self.direction)
 
+        # Require one unambiguous source-energy representation
+        if discrete_energy is not None and energy is not None:
+            print_error("Cannot specify both energy and discrete_energy.")
+
+        # Discrete energy
+        if discrete_energy is not None:
+            values, probabilities = _distribution_pair(
+                discrete_energy, "Discrete energy"
+            )
+            self.mono_energetic = False
+            self.discrete_energy = True
+            self.energy_pmf = DistributionPMF(values, probabilities)
+
         # Energy
-        if energy_group is not None:
-            if isinstance(energy_group, Integral) and not isinstance(
-                energy_group, (bool, np.bool_)
-            ):
-                self.energy_group = int(energy_group)
-            else:
-                values, probabilities = _distribution_pair(energy_group, "Energy-group")
-                self.mono_energetic = False
-                self.energy_group_pmf = DistributionPMF(values, probabilities)
-        elif energy is not None:
+        if energy is not None:
             if isinstance(energy, Real) and not isinstance(energy, (bool, np.bool_)):
                 self.energy = float(energy)
             else:
@@ -393,11 +430,12 @@ class Source(MCDCObject):
         elif self.white_direction:
             text += f"  - Isotropic halfspace: {self.direction}\n"
         if self.mono_energetic:
-            text += (
-                f"  - Energy / energy group: {self.energy} eV / {self.energy_group}\n"
-            )
+            energy_text = f"{self.energy} eV"
+        elif self.discrete_energy:
+            energy_text = "PMF"
         else:
-            text += f"  - Energy / energy group: PDF / PMF\n"
+            energy_text = "PDF"
+        text += f"  - Energy: {energy_text}\n"
         if self.discrete_time:
             text += f"  - Time: {self.time} s\n"
         else:

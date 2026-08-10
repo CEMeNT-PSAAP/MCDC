@@ -18,7 +18,6 @@ particle_data = into_dtype([
     ('ux', float64),
     ('uy', float64),
     ('uz', float64),
-    ('g', int64),
     ('E', float64),
     ('w', float64),
     ('particle_type', int64),
@@ -39,7 +38,6 @@ particle = into_dtype([
     ('ux', float64),
     ('uy', float64),
     ('uz', float64),
-    ('g', int64),
     ('E', float64),
     ('w', float64),
     ('particle_type', int64),
@@ -83,10 +81,19 @@ lattice = into_dtype([
 
 material = into_dtype([
     ('name', 'U32'),
+    ('temperature', float64),
     ('fissionable', bool),
+    ('has_neutron_multigroup', bool),
+    ('neutron_multigroup_ID', int64),
+    ('N_nuclide', int64),
+    ('nuclide_IDs_offset', int64),
+    ('N_element', int64),
+    ('element_IDs_offset', int64),
+    ('nuclide_densities_offset', int64),
+    ('nuclide_densities_length', int64),
+    ('element_densities_offset', int64),
+    ('element_densities_length', int64),
     ('ID', int64),
-    ('sub_type', int64),
-    ('sub_ID', int64),
 ])
 
 collision_tally = into_dtype([
@@ -333,52 +340,42 @@ element = into_dtype([
     ('ID', int64),
 ])
 
-native_material = into_dtype([
-    ('N_nuclide', int64),
-    ('nuclide_IDs_offset', int64),
-    ('N_element', int64),
-    ('element_IDs_offset', int64),
-    ('nuclide_densities_offset', int64),
-    ('nuclide_densities_length', int64),
-    ('element_densities_offset', int64),
-    ('element_densities_length', int64),
-    ('ID', int64),
-    ('base_ID', int64),
-])
-
-multigroup_material = into_dtype([
+neutron_multigroup_data = into_dtype([
     ('G', int64),
     ('J', int64),
-    ('mgxs_speed_offset', int64),
-    ('mgxs_speed_length', int64),
-    ('mgxs_decay_rate_offset', int64),
-    ('mgxs_decay_rate_length', int64),
-    ('mgxs_capture_offset', int64),
-    ('mgxs_capture_length', int64),
-    ('mgxs_scatter_offset', int64),
-    ('mgxs_scatter_length', int64),
-    ('mgxs_fission_offset', int64),
-    ('mgxs_fission_length', int64),
-    ('mgxs_total_offset', int64),
-    ('mgxs_total_length', int64),
-    ('mgxs_nu_s_offset', int64),
-    ('mgxs_nu_s_length', int64),
-    ('mgxs_nu_p_offset', int64),
-    ('mgxs_nu_p_length', int64),
-    ('mgxs_nu_d_offset', int64),
-    ('mgxs_nu_d_length', int64),
-    ('mgxs_nu_d_total_offset', int64),
-    ('mgxs_nu_d_total_length', int64),
-    ('mgxs_nu_f_offset', int64),
-    ('mgxs_nu_f_length', int64),
-    ('mgxs_chi_s_offset', int64),
-    ('mgxs_chi_s_length', int64),
-    ('mgxs_chi_p_offset', int64),
-    ('mgxs_chi_p_length', int64),
-    ('mgxs_chi_d_offset', int64),
-    ('mgxs_chi_d_length', int64),
+    ('energy_grid_offset', int64),
+    ('energy_grid_length', int64),
+    ('energy_representation', int64),
+    ('speed_offset', int64),
+    ('speed_length', int64),
+    ('decay_rate_offset', int64),
+    ('decay_rate_length', int64),
+    ('capture_offset', int64),
+    ('capture_length', int64),
+    ('scatter_offset', int64),
+    ('scatter_length', int64),
+    ('fission_offset', int64),
+    ('fission_length', int64),
+    ('total_offset', int64),
+    ('total_length', int64),
+    ('nu_s_offset', int64),
+    ('nu_s_length', int64),
+    ('nu_p_offset', int64),
+    ('nu_p_length', int64),
+    ('nu_d_offset', int64),
+    ('nu_d_length', int64),
+    ('nu_d_total_offset', int64),
+    ('nu_d_total_length', int64),
+    ('nu_f_offset', int64),
+    ('nu_f_length', int64),
+    ('chi_s_offset', int64),
+    ('chi_s_length', int64),
+    ('chi_p_offset', int64),
+    ('chi_p_length', int64),
+    ('chi_d_offset', int64),
+    ('chi_d_length', int64),
+    ('fissionable', bool),
     ('ID', int64),
-    ('base_ID', int64),
 ])
 
 nuclide = into_dtype([
@@ -541,25 +538,29 @@ settings = into_dtype([
     ('neutron_transport', bool),
     ('electron_transport', bool),
     ('proton_transport', bool),
-    ('neutron_multigroup_mode', bool),
     ('neutron_eigenvalue_mode', bool),
     ('gpu_strategy', int64),
     ('gpu_async_type', int64),
     ('gpu_storage', int64),
 ])
 
-global_weight_roulette = into_dtype([
-    ('active', bool),
-    ('weight_threshold', float64),
-    ('weight_target', float64),
+neutron_multigroup = into_dtype([
+    ('hybrid', bool),
 ])
 
 implicit_capture = into_dtype([
     ('active', bool),
 ])
 
-population_control = into_dtype([
+weighted_emission = into_dtype([
     ('active', bool),
+    ('weight_target', float64),
+])
+
+global_weight_roulette = into_dtype([
+    ('active', bool),
+    ('weight_threshold', float64),
+    ('weight_target', float64),
 ])
 
 weight_windows = into_dtype([
@@ -579,9 +580,17 @@ weight_windows = into_dtype([
     ('upper_weights_length', int64),
 ])
 
-weighted_emission = into_dtype([
+population_control = into_dtype([
     ('active', bool),
-    ('weight_target', float64),
+])
+
+technique = into_dtype([
+    ('neutron_multigroup', neutron_multigroup),
+    ('implicit_capture', implicit_capture),
+    ('weighted_emission', weighted_emission),
+    ('global_weight_roulette', global_weight_roulette),
+    ('weight_windows', weight_windows),
+    ('population_control', population_control),
 ])
 
 source = into_dtype([
@@ -598,10 +607,10 @@ source = into_dtype([
     ('polar_cosine', float64, (2,)),
     ('azimuthal', float64, (2,)),
     ('mono_energetic', bool),
-    ('energy_group', int64),
+    ('discrete_energy', bool),
     ('energy', float64),
-    ('energy_group_pmf_ID', int64),
     ('energy_pdf_ID', int64),
+    ('energy_pmf_ID', int64),
     ('discrete_time', bool),
     ('time', float64),
     ('time_range', float64, (2,)),
@@ -672,6 +681,7 @@ tally = into_dtype([
     ('name', 'U32'),
     ('scores_offset', int64),
     ('scores_length', int64),
+    ('particle_type', int64),
     ('filter_direction', bool),
     ('filter_energy', bool),
     ('filter_time', bool),
@@ -804,10 +814,8 @@ def set_simulation(N: dict):
         ('N_element', int64),
         ('materials', material, (N['material'])),
         ('N_material', int64),
-        ('native_materials', native_material, (N['native_material'])),
-        ('N_native_material', int64),
-        ('multigroup_materials', multigroup_material, (N['multigroup_material'])),
-        ('N_multigroup_material', int64),
+        ('neutron_multigroup_data', neutron_multigroup_data, (N['neutron_multigroup_data'])),
+        ('N_neutron_multigroup_data', int64),
         ('sources', source, (N['source'])),
         ('N_source', int64),
         ('surfaces', surface, (N['surface'])),
@@ -833,11 +841,7 @@ def set_simulation(N: dict):
         ('tallies', tally, (N['tally'])),
         ('N_tally', int64),
         ('settings', settings),
-        ('implicit_capture', implicit_capture),
-        ('weighted_emission', weighted_emission),
-        ('global_weight_roulette', global_weight_roulette),
-        ('weight_windows', weight_windows),
-        ('population_control', population_control),
+        ('technique', technique),
         ('gpu_meta', gpu_meta),
         ('bank_future', bank_future),
         ('bank_source', bank_source),

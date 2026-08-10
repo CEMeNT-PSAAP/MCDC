@@ -10,6 +10,20 @@ def test_print_1d_array():
     assert print_module.print_1d_array(np.arange(6.0)) == "(size=6): [0, 1, ..., 4, 5]"
 
 
+def test_print_bank_uses_runtime_particle_data(capsys):
+    bank = {
+        "size": np.array([1]),
+        "tag": "source",
+        "particle_data": np.array([1.0, 2.0]),
+    }
+
+    print_module.print_bank(bank, show_content=True)
+
+    output = capsys.readouterr().out
+    assert "size : 1 of 2" in output
+    assert "1.0" in output
+
+
 @pytest.mark.parametrize(
     ("duration", "expected"),
     [
