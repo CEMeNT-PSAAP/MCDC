@@ -63,7 +63,7 @@ def print_bank(bank, show_content=False):
     """Print summary information for a particle bank."""
     size_field = bank["size"]
     size = int(size_field[0]) if getattr(size_field, "ndim", 0) else int(size_field)
-    particles = bank["particles"]
+    particles = bank["particle_data"]
 
     print("\n=============")
     print("Particle bank")
