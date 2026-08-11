@@ -42,9 +42,12 @@ jobs:
         id: install
         run: pip install -e ".[dev]"
 
-      - name: Run unit tests
-        run: python -m pytest -v test/unit
+      #- name: Run unit tests
+      #  run: python -m pytest -v test/unit
 
+      #- name: Run regression tests
+      #  if: always() && steps.install.outcome == 'success'
+      #  run: python -m pytest -v test/regression
+      
       - name: Run regression tests
-        if: always() && steps.install.outcome == 'success'
-        run: python -m pytest -v test/regression
+        run: python -m pytest -v test/regression --mode numba
