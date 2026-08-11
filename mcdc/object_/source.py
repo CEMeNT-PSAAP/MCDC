@@ -447,7 +447,7 @@ class Source(MCDCObject):
     # Source moving
     # ==================================================================================
 
-    def move(self, velocities, durations) -> None:
+    def move(self, velocities: ArrayLike, durations: ArrayLike) -> None:
         """
         Define piecewise-constant motion for the source.
 

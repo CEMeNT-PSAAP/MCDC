@@ -1,9 +1,8 @@
-from typing import List
 import h5py
 import numpy as np
 
 from dataclasses import dataclass, field
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 ####
 
@@ -90,7 +89,9 @@ class Settings(MCDCBase):
     gpu_async_type: int = GPU_ASYNC_SIMPLE
     gpu_storage: int = GPU_STORAGE_SEPARATE
 
-    def set_time_census(self, time, tally_frequency=None) -> None:
+    def set_time_census(
+        self, time: ArrayLike, tally_frequency: int | None = None
+    ) -> None:
         """Configure census times for time-dependent transport.
 
         Parameters
@@ -142,11 +143,11 @@ class Settings(MCDCBase):
 
     def set_eigenmode(
         self,
-        N_inactive=0,
-        N_active=0,
-        k_init=1.0,
-        gyration_radius=None,
-        save_particle=False,
+        N_inactive: int = 0,
+        N_active: int = 0,
+        k_init: float = 1.0,
+        gyration_radius: str | None = None,
+        save_particle: bool = False,
     ) -> None:
         """Enable neutron k-eigenvalue mode.
 
@@ -214,7 +215,7 @@ class Settings(MCDCBase):
             else:
                 print_error("Unknown gyration radius type")
 
-    def set_source_file(self, source_file_name) -> None:
+    def set_source_file(self, source_file_name: str) -> None:
         """Use particles from an HDF5 source file.
 
         The particle count is read from the file's ``particles_size`` dataset.
@@ -239,7 +240,7 @@ class Settings(MCDCBase):
         with h5py.File(source_file_name, "r") as f:
             self.N_particle = int(f["particles_size"][()])
 
-    def set_transported_particles(self, transported_particles: List[str]) -> None:
+    def set_transported_particles(self, transported_particles: list[str]) -> None:
         """Select the particle species enabled during transport.
 
         Parameters

@@ -2,7 +2,7 @@ from typing import Annotated, Sequence
 import numpy as np
 
 from numpy import float64
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 ####
 
@@ -128,7 +128,7 @@ class Surface(MCDCObject):
     move_translations: Annotated[NDArray[float64], ("N_move_grid", 3)]
     surface_crossing_tallies: list[TallySurfaceCrossing]
 
-    def __init__(self, type_, name, boundary_condition) -> None:
+    def __init__(self, type_: int, name: str, boundary_condition: str) -> None:
         super().__init__()
 
         self.type = type_
@@ -877,7 +877,7 @@ class Surface(MCDCObject):
     # Surface moving
     # ==================================================================================
 
-    def move(self, velocities, durations) -> None:
+    def move(self, velocities: ArrayLike, durations: ArrayLike) -> None:
         """Define piecewise-constant translational motion.
 
         Parameters

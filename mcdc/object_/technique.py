@@ -211,7 +211,12 @@ class WeightWindows(MCDCBase):
         self.target_weights = np.array([1.0]).reshape(*shape)
         self.upper_weights = np.array([1.0]).reshape(*shape)
 
-    def __call__(self, weight_windows, mesh=None, energy=None) -> None:
+    def __call__(
+        self,
+        weight_windows: NDArray[np.float64],
+        mesh: MeshBase | None = None,
+        energy: NDArray[np.float64] | None = None,
+    ) -> None:
         """Configure lower, target, and upper particle weights.
 
         Parameters
