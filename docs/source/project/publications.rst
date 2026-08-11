@@ -53,8 +53,6 @@ Hybrid Monte Carlo Transport
 
 - Pasmann, Sam, et al. "A quasi–Monte Carlo method with Krylov linear solvers for multigroup neutron transport simulations." Nuclear Science and Engineering 197.6 (2023): 1159-1173. https://www.tandfonline.com/doi/abs/10.1080/00295639.2022.2143704
 
-- Pasmann, Sam, et al. "A quasi–Monte Carlo method with Krylov linear solvers for multigroup neutron transport simulations." Nuclear Science and Engineering 197.6 (2023): 1159-1173. https://www.tandfonline.com/doi/abs/10.1080/00295639.2022.2143704
-
 - Pasmann, Samuel, et al. “iQMC: Iterative Quasi-Monte Carlo with Krylov Linear Solvers for k-Eigenvalue Neutron Transport Simulations.” In International Conference on Mathematics and Computational Methods Applied to Nuclear Science and Engineering. Niagara Falls, Ontario, Canada (2023). Preprint: https://arxiv.org/abs/2306.11600
 
 - Pasmann, Samuel, Ilham Variansyah, and R. G. McClarren. "Convergent transport source iteration calculations with Quasi-Monte Carlo." Transactions of the American Nuclear Society 124 (2021): 192-195.

@@ -9,6 +9,8 @@ We use `GitHub Actions <https://github.com/mcdc-project/mcdc/actions>`_ to host 
 We run pure python unit tests and regression testing in pure Python, pure Python + MPI, numba, numba + MPI, and numba+GPU+harmonize.
 When running regression tests we compare small particle count outputs to saved files in the testing directory.
 If the RNG seed has not changed the results should be deterministic.
+The Black workflow runs on Python 3.14 and formats for all supported Python versions, while Pyright checks the typed public API against Python 3.14.
+Automatic runtime tests use Python 3.13, while maintainers manually test Python 3.11, 3.12, and 3.14 in Python and Numba modes before a release.
 
 
 GPU COE Machine
@@ -31,9 +33,9 @@ The standard dev env for MC/DC install on this machine can be ascertained with
 
 .. code-block:: bash
 
-    module load cuda/11.8 gcc/10.3 mpich/4.0h_gcc-10 python/3.11
+    module load cuda/11.8 gcc/10.3 mpich/4.0h_gcc-10 python/3.13
     python -m venv <MCDC_venv>
-    module unload python/3.11
+    module unload python/3.13
     source <MCDC_venv>/bin/activate
 
 Then MC/DC and harmonize can be installed there in the normal manner for GPU capabilities.

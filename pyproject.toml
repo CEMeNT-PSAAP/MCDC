@@ -10,31 +10,17 @@ authors = [
   { name = "MC/DC Development Team" },
 ]
 
-maintainers = [
-  { name = "Ilham Variansyah", email = "variansi@oregonstate.edu" },
-  { name = "Joanna Piper Morgan", email = "morgan83@llnl.gov" },
-  { name = "Melek Derman", email = "dermanm@oregonstate.edu" },
-  { name = "Nathan Glaser", email = "glaserna@oregonstate.edu" },
-  { name = "Massimo Larsen", email = "larsemas@oregonstate.edu" },
-  { name = "Braxton Cuneo", email = "bcuneo@seattleu.edu" },
-  { name = "Kyle E. Niemeyer", email = "kyle.niemeyer@oregonstate.edu" },
-  { name = "Madicken Munk", email = "madicken.munk@oregonstate.edu" },
-]
-
-description = "A performant, scalable, and machine-portable Monte Carlo radiation transport code."
+description = "A performant, scalable, and machine-portable Python-based Monte Carlo radiation transport code."
 readme = "README.md"
-requires-python = ">=3.10"
-license = { file = "LICENSE" }
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 
 keywords = [
   "monte carlo",
+  "nuclear engineering",
+  "particle transport",
   "radiation transport",
-  "neutron transport",
-  "high-performance computing",
-  "hpc",
-  "gpu",
-  "numba",
-  "mpi",
 ]
 
 classifiers = [
@@ -48,12 +34,10 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-
-  "License :: OSI Approved :: BSD License",
+  "Programming Language :: Python :: 3.14",
 
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
@@ -64,7 +48,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "numba>=0.60.0",
+  "numba>=0.61.0",
   "numpy>=2.0.0",
   "scipy",
   "matplotlib",
@@ -84,12 +68,13 @@ docs = [
 dev = [
   "black",
   "pre-commit",
+  "pyright",
   "pytest",
 ]
 
 [project.urls]
 Homepage = "https://mcdc.readthedocs.io/"
-Documentation = "https://mcdc.readthedocs.io/"
+Documentation = "https://mcdc.readthedocs.io/en/stable/"
 Repository = "https://github.com/mcdc-project/mcdc"
 Issues = "https://github.com/mcdc-project/mcdc/issues"
 "Release Notes" = "https://github.com/mcdc-project/mcdc/releases"
@@ -97,10 +82,8 @@ Issues = "https://github.com/mcdc-project/mcdc/issues"
 [tool.hatch.version]
 source = "vcs"
 
-[tool.hatch.build.hooks.vcs]
-version-file = "mcdc/_version.py"
-
 [tool.black]
+target-version = ["py311", "py312", "py313", "py314"]
 force-exclude = '''
 (
   mcdc/numba_types\.py
@@ -108,6 +91,11 @@ force-exclude = '''
   | mcdc/mcdc_set/
 )
 '''
+
+[tool.pyright]
+include = ["test/typecheck"]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
 testpaths = ["test/unit"]

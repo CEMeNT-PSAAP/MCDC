@@ -5,16 +5,13 @@ Troubleshooting
 ===============
 
 This page collects solutions to common installation and runtime problems.
-If your issue is not listed here, please check our
-`GitHub issues <https://github.com/mcdc-project/mcdc/issues>`_
-or open a new one.
+If your issue is not listed here, check the `GitHub issues <https://github.com/mcdc-project/mcdc/issues>`_ or open a new one.
 
 Numba Version Compatibility
 ----------------------------
 
-MC/DC requires **Numba >= 0.60.0**.
-Symptoms of version mismatch include ``TypingError``, unexpected ``LoweringError``,
-or missing ``@njit`` features.
+MC/DC requires **Numba >= 0.61.0**.
+Symptoms of version mismatch include ``TypingError``, unexpected ``LoweringError``, or missing ``@njit`` features.
 
 Check your version:
 
@@ -27,26 +24,24 @@ Check your version:
 .. code-block:: sh
 
    # pip
-   pip install --upgrade 'numba>=0.60.0'
+   pip install --upgrade 'numba>=0.61.0'
 
    # conda
-   conda install numba>=0.60.0 -c conda-forge
+   conda install 'numba>=0.61.0' -c conda-forge
 
 **Pinning Numba for CUDA compatibility:**
 
-If your system requires a specific CUDA toolkit,
-Numba and ``cuda-toolkit`` versions must match.
-For example, CUDA 11.8 works best with Numba 0.60.x:
+If your system requires a specific CUDA toolkit, Numba and ``cuda-toolkit`` versions must match.
+Use a Numba release compatible with both the installed Python version and the selected CUDA toolkit:
 
 .. code-block:: sh
 
-   conda install numba=0.60 cudatoolkit=11.8 -c conda-forge
+   conda install 'numba>=0.61.0' cuda-toolkit=11.8 -c conda-forge
 
 **Patching Numba for AMD GPUs (HIP):**
 
 AMD ROCm GPU support requires a patched Numba build.
-Follow the `numba-hip instructions <https://github.com/ROCm/numba-hip>`_
-to apply the HIP target triple patch.
+Follow the `numba-hip instructions <https://github.com/ROCm/numba-hip>`_ to apply the HIP target triple patch.
 This is required before installing Harmonize for AMD targets.
 See also :ref:`install-amd-gpus`.
 
@@ -55,8 +50,7 @@ Building mpi4py from Source
 ----------------------------
 
 On most HPCs, prebuilt mpi4py wheels are incompatible with the system MPI library.
-Symptoms include ``MPI_Init`` failures, segfaults at launch, or
-``ImportError: libmpi.so: cannot open shared object file``.
+Symptoms include ``MPI_Init`` failures, segfaults at launch, or ``ImportError: libmpi.so: cannot open shared object file``.
 
 **Step 1 — Load the correct MPI module:**
 
@@ -72,15 +66,6 @@ Symptoms include ``MPI_Init`` failures, segfaults at launch, or
 .. code-block:: sh
 
    CC=mpicc pip install --no-cache-dir --no-binary mpi4py mpi4py
-
-Or, if using conda with the ``install.sh`` script:
-
-.. code-block:: sh
-
-   bash install.sh --hpc
-
-The ``--hpc`` flag instructs the install script to build mpi4py from source
-using the currently loaded MPI module.
 
 **Verifying the installation:**
 
@@ -105,10 +90,10 @@ Incorrect or missing modules are the most common source of build failures.
      - **Module loads**
      - **Notes**
    * - Quartz (LLNL)
-     - ``module load python/3.11``
+     - ``module load python/3.13``
      - Default ``intel-classic`` + ``mvapich2`` are sufficient
    * - Dane (LLNL)
-     - ``module load python/3.11``
+     - ``module load python/3.13``
      - x86_64, similar to Quartz
    * - Lassen (LLNL)
      - ``module load gcc/8 cuda/11.8``
@@ -120,8 +105,7 @@ Incorrect or missing modules are the most common source of build failures.
      - ``module load cray-mpich rocm/6.0.0``
      - AMD MI300A GPUs
 
-After loading modules, activate your Python environment (venv or conda)
-before running ``pip install`` or ``bash install.sh``.
+After loading modules, activate your Python environment before running ``pip install``.
 
 Container Errors
 ----------------
@@ -140,7 +124,7 @@ Fix:
 
 .. code-block:: bash
 
-    podman run --rm -it --user root mcdc:dev
+    podman run --rm -it --user root ghcr.io/mcdc-project/mcdc:dev
 
 ``Out of memory`` (Apptainer)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,8 +173,7 @@ Use ``--caching`` to save compiled binaries:
    python input.py --mode=numba --caching
 
 Subsequent runs will skip compilation.
-If compilation seems stuck, check that you are not running
-on a login node with limited resources.
+If compilation seems stuck, check that you are not running on a login node with limited resources.
 
 **Segmentation fault during MPI runs**
 
@@ -204,8 +187,7 @@ Also ensure that the number of MPI ranks does not exceed available cores:
 
 **"AttributeError: 'list' object has no attribute 'ID'" in** ``mcdc.Cell()``
 
-This error occurs when passing a Python list instead of using the ``&`` (intersection)
-and ``|`` (union) region operators.
+This error occurs when passing a Python list instead of using the ``&`` (intersection) and ``|`` (union) region operators.
 Use the operator syntax:
 
 .. code-block:: python3
@@ -222,9 +204,8 @@ See `#348 <https://github.com/mcdc-project/mcdc/issues/348>`_.
 Bugs and Issues
 ---------------
 
-Our documentation is in the early stages of development, so thank you for bearing with us 
-while we bring it up to snuff. If you find a novel bug or anything else you feel we should 
-be aware of, feel free to `open an issue <https://github.com/mcdc-project/mcdc/issues>`_.
+Our documentation remains under development, so thank you for bearing with us while we improve it.
+If you find a bug or another problem, please `open an issue <https://github.com/mcdc-project/mcdc/issues>`_.
 
 Getting More Help
 ~~~~~~~~~~~~~~~~~

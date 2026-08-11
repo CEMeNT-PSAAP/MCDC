@@ -15,12 +15,14 @@ For software architecture and documentation practices, see the :doc:`../develope
 
 For implementation guidance specific to compiled transport functions, see :doc:`../developer_guide/extending/writing_numba_compatible_transport_code`.
 
-Contributions target the ``dev`` branch. To prepare a development checkout:
+Contributions target the ``dev`` branch.
+Prepare a development checkout with the following steps:
 
 #. Fork ``mcdc-project/mcdc`` to your GitHub account.
 #. ``git clone git@github.com:<YOUR_GITHUB>/mcdc.git``
 #. ``git switch dev``
-#. Run the installation script to install MC/DC as an editable package.
+#. Create and activate a Python 3.14 environment for contributor tooling.
+#. ``python -m pip install -e ".[dev]"``
 
 Development Workflow
 --------------------
@@ -42,18 +44,28 @@ Please note our `code of conduct <https://github.com/mcdc-project/mcdc/blob/dev/
 Code Styling
 ------------
 
-Our code is auto-linted for the `Black code style <https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html>`_.
-Your contributions will not be merged unless you follow this code style.
-It's pretty easy to do this locally, just run,
+MC/DC uses the `Black code style <https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html>`_.
+Run Black with Python 3.14 from the repository root before submitting a contribution:
 
 .. code-block:: sh
 
-
-    pip install black
     black .
 
+Black is included in the ``dev`` optional dependency group installed during development setup.
+Black formats for every supported Python version listed in ``pyproject.toml``.
 
-in the top level MC/DC directory and all necessary changes will be automatically made for you.
+Public API Typing
+-----------------
+
+MC/DC ships inline type information for its public Python interface.
+Run Pyright from the repository root after changing a public class, annotation, or export:
+
+.. code-block:: sh
+
+    pyright
+
+The strict public API checks are defined in ``test/typecheck/public_api.py``.
+Pyright checks the public API against Python 3.14.
 
 ---------
 Debugging
@@ -72,11 +84,16 @@ The most useful set of debug options for MC/DC can be enabled with
 Which will toggle the following debug and compiler options in Numba:
 
 * ``DISABLE_JIT=False`` turns on the jitter
-* ``NUMBA_OPT=0`` Forces the compilers to form un-optimized code (other options for this are ``1``, ``2``, and ``3`` with ``3`` being the most optimized). This option might need to be changed if errors only result from more optimization.
-* ``DEBUG=False`` turns on all debugging options. This is still disabled in ``mcdc numba_debug`` as it will print ALOT of info on your terminal screen
+* ``NUMBA_OPT=0`` forces the compilers to form unoptimized code, while values ``1``, ``2``, and ``3`` enable increasing optimization.
+  Change this option when an error appears only at higher optimization levels.
+* ``DEBUG=False`` controls all debugging options.
+  MC/DC leaves this disabled in ``numba_debug`` because it produces extensive terminal output.
 * ``NUMBA_FULL_TRACEBACKS=1`` allows errors from sub-packages to be printed (i.e. Numpy)
-* ``NUMBA_BOUNDSCHECK=1`` numba will check vectors for bounds errors. If this is disabled it bound errors will result in a ``seg_fault``. This in consort with the previous option allows for the exact location of a bound error to be printed from Numpy subroutines
-* ``NUMBA_DEBUG_NRT=1`` enables the `Numba run time (NRT) statistics counter <https://numba.readthedocs.io/en/stable/developer/numba-runtime.html>`_ This helps with debugging memory leaks.
+* ``NUMBA_BOUNDSCHECK=1`` makes Numba check vectors for bounds errors.
+  Without this check, a bounds error can result in a segmentation fault.
+  Together with full tracebacks, this option identifies the location of a bounds error in NumPy operations.
+* ``NUMBA_DEBUG_NRT=1`` enables the `Numba runtime statistics counter <https://numba.readthedocs.io/en/stable/developer/numba-runtime.html>`_.
+  This counter helps diagnose memory leaks.
 * ``NUMBA_DEBUG_TYPEINFER= 1`` print out debugging information about type inferences that numba might need to make if a function is ill-defined
 * ``NUMBA_ENABLE_PROFILING=1`` enables profiler use
 * ``NUMBA_DUMP_CFG=1`` prints out a control flow diagram
@@ -103,7 +120,8 @@ To disable caching, omit the ``--caching`` flag (the default).
 Alternatively a developer could delete the ``__pycache__`` directory or other cache directory which is system dependent (`see more about clearing the numba cache <https://numba.readthedocs.io/en/stable/developer/caching.html>`_)
 
 
-At some point MC/DC will enable `Numba's Ahead of Time compilation abilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_. But the core development team is holding off until scheduled `upgrades to AOT functionality in Numba are implemented <https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-numba-pycc>`_.
+MC/DC may eventually enable `Numba's ahead-of-time compilation capabilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_.
+The core development team is waiting for planned `upgrades to Numba's AOT functionality <https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-numba-pycc>`_.
 However if absolutely required by users numba does allow for some `cache sharing <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
 
 ------------------
@@ -130,18 +148,10 @@ Testing
 
 See :doc:`continuous_integration` for more information on how we run these tests automatically.
 
-MC/DC has a robust testing suite that your changes must be able to pass before a PR is accepted.
-Unit tests for functions that have them are ran in a pure python from.
-Mostly this is for ensuring input operability
-A regression test suite (including models with analytical and experimental solutions) is provided to ensure accuracy and precision of MC/DC.
-
-Our test suite runs on every PR, and Push.
-Our github based CI runs for, 
-
-* linux-64 (x86)
-* osx-64 (x86, intel based macs)
-
-while we do not have continuous integration we have validated MC/DC on other systems.
+MC/DC has unit and regression test suites that contributions must pass before they are accepted.
+Unit tests exercise focused behavior in both Python and Numba modes.
+Regression tests compare representative simulations against saved reference results.
+GitHub Actions runs the CPU suites on Linux, and a self-hosted runner provides GPU regression coverage.
 
 To run the default fast unit-test suite locally, run,
 
@@ -162,7 +172,8 @@ To run the regression tests locally, run,
     python -m pytest test/regression <OPTION_FLAG(s)>
 
 
-and all the tests will run. Various option ``OPTION_FLAG`` are accepted to control the tests ran,
+The command runs all regression tests.
+The following options control test selection and execution:
 
 * Run a specific test (with wildcard ``*`` support): ``--name=<test_name>``
 * Skip a specific test (with wildcard ``*`` support): ``--skip=<test_name>``
@@ -171,11 +182,12 @@ and all the tests will run. Various option ``OPTION_FLAG`` are accepted to contr
 * Run in multiple MPI ranks (currently support ``mpiexec`` and ``srun``): ``--mpiexec=<number of ranks>``
 * Run with Slurm ``srun`` instead of ``mpiexec``: ``--srun=<number of ranks>``
 
-Note that flags can be combined. To add a new test:
+The flags can be combined.
+Add a new test with the following steps:
 
-#. Create a folder. The name of the folder will be the test name.
-#. Add the input file. Name it`input.py`.
-#. Add the answer key file. Name it `answer.h5`.
+#. Create a folder whose name identifies the test.
+#. Add the input file as ``input.py``.
+#. Add the answer key as ``answer.h5``.
 #. Make sure that the number of particles run is large enough for a good test.
 #. If the test runs longer than 5 seconds, consider decreasing the number of particles.
 

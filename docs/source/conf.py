@@ -60,14 +60,14 @@ exclude_patterns = []
 # in-page table of contents, search, and light/dark mode.
 html_theme = "pydata_sphinx_theme"
 html_title = "MC/DC Documentation"
-html_logo = "images/home/mcdc.svg"
-html_favicon = "images/home/mcdc_square.svg"
+html_logo = "../../assets/mcdc-logo.svg"
+html_favicon = "../../assets/mcdc-favicon.svg"
 
 # Read the Docs provides the active version slug during hosted builds. Use the
 # development docs as the local-build default.
 docs_version = os.environ.get("READTHEDOCS_VERSION", "dev")
 switcher_json_url = (
-    "https://mcdc.readthedocs.io/en/latest/_static/switcher.json"
+    "https://mcdc.readthedocs.io/en/dev/_static/switcher.json"
     if os.environ.get("READTHEDOCS") == "True"
     else "/_static/switcher.json"
 )
@@ -84,8 +84,9 @@ html_theme_options = {
         "json_url": switcher_json_url,
         "version_match": docs_version,
     },
-    # Hosted builds share one version list from the latest documentation. Local
-    # builds use the copied static file when served from the HTML output root.
+    "show_version_warning_banner": docs_version != "stable",
+    # Hosted builds share one version list from the development documentation.
+    # Local builds use the copied static file when served from the HTML output root.
     "check_switcher": False,
     "logo": {
         "alt_text": "MC/DC Documentation - Home",

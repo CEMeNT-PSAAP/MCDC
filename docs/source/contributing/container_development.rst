@@ -40,7 +40,7 @@ Option A:
 
 .. code-block:: bash
 
-    apptainer build --sandbox mcdc_sandbox docker://ghcr.io/cement-psaap/mcdc:dev
+    apptainer build --sandbox mcdc_sandbox docker://ghcr.io/mcdc-project/mcdc:dev
 
 Option B:
 
@@ -127,8 +127,8 @@ On Apple Silicon:
 .. code-block:: bash
 
     docker build --platform linux/amd64 -f containers/Dockerfile -t mcdc:dev-amd64 .
-    docker tag mcdc:dev-amd64 ghcr.io/cement-psaap/mcdc:dev
-    docker push ghcr.io/cement-psaap/mcdc:dev
+    docker tag mcdc:dev-amd64 ghcr.io/mcdc-project/mcdc:dev
+    docker push ghcr.io/mcdc-project/mcdc:dev
 
 .. rubric:: Making the Package Public
 
@@ -143,5 +143,6 @@ File Overview
 
     containers/
     ├── Dockerfile
-    ├── docker-compose.yml
-    └── README.md
+    ├── Dockerfile.cuda
+    ├── Dockerfile.rocm
+    └── docker-compose.yml

@@ -101,7 +101,7 @@ class MCDCObject(MCDCBase):
 
     ID: int
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Initialize the object as unregistered
         self.ID = -1
 
@@ -151,7 +151,7 @@ class MCDCPolymorphic(MCDCObject):
                 f"MC/DC class '{cls.__name__}' must have 'sub_type' class attribute."
             )
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Initialize common object registration state
         super().__init__()
 

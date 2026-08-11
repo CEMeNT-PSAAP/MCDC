@@ -2,7 +2,7 @@ from typing import Annotated, Sequence
 import numpy as np
 
 from numpy import float64
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 ####
 
@@ -128,7 +128,7 @@ class Surface(MCDCObject):
     move_translations: Annotated[NDArray[float64], ("N_move_grid", 3)]
     surface_crossing_tallies: list[TallySurfaceCrossing]
 
-    def __init__(self, type_, name, boundary_condition):
+    def __init__(self, type_: int, name: str, boundary_condition: str) -> None:
         super().__init__()
 
         self.type = type_
@@ -180,7 +180,7 @@ class Surface(MCDCObject):
         # Surface-crossing tallies
         self.surface_crossing_tallies = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"
@@ -284,7 +284,7 @@ class Surface(MCDCObject):
         name: str = "",
         x: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create the plane ``x = constant``.
 
         Parameters
@@ -315,7 +315,7 @@ class Surface(MCDCObject):
         name: str = "",
         y: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create the plane ``y = constant``.
 
         Parameters are the surface ``name``, position ``y`` in cm, and a
@@ -341,7 +341,7 @@ class Surface(MCDCObject):
         name: str = "",
         z: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create the plane ``z = constant``.
 
         Parameters are the surface ``name``, position ``z`` in cm, and a
@@ -370,7 +370,7 @@ class Surface(MCDCObject):
         C: float = 0.0,
         D: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a general plane ``A*x + B*y + C*z + D = 0``.
 
         The coefficients are normalized internally. ``(A, B, C)`` must be a
@@ -410,7 +410,7 @@ class Surface(MCDCObject):
         center: Sequence[float] = [0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create an infinite cylinder parallel to the x axis.
 
         ``center`` gives ``[y, z]`` in cm and ``radius`` is in cm.
@@ -441,7 +441,7 @@ class Surface(MCDCObject):
         center: Sequence[float] = [0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create an infinite cylinder parallel to the y axis.
 
         ``center`` gives ``[x, z]`` in cm and ``radius`` is in cm.
@@ -472,7 +472,7 @@ class Surface(MCDCObject):
         center: Sequence[float] = [0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create an infinite cylinder parallel to the z axis.
 
         ``center`` gives ``[x, y]`` in cm and ``radius`` is in cm.
@@ -505,7 +505,7 @@ class Surface(MCDCObject):
         axis: Sequence[float] = [0.0, 0.0, 1.0],
         point: Sequence[float] = [0.0, 0.0, 0.0],
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create an infinite cylinder with an arbitrary axis.
 
         Parameters
@@ -556,7 +556,7 @@ class Surface(MCDCObject):
         center: Sequence[float] = [0.0, 0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a sphere from its center and radius in cm."""
         type_ = SURFACE_SPHERE
         surface = cls(type_, name, boundary_condition)
@@ -586,7 +586,7 @@ class Surface(MCDCObject):
         apex: Sequence[float] = [0.0, 0.0, 0.0],
         t_sq: float = 1.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a double cone aligned with the x axis.
 
         ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
@@ -618,7 +618,7 @@ class Surface(MCDCObject):
         apex: Sequence[float] = [0.0, 0.0, 0.0],
         t_sq: float = 1.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a double cone aligned with the y axis.
 
         ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
@@ -650,7 +650,7 @@ class Surface(MCDCObject):
         apex: Sequence[float] = [0.0, 0.0, 0.0],
         t_sq: float = 1.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a double cone aligned with the z axis.
 
         ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
@@ -690,7 +690,7 @@ class Surface(MCDCObject):
         I: float = 0.0,
         J: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a general second-degree surface.
 
         The coefficients define
@@ -728,7 +728,7 @@ class Surface(MCDCObject):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a torus centered at ``(A, B, C)`` and aligned with x.
 
         ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
@@ -760,7 +760,7 @@ class Surface(MCDCObject):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a torus centered at ``(A, B, C)`` and aligned with y.
 
         ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
@@ -792,7 +792,7 @@ class Surface(MCDCObject):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a torus centered at ``(A, B, C)`` and aligned with z.
 
         ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
@@ -823,7 +823,7 @@ class Surface(MCDCObject):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
+    ) -> "Surface":
         """Create a torus with an arbitrary axis.
 
         Parameters
@@ -867,17 +867,17 @@ class Surface(MCDCObject):
     # Region building
     # ==================================================================================
 
-    def __pos__(self):
+    def __pos__(self) -> Region:
         return Region.make_halfspace(self, +1)
 
-    def __neg__(self):
+    def __neg__(self) -> Region:
         return Region.make_halfspace(self, -1)
 
     # ==================================================================================
     # Surface moving
     # ==================================================================================
 
-    def move(self, velocities, durations):
+    def move(self, velocities: ArrayLike, durations: ArrayLike) -> None:
         """Define piecewise-constant translational motion.
 
         Parameters

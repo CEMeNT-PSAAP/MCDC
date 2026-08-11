@@ -118,18 +118,6 @@ Make sure you're in ``mcdc/docs/``:
    Check your work: has your content been added or changed as you expected?
 #. Continue making changes to your local rst files, building locally, and launching the built html files until you're satisfied with how the website will look.
 
-.. warning::
-   In the process of creating MC/DC's documentation, ``autodoc`` *imports every python module that MC/DC imports*.
+The API reference imports MC/DC during the documentation build, so run a complete local build after changing package imports or dependencies.
 
-   This doesn't cause any issues when you build the webpages locally, because you already have all of MC/DC's requisite packages installed.
-
-   However, this *WILL* cause issues with our documentation website host, readthedocs.
-   Like you just did, readthedocs will checkout our repo and use Sphinx to build html files from our rst files, attempting to import all of MC/DC's packages along the way.
-   There are some python packages, like ``mpi4py``, that readthedocs is unable to import, causing the documentation build to fail.
-
-   **If you've added any new package imports to MC/DC's source code, add them to the** ``MOCK_MODULES`` **list in** ``mcdc/docs/source/conf.py``.
-
-   This will allow readthedocs to get past the imports without issue.
-
-
-Once you're satisfied with your changes and have added any new modules to ``conf.py``, submit a PR!
+Once you are satisfied with the local build, submit a PR.

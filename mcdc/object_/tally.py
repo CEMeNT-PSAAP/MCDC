@@ -277,7 +277,7 @@ class Tally(MCDCPolymorphic):
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
         spatial_shape: tuple[int, ...] | NoneType = None,
-    ):
+    ) -> None:
         super().__init__()
 
         # Set name
@@ -445,7 +445,7 @@ class Tally(MCDCPolymorphic):
             shape[2] = G
             self._set_bin_shape_and_strides(tuple(shape))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"
@@ -515,7 +515,7 @@ class TallySurfaceCrossing(Tally):
         particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
-    ):
+    ) -> None:
         super().__init__(
             name,
             scores,
@@ -575,7 +575,7 @@ class TallySurfaceCrossing(Tally):
 
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         if isinstance(self.surface, Surface):
@@ -630,7 +630,7 @@ class TallyCollision(Tally):
         particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
-    ):
+    ) -> None:
         spatial_shape = None
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
@@ -706,7 +706,7 @@ class TallyCollision(Tally):
 
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
         if self.cell:
             text += f"  - Cell filter: {self.cell.name}\n"
@@ -760,7 +760,7 @@ class TallyTracklength(Tally):
         particle_type: str | NoneType = None,
         energy: Sequence[float] | str | NoneType = None,
         time: Sequence[float] | NoneType = None,
-    ):
+    ) -> None:
         spatial_shape = None
         if mesh is not None:
             spatial_shape = (mesh.Nx, mesh.Ny, mesh.Nz)
@@ -836,7 +836,7 @@ class TallyTracklength(Tally):
 
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         if self.cell:

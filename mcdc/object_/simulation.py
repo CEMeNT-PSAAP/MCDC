@@ -1,7 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 if TYPE_CHECKING:
+    from matplotlib.typing import ColorType
+
     from mcdc.object_.cell import Cell, Region
     from mcdc.object_.element import Element
     from mcdc.object_.electron_reaction import ElectronReactionBase
@@ -16,7 +18,8 @@ if TYPE_CHECKING:
 ####
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from os import PathLike, fspath
 
 import numpy as np
 from mpi4py import MPI
@@ -528,14 +531,14 @@ class Simulation(MCDCBase):
 
     def visualize_model(
         self,
-        vis_plane,
-        x,
-        y,
-        z,
-        pixels,
-        colors,
-        time,
-        save_as,
+        vis_plane: Literal["xy", "xz", "yz", "yx", "zx", "zy"],
+        x: float | Sequence[float],
+        y: float | Sequence[float],
+        z: float | Sequence[float],
+        pixels: Sequence[int],
+        colors: Mapping[Material, ColorType] | None,
+        time: Sequence[float] | NDArray[float64],
+        save_as: str | PathLike[str] | None,
     ) -> None:
         """Render a two-dimensional material map of the compiled model.
 
@@ -578,6 +581,17 @@ class Simulation(MCDCBase):
             self.compile()
 
         from mcdc.visualize import visualize_model
+
+        if not np.isscalar(x):
+            x = tuple(x)
+        if not np.isscalar(y):
+            y = tuple(y)
+        if not np.isscalar(z):
+            z = tuple(z)
+        pixels = tuple(pixels)
+        time = tuple(time)
+        if save_as is not None:
+            save_as = fspath(save_as)
 
         visualize_model(self, vis_plane, x, y, z, pixels, colors, time, save_as)
 

@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 LABEL org.opencontainers.image.source="https://github.com/mcdc-project/mcdc"
 LABEL org.opencontainers.image.description="MC/DC: Monte Carlo Dynamic Code"

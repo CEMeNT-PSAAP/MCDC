@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
 if TYPE_CHECKING:
     from mcdc.object_.surface import Surface
@@ -38,27 +38,50 @@ from mcdc.print_ import print_error
 # Region
 # ======================================================================================
 
+RegionType: TypeAlias = Literal[
+    "all",
+    "halfspace",
+    "intersection",
+    "union",
+    "complement",
+]
+
 
 class Region:
     """Boolean combination of oriented surface half-spaces.
 
     Regions are normally built with unary ``+`` and ``-`` on
-    :class:`~mcdc.object_.surface.Surface` objects, followed by ``&`` (intersection),
-    ``|`` (union), and ``~`` (complement). During compilation, the expression is
-    converted to reverse Polish notation for evaluation by the geometry kernels.
+    :class:`~mcdc.object_.surface.Surface` objects, followed by ``&``
+    (intersection), ``|`` (union), and ``~`` (complement). During compilation,
+    the expression is converted to reverse Polish notation for evaluation by
+    the geometry kernels.
+
+    The supported region types and components are:
+
+    - ``"all"`` uses ``A=None`` and ``B=None``.
+    - ``"halfspace"`` uses a :class:`~mcdc.object_.surface.Surface` for ``A``
+      and ``-1`` or ``1`` for ``B``.
+    - ``"intersection"`` and ``"union"`` use a :class:`Region` for both
+      ``A`` and ``B``.
+    - ``"complement"`` uses a :class:`Region` for ``A`` and ``B=None``.
     """
 
-    type: str
+    type: RegionType
     A: Surface | Region | NoneType
     B: Region | int | NoneType
 
-    def __init__(self, type_, A, B):
+    def __init__(
+        self,
+        type_: RegionType,
+        A: Surface | Region | NoneType,
+        B: Region | int | NoneType,
+    ) -> None:
         self.type = type_
         self.A = A
         self.B = B
 
     @classmethod
-    def make_halfspace(cls, surface, sense):
+    def make_halfspace(cls, surface: Surface, sense: Literal[-1, 1]) -> Region:
         """Create the positive or negative half-space of a surface.
 
         Parameters
@@ -77,16 +100,16 @@ class Region:
         region = Region("halfspace", surface, sense)
         return region
 
-    def __and__(self, other):
+    def __and__(self, other: Region) -> Region:
         return Region("intersection", self, other)
 
-    def __or__(self, other):
+    def __or__(self, other: Region) -> Region:
         return Region("union", self, other)
 
-    def __invert__(self):
+    def __invert__(self) -> Region:
         return Region("complement", self, None)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{str.capitalize(self.type)} Region"
 
 
@@ -192,7 +215,7 @@ class Cell(MCDCObject):
         name: str = "",
         translation: Sequence[float] = [0.0, 0.0, 0.0],
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
-    ):
+    ) -> None:
         super().__init__()
 
         self.name = name or "(Unnamed cell)"
@@ -252,7 +275,7 @@ class Cell(MCDCObject):
 
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"
