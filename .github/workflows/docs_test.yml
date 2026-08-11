@@ -7,6 +7,8 @@ on:
 
 jobs:
   build-docs:
+    # Temporary suppression while validating Python compatibility on make_release.
+    if: github.ref_name != 'make_release' && github.head_ref != 'make_release'
     runs-on: "ubuntu-latest"
     timeout-minutes: 60
 

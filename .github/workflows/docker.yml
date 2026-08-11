@@ -32,6 +32,8 @@ jobs:
   # Stage 0: Detect what changed (drives downstream job decisions)
   # ---------------------------------------------------------------------------
   changes:
+    # Temporary suppression while validating Python compatibility on make_release.
+    if: github.ref_name != 'make_release' && github.head_ref != 'make_release'
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:

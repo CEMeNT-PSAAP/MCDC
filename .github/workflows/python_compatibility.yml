@@ -1,0 +1,49 @@
+name: Python Compatibility Tests
+
+on:
+  workflow_dispatch:
+  # Temporary trigger for validating this workflow before it reaches the default branch.
+  push:
+    branches: [make_release]
+
+jobs:
+  compatibility-test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Set up MPI
+        uses: mpi4py/setup-mpi@v1
+
+      - name: Install mpi4py
+        run: |
+          pip install --upgrade pip
+          pip install --no-binary=mpi4py mpi4py
+
+      - name: Install MC/DC
+        if: matrix.python-version == '3.13' || matrix.python-version == '3.14'
+        run: pip install -e ".[dev]"
+
+      - name: Install MC/DC for exploratory compatibility testing
+        if: matrix.python-version == '3.11' || matrix.python-version == '3.12'
+        run: pip install --ignore-requires-python -e ".[dev]"
+
+      - name: Run unit tests
+        run: python -m pytest -v test/unit
+
+      - name: Run regression tests
+        run: python -m pytest -v test/regression
