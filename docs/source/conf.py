@@ -67,7 +67,7 @@ html_favicon = "images/home/mcdc_square.svg"
 # development docs as the local-build default.
 docs_version = os.environ.get("READTHEDOCS_VERSION", "dev")
 switcher_json_url = (
-    "https://mcdc.readthedocs.io/en/latest/_static/switcher.json"
+    "https://mcdc.readthedocs.io/en/dev/_static/switcher.json"
     if os.environ.get("READTHEDOCS") == "True"
     else "/_static/switcher.json"
 )
@@ -84,8 +84,9 @@ html_theme_options = {
         "json_url": switcher_json_url,
         "version_match": docs_version,
     },
-    # Hosted builds share one version list from the latest documentation. Local
-    # builds use the copied static file when served from the HTML output root.
+    "show_version_warning_banner": docs_version != "stable",
+    # Hosted builds share one version list from the development documentation.
+    # Local builds use the copied static file when served from the HTML output root.
     "check_switcher": False,
     "logo": {
         "alt_text": "MC/DC Documentation - Home",
