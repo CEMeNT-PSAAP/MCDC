@@ -1,21 +1,14 @@
-# This CITATION.cff file was generated with cffinit.
-# Visit https://bit.ly/cffinit to generate yours today!
+# This CITATION.cff file was initially generated with cffinit
+# and is maintained manually.
 
 cff-version: 1.2.0
 title: 'MC/DC: Monte Carlo Dynamic Code'
 message: >-
-  If you use this software, please cite it using the
-  metadata from this file.
+  If you use MC/DC in published work, please cite the JOSS
+  article listed as the preferred citation.
 type: software
 authors:
   - name: The MC/DC Development Team
-identifiers:
-  - type: doi
-    value: 10.48550/arXiv.2305.07636
-    description: MC/DC Origins
-  - type: doi
-    value: 10.21105/joss.06415
-    description: MC/DC JOSS Article
 repository-code: 'https://github.com/mcdc-project/mcdc'
 url: 'https://mcdc.readthedocs.io/en/stable/'
 abstract: >-
@@ -41,5 +34,55 @@ keywords:
   - Numba
   - GPU
 license: BSD-3-Clause
-version: 0.14.1
-date-released: '2026-07-04'
+version: 0.15.0
+date-released: '2026-08-11'
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Morgan
+      given-names: Joanna Piper
+    - family-names: Variansyah
+      given-names: Ilham
+    - family-names: Pasmann
+      given-names: Samuel L.
+    - family-names: Clements
+      given-names: Kayla B.
+    - family-names: Cuneo
+      given-names: Braxton
+    - family-names: Mote
+      given-names: Alexander
+    - family-names: Goodman
+      given-names: Charles
+    - family-names: Shaw
+      given-names: Caleb
+    - family-names: Northrop
+      given-names: Jordan
+    - family-names: Pankaj
+      given-names: Rohan
+    - family-names: Lame
+      given-names: Ethan
+    - family-names: Whewell
+      given-names: Benjamin
+    - family-names: McClarren
+      given-names: Ryan G.
+    - family-names: Palmer
+      given-names: Todd S.
+    - family-names: Chen
+      given-names: Lizhong
+    - family-names: Anistratov
+      given-names: Dmitriy Y.
+    - family-names: Kelley
+      given-names: C. T.
+    - family-names: Palmer
+      given-names: Camille J.
+    - family-names: Niemeyer
+      given-names: Kyle E.
+  title: >-
+    Monte Carlo / Dynamic Code (MC/DC): An accelerated Python package for
+    fully transient neutron transport and rapid methods development
+  journal: Journal of Open Source Software
+  year: 2024
+  volume: '9'
+  issue: '96'
+  start: '6415'
+  doi: 10.21105/joss.06415
