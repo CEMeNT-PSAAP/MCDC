@@ -17,7 +17,7 @@ identifiers:
     value: 10.21105/joss.06415
     description: MC/DC JOSS Article
 repository-code: 'https://github.com/mcdc-project/mcdc'
-url: 'https://mcdc.readthedocs.io/en/latest/'
+url: 'https://mcdc.readthedocs.io/en/stable/'
 abstract: >-
   MC/DC is an open-source, Python-based Monte Carlo
   radiation transport code that
