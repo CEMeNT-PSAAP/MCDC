@@ -10,31 +10,16 @@ authors = [
   { name = "MC/DC Development Team" },
 ]
 
-maintainers = [
-  { name = "Ilham Variansyah", email = "variansi@oregonstate.edu" },
-  { name = "Joanna Piper Morgan", email = "morgan83@llnl.gov" },
-  { name = "Melek Derman", email = "dermanm@oregonstate.edu" },
-  { name = "Nathan Glaser", email = "glaserna@oregonstate.edu" },
-  { name = "Massimo Larsen", email = "larsemas@oregonstate.edu" },
-  { name = "Braxton Cuneo", email = "bcuneo@seattleu.edu" },
-  { name = "Kyle E. Niemeyer", email = "kyle.niemeyer@oregonstate.edu" },
-  { name = "Madicken Munk", email = "madicken.munk@oregonstate.edu" },
-]
-
-description = "A performant, scalable, and machine-portable Monte Carlo radiation transport code."
+description = "A performant, scalable, and machine-portable Python-based Monte Carlo radiation transport code."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 
 keywords = [
   "monte carlo",
+  "nuclear engineering",
+  "particle transport",
   "radiation transport",
-  "neutron transport",
-  "high-performance computing",
-  "hpc",
-  "gpu",
-  "numba",
-  "mpi",
 ]
 
 classifiers = [
@@ -66,7 +51,6 @@ classifiers = [
 dependencies = [
   "numba>=0.60.0",
   "numpy>=2.0.0",
-  "scipy",
   "matplotlib",
   "mpi4py>=3.1.4",
   "h5py",
