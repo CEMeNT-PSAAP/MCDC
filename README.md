@@ -24,6 +24,8 @@ Originally initiated by the Center for Exascale Monte Carlo Neutron Transport ([
 
 ## Installation
 
+MC/DC requires Python 3.11 or newer.
+
 Install the latest stable release from PyPI:
 
 ```bash

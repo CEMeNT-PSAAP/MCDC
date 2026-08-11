@@ -12,7 +12,7 @@ authors = [
 
 description = "A performant, scalable, and machine-portable Python-based Monte Carlo radiation transport code."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 
@@ -34,7 +34,10 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
@@ -80,7 +83,7 @@ Issues = "https://github.com/mcdc-project/mcdc/issues"
 source = "vcs"
 
 [tool.black]
-target-version = ["py313"]
+target-version = ["py311", "py312", "py313", "py314"]
 force-exclude = '''
 (
   mcdc/numba_types\.py
@@ -91,7 +94,7 @@ force-exclude = '''
 
 [tool.pyright]
 include = ["test/typecheck"]
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]

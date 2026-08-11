@@ -9,22 +9,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Added
 
 - Add `NeutronMultigroupData` and hybrid neutron multigroup transport with material-local physical energy grids and energy-representation policies, together with the `Material.multigroup()` convenience interface, from [@ilhamv]
-- Add PEP 561-compatible inline type information and strict Pyright checks for the public Python API
+- Add manually triggered unit and serial regression compatibility testing for Python 3.11, 3.12, and 3.14 while retaining Python 3.13 for automatic testing, from [@ilhamv]
+- Add PEP 561-compatible inline type information and strict Pyright checks for the public Python API, from [@ilhamv]
 
 ### Changed
 
 - **Breaking:** Unify native and neutron multigroup materials under one non-polymorphic `Material` and runtime layout, replacing `MaterialMG` and the separate native and multigroup material structures, from [@ilhamv]
 - Group transport techniques under `simulation.technique`, from [@ilhamv]
+- **Breaking:** Encapsulate MC/DC model building and execution within an explicit `mcdc.Simulation` instance, replacing the global simulation state and interface from [@ilhamv]
 - Modernize and reorganize the documentation around distinct user, API reference, theory, project, and developer paths; adopt the PyData Sphinx Theme; and expand the architecture and extension guidance from [@ilhamv]
 - Move model-specific finalization into simulation compilation and reserve runtime preparation for framework-level packing and execution setup from [@ilhamv]
-- **Breaking:** Encapsulate MC/DC model building and execution within an explicit `mcdc.Simulation` instance, replacing the global simulation state and interface from [@ilhamv]
 - Move regression tests from the custom `run.py` harness to pytest-based collection and reporting from [@massimolarsen]
-- **Breaking:** Declare Python 3.13 as the only currently supported and tested Python version
-- Adopt a three-month seasonal cycle for minor releases while continuing to publish patch releases as needed
+- **Breaking:** Require Python 3.11 or newer and designate Python 3.13 as the primary automatic test version, from [@ilhamv]
+- Run Black and Pyright with Python 3.14 while keeping Black output compatible with every supported Python version, from [@ilhamv]
+- Adopt a three-month seasonal cycle for minor releases while continuing to publish patch releases as needed, from [@ilhamv]
 
 ### Removed
 
-- Remove the legacy `install.sh` installation helper
+- Remove the legacy `install.sh` installation helper, from [@ilhamv]
 
 ## [0.14.2] - 2026-07-15
 
