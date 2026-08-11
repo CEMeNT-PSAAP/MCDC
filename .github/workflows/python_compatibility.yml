@@ -6,6 +6,9 @@ on:
   push:
     branches: [make_release]
 
+env:
+  UCX_TLS: self,sm,tcp
+
 jobs:
   compatibility-test:
     name: Python ${{ matrix.python-version }}
