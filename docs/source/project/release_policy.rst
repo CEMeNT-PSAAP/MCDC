@@ -11,7 +11,7 @@ Minor Releases
 
 MC/DC plans one minor release each calendar quarter.
 These releases collect compatible features, improvements, and fixes that have passed the project's required review and validation.
-For planning convenience, the four release cycles may be referred to informally as winter (Dec-Feb), spring (Mar-May), summer (Jun-Aug), and autumn (Sep-Nov) releases.
+For planning convenience, the four release cycles may be referred to informally as winter (Dec-Feb), spring (Mar-May), summer (Jun-Aug), and autumn/fall (Sep-Nov) releases.
 
 The quarterly schedule is a target rather than a reason to release unverified work.
 A minor release may be delayed when additional testing, documentation, or integration work is needed; it may also be brought forward when the accumulated changes are substantial and users would benefit from earlier availability.
