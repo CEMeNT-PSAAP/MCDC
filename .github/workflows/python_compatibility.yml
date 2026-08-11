@@ -34,16 +34,17 @@ jobs:
           pip install --upgrade pip
           pip install --no-binary=mpi4py mpi4py
 
-      - name: Install MC/DC
-        if: matrix.python-version == '3.13' || matrix.python-version == '3.14'
-        run: pip install -e ".[dev]"
-
-      - name: Install MC/DC for exploratory compatibility testing
+      - name: Relax the MC/DC Python requirement for exploratory testing
         if: matrix.python-version == '3.11' || matrix.python-version == '3.12'
-        run: pip install --ignore-requires-python -e ".[dev]"
+        run: sed -i 's/requires-python = ">=3.13"/requires-python = ">=3.11"/' pyproject.toml
+
+      - name: Install MC/DC
+        id: install
+        run: pip install -e ".[dev]"
 
       - name: Run unit tests
         run: python -m pytest -v test/unit
 
       - name: Run regression tests
+        if: always() && steps.install.outcome == 'success'
         run: python -m pytest -v test/regression
