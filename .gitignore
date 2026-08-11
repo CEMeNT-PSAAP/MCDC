@@ -1,68 +1,61 @@
-# setup.py
-build
-.eggs
-mcdc.egg-info
+# Package builds
+build/
+dist/
+.eggs/
+*.egg-info/
+mcdc/_version.py
 
-# Material Data
-mcdc_xs
-MCDC-Xsec
+# Material and cross-section libraries
+mcdc_xs/
+MCDC-Xsec/
 
-# Python cache
-__pycache__
+# Python caches and environments
+__pycache__/
 *.pyc
 *.nbc
 *.nbi
+.pytest_cache/
+pytestdebug.log
+.coverage*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
 
-# GPU cache
-__ptxcache__
-__harmonize_cache__
+# GPU caches
+__ptxcache__/
+__harmonize_cache__/
 
-# Editor
+# Editors
 .spyproject
 *.swp
 .vscode/
+.idea/
 
-# Output
+# Generated simulation output
 *output.h5
 output*.h5
-*output.h5
 *.png
-*.mp4
 *.gif
+*.mp4
 
-# Ignore all png and giffiles except those in the docs/source/images directory
+# Keep documentation images under version control
 !docs/source/images/**/*.png
 !docs/source/images/**/*.gif
 
-# Cluster job
+# Cluster and profiling output
 *.out
 *.pbs
-
-# Misc.
-tmp
-tmp.py
-tmp_*
-*_tmp.py
-*.core
-.DS_Store # for mac users
-**/.DS_Store
-**/.idea
-*.csv
-
-# test cache
-.pytest_cache
-pytestdebug.log
-
-# profiler
+*.log
 *.prof
 
 # Documentation builds
-docs/build
+docs/build/
 docs/source/reference/python_api/generated/
-dist/
-mcdc/_version.py
 
-# Regression tests
+# Regression-test output
 dummy_nuclide.h5
 source_particles.h5
 
@@ -70,3 +63,11 @@ source_particles.h5
 *.sif
 *_sandbox
 *.tar
+
+# Temporary and operating-system files
+tmp
+tmp.py
+tmp_*
+*_tmp.py
+*.core
+.DS_Store
