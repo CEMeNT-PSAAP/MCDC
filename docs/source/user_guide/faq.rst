@@ -9,20 +9,16 @@ General
 
 **What Python versions does MC/DC support?**
 
-MC/DC supports Python 3.13.
+MC/DC supports Python 3.11 and newer.
 
 **What platforms are supported?**
 
-MC/DC is validated on linux-64 (x86), win-64, osx-64 (Intel), osx-arm64 (Apple Silicon),
-linux-ppc64 (IBM POWER9), linux-nvidia-cuda, and linux-amd-rocm.
+MC/DC is validated on linux-64 (x86), win-64, osx-64 (Intel), osx-arm64 (Apple Silicon), linux-ppc64 (IBM POWER9), linux-nvidia-cuda, and linux-amd-rocm.
 
 **Should I use pip or conda to install MC/DC?**
 
-For **personal machines and simple setups**, ``pip`` inside a ``venv`` is the easiest route
-(see :ref:`user_guide/getting_started/installation:Installing with pip`).
-For **HPCs or non-standard hardware** (e.g., POWER9 on Lassen, or when mpi4py is
-troublesome), a **conda environment** with the ``install.sh`` script is more robust
-(see :ref:`user_guide/getting_started/installation:Installing MC/DC via conda`).
+For **personal machines and simple setups**, ``pip`` inside a ``venv`` is the easiest route (see :ref:`user_guide/getting_started/installation:Installing with pip`).
+For **HPCs or non-standard hardware**, a **conda environment** can provide more robust environment management while pip installs MC/DC (see :ref:`user_guide/getting_started/installation:Installing MC/DC via conda`).
 
 .. list-table:: pip vs. conda at a glance
    :widths: 30 35 35
@@ -42,15 +38,13 @@ troublesome), a **conda environment** with the ``install.sh`` script is more rob
      - Excellent
    * - MPI support
      - Needs system MPI
-     - Can build mpi4py from source via ``install.sh``
+     - Can isolate an ``mpi4py`` build matched to the system MPI
 
 **Where can I find cross-section data for continuous-energy simulations?**
 
 CE data libraries are provided to CEMeNT members via an internal repository.
 Due to export controls they cannot be publicly distributed.
-If you need cross-section data, we recommend using
-`OpenMC <https://docs.openmc.org>`_ or `NJOY <http://www.njoy21.io/>`_ to generate it,
-then converting to MC/DC format with the tool in ``tools/data_library_generator/``.
+If you need cross-section data, we recommend using `OpenMC <https://docs.openmc.org>`_ or `NJOY <http://www.njoy21.io/>`_ to generate it, then converting it to MC/DC format with the tool in ``tools/data_library_generator/neutron/``.
 See :ref:`install-data-library` for setup instructions.
 
 Installation
@@ -79,22 +73,18 @@ Load the correct MPI module first, then install from source:
    module load <mpi_module>        # e.g., mvapich2, openmpi, spectrum-mpi
    CC=mpicc pip install --no-binary mpi4py mpi4py
 
-Or use the conda path with ``bash install.sh --hpc``, which handles this automatically.
-See :ref:`user_guide/troubleshooting:Building mpi4py from Source` for more
-details.
+See :ref:`user_guide/troubleshooting:Building mpi4py from Source` for more details.
 
 **I get Numba version errors or** ``TypingError`` **on older Numba versions.**
 
-MC/DC requires **Numba >= 0.60.0**.
+MC/DC requires **Numba >= 0.61.0**.
 If you are on an older version, upgrade:
 
 .. code-block:: sh
 
-   pip install 'numba>=0.60.0'
+   pip install 'numba>=0.61.0'
 
-If your system constrains the Numba version (e.g., due to CUDA toolkit compatibility),
-see :ref:`user_guide/troubleshooting:Numba Version Compatibility` for patching
-guidance.
+If your system constrains the Numba version, see :ref:`user_guide/troubleshooting:Numba Version Compatibility` for compatibility guidance.
 
 Running Simulations
 -------------------
@@ -105,15 +95,15 @@ Running Simulations
 
    mpiexec -n <nprocs> python input.py --mode=numba
 
-On HPCs, use the appropriate launcher (``srun``, ``jsrun``, ``flux run``).
-See :ref:`user_guide/execution/batch_systems:Batch Job Scripts` for ready-to-use
-templates.
+On HPCs, use the appropriate launcher, such as ``srun``, ``jsrun``, or ``flux run``.
+See :ref:`user_guide/execution/batch_systems:Batch Job Scripts` for ready-to-use templates.
 
 **My simulation is very slow — what should I check?**
 
-#. Are you running in ``--mode=numba``?  Python mode is orders of magnitude slower.
-#. First Numba run incurs JIT compilation overhead (15–80 s).
-   Subsequent runs with ``--caching`` are much faster.
+#. Are you running in ``--mode=numba``?
+   Python mode is orders of magnitude slower.
+#. The first Numba run incurs JIT compilation overhead of approximately 15–80 seconds.
+#. Subsequent runs with ``--caching`` are much faster.
 #. Check your particle count — start small and scale up.
 
 **I see** ``SyntaxWarning: invalid escape sequence`` **on import.**
@@ -137,9 +127,7 @@ Use ``h5py`` to read them:
        print(list(f.keys()))                    # ['runtime', 'tallies']
        print(list(f["tallies"].keys()))          # list of tally names
 
-See the post-processing section in
-:ref:`user_guide/getting_started/first_simulation:First MC/DC Simulation` for a complete
-example.
+See the post-processing section in :ref:`user_guide/getting_started/first_simulation:First MC/DC Simulation` for a complete example.
 
 **What visualization tools work with MC/DC output?**
 
