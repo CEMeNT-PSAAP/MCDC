@@ -31,9 +31,9 @@ The standard dev env for MC/DC install on this machine can be ascertained with
 
 .. code-block:: bash
 
-    module load cuda/11.8 gcc/10.3 mpich/4.0h_gcc-10 python/3.11
+    module load cuda/11.8 gcc/10.3 mpich/4.0h_gcc-10 python/3.13
     python -m venv <MCDC_venv>
-    module unload python/3.11
+    module unload python/3.13
     source <MCDC_venv>/bin/activate
 
 Then MC/DC and harmonize can be installed there in the normal manner for GPU capabilities.

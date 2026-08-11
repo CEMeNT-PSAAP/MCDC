@@ -109,12 +109,12 @@ or `Anaconda <https://www.anaconda.com/>`_. HPC instructions:
 
 
 Then create and activate a new conda environment called *mcdc-env* in
-which to install MC/DC. MC/DC supports Python ``>3.10``;
-we recommend Python 3.11:
+which to install MC/DC.
+MC/DC supports Python 3.13:
 
 .. code-block:: sh
 
-    conda create -n mcdc-env python=3.11
+    conda create -n mcdc-env python=3.13
     conda activate mcdc-env
 
 Then, MC/DC can be installed from source by first cloning the MC/DC repository:

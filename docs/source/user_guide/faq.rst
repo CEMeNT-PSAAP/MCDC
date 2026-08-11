@@ -9,8 +9,7 @@ General
 
 **What Python versions does MC/DC support?**
 
-MC/DC supports Python ``>3.10``.
-We recommend Python 3.11 for the best performance and compatibility with Numba.
+MC/DC supports Python 3.13.
 
 **What platforms are supported?**
 

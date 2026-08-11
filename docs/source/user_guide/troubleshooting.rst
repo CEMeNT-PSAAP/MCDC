@@ -105,10 +105,10 @@ Incorrect or missing modules are the most common source of build failures.
      - **Module loads**
      - **Notes**
    * - Quartz (LLNL)
-     - ``module load python/3.11``
+     - ``module load python/3.13``
      - Default ``intel-classic`` + ``mvapich2`` are sufficient
    * - Dane (LLNL)
-     - ``module load python/3.11``
+     - ``module load python/3.13``
      - x86_64, similar to Quartz
    * - Lassen (LLNL)
      - ``module load gcc/8 cuda/11.8``

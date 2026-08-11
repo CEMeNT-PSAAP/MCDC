@@ -33,7 +33,7 @@ Tested Platforms
 | COE (OSU)   | Rocky 8.10 | x86_64 | Apptainer 1.4.5    | ✓      |
 +-------------+------------+--------+--------------------+--------+
 
-All platforms produce identical containers: Debian 13, Python 3.11,
+All platforms produce identical containers: Debian 13, Python 3.13,
 MPICH 4.2.1, MC/DC 0.12.0.
 
 Getting Started (New Users)

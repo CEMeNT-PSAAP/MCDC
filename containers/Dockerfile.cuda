@@ -30,7 +30,7 @@ ENV PATH="/opt/conda/bin:$PATH"
 # Install Python environment (matching Harmonize prereqs: CUDA=11.8, Numba>=0.60.0)
 RUN conda install -y \
     gxx \
-    python=3.11 \
+    python=3.13 \
     numba \
     numpy \
     && conda clean -afy
