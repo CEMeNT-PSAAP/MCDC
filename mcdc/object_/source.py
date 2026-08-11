@@ -254,7 +254,7 @@ class Source(MCDCObject):
         particle_type: str = "neutron",
         #
         probability: float = 1.0,
-    ):
+    ) -> None:
         super().__init__()
 
         self.name = name or "(Unnamed source)"
@@ -410,7 +410,7 @@ class Source(MCDCObject):
         self.move_time_grid = np.array([0.0, INF])
         self.move_translations = np.zeros((2, 3))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"
@@ -447,7 +447,7 @@ class Source(MCDCObject):
     # Source moving
     # ==================================================================================
 
-    def move(self, velocities, durations):
+    def move(self, velocities, durations) -> None:
         """
         Define piecewise-constant motion for the source.
 

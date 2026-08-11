@@ -20,7 +20,7 @@ class NeutronMultigroup(MCDCBase):
 
     hybrid: bool  # Whether neutron multigroup transport is hybrid
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.hybrid = True
 
 
@@ -37,10 +37,10 @@ class ImplicitCapture(MCDCBase):
 
     active: bool
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active = False
 
-    def __call__(self, active: bool = True):
+    def __call__(self, active: bool = True) -> None:
         """Configure implicit capture.
 
         Parameters
@@ -77,11 +77,11 @@ class WeightedEmission(MCDCBase):
     active: bool
     weight_target: float
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active = False
         self.weight_target = 0.0
 
-    def __call__(self, active: bool = True, weight_target: float = 1.0):
+    def __call__(self, active: bool = True, weight_target: float = 1.0) -> None:
         """Configure weighted emission.
 
         Parameters
@@ -126,12 +126,14 @@ class GlobalWeightRoulette(MCDCBase):
     weight_threshold: float
     weight_target: float
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active = False
         self.weight_threshold = 0.0
         self.weight_target = 1.0
 
-    def __call__(self, weight_threshold: float = 0.0, weight_target: float = 1.0):
+    def __call__(
+        self, weight_threshold: float = 0.0, weight_target: float = 1.0
+    ) -> None:
         """Enable roulette below a global weight threshold.
 
         Parameters
@@ -197,7 +199,7 @@ class WeightWindows(MCDCBase):
     target_weights: Annotated[NDArray[np.float64], ("Ne", "Nx", "Ny", "Nz")]
     upper_weights: Annotated[NDArray[np.float64], ("Ne", "Nx", "Ny", "Nz")]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active = False
         self.energy_bounds = np.array([0.0, 1.0])
         self.Ne = 1
@@ -209,7 +211,7 @@ class WeightWindows(MCDCBase):
         self.target_weights = np.array([1.0]).reshape(*shape)
         self.upper_weights = np.array([1.0]).reshape(*shape)
 
-    def __call__(self, weight_windows, mesh=None, energy=None):
+    def __call__(self, weight_windows, mesh=None, energy=None) -> None:
         """Configure lower, target, and upper particle weights.
 
         Parameters
@@ -328,10 +330,10 @@ class PopulationControl(MCDCBase):
 
     active: bool
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active = False
 
-    def __call__(self, active: bool = True):
+    def __call__(self, active: bool = True) -> None:
         """Configure source-bank population control.
 
         Parameters
@@ -377,7 +379,7 @@ class Technique(MCDCBase):
     weight_windows: WeightWindows
     population_control: PopulationControl
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Construct every simulation-wide technique configuration
         self.neutron_multigroup = NeutronMultigroup()
         self.implicit_capture = ImplicitCapture()

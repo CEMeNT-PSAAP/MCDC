@@ -52,13 +52,13 @@ class Region:
     A: Surface | Region | NoneType
     B: Region | int | NoneType
 
-    def __init__(self, type_, A, B):
+    def __init__(self, type_, A, B) -> None:
         self.type = type_
         self.A = A
         self.B = B
 
     @classmethod
-    def make_halfspace(cls, surface, sense):
+    def make_halfspace(cls, surface, sense) -> Region:
         """Create the positive or negative half-space of a surface.
 
         Parameters
@@ -77,16 +77,16 @@ class Region:
         region = Region("halfspace", surface, sense)
         return region
 
-    def __and__(self, other):
+    def __and__(self, other) -> Region:
         return Region("intersection", self, other)
 
-    def __or__(self, other):
+    def __or__(self, other) -> Region:
         return Region("union", self, other)
 
-    def __invert__(self):
+    def __invert__(self) -> Region:
         return Region("complement", self, None)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{str.capitalize(self.type)} Region"
 
 
@@ -192,7 +192,7 @@ class Cell(MCDCObject):
         name: str = "",
         translation: Sequence[float] = [0.0, 0.0, 0.0],
         rotation: Sequence[float] = [0.0, 0.0, 0.0],
-    ):
+    ) -> None:
         super().__init__()
 
         self.name = name or "(Unnamed cell)"
@@ -252,7 +252,7 @@ class Cell(MCDCObject):
 
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"

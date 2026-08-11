@@ -34,7 +34,7 @@ class MeshBase(MCDCPolymorphic):
         self.name = name or "(Unnamed mesh)"
         self.N_bin = 0
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
 
         text += f"  - Name: {self.name}\n"
@@ -101,7 +101,7 @@ class MeshUniform(MeshBase):
         x: tuple[float, float, int] = (-INF, 2 * INF, 1),
         y: tuple[float, float, int] = (-INF, 2 * INF, 1),
         z: tuple[float, float, int] = (-INF, 2 * INF, 1),
-    ):
+    ) -> None:
         super().__init__(
             name,
         )
@@ -119,7 +119,7 @@ class MeshUniform(MeshBase):
 
         self.N_bin = self.Nx * self.Ny * self.Nz
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
         text += f"  - Grid specification\n"
         text += f"    - (x0, dx, Nx): ({self.x0}, {self.dx}, {self.Nx}) [cm]\n"
@@ -182,7 +182,7 @@ class MeshStructured(MeshBase):
         x: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
         y: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
         z: Sequence[float] | NDArray[float64] = np.array([-INF, INF]),
-    ):
+    ) -> None:
         super().__init__(name)
 
         # Set the grid
@@ -196,7 +196,7 @@ class MeshStructured(MeshBase):
 
         self.N_bin = self.Nx * self.Ny * self.Nz
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         text = super().__repr__()
         text += f"  - Grid specification\n"
         text += f"    - x {print_1d_array(self.x)} cm\n"

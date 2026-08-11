@@ -90,7 +90,7 @@ class Settings(MCDCBase):
     gpu_async_type: int = GPU_ASYNC_SIMPLE
     gpu_storage: int = GPU_STORAGE_SEPARATE
 
-    def set_time_census(self, time, tally_frequency=None):
+    def set_time_census(self, time, tally_frequency=None) -> None:
         """Configure census times for time-dependent transport.
 
         Parameters
@@ -147,7 +147,7 @@ class Settings(MCDCBase):
         k_init=1.0,
         gyration_radius=None,
         save_particle=False,
-    ):
+    ) -> None:
         """Enable neutron k-eigenvalue mode.
 
         Parameters
@@ -214,7 +214,7 @@ class Settings(MCDCBase):
             else:
                 print_error("Unknown gyration radius type")
 
-    def set_source_file(self, source_file_name):
+    def set_source_file(self, source_file_name) -> None:
         """Use particles from an HDF5 source file.
 
         The particle count is read from the file's ``particles_size`` dataset.
@@ -239,7 +239,7 @@ class Settings(MCDCBase):
         with h5py.File(source_file_name, "r") as f:
             self.N_particle = int(f["particles_size"][()])
 
-    def set_transported_particles(self, transported_particles: List[str]):
+    def set_transported_particles(self, transported_particles: List[str]) -> None:
         """Select the particle species enabled during transport.
 
         Parameters
