@@ -13,7 +13,8 @@ authors = [
 description = "A performant, scalable, and machine-portable Python-based Monte Carlo radiation transport code."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 
 keywords = [
   "monte carlo",
@@ -37,8 +38,6 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-
-  "License :: OSI Approved :: BSD License",
 
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
@@ -73,16 +72,13 @@ dev = [
 
 [project.urls]
 Homepage = "https://mcdc.readthedocs.io/"
-Documentation = "https://mcdc.readthedocs.io/"
+Documentation = "https://mcdc.readthedocs.io/en/stable/"
 Repository = "https://github.com/mcdc-project/mcdc"
 Issues = "https://github.com/mcdc-project/mcdc/issues"
 "Release Notes" = "https://github.com/mcdc-project/mcdc/releases"
 
 [tool.hatch.version]
 source = "vcs"
-
-[tool.hatch.build.hooks.vcs]
-version-file = "mcdc/_version.py"
 
 [tool.black]
 force-exclude = '''
