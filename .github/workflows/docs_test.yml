@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  UCX_TLS: self,sm,tcp
+
 jobs:
   build-docs:
     runs-on: "ubuntu-latest"
