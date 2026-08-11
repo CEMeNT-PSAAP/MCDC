@@ -46,6 +46,11 @@ jobs:
       # and the wheel into the dist/ directory.
       - name: Build distributions
         run: python -m build
+      # Confirm that type checkers can detect MC/DC's inline annotations.
+      - name: Verify typing marker
+        run: |
+          unzip -l dist/*.whl | grep "mcdc/py.typed"
+          tar -tzf dist/*.tar.gz | grep "/mcdc/py.typed"
       # Hand the built distributions over to the publish job.
       - name: Upload distributions
         uses: actions/upload-artifact@v4

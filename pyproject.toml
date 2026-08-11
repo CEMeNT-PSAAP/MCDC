@@ -67,6 +67,7 @@ docs = [
 dev = [
   "black",
   "pre-commit",
+  "pyright",
   "pytest",
 ]
 
@@ -88,6 +89,11 @@ force-exclude = '''
   | mcdc/mcdc_set/
 )
 '''
+
+[tool.pyright]
+include = ["test/typecheck"]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
 testpaths = ["test/unit"]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import NoneType
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, TypeAlias
 
 if TYPE_CHECKING:
     from mcdc.object_.cell import Cell
@@ -90,6 +90,11 @@ class Universe(MCDCObject):
         return text
 
 
+UniverseLayout: TypeAlias = (
+    list[Universe] | list[list[Universe]] | list[list[list[Universe]]]
+)
+
+
 # ======================================================================================
 # Lattice
 # ======================================================================================
@@ -165,7 +170,9 @@ class Lattice(MCDCObject):
     dz: float
     Nz: int
 
-    universes: list[Universe]  # Non-numba
+    universes: (  # Non-numba
+        list[Universe] | list[list[Universe]] | list[list[list[Universe]]]
+    )
     universe_IDs: Annotated[NDArray[int64], ("Nx", "Ny", "Nz")]
 
     def __init__(
@@ -174,7 +181,7 @@ class Lattice(MCDCObject):
         x: tuple[float, float, int] | NoneType = None,
         y: tuple[float, float, int] | NoneType = None,
         z: tuple[float, float, int] | NoneType = None,
-        universes: list[Universe] = [],
+        universes: UniverseLayout = [],
     ) -> None:
         super().__init__()
 
