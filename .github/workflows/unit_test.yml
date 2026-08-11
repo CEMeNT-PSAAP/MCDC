@@ -46,4 +46,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python -m pytest test/unit
+          python -m pytest -v test/unit
+
+      - name: Run public API type checks
+        run: pyright

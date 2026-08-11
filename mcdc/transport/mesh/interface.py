@@ -7,57 +7,57 @@ import mcdc.transport.mesh.uniform as uniform
 
 
 @njit
-def get_indices(particle_container, mesh_base, simulation, data):
-    mesh_type = mesh_base["child_type"]
-    mesh_ID = mesh_base["child_ID"]
+def get_indices(particle_container, mesh, simulation, data):
+    mesh_type = mesh["sub_type"]
+    mesh_ID = mesh["sub_ID"]
 
     if mesh_type == MESH_UNIFORM:
-        mesh = simulation["uniform_meshes"][mesh_ID]
-        return uniform.get_indices(particle_container, mesh)
+        uniform_mesh = simulation["uniform_meshes"][mesh_ID]
+        return uniform.get_indices(particle_container, uniform_mesh)
     elif mesh_type == MESH_STRUCTURED:
-        mesh = simulation["structured_meshes"][mesh_ID]
-        return structured.get_indices(particle_container, mesh, data)
+        structured_mesh = simulation["structured_meshes"][mesh_ID]
+        return structured.get_indices(particle_container, structured_mesh, data)
 
     return -1, -1, -1
 
 
 @njit
-def get_x(index, mesh_base, simulation, data):
-    mesh_type = mesh_base["child_type"]
-    mesh_ID = mesh_base["child_ID"]
+def get_x(index, mesh, simulation, data):
+    mesh_type = mesh["sub_type"]
+    mesh_ID = mesh["sub_ID"]
 
     if mesh_type == MESH_UNIFORM:
-        mesh = simulation["uniform_meshes"][mesh_ID]
-        return mesh["x0"] + mesh["dx"] * index
+        uniform_mesh = simulation["uniform_meshes"][mesh_ID]
+        return uniform_mesh["x0"] + uniform_mesh["dx"] * index
     elif mesh_type == MESH_STRUCTURED:
-        mesh = simulation["structured_meshes"][mesh_ID]
-        return mcdc_get.structured_mesh.x(index, mesh, data)
+        structured_mesh = simulation["structured_meshes"][mesh_ID]
+        return mcdc_get.structured_mesh.x(index, structured_mesh, data)
     return 0.0
 
 
 @njit
-def get_y(index, mesh_base, simulation, data):
-    mesh_type = mesh_base["child_type"]
-    mesh_ID = mesh_base["child_ID"]
+def get_y(index, mesh, simulation, data):
+    mesh_type = mesh["sub_type"]
+    mesh_ID = mesh["sub_ID"]
 
     if mesh_type == MESH_UNIFORM:
-        mesh = simulation["uniform_meshes"][mesh_ID]
-        return mesh["y0"] + mesh["dy"] * index
+        uniform_mesh = simulation["uniform_meshes"][mesh_ID]
+        return uniform_mesh["y0"] + uniform_mesh["dy"] * index
     elif mesh_type == MESH_STRUCTURED:
-        mesh = simulation["structured_meshes"][mesh_ID]
-        return mcdc_get.structured_mesh.y(index, mesh, data)
+        structured_mesh = simulation["structured_meshes"][mesh_ID]
+        return mcdc_get.structured_mesh.y(index, structured_mesh, data)
     return 0.0
 
 
 @njit
-def get_z(index, mesh_base, simulation, data):
-    mesh_type = mesh_base["child_type"]
-    mesh_ID = mesh_base["child_ID"]
+def get_z(index, mesh, simulation, data):
+    mesh_type = mesh["sub_type"]
+    mesh_ID = mesh["sub_ID"]
 
     if mesh_type == MESH_UNIFORM:
-        mesh = simulation["uniform_meshes"][mesh_ID]
-        return mesh["z0"] + mesh["dz"] * index
+        uniform_mesh = simulation["uniform_meshes"][mesh_ID]
+        return uniform_mesh["z0"] + uniform_mesh["dz"] * index
     elif mesh_type == MESH_STRUCTURED:
-        mesh = simulation["structured_meshes"][mesh_ID]
-        return mcdc_get.structured_mesh.z(index, mesh, data)
+        structured_mesh = simulation["structured_meshes"][mesh_ID]
+        return mcdc_get.structured_mesh.z(index, structured_mesh, data)
     return 0.0

@@ -58,7 +58,7 @@ pytestdebug.log
 
 # Documentation builds
 docs/build
-docs/source/pythonapi/generated/
+docs/source/reference/python_api/generated/
 dist/
 mcdc/_version.py
 

@@ -1,22 +1,24 @@
 import numpy as np
 import mcdc
 
+simulation = mcdc.Simulation("Packaged fuel array")
+
 # ======================================================================================
 # Materials
 # ======================================================================================
 
-fuel = mcdc.MaterialMG(
+fuel = mcdc.Material.multigroup(
     capture=np.array([0.45]),
     fission=np.array([0.55]),
     nu_p=np.array([2.5]),
 )
 
-cover = mcdc.MaterialMG(
+cover = mcdc.Material.multigroup(
     capture=np.array([0.05]),
     scatter=np.array([[0.95]]),
 )
 
-water = mcdc.MaterialMG(
+water = mcdc.Material.multigroup(
     capture=np.array([0.02]),
     scatter=np.array([[0.08]]),
 )
@@ -68,14 +70,15 @@ assembly_right = mcdc.Cell(
     region=container_right, fill=assembly, translation=[+5, 0, 0], rotation=[0, 10, 0]
 )
 
-# Root universe
-mcdc.simulation.set_root_universe(cells=[assembly_left, assembly_right])
+# Set model
+simulation.set_model([assembly_left, assembly_right])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 
-mcdc.Source(x=[-0.1, 0.1], isotropic=True, energy_group=0)
+source = mcdc.Source(x=[-0.1, 0.1], isotropic=True, energy=0)
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, and run MC/DC
@@ -86,23 +89,31 @@ mesh = mcdc.MeshStructured(
     x=np.linspace(-10, 10, 201),
     z=np.linspace(-5, 5, 101),
 )
-mcdc.Tally(mesh=mesh, scores=["fission"])
+tally = mcdc.Tally(mesh=mesh, scores=["fission"])
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 1000
-mcdc.settings.N_batch = 2
-mcdc.settings.active_bank_buffer = 1000
+simulation.settings.N_particle = 1000
+simulation.settings.N_batch = 2
+simulation.settings.active_bank_buffer = 1000
 
 # Run (or visualize)
 visualize = False
 if not visualize:
-    mcdc.run()
+    simulation.run()
 else:
     colors = {
         fuel: "red",
         cover: "gray",
         water: "blue",
     }
-    mcdc.visualize(
-        "xz", y=0.0, x=[-11.0, 11.0], z=[-6, 6], pixels=(400, 400), colors=colors
+    simulation.visualize_model(
+        vis_plane="xz",
+        y=0.0,
+        x=[-11.0, 11.0],
+        z=[-6, 6],
+        pixels=(400, 400),
+        colors=colors,
+        time=[0.0],
+        save_as=None,
     )

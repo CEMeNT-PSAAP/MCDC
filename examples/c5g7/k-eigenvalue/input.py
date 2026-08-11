@@ -3,6 +3,8 @@ import numpy as np
 
 import mcdc
 
+simulation = mcdc.Simulation("C5G7 k-eigenvalue")
+
 # =============================================================================
 # Materials
 # =============================================================================
@@ -13,7 +15,7 @@ lib = h5py.File("../MGXS-C5G7-TD.h5", "r")
 
 # Setter
 def set_mat(mat):
-    return mcdc.MaterialMG(
+    return mcdc.Material.multigroup(
         capture=mat["capture"][:],
         scatter=mat["scatter"][:],
         fission=mat["fission"][:],
@@ -255,9 +257,9 @@ reflector_bottom = mcdc.Cell(+x0 & -x3 & +y0 & -y3 & +z0 & -z1, mat_mod)
 reflector_south = mcdc.Cell(+x0 & -x3 & +y0 & -y1 & +z1 & -z2, mat_mod)
 reflector_east = mcdc.Cell(+x2 & -x3 & +y1 & -y3 & +z1 & -z2, mat_mod)
 
-# Root universe
-mcdc.simulation.set_root_universe(
-    cells=[
+# Set model
+simulation.set_model(
+    [
         assembly_1,
         assembly_2,
         assembly_3,
@@ -265,20 +267,21 @@ mcdc.simulation.set_root_universe(
         reflector_bottom,
         reflector_south,
         reflector_east,
-    ],
+    ]
 )
 
 # =============================================================================
 # Set source
 # =============================================================================
 
-mcdc.Source(
+source = mcdc.Source(
     x=[0.0, pitch * 17 * 2],
     y=[-pitch * 17 * 2, 0.0],
     z=[-core_height / 2, core_height / 2],
     isotropic=True,
-    energy_group=0,  # Highest energy
+    energy=0,  # Highest energy
 )
+simulation.set_sources([source])
 
 # =============================================================================
 # Set tallies, settings, techniques and run MC/DC
@@ -292,15 +295,16 @@ z_grid = np.linspace(
 )
 g_grid = np.array([-0.5, 3.5, 6.5])  # Collapsing to fast (1-4) and slow (5-7)
 mesh = mcdc.MeshStructured(x=x_grid, y=y_grid, z=z_grid)
-mcdc.Tally(mesh=mesh, scores=["flux"], energy=g_grid)
+tally = mcdc.Tally(mesh=mesh, scores=["flux"], energy=g_grid)
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 50
-mcdc.settings.census_bank_buffer_ratio = 4.0
-mcdc.settings.set_eigenmode(N_inactive=5, N_active=10, gyration_radius="all")
+simulation.settings.N_particle = 50
+simulation.settings.census_bank_buffer_ratio = 4.0
+simulation.settings.set_eigenmode(N_inactive=5, N_active=10, gyration_radius="all")
 
 # Techniques
-mcdc.simulation.population_control()
+simulation.technique.population_control()
 
 # Run
-mcdc.run()
+simulation.run()

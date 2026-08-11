@@ -1,39 +1,18 @@
-import math
 import numpy as np
 
-import mcdc.numba_types as type_
 import mcdc.transport.distribution as dist
-from mcdc.constant import DISTRIBUTION_N_BODY
-
-from .test_data import make_test_tabulated_data
+from mcdc.object_.distribution import DistributionNBody
 
 
-def test_nbody_sample_correlated(mock_rng_sequence, make_distribution_record):
-    """
+def test_nbody_sample_correlated(mock_rng_sequence, prepare_simulation):
     # MCNP Theory & User Manual §2.4.3.5.4.13 (Law 66: N-body Phase Space Distribution)
-    table_dict, data = make_test_tabulated_data([2.0, 4.0, 6.0], [0.0, 0.4, 1.0])
-    nbody = make_distribution_record(type_.nbody_distribution, table_dict)
-    distribution = make_distribution_record(
-        type_.distribution, {"child_type": DISTRIBUTION_N_BODY, "child_ID": 0}
+    distribution = DistributionNBody(
+        values=[2.0, 4.0, 6.0],
+        probabilities=[1.0, 1.0, 1.0],
     )
-    data = np.asarray(data, dtype=np.float64)
-
-    # Numba compiles all correlated-branch field accesses, so this container needs
-    # the three correlated distribution arrays even though this test uses N-body only.
-    simulation_dtype = np.dtype(
-        [
-            ("kalbach_mann_distributions", type_.kalbach_mann_distribution, (1,)),
-            (
-                "tabulated_energy_angle_distributions",
-                type_.tabulated_energy_angle_distribution,
-                (1,),
-            ),
-            ("nbody_distributions", type_.nbody_distribution, (1,)),
-        ]
-    )
-    simulation_container = np.zeros(1, dtype=simulation_dtype)
+    simulation_container, data = prepare_simulation(objects=[distribution])
     simulation = simulation_container[0]
-    simulation["nbody_distributions"][0] = nbody
+    distribution_base = simulation["distributions"][distribution.ID]
 
     # First value samples energy, second value samples isotropic cosine.
     xi1, xi2 = 0.2, 0.75
@@ -41,7 +20,7 @@ def test_nbody_sample_correlated(mock_rng_sequence, make_distribution_record):
 
     sampled_E, sampled_mu = dist.sample_correlated_distribution(
         2.0,
-        distribution,
+        distribution_base,
         mock_rng,
         simulation,
         data,
@@ -51,12 +30,12 @@ def test_nbody_sample_correlated(mock_rng_sequence, make_distribution_record):
     # samples the cosine isotropically. This test is therefore checking the current
     # reduced implementation, not reconstructing the full Law 66 rejection sampler
     # from Eq. (2.103) through Eq. (2.106).
-    # For the tabulated-energy part, xi_1 = 0.2 gives linear interpolation in the first
-    # bin. For the angular part, MCNP Eq. (2.107) gives mu = 2 * xi_10 - 1 for
-    # isotropic center-of-mass sampling.
-    expected_E = 2.0 + (xi1 - 0.0) * (4.0 - 2.0) / (0.4 - 0.0)
+    # The constant PDF is normalized to 0.25 over [2, 6], so inverse-CDF sampling
+    # in the first bin gives E_out = 2 + xi_1 / 0.25.
+    # For the angular part, MCNP Eq. (2.107) gives mu = 2 * xi_10 - 1 for isotropic
+    # center-of-mass sampling.
+    expected_E = 2.0 + xi1 / 0.25
     expected_mu = 2.0 * xi2 - 1.0
 
     np.testing.assert_allclose(sampled_E, expected_E, rtol=0.0, atol=1e-12)
     np.testing.assert_allclose(sampled_mu, expected_mu, rtol=0.0, atol=1e-12)
-    """

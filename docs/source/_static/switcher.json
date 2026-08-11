@@ -1,0 +1,13 @@
+[
+  {
+    "name": "dev",
+    "version": "dev",
+    "url": "https://mcdc.readthedocs.io/en/dev/"
+  },
+  {
+    "name": "0.15 (stable)",
+    "version": "stable",
+    "url": "https://mcdc.readthedocs.io/en/stable/",
+    "preferred": true
+  }
+]

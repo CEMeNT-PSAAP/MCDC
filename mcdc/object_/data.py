@@ -1,23 +1,22 @@
-import numpy as np
-
 from collections.abc import Sequence
-from numpy import float64, int64
-from numpy.typing import NDArray
+from numbers import Integral
 from typing import Annotated
 
-####
+import numpy as np
+from numpy import float64, int64
+from numpy.typing import NDArray
 
 from mcdc.constant import (
     DATA_NONE,
-    DATA_TABLE,
     DATA_POLYNOMIAL,
+    DATA_TABLE,
     INTERPOLATION_HISTOGRAM,
     INTERPOLATION_LINEAR,
+    INTERPOLATION_LOG,
     INTERPOLATION_SEMILOGX,
     INTERPOLATION_SEMILOGY,
-    INTERPOLATION_LOG,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.print_ import print_1d_array, print_error
 
 # ======================================================================================
@@ -25,44 +24,27 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class DataBase(ObjectPolymorphic):
-    # Annotations for Numba mode
-    label: str = "data"
+class DataBase(MCDCPolymorphic):
+    """Base class for scalar data evaluated by transport kernels."""
 
-    def __init__(self, type_, register=True):
-        super().__init__(type_, register)
-
-    def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
-        return text
-
-
-def decode_type(type_):
-    if type_ == DATA_NONE:
-        return "Data (None)"
-    elif type_ == DATA_TABLE:
-        return "Data (Table)"
-    elif type_ == DATA_POLYNOMIAL:
-        return "Data (Polynomial function)"
+    # MC/DC framework metadata
+    label = "data"
+    sub_type = -1  # Polymorphic base
 
 
 # ======================================================================================
 # None
 # ======================================================================================
 # Placeholder for data that does not need to store anything:
-#   - Fission multiplicity and delayed precursor data for non-fissionable nuclide
+#   - Fission multiplicity and delayed precursor data for non-fissionable nuclides
 
 
 class DataNone(DataBase):
-    # Annotations for Numba mode
-    label: str = "none_data"
+    """Placeholder used when a reaction has no associated evaluable data."""
 
-    def __init__(self):
-        type_ = DATA_NONE
-        super().__init__(type_, False)
-        self.ID = 0
+    # MC/DC framework metadata
+    label = "none_data"
+    sub_type = DATA_NONE
 
 
 # ======================================================================================
@@ -71,26 +53,41 @@ class DataNone(DataBase):
 
 
 class DataTable(DataBase):
-    """
-    Tabulated one-dimensional data with ENDF/ACE-style interpolation regions.
+    """One-dimensional table with one or more interpolation regions.
 
-    The interpolation laws apply only to `y`. The optional `aux` array stores
-    additional data aligned with `x`, such as a CDF associated with a PDF table.
-    Auxiliary data are stored for lookup only and are not interpolated.
+    Parameters
+    ----------
+    x, y : ndarray
+        One-dimensional abscissa and ordinate arrays of equal nonzero length.
+    interpolations : int or sequence of int
+        Packed interpolation code for each region. A scalar applies to the full
+        table.
+    interpolation_boundaries : sequence of int, optional
+        Exclusive end index of each interpolation region. Required when
+        ``interpolations`` contains multiple codes; the final value must equal
+        ``len(x)``.
+    aux : ndarray, optional
+        Additional values aligned with ``x``. A one-dimensional array is stored
+        as one auxiliary row; a two-dimensional array must have shape
+        ``(N_aux, len(x))``.
     """
 
-    # Annotations for Numba mode
-    label: str = "table_data"
-    #
+    # MC/DC framework metadata
+    label = "table_data"
+    sub_type = DATA_TABLE
+
+    # Main data
     N: int
     x: NDArray[float64]
     y: NDArray[float64]
-    #
+
+    # Interpolation rules
     interpolations: NDArray[int64]
     interpolation_boundaries: NDArray[int64]
-    #
+
+    # Auxiliary data
     N_aux: int
-    aux: Annotated[NDArray[np.float64], ("N_aux", "N")]
+    aux: Annotated[NDArray[float64], ("N_aux", "N")]
 
     def __init__(
         self,
@@ -100,38 +97,18 @@ class DataTable(DataBase):
         interpolation_boundaries: Sequence[int] | None = None,
         aux: NDArray[float64] | None = None,
     ) -> None:
-        """
-        Create a tabulated data object.
-
-        Parameters
-        ----------
-        x : ndarray of float64
-            Independent variable values.
-        y : ndarray of float64
-            Dependent variable values.
-        interpolations : int or sequence of int
-            Interpolation law or list of interpolation laws.
-        interpolation_boundaries : sequence of int, optional
-            Region boundaries. Required when `interpolations` is a sequence.
-        aux : ndarray of float64, optional
-            Auxiliary data aligned with `x`. A one-dimensional array is stored
-            internally with shape `(1, N)`. A two-dimensional array must have
-            shape `(N_aux, N)`. Auxiliary data are not interpolated.
-
-        Notes
-        -----
-        Boundaries are stored as Python-style exclusive upper indices.
-        Therefore the final boundary should be `len(x)`.
-        """
-
-        # Set type
-        type_ = DATA_TABLE
-        super().__init__(type_)
+        super().__init__()
 
         # Set primary data
-        self.x = x
-        self.y = y
-        self.N = len(x)
+        self.x = np.asarray(x, dtype=float64)
+        self.y = np.asarray(y, dtype=float64)
+
+        if self.x.ndim != 1:
+            print_error("x must be one-dimensional.")
+        if self.y.ndim != 1:
+            print_error("y must be one-dimensional.")
+
+        self.N = len(self.x)
 
         # Basic size checks
         if self.N == 0:
@@ -142,35 +119,50 @@ class DataTable(DataBase):
         # Set auxiliary data
         if aux is None:
             self.N_aux = 0
-            self.aux = np.zeros((0, self.N), dtype=float)
-        elif aux.ndim == 1:
-            self.N_aux = 1
-            if len(aux) != self.N:
-                print_error("1D aux must have the same length as x.")
-            self.aux = np.zeros((1, self.N), dtype=float)
-            self.aux[0, :] = aux
-        elif aux.ndim == 2:
-            self.N_aux = aux.shape[0]
-            if aux.shape[1] != self.N:
-                print_error("2D aux must have shape (N_aux, len(x)).")
-            self.aux = aux
+            self.aux = np.zeros((0, self.N), dtype=float64)
         else:
-            print_error("aux must be None, 1D, or 2D.")
+            aux_array = np.asarray(aux, dtype=float64)
 
-        # Set interpolations and boundaries
-        if isinstance(interpolations, int):
-            self.interpolations = np.array([interpolations], dtype=int)
-            self.interpolation_boundaries = np.array([self.N], dtype=int)
+            if aux_array.ndim == 1:
+                if len(aux_array) != self.N:
+                    print_error("One-dimensional aux must have the same length as x.")
+
+                self.N_aux = 1
+                self.aux = aux_array.reshape(1, self.N)
+
+            elif aux_array.ndim == 2:
+                if aux_array.shape[1] != self.N:
+                    print_error("Two-dimensional aux must have shape (N_aux, len(x)).")
+
+                self.N_aux = aux_array.shape[0]
+                self.aux = aux_array
+
+            else:
+                print_error("aux must be None, one-dimensional, or two-dimensional.")
+
+        # Set interpolation rules and boundaries
+        if isinstance(interpolations, Integral):
+            self.interpolations = np.array([interpolations], dtype=int64)
+            self.interpolation_boundaries = np.array([self.N], dtype=int64)
         else:
-            self.interpolations = np.array(interpolations, dtype=int)
+            self.interpolations = np.asarray(interpolations, dtype=int64)
+
+            if self.interpolations.ndim != 1:
+                print_error("interpolations must be one-dimensional.")
 
             if interpolation_boundaries is None:
-                print_error("Missing interpolation boundaries in tabulated data.")
+                print_error(
+                    "interpolation_boundaries is required when multiple "
+                    "interpolation laws are provided."
+                )
 
-            self.interpolation_boundaries = np.array(
+            self.interpolation_boundaries = np.asarray(
                 interpolation_boundaries,
-                dtype=int,
+                dtype=int64,
             )
+
+            if self.interpolation_boundaries.ndim != 1:
+                print_error("interpolation_boundaries must be one-dimensional.")
 
         # Interpolation-region checks
         if len(self.interpolations) == 0:
@@ -182,7 +174,7 @@ class DataTable(DataBase):
             )
 
         if self.interpolation_boundaries[-1] != self.N:
-            print_error("Last interpolation boundary must equal len(x).")
+            print_error("The last interpolation boundary must equal len(x).")
 
         previous = 0
         for boundary in self.interpolation_boundaries:
@@ -190,68 +182,78 @@ class DataTable(DataBase):
                 print_error("interpolation_boundaries must be strictly increasing.")
             if boundary > self.N:
                 print_error("interpolation_boundaries cannot exceed len(x).")
+
             previous = boundary
 
+        # Validate interpolation codes
+        for interpolation in self.interpolations:
+            decode_interpolation(interpolation)
+
     def __repr__(self) -> str:
-        """Return a human-readable summary of the tabulated data."""
         text = super().__repr__()
+
         text += f"  - x {print_1d_array(self.x)}\n"
         text += f"  - y {print_1d_array(self.y)}\n"
 
         if self.N_aux > 0:
             text += f"  - aux shape: {self.aux.shape}\n"
-            for i in range(len(self.aux)):
-                text += f"    - aux[{i}]: {print_1d_array(self.aux[i])}\n"
+            for i, values in enumerate(self.aux):
+                text += f"    - aux[{i}]: {print_1d_array(values)}\n"
 
         if len(self.interpolations) == 1:
             text += (
-                f"  - Interpolation: "
+                "  - Interpolation: "
                 f"{decode_interpolation(self.interpolations[0])}\n"
             )
         else:
             text += "  - Interpolation regions:\n"
 
             start = 0
-            for interp, end in zip(
+            for interpolation, end in zip(
                 self.interpolations,
                 self.interpolation_boundaries,
             ):
-                text += f"    - [{start}, {end}): " f"{decode_interpolation(interp)}\n"
+                text += (
+                    f"    - [{start}, {end}): "
+                    f"{decode_interpolation(interpolation)}\n"
+                )
                 start = end
 
         return text
 
 
-def decode_interpolation(type_) -> str:
-    """Convert an interpolation integer code to its string name."""
+def decode_interpolation(type_: int) -> str:
+    """Return the name associated with a packed interpolation code."""
+
     if type_ == INTERPOLATION_HISTOGRAM:
         return "histogram"
-    elif type_ == INTERPOLATION_LINEAR:
+    if type_ == INTERPOLATION_LINEAR:
         return "linear"
-    elif type_ == INTERPOLATION_SEMILOGX:
+    if type_ == INTERPOLATION_SEMILOGX:
         return "semilog-x"
-    elif type_ == INTERPOLATION_SEMILOGY:
+    if type_ == INTERPOLATION_SEMILOGY:
         return "semilog-y"
-    elif type_ == INTERPOLATION_LOG:
+    if type_ == INTERPOLATION_LOG:
         return "log"
-    else:
-        raise ValueError(f"Unknown interpolation type: {type_}")
+
+    raise ValueError(f"Unknown interpolation type: {type_}")
 
 
-def encode_interpolation(type_) -> int:
-    """Convert an interpolation string name to its integer code."""
-    if type_ == "histogram":
+def encode_interpolation(name: str) -> int:
+    """Return the packed code associated with an interpolation name."""
+
+    if name == "histogram":
         return INTERPOLATION_HISTOGRAM
-    elif type_ == "linear":
+    if name == "linear":
         return INTERPOLATION_LINEAR
-    elif type_ == "semilog-x":
+    if name == "semilog-x":
         return INTERPOLATION_SEMILOGX
-    elif type_ == "semilog-y":
+    if name == "semilog-y":
         return INTERPOLATION_SEMILOGY
-    elif type_ == "log":
+    if name == "log":
         return INTERPOLATION_LOG
-    else:
-        raise ValueError(f"Unknown interpolation name: {type_}")
+
+    raise ValueError(f"Unknown interpolation name: {name}")
 
 
 # ======================================================================================
@@ -260,18 +262,30 @@ def encode_interpolation(type_) -> int:
 
 
 class DataPolynomial(DataBase):
-    # Annotations for Numba mode
-    label: str = "polynomial_data"
-    #
+    """Polynomial coefficients evaluated in ascending power order.
+
+    Parameters
+    ----------
+    coefficients : ndarray
+        One-dimensional coefficient array.
+    """
+
+    # MC/DC framework metadata
+    label = "polynomial_data"
+    sub_type = DATA_POLYNOMIAL
+
     coefficients: NDArray[float64]
 
-    def __init__(self, coeffs):
-        type_ = DATA_POLYNOMIAL
-        super().__init__(type_)
+    def __init__(self, coefficients: NDArray[float64]) -> None:
+        super().__init__()
 
-        self.coefficients = coeffs
+        self.coefficients = np.asarray(coefficients, dtype=float64)
 
-    def __repr__(self):
+        if self.coefficients.ndim != 1:
+            print_error("coefficients must be one-dimensional.")
+
+    def __repr__(self) -> str:
         text = super().__repr__()
+
         text += f"  - coefficients {print_1d_array(self.coefficients)}\n"
         return text

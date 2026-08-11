@@ -1,15 +1,18 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Slab absorbium")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
 # Three slab layers with different purely-absorbing materials
 
 # Set materials
-m1 = mcdc.MaterialMG(capture=np.array([1.0]))
-m2 = mcdc.MaterialMG(capture=np.array([1.5]))
-m3 = mcdc.MaterialMG(capture=np.array([2.0]))
+m1 = mcdc.Material.multigroup(capture=np.array([1.0]))
+m2 = mcdc.Material.multigroup(capture=np.array([1.5]))
+m3 = mcdc.Material.multigroup(capture=np.array([2.0]))
 
 # Set surfaces
 s1 = mcdc.Surface.PlaneZ(z=0.0, boundary_condition="vacuum")
@@ -18,29 +21,36 @@ s3 = mcdc.Surface.PlaneZ(z=4.0)
 s4 = mcdc.Surface.PlaneZ(z=6.0, boundary_condition="vacuum")
 
 # Set cells
-mcdc.Cell(region=+s1 & -s2, fill=m2)
-mcdc.Cell(region=+s2 & -s3, fill=m3)
-mcdc.Cell(region=+s3 & -s4, fill=m1)
+cell_1 = mcdc.Cell(region=+s1 & -s2, fill=m2)
+cell_2 = mcdc.Cell(region=+s2 & -s3, fill=m3)
+cell_3 = mcdc.Cell(region=+s3 & -s4, fill=m1)
+simulation.set_model([cell_1, cell_2, cell_3])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 # Uniform isotropic source throughout the domain
 
-mcdc.Source(z=[0.0, 6.0], isotropic=True, energy_group=0)
+source = mcdc.Source(z=[0.0, 6.0], isotropic=True, energy=0)
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, and run mcdc
 # ======================================================================================
 
 # Tallies
-mcdc.Tally(surface=s4, scores=["current-net"])
+surface_tally = mcdc.Tally(surface=s4, scores=["current-net"])
 mesh = mcdc.MeshStructured(z=np.linspace(0.0, 6.0, 61))
-mcdc.Tally(mesh=mesh, mu=np.linspace(-1.0, 1.0, 32 + 1), scores=["flux", "collision"])
+mesh_tally = mcdc.Tally(
+    mesh=mesh,
+    mu=np.linspace(-1.0, 1.0, 32 + 1),
+    scores=["flux", "collision"],
+)
+simulation.set_tallies([surface_tally, mesh_tally])
 
 # Settings
-mcdc.settings.N_particle = 100
-mcdc.settings.N_batch = 2
+simulation.settings.N_particle = 100
+simulation.settings.N_batch = 2
 
 # Run
-mcdc.run()
+simulation.run()

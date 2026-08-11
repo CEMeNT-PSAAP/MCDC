@@ -1,0 +1,1509 @@
+from __future__ import annotations
+
+####
+
+import importlib
+import numba as nb
+import numpy as np
+
+from mpi4py import MPI
+from numba import njit
+from numba.extending import intrinsic
+from pathlib import Path
+
+####
+
+import mcdc
+import mcdc.code_factory.gpu.program_builder as gpu_builder
+import mcdc.config as config
+import mcdc.object_ as object_module
+import mcdc.object_.base as base
+
+from mcdc.object_.base import (
+    MCDCBase,
+    MCDCObject,
+    MCDCPolymorphic,
+)
+from mcdc.object_.particle import Particle, ParticleBank, ParticleData
+from mcdc.object_.tally import Tally
+from mcdc.object_.util import parse_dimension_expression
+from mcdc.print_ import print_error
+from mcdc.util import flatten
+
+type_map = {
+    bool: np.bool_,
+    float: np.float64,
+    int: np.int64,
+    str: "U32",
+    np.bool_: np.bool_,
+    np.float64: np.float64,
+    np.int64: np.int64,
+    np.uint64: np.uint64,
+    np.str_: "U32",
+    np.uintp: np.uintp,
+}
+
+bank_names = ["bank_active", "bank_census", "bank_source", "bank_future"]
+
+
+def validate_unique_class_labels(classes):
+    """Reject distinct runtime classes that use the same structure label."""
+    classes_by_label = {}
+    for class_ in classes:
+        existing = classes_by_label.get(class_.label)
+        if existing is not None and existing is not class_:
+            print_error(
+                f"Duplicate MC/DC class label '{class_.label}' used by "
+                f"{existing.__name__} and {class_.__name__}."
+            )
+        classes_by_label[class_.label] = class_
+
+
+# ======================================================================================
+# Gather and group the classes
+# ======================================================================================
+
+base_classes = [
+    getattr(base, x)
+    for x in dir(base)
+    if isinstance(getattr(base, x), type) and issubclass(getattr(base, x), MCDCBase)
+]
+
+all_classes = [ParticleData, Particle]
+mcdc_classes = [ParticleData, Particle]
+polymorphic_bases = []
+
+file_names = [x for x in dir(object_module) if x[:2] != "__" and x != "base"]
+for file_name in file_names:
+    file = getattr(object_module, file_name)
+    item_names = dir(file)
+    for item_name in item_names:
+        item = getattr(file, item_name)
+        if (
+            isinstance(item, type)
+            and issubclass(item, MCDCBase)
+            and item not in all_classes
+        ):
+            all_classes.append(item)
+
+            if (
+                item not in base_classes
+                and "label" in dir(item)
+                and item not in mcdc_classes
+            ):
+                mcdc_classes.append(item)
+
+validate_unique_class_labels(mcdc_classes)
+
+polymorphic_bases = [
+    x for x in mcdc_classes if issubclass(x, MCDCPolymorphic) and x.sub_type == -1
+]
+
+# ======================================================================================
+# Numba layer creation
+# ======================================================================================
+
+
+def generate_numba_layers(simulation):
+    """Pack a finalized Python model into the shared runtime data layers."""
+    # ==================================================================================
+    # Allocate key items for the Numba runtime layers:
+    #   - Python annotations
+    #   - Numba structures
+    #   - Records
+    #   - Data: flattened vector to store arbitrary-size arrays
+    #   - Accessor targets: to generate getter/setter helpers to easily access data
+    # ==================================================================================
+
+    annotations = {}
+    structures = {}
+    records = {}
+    data = {"size": 0}
+    accessor_targets = {}
+
+    for mcdc_class in mcdc_classes:
+        annotations[mcdc_class.label] = {}
+        structures[mcdc_class.label] = []
+        accessor_targets[mcdc_class.label] = []
+        if issubclass(mcdc_class, MCDCObject):
+            records[mcdc_class.label] = []
+        else:
+            records[mcdc_class.label] = {}
+
+    # Allocate particle banks from capacities finalized during simulation compilation
+    for name in bank_names:
+        annotations[name] = {}
+        structures[name] = []
+        accessor_targets[name] = []
+
+    # Move simulation to last
+    annotations["simulation"] = annotations.pop("simulation")
+    structures["simulation"] = structures.pop("simulation")
+    records["simulation"] = records.pop("simulation")
+    accessor_targets["simulation"] = accessor_targets.pop("simulation")
+
+    # ==================================================================================
+    # Gather the annotations from the classes
+    # ==================================================================================
+
+    for mcdc_class in mcdc_classes:
+        # Include all ancestors, but stop at the MC/DC base classes
+        classes = []
+        for item in mcdc_class.__mro__:
+            if item in base_classes:
+                break
+            classes.append(item)
+
+        # If polymorphic, don't include the polymorphic base
+        if issubclass(mcdc_class, MCDCPolymorphic):
+            classes = [mcdc_class]
+
+        # Get the annotations
+        for class_ in classes:
+            new_annotations = {
+                k: v
+                for k, v in class_.__annotations__.items()
+                if k not in ["label", "non_numba"]
+                and (
+                    "non_numba" not in dir(class_)
+                    or ("non_numba" in dir(class_) and k not in class_.non_numba)
+                )
+            }
+            # Evaluate stringified annotation
+            if (
+                len(new_annotations) > 0
+                and type(next(iter(new_annotations.values()))) == str
+            ):
+                new_annotations = parse_annotations_dict(new_annotations)
+
+            annotations[mcdc_class.label].update(new_annotations)
+
+    # Particle banks
+    for name in bank_names:
+        annotations[name] = {
+            k: v
+            for k, v in ParticleBank.__annotations__.items()
+            if k not in ["label", "non_numba"]
+            and (
+                "non_numba" not in dir(ParticleBank)
+                or (
+                    "non_numba" in dir(ParticleBank) and k not in ParticleBank.non_numba
+                )
+            )
+        }
+
+    # ==================================================================================
+    # Set the structures and accessor targets based on the annotations
+    # ==================================================================================
+
+    # Temporary simulation object structure
+    simulation_object_structure = []
+    included_classes = []
+    for field in annotations["simulation"]:
+        hint = annotations["simulation"][field]
+        hint_origin = get_origin(hint)
+        hint_args = get_args(hint)
+
+        if hint in all_classes:
+            simulation_object_structure.append((field, hint))
+            included_classes.append(hint)
+            continue
+        if hint_origin == list and hint_args[0] in all_classes:
+            simulation_object_structure.append((field, list, hint_args[0]))
+            included_classes.append(hint_args[0])
+            continue
+
+    # Build child structures before structures that embed them
+    completed_structures = set()
+    active_structures = set()
+    structure_order = []
+    for label in annotations.keys():
+        set_structure(
+            label,
+            structures,
+            accessor_targets,
+            annotations,
+            completed_structures,
+            active_structures,
+            structure_order,
+        )
+
+    # Generate the accessor helper
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        generate_mcdc_access(accessor_targets)
+
+    # Add ID for non-singleton
+    for class_ in mcdc_classes:
+        if issubclass(class_, MCDCObject):
+            structures[class_.label].append(("ID", type_map[int]))
+        # Set parent and child ID and type if polymorphic
+        if issubclass(class_, MCDCPolymorphic):
+            if class_ in polymorphic_bases:
+                structures[class_.label].append(("sub_type", type_map[int]))
+                structures[class_.label].append(("sub_ID", type_map[int]))
+            else:
+                structures[class_.label].append(("base_ID", type_map[int]))
+
+    # Add particle data to particle banks and add particle banks to the simulation
+    for name in bank_names:
+        bank = getattr(simulation, name)
+        size = int(bank.size[0])
+        structures[name] += [
+            ("particle_data", into_dtype(structures["particle_data"]), (size,))
+        ]
+        #
+        structures["simulation"] = [(name, into_dtype(structures[name]))] + structures[
+            "simulation"
+        ]
+
+    # ==================================================================================
+    # Set records and data size based on the simulation structures and objects
+    # ==================================================================================
+
+    # Allocate object containers
+    objects = []
+
+    # Gather the objects from the simulation
+    attribute_names = [
+        x
+        for x in dir(simulation)
+        if (
+            not x.startswith("__")
+            and (
+                isinstance(getattr(simulation, x), MCDCBase)
+                or not callable(getattr(simulation, x))
+            )
+            and x not in simulation.non_numba
+        )
+    ]
+    for attribute_name in attribute_names:
+        attribute = getattr(simulation, attribute_name)
+        if type(attribute) in mcdc_classes:
+            objects.append(attribute)
+        if type(attribute) == list:
+            for item in attribute:
+                if type(item) in mcdc_classes:
+                    objects.append(item)
+
+    # Set the records and the data size
+    for object_ in objects:
+        set_object(object_, annotations, structures, records, data)
+    set_object(simulation, annotations, structures, records, data)
+
+    # ==================================================================================
+    # Finalize the simulation object structure and set record
+    # ==================================================================================
+
+    new_structure = []
+    record = records["simulation"]
+    for item in simulation_object_structure:
+        field = item[0]
+        type_1 = item[1]
+
+        # List of objects
+        if type_1 == list:
+            type_2 = item[2]
+
+            # List of non-polymorphics
+            if item[2] not in polymorphic_bases:
+                N = len(records[item[2].label])
+                new_structure.append(
+                    (field, into_dtype(structures[item[2].label]), (N,))
+                )
+                new_structure.append((f"N_{plural_to_singular(field)}", type_map[int]))
+                record[f"N_{plural_to_singular(field)}"] = N
+
+            # List of polymorphics
+            else:
+                for class_ in mcdc_classes:
+                    if issubclass(class_, type_2):
+                        N = len(records[class_.label])
+                        new_structure.append(
+                            (
+                                singular_to_plural(class_.label),
+                                into_dtype(structures[class_.label]),
+                                (N,),
+                            )
+                        )
+                        new_structure.append((f"N_{class_.label}", type_map[int]))
+                        record[f"N_{class_.label}"] = N
+
+        # Singleton
+        elif item[1] in mcdc_classes and issubclass(item[1], MCDCBase):
+            new_structure.append((field, into_dtype(structures[item[1].label])))
+
+        else:
+            print_error(f"Unknown type: {item}")
+
+    structures["simulation"] = new_structure + structures["simulation"]
+
+    # Print the fields
+    if MPI.COMM_WORLD.Get_rank() == 0:
+        with open(f"{Path(mcdc.__file__).parent}/numba_types.py", "w") as f:
+            text = (
+                "# The following is automatically generated by "
+                "numba_layers_generator.py\n\n"
+            )
+            text += "from numpy import bool_\n"
+            text += "from numpy import float64\n"
+            text += "from numpy import int64\n"
+            text += "from numpy import uint64\n"
+            text += "from numpy import uintp\n"
+            text += "\n###\n\n"
+            text += (
+                "from mcdc.code_factory.numba_layers_generator import into_dtype\n\n"
+            )
+
+            for label in structure_order:
+                # Skip special types
+                if label in ["gpu_meta"] + bank_names + ["simulation"]:
+                    continue
+
+                text += f"{label} = into_dtype([\n"
+                structure = structures[label]
+                for item in structure:
+                    text += decode_structure_item(item)
+                text += "])\n\n"
+
+            # GPU meta
+            text += "gpu_meta = into_dtype([\n"
+            for item in structures["gpu_meta"]:
+                if item[0].endswith("pointer"):
+                    text += f"    ('{item[0]}', uintp),\n"
+                else:
+                    text += decode_structure_item(item)
+            text += "])\n\n"
+
+            # Particle banks
+            for label in bank_names:
+                structure = structures[label]
+
+                text += f"{label} = None\n"
+                text += f"def set_{label}(N: dict):\n"
+                text += f"    global {label}\n"
+                text += f"    {label} = into_dtype([\n"
+                for item in structure:
+                    if item[0] == "particle_data":
+                        text += (
+                            f"        ('{item[0]}', {item[0]}, (N['{item[0]}'],)),\n"
+                        )
+                    else:
+                        text += decode_structure_item(item, "    ")
+                text += "    ])\n\n"
+
+            # Simulation
+            text += f"simulation = None\n"
+            text += f"def set_simulation(N: dict):\n"
+            text += f"    global simulation\n"
+            text += f"    simulation = into_dtype([\n"
+            for item in structures["simulation"]:
+                if type(item[1]) == np.dtypes.VoidDType and len(item) == 3:
+                    singular_field = plural_to_singular(item[0])
+                    text += f"        ('{item[0]}', {singular_field}, (N['{singular_field}'])),\n"
+                else:
+                    text += decode_structure_item(item, "    ")
+            text += "    ])\n\n"
+
+            f.write(text)
+
+    # ==================================================================================
+    # Set numba_types.py
+    # ==================================================================================
+
+    import mcdc.numba_types as type_
+
+    # Particle banks
+    type_.set_bank_active({"particle_data": simulation.bank_active.size[0]})
+    type_.set_bank_census({"particle_data": simulation.bank_census.size[0]})
+    type_.set_bank_source({"particle_data": simulation.bank_source.size[0]})
+    type_.set_bank_future({"particle_data": simulation.bank_future.size[0]})
+
+    # Simulation
+    N = {}
+    for item in structures["simulation"]:
+        if type(item[1]) == np.dtypes.VoidDType and len(item) == 3:
+            singular_field = plural_to_singular(item[0])
+            N[singular_field] = item[2]
+    type_.set_simulation(N)
+
+    # ==================================================================================
+    # GPU preparation: Adapt transport functions, forward declare, and build program
+    # ==================================================================================
+
+    if config.target == "gpu":
+        gpu_builder.forward_declare_gpu_program()
+        gpu_builder.adapt_transport_functions()
+        gpu_builder.build_gpu_program(data["size"])
+
+    # ==================================================================================
+    # Allocate the flattened data and re-set the objects
+    # ==================================================================================
+
+    data["array"], data["pointer"] = create_data_array(data["size"])
+
+    data["size"] = 0
+    for object_ in objects:
+        set_object(object_, annotations, structures, records, data, set_data=True)
+    set_object(simulation, annotations, structures, records, data, set_data=True)
+
+    # ==================================================================================
+    # Set with records
+    # ==================================================================================
+
+    # The global structure/variable container
+    mcdc_simulation_container, mcdc_simulation_pointer = create_simulation_container(
+        into_dtype(structures["simulation"])
+    )
+    mcdc_simulation = mcdc_simulation_container[0]
+
+    record = records["simulation"]
+    structure = structures["simulation"]
+    for item in structure:
+        field = item[0]
+        field_type = item[1]
+        size = -1
+        if len(item) == 3:
+            size = item[2][0]
+
+        # Skip particular attributes
+        if field in bank_names:
+            continue
+
+        # Simple attribute
+        if type(field_type) != np.dtypes.VoidDType:
+            mcdc_simulation[field] = record[field]
+
+        # MC/DC objects
+        else:
+            # Singleton
+            if size == -1:
+                for sub_item in structures[field]:
+                    mcdc_simulation[field][sub_item[0]] = records[field][sub_item[0]]
+            # Non-singleton
+            else:
+                singular_field = plural_to_singular(field)
+                for i in range(size):
+                    for sub_item in structures[singular_field]:
+                        mcdc_simulation[field][i][sub_item[0]] = records[
+                            singular_field
+                        ][i][sub_item[0]]
+
+    # Manually set particle bank attributes
+    for name in bank_names:
+        mcdc_simulation[name]["tag"] = getattr(simulation, name).tag
+
+    # GPU program setup
+    if config.target == "gpu":
+        gpu_builder.setup_gpu_program(mcdc_simulation_container, data["array"])
+        gpu_builder.adapt_transport_functions_post_setup()
+
+    return mcdc_simulation_container, data["array"]
+
+
+def is_embedded_mcdc_base(hint):
+    """Return whether a field is an inline, simulation-owned MC/DC object."""
+    return (
+        isinstance(hint, type)
+        and issubclass(hint, MCDCBase)
+        and not issubclass(hint, MCDCObject)
+    )
+
+
+def set_structure(
+    label,
+    structures,
+    accessor_targets,
+    annotations,
+    completed=None,
+    active=None,
+    order=None,
+):
+    # Track dependencies so embedded structures are complete before their owners
+    if completed is None:
+        completed = set()
+    if active is None:
+        active = set()
+    if order is None:
+        order = []
+    if label in completed:
+        return
+    if label in active:
+        print_error(f"Cyclic embedded MCDCBase structure involving '{label}'.")
+    active.add(label)
+
+    structure = structures[label]
+    annotation = annotations[label]
+    accessor_target = accessor_targets[label]
+
+    for field in annotation:
+        hint = annotation[field]
+        hint_origin = get_origin(hint)
+        hint_args = get_args(hint)
+        embedded_mcdc_base = is_embedded_mcdc_base(hint)
+        hint_origin_shape = None
+        hint_inner_dtype = None
+        fixed_size_array = False
+
+        # Inline runtime fields use their class label as their field name
+        if embedded_mcdc_base and field != hint.label:
+            print_error(
+                f"Embedded MCDCBase field '{label}.{field}' must match the "
+                f"class label '{hint.label}'."
+            )
+
+        # Process annotation
+        if hint_origin is Annotated:
+            hint_decoded = decode_annotated_ndarray(hint)
+            hint_origin = hint_decoded["origin"]
+            hint_origin_shape = hint_decoded["shape"]
+            hint_inner_dtype = get_args(hint_decoded["dtype"])[0]
+            fixed_size_array = True
+
+            # Mark as arbitrary size if string is used in shape
+            for dim_size in hint_origin_shape:
+                if type(dim_size) == str:
+                    fixed_size_array = False
+                    break
+
+        # Get the element dtype from an NDArray without shape metadata
+        if hint_origin is np.ndarray and hint_inner_dtype is None:
+            hint_inner_dtype = get_ndarray_dtype(hint)
+
+        # Skip simulation object structure
+        if label == "simulation":
+            if hint in all_classes:
+                continue
+            if hint_origin == list and hint_args[0] in all_classes:
+                hint_origin = np.ndarray
+                continue
+
+        # ==========================================================================
+        # Get the type
+        # ==========================================================================
+
+        # Basics
+        simple_scalar = hint in type_map.keys()
+        simple_list = hint_origin == list and hint_args[0] in type_map.keys()
+        numpy_array = hint_origin == np.ndarray
+
+        # MC/DC class
+        def non_polymorphic(x):
+            # Only treat real classes that inherit from MCDCObject
+            return (
+                isinstance(x, type)
+                and issubclass(x, MCDCObject)
+                and x not in polymorphic_bases
+            )
+
+        def polymorphic_base(x):
+            # Only treat real classes that are registered polymorphic bases
+            return isinstance(x, type) and x in polymorphic_bases
+
+        # List of MC/DC classes
+        list_of_non_polymorphics = hint_origin == list and non_polymorphic(hint_args[0])
+        list_of_polymorphic_bases = hint_origin == list and polymorphic_base(
+            hint_args[0]
+        )
+
+        # ==========================================================================
+        # Set the structure
+        # ==========================================================================
+
+        # Basics
+        if embedded_mcdc_base:
+            child_label = hint.label
+            if child_label not in annotations:
+                print_error(
+                    f"Missing annotations for embedded MCDCBase {label}/{field}: "
+                    f"{child_label}"
+                )
+            set_structure(
+                child_label,
+                structures,
+                accessor_targets,
+                annotations,
+                completed,
+                active,
+                order,
+            )
+            structure.append((field, into_dtype(structures[child_label])))
+        elif fixed_size_array:
+            structure.append((field, type_map[hint_inner_dtype], hint_origin_shape))
+        elif simple_scalar:
+            structure.append((field, type_map[hint]))
+        elif simple_list or numpy_array:
+            structure.append((f"{field}_offset", type_map[int]))
+            structure.append((f"{field}_length", type_map[int]))
+            logical_type = hint_args[0] if simple_list else hint_inner_dtype
+            cast_to_int = is_integer_type(logical_type)
+            if hint_origin_shape is not None:
+                accessor_target.append(
+                    AccessorTarget(f"{field}", hint_origin_shape, cast_to_int)
+                )
+            else:
+                accessor_target.append(
+                    AccessorTarget(f"{field}", (f"{field}_length",), cast_to_int)
+                )
+
+        # MC/DC classes
+        elif non_polymorphic(hint) or polymorphic_base(hint):
+            structure.append((f"{field}_ID", type_map[int]))
+
+        # List of MC/DC classes
+        elif list_of_non_polymorphics or list_of_polymorphic_bases:
+            singular = plural_to_singular(field)
+            structure.append((f"N_{singular}", type_map[int]))
+            structure.append((f"{singular}_IDs_offset", type_map[int]))
+            if hint_origin_shape is not None:
+                accessor_target.append(
+                    AccessorTarget(f"{singular}_IDs", hint_origin_shape, True)
+                )
+            else:
+                accessor_target.append(
+                    AccessorTarget(f"{singular}_IDs", (f"N_{singular}",), True)
+                )
+
+        # Unknown type
+        else:
+            print_error(f"Unknown type hint for {label}/{field}: {hint}")
+
+    # Record a dependency-safe declaration order for generated Numba types
+    active.remove(label)
+    completed.add(label)
+    order.append(label)
+
+
+def set_object(
+    object_, annotations, structures, records, data, class_=None, set_data=False
+):
+    if class_ == None:
+        class_ = object_.__class__
+
+    # Set the parent first if polymorphics
+    if isinstance(object_, MCDCPolymorphic) and class_ not in polymorphic_bases:
+        for parent_class in polymorphic_bases:
+            if issubclass(class_, parent_class):
+                set_object(
+                    object_,
+                    annotations,
+                    structures,
+                    records,
+                    data,
+                    parent_class,
+                    set_data,
+                )
+
+    annotation = annotations[class_.label]
+    structure = structures[class_.label]
+    record = {}
+
+    if class_.label == "simulation":
+        record = records["simulation"]
+
+    # Recursively pack inline MCDCBase members before packing their owner
+    if class_.label != "simulation":
+        for field, child_class in annotation.items():
+            if not is_embedded_mcdc_base(child_class):
+                continue
+            child = getattr(object_, field)
+            set_object(
+                child,
+                annotations,
+                structures,
+                records,
+                data,
+                set_data=set_data,
+            )
+            child_structure = structures[child_class.label]
+            child_container = np.zeros(1, dtype=into_dtype(child_structure))
+            child_record = child_container[0]
+            for child_item in child_structure:
+                child_field = child_item[0]
+                child_record[child_field] = records[child_class.label][child_field]
+            record[field] = child_record
+
+    # Straightforwardly set up attributes
+    for key in [x[0] for x in structure]:
+        if key in dir(object_):
+            # Skip if set already
+            if key in record.keys():
+                continue
+            record[key] = getattr(object_, key)
+
+    # Loop over the supported attributes
+    attribute_names = [
+        x for x in dir(object_) if (x[:2] != "__" and not callable(getattr(object_, x)))
+    ]
+    if "non_numba" in dir(object_):
+        attribute_names = list(set(attribute_names) - set(object_.non_numba))
+    for attribute_name in attribute_names:
+        # Skip if set already
+        if attribute_name in record.keys():
+            continue
+
+        # Skip if not in annotation
+        if attribute_name not in annotation.keys():
+            continue
+        attribute = getattr(object_, attribute_name)
+
+        # Convert list of supported types into Numpy array
+        if type(attribute) == list:
+            if get_args(annotation[attribute_name])[0] in type_map.keys():
+                attribute = np.array(attribute)
+
+        # Numpy array
+        if type(attribute) == np.ndarray:
+            attribute_flatten = attribute.flatten()
+            record[f"{attribute_name}_offset"] = data["size"]
+            record[f"{attribute_name}_length"] = len(attribute_flatten)
+            if set_data:
+                data["array"][data["size"] : data["size"] + len(attribute_flatten)] = (
+                    attribute_flatten[:]
+                )
+            data["size"] += len(attribute_flatten)
+
+        # Non-singleton object
+        elif isinstance(attribute, MCDCObject):
+            record[f"{attribute_name}_ID"] = attribute.ID
+
+        # List of Non-singleton objects
+        elif type(attribute) == list:
+            inner_type = get_args(annotation[attribute_name])[0]
+
+            # Flatten the list
+            attribute_flatten = list(flatten(attribute))
+            singular_name = plural_to_singular(attribute_name)
+
+            if not issubclass(inner_type, MCDCObject):
+                print_error(
+                    f"[ERROR] Get a list of non-object for {attribute_name}: {attribute}"
+                )
+
+            record[f"N_{singular_name}"] = len(attribute_flatten)
+            record[f"{singular_name}_IDs_offset"] = data["size"]
+            if set_data:
+                data["array"][data["size"] : data["size"] + len(attribute_flatten)] = [
+                    x.ID for x in attribute_flatten
+                ]
+            data["size"] += len(attribute_flatten)
+
+    # Complete for simulation object
+    if class_.label == "simulation":
+        return
+
+    # Set ID of non-singleton
+    if isinstance(object_, MCDCObject):
+        if not isinstance(object_, MCDCPolymorphic):
+            record["ID"] = object_.ID
+
+        # Set parent and child ID and type if polymorphic
+        else:
+            # Parent
+            if class_ in polymorphic_bases:
+                record["ID"] = object_.ID
+                record["sub_ID"] = object_.sub_ID
+                record["sub_type"] = object_.sub_type
+            # Child
+            else:
+                record["ID"] = object_.sub_ID
+                record["base_ID"] = object_.ID
+
+    # Set tally bins
+    if class_ == Tally:
+        tally_size = np.prod(object_.bin_shape)
+        record[f"bin_offset"] = data["size"]
+        record[f"bin_sum_offset"] = data["size"] + tally_size
+        record[f"bin_sum_square_offset"] = data["size"] + tally_size * 2
+        record[f"bin_length"] = tally_size
+        record[f"bin_sum_length"] = tally_size
+        record[f"bin_sum_square_length"] = tally_size
+        data["size"] += 3 * tally_size
+
+    # Check structure-record compatibility
+    missing = set([x[0] for x in structure]) - set(record.keys())
+    if len(missing) > 0:
+        print_error(f"Missing structure keys in record for {class_.label}: {missing}")
+
+    # Register the record
+    if isinstance(object_, MCDCObject):
+        records[class_.label].append(record)
+    elif isinstance(object_, MCDCBase):
+        records[class_.label] = record
+
+
+# =============================================================================
+# Global GPU/CPU variable array constructors
+# =============================================================================
+
+
+def create_data_array(size):
+    if not config.target == "gpu":
+        data = np.zeros(size, dtype=np.float64)
+        return data, 0
+    else:
+        return create_data_array_on_gpu(size * 8)
+
+
+@njit
+def create_data_array_on_gpu(size):
+    if config.gpu_state_storage == "managed":
+        data_ptr = gpu_builder.alloc_managed_bytes(size)
+    else:
+        data_ptr = gpu_builder.alloc_device_bytes(size)
+    data_uint = voidptr_to_uintp(data_ptr)
+    data = nb.carray(data_ptr, (size,), dtype=np.float64)
+    return data, data_uint
+
+
+def create_simulation_container(dtype):
+    if not config.target == "gpu":
+        simulation_container = np.zeros((1,), dtype=dtype)
+        return simulation_container, 0
+    else:
+        return create_simulation_container_on_gpu(dtype, dtype.itemsize)
+
+
+@njit
+def create_simulation_container_on_gpu(dtype, size):
+    if config.gpu_state_storage == "managed":
+        simulation_ptr = gpu_builder.alloc_managed_bytes(size)
+    else:
+        simulation_ptr = gpu_builder.alloc_device_bytes(size)
+    simulation_uint = voidptr_to_uintp(simulation_ptr)
+    simulation = nb.carray(simulation_ptr, (1,), dtype)
+    return simulation, simulation_uint
+
+
+# =============================================================================
+# Type casters
+# =============================================================================
+
+
+@intrinsic
+def cast_voidptr_to_uintp(typingctx, src):
+    # check for accepted types
+    if isinstance(src, nb.types.RawPointer):
+        # create the expected type signature
+        result_type = nb.types.uintp
+        sig = result_type(nb.types.voidptr)
+
+        # defines the custom code generation
+        def codegen(context, builder, signature, args):
+            # llvm IRBuilder code here
+            [src] = args
+            rtype = signature.return_type
+            llrtype = context.get_value_type(rtype)
+            return builder.ptrtoint(src, llrtype)
+
+        return sig, codegen
+
+
+@njit()
+def voidptr_to_uintp(value):
+    return cast_voidptr_to_uintp(value)
+
+
+# ======================================================================================
+# Alignment Logic
+# ======================================================================================
+# While CPU execution can robustly handle all sorts of Numba types, GPU
+# execution requires structs to follow some of the basic properties expected of
+# C-style structs with standard layout:
+#
+#      - Every primitive field is aligned by its size, and padding is inserted
+#        between fields to ensure alignment in arrays and nested data structures
+#
+#      - Every field has a unique address
+#
+# If these rules are violated, memory accesses made in GPUs may encounter
+# problems. For example, in cases where an access is not at an address aligned
+# by their size, a segfault or similar fault will occur, or information will be
+# lost. These issues were fixed by providing a function, align, which ensures the
+# field lists fed to np.dtype fulfill these requirements.
+#
+# The align function does the following:
+#
+#      - Tracks the cumulative offset of fields as they appear in the input list.
+#
+#      - Inserts additional padding fields to ensure that primitive fields are
+#        aligned by their size
+#
+#      - Re-sizes arrays to have at least one element in their array (this ensure
+#        they have a non-zero size, and hence cannot overlap base addresses with
+#        other fields.
+#
+
+
+def fixup_dims(dim_tuple):
+    return tuple([max(d, 1) for d in dim_tuple])
+
+
+def align(field_list):
+    result = []
+    offset = 0
+    pad_id = 0
+    for field in field_list:
+        if len(field) > 3:
+            print_error("Unexpected struct field specification. Specifications \
+                        usually only consist of 3 or fewer members")
+        multiplier = 1
+        if len(field) == 3:
+            field = (field[0], field[1], fixup_dims(field[2]))
+            for d in field[2]:
+                multiplier *= d
+        kind = np.dtype(field[1])
+        size = kind.itemsize
+
+        if kind.isbuiltin == 0:
+            alignment = 8
+        elif kind.isbuiltin == 1:
+            alignment = size
+        else:
+            print_error("Unexpected field item type")
+
+        size *= multiplier
+
+        if offset % alignment != 0:
+            pad_size = alignment - (offset % alignment)
+            result.append((f"padding_{pad_id}", np.uint8, (pad_size,)))
+            pad_id += 1
+            offset += pad_size
+
+        result.append(field)
+        offset += size
+
+    if offset % 8 != 0:
+        pad_size = 8 - (offset % 8)
+        result.append((f"padding_{pad_id}", np.uint8, (pad_size,)))
+        pad_id += 1
+
+    return result
+
+
+def into_dtype(field_list):
+    result = np.dtype(align(field_list), align=True)
+    return result
+
+
+# ======================================================================================
+# Type parser
+# ======================================================================================
+
+from typing import (
+    Annotated,
+    Any,
+    ForwardRef,
+    NamedTuple,
+    Optional,
+    Union,
+    get_args,
+    get_origin,
+)
+import numpy as np
+from numpy.typing import NDArray
+
+
+class AccessorTarget(NamedTuple):
+    name: str
+    shape: tuple[int | str, ...]
+    cast_to_int: bool
+
+
+# --- Safe locals for eval + ForwardRef fallback ---
+class _FwdRefDict(dict):
+    """If a symbol isn't in the whitelist, treat it as a ForwardRef('Symbol')."""
+
+    def __missing__(self, key):
+        for class_ in all_classes:
+            if key == class_.__name__:
+                return class_
+        return ForwardRef(key)
+
+
+_SAFE_GLOBALS = {}  # no builtins
+_SAFE_LOCALS = _FwdRefDict(
+    {
+        # builtins
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "bytes": bytes,
+        "object": object,
+        "list": list,
+        "dict": dict,
+        "tuple": tuple,
+        "set": set,
+        # typing
+        "Any": Any,
+        "Annotated": Annotated,
+        "Union": Union,
+        "Optional": Optional,
+        # numpy typing
+        "NDArray": NDArray,
+        # numpy dtypes (extend if you need more)
+        "float64": np.float64,
+        "float32": np.float32,
+        "int64": np.int64,
+        "int32": np.int32,
+    }
+)
+
+
+def parse_type_hint_str(s: str):
+    """
+    Parse a stringified type hint into a runtime type/typing object.
+    Unknown identifiers become ForwardRef('Name') so we don't import/resolve.
+    """
+    s = s.strip()
+    # Special-case empty or 'None' if you ever pass those
+    if s in {"None", "NoneType"}:
+        return type(None)
+    return eval(s, _SAFE_GLOBALS, _SAFE_LOCALS)
+
+
+def parse_annotations_dict(ann: dict[str, str]) -> dict[str, object]:
+    return {k: parse_type_hint_str(v) for k, v in ann.items()}
+
+
+def decode_annotated_ndarray(hint):
+    inner, metadata = get_args(hint)
+    inner_origin = get_origin(inner)
+    inner_args = get_args(inner)
+    shape_type, dtype_type = inner_args
+    return {
+        "origin": inner_origin,
+        "shape": metadata,
+        "shape_type": shape_type,
+        "dtype": dtype_type,
+    }
+
+
+def get_ndarray_dtype(hint):
+    hint_args = get_args(hint)
+    if len(hint_args) < 2:
+        return None
+    dtype_args = get_args(hint_args[1])
+    if len(dtype_args) == 0:
+        return None
+    return dtype_args[0]
+
+
+def is_integer_type(type_):
+    if type_ is None:
+        return False
+    try:
+        return np.issubdtype(np.dtype(type_), np.integer)
+    except TypeError:
+        return False
+
+
+# ======================================================================================
+# Helpers for mcdc_get generators
+# ======================================================================================
+
+
+def validate_accessor_targets(targets):
+    for object_name, attributes in targets.items():
+        for attribute in attributes:
+            rank = len(attribute.shape)
+            if not 1 <= rank <= 4:
+                raise ValueError(
+                    f"Generated accessors support one through four dimensions, "
+                    f"but {object_name}.{attribute.name} has rank {rank}."
+                )
+
+
+def generate_mcdc_access(targets):
+    validate_accessor_targets(targets)
+
+    for object_name in targets.keys():
+        path = f"{Path(mcdc.__file__).parent}"
+        file_getter = open(f"{path}/mcdc_get/{object_name}.py", "w")
+        file_setter = open(f"{path}/mcdc_set/{object_name}.py", "w")
+
+        text_getter = (
+            "# The following is automatically generated by code_factory.py\n\n"
+        )
+        text_setter = (
+            "# The following is automatically generated by code_factory.py\n\n"
+        )
+
+        if any(attribute.cast_to_int for attribute in targets[object_name]):
+            text_getter += "from numpy import int64\n"
+        text_getter += "from numba import njit\n\n\n"
+        text_setter += "from numba import njit\n\n\n"
+
+        for attribute in targets[object_name]:
+            attribute_name = attribute.name
+            shape = attribute.shape
+            cast_to_int = attribute.cast_to_int
+
+            if len(shape) == 1:
+                text_getter += _accessor_1d_element(
+                    object_name, attribute_name, cast_to_int=cast_to_int
+                )
+                text_getter += _accessor_1d_all(object_name, attribute_name, shape[0])
+                text_getter += _accessor_1d_last(
+                    object_name,
+                    attribute_name,
+                    shape[0],
+                    cast_to_int=cast_to_int,
+                )
+
+                text_setter += _accessor_1d_element(object_name, attribute_name, True)
+                text_setter += _accessor_1d_all(
+                    object_name, attribute_name, shape[0], True
+                )
+                text_setter += _accessor_1d_last(
+                    object_name, attribute_name, shape[0], True
+                )
+
+            elif len(shape) == 2:
+                text_getter += _accessor_2d_vector(
+                    object_name, attribute_name, shape[1]
+                )
+                text_getter += _accessor_2d_element(
+                    object_name,
+                    attribute_name,
+                    shape[1],
+                    cast_to_int=cast_to_int,
+                )
+
+                text_setter += _accessor_2d_vector(
+                    object_name, attribute_name, shape[1], True
+                )
+                text_setter += _accessor_2d_element(
+                    object_name, attribute_name, shape[1], True
+                )
+
+            elif len(shape) == 3:
+                text_getter += _accessor_3d_element(
+                    object_name,
+                    attribute_name,
+                    shape[1],
+                    shape[2],
+                    cast_to_int=cast_to_int,
+                )
+
+                text_setter += _accessor_3d_element(
+                    object_name, attribute_name, shape[1], shape[2], True
+                )
+
+            elif len(shape) == 4:
+                text_getter += _accessor_4d_element(
+                    object_name,
+                    attribute_name,
+                    shape[1],
+                    shape[2],
+                    shape[3],
+                    cast_to_int=cast_to_int,
+                )
+
+                text_setter += _accessor_4d_element(
+                    object_name, attribute_name, shape[1], shape[2], shape[3], True
+                )
+            text_getter += _accessor_chunk(object_name, attribute_name)
+            text_setter += _accessor_chunk(object_name, attribute_name, True)
+
+        file_getter.write(text_getter[:-2])
+        file_setter.write(text_setter[:-2])
+
+        file_getter.close()
+        file_setter.close()
+
+    for key in ["get", "set"]:
+        with open(f"{Path(mcdc.__file__).parent}/mcdc_{key}/__init__.py", "w") as f:
+            text = "# The following is automatically generated by code_factory.py\n\n"
+            for i, object_name in enumerate(targets.keys()):
+                text += f"import mcdc.mcdc_{key}.{object_name} as {object_name}\n"
+                if i < len(targets.keys()) - 1:
+                    text += "\n"
+            f.write(text)
+
+
+def accessor_return(expression, cast_to_int):
+    if cast_to_int:
+        # Use an explicit NumPy scalar type so Python and Numba return the same
+        # logical integer width from the float64 data arena.
+        expression = f"int64({expression})"
+    return f"    return {expression}\n\n\n"
+
+
+def accessor_dimension(variable_name, dimension, object_name):
+    if isinstance(dimension, str):
+        attribute, offset = parse_dimension_expression(dimension)
+        expression = f'{object_name}["{attribute}"]'
+        if offset > 0:
+            expression += f" + {offset}"
+        elif offset < 0:
+            expression += f" - {-offset}"
+        return f"    {variable_name} = {expression}\n"
+    return f"    {variable_name} = {dimension}\n"
+
+
+def _accessor_1d_element(object_name, attribute_name, setter=False, cast_to_int=False):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}(index, {object_name}, data, value):\n"
+    else:
+        text += f"def {attribute_name}(index, {object_name}, data):\n"
+    text += f'    offset = {object_name}["{attribute_name}_offset"]\n'
+    if setter:
+        text += f"    data[offset + index] = value\n\n\n"
+    else:
+        text += accessor_return("data[offset + index]", cast_to_int)
+    return text
+
+
+def _accessor_1d_all(object_name, attribute_name, size, setter=False):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}_all({object_name}, data, value):\n"
+    else:
+        text += f"def {attribute_name}_all({object_name}, data):\n"
+    text += f'    start = {object_name}["{attribute_name}_offset"]\n'
+    text += accessor_dimension("size", size, object_name)
+    text += f"    end = start + size\n"
+    if setter:
+        text += f"    data[start:end] = value\n\n\n"
+    else:
+        text += f"    return data[start:end]\n\n\n"
+    return text
+
+
+def _accessor_1d_last(
+    object_name, attribute_name, size, setter=False, cast_to_int=False
+):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}_last({object_name}, data, value):\n"
+    else:
+        text += f"def {attribute_name}_last({object_name}, data):\n"
+    text += f'    start = {object_name}["{attribute_name}_offset"]\n'
+    text += accessor_dimension("size", size, object_name)
+    text += f"    end = start + size\n"
+    if setter:
+        text += f"    data[end - 1] = value\n\n\n"
+    else:
+        text += accessor_return("data[end - 1]", cast_to_int)
+    return text
+
+
+def _accessor_chunk(object_name, attribute_name, setter=False):
+    text = f"@njit\n"
+    if setter:
+        text += (
+            f"def {attribute_name}_chunk(start, length, {object_name}, data, value):\n"
+        )
+    else:
+        text += f"def {attribute_name}_chunk(start, length, {object_name}, data):\n"
+    text += f'    start += {object_name}["{attribute_name}_offset"]\n'
+    text += f"    end = start + length\n"
+    if setter:
+        text += f"    data[start:end] = value\n\n\n"
+    else:
+        text += f"    return data[start:end]\n\n\n"
+    return text
+
+
+def _accessor_2d_element(
+    object_name, attribute_name, stride, setter=False, cast_to_int=False
+):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}(index_1, index_2, {object_name}, data, value):\n"
+    else:
+        text += f"def {attribute_name}(index_1, index_2, {object_name}, data):\n"
+    text += f'    offset = {object_name}["{attribute_name}_offset"]\n'
+    text += accessor_dimension("stride", stride, object_name)
+    if setter:
+        text += f"    data[offset + index_1 * stride + index_2] = value\n\n\n"
+    else:
+        text += accessor_return(
+            "data[offset + index_1 * stride + index_2]", cast_to_int
+        )
+    return text
+
+
+def _accessor_2d_vector(object_name, attribute_name, stride, setter=False):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}_vector(index_1, {object_name}, data, value):\n"
+    else:
+        text += f"def {attribute_name}_vector(index_1, {object_name}, data):\n"
+    text += f'    offset = {object_name}["{attribute_name}_offset"]\n'
+    text += accessor_dimension("stride", stride, object_name)
+    text += f"    start = offset + index_1 * stride\n"
+    text += f"    end = start + stride\n"
+    if setter:
+        text += f"    data[start:end] = value\n\n\n"
+    else:
+        text += f"    return data[start:end]\n\n\n"
+    return text
+
+
+def _accessor_3d_element(
+    object_name,
+    attribute_name,
+    stride_2,
+    stride_3,
+    setter=False,
+    cast_to_int=False,
+):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}(index_1, index_2, index_3, {object_name}, data, value):\n"
+    else:
+        text += (
+            f"def {attribute_name}(index_1, index_2, index_3, {object_name}, data):\n"
+        )
+    text += f'    offset = {object_name}["{attribute_name}_offset"]\n'
+    text += accessor_dimension("stride_2", stride_2, object_name)
+    text += accessor_dimension("stride_3", stride_3, object_name)
+    if setter:
+        text += f"    data[offset + index_1 * stride_2 * stride_3 + index_2 * stride_3 + index_3] = value\n\n\n"
+    else:
+        text += accessor_return(
+            "data[offset + index_1 * stride_2 * stride_3 + index_2 * stride_3 + index_3]",
+            cast_to_int,
+        )
+    return text
+
+
+def _accessor_4d_element(
+    object_name,
+    attribute_name,
+    stride_2,
+    stride_3,
+    stride_4,
+    setter=False,
+    cast_to_int=False,
+):
+    text = f"@njit\n"
+    if setter:
+        text += f"def {attribute_name}(index_1, index_2, index_3, index_4, {object_name}, data, value):\n"
+    else:
+        text += f"def {attribute_name}(index_1, index_2, index_3, index_4, {object_name}, data):\n"
+    text += f'    offset = {object_name}["{attribute_name}_offset"]\n'
+    text += accessor_dimension("stride_2", stride_2, object_name)
+    text += accessor_dimension("stride_3", stride_3, object_name)
+    text += accessor_dimension("stride_4", stride_4, object_name)
+    if setter:
+        text += f"    data[offset + index_1 * stride_2 * stride_3 * stride_4 + index_2 * stride_3 * stride_4 + index_3 * stride_4 + index_4] = value\n\n\n"
+    else:
+        text += accessor_return(
+            "data[offset + index_1 * stride_2 * stride_3 * stride_4 + index_2 * stride_3 * stride_4 + index_3 * stride_4 + index_4]",
+            cast_to_int,
+        )
+    return text
+
+
+# ======================================================================================
+# Misc.
+# ======================================================================================
+
+
+def plural_to_singular(word: str) -> str:
+    """
+    Convert a plural English noun (possibly underscore-separated) to singular.
+    Applies only to the last word and handles common irregulars.
+    """
+    irregulars = {
+        "universes": "universe",
+        "children": "child",
+        "men": "man",
+        "women": "woman",
+        "people": "person",
+        "mice": "mouse",
+        "geese": "goose",
+        "teeth": "tooth",
+        "feet": "foot",
+        "indices": "index",
+        "matrices": "matrix",
+        "criteria": "criterion",
+        "data": "data",  # invariant
+        "mgxs": "mgxs",  # invariant
+        "spectra": "spectrum",
+    }
+
+    parts = word.lower().split("_")
+    w = parts[-1]
+
+    if w in irregulars:
+        parts[-1] = irregulars[w]
+    elif w.endswith("ies") and len(w) > 3:
+        parts[-1] = w[:-3] + "y"
+    elif w.endswith("ves") and len(w) > 3:
+        parts[-1] = w[:-3] + "f"
+    elif w.endswith("oes"):
+        parts[-1] = w[:-2]
+    elif any(w.endswith(suffix) for suffix in ("ses", "xes", "zes", "ches", "shes")):
+        parts[-1] = w[:-2]
+    elif w.endswith("s") and not w.endswith("ss"):
+        parts[-1] = w[:-1]
+
+    return "_".join(parts)
+
+
+def singular_to_plural(word: str) -> str:
+    """
+    Convert a singular English noun (possibly underscore-separated) to plural.
+    Applies only to the last word and handles common irregulars.
+    """
+    irregulars = {
+        "universe": "universes",
+        "child": "children",
+        "man": "men",
+        "woman": "women",
+        "person": "people",
+        "mouse": "mice",
+        "goose": "geese",
+        "tooth": "teeth",
+        "foot": "feet",
+        "index": "indices",
+        "matrix": "matrices",
+        "criterion": "criteria",
+        "data": "data",  # invariant
+        "mgxs": "mgxs",  # invariant
+        "spectrum": "spectra",
+    }
+
+    parts = word.lower().split("_")
+    w = parts[-1]
+
+    if w in irregulars:
+        parts[-1] = irregulars[w]
+    elif w.endswith("y") and w[-2:] not in ("ay", "ey", "iy", "oy", "uy"):
+        parts[-1] = w[:-1] + "ies"
+    elif w.endswith("f"):
+        parts[-1] = w[:-1] + "ves"
+    elif w.endswith("fe"):
+        parts[-1] = w[:-2] + "ves"
+    elif w.endswith(("s", "x", "z", "ch", "sh")):
+        parts[-1] = w + "es"
+    else:
+        parts[-1] = w + "s"
+
+    return "_".join(parts)
+
+
+def decode_structure_item(item, prefix=""):
+    """
+    A structure item is a list describing a member field in the structure.
+    The list contains [field name, field type, size].
+    """
+    if type(item[1]) != np.dtypes.VoidDType:
+        if isinstance(item[1], str):
+            dtype = f"'{item[1]}'"
+        else:
+            dtype = item[1].__name__
+        if len(item) == 3:
+            return f"{prefix}    ('{item[0]}', {dtype}, {item[2]}),\n"
+        else:
+            return f"{prefix}    ('{item[0]}', {dtype}),\n"
+    else:
+        if len(item) == 3:
+            return f"{prefix}    ('{item[0]}', {plural_to_singular(item[0])}, {item[2]}),\n"
+        else:
+            return f"{prefix}    ('{item[0]}', {item[0]}),\n"

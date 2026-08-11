@@ -6,9 +6,9 @@ from mcdc.constant import COINCIDENCE_TOLERANCE, INF
 
 
 @njit
-def get_indices(particle_container, mesh):
+def get_indices(particle_container, uniform_mesh):
     """
-    Get mesh indices given the particle coordinate
+    Get uniform_mesh indices given the particle coordinate
     """
     particle = particle_container[0]
 
@@ -21,15 +21,15 @@ def get_indices(particle_container, mesh):
     uz = particle["uz"]
 
     # Mesh parameters
-    x0 = mesh["x0"]
-    y0 = mesh["y0"]
-    z0 = mesh["z0"]
-    dx = mesh["dx"]
-    dy = mesh["dy"]
-    dz = mesh["dz"]
-    Nx = mesh["Nx"]
-    Ny = mesh["Ny"]
-    Nz = mesh["Nz"]
+    x0 = uniform_mesh["x0"]
+    y0 = uniform_mesh["y0"]
+    z0 = uniform_mesh["z0"]
+    dx = uniform_mesh["dx"]
+    dy = uniform_mesh["dy"]
+    dz = uniform_mesh["dz"]
+    Nx = uniform_mesh["Nx"]
+    Ny = uniform_mesh["Ny"]
+    Nz = uniform_mesh["Nz"]
     x_last = x0 + Nx * dx
     y_last = y0 + Ny * dy
     z_last = z0 + Nz * dz
@@ -77,10 +77,10 @@ def get_indices(particle_container, mesh):
 
 
 @njit
-def get_crossing_distance(particle_container, speed, mesh):
+def get_crossing_distance(particle_container, speed, uniform_mesh):
     """
     Get distance for the particle, moving with the given speed,
-    to cross the nearest grid of the mesh
+    to cross the nearest grid of the uniform_mesh
     """
     particle = particle_container[0]
 
@@ -93,15 +93,15 @@ def get_crossing_distance(particle_container, speed, mesh):
     uz = particle["uz"]
 
     # Mesh parameters
-    x0 = mesh["x0"]
-    y0 = mesh["y0"]
-    z0 = mesh["z0"]
-    dx = mesh["dx"]
-    dy = mesh["dy"]
-    dz = mesh["dz"]
-    Nx = mesh["Nx"]
-    Ny = mesh["Ny"]
-    Nz = mesh["Nz"]
+    x0 = uniform_mesh["x0"]
+    y0 = uniform_mesh["y0"]
+    z0 = uniform_mesh["z0"]
+    dx = uniform_mesh["dx"]
+    dy = uniform_mesh["dy"]
+    dz = uniform_mesh["dz"]
+    Nx = uniform_mesh["Nx"]
+    Ny = uniform_mesh["Ny"]
+    Nz = uniform_mesh["Nz"]
     x_last = x0 + Nx * dx
     y_last = y0 + Ny * dy
     z_last = z0 + Nz * dz

@@ -1,19 +1,12 @@
+from mcdc.object_.simulation import Simulation
+
 # ======================================================================================
-# Run
+# Run Simulation
 # ======================================================================================
 
 
-def run():
-    """
-    Execute the MC/DC simulation.
-
-    Runs the transport simulation defined by the current problem
-    (materials, geometry, sources, tallies, and settings).
-    Results are written to an HDF5 output file.
-
-    Command-line arguments (``--N_particle``, ``--output``, etc.) override
-    the corresponding settings when provided.
-    """
+def run_simulation(simulationPy: Simulation):
+    """Compile when needed, prepare runtime state, and execute a simulation."""
     import mcdc.print_ as print_module
     from mpi4py import MPI
 
@@ -21,8 +14,6 @@ def run():
     time_total_start = MPI.Wtime()
 
     # Get settings and MPI master status
-    from mcdc.object_.simulation import simulation as simulationPy
-
     settings = simulationPy.settings
     master = MPI.COMM_WORLD.Get_rank() == 0
 
@@ -33,9 +24,6 @@ def run():
     # TIMER: preparation
     time_prep_start = MPI.Wtime()
 
-    # Override settings with command-line arguments
-    override_settings()
-
     # Generate the program state:
     #   - `simulation`: the simulation structure, storing fixed side data and meta data
     #                   that describes arbitrarily-sized data
@@ -44,7 +32,7 @@ def run():
     #       The use of container is necessary to ensure proper mutability and tracking
     #       of the structure when running in different kinds of machines supported by
     #       the Numba-based compilation framework.
-    simulation_container, data = preparation()
+    simulation_container, data = prepare(simulationPy)
     simulation = simulation_container[0]
 
     # Print headers
@@ -86,7 +74,11 @@ def run():
     time_output_start = MPI.Wtime()
 
     # Generate hdf5 output file
-    output_module.generate_output(simulation, data)
+    output_module.generate_output(simulation, data, simulationPy)
+
+    # Combine per-batch, per-census tally files into the main output
+    if settings.use_census_based_tally:
+        output_module.recombine_tallies(simulationPy, simulation)
 
     # TIMER: output
     time_output_end = MPI.Wtime()
@@ -114,140 +106,27 @@ def run():
 
 
 # ======================================================================================
-# Preparation
+# Prepare
 # ======================================================================================
 
 
-def preparation():
-    import math
+def prepare(simulationPy: Simulation):
+    """Create framework-owned runtime state for a compiled simulation.
 
-    from mpi4py import MPI
-
-    from mcdc.object_.simulation import simulation as simulationPy
-    from mcdc.object_.material import (
-        Material,
-        MaterialMG,
-        set_elements_from_nuclides,
-        set_nuclides_from_elements,
-        update_fissionable_from_nuclides,
-    )
-
+    Model-specific finalization occurs during :meth:`mcdc.Simulation.compile`.
+    This function packs that model, allocates execution resources, configures
+    the selected backend, and loads any external source-particle state.
+    """
     # ==================================================================================
-    # Adjust simulation settings as needed
+    # Generate Numba runtime layers
     # ==================================================================================
 
-    # Get settings
-    settings = simulationPy.settings
-
-    # Set appropriate time boundary
-    settings.time_boundary = min(
-        [settings.time_boundary] + [tally.time[-1] for tally in simulationPy.tallies]
-    )
-
-    # ==================================================================================
-    # Set material data as needed
-    # ==================================================================================
-
-    # Set material compositions based on transported particles
-    for material in simulationPy.materials:
-        if not isinstance(material, Material):
-            continue
-
-        if settings.neutron_transport and len(material.nuclides) == 0:
-            set_nuclides_from_elements(material)
-
-        if settings.electron_transport and len(material.elements) == 0:
-            set_elements_from_nuclides(material)
-
-    # Set nuclear and atomic data for transported particles
-    if settings.neutron_transport:
-        for nuclide in simulationPy.nuclides:
-            nuclide.set_neutron_data()
-
-        for material in simulationPy.materials:
-            if isinstance(material, Material):
-                update_fissionable_from_nuclides(material)
-
-    if settings.electron_transport:
-        for element in simulationPy.elements:
-            element.set_electron_data()
-
-    # Set physics mode
-    if len(simulationPy.materials) == 0:
-        # Default physics in dummy mode
-        settings.neutron_multigroup_mode = True
-    else:
-        settings.neutron_multigroup_mode = isinstance(
-            simulationPy.materials[0], MaterialMG
-        )
-
-    # ==================================================================================
-    # Adjust simulation parameters as needed
-    # ==================================================================================
-
-    # Reset time grid size of all tallies if census-based tally is desired
-    if settings.use_census_based_tally:
-        N_bin = settings.census_tally_frequency
-        for tally in simulationPy.tallies:
-            tally._use_census_based_tally(N_bin)
-
-    # Normalize source probability
-    norm = 0.0
-    for source in simulationPy.sources:
-        norm += source.probability
-    for source in simulationPy.sources:
-        source.probability /= norm
-
-    # Create root universe if not defined
-    if len(simulationPy.universes[0].cells) == 0:
-        simulationPy.universes[0].cells = simulationPy.cells
-
-    # Initial guess
-    simulationPy.k_eff = settings.k_init
-
-    # Activate tally scoring for fixed-source
-    if not settings.neutron_eigenvalue_mode:
-        simulationPy.cycle_active = True
-    # All active eigenvalue cycle?
-    elif settings.N_inactive == 0:
-        simulationPy.cycle_active = True
-
-    # ==================================================================================
-    # Set particle bank sizes
-    # ==================================================================================
-
-    # Some sizes
-    N_particle = settings.N_particle
-    N_work = math.ceil(N_particle / MPI.COMM_WORLD.Get_size())
-    N_census = settings.N_census
-
-    # Determine bank size
-    if settings.neutron_eigenvalue_mode or N_census == 1:
-        settings.future_bank_buffer_ratio = 0.0
-    if not settings.neutron_eigenvalue_mode and N_census == 1:
-        settings.census_bank_buffer_ratio = 0.0
-        settings.source_bank_buffer_ratio = 0.0
-    size_active = settings.active_bank_buffer
-    size_census = int((settings.census_bank_buffer_ratio) * N_work)
-    size_source = int((settings.source_bank_buffer_ratio) * N_work)
-    size_future = int((settings.future_bank_buffer_ratio) * N_work)
-
-    # Set bank size
-    simulationPy.bank_active.size[0] = size_active
-    simulationPy.bank_census.size[0] = size_census
-    simulationPy.bank_source.size[0] = size_source
-    simulationPy.bank_future.size[0] = size_future
-
-    # ==================================================================================
-    # Generate Numba-supported "Objects"
-    # ==================================================================================
-
-    from mcdc.code_factory.numba_objects_generator import generate_numba_objects
+    from mcdc.code_factory.numba_layers_generator import generate_numba_layers
     from mcdc.code_factory.literals_generator import make_literals
 
     make_literals(simulationPy)
 
-    simulation_container, data = generate_numba_objects(simulationPy)
+    simulation_container, data = generate_numba_layers(simulationPy)
     simulation = simulation_container[0]
 
     # Reload mcdc getters and setters
@@ -257,21 +136,6 @@ def preparation():
 
     importlib.reload(mcdc_get)
     importlib.reload(mcdc_set)
-
-    # ==================================================================================
-    # Adapt functions as needed
-    # ==================================================================================
-
-    # Pick physics model
-    import mcdc.transport.physics as physics
-
-    if settings.neutron_multigroup_mode:
-        physics.neutron.particle_speed = physics.neutron.multigroup.particle_speed
-        physics.neutron.macro_xs = physics.neutron.multigroup.macro_xs
-        physics.neutron.neutron_production_xs = (
-            physics.neutron.multigroup.neutron_production_xs
-        )
-        physics.neutron.collision = physics.neutron.multigroup.collision
 
     # Pick Python-version RNG if needed
     import mcdc.config as config
@@ -287,30 +151,26 @@ def preparation():
     # ==================================================================================
     # Source particles from file
     # ==================================================================================
-    # TODO: Use parallel h5py, may need to compile for speed
-
-    import h5py
-
-    # All ranks, take turn
-    for i in range(simulation["mpi_size"]):
-        if simulation["mpi_rank"] == i:
-            if settings.use_source_file:
-                with h5py.File(settings.source_file_name, "r") as f:
-                    # Get source particle size
-                    N_particle = f["particles_size"][()]
-
-                    # Redistribute work
-                    mpi.distribute_work(N_particle, simulation)
-                    N_local = simulation["mpi_work_size"]
-                    start = simulation["mpi_work_start"]
-                    end = start + N_local
-
-                    # Add particles to source bank
-                    simulation["bank_source"]["particles"][:N_local] = f["particles"][
-                        start:end
-                    ]
-                    simulation["bank_source"]["size"] = N_local
-        MPI.COMM_WORLD.Barrier()
+    # TODO: Re-enable file-backed source initialization after its particle-bank
+    # schema and MPI redistribution path are updated.
+    #
+    # import h5py
+    # import mcdc.transport.mpi as mpi
+    # from mpi4py import MPI
+    #
+    # for i in range(simulation["mpi_size"]):
+    #     if simulation["mpi_rank"] == i and settings.use_source_file:
+    #         with h5py.File(settings.source_file_name, "r") as f:
+    #             N_particle = f["particles_size"][()]
+    #             mpi.distribute_work(N_particle, simulation)
+    #             N_local = simulation["mpi_work_size"]
+    #             start = simulation["mpi_work_start"]
+    #             end = start + N_local
+    #             simulation["bank_source"]["particle_data"][:N_local] = f[
+    #                 "particles"
+    #             ][start:end]
+    #             simulation["bank_source"]["size"] = N_local
+    #     MPI.COMM_WORLD.Barrier()
 
     # ==================================================================================
     # Finalize
@@ -322,44 +182,6 @@ def preparation():
 # ======================================================================================
 # Misc.
 # ======================================================================================
-
-
-def override_settings():
-    import mcdc.config as config
-    from mcdc.object_.simulation import simulation as simulationPy
-
-    settings = simulationPy.settings
-
-    if config.args.N_particle is not None:
-        settings.N_particle = config.args.N_particle
-    if config.args.N_batch is not None:
-        settings.N_batch = config.args.N_batch
-    if config.args.output is not None:
-        settings.output_name = config.args.output
-    if config.args.progress_bar is not None:
-        settings.use_progress_bar = config.args.progress_bar
-
-    # GPU settings
-    if config.target == "gpu":
-        from mcdc.constant import (
-            GPU_STRATEGY_ASYNC,
-            GPU_STRATEGY_EVENT,
-            GPU_STORAGE_SEPARATE,
-            GPU_STORAGE_MANAGED,
-            GPU_STORAGE_UNITED,
-        )
-
-        if config.args.gpu_strategy == "async":
-            settings.gpu_strategy = GPU_STRATEGY_ASYNC
-        elif config.args.gpu_strategy == "event":
-            settings.gpu_strategy = GPU_STRATEGY_EVENT
-
-        if config.args.gpu_state_storage == "separate":
-            settings.gpu_storage = GPU_STORAGE_SEPARATE
-        elif config.args.gpu_state_storage == "managed":
-            settings.gpu_storage = GPU_STORAGE_MANAGED
-        elif config.args.gpu_state_storage == "united":
-            settings.gpu_storage = GPU_STORAGE_UNITED
 
 
 def finalize(simulation):

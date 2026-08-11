@@ -1,10 +1,12 @@
-# MC/DC Documentation!
+# MC/DC Documentation
 
-To build these docs locally run the following:
-```bash 
-conda install sphinx==7.2.6
-pip install furo sphinx_toolbox
+To build the documentation locally, install MC/DC with its documentation
+dependencies from the repository root:
+
+```bash
+pip install -e ".[docs]"
+cd docs
 make html
 ```
 
-Then launch ``build/html/index.html`` with your browser of choice
+Then open `build/html/index.html` in your browser.

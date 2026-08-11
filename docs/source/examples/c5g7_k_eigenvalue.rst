@@ -21,8 +21,8 @@ using MC/DC’s lattice and universe system.
 
 Key concepts demonstrated:
 
-- **Multi-group materials** loaded from an external HDF5 library via
-  ``mcdc.MaterialMG(library=...)``.
+- **Multigroup data** loaded from an external HDF5 library and used to construct
+  materials through ``mcdc.Material.multigroup(...)``.
 - **Pin-cell universes** built from cylindrical fuel pins in square
   moderator cells.
 - **Lattice assemblies** that tile pin-cell universes into fuel
@@ -42,7 +42,7 @@ section (materials, pins, assemblies, core, source, tallies, settings).
 Full Input
 ==========
 
-Click here to view the input file: `examples/c5g7/k-eigenvalue/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/c5g7/k-eigenvalue/input.py>`_.
+Click here to view the input file: `examples/c5g7/k-eigenvalue/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/c5g7/k-eigenvalue/input.py>`_.
 
 The complete input used for this example is embedded below:
 
@@ -53,9 +53,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/c5g7/k-eigenvalue`` run::
 
-   python examples/c5g7/k-eigenvalue/input.py
+   python input.py
 
 Expected Output
 ===============

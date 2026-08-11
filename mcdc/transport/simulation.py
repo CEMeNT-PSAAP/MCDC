@@ -1,5 +1,3 @@
-import numpy as np
-
 from numba import njit, objmode, uint64
 
 ####
@@ -292,7 +290,7 @@ def step_particle(particle_container, program, data):
 
     # Collision
     if particle["event"] & EVENT_COLLISION:
-        collision_data_container = np.zeros(1, type_.collision_data)
+        collision_data_container = util.local_array(1, type_.collision_data)
 
         # Execute the physics
         physics.collision(particle_container, collision_data_container, program, data)
@@ -301,9 +299,9 @@ def step_particle(particle_container, program, data):
         if simulation["cycle_active"]:
             cell = simulation["cells"][particle["cell_ID"]]
             for i in range(cell["N_collision_tally"]):
-                tally_ID = int(mcdc_get.cell.collision_tally_IDs(i, cell, data))
-                tally = simulation["collision_tallies"][tally_ID]
-                tally_module.score.collision_tally(
+                tally_ID = mcdc_get.cell.collision_tally_IDs(i, cell, data)
+                tally = simulation["tallies"][tally_ID]
+                tally_module.score.collision(
                     particle_container,
                     collision_data_container,
                     tally,
@@ -333,11 +331,11 @@ def step_particle(particle_container, program, data):
         return
 
     # Weight windows
-    if simulation["weight_windows"]["active"]:
+    if simulation["technique"]["weight_windows"]["active"]:
         technique.weight_windows(particle_container, program, data)
 
     # Global weight roulette
-    if simulation["global_weight_roulette"]["active"]:
+    if simulation["technique"]["global_weight_roulette"]["active"]:
         technique.global_weight_roulette(particle_container, simulation)
 
 
@@ -348,17 +346,14 @@ def move_to_event(particle_container, simulation, data):
     # ==================================================================================
     # Preparation (as needed)
     # ==================================================================================
+
     particle = particle_container[0]
 
-    # Multigroup preparation
-    #   In MG mode, particle speed is material-dependent.
-    if settings["neutron_multigroup_mode"]:
-        # If material is not identified yet, locate the particle
-        if particle["material_ID"] == -1:
-            if not geometry.locate_particle(particle_container, simulation, data):
-                # Particle is lost
-                particle["event"] = EVENT_LOST
-                return
+    # Locate the material before evaluating material-dependent transport data.
+    if particle["material_ID"] == -1:
+        if not geometry.locate_particle(particle_container, simulation, data):
+            particle["event"] = EVENT_LOST
+            return
 
     # ==================================================================================
     # Geometry inspection
@@ -430,9 +425,9 @@ def move_to_event(particle_container, simulation, data):
     if simulation["cycle_active"]:
         cell = simulation["cells"][particle["cell_ID"]]
         for i in range(cell["N_tracklength_tally"]):
-            tally_ID = int(mcdc_get.cell.tracklength_tally_IDs(i, cell, data))
-            tally = simulation["tracklength_tallies"][tally_ID]
-            tally_module.score.tracklength_tally(
+            tally_ID = mcdc_get.cell.tracklength_tally_IDs(i, cell, data)
+            tally = simulation["tallies"][tally_ID]
+            tally_module.score.tracklength(
                 particle_container, distance, tally, simulation, data
             )
 
@@ -446,29 +441,29 @@ def move_to_event(particle_container, simulation, data):
 
 
 @njit
-def surface_crossing(P_arr, simulation, data):
-    P = P_arr[0]
-    crossed_surface_ID = P["surface_ID"]
+def surface_crossing(particle_container, simulation, data):
+    particle = particle_container[0]
+    crossed_surface_ID = particle["surface_ID"]
 
     surface = simulation["surfaces"][crossed_surface_ID]
     BC = surface["boundary_condition"]
 
     # Apply BC
     if BC == BC_VACUUM:
-        P["alive"] = False
+        particle["alive"] = False
     elif BC == BC_REFLECTIVE:
-        surface_module.reflect(P_arr, surface)
+        surface_module.reflect(particle_container, surface)
         return  # No score
 
     # Score tally
-    for i in range(surface["N_tally"]):
-        tally_ID = int(mcdc_get.surface.tally_IDs(i, surface, data))
-        tally = simulation["surface_crossing_tallies"][tally_ID]
-        tally_module.score.surface_crossing_tally(
-            P_arr, surface, tally, simulation, data
+    for i in range(surface["N_surface_crossing_tally"]):
+        tally_ID = mcdc_get.surface.surface_crossing_tally_IDs(i, surface, data)
+        tally = simulation["tallies"][tally_ID]
+        tally_module.score.surface_crossing(
+            particle_container, surface, tally, simulation, data
         )
 
     # Flag to check new cell later
-    if P["alive"]:
-        P["cell_ID"] = -1
-        P["material_ID"] = -1
+    if particle["alive"]:
+        particle["cell_ID"] = -1
+        particle["material_ID"] = -1

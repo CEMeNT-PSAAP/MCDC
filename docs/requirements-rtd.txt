@@ -1,8 +1,8 @@
-sphinx==7.2.6
-furo
+sphinx>=8,<10
+pydata-sphinx-theme>=0.20,<0.21
+sphinx-design>=0.6
 numpy
 numba
 matplotlib
 scipy
 h5py
-sphinx_toolbox

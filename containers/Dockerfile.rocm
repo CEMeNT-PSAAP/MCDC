@@ -1,6 +1,6 @@
 FROM rocm/dev-ubuntu-22.04:6.0
 
-LABEL org.opencontainers.image.source="https://github.com/CEMeNT-PSAAP/MCDC"
+LABEL org.opencontainers.image.source="https://github.com/mcdc-project/mcdc"
 LABEL org.opencontainers.image.description="MC/DC: Monte Carlo Dynamic Code (ROCm/GPU)"
 LABEL org.opencontainers.image.licenses="BSD-3-Clause"
 
@@ -27,10 +27,10 @@ RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Mi
 
 ENV PATH="/opt/conda/bin:$PATH"
 
-# Install Python environment (matching Harmonize prereqs: ROCm=6.0.0, Numba>=0.60.0)
+# Install Python environment (matching Harmonize prerequisites: ROCm 6.0.0 and Numba 0.61 or newer)
 RUN conda install -y \
     gxx \
-    python=3.11 \
+    python=3.13 \
     numba \
     numpy \
     && conda clean -afy

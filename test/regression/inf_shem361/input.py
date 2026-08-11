@@ -1,6 +1,9 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Infinite SHEM-361")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
@@ -20,7 +23,7 @@ with np.load("SHEM-361.npz") as data:
     lamd = data["lamd"]
 
 # Set material
-m = mcdc.MaterialMG(
+m = mcdc.Material.multigroup(
     capture=SigmaC,
     scatter=SigmaS,
     fission=SigmaF,
@@ -36,26 +39,29 @@ s2 = mcdc.Surface.PlaneX(x=1e10, boundary_condition="reflective")
 
 # Set cells
 c = mcdc.Cell(region=+s1 & -s2, fill=m)
+simulation.set_model([c])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 
-mcdc.Source(
-    position=(0.0, 0.0, 0.0), isotropic=True, energy_group=np.array([[360], [1.0]])
+source = mcdc.Source(
+    position=(0.0, 0.0, 0.0), isotropic=True, discrete_energy=np.array([[360], [1.0]])
 )
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, and run MC/DC
 # ======================================================================================
 
 # Tallies
-mcdc.Tally(scores=["flux"], energy="all_groups")
+tally = mcdc.Tally(scores=["flux"], energy="all")
+simulation.set_tallies([tally])
 
-# Swttings
-mcdc.settings.N_particle = 25
-mcdc.settings.N_batch = 2
-mcdc.settings.active_bank_buffer = 1000
+# Settings
+simulation.settings.N_particle = 25
+simulation.settings.N_batch = 2
+simulation.settings.active_bank_buffer = 1000
 
 # Run
-mcdc.run()
+simulation.run()

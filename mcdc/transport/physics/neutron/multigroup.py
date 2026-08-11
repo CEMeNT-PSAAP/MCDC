@@ -1,4 +1,3 @@
-import numpy as np
 import math
 
 from numba import njit
@@ -14,6 +13,10 @@ import mcdc.transport.util as util
 
 from mcdc.constant import (
     PI,
+    NEUTRON_MULTIGROUP_ENERGY_MIDPOINT,
+    NEUTRON_MULTIGROUP_ENERGY_MIDPOINT_LOG,
+    NEUTRON_MULTIGROUP_ENERGY_UNIFORM,
+    NEUTRON_MULTIGROUP_ENERGY_UNIFORM_LOG,
     NEUTRON_REACTION_TOTAL,
     NEUTRON_REACTION_CAPTURE,
     NEUTRON_REACTION_ELASTIC_SCATTERING,
@@ -25,6 +28,33 @@ from mcdc.transport.physics.util import scatter_direction
 from mcdc.transport.distribution import sample_isotropic_direction
 
 # ======================================================================================
+# Applicability
+# ======================================================================================
+
+
+@njit
+def applicable(particle_container, simulation, data):
+    particle = particle_container[0]
+    material = simulation["materials"][particle["material_ID"]]
+
+    if not material["has_neutron_multigroup"]:
+        return False
+
+    if simulation["technique"]["neutron_multigroup"]["hybrid"]:
+        mgxs_ID = material["neutron_multigroup_ID"]
+        mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+
+        E = particle["E"]
+        E_min = mcdc_get.neutron_multigroup_data.energy_grid(0, mgxs, data)
+        E_max = mcdc_get.neutron_multigroup_data.energy_grid_last(mgxs, data)
+
+        if E < E_min or E >= E_max:
+            return False
+
+    return True
+
+
+# ======================================================================================
 # Particle attributes
 # ======================================================================================
 
@@ -32,8 +62,14 @@ from mcdc.transport.distribution import sample_isotropic_direction
 @njit
 def particle_speed(particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["multigroup_materials"][particle["material_ID"]]
-    return mcdc_get.multigroup_material.mgxs_speed(particle["g"], material, data)
+    material = simulation["materials"][particle["material_ID"]]
+
+    mgxs_ID = material["neutron_multigroup_ID"]
+    mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
+
+    return mcdc_get.neutron_multigroup_data.speed(group, mgxs, data)
 
 
 # ======================================================================================
@@ -44,38 +80,46 @@ def particle_speed(particle_container, simulation, data):
 @njit
 def macro_xs(reaction_type, particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["multigroup_materials"][particle["material_ID"]]
-    g = particle["g"]
+    material = simulation["materials"][particle["material_ID"]]
+
+    mgxs_ID = material["neutron_multigroup_ID"]
+    mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     if reaction_type == NEUTRON_REACTION_TOTAL:
-        return mcdc_get.multigroup_material.mgxs_total(g, material, data)
+        return mcdc_get.neutron_multigroup_data.total(group, mgxs, data)
     elif reaction_type == NEUTRON_REACTION_CAPTURE:
-        return mcdc_get.multigroup_material.mgxs_capture(g, material, data)
+        return mcdc_get.neutron_multigroup_data.capture(group, mgxs, data)
     elif reaction_type == NEUTRON_REACTION_ELASTIC_SCATTERING:
-        return mcdc_get.multigroup_material.mgxs_scatter(g, material, data)
+        return mcdc_get.neutron_multigroup_data.scatter(group, mgxs, data)
     elif reaction_type == NEUTRON_REACTION_FISSION:
-        return mcdc_get.multigroup_material.mgxs_fission(g, material, data)
+        return mcdc_get.neutron_multigroup_data.fission(group, mgxs, data)
     return 0.0
 
 
 @njit
 def neutron_production_xs(reaction_type, particle_container, simulation, data):
     particle = particle_container[0]
-    material = simulation["multigroup_materials"][particle["material_ID"]]
-    g = particle["g"]
+    material = simulation["materials"][particle["material_ID"]]
+
+    mgxs_ID = material["neutron_multigroup_ID"]
+    mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     # Total production
     if reaction_type == NEUTRON_REACTION_TOTAL:
         total = 0.0
 
         # Scattering production
-        nu = mcdc_get.multigroup_material.mgxs_nu_s(g, material, data)
-        xs = mcdc_get.multigroup_material.mgxs_scatter(g, material, data)
+        nu = mcdc_get.neutron_multigroup_data.nu_s(group, mgxs, data)
+        xs = mcdc_get.neutron_multigroup_data.scatter(group, mgxs, data)
         total += nu * xs
 
         # Fission production
-        nu = mcdc_get.multigroup_material.mgxs_nu_f(g, material, data)
-        xs = mcdc_get.multigroup_material.mgxs_fission(g, material, data)
+        nu = mcdc_get.neutron_multigroup_data.nu_f(group, mgxs, data)
+        xs = mcdc_get.neutron_multigroup_data.fission(group, mgxs, data)
         total += nu * xs
         return total
 
@@ -85,26 +129,26 @@ def neutron_production_xs(reaction_type, particle_container, simulation, data):
 
     # Scattering production
     elif reaction_type == NEUTRON_REACTION_ELASTIC_SCATTERING:
-        nu = mcdc_get.multigroup_material.mgxs_nu_s(g, material, data)
-        xs = mcdc_get.multigroup_material.mgxs_scatter(g, material, data)
+        nu = mcdc_get.neutron_multigroup_data.nu_s(group, mgxs, data)
+        xs = mcdc_get.neutron_multigroup_data.scatter(group, mgxs, data)
         return nu * xs
 
     # Fission production
     elif reaction_type == NEUTRON_REACTION_FISSION:
-        nu = mcdc_get.multigroup_material.mgxs_nu_f(g, material, data)
-        xs = mcdc_get.multigroup_material.mgxs_fission(g, material, data)
+        nu = mcdc_get.neutron_multigroup_data.nu_f(group, mgxs, data)
+        xs = mcdc_get.neutron_multigroup_data.fission(group, mgxs, data)
         return nu * xs
 
     # Prompt fission production
     elif reaction_type == NEUTRON_REACTION_FISSION_PROMPT:
-        nu = mcdc_get.multigroup_material.mgxs_nu_p(g, material, data)
-        xs = mcdc_get.multigroup_material.mgxs_fission(g, material, data)
+        nu = mcdc_get.neutron_multigroup_data.nu_p(group, mgxs, data)
+        xs = mcdc_get.neutron_multigroup_data.fission(group, mgxs, data)
         return nu * xs
 
     # Delayed neutron production
     elif reaction_type == NEUTRON_REACTION_FISSION_DELAYED:
-        nu = mcdc_get.multigroup_material.mgxs_nu_d_total(g, material, data)
-        xs = mcdc_get.multigroup_material.mgxs_fission(g, material, data)
+        nu = mcdc_get.neutron_multigroup_data.nu_d_total(group, mgxs, data)
+        xs = mcdc_get.neutron_multigroup_data.fission(group, mgxs, data)
         return nu * xs
 
     # Unsupported default
@@ -130,7 +174,7 @@ def collision(particle_container, collision_data_container, program, data):
     SigmaF = macro_xs(NEUTRON_REACTION_FISSION, particle_container, simulation, data)
 
     # Implicit capture
-    if simulation["implicit_capture"]["active"]:
+    if simulation["technique"]["implicit_capture"]["active"]:
         particle["w"] *= (SigmaT - SigmaC) / SigmaT
         SigmaT -= SigmaC
 
@@ -155,17 +199,19 @@ def collision(particle_container, collision_data_container, program, data):
 @njit
 def scattering(particle_container, program, data):
     simulation = util.access_simulation(program)
+    particle = particle_container[0]
+    material = simulation["materials"][particle["material_ID"]]
+
+    # Material attributes
+    mgxs_ID = material["neutron_multigroup_ID"]
+    mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+    G = mgxs["G"]
 
     # Particle attributes
-    particle = particle_container[0]
-    g = particle["g"]
     ux = particle["ux"]
     uy = particle["uy"]
     uz = particle["uz"]
-
-    # Material attributes
-    material = simulation["multigroup_materials"][particle["material_ID"]]
-    G = material["G"]
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     # Kill the current particle
     particle["alive"] = False
@@ -173,13 +219,13 @@ def scattering(particle_container, program, data):
     # Adjust production and product weights if weighted emission
     weight_production = 1.0
     weight_product = particle["w"]
-    if simulation["weighted_emission"]["active"]:
-        weight_target = simulation["weighted_emission"]["weight_target"]
+    if simulation["technique"]["weighted_emission"]["active"]:
+        weight_target = simulation["technique"]["weighted_emission"]["weight_target"]
         weight_production = particle["w"] / weight_target
         weight_product = weight_target
 
     # Get number of secondaries
-    nu_s = mcdc_get.multigroup_material.mgxs_nu_s(g, material, data)
+    nu_s = mcdc_get.neutron_multigroup_data.nu_s(group, mgxs, data)
     N = int(math.floor(weight_production * nu_s + rng.lcg(particle_container)))
 
     # Set up secondary partice container
@@ -205,19 +251,22 @@ def scattering(particle_container, program, data):
         particle_new["uz"] = uz_new
 
         # Get outgoing spectrum
-        stride = material["G"]
-        start = material["mgxs_chi_s_offset"] + g * stride
+        stride = mgxs["G"]
+        start = mgxs["chi_s_offset"] + group * stride
         chi_s = data[start : start + stride]
-        # Above is equivalent to: chi_s = mcdc_get.multigroup_material.mgxs_chi_s_vector(g, material, data)
+        # Above is equivalent to: chi_s = mcdc_get.neutron_multigroup_data.chi_s_vector(group, mgxs, data)
 
         # Sample outgoing energy
         xi = rng.lcg(particle_container_new)
         total = 0.0
-        for g_out in range(G):
-            total += chi_s[g_out]
+        group_out = 0
+        for group_out in range(G):
+            total += chi_s[group_out]
             if total > xi:
                 break
-        particle_new["g"] = g_out
+        particle_new["E"] = _get_group_energy(
+            group_out, particle_container_new, mgxs, simulation, data
+        )
 
         # Bank, but keep it if it is the last particle
         if n == N - 1:
@@ -225,7 +274,6 @@ def scattering(particle_container, program, data):
             particle["ux"] = particle_new["ux"]
             particle["uy"] = particle_new["uy"]
             particle["uz"] = particle_new["uz"]
-            particle["g"] = particle_new["g"]
             particle["E"] = particle_new["E"]
             particle["w"] = particle_new["w"]
         else:
@@ -235,16 +283,18 @@ def scattering(particle_container, program, data):
 @njit
 def fission(particle_container, program, data):
     simulation = util.access_simulation(program)
+    particle = particle_container[0]
+    material = simulation["materials"][particle["material_ID"]]
     settings = simulation["settings"]
 
-    # Particle properties
-    particle = particle_container[0]
-    g = particle["g"]
+    # Material attributes
+    mgxs_ID = material["neutron_multigroup_ID"]
+    mgxs = simulation["neutron_multigroup_data"][mgxs_ID]
+    G = mgxs["G"]
+    J = mgxs["J"]
 
-    # Material properties
-    material = simulation["multigroup_materials"][particle["material_ID"]]
-    G = material["G"]
-    J = material["J"]
+    # Particle attributes
+    group = _get_energy_group(particle["E"], mgxs, simulation, data)
 
     # Kill the current particle
     particle["alive"] = False
@@ -252,19 +302,19 @@ def fission(particle_container, program, data):
     # Adjust production and product weights if weighted emission
     weight_production = 1.0
     weight_product = particle["w"]
-    if simulation["weighted_emission"]["active"]:
-        weight_target = simulation["weighted_emission"]["weight_target"]
+    if simulation["technique"]["weighted_emission"]["active"]:
+        weight_target = simulation["technique"]["weighted_emission"]["weight_target"]
         weight_production = particle["w"] / weight_target
         weight_product = weight_target
 
     # Fission yields
-    nu = mcdc_get.multigroup_material.mgxs_nu_f(g, material, data)
-    nu_p = mcdc_get.multigroup_material.mgxs_nu_p(g, material, data)
+    nu = mcdc_get.neutron_multigroup_data.nu_f(group, mgxs, data)
+    nu_p = mcdc_get.neutron_multigroup_data.nu_p(group, mgxs, data)
     if J > 0:
-        stride = material["J"]
-        start = material["mgxs_nu_d_offset"] + g * stride
+        stride = mgxs["J"]
+        start = mgxs["nu_d_offset"] + group * stride
         nu_d = data[start : start + stride]
-        # Above is equivalent to: nu_d = mcdc_get.multigroup_material.mgxs_nu_d_vector(g, material, data)
+        # Above is equivalent to: nu_d = mcdc_get.neutron_multigroup_data.nu_d_vector(group, mgxs, data)
 
     # Get number of secondaries
     N = int(
@@ -296,10 +346,10 @@ def fission(particle_container, program, data):
         total = nu_p
         if xi < total:
             prompt = True
-            stride = material["G"]
-            start = material["mgxs_chi_p_offset"] + g * stride
+            stride = mgxs["G"]
+            start = mgxs["chi_p_offset"] + group * stride
             spectrum = data[start : start + stride]
-            # Above is equivalent to: spectrum = mcdc_get.multigroup_material.mgxs_chi_p_vector(g, material, data)
+            # Above is equivalent to: spectrum = mcdc_get.neutron_multigroup_data.chi_p_vector(group, mgxs, data)
         else:
             prompt = False
 
@@ -307,26 +357,26 @@ def fission(particle_container, program, data):
             for j in range(J):
                 total += nu_d[j]
                 if xi < total:
-                    stride = material["G"]
-                    start = material["mgxs_chi_d_offset"] + j * stride
+                    stride = mgxs["G"]
+                    start = mgxs["chi_d_offset"] + j * stride
                     spectrum = data[start : start + stride]
                     # Above is equivalent to:
-                    # spectrum = mcdc_get.multigroup_material.mgxs_chi_d_vector(
-                    #     j, material, data
+                    # spectrum = mcdc_get.neutron_multigroup_data.chi_d_vector(
+                    #     j, mgxs, data
                     # )
-                    decay = mcdc_get.multigroup_material.mgxs_decay_rate(
-                        j, material, data
-                    )
+                    decay = mcdc_get.neutron_multigroup_data.decay_rate(j, mgxs, data)
                     break
 
         # Sample outgoing energy
         xi = rng.lcg(particle_container_new)
         tot = 0.0
-        for g_out in range(G):
-            tot += spectrum[g_out]
+        for group_out in range(G):
+            tot += spectrum[group_out]
             if tot > xi:
                 break
-        particle_new["g"] = g_out
+        particle_new["E"] = _get_group_energy(
+            group_out, particle_container_new, mgxs, simulation, data
+        )
 
         # Sample emission time
         if not prompt:
@@ -366,7 +416,6 @@ def fission(particle_container, program, data):
                 particle["uy"] = particle_new["uy"]
                 particle["uz"] = particle_new["uz"]
                 particle["t"] = particle_new["t"]
-                particle["g"] = particle_new["g"]
                 particle["E"] = particle_new["E"]
                 particle["w"] = particle_new["w"]
             else:
@@ -383,3 +432,50 @@ def fission(particle_container, program, data):
         else:
             # Particle will participate after the current census is completed
             particle_bank_module.bank_census_particle(particle_container_new, program)
+
+
+# ======================================================================================
+# Helpers
+# ======================================================================================
+
+
+@njit
+def _get_energy_group(E, mgxs, simulation, data):
+    if simulation["technique"]["neutron_multigroup"]["hybrid"]:
+        offset = mgxs["energy_grid_offset"]
+        length = mgxs["energy_grid_length"]
+        E_grid = data[offset : offset + length]
+        group = util.find_bin_with_rules(E, E_grid, 0.0, False)
+
+    else:
+        group = int(E)
+
+    return group
+
+
+@njit
+def _get_group_energy(group, rng_state, mgxs, simulation, data):
+    if simulation["technique"]["neutron_multigroup"]["hybrid"]:
+        E_low = mcdc_get.neutron_multigroup_data.energy_grid(group, mgxs, data)
+        E_high = mcdc_get.neutron_multigroup_data.energy_grid(group + 1, mgxs, data)
+        representation = mgxs["energy_representation"]
+
+        if representation == NEUTRON_MULTIGROUP_ENERGY_MIDPOINT:
+            energy = 0.5 * (E_low + E_high)
+        elif representation == NEUTRON_MULTIGROUP_ENERGY_MIDPOINT_LOG:
+            energy = math.sqrt(E_low * E_high)
+        elif representation == NEUTRON_MULTIGROUP_ENERGY_UNIFORM:
+            xi = rng.lcg(rng_state)
+            energy = E_low + xi * (E_high - E_low)
+        elif representation == NEUTRON_MULTIGROUP_ENERGY_UNIFORM_LOG:
+            xi = rng.lcg(rng_state)
+            log_E_low = math.log(E_low)
+            energy = math.exp(log_E_low + xi * (math.log(E_high) - log_E_low))
+        else:
+            # Unreachable
+            energy = -1.0
+
+    else:
+        energy = float(group)
+
+    return energy

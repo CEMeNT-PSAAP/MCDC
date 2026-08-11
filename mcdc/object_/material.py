@@ -1,102 +1,101 @@
-import numpy as np
-import os
-
-from numpy import float64
-from numpy.typing import NDArray
 from types import NoneType
-from typing import Annotated
+from typing import Self
 
-####
+import numpy as np
+from numpy import float64
+from numpy.typing import ArrayLike, NDArray
 
-from mcdc.constant import MATERIAL, MATERIAL_MG
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.element import Element
+from mcdc.object_.transport_model_data import NeutronMultigroupData
 from mcdc.object_.nuclide import Nuclide
-from mcdc.object_.simulation import simulation
 from mcdc.object_.util import ISOTOPIC_ABUNDANCE
-from mcdc.print_ import print_1d_array, print_error
+from mcdc.print_ import print_error
 
 # ======================================================================================
-# Material base class
-# ======================================================================================
-
-
-class MaterialBase(ObjectPolymorphic):
-    # Annotations for Numba mode
-    label: str = "material"
-    #
-    name: str
-    fissionable: bool
-
-    def __init__(self, type_, name):
-        super().__init__(type_)
-
-        # Set name
-        if name != "":
-            self.name = name
-        else:
-            self.name = f"{self.label}_{self.child_ID}"
-
-        self.fissionable = False
-
-    def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
-        text += f"  - Name: {self.name}\n"
-        text += f"  - Fissionable: {self.fissionable}\n"
-        return text
-
-
-def decode_type(type_):
-    if type_ == MATERIAL:
-        return "Material"
-    elif type_ == MATERIAL_MG:
-        return "Multigroup material"
-
-
-# ======================================================================================
-# Native material
+# Material
 # ======================================================================================
 
 
-class Material(MaterialBase):
-    """
-    Define a continuous-energy material from a nuclide composition.
+class Material(MCDCObject):
+    """Particle-interaction properties assigned to simulation cells.
 
     Parameters
     ----------
     name : str, optional
-        User label.
-    nuclide_composition : dict
-        Dictionary mapping nuclide names (str) to atom densities (float).
-    element_composition : dict
-        Dictionary mapping element names (str) to atom densities (float).
+        User-facing material name.
+    nuclide_composition : dict of str to float, optional
+        Nuclide names and atomic densities in atoms/(barn cm).
+    element_composition : dict of str to float, optional
+        Element symbols and atomic densities in atoms/(barn cm).
     temperature : float, optional
-        Temperature in Kelvin (default 293.6 K).
-
-    Returns
-    -------
-    Material
-        The material object.
+        Material temperature in kelvin. Each nuclide uses the closest
+        temperature available in the data library.
+    neutron_multigroup : NeutronMultigroupData, optional
+        Groupwise macroscopic cross sections and related data for neutron
+        multigroup transport, where neutron energy is represented by discrete
+        groups. When supplied with a
+        :ref:`native composition <user_native_transport>`, its explicit
+        ``energy_grid`` defines the energy range where the multigroup treatment
+        applies. In hybrid transport, native neutron data is used outside that
+        range when present; without native composition, the material has zero
+        interaction cross section.
 
     Notes
     -----
-    Requires the ``MCDC_LIB`` environment variable to point to the nuclear
-    data library directory.
+    A nuclide or element composition connects the material to MC/DC's native
+    transport physics through its data libraries. Particle-specific data can
+    augment native interaction data or support specialized and reduced
+    transport treatments.
+    ``NeutronMultigroupData`` describes discrete neutron energy groups and
+    their macroscopic interaction, production, and timing data. It can be used
+    alone or alongside a native composition.
 
-    See Also
+    Examples
     --------
-    mcdc.MaterialMG : Creates a multigroup material.
+    Define uranium dioxide from nuclide atomic densities:
+
+    >>> import mcdc
+    >>> fuel = mcdc.Material(
+    ...     name="UO2",
+    ...     nuclide_composition={"U235": 5.0e-4, "U238": 2.2e-2, "O16": 4.5e-2},
+    ...     temperature=293.6,
+    ... )
+
+    Define a one-group multigroup material:
+
+    >>> import numpy as np
+    >>> absorber = mcdc.Material.multigroup(
+    ...     name="Absorber", capture=np.array([1.0])
+    ... )
+
+    Attach native data and multigroup neutron data to the same material:
+
+    >>> hybrid_fuel = mcdc.Material(
+    ...     name="Hybrid fuel",
+    ...     nuclide_composition={"U235": 5.0e-4, "U238": 2.2e-2},
+    ...     neutron_multigroup=mcdc.NeutronMultigroupData(
+    ...         capture=np.array([0.10]),
+    ...         fission=np.array([0.20]),
+    ...         nu_p=np.array([2.50]),
+    ...         energy_grid=np.array([1.0e-5, 20.0e6]),
+    ...     ),
+    ... )
     """
 
-    # Annotations for Numba mode
-    label: str = "native_material"
-    non_numba: list[str] = ["nuclide_composition", "element_composition"]
-    #
-    nuclide_composition: dict[Nuclide, float]
-    element_composition: dict[Element, float]
-    #
+    # MC/DC framework metadata
+    label = "material"
+    non_numba = ["nuclide_composition", "element_composition"]
+
+    name: str
+    temperature: float
+    fissionable: bool
+    has_neutron_multigroup: bool
+
+    nuclide_composition: dict[Nuclide, float]  # Non-Numba
+    element_composition: dict[Element, float]  # Non-Numba
+    neutron_multigroup: NeutronMultigroupData
+
     nuclides: list[Nuclide]
     elements: list[Element]
     nuclide_densities: NDArray[float64]
@@ -105,120 +104,196 @@ class Material(MaterialBase):
     def __init__(
         self,
         name: str = "",
-        nuclide_composition: dict[str, float] = {},
-        element_composition: dict[str, float] = {},
+        nuclide_composition: dict[str, float] | NoneType = None,
+        element_composition: dict[str, float] | NoneType = None,
         temperature: float = 293.6,
-    ):
-        type_ = MATERIAL
-        super().__init__(type_, name)
+        neutron_multigroup: NeutronMultigroupData | NoneType = None,
+    ) -> None:
+        super().__init__()
 
-        # Temperature
-        self.temperature = temperature
+        # Normalize optional compositions without mutable argument defaults
+        nuclide_composition = nuclide_composition or {}
+        element_composition = element_composition or {}
 
-        # Dictionary connecting nuclides to respective densities
-        self.nuclide_composition = {}
-
-        # Dictionary connecting elements to respective densities
-        self.element_composition = {}
-
-        # Numba representation of nuclide_composition
-        self.nuclides = []
-        self.nuclide_densities = np.zeros(len(nuclide_composition))
-
-        # Numba representation of element_composition
-        self.elements = []
-        self.element_densities = np.zeros(len(element_composition))
-
-        # Check if library directory is set
-        lib_dir = os.getenv("MCDC_LIB")
-        if lib_dir is None:
-            print_error("Environment variable MCDC_LIB is not set")
-
-        # Check that only one composition is supplied
-        if len(nuclide_composition) > 0 and len(element_composition) > 0:
+        # Require one valid material-data representation
+        if nuclide_composition and element_composition:
             print_error(
-                "Cannot specify both nuclide_composition and element_composition"
+                "Cannot specify both nuclide_composition and element_composition."
             )
-
-        if len(nuclide_composition) == 0 and len(element_composition) == 0:
+        if (
+            not nuclide_composition
+            and not element_composition
+            and neutron_multigroup is None
+        ):
             print_error(
-                "Must specify either nuclide_composition or element_composition"
+                "Material requires nuclide_composition, element_composition, "
+                "or neutron_multigroup."
             )
+        if neutron_multigroup is not None and not isinstance(
+            neutron_multigroup, NeutronMultigroupData
+        ):
+            print_error("neutron_multigroup must be a NeutronMultigroupData object.")
+        if neutron_multigroup is not None and neutron_multigroup.G == 0:
+            print_error(
+                "Material neutron_multigroup must define at least one energy group."
+            )
+        if (
+            (nuclide_composition or element_composition)
+            and neutron_multigroup is not None
+            and neutron_multigroup.G > 0
+            and not np.any(neutron_multigroup.energy_grid)
+        ):
+            print_error(
+                "Material requires an explicit neutron multigroup energy_grid "
+                "when a nuclide or element composition is supplied."
+            )
+        # Initialize shared material state
+        self.name = name or "(Unnamed material)"
+        self.temperature = float(temperature)
 
-        # Loop over the items in the elemental composition
-        for i, (key, value) in enumerate(element_composition.items()):
-            element_name = key
-            element_density = value
+        # Use a zero-group placeholder until compilation can select ID 0
+        self.neutron_multigroup = (
+            neutron_multigroup
+            if neutron_multigroup is not None
+            else NeutronMultigroupData()
+        )
+        self.has_neutron_multigroup = self.neutron_multigroup.G > 0
+        self.fissionable = self.neutron_multigroup.fissionable
 
-            # Check if element is already created
-            found = False
-            for element in simulation.elements:
-                if element.name == element_name:
-                    found = True
-                    break
+        # Create lightweight native-composition objects without loading data
+        nearest_temperature = _get_supported_temperature(self.temperature)
+        self.nuclide_composition = {
+            Nuclide(name, nearest_temperature): float(density)
+            for name, density in nuclide_composition.items()
+        }
+        self.element_composition = {
+            Element(name): float(density)
+            for name, density in element_composition.items()
+        }
 
-            # Create the element object if needed
-            if not found:
-                element = Element(element_name)
+        # Initialize the packed native-composition representation
+        self.nuclides = list(self.nuclide_composition)
+        self.elements = list(self.element_composition)
+        self.nuclide_densities = np.asarray(
+            list(self.nuclide_composition.values()), dtype=float64
+        )
+        self.element_densities = np.asarray(
+            list(self.element_composition.values()), dtype=float64
+        )
 
-            # Register the element composition
-            self.elements.append(element)
-            self.element_densities[i] = element_density
-            self.element_composition[element] = element_density
+    @classmethod
+    def multigroup(
+        cls,
+        *,
+        name: str = "",
+        capture: ArrayLike | NoneType = None,
+        scatter: ArrayLike | NoneType = None,
+        fission: ArrayLike | NoneType = None,
+        nu_s: ArrayLike | NoneType = None,
+        nu_p: ArrayLike | NoneType = None,
+        nu_d: ArrayLike | NoneType = None,
+        chi_p: ArrayLike | NoneType = None,
+        chi_d: ArrayLike | NoneType = None,
+        speed: ArrayLike | NoneType = None,
+        decay_rate: ArrayLike | NoneType = None,
+        energy_grid: ArrayLike | NoneType = None,
+        energy_representation: str | int = "midpoint",
+    ) -> Self:
+        """Create a material for neutron multigroup transport.
 
-        # Loop over the items in the nuclide composition
-        for i, (key, value) in enumerate(nuclide_composition.items()):
-            nuclide_name = key
-            nuclide_density = value
+        The supplied arguments define groupwise macroscopic interaction and
+        production data. This helper stores them in
+        :class:`NeutronMultigroupData` and attaches the data to the material.
+        Macroscopic cross sections use ``cm^-1``, group speeds use cm/s,
+        precursor decay rates use ``s^-1``, and explicit physical energy
+        boundaries use eV. Omitting ``energy_grid`` creates a zero-valued
+        placeholder that is valid only when every material with neutron
+        multigroup data also omits its energy grid.
+        """
+        # Build the neutron multigroup data while preserving Material as the sole type
+        neutron_multigroup = NeutronMultigroupData(
+            capture=capture,
+            scatter=scatter,
+            fission=fission,
+            nu_s=nu_s,
+            nu_p=nu_p,
+            nu_d=nu_d,
+            chi_p=chi_p,
+            chi_d=chi_d,
+            speed=speed,
+            decay_rate=decay_rate,
+            energy_grid=energy_grid,
+            energy_representation=energy_representation,
+        )
+        return cls(name=name, neutron_multigroup=neutron_multigroup)
 
-            # Get supported temperature
-            nearest_temperature = min(TEMPERATURES, key=lambda x: abs(x - temperature))
+    def _compile_into_simulation(self, simulation) -> bool:
+        """Canonicalize owned data and register the unified material."""
+        # Skip canonicalization when this material is already compiled
+        if self.compile_ID == simulation.compile_ID:
+            return False
 
-            # Check if nuclide-temperature is available in the library
-            file_name = f"{nuclide_name}-{nearest_temperature}K.h5"
-            if not file_name in os.listdir(lib_dir):
-                print_error(
-                    f"Nuclide {nuclide_name} at temperature {nearest_temperature} K is not available in the library"
-                )
+        # Resolve native composition objects before generic member traversal
+        nuclide_composition = {}
+        element_composition = {}
 
-            # Check if nuclide is already created
-            found = False
-            for nuclide in simulation.nuclides:
-                if (
-                    nuclide.name == nuclide_name
-                    and nearest_temperature == nuclide.temperature
-                ):
-                    found = True
-                    break
+        for element, density in self.element_composition.items():
+            element = _get_or_create_element(element.name, simulation, element)
+            element_composition[element] = density
 
-            # Create the nuclide to objects if needed
-            if not found:
-                nuclide = Nuclide(nuclide_name, nearest_temperature)
+        for nuclide, density in self.nuclide_composition.items():
+            nuclide = _get_or_create_nuclide(
+                nuclide.name, nuclide.temperature, simulation, nuclide
+            )
+            nuclide_composition[nuclide] = density
 
-            # Register the nuclide composition
-            self.nuclides.append(nuclide)
-            self.nuclide_densities[i] = nuclide_density
-            self.nuclide_composition[nuclide] = nuclide_density
+        # Synchronize packed fields with canonical native objects
+        self.nuclide_composition = nuclide_composition
+        self.element_composition = element_composition
+        self.nuclides = list(nuclide_composition)
+        self.elements = list(element_composition)
+        self.nuclide_densities = np.asarray(
+            list(nuclide_composition.values()), dtype=float64
+        )
+        self.element_densities = np.asarray(
+            list(element_composition.values()), dtype=float64
+        )
 
-            # Promote nuclide flags to material
-            if nuclide.fissionable:
-                self.fissionable = True
+        # Point absent multigroup data to the reserved neutron model
+        if self.neutron_multigroup.G == 0:
+            self.neutron_multigroup = simulation.neutron_multigroup_data[0]
+        self.has_neutron_multigroup = self.neutron_multigroup.G > 0
 
-    def __repr__(self):
+        # Register the material, then compile only canonical owned members
+        if not super()._compile_into_simulation(simulation):
+            return False
+
+        # Resolve fissionability from every available neutron representation
+        self.fissionable = self.neutron_multigroup.fissionable or any(
+            nuclide.fissionable for nuclide in self.nuclides
+        )
+        return True
+
+    def __repr__(self) -> str:
         text = super().__repr__()
+        text += f"  - Name: {self.name}\n"
+        text += f"  - Fissionable: {self.fissionable}\n"
         text += f"  - Temperature: {self.temperature} K\n"
-        if len(self.nuclide_composition) > 0:
-            text += f"  - Nuclide composition [atoms/barn-cm]\n"
-            for nuclide in self.nuclide_composition.keys():
-                text += (
-                    f"    - {nuclide.name:<5} | {self.nuclide_composition[nuclide]}\n"
-                )
-        if len(self.element_composition) > 0:
-            text += f"  - Element composition [atoms/barn-cm]\n"
-            for element in self.element_composition.keys():
-                text += (
-                    f"    - {element.name:<5} | {self.element_composition[element]}\n"
-                )
+
+        if self.nuclide_composition:
+            text += "  - Nuclide composition [atoms/barn-cm]\n"
+            for nuclide, density in self.nuclide_composition.items():
+                text += f"    - {nuclide.name:<5} | {density}\n"
+
+        if self.element_composition:
+            text += "  - Element composition [atoms/barn-cm]\n"
+            for element, density in self.element_composition.items():
+                text += f"    - {element.name:<5} | {density}\n"
+
+        if self.neutron_multigroup.G > 0:
+            text += "  - Neutron multigroup model\n"
+            text += f"    - G: {self.neutron_multigroup.G}\n"
+            text += f"    - J: {self.neutron_multigroup.J}\n"
         return text
 
 
@@ -227,272 +302,43 @@ TEMPERATURES = [0.1, 233.15, 273.15, 293.6, 600.0, 900.0, 1200.0, 2500.0]
 
 
 # ======================================================================================
-# Multigroup material
+# Native-composition helpers
 # ======================================================================================
 
 
-class MaterialMG(MaterialBase):
-    """
-    Define a multigroup material.
-
-    Cross-section arrays are provided as NumPy arrays of length ``G`` (number
-    of energy groups). Scatter and fission matrices are ``(G, G)``.
-
-    Parameters
-    ----------
-    name : str, optional
-        User label.
-    capture : ndarray, optional
-        Capture cross section for each group.
-    scatter : ndarray, optional
-        Scattering matrix ``(G, G)``.
-    fission : ndarray, optional
-        Fission cross section for each group.
-    nu_s : ndarray, optional
-        Average scattering multiplicity.
-    nu_p : ndarray, optional
-        Average prompt fission neutron yield.
-    nu_d : ndarray, optional
-        Average delayed fission neutron yield.
-    chi_p : ndarray, optional
-        Prompt fission spectrum.
-    chi_d : ndarray, optional
-        Delayed fission spectrum.
-    speed : ndarray, optional
-        Neutron speeds for each group (cm/s).
-    decay_rate : ndarray, optional
-        Delayed neutron precursor decay rates (1/s).
-
-    Returns
-    -------
-    MaterialMG
-        The multigroup material object.
-
-    See Also
-    --------
-    mcdc.Material : Creates a continuous-energy material.
-    """
-
-    # Annotations for Numba mode
-    label: str = "multigroup_material"
-    #
-    G: int
-    J: int
-    mgxs_speed: Annotated[NDArray[float64], ("G",)]
-    mgxs_decay_rate: Annotated[NDArray[float64], ("J",)]
-    mgxs_capture: Annotated[NDArray[float64], ("G",)]
-    mgxs_scatter: Annotated[NDArray[float64], ("G",)]
-    mgxs_fission: Annotated[NDArray[float64], ("G",)]
-    mgxs_total: Annotated[NDArray[float64], ("G",)]
-    mgxs_nu_s: Annotated[NDArray[float64], ("G",)]
-    mgxs_nu_p: Annotated[NDArray[float64], ("G",)]
-    mgxs_nu_d: Annotated[NDArray[float64], ("G", "J")]
-    mgxs_nu_d_total: Annotated[NDArray[float64], ("G",)]
-    mgxs_nu_f: Annotated[NDArray[float64], ("G",)]
-    mgxs_chi_s: Annotated[NDArray[float64], ("G", "G")]
-    mgxs_chi_p: Annotated[NDArray[float64], ("G", "G")]
-    mgxs_chi_d: Annotated[NDArray[float64], ("J", "G")]
-
-    def __init__(
-        self,
-        name: str = "",
-        capture: NDArray[float64] | NoneType = None,
-        scatter: NDArray[float64] | NoneType = None,
-        fission: NDArray[float64] | NoneType = None,
-        nu_s: NDArray[float64] | NoneType = None,
-        nu_p: NDArray[float64] | NoneType = None,
-        nu_d: NDArray[float64] | NoneType = None,
-        chi_p: NDArray[float64] | NoneType = None,
-        chi_d: NDArray[float64] | NoneType = None,
-        speed: NDArray[float64] | NoneType = None,
-        decay_rate: NDArray[float64] | NoneType = None,
-    ):
-        type_ = MATERIAL_MG
-        super().__init__(type_, name)
-
-        # Energy group size
-        if capture is not None:
-            G = len(capture)
-        elif scatter is not None:
-            G = len(scatter)
-        elif fission is not None:
-            G = len(fission)
-        else:
-            print_error("Need to supply capture, scatter, or fission for MaterialMG")
-        self.G = G
-
-        # Delayed group size
-        J = 0
-        if nu_d is not None:
-            J = len(nu_d)
-        self.J = J
-
-        # Allocate the attributes
-        self.mgxs_speed = np.ones(G)
-        self.mgxs_decay_rate = np.ones(J) * np.inf
-        self.mgxs_capture = np.zeros(G)
-        self.mgxs_scatter = np.zeros(G)
-        self.mgxs_fission = np.zeros(G)
-        self.mgxs_total = np.zeros(G)
-        self.mgxs_nu_s = np.ones(G)
-        self.mgxs_nu_p = np.zeros(G)
-        self.mgxs_nu_d = np.zeros([G, J])
-        self.mgxs_nu_d_total = np.zeros([G])
-        self.mgxs_nu_f = np.zeros(G)
-        self.mgxs_chi_s = np.zeros([G, G])
-        self.mgxs_chi_p = np.zeros([G, G])
-        self.mgxs_chi_d = np.zeros([J, G])
-
-        # Speed (vector of size G)
-        if speed is not None:
-            self.mgxs_speed = speed
-
-        # Decay constant (vector of size J)
-        if decay_rate is not None:
-            self.mgxs_decay_rate = decay_rate
-
-        # Cross-sections (vector of size G)
-        if capture is not None:
-            self.mgxs_capture = capture
-        if scatter is not None:
-            self.mgxs_scatter = np.sum(scatter, 0)
-        if fission is not None:
-            self.mgxs_fission = fission
-            self.fissionable = True
-        self.mgxs_total = self.mgxs_capture + self.mgxs_scatter + self.mgxs_fission
-
-        # Scattering multiplication (vector of size G)
-        if nu_s is not None:
-            self.mgxs_nu_s = nu_s
-
-        # Check if nu_p or nu_d is not provided, give fission
-        if fission is not None:
-            if nu_p is None and nu_d is None:
-                print_error("Need to supply nu_p or nu_d for fissionable MaterialMG")
-
-        # Prompt fission production (vector of size G)
-        if nu_p is not None:
-            self.mgxs_nu_p = nu_p
-
-        # Delayed fission production (matrix of size GxJ)
-        if nu_d is not None:
-            # Transpose: [dg, gin] -> [gin, dg]
-            self.mgxs_nu_d = np.swapaxes(nu_d, 0, 1)[:, :]
-        self.mgxs_nu_d_total = np.sum(self.mgxs_nu_d, axis=1)
-
-        # Total fission production (vector of size G)
-        self.mgxs_nu_f = np.zeros_like(self.mgxs_nu_p)
-        self.mgxs_nu_f += self.mgxs_nu_p
-        for j in range(J):
-            self.mgxs_nu_f += self.mgxs_nu_d[:, j]
-
-        # Scattering spectrum (matrix of size GxG)
-        if scatter is not None:
-            # Transpose: [gout, gin] -> [gin, gout]
-            self.mgxs_chi_s = np.swapaxes(scatter, 0, 1)[:, :]
-            for g in range(G):
-                if self.mgxs_scatter[g] > 0.0:
-                    self.mgxs_chi_s[g, :] /= self.mgxs_scatter[g]
-
-        # Prompt fission spectrum (matrix of size GxG)
-        if nu_p is not None:
-            if G == 1:
-                self.mgxs_chi_p[:, :] = np.array([[1.0]])
-            elif chi_p is None:
-                print_error("Need to supply chi_p if nu_p is provided and G > 1")
-            else:
-                # Convert 1D spectrum to 2D
-                if chi_p.ndim == 1:
-                    tmp = np.zeros((G, G))
-                    for g in range(G):
-                        tmp[:, g] = chi_p
-                    chi_p = tmp
-                # Transpose: [gout, gin] -> [gin, gout]
-                self.mgxs_chi_p[:, :] = np.swapaxes(chi_p, 0, 1)[:, :]
-                # Normalize
-                for g in range(G):
-                    if np.sum(self.mgxs_chi_p[g, :]) > 0.0:
-                        self.mgxs_chi_p[g, :] /= np.sum(self.mgxs_chi_p[g, :])
-
-        # Delayed fission spectrum (matrix of size JxG)
-        if nu_d is not None:
-            if G == 1:
-                self.mgxs_chi_d = np.ones([J, G])
-            else:
-                if chi_d is None:
-                    print_error("Need to supply chi_d if nu_d is provided and G > 1")
-                # Transpose: [gout, dg] -> [dg, gout]
-                self.mgxs_chi_d = np.swapaxes(chi_d, 0, 1)[:, :]
-            # Normalize
-            for dg in range(J):
-                if np.sum(self.mgxs_chi_d[dg, :]) > 0.0:
-                    self.mgxs_chi_d[dg, :] /= np.sum(self.mgxs_chi_d[dg, :])
-
-    def __repr__(self):
-        text = super().__repr__()
-        text += f"  - Multigroup data\n"
-        text += f"    - G: {self.G}\n"
-        text += f"    - J: {self.J}\n"
-        text += f"    - Sigma_c {print_1d_array(self.mgxs_capture)}\n"
-        text += f"    - Sigma_s {print_1d_array(self.mgxs_scatter)}\n"
-        text += f"    - Sigma_f {print_1d_array(self.mgxs_fission)}\n"
-        text += f"    - nu_s {print_1d_array(self.mgxs_nu_s)}\n"
-        text += f"    - nu_p {print_1d_array(self.mgxs_nu_p)}\n"
-        text += f"    - nu_d {print_1d_array(self.mgxs_nu_d.flatten())}\n"
-        text += f"    - chi_s {print_1d_array(self.mgxs_chi_s.flatten())}\n"
-        text += f"    - chi_fp {print_1d_array(self.mgxs_chi_p.flatten())}\n"
-        text += f"    - chi_fd {print_1d_array(self.mgxs_chi_d.flatten())}\n"
-        text += f"    - speed {print_1d_array(self.mgxs_speed)}\n"
-        text += f"    - lambda {print_1d_array(self.mgxs_decay_rate)}\n"
-        return text
-
-
-def set_nuclides_from_elements(material):
+def set_nuclides_from_elements(material, simulation):
+    """Expand an elemental composition and register its natural isotopes."""
     material.nuclides = []
     material.nuclide_composition = {}
     nuclide_densities = []
 
-    # Get supported temperature
-    nearest_temperature = min(TEMPERATURES, key=lambda x: abs(x - material.temperature))
+    # Select the nearest supported native-data temperature
+    nearest_temperature = _get_supported_temperature(material.temperature)
 
+    # Expand each natural element into its normalized isotopic composition
     for element, element_density in material.element_composition.items():
-        # To make sure that the abundance is normalized
-        norm = 0.0
-        for abundance in ISOTOPIC_ABUNDANCE[element.name].values():
-            norm += abundance
+        norm = sum(ISOTOPIC_ABUNDANCE[element.name].values())
 
-        # Loop over the nuclide composition
         for nuclide_name, abundance in ISOTOPIC_ABUNDANCE[element.name].items():
-            # Check if nuclide is already created
-            found = False
-            for nuclide in simulation.nuclides:
-                if (
-                    nuclide.name == nuclide_name
-                    and nearest_temperature == nuclide.temperature
-                ):
-                    found = True
-                    break
+            nuclide = _get_or_create_nuclide(
+                nuclide_name, nearest_temperature, simulation
+            )
+            nuclide._compile_into_simulation(simulation)
 
-            # Create the nuclide object if needed
-            if not found:
-                nuclide = Nuclide(nuclide_name, nearest_temperature)
-
-            # Calculate nuclide density
             nuclide_density = element_density * abundance / norm
-
-            # Register the nuclide composition
             material.nuclides.append(nuclide)
             nuclide_densities.append(nuclide_density)
             material.nuclide_composition[nuclide] = nuclide_density
 
-    material.nuclide_densities = np.array(nuclide_densities)
+    material.nuclide_densities = np.asarray(nuclide_densities, dtype=float64)
 
 
-def set_elements_from_nuclides(material):
+def set_elements_from_nuclides(material, simulation):
+    """Collapse a nuclide composition and register its elements."""
     material.elements = []
     material.element_composition = {}
 
-    # Get the list of the element names
+    # Gather the unique element names represented by the nuclides
     element_names = []
     for nuclide in material.nuclides:
         element_name = nuclide.name[:2]
@@ -500,31 +346,18 @@ def set_elements_from_nuclides(material):
             element_name = element_name[0]
         if element_name not in element_names:
             element_names.append(element_name)
-    element_densities = np.zeros(len(element_names))
+    element_densities = np.zeros(len(element_names), dtype=float64)
 
-    # Iterate over all named elements
+    # Accumulate each element's density and register its canonical object
     for i, element_name in enumerate(element_names):
-        # Check if element is already created
-        found = False
-        for element in simulation.elements:
-            if element.name == element_name:
-                found = True
-                break
-
-        # Create the element object if needed
-        if not found:
-            element = Element(element_name)
-
+        element = _get_or_create_element(element_name, simulation)
+        element._compile_into_simulation(simulation)
         material.elements.append(element)
 
-        # Iterate over all nuclides to get the total density
         density = 0.0
         for nuclide, nuclide_density in material.nuclide_composition.items():
-            # Skip if non-isotope
             if nuclide.name[: len(element_name)] != element_name:
                 continue
-
-            # Accumulate density
             density += nuclide_density
 
         element_densities[i] = density
@@ -533,9 +366,26 @@ def set_elements_from_nuclides(material):
     material.element_densities = element_densities
 
 
+def _get_supported_temperature(temperature):
+    return min(TEMPERATURES, key=lambda value: abs(value - temperature))
+
+
+def _get_or_create_element(element_name, simulation, candidate=None):
+    for element in simulation.elements:
+        if element.name == element_name:
+            return element
+    return candidate or Element(element_name)
+
+
+def _get_or_create_nuclide(nuclide_name, temperature, simulation, candidate=None):
+    for nuclide in simulation.nuclides:
+        if nuclide.name == nuclide_name and nuclide.temperature == temperature:
+            return nuclide
+    return candidate or Nuclide(nuclide_name, temperature)
+
+
 def update_fissionable_from_nuclides(material):
-    material.fissionable = False
-    for nuclide in material.nuclides:
-        if nuclide.fissionable:
-            material.fissionable = True
-            break
+    """Update fissionability from native and multigroup neutron data."""
+    material.fissionable = material.neutron_multigroup.fissionable or any(
+        nuclide.fissionable for nuclide in material.nuclides
+    )

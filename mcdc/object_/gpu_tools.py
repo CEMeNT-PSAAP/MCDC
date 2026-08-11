@@ -3,14 +3,16 @@ from numpy import uintp
 
 ####
 
-from mcdc.object_.base import ObjectSingleton
+from mcdc.object_.base import MCDCBase
 
 
 @dataclass
-class GPUMeta(ObjectSingleton):
-    # Annotations for Numba mode
-    label: str = "gpu_meta"
-    #
+class GPUMeta(MCDCBase):
+    """Opaque device pointers owned by the GPU execution bridge."""
+
+    # MC/DC framework metadata
+    label = "gpu_meta"
+
     state_pointer: uintp = uintp(0)
     program_pointer: uintp = uintp(0)
     simulation_pointer: uintp = uintp(0)

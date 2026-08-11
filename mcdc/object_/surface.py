@@ -2,7 +2,7 @@ from typing import Annotated, Sequence
 import numpy as np
 
 from numpy import float64
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 ####
 
@@ -29,7 +29,7 @@ from mcdc.constant import (
     SURFACE_TORUS_Z,
     SURFACE_TORUS,
 )
-from mcdc.object_.base import ObjectNonSingleton
+from mcdc.object_.base import MCDCObject
 from mcdc.object_.cell import Region
 from mcdc.object_.tally import TallySurfaceCrossing
 from mcdc.object_.util import move_object
@@ -40,70 +40,64 @@ from mcdc.print_ import print_error
 # ======================================================================================
 
 
-class Surface(ObjectNonSingleton):
-    """
-    Geometric surface primitive with optional boundary condition and motion.
+class Surface(MCDCObject):
+    """Geometric boundaries of simulation cells.
 
-    Surfaces are registered non-singletons and receive a stable ``ID``. Factory
-    constructors (:meth:`PlaneX`, :meth:`CylinderZ`, etc.) set the quadric
-    coefficients (A..J) and linearity flag. Motion segments can be defined with
-    :meth:`move`.
+    Surfaces are created with class methods such as :meth:`PlaneX`,
+    :meth:`CylinderZ`, and :meth:`Sphere`. Unary ``+`` and ``-`` return the
+    corresponding positive and negative half-space
+    :class:`~mcdc.object_.cell.Region`.
 
-    Parameters
-    ----------
-    type\\_ : int
-        One of ``SURFACE_*`` constants (e.g., ``SURFACE_PLANE_X``).
-    name : str
-        Optional label for reporting.
-    boundary_condition : str
-        Boundary behavior at the surface (``"none"``, ``"vacuum"``, or ``"reflective"``).
+    Boundary conditions may be ``"none"``, ``"vacuum"``, or ``"reflective"``.
+    A surface can also undergo piecewise-constant translational motion configured
+    with :meth:`move`.
 
-    Attributes
-    ----------
-    ID : int
-        Index in the global registry (assigned on construction).
-    type\\_ : int
-        Surface type code (``SURFACE_*``).
-    name : str
-        User label.
-    boundary_condition : int
-        One of ``BC_NONE``, ``BC_VACUUM``, ``BC_REFLECTIVE``.
-    A,B,C,D,E,F,G,H,I,J : float
-        Quadric coefficients defining the implicit surface.
-    linear : bool
-        True for linear (plane) surfaces.
-    quadric : bool
-        True for quadric (e.g.,cylinder) surfaces.
-    quartic : bool
-        True for quartic (e.g., torus) surfaces.
-    nx, ny, nz : float
-        Outward normal components for linear planes.
-    moving : bool
-        True if :meth:`move` has been called.
-    N_move : int
-        Number of motion segments plus the final static segment.
-    move_velocities : (N_move, 3) ndarray
-        Per-segment velocity vectors.
-    move_durations : (N_move,) ndarray
-        Per-segment durations (s).
-    move_time_grid : (N_move+1,) ndarray
-        Cumulative time breakpoints.
-    move_translations : (N_move+1, 3) ndarray
-        Cumulative translations at each breakpoint.
-
-    See Also
+    Examples
     --------
-    Region
-        Use unary ``+`` / ``-`` to form half-spaces: ``+surface`` or ``-surface``.
-    decode_type
-        Human-readable surface type.
-    decode_BC_type
-        Human-readable boundary condition name.
+    Create a vacuum x plane and select its positive half-space:
+
+    >>> import numpy as np
+    >>> import mcdc
+    >>> plane = mcdc.Surface.PlaneX(x=0.0, boundary_condition="vacuum")
+    >>> region = +plane
+
+    Create a sphere and select its interior:
+
+    >>> sphere = mcdc.Surface.Sphere(center=[0.0, 0.0, 0.0], radius=2.0)
+    >>> interior = -sphere
+
+    Create a cylinder parallel to the z axis:
+
+    >>> cylinder = mcdc.Surface.CylinderZ(
+    ...     center=[1.0, -1.0],
+    ...     radius=0.5,
+    ... )
+
+    Create an oblique plane from its equation coefficients:
+
+    >>> oblique = mcdc.Surface.Plane(A=1.0, B=1.0, C=0.0, D=-2.0)
+
+    Create a torus with an arbitrary symmetry axis:
+
+    >>> torus = mcdc.Surface.Torus(
+    ...     center=[0.0, 0.0, 0.0],
+    ...     axis=[1.0, 1.0, 0.0],
+    ...     R=2.0,
+    ...     r=0.5,
+    ... )
+
+    Define piecewise-constant motion for a plane:
+
+    >>> moving_plane = mcdc.Surface.PlaneX(x=0.0)
+    >>> moving_plane.move(
+    ...     velocities=np.array([[1.0, 0.0, 0.0]]),
+    ...     durations=np.array([0.5]),
+    ... )
     """
 
-    # Annotations for Numba mode
-    label: str = "surface"
-    #
+    # MC/DC framework metadata
+    label = "surface"
+
     type: int
     name: str
     boundary_condition: int
@@ -132,17 +126,13 @@ class Surface(ObjectNonSingleton):
     move_durations: Annotated[NDArray[float64], ("N_move",)]
     move_time_grid: Annotated[NDArray[float64], ("N_move_grid",)]
     move_translations: Annotated[NDArray[float64], ("N_move_grid", 3)]
-    tallies: list[TallySurfaceCrossing]
+    surface_crossing_tallies: list[TallySurfaceCrossing]
 
-    def __init__(self, type_, name, boundary_condition):
+    def __init__(self, type_: int, name: str, boundary_condition: str) -> None:
         super().__init__()
 
-        # Type and name
         self.type = type_
-        if name != "":
-            self.name = name
-        else:
-            self.name = f"{self.label}_{self.ID}"
+        self.name = name or "(Unnamed surface)"
 
         # Boundary condition
         if boundary_condition == "none":
@@ -187,21 +177,12 @@ class Surface(ObjectNonSingleton):
         self.move_time_grid = np.array([0.0, INF])
         self.move_translations = np.zeros((2, 3))
 
-        # Surface tallies
-        self.tallies = []
+        # Surface-crossing tallies
+        self.surface_crossing_tallies = []
 
-    def __repr__(self):
-        """
-        Return a human-readable description including type-specific parameters.
+    def __repr__(self) -> str:
+        text = super().__repr__()
 
-        Returns
-        -------
-        str
-            Multi-line formatted string with ID, name, BC, and geometry details.
-        """
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
-        text += f"  - ID: {self.ID}\n"
         text += f"  - Name: {self.name}\n"
         text += f"  - Boundary condition: {decode_BC_type(self.boundary_condition)}\n"
 
@@ -288,8 +269,8 @@ class Surface(ObjectNonSingleton):
             text += f"  - A, B, C: {self.A}, {self.B}, {self.C}\n"
             text += f"  - R: {self.R} cm\n"
             text += f"  - r: {self.r} cm\n"
-        if len(self.tallies) > 0:
-            text += f"  - Tallies: {[x.ID for x in self.tallies]}\n"
+        if len(self.surface_crossing_tallies) > 0:
+            text += f"  - Surface-crossing tallies: {[x.name for x in self.surface_crossing_tallies]}\n"
 
         return text
 
@@ -298,23 +279,22 @@ class Surface(ObjectNonSingleton):
     # ==================================================================================
 
     @classmethod
-    def PlaneX(cls, name: str = "", x: float = 0.0, boundary_condition: str = "none"):
-        """
-        Create a plane perpendicular to +x at x = constant.
+    def PlaneX(
+        cls,
+        name: str = "",
+        x: float = 0.0,
+        boundary_condition: str = "none",
+    ) -> "Surface":
+        """Create the plane ``x = constant``.
 
         Parameters
         ----------
         name : str, optional
-            User label.
-        x : float, default 0.0
-            Plane location (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Linear plane with normal ``(+1, 0, 0)``.
+            User-facing surface name.
+        x : float, optional
+            Plane position in cm.
+        boundary_condition : {"none", "vacuum", "reflective"}, optional
+            Boundary condition applied when a particle crosses the plane.
         """
         type_ = SURFACE_PLANE_X
         surface = cls(type_, name, boundary_condition)
@@ -330,23 +310,17 @@ class Surface(ObjectNonSingleton):
         return surface
 
     @classmethod
-    def PlaneY(cls, name: str = "", y: float = 0.0, boundary_condition: str = "none"):
-        """
-        Create a plane perpendicular to +y at y = constant.
+    def PlaneY(
+        cls,
+        name: str = "",
+        y: float = 0.0,
+        boundary_condition: str = "none",
+    ) -> "Surface":
+        """Create the plane ``y = constant``.
 
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        y : float, default 0.0
-            Plane location (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Linear plane with normal ``(0, +1, 0)``.
+        Parameters are the surface ``name``, position ``y`` in cm, and a
+        ``boundary_condition`` of ``"none"``, ``"vacuum"``, or
+        ``"reflective"``.
         """
         type_ = SURFACE_PLANE_Y
         surface = cls(type_, name, boundary_condition)
@@ -362,23 +336,17 @@ class Surface(ObjectNonSingleton):
         return surface
 
     @classmethod
-    def PlaneZ(cls, name: str = "", z: float = 0.0, boundary_condition: str = "none"):
-        """
-        Create a plane perpendicular to +z at z = constant.
+    def PlaneZ(
+        cls,
+        name: str = "",
+        z: float = 0.0,
+        boundary_condition: str = "none",
+    ) -> "Surface":
+        """Create the plane ``z = constant``.
 
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        z : float, default 0.0
-            Plane location (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Linear plane with normal ``(0, 0, +1)``.
+        Parameters are the surface ``name``, position ``z`` in cm, and a
+        ``boundary_condition`` of ``"none"``, ``"vacuum"``, or
+        ``"reflective"``.
         """
         type_ = SURFACE_PLANE_Z
         surface = cls(type_, name, boundary_condition)
@@ -402,25 +370,12 @@ class Surface(ObjectNonSingleton):
         C: float = 0.0,
         D: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a general plane defined by A x + B y + C z + D = 0.
+    ) -> "Surface":
+        """Create a general plane ``A*x + B*y + C*z + D = 0``.
 
-        The normal is normalized to unit length and stored in ``(nx, ny, nz)``.
-
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        A, B, C, D : float
-            Plane coefficients.
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Linear plane with normalized normal vector.
+        The coefficients are normalized internally. ``(A, B, C)`` must be a
+        nonzero normal vector. Coordinates are evaluated in cm, so ``D`` must
+        use the corresponding length scaling.
         """
         type_ = SURFACE_PLANE
         surface = cls(type_, name, boundary_condition)
@@ -455,25 +410,10 @@ class Surface(ObjectNonSingleton):
         center: Sequence[float] = [0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create an infinite cylinder aligned with the x-axis.
+    ) -> "Surface":
+        """Create an infinite cylinder parallel to the x axis.
 
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        center : (2,) array_like of float, default (0, 0)
-            Cylinder center in (y, z) (cm).
-        radius : float, default 1.0
-            Cylinder radius (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Quadratic cylinder surface.
+        ``center`` gives ``[y, z]`` in cm and ``radius`` is in cm.
         """
         type_ = SURFACE_CYLINDER_X
         surface = cls(type_, name, boundary_condition)
@@ -501,25 +441,10 @@ class Surface(ObjectNonSingleton):
         center: Sequence[float] = [0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create an infinite cylinder aligned with the y-axis.
+    ) -> "Surface":
+        """Create an infinite cylinder parallel to the y axis.
 
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        center : (2,) array_like of float
-            Cylinder center in (x, z) (cm).
-        radius : float
-            Cylinder radius (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Quadratic cylinder surface.
+        ``center`` gives ``[x, z]`` in cm and ``radius`` is in cm.
         """
         type_ = SURFACE_CYLINDER_Y
         surface = cls(type_, name, boundary_condition)
@@ -547,25 +472,10 @@ class Surface(ObjectNonSingleton):
         center: Sequence[float] = [0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create an infinite cylinder aligned with the z-axis.
+    ) -> "Surface":
+        """Create an infinite cylinder parallel to the z axis.
 
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        center : (2,) array_like of float
-            Cylinder center in (x, y) (cm).
-        radius : float
-            Cylinder radius (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Quadratic cylinder surface.
+        ``center`` gives ``[x, y]`` in cm and ``radius`` is in cm.
         """
         type_ = SURFACE_CYLINDER_Z
         surface = cls(type_, name, boundary_condition)
@@ -595,25 +505,17 @@ class Surface(ObjectNonSingleton):
         axis: Sequence[float] = [0.0, 0.0, 1.0],
         point: Sequence[float] = [0.0, 0.0, 0.0],
         boundary_condition: str = "none",
-    ):
-        """
-        Create a general infinite cylinder with an arbitrary axis.
+    ) -> "Surface":
+        """Create an infinite cylinder with an arbitrary axis.
 
         Parameters
         ----------
-        name : str, optional
-        radius : float
-            Cylinder radius (cm).
-        axis : (3,) array_like of float
-            Direction vector of the cylinder axis (normalized automatically).
-        point : (3,) array_like of float
-            A point on the cylinder axis (cm).
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            General cylinder surface.
+        radius : float, optional
+            Cylinder radius in cm.
+        axis : sequence of 3 float, optional
+            Nonzero vector parallel to the cylinder axis.
+        point : sequence of 3 float, optional
+            A point on the cylinder axis, in cm.
         """
         type_ = SURFACE_CYLINDER
         surface = cls(type_, name, boundary_condition)
@@ -654,26 +556,8 @@ class Surface(ObjectNonSingleton):
         center: Sequence[float] = [0.0, 0.0, 0.0],
         radius: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a sphere.
-
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        center : (3,) array_like of float
-            Sphere center (x, y, z) in cm.
-        radius : float
-            Radius (cm).
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            Quadratic spherical surface.
-        """
+    ) -> "Surface":
+        """Create a sphere from its center and radius in cm."""
         type_ = SURFACE_SPHERE
         surface = cls(type_, name, boundary_condition)
 
@@ -702,26 +586,11 @@ class Surface(ObjectNonSingleton):
         apex: Sequence[float] = [0.0, 0.0, 0.0],
         t_sq: float = 1.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create an infinite cone with axis along the x-axis.
+    ) -> "Surface":
+        """Create a double cone aligned with the x axis.
 
-        Equation: (y - y0)^2 + (z - z0)^2 - t_sq * (x - x0)^2 = 0
-
-        Parameters
-        ----------
-        name : str, optional
-        apex : (3,) array_like of float
-            Cone apex (x0, y0, z0) in cm.
-        t_sq : float
-            Squared tangent of the half-angle: t_sq = tan^2(theta).
-            For a 45-degree half-angle use t_sq = 1.0.
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            Cone-X surface.
+        ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
+        half-angle.
         """
         type_ = SURFACE_CONE_X
         surface = cls(type_, name, boundary_condition)
@@ -749,25 +618,11 @@ class Surface(ObjectNonSingleton):
         apex: Sequence[float] = [0.0, 0.0, 0.0],
         t_sq: float = 1.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create an infinite cone with axis along the y-axis.
+    ) -> "Surface":
+        """Create a double cone aligned with the y axis.
 
-        Equation: (x - x0)^2 + (z - z0)^2 - t_sq * (y - y0)^2 = 0
-
-        Parameters
-        ----------
-        name : str, optional
-        apex : (3,) array_like of float
-            Cone apex (x0, y0, z0) in cm.
-        t_sq : float
-            Squared tangent of the half-angle: t_sq = tan^2(theta).
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            Cone-Y surface.
+        ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
+        half-angle.
         """
         type_ = SURFACE_CONE_Y
         surface = cls(type_, name, boundary_condition)
@@ -795,25 +650,11 @@ class Surface(ObjectNonSingleton):
         apex: Sequence[float] = [0.0, 0.0, 0.0],
         t_sq: float = 1.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create an infinite cone with axis along the z-axis.
+    ) -> "Surface":
+        """Create a double cone aligned with the z axis.
 
-        Equation: (x - x0)^2 + (y - y0)^2 - t_sq * (z - z0)^2 = 0
-
-        Parameters
-        ----------
-        name : str, optional
-        apex : (3,) array_like of float
-            Cone apex (x0, y0, z0) in cm.
-        t_sq : float
-            Squared tangent of the half-angle: t_sq = tan^2(theta).
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            Cone surface.
+        ``apex`` is in cm and ``t_sq`` is the squared tangent of the opening
+        half-angle.
         """
         type_ = SURFACE_CONE_Z
         surface = cls(type_, name, boundary_condition)
@@ -849,24 +690,13 @@ class Surface(ObjectNonSingleton):
         I: float = 0.0,
         J: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a general quadric:
-            A x^2 + B y^2 + C z^2 + D xy + E yz + F zx + G x + H y + I z + J = 0
+    ) -> "Surface":
+        """Create a general second-degree surface.
 
-        Parameters
-        ----------
-        name : str, optional
-            User label.
-        A,B,C,D,E,F,G,H,I,J : float
-            Quadric coefficients.
-        boundary_condition : str, optional
-            Boundary type (``"none"``, ``"vacuum"``, or ``"reflective"``).
-
-        Returns
-        -------
-        Surface
-            General quadratic surface.
+        The coefficients define
+        ``A*x**2 + B*y**2 + C*z**2 + D*x*y + E*x*z + F*y*z
+        + G*x + H*y + I*z + J = 0``. Coordinates are evaluated in cm; the
+        coefficients must therefore use mutually consistent units.
         """
         type_ = SURFACE_QUADRIC
         surface = cls(type_, name, boundary_condition)
@@ -898,24 +728,11 @@ class Surface(ObjectNonSingleton):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a torus on the y-z plane radially symmetric around the x axis:
-            f(x, y, z) = ( sqrt[(y - B)^2 + (z - C)^2] - R )^2 + (x - A)^2 - r^2
+    ) -> "Surface":
+        """Create a torus centered at ``(A, B, C)`` and aligned with x.
 
-        Parameters
-        ----------
-        name : str, optional
-        A,B,C,R,r : float
-            A, B, C are displacement values for the torus in the x, y, z directions respectively
-            R is the radius around which a circle is revolved about the axis of revolution (parallel with the x-axis)
-            r is the radius of the circle that is being revolved
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            Torus surface.
+        ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
+        ``r`` the minor radius, both in cm.
         """
         type_ = SURFACE_TORUS_X
         surface = cls(type_, name, boundary_condition)
@@ -943,24 +760,11 @@ class Surface(ObjectNonSingleton):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a torus on the x-z plane radially symmetric around the y axis:
-            f(x, y, z) = ( sqrt[(x - A)^2 + (z - C)^2] - R )^2 + (y - B)^2 - r^2
+    ) -> "Surface":
+        """Create a torus centered at ``(A, B, C)`` and aligned with y.
 
-        Parameters
-        ----------
-        name : str, optional
-        A,B,C,R,r : float
-            A, B, C are displacement values for the torus in the x, y, z directions respectively
-            R is the radius around which a circle is revolved about the axis of revolution (parallel with the y-axis)
-            r is the radius of the circle that is being revolved
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            Torus surface.
+        ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
+        ``r`` the minor radius, both in cm.
         """
         type_ = SURFACE_TORUS_Y
         surface = cls(type_, name, boundary_condition)
@@ -988,24 +792,11 @@ class Surface(ObjectNonSingleton):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a torus on the x-y plane radially symmetric around the z axis:
-            f(x, y, z) = ( sqrt[(x - A)^2 + (y - B)^2] - R )^2 + (z - C)^2 - r^2
+    ) -> "Surface":
+        """Create a torus centered at ``(A, B, C)`` and aligned with z.
 
-        Parameters
-        ----------
-        name : str, optional
-        A,B,C,R,r : float
-            A, B, C are displacement values for the torus in the x, y, z directions respectively
-            R is the radius around which a circle is revolved about the axis of revolution (parallel with the z-axis)
-            r is the radius of the circle that is being revolved
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            Torus surface.
+        ``(A, B, C)`` gives the center in cm. ``R`` is the major radius and
+        ``r`` the minor radius, both in cm.
         """
         type_ = SURFACE_TORUS_Z
         surface = cls(type_, name, boundary_condition)
@@ -1032,27 +823,19 @@ class Surface(ObjectNonSingleton):
         R: float = 0.0,
         r: float = 0.0,
         boundary_condition: str = "none",
-    ):
-        """
-        Create a general torus with an arbitrary axis.
+    ) -> "Surface":
+        """Create a torus with an arbitrary axis.
 
         Parameters
         ----------
-        name : str, optional
-        center : (3,) array_like of float
-            Torus center (cm).
-        axis : (3,) array_like of float
-            Direction vector of the torus axis (normalized automatically).
-        R : float
-            Major radius.
-        r : float
-            Minor radius of the tube.
-        boundary_condition : {"none","vacuum","reflective"}, optional
-
-        Returns
-        -------
-        Surface
-            General torus surface.
+        center : sequence of 3 float, optional
+            Torus center in cm.
+        axis : sequence of 3 float, optional
+            Nonzero symmetry-axis vector.
+        R : float, optional
+            Major radius in cm.
+        r : float, optional
+            Minor radius in cm.
         """
         x, y, z = center
         ax, ay, az = axis
@@ -1084,105 +867,33 @@ class Surface(ObjectNonSingleton):
     # Region building
     # ==================================================================================
 
-    def __pos__(self):
-        """
-        Half-space on the **outward** side of the surface.
-
-        Returns
-        -------
-        Region
-            Region representing ``n · r + J >= 0`` (sign convention per type).
-        """
+    def __pos__(self) -> Region:
         return Region.make_halfspace(self, +1)
 
-    def __neg__(self):
-        """
-        Half-space on the **inward** side of the surface.
-
-        Returns
-        -------
-        Region
-            Region representing the complement half-space.
-        """
+    def __neg__(self) -> Region:
         return Region.make_halfspace(self, -1)
 
     # ==================================================================================
     # Surface moving
     # ==================================================================================
 
-    def move(self, velocities, durations):
-        """
-        Define piecewise-constant motion for the surface.
-
-        Appends a final static segment (zero velocity, infinite duration) so that
-        the motion covers the whole simulation time.
+    def move(self, velocities: ArrayLike, durations: ArrayLike) -> None:
+        """Define piecewise-constant translational motion.
 
         Parameters
         ----------
-        velocities : array_like, shape (N, 3) or list
-            Per-segment velocity vectors [cm/s].
-        durations : array_like, shape (N,) or list
-            Per-segment durations [s].
-
-        Notes
-        -----
-        - Internally converts lists to arrays and constructs
-          ``move_time_grid`` and cumulative ``move_translations``.
-        - Sets ``moving=True`` and ``N_move = len(durations) + 1``.
-
-        Examples
-        --------
-        >>> s = Surface.PlaneZ(z=0.0)
-        >>> s.move(velocities=[[0,0,1.0]], durations=[0.5])  # 0.5 s upward, then static
-        >>> s.N_move
-        2
+        velocities : array_like, shape (N, 3)
+            Velocity vector for each segment in cm/s.
+        durations : array_like, shape (N,)
+            Segment durations in seconds. A final stationary segment is appended
+            automatically.
         """
         move_object(self, velocities, durations)
 
 
-# ======================================================================================
-# Type decoder
-# ======================================================================================
-
-
-def decode_type(type_):
-    if type_ == SURFACE_PLANE_X:
-        return "Plane-X surface"
-    elif type_ == SURFACE_PLANE_Y:
-        return "Plane-Y surface"
-    elif type_ == SURFACE_PLANE_Z:
-        return "Plane-Z surface"
-    elif type_ == SURFACE_PLANE:
-        return "Plane surface"
-    elif type_ == SURFACE_CYLINDER_X:
-        return "Infinite cylinder-X surface"
-    elif type_ == SURFACE_CYLINDER_Y:
-        return "Infinite cylinder-Y surface"
-    elif type_ == SURFACE_CYLINDER_Z:
-        return "Infinite cylinder-Z surface"
-    elif type_ == SURFACE_CYLINDER:
-        return "General cylinder surface"
-    elif type_ == SURFACE_SPHERE:
-        return "Sphere surface"
-    elif type_ == SURFACE_CONE_X:
-        return "Infinite cone-X surface"
-    elif type_ == SURFACE_CONE_Y:
-        return "Infinite cone-Y surface"
-    elif type_ == SURFACE_CONE_Z:
-        return "Infinite cone-Z surface"
-    elif type_ == SURFACE_QUADRIC:
-        return "Quadric surface"
-    elif type_ == SURFACE_TORUS_X:
-        return "Torus-X surface"
-    elif type_ == SURFACE_TORUS_Y:
-        return "Torus-Y surface"
-    elif type_ == SURFACE_TORUS_Z:
-        return "Torus-Z surface"
-    elif type_ == SURFACE_TORUS:
-        return "General torus surface"
-
-
 def decode_BC_type(type_):
+    """Return the display name for a packed boundary-condition code."""
+
     if type_ == BC_NONE:
         return "None"
     elif type_ == BC_VACUUM:

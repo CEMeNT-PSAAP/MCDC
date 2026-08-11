@@ -1,6 +1,9 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Kornreich")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
@@ -8,13 +11,13 @@ import mcdc
 # DOI: 10.1016/j.anucene.2004.03.012
 
 # Set materials
-m1 = mcdc.MaterialMG(
+m1 = mcdc.Material.multigroup(
     capture=np.array([0.0]),
     scatter=np.array([[0.9]]),
     fission=np.array([0.1]),
     nu_p=np.array([6.0]),
 )
-m2 = mcdc.MaterialMG(
+m2 = mcdc.Material.multigroup(
     capture=np.array([0.68]),
     scatter=np.array([[0.2]]),
     fission=np.array([0.12]),
@@ -27,14 +30,16 @@ s2 = mcdc.Surface.PlaneX(x=1.5)
 s3 = mcdc.Surface.PlaneX(x=2.5, boundary_condition="vacuum")
 
 # Set cells
-mcdc.Cell(region=+s1 & -s2, fill=m1)
-mcdc.Cell(region=+s2 & -s3, fill=m2)
+cell_1 = mcdc.Cell(region=+s1 & -s2, fill=m1)
+cell_2 = mcdc.Cell(region=+s2 & -s3, fill=m2)
+simulation.set_model([cell_1, cell_2])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 
-mcdc.Source(x=[0.0, 2.5], isotropic=True, energy_group=0)
+source = mcdc.Source(x=[0.0, 2.5], isotropic=True, energy=0)
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, and run MC/DC
@@ -68,13 +73,14 @@ mesh = mcdc.MeshStructured(
         ]
     )
 )
-mcdc.Tally(mesh=mesh, scores=["flux"])
+tally = mcdc.Tally(mesh=mesh, scores=["flux"])
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 100
-mcdc.settings.census_bank_buffer_ratio = 3.0
-mcdc.settings.source_bank_buffer_ratio = 3.0
-mcdc.settings.set_eigenmode(N_inactive=1, N_active=2, gyration_radius="only-x")
+simulation.settings.N_particle = 100
+simulation.settings.census_bank_buffer_ratio = 3.0
+simulation.settings.source_bank_buffer_ratio = 3.0
+simulation.settings.set_eigenmode(N_inactive=1, N_active=2, gyration_radius="only-x")
 
 # Run
-mcdc.run()
+simulation.run()

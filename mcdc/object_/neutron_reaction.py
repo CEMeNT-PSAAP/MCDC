@@ -10,8 +10,6 @@ from mcdc.constant import (
     ANGLE_ISOTROPIC,
     ANGLE_ENERGY_CORRELATED,
     ANGLE_DISTRIBUTED,
-    INTERPOLATION_LINEAR,
-    INTERPOLATION_LOG,
     NEUTRON_REACTION_CAPTURE,
     NEUTRON_REACTION_ELASTIC_SCATTERING,
     NEUTRON_REACTION_FISSION,
@@ -19,7 +17,7 @@ from mcdc.constant import (
     REFERENCE_FRAME_COM,
     REFERENCE_FRAME_LAB,
 )
-from mcdc.object_.base import ObjectPolymorphic
+from mcdc.object_.base import MCDCPolymorphic
 from mcdc.object_.data import encode_interpolation
 from mcdc.object_.distribution import (
     DistributionBase,
@@ -31,7 +29,6 @@ from mcdc.object_.distribution import (
     DistributionTabulatedEnergyAngle,
     DistributionNBody,
 )
-from mcdc.object_.simulation import simulation
 from mcdc.print_ import print_1d_array, print_error
 
 # ======================================================================================
@@ -39,18 +36,25 @@ from mcdc.print_ import print_1d_array, print_error
 # ======================================================================================
 
 
-class NeutronReactionBase(ObjectPolymorphic):
-    # Annotations for Numba mode
-    label: str = "neutron_reaction"
-    #
+class NeutronReactionBase(MCDCPolymorphic):
+    """Base neutron reaction data loaded from the HDF5 physics library.
+
+    Stores the ENDF reaction identifier, cross-section segment and offset,
+    reaction reference frame, and Q value.
+    """
+
+    # MC/DC framework metadata
+    label = "neutron_reaction"
+    sub_type = -1  # Polymorphic base
+
     MT: int
     xs: NDArray[float64]
     xs_offset_: int  # "xs_offset" ir reserved for "xs"
     reference_frame: int
     q_value: float64
 
-    def __init__(self, type_, MT, xs, xs_offset, reference_frame, q_value):
-        super().__init__(type_)
+    def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
+        super().__init__()
         self.MT = MT
         self.xs = xs
         self.xs_offset_ = xs_offset
@@ -58,8 +62,8 @@ class NeutronReactionBase(ObjectPolymorphic):
         self.q_value = q_value
 
     def __repr__(self):
-        text = "\n"
-        text += f"{decode_type(self.type)}\n"
+        text = super().__repr__()
+
         text += f"  - ID: {self.ID}\n"
         text += f"  - MT: {self.MT}\n"
         text += f"  - XS {print_1d_array(self.xs)} barn\n"
@@ -68,18 +72,9 @@ class NeutronReactionBase(ObjectPolymorphic):
         return text
 
 
-def decode_type(type_):
-    if type_ == NEUTRON_REACTION_ELASTIC_SCATTERING:
-        return "Neutron elastic scattering"
-    elif type_ == NEUTRON_REACTION_CAPTURE:
-        return "Neutron capture"
-    elif type_ == NEUTRON_REACTION_INELASTIC_SCATTERING:
-        return "Neutron inelastic scattering"
-    elif type_ == NEUTRON_REACTION_FISSION:
-        return "Neutron fission"
-
-
 def decode_reference_frame(type_):
+    """Return the display name for a packed reference-frame code."""
+
     if type_ == REFERENCE_FRAME_LAB:
         return "Laboratory"
     elif type_ == REFERENCE_FRAME_COM:
@@ -92,20 +87,25 @@ def decode_reference_frame(type_):
 
 
 class NeutronReactionElasticScattering(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_elastic_scattering_reaction"
-    #
+    """Elastic neutron scattering with incident-energy-dependent cosine data."""
+
+    # MC/DC framework metadata
+    label = "neutron_elastic_scattering_reaction"
+    sub_type = NEUTRON_REACTION_ELASTIC_SCATTERING
+
     mu_table: DistributionMultiTable
 
     def __init__(self, MT, xs, xs_offset, reference_frame, mu):
-        type_ = NEUTRON_REACTION_ELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, 0.0)
+        super().__init__(MT, xs, xs_offset, reference_frame, 0.0)
         self.mu_table = mu
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
+        """Build an elastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, _ = set_basic_properties(h5_group)
-        _, mu = set_angular_distribution(h5_group["angular_cosine_distribution"])
+        _, mu = set_angular_distribution(
+            h5_group["angular_cosine_distribution"], simulation
+        )
         return cls(MT, xs, xs_offset, reference_frame, mu)
 
     def __repr__(self):
@@ -120,15 +120,18 @@ class NeutronReactionElasticScattering(NeutronReactionBase):
 
 
 class NeutronReactionCapture(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_capture_reaction"
+    """Neutron capture reaction."""
+
+    # MC/DC framework metadata
+    label = "neutron_capture_reaction"
+    sub_type = NEUTRON_REACTION_CAPTURE
 
     def __init__(self, MT, xs, xs_offset, reference_frame, q_value):
-        type_ = NEUTRON_REACTION_CAPTURE
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
+        """Build a capture reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         return cls(MT, xs, xs_offset, reference_frame, q_value)
 
@@ -139,9 +142,12 @@ class NeutronReactionCapture(NeutronReactionBase):
 
 
 class NeutronReactionInelasticScattering(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_inelastic_scattering_reaction"
-    #
+    """Inelastic scattering with angular data and one or more energy spectra."""
+
+    # MC/DC framework metadata
+    label = "neutron_inelastic_scattering_reaction"
+    sub_type = NEUTRON_REACTION_INELASTIC_SCATTERING
+
     multiplicity: int
     angle_type: int
     mu: DistributionBase
@@ -167,8 +173,7 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
         spectrum_probability,
         energy_spectra,
     ):
-        type_ = NEUTRON_REACTION_INELASTIC_SCATTERING
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
 
         self.multiplicity = multiplicity
         self.angle_type = angle_type
@@ -180,12 +185,13 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
         self.energy_spectra = energy_spectra
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
+        """Build an inelastic-scattering reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
         multiplicity = int(h5_group["multiplicity"][()])
 
         angle_type, mu = set_angular_distribution(
-            h5_group["angular_cosine_distribution"]
+            h5_group["angular_cosine_distribution"], simulation
         )
 
         # Energy spectra
@@ -233,9 +239,12 @@ class NeutronReactionInelasticScattering(NeutronReactionBase):
 
 
 class NeutronReactionFission(NeutronReactionBase):
-    # Annotations for Numba mode
-    label: str = "neutron_fission_reaction"
-    #
+    """Fission reaction with prompt angular and energy distributions."""
+
+    # MC/DC framework metadata
+    label = "neutron_fission_reaction"
+    sub_type = NEUTRON_REACTION_FISSION
+
     angle_type: int
     mu: DistributionBase
     spectrum: DistributionBase
@@ -251,19 +260,19 @@ class NeutronReactionFission(NeutronReactionBase):
         mu,
         spectrum,
     ):
-        type_ = NEUTRON_REACTION_FISSION
-        super().__init__(type_, MT, xs, xs_offset, reference_frame, q_value)
+        super().__init__(MT, xs, xs_offset, reference_frame, q_value)
         self.angle_type = angle_type
         self.mu = mu
         self.spectrum = spectrum
 
     @classmethod
-    def from_h5_group(cls, h5_group):
+    def from_h5_group(cls, h5_group, simulation):
+        """Build a fission reaction from a library HDF5 group."""
         MT, xs, xs_offset, reference_frame, q_value = set_basic_properties(h5_group)
 
         # Prompt angular distribution
         angle_type, mu = set_angular_distribution(
-            h5_group["angular_cosine_distribution"]
+            h5_group["angular_cosine_distribution"], simulation
         )
 
         # Prompt spectrum
@@ -296,6 +305,8 @@ class NeutronReactionFission(NeutronReactionBase):
 
 
 def set_basic_properties(h5_group):
+    """Read properties shared by all neutron reactions from an HDF5 group."""
+
     MT = h5_group.attrs["MT"][()]
     xs = h5_group["xs"][()]
     xs_offset = h5_group["xs"].attrs["offset"]
@@ -308,7 +319,9 @@ def set_basic_properties(h5_group):
     return MT, xs, xs_offset, reference_frame, q_value
 
 
-def set_angular_distribution(h5_group):
+def set_angular_distribution(h5_group, simulation):
+    """Create the packed angle type and distribution from an HDF5 group."""
+
     mu_type = h5_group.attrs["type"]
     if mu_type == "isotropic":
         angle_type = ANGLE_ISOTROPIC
@@ -328,6 +341,8 @@ def set_angular_distribution(h5_group):
 
 
 def set_energy_distribution(h5_group):
+    """Create an outgoing-energy distribution from an HDF5 group."""
+
     spectrum_type = h5_group.attrs["type"]
 
     if spectrum_type == "tabulated":

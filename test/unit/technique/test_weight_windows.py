@@ -2,7 +2,6 @@ import mcdc
 import numpy as np
 import pytest
 
-from mcdc.main import preparation
 import mcdc.numba_types as type_
 from mcdc.transport.technique import (
     weight_roulette,
@@ -34,7 +33,13 @@ def make_mesh():
     return mesh, N
 
 
-def make_ww_model_params(lower=0.1, target=1.0, upper=1.0, mess_up_size=False):
+def make_ww_model_params(
+    prepare_simulation,
+    lower=0.1,
+    target=1.0,
+    upper=1.0,
+    mess_up_size=False,
+):
     mesh, N = make_mesh()
     Ne = 1
 
@@ -47,13 +52,14 @@ def make_ww_model_params(lower=0.1, target=1.0, upper=1.0, mess_up_size=False):
         ww_array[..., 1] = target
         ww_array[..., 2] = upper
 
-    mcdc.simulation.weight_windows(ww_array, mesh=mesh)
+    def configure(simulation):
+        simulation.technique.weight_windows(ww_array, mesh=mesh)
 
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(configure=configure)
     return mcdc_container[0], data
 
 
-def make_ww_model_distinct():
+def make_ww_model_distinct(prepare_simulation):
     mesh, N = make_mesh()
     energy = np.linspace(0.0, 6.0, 7)
     Ne = 6
@@ -70,9 +76,10 @@ def make_ww_model_distinct():
                     ww_array[e, i, j, k, 1] = 10000 + val
                     ww_array[e, i, j, k, 2] = 20000 + val
 
-    mcdc.simulation.weight_windows(ww_array, mesh=mesh, energy=energy)
+    def configure(simulation):
+        simulation.technique.weight_windows(ww_array, mesh=mesh, energy=energy)
 
-    mcdc_container, data = preparation()
+    mcdc_container, data = prepare_simulation(configure=configure)
     return mcdc_container[0], data
 
 
@@ -106,9 +113,9 @@ def make_ww_model_distinct():
         ),
     ],
 )
-def test_error_throw(capsys, kwargs, expected_msg):
+def test_error_throw(prepare_simulation, capsys, kwargs, expected_msg):
     with pytest.raises(SystemExit):
-        make_ww_model_params(**kwargs)
+        make_ww_model_params(prepare_simulation, **kwargs)
 
     out = capsys.readouterr().out
     assert expected_msg in out
@@ -133,8 +140,8 @@ def test_roulette_from_weight_bounds():
         assert p["w"] == target or not p["alive"]
 
 
-def test_split_from_weight_window():
-    program, data = make_ww_model_distinct()
+def test_split_from_weight_window(prepare_simulation):
+    program, data = make_ww_model_distinct(prepare_simulation)
 
     def run_split(initial_weight, w_upper=1.0, w_target=0.5, w_lower=0.0):
         particles = np.zeros(1, type_.particle)
@@ -188,12 +195,11 @@ def test_split_from_weight_window():
     assert total_banked < maximum_bank
 
 
-def test_query_weight_window():
+def test_query_weight_window(prepare_simulation):
     p = np.zeros(1, type_.particle_data)
 
-    program, data = make_ww_model_distinct()
+    program, data = make_ww_model_distinct(prepare_simulation)
     simulation = util.access_simulation(program)
-    simulation["settings"]["neutron_multigroup_mode"] = False
     # hardcode mesh params
     pitch, height, N = 2.0, 10.0, 3
     nx, ny, nz = N, N, N

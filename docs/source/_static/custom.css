@@ -5,18 +5,17 @@ dt.sig.sig-object.py > em.property {
     display: none;
 }
 
-/* Container styling */
-.admonition.tip {
-    border-left: 5px solid #ffde57; /* Python Yellow border */
+/* Align Simulation-owned settings and techniques with regular class members. */
+.simulation-members {
+    margin-left: 30px;
 }
 
-/* Adding the Green Circle to the title */
-.admonition.tip > .admonition-title::before {
-    background-color: #ffde57;
+/* Separate the architecture flow figure from its introductory discussion. */
+.architecture-flow-figure {
+    margin-bottom: 1.5rem;
 }
 
-/* Optional: Change title background to a light Python Yellow */
-.admonition.tip > .admonition-title {
-    background-color: #3776ab;
-    color: #ffffff;
+/* Separate the architecture component table from its follow-up discussion. */
+.architecture-component-followup {
+    margin-top: 1.5rem;
 }

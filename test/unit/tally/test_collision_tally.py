@@ -10,6 +10,10 @@ def test_collision_tally_with_mesh_filter():
         z=(-1.0, 1.0, 1),
     )
     tally = mcdc.Tally(mesh=mesh, scores=["energy_deposition"])
+    simulation = mcdc.Simulation()
+    simulation.set_model([mcdc.Cell()])
+    simulation.set_tallies([tally])
+    simulation.compile()
 
     assert isinstance(tally, TallyCollision)
     assert not tally.cell_filtered

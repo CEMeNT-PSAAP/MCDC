@@ -1,6 +1,9 @@
 import numpy as np
 import mcdc
 
+# Create MC/DC simulation
+simulation = mcdc.Simulation("Infinite SHEM-361 time-dependent census")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
@@ -20,7 +23,7 @@ with np.load("SHEM-361.npz") as data:
     lamd = data["lamd"]
 
 # Set material
-m = mcdc.MaterialMG(
+m = mcdc.Material.multigroup(
     capture=SigmaC,
     scatter=SigmaS,
     fission=SigmaF,
@@ -38,36 +41,39 @@ s2 = mcdc.Surface.PlaneX(x=1e10, boundary_condition="reflective")
 
 # Set cells
 c = mcdc.Cell(region=+s1 & -s2, fill=m)
+simulation.set_model([c])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 
-mcdc.Source(
-    position=(0.0, 0.0, 0.0), isotropic=True, energy_group=np.array([[360], [1.0]])
+source = mcdc.Source(
+    position=(0.0, 0.0, 0.0), isotropic=True, discrete_energy=np.array([[360], [1.0]])
 )
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, techniques, and run MC/DC
 # ======================================================================================
 
 # Tallies
-mcdc.Tally(
+tally = mcdc.Tally(
     scores=["flux"],
     time=np.insert(np.logspace(-8, 1, 100), 0, 0.0),
-    energy="all_groups",
+    energy="all",
 )
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 40
-mcdc.settings.N_batch = 2
-mcdc.settings.set_time_census(np.logspace(-5, 1, 6))
-mcdc.settings.active_bank_buffer = 1000
-mcdc.settings.census_bank_buffer_ratio = 5.0
-mcdc.settings.source_bank_buffer_ratio = 5.0
+simulation.settings.N_particle = 40
+simulation.settings.N_batch = 2
+simulation.settings.set_time_census(np.logspace(-5, 1, 6))
+simulation.settings.active_bank_buffer = 1000
+simulation.settings.census_bank_buffer_ratio = 5.0
+simulation.settings.source_bank_buffer_ratio = 5.0
 
 # Techniques
-mcdc.simulation.population_control()
+simulation.technique.population_control()
 
 # Run
-mcdc.run()
+simulation.run()

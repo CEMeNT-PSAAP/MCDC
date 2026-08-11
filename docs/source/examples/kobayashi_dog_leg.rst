@@ -102,7 +102,7 @@ This section walks through the input file block by block.
    :linenos:
    :lineno-match:
 
-Two mono-energetic multi-group materials are created:
+Two mono-energetic multigroup materials are created:
 ``m`` for the shield (:math:`\Sigma_c = \Sigma_s = 0.05`) and
 ``m_void`` for the dog-leg channel (:math:`10^{-4}` total).
 
@@ -156,7 +156,7 @@ An isotropic, uniformly distributed source fills the
 - A uniform :math:`60 \times 100 \times 60` mesh tally records scalar flux.
 - 1 000 source particles in 2 batches (increase for production).
 - Implicit capture prevents particles from being absorbed prematurely.
-- ``mcdc.run()`` launches the simulation.
+- ``simulation.run()`` launches the simulation.
 
 **What to try:**
 
@@ -167,7 +167,7 @@ An isotropic, uniformly distributed source fills the
 Full Input
 ==========
 
-Click here to view the input file: `examples/kobayashi/input.py <https://github.com/CEMeNT-PSAAP/MCDC/blob/dev/examples/kobayashi/input.py>`_.
+Click here to view the input file: `examples/kobayashi/input.py <https://github.com/mcdc-project/mcdc/blob/dev/examples/kobayashi/input.py>`_.
 
 The complete input used for this example is embedded below:
 
@@ -178,9 +178,9 @@ The complete input used for this example is embedded below:
 How to Run
 ==========
 
-From the repository root run::
+From inside ``examples/kobayashi`` run::
 
-  python examples/kobayashi/input.py
+  python input.py
 
 Expected Output
 ===============

@@ -2,18 +2,20 @@ import numpy as np
 
 import mcdc
 
+simulation = mcdc.Simulation("Moving pellet")
+
 # ======================================================================================
 # Set model
 # ======================================================================================
 
 # Set materials
-fuel = mcdc.MaterialMG(
+fuel = mcdc.Material.multigroup(
     capture=np.array([0.5]),
     fission=np.array([0.25]),
     nu_p=np.array([1.5]),
     speed=np.array([200000.0]),
 )
-air = mcdc.MaterialMG(
+air = mcdc.Material.multigroup(
     capture=np.array([0.002]),
     scatter=np.array([[0.008]]),
     speed=np.array([200000.0]),
@@ -39,24 +41,26 @@ max_z = mcdc.Surface.PlaneZ(z=10.0, boundary_condition="vacuum")
 
 # Make cells
 fuel_pellet_region = +bot_z & -top_z & -cylinder_z
-mcdc.Cell(region=fuel_pellet_region, fill=fuel)
-mcdc.Cell(
+fuel_cell = mcdc.Cell(region=fuel_pellet_region, fill=fuel)
+air_cell = mcdc.Cell(
     region=~fuel_pellet_region & +min_x & -max_x & +min_y & -max_y & +min_z & -max_z,
     fill=air,
 )
+simulation.set_model([fuel_cell, air_cell])
 
 # ======================================================================================
 # Set source
 # ======================================================================================
 
-mcdc.Source(
+source = mcdc.Source(
     x=[2.0, 3.0],
     y=[-0.5, 0.5],
     z=[-0.5, 0.5],
     isotropic=True,
-    energy_group=0,
+    energy=0,
     time=[0.0, 9.0],
 )
+simulation.set_sources([source])
 
 # ======================================================================================
 # Set tallies, settings, and run MC/DC
@@ -67,24 +71,25 @@ mesh = mcdc.MeshStructured(
     x=np.linspace(-5, 5, 201),
     z=np.linspace(-10, 10, 201),
 )
-mcdc.Tally(mesh=mesh, scores=["fission"], time=np.linspace(0, 9, 46))
+tally = mcdc.Tally(mesh=mesh, scores=["fission"], time=np.linspace(0, 9, 46))
+simulation.set_tallies([tally])
 
 # Settings
-mcdc.settings.N_particle = 100000
-mcdc.settings.N_batch = 2
-mcdc.settings.active_bank_buffer = 1000
+simulation.settings.N_particle = 100000
+simulation.settings.N_batch = 2
+simulation.settings.active_bank_buffer = 1000
 
 # Run (or visualize)
 visualize = False
 if not visualize:
-    mcdc.run()
+    simulation.run()
 else:
     colors = {
         fuel: "red",
         air: "blue",
     }
-    mcdc.visualize(
-        "xz",
+    simulation.visualize_model(
+        vis_plane="xz",
         y=0.0,
         x=[-5.0, 5.0],
         z=[-10, 10],

@@ -1,21 +1,12 @@
 import pytest
 
 
-@pytest.fixture(autouse=True)
-def reset_simulation():
-    from mcdc.object_.simulation import simulation
-
-    simulation.__init__()
-    yield
-    simulation.__init__()
-
-
 @pytest.fixture
-def compile_surfaces():
+def compile_surfaces(prepare_simulation):
     def _compile(static_surface_obj, moving_surface_obj):
-        from mcdc.main import preparation
-
-        structure_container, data = preparation()
+        structure_container, data = prepare_simulation(
+            objects=[static_surface_obj, moving_surface_obj]
+        )
         structure = structure_container[0]
         static_surface = structure["surfaces"][static_surface_obj.ID]
         moving_surface = structure["surfaces"][moving_surface_obj.ID]
