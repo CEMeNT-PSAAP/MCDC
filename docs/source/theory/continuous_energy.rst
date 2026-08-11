@@ -40,7 +40,8 @@ Collision Physics
 
 CE collision processing implements full center-of-mass (COM) kinematics:
 
-- **Elastic scattering** (MT-2): Thermal motion of the target nucleus is sampled from a Maxwellian distribution parameterized by :math:`\beta = \sqrt{A m / (2 k_B T)}`, where :math:`A` is the mass ratio. Rejection sampling is used for the relative speed.
+- **Elastic scattering** (MT-2): Thermal motion of the target nucleus is sampled from a Maxwellian distribution parameterized by :math:`\beta = \sqrt{A m / (2 k_B T)}`, where :math:`A` is the mass ratio.
+  Rejection sampling is used for the relative speed.
 - **Inelastic scattering**: Multiple MT channels with tabulated energy-angle distributions (Kalbach-Mann, evaporation, Maxwellian, N-body, level scattering).
 - **Capture**: Particle is absorbed; implicit capture can be enabled as a variance reduction technique.
 - **Fission**: Secondary particles are emitted using :math:`\nu(E)/k_\text{eff}` scaling, with prompt and delayed components sampled separately.
@@ -55,9 +56,8 @@ Relativistic particle speed is computed as:
 Generating a Data Library from ACE Files
 -----------------------------------------
 
-MC/DC ships with a conversion tool in ``tools/data_library_generator/`` that reads
-standard ACE-format nuclear data files and writes them into MC/DC's per-nuclide
-HDF5 format.  This is the primary path for creating CE libraries.
+MC/DC ships with a conversion tool in ``tools/data_library_generator/neutron/`` that reads standard ACE-format nuclear data files and writes them into MC/DC's per-nuclide HDF5 format.
+This is the primary path for creating CE libraries.
 
 **Prerequisites:**
 
@@ -65,8 +65,7 @@ HDF5 format.  This is the primary path for creating CE libraries.
 
    pip install ACEtk h5py numpy tqdm
 
-You also need a set of ACE files (e.g., from `NJOY <http://www.njoy21.io/>`_ or
-an ENDF/B distribution).
+You also need a set of ACE files from a source such as `NJOY <http://www.njoy21.io/>`_ or an ENDF/B distribution.
 
 **Environment variables:**
 
@@ -88,12 +87,11 @@ an ENDF/B distribution).
    export MCDC_ACELIB=/path/to/ace/files
    export MCDC_LIB=/path/to/mcdc/library
 
-   cd tools/data_library_generator
+   cd tools/data_library_generator/neutron
    python generate.py
 
-By default the tool only converts nuclides that do not already have a corresponding
-HDF5 file in ``$MCDC_LIB``.  Use ``--rewrite`` to regenerate all files, or
-``--verbose`` for detailed per-nuclide output:
+By default, the tool converts only nuclides without a corresponding HDF5 file in ``$MCDC_LIB``.
+Use ``--rewrite`` to regenerate all files or ``--verbose`` for detailed per-nuclide output:
 
 .. code-block:: sh
 
@@ -101,26 +99,18 @@ HDF5 file in ``$MCDC_LIB``.  Use ``--rewrite`` to regenerate all files, or
 
 The generator processes each ACE file as follows:
 
-#. Reads the ACE header to determine nuclide identity (Z, A, isomeric state)
-   and temperature.
-#. Extracts the principal cross-section block (energy grid, elastic, capture,
-   fission, inelastic channels) and writes them as HDF5 datasets grouped by
-   reaction type (elastic scattering, capture, inelastic scattering, fission).
-#. Extracts angular distributions (tabulated cosine PDFs) and energy
-   distributions (level scattering, evaporation, Maxwellian, Kalbach-Mann,
-   N-body phase space, tabulated outgoing energy) for each reaction channel.
-#. For fissionable nuclides, extracts prompt/delayed :math:`\nu(E)` multiplicities,
-   delayed neutron precursor fractions, decay constants, and energy spectra.
+#. Reads the ACE header to determine nuclide identity and temperature.
+#. Extracts the principal cross-section block and writes HDF5 datasets grouped by reaction type.
+#. Extracts angular and energy distributions for each reaction channel.
+#. Extracts prompt and delayed :math:`\nu(E)` data, precursor fractions, decay constants, and energy spectra for fissionable nuclides.
 
-The resulting HDF5 file (e.g., ``U235-293.6K.h5``) is ready for use with
-``mcdc.Material()``.
+The resulting HDF5 file, such as ``U235-293.6K.h5``, is ready for use with ``mcdc.Material()``.
 
 
 Using CE Materials in an Input Deck
 ------------------------------------
 
-Once the library is generated, set the ``MCDC_LIB`` environment variable and
-define materials with ``mcdc.Material()``:
+Once the library is generated, set the ``MCDC_LIB`` environment variable and define materials with ``mcdc.Material()``:
 
 .. code-block:: python3
 
@@ -141,9 +131,7 @@ Note on External Data Sources
 ------------------------------
 
 MC/DC's internal HDF5 format is independent of the original data source.
-While the shipped tool converts from **ACE format**, users with data in other
-formats (e.g., OpenMC HDF5 nuclear data) can write their own converter
-following the same HDF5 schema used by ``generate.py``.
+The shipped tool converts ACE data, but users can implement converters for other formats by following the same HDF5 schema used by ``generate.py``.
 
 The key HDF5 structure expected by MC/DC is:
 
@@ -175,6 +163,5 @@ The key HDF5 structure expected by MC/DC is:
                ├── nu_delayed/
                └── delayed_neutron/ ...
 
-A converter from OpenMC's ``IncidentNeutron`` HDF5 format to this schema is
-a planned future addition.  Contributions are welcome — see
-`Issue #333 <https://github.com/mcdc-project/mcdc/issues/333>`_.
+A converter from OpenMC's ``IncidentNeutron`` HDF5 format to this schema is a planned future addition.
+Contributions are welcome through `Issue #333 <https://github.com/mcdc-project/mcdc/issues/333>`_.
