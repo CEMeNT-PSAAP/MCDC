@@ -9,6 +9,8 @@ We use `GitHub Actions <https://github.com/mcdc-project/mcdc/actions>`_ to host 
 We run pure python unit tests and regression testing in pure Python, pure Python + MPI, numba, numba + MPI, and numba+GPU+harmonize.
 When running regression tests we compare small particle count outputs to saved files in the testing directory.
 If the RNG seed has not changed the results should be deterministic.
+The Black workflow runs on Python 3.14 and formats for all supported Python versions, while Pyright checks the typed public API against Python 3.14.
+Automatic runtime tests use Python 3.13, while maintainers manually test Python 3.11, 3.12, and 3.14 in Python and Numba modes before a release.
 
 
 GPU COE Machine
