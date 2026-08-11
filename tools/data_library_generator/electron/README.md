@@ -100,5 +100,5 @@ only CDFs for EPRDATA14; sampling from the CDF is handled on the MC/DC side.
 ```
 
 ## See Also
-- [Continuous Energy Theory Guide](../../docs/source/theory/continuous_energy.rst)
+- [Continuous Energy Theory Guide](../../../docs/source/theory/continuous_energy.rst)
 - [Installation — CE Library Configuration](../../../docs/source/user_guide/getting_started/installation.rst)
