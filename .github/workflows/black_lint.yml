@@ -6,8 +6,6 @@ on:
 
 jobs:
   black-lint:
-    # Temporary suppression while validating Python compatibility on make_release.
-    if: github.ref_name != 'make_release' && github.head_ref != 'make_release'
     name: Lint with Black
     runs-on: ubuntu-latest
 
@@ -18,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: pip
 
       - name: Install Black
