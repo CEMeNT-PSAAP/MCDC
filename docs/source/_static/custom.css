@@ -19,3 +19,10 @@ dt.sig.sig-object.py > em.property {
 .architecture-component-followup {
     margin-top: 1.5rem;
 }
+
+/* Hide the Read the Docs version flyout because the site already provides a
+   version switcher in the top navigation. */
+readthedocs-flyout,
+.rst-versions {
+    display: none !important;
+}

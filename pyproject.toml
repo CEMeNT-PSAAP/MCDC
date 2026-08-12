@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling<1.33", "hatch-vcs<0.6"]
 build-backend = "hatchling.build"
 
 [project]
@@ -48,28 +48,28 @@ classifiers = [
 ]
 
 dependencies = [
-  "numba>=0.61.0",
-  "numpy>=2.0.0",
-  "scipy",
-  "matplotlib",
-  "mpi4py>=3.1.4",
-  "h5py",
-  "colorama",
-  "sympy",
+  "numba>=0.61.0,<0.67",
+  "numpy>=2.0.0,<2.5",
+  "scipy<1.19",
+  "matplotlib<3.12",
+  "mpi4py>=3.1.4,<4.2",
+  "h5py<3.17",
+  "colorama<0.5",
+  "sympy<1.15",
 ]
 
 [project.optional-dependencies]
 docs = [
   "sphinx>=8,<10",
   "pydata-sphinx-theme>=0.20,<0.21",
-  "sphinx-design>=0.6",
+  "sphinx-design>=0.6,<0.8",
 ]
 
 dev = [
-  "black",
-  "pre-commit",
-  "pyright",
-  "pytest",
+  "black<27",
+  "pre-commit<5",
+  "pyright<1.2",
+  "pytest<10",
 ]
 
 [project.urls]

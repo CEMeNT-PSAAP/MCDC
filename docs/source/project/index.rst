@@ -4,15 +4,11 @@
 Project
 =======
 
-Project information collects material about MC/DC as a research software
-project rather than instructions for using or developing the code.
-
-Use :doc:`publications` to find overview and method-specific references for
-published work. Read :doc:`release_policy` for the project's release cadence
-and handling of bug-fix releases.
+The Project pages present the research programs shaping MC/DC, the capabilities under active development, and the publications documenting this work.
+MC/DC is currently developed as part of the `Center for Advancing the Radiation Resilience of Electronics (CARRE) <https://carre-psaapiv.org/>`_ and builds on its origins in the `Center for Exascale Monte Carlo Neutron Transport (CEMeNT) <https://cement-psaap.github.io/>`_.
 
 .. toctree::
    :maxdepth: 1
 
+   carre
    publications
-   release_policy

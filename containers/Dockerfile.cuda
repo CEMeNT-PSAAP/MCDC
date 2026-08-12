@@ -36,7 +36,7 @@ RUN conda install -y \
     && conda clean -afy
 
 # Install mpi4py
-RUN pip install --no-cache-dir mpi4py
+RUN pip install --no-cache-dir "mpi4py<4.2"
 
 # Install Harmonize (NVIDIA GPU runtime for MC/DC)
 RUN git clone https://github.com/CEMeNT-PSAAP/harmonize.git /opt/harmonize \

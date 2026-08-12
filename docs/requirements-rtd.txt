@@ -1,8 +1,0 @@
-sphinx>=8,<10
-pydata-sphinx-theme>=0.20,<0.21
-sphinx-design>=0.6
-numpy
-numba
-matplotlib
-scipy
-h5py

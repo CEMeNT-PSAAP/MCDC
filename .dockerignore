@@ -1,72 +1,62 @@
-# Git
-.git
-.github
+# Version control
+.git/
+.github/
 
-# Build artifacts
-build
-.eggs
-mcdc.egg-info
+# Package builds
+build/
 dist/
+.eggs/
+*.egg-info/
 
-# Material / cross-section data
-mcdc_xs
-MCDC-Xsec
+# Material and cross-section libraries
+mcdc_xs/
+MCDC-Xsec/
 
-# Python cache
-__pycache__
+# Python caches
+**/__pycache__/
 *.pyc
 *.nbc
 *.nbi
+.pytest_cache/
+.coverage*
+htmlcov/
 
-# GPU cache
-__ptxcache__
-__harmonize_cache__
+# GPU caches
+__ptxcache__/
+__harmonize_cache__/
 
-# Editor files
+# Development environments and editors
+.venv/
+venv/
+env/
 .spyproject
 *.swp
 .vscode/
-**/.idea
+**/.idea/
 
-# Virtual environments
-.venv
-venv
-env
-
-# Output files
+# Generated simulation output
 *output.h5
 output*.h5
-*.h5
-*.hdf5
 *.png
-*.mp4
 *.gif
+*.mp4
 
-# Cluster job files
+# Cluster and profiling output
 *.out
 *.pbs
 *.log
-
-# Test cache
-.pytest_cache
-pytestdebug.log
-.coverage
-htmlcov
-
-# Profiler
 *.prof
 
-# Documentation builds
-docs/build
-docs
+# Documentation and container sources
+docs/
+containers/
 
 # Container artifacts
 *.sif
 *_sandbox
 *.tar
-containers/
 
-# Misc
+# Temporary and operating-system files
 tmp
 tmp.py
 tmp_*
@@ -74,89 +64,3 @@ tmp_*
 *.core
 .DS_Store
 **/.DS_Store
-# Git
-.git
-.github
-
-# Build artifacts
-build
-.eggs
-mcdc.egg-info
-dist/
-
-# Material / cross-section data
-mcdc_xs
-MCDC-Xsec
-
-# Python cache
-__pycache__
-*.pyc
-*.nbc
-*.nbi
-
-# GPU cache
-__ptxcache__
-__harmonize_cache__
-
-# Editor files
-.spyproject
-*.swp
-.vscode/
-**/.idea
-
-# Virtual environments
-.venv
-venv
-env
-
-# Output files
-*output.h5
-output*.h5
-*.h5
-*.hdf5
-*.png
-*.mp4
-*.gif
-
-# Cluster job files
-*.out
-*.pbs
-*.log
-
-# Test cache
-.pytest_cache
-pytestdebug.log
-.coverage
-htmlcov
-
-# Profiler
-*.prof
-
-# Documentation builds
-docs/build
-docs
-
-# Container artifacts
-*.sif
-*_sandbox
-*.tar
-containers/
-
-# Misc
-tmp
-tmp.py
-tmp_*
-*_tmp.py
-*.core
-.DS_Store
-**/.DS_Store
-*.csv
-
-# Regression test data
-dummy_nuclide.h5
-source_particles.h5
-*.csv
-
-# Regression test data
-dummy_nuclide.h5
-source_particles.h5
