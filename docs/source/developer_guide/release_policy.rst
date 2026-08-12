@@ -21,6 +21,9 @@ Patch Releases
 
 Bug fixes are not held until the next seasonal minor release.
 Once a fix has passed review and the relevant validation and release checks, MC/DC publishes a patch release as soon as practical.
+Every patch release must include a non-empty ``Fixed`` section in ``CHANGELOG.md`` that describes the user-visible defect corrected by the release.
+Supporting changes may also appear under other headings, but the defect that justifies the patch release must be stated under ``Fixed``.
+For dependency-compatibility patches, identify the installation or runtime failure prevented and the affected dependency or version range when known.
 
 Published versions and release notes are available from the `MC/DC releases page <https://github.com/mcdc-project/mcdc/releases>`_.
 
@@ -38,6 +41,7 @@ Prepare the Release
 #. Confirm the intended version and scope against the release policy above.
 #. Review the ``Unreleased`` section of ``CHANGELOG.md``.
    Ensure every user-visible change is included under the correct heading, remove empty headings, and add contributor attribution where appropriate.
+   For a patch release, confirm that ``Fixed`` is non-empty and clearly states the defect that justifies the release.
 #. Finalize the release version and date in ``CHANGELOG.md`` and ``CITATION.cff``, and update the stable entry's display name in ``docs/source/_static/switcher.json`` to the full ``X.Y.Z (stable)`` version while retaining ``stable`` as its version identifier and URL.
 #. Confirm that documentation, examples, deprecation notices, and migration guidance match the release behavior.
 #. Verify the supported Python versions in ``pyproject.toml``, continuous integration, and the user documentation agree.
