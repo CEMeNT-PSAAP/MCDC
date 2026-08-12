@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.15.1] - 2026-08-12
 
 ### Added
 
@@ -16,14 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 - Add explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
 - Hide flyout in Read the Docs, from [@ilhamv]
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [0.15.0] - 2026-08-11
 
@@ -158,7 +150,7 @@ The pre-refactor implementation remains available in the `cement` branch as a re
 
 - Multi-table distribution table selection sampling from [@melekderman]
 
-[Unreleased]: https://github.com/mcdc-project/mcdc/tree/dev
+[0.15.1]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.1
 [0.15.0]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.0
 [0.14.2]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.2
 [0.14.1]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.1
