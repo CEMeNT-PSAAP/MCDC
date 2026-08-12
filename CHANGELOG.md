@@ -14,8 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Changed
 
-- Add explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
 - Hide flyout in Read the Docs, from [@ilhamv]
+
+### Fixed
+
+- Prevent unbounded dependency resolution from selecting incompatible releases that break MC/DC by adding explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
 
 ## [0.15.0] - 2026-08-11
 
