@@ -38,6 +38,7 @@ Prepare the Release
 #. Confirm the intended version and scope against the release policy above.
 #. Review the ``Unreleased`` section of ``CHANGELOG.md``.
    Ensure every user-visible change is included under the correct heading, remove empty headings, and add contributor attribution where appropriate.
+#. Finalize the release version and date in ``CHANGELOG.md`` and ``CITATION.cff``, and update the stable entry's display name in ``docs/source/_static/switcher.json`` to the full ``X.Y.Z (stable)`` version while retaining ``stable`` as its version identifier and URL.
 #. Confirm that documentation, examples, deprecation notices, and migration guidance match the release behavior.
 #. Verify the supported Python versions in ``pyproject.toml``, continuous integration, and the user documentation agree.
 
