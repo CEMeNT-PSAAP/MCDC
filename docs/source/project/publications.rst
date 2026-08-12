@@ -4,6 +4,8 @@
 Publications
 =============
 
+MC/DC publications document the software, transport methods, performance-portability work, benchmarks, verification and validation, variance reduction, hybrid transport, and uncertainty-quantification research developed through its research programs.
+
 Overview
 --------
 

@@ -8,7 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
+- Add a dedicated CARRE project page, from [@ilhamv]
+- Add the release policy and checklist, from [@ilhamv]
+- Add the one-sentence-per-line convention for documentation source, from [@ilhamv]
+
 ### Changed
+
+- Add explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
+- Hide flyout in Read the Docs, from [@ilhamv]
 
 ### Deprecated
 

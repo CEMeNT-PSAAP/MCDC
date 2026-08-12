@@ -74,8 +74,8 @@ More resources
 --------------
 
 - Learn from complete input decks in :doc:`examples/index`.
+- Explore the ongoing :doc:`CARRE research program <project/carre>`, its collaboration opportunities, and the :doc:`MC/DC publication record <project/publications>`.
 - Follow the contribution workflow in :doc:`contributing/index`.
-- Find citation and publication information in :doc:`project/index`.
 
 .. admonition:: Recommended citation
    :class: tip
