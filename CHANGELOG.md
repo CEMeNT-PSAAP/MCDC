@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
+- Add release checklist, including the dependency consolidation process, from [@ilhamv]
+
 ### Changed
+
+- Add explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
+- Hide flyout in Read the Docs, from [@ilhamv]
 
 ### Deprecated
 

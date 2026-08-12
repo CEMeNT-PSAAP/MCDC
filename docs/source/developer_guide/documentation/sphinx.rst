@@ -20,6 +20,15 @@ The root document, ``index.rst``, serves as the welcome page.
 The root directory also contains task-oriented sections, each with an ``index.rst`` landing page and related topic pages.
 It's useful to compare our rst files to their associated webpages to get a feel for how they translate.
 
+Source Formatting
+^^^^^^^^^^^^^^^^^
+
+Documentation source follows a one-sentence-per-line convention.
+Start each new sentence on a new physical line, and do not wrap a sentence to meet a fixed line length.
+This semantic line structure makes changes easier to review and keeps unrelated sentences out of the same diff.
+Blank lines still separate paragraphs, and indentation required by reStructuredText lists, directives, and other structured blocks must be preserved.
+Code blocks, tables, generated content, URLs, and other syntax that requires a particular layout are exempt from this convention.
+
 
 Like any plaintext markup language, rst uses "explicit markup" for constructs that need special handling, such as including a code-block or cross-referencing other pages.
 

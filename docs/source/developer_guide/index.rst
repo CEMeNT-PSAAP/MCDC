@@ -26,6 +26,7 @@ Where to Go Next
 - Read :doc:`extending/index` when adding model fields, registered objects, polymorphic subtypes, or Numba-compatible transport behavior.
 - Read :doc:`documentation/index` when writing or reviewing project documentation.
 - Use :doc:`../contributing/index` for repository setup, development workflow, testing, and pull-request requirements.
+- Use :doc:`release_policy` when preparing, validating, and publishing a release.
 
 .. toctree::
    :maxdepth: 1
@@ -33,4 +34,5 @@ Where to Go Next
    architecture/index
    extending/index
    documentation/index
+   release_policy
    Contributing <../contributing/index>

@@ -47,6 +47,7 @@ Investigatory Center of the Predictive Science Academic Alliance Program–III
 for Advancing the Radiation Resilience of Electronics
 (`CARRE <https://carre-psaapiv.org>`_), a Predictive Simulation Center of
 `PSAAP-IV <https://psaap.llnl.gov>`_.
+See :doc:`the CARRE project page <../../project/carre>` for MC/DC's ongoing research direction and collaboration opportunities.
 
 **Open source** — MC/DC is released under the
 `BSD 3-Clause <https://github.com/mcdc-project/mcdc/blob/main/LICENSE>`_

@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /opt/mcdc
 COPY pyproject.toml .
-RUN pip install --no-cache-dir mpi4py
+RUN pip install --no-cache-dir "mpi4py<4.2"
 COPY . .
 
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
