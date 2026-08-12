@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
-- Add release checklist, including the dependency consolidation process, from [@ilhamv]
+- Add a dedicated CARRE project page, from [@ilhamv]
+- Add the release policy and checklist, from [@ilhamv]
+- Add the one-sentence-per-line convention for documentation source, from [@ilhamv]
 
 ### Changed
 
