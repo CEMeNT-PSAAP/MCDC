@@ -134,14 +134,6 @@ def prepare(simulationPy: Simulation):
     simulation_container, data = generate_numba_layers(simulationPy)
     simulation = simulation_container[0]
 
-    # Reload mcdc getters and setters
-    import importlib
-    import mcdc.mcdc_get as mcdc_get
-    import mcdc.mcdc_set as mcdc_set
-
-    importlib.reload(mcdc_get)
-    importlib.reload(mcdc_set)
-
     # Pick Python-version RNG if needed
     import mcdc.config as config
     import mcdc.transport.rng as rng

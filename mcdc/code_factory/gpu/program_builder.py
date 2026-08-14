@@ -72,7 +72,31 @@ alloc_managed_bytes = None
 alloc_device_bytes = None
 
 
-def forward_declare_gpu_program():
+def prepare_gpu_program(simulation_dtype, data_size):
+    """Build shared GPU artifacts on rank zero before other ranks load them."""
+    communicator = MPI.COMM_WORLD
+    master = communicator.Get_rank() == 0
+
+    if master:
+        _prepare_gpu_program(simulation_dtype, data_size)
+
+    if communicator.Get_size() > 1:
+        communicator.Barrier()
+
+    if not master:
+        _prepare_gpu_program(simulation_dtype, data_size)
+
+    if communicator.Get_size() > 1:
+        communicator.Barrier()
+
+
+def _prepare_gpu_program(simulation_dtype, data_size):
+    forward_declare_gpu_program(simulation_dtype)
+    adapt_transport_functions()
+    build_gpu_program(data_size)
+
+
+def forward_declare_gpu_program(simulation_dtype):
     import harmonize
     import mcdc.numba_types as type_
 
@@ -97,7 +121,7 @@ def forward_declare_gpu_program():
 
     # Main types: none, simulation structure, and simulation data
     none_type = nb.from_dtype(np.dtype([]))
-    simulation_type = nb.types.Array(nb.from_dtype(type_.simulation), (1,), "C")
+    simulation_type = nb.types.Array(nb.from_dtype(simulation_dtype), (1,), "C")
     data_type = nb.types.Array(nb.float64, 1, "C")
 
     # Set access functions
