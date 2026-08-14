@@ -126,10 +126,6 @@ def prepare(simulationPy: Simulation):
     # Generate Numba runtime layers
     # ==================================================================================
 
-    import mcdc.config as config
-
-    config.rebuild_numba_support_if_requested()
-
     from mcdc.code_factory.numba_layers_generator import generate_numba_layers
     from mcdc.code_factory.literals_generator import make_literals
 
@@ -139,6 +135,7 @@ def prepare(simulationPy: Simulation):
     simulation = simulation_container[0]
 
     # Pick Python-version RNG if needed
+    import mcdc.config as config
     import mcdc.transport.rng as rng
 
     if config.mode == "python":

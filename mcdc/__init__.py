@@ -32,3 +32,9 @@ try:
     __version__: str = _version("mcdc")
 except _PackageNotFoundError:
     __version__ = "unknown"
+
+
+# Evaluate developer options
+import mcdc.config as _config
+
+_config.rebuild_numba_support_if_requested()

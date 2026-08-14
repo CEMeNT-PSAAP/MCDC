@@ -6,8 +6,6 @@ import numba as nb
 from colorama import Fore, Style
 from mpi4py import MPI
 
-import mcdc.mcdc_get as mcdc_get
-
 _IS_MASTER = MPI.COMM_WORLD.Get_rank() == 0
 
 
@@ -166,6 +164,8 @@ def print_progress_eigenvalue(simulation, data):
     """Print one eigenvalue-cycle result."""
     if not _IS_MASTER:
         return
+
+    import mcdc.mcdc_get as mcdc_get
 
     index = simulation["idx_cycle"]
     k_effective = simulation["k_eff"]

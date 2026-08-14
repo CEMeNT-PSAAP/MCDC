@@ -49,7 +49,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "-r",
         "--rebuild",
         action="store_true",
-        help="Rebuild generated Numba support before runtime preparation.",
+        help=(
+            "Rebuild generated Numba support " "(for active object-model development)."
+        ),
     )
 
     # GPU execution
@@ -112,8 +114,6 @@ gpu_state_storage = args.gpu_state_storage
 caching = args.caching
 clear_cache = args.clear_cache
 
-_numba_support_rebuilt = False
-
 
 # ======================================================================================
 # Simulation-setting overrides
@@ -165,10 +165,8 @@ def override_settings(simulation) -> bool:
 
 
 def rebuild_numba_support_if_requested() -> None:
-    """Rebuild generated Numba support once when explicitly requested."""
-    global _numba_support_rebuilt
-
-    if not args.rebuild or _numba_support_rebuilt:
+    """Rebuild generated Numba support during package initialization."""
+    if not args.rebuild:
         return
 
     communicator = MPI.COMM_WORLD
@@ -179,8 +177,6 @@ def rebuild_numba_support_if_requested() -> None:
 
     if communicator.Get_size() > 1:
         communicator.Barrier()
-
-    _numba_support_rebuilt = True
 
 
 # ======================================================================================
