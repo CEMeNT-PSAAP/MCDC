@@ -1,18 +1,86 @@
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import mcdc
 import mcdc.config as config
+import mcdc.code_factory.numba_layers_generator as numba_layers_generator
 
-from mcdc.config import override_settings
+from mcdc.config import _build_parser, override_settings
 
 
 class SingleRankCommunicator:
+    def __init__(self, size=1):
+        self.size = size
+        self.barrier_count = 0
+
     def Get_rank(self):
         return 0
 
     def Get_size(self):
-        return 1
+        return self.size
+
+    def Barrier(self):
+        self.barrier_count += 1
+
+
+def test_parser_accepts_numba_support_rebuild():
+    parser = _build_parser()
+
+    assert parser.parse_args(["--rebuild"]).rebuild
+    assert parser.parse_args(["-r"]).rebuild
+
+
+def test_package_import_calls_configured_rebuild_gate():
+    check_trigger = """
+import sys
+import types
+
+config = types.ModuleType("mcdc.config")
+config.rebuild_numba_support_if_requested = lambda: print("rebuild-gate-called")
+sys.modules["mcdc.config"] = config
+
+import mcdc
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", check_trigger],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "rebuild-gate-called" in result.stdout
+
+
+def test_requested_numba_support_rebuild_runs_on_master(monkeypatch):
+    rebuild_count = 0
+    communicator = SingleRankCommunicator(size=2)
+
+    def rebuild():
+        nonlocal rebuild_count
+        rebuild_count += 1
+
+    monkeypatch.setattr(config, "MPI", SimpleNamespace(COMM_WORLD=communicator))
+    monkeypatch.setattr(config.args, "rebuild", True)
+    monkeypatch.setattr(numba_layers_generator, "rebuild_numba_support", rebuild)
+
+    config.rebuild_numba_support_if_requested()
+
+    assert rebuild_count == 1
+    assert communicator.barrier_count == 1
+
+
+def test_unrequested_numba_support_rebuild_does_nothing(monkeypatch):
+    communicator = SingleRankCommunicator(size=2)
+
+    monkeypatch.setattr(config, "MPI", SimpleNamespace(COMM_WORLD=communicator))
+    monkeypatch.setattr(config.args, "rebuild", False)
+
+    config.rebuild_numba_support_if_requested()
+
+    assert communicator.barrier_count == 0
 
 
 def test_cache_cleanup_does_not_remove_python_cache(monkeypatch):
