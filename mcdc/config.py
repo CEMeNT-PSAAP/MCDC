@@ -165,10 +165,9 @@ def _manage_runtime_caches() -> None:
     """Clear generated-code caches when caching is disabled or reset."""
     should_clear = not caching or clear_cache
     if should_clear and MPI.COMM_WORLD.Get_rank() == 0:
-        cache_directories = (
-            Path(__file__).resolve().parent / "__pycache__",
-            Path.cwd() / "__harmonize_cache__",
-        )
+        # Python manages concurrent __pycache__ writes atomically. Removing that
+        # shared directory here can race with independent batch launches.
+        cache_directories = (Path.cwd() / "__harmonize_cache__",)
         for cache_directory in cache_directories:
             if cache_directory.exists():
                 shutil.rmtree(cache_directory)
