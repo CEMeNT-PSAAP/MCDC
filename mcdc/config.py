@@ -45,6 +45,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clear_cache", action="store_true")
     parser.add_argument("--caching", action="store_true", default=False)
     parser.add_argument("--no_caching", dest="caching", action="store_false")
+    parser.add_argument(
+        "-r",
+        "--rebuild",
+        action="store_true",
+        help="Rebuild generated Numba support before runtime preparation.",
+    )
 
     # GPU execution
     parser.add_argument(
@@ -106,6 +112,8 @@ gpu_state_storage = args.gpu_state_storage
 caching = args.caching
 clear_cache = args.clear_cache
 
+_numba_support_rebuilt = False
+
 
 # ======================================================================================
 # Simulation-setting overrides
@@ -154,6 +162,25 @@ def override_settings(simulation) -> bool:
         set_setting("gpu_storage", storage)
 
     return changed
+
+
+def rebuild_numba_support_if_requested() -> None:
+    """Rebuild generated Numba support once when explicitly requested."""
+    global _numba_support_rebuilt
+
+    if not args.rebuild or _numba_support_rebuilt:
+        return
+
+    communicator = MPI.COMM_WORLD
+    if communicator.Get_rank() == 0:
+        from mcdc.code_factory.numba_layers_generator import rebuild_numba_support
+
+        rebuild_numba_support()
+
+    if communicator.Get_size() > 1:
+        communicator.Barrier()
+
+    _numba_support_rebuilt = True
 
 
 # ======================================================================================
