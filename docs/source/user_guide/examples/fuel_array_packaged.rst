@@ -98,7 +98,7 @@ Step-by-Step Walkthrough
 
 **1. Materials (lines 1–27)**
 
-.. literalinclude:: ../../../examples/fuel_array_packaged/input.py
+.. literalinclude:: ../../../../examples/fuel_array_packaged/input.py
    :language: python
    :lines: 1-27
    :linenos:
@@ -109,7 +109,7 @@ water moderator.
 
 **2. Assembly Geometry — Shooting-Star CSG (lines 29–54)**
 
-.. literalinclude:: ../../../examples/fuel_array_packaged/input.py
+.. literalinclude:: ../../../../examples/fuel_array_packaged/input.py
    :language: python
    :lines: 29-54
    :linenos:
@@ -122,7 +122,7 @@ Water fills outside the sphere.  These three cells form a reusable
 
 **3. Packaging with Universe, Translation, and Rotation (lines 56–80)**
 
-.. literalinclude:: ../../../examples/fuel_array_packaged/input.py
+.. literalinclude:: ../../../../examples/fuel_array_packaged/input.py
    :language: python
    :lines: 56-80
    :linenos:
@@ -137,7 +137,7 @@ The assembly universe is placed twice using ``mcdc.Cell(..., fill=assembly)``:
 
 **4. Source, Tallies, Settings, and Run (lines 82–105)**
 
-.. literalinclude:: ../../../examples/fuel_array_packaged/input.py
+.. literalinclude:: ../../../../examples/fuel_array_packaged/input.py
    :language: python
    :lines: 82-105
    :linenos:
@@ -149,7 +149,7 @@ The ``active_bank_buffer`` accommodates fission-born particles.
 
 **5. Optional Visualization (lines 107–end)**
 
-.. literalinclude:: ../../../examples/fuel_array_packaged/input.py
+.. literalinclude:: ../../../../examples/fuel_array_packaged/input.py
    :language: python
    :lines: 107-
    :linenos:
@@ -171,7 +171,7 @@ Click here to view the input file: `examples/fuel_array_packaged/input.py <https
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/fuel_array_packaged/input.py
+.. literalinclude:: ../../../../examples/fuel_array_packaged/input.py
   :language: python
   :linenos:
 

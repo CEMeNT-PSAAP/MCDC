@@ -46,7 +46,7 @@ Click here to view the input file: `examples/c5g7/k-eigenvalue/input.py <https:/
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/c5g7/k-eigenvalue/input.py
+.. literalinclude:: ../../../../examples/c5g7/k-eigenvalue/input.py
    :language: python
    :linenos:
 

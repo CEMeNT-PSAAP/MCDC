@@ -11,9 +11,9 @@ Start with the setup steps below.
 Use :doc:`continuous_integration` to understand automated checks and :doc:`container_development` when developing in the project container.
 Use :doc:`example_validation` when changing the public API or example problems.
 Read :doc:`pull_requests` before preparing a contribution.
-For software architecture and documentation practices, see the :doc:`../developer_guide/index`.
+For software architecture and documentation practices, see the :doc:`../index`.
 
-For implementation guidance specific to compiled transport functions, see :doc:`../developer_guide/extending/writing_numba_compatible_transport_code`.
+For implementation guidance specific to compiled transport functions, see :doc:`../extending/writing_numba_compatible_transport_code`.
 
 Contributions target the ``dev`` branch.
 Prepare a development checkout with the following steps:
@@ -36,7 +36,7 @@ Development Workflow
    pull_requests
 
 MC/DC documentation is an important part of the project and evolves alongside the codebase.
-The :doc:`../developer_guide/documentation/index` guide describes the documentation philosophy, writing guidelines, and the tools used to build and maintain the documentation.
+The :doc:`../documentation/index` guide describes the documentation philosophy, writing guidelines, and the tools used to build and maintain the documentation.
 
 Please note our `code of conduct <https://github.com/mcdc-project/mcdc/blob/dev/CODE_OF_CONDUCT.md>`_, which we take seriously.
 
@@ -132,7 +132,7 @@ However if absolutely required by users numba does allow for some `cache sharing
 Adding a New Input
 ------------------
 
-For architectural guidance on adding a model field, embedded configuration, registered object category, or polymorphic subtype, see :doc:`../developer_guide/extending/extending_the_object_model`.
+For architectural guidance on adding a model field, embedded configuration, registered object category, or polymorphic subtype, see :doc:`../extending/extending_the_object_model`.
 Public model classes and configuration are primarily defined in ``mcdc/object_/``.
 Common input-related locations include:
 
@@ -213,4 +213,4 @@ Adding Documentation
 Documentation is a core part of MC/DC.
 Contributions that introduce new features, modify existing behavior, or change developer workflows should update the relevant documentation accordingly.
 
-See the :doc:`../developer_guide/documentation/index` guide for documentation philosophy, writing guidelines, and instructions for contributing to the documentation.
+See the :doc:`../documentation/index` guide for documentation philosophy, writing guidelines, and instructions for contributing to the documentation.

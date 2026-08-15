@@ -253,4 +253,4 @@ After running the original problem, useful variations include:
 - Add an energy group or another spatial region.
 - Add a surface-crossing tally at the material interface.
 
-See :doc:`../../examples/index` for examples involving lattices, moving geometry, time-dependent transport, and reactor benchmarks.
+See :doc:`../examples/index` for examples involving lattices, moving geometry, time-dependent transport, and reactor benchmarks.

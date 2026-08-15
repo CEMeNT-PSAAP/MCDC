@@ -42,7 +42,7 @@ Complete documentation is available on [Read the Docs](https://mcdc.readthedocs.
 - [Getting Started](https://mcdc.readthedocs.io/en/dev/user_guide/getting_started/index.html)
 - [API Reference](https://mcdc.readthedocs.io/en/dev/reference/python_api/index.html)
 - [Developer Guide](https://mcdc.readthedocs.io/en/dev/developer_guide/index.html)
-- [Contributing](https://mcdc.readthedocs.io/en/dev/contributing/index.html)
+- [Contributing](https://mcdc.readthedocs.io/en/dev/developer_guide/contributing/index.html)
 
 ## Citing
 

@@ -408,4 +408,4 @@ An object model extension should verify all affected layers:
 - API and developer documentation build without warnings.
 
 Add focused unit tests near ``test/unit/test_object_compilation.py`` for compilation behavior and near the relevant transport tests for runtime behavior.
-Use :doc:`../../contributing/example_validation` when an extension changes public examples.
+Use :doc:`../contributing/example_validation` when an extension changes public examples.

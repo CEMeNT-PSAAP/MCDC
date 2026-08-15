@@ -73,9 +73,9 @@ Choose the path that best matches what you want to accomplish.
 More resources
 --------------
 
-- Learn from complete input decks in :doc:`examples/index`.
+- Learn from complete input decks in :doc:`user_guide/examples/index`.
 - Explore the ongoing :doc:`CARRE research program <project/carre>`, its collaboration opportunities, and the :doc:`MC/DC publication record <project/publications>`.
-- Follow the contribution workflow in :doc:`contributing/index`.
+- Follow the contribution workflow in :doc:`developer_guide/contributing/index`.
 
 .. admonition:: Recommended citation
    :class: tip

@@ -33,7 +33,7 @@ Users and Collaborators
 
 The CARRE work creates opportunities for users and collaborators interested in particle-interaction models, nuclear and atomic data, multiparticle coupling, uncertainty quantification, variance reduction, hybrid methods, Monte Carlo algorithms, V&V benchmarks, and high-performance computing.
 Prospective users can help shape the developing capabilities by sharing intended applications, workflow requirements, benchmark problems, and validation needs.
-Researchers and developers are invited to explore the ongoing work and contribute through the :doc:`MC/DC development process <../contributing/index>`.
+Researchers and developers are invited to explore the ongoing work and contribute through the :doc:`MC/DC development process <../developer_guide/contributing/index>`.
 
 Foundation in CEMeNT
 --------------------
