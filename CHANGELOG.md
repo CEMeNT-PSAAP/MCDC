@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
+- Add `rebuild_numba_support.py` and the `-r`/`--rebuild` developer option for regenerating Numba support (mcdc_get, mcdc_set, numba_types.py) after object model changes, from [@ilhamv]
+
 ### Changed
+
+- Generate shared Numba support independently of simulation preparation and create problem-dependent dtypes locally through pure factories, from [@ilhamv]
+- Organize example documentation under the User Guide and contribution documentation under the Developer Guide, from [@ilhamv]
 
 ### Deprecated
 
@@ -17,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Fixed
 
 - Anticipate empty census-based tallies in batch runs for correct tally recombination, from [@ilhamv]
+- Prevent independent runs with different problem sizes from sharing mutable problem-dependent Numba types, and preserve Python-managed `__pycache__` directories during startup, from [@ilhamv]
 
 ### Security
 
