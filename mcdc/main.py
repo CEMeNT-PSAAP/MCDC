@@ -35,6 +35,14 @@ def run_simulation(simulationPy: Simulation):
     simulation_container, data = prepare(simulationPy)
     simulation = simulation_container[0]
 
+    # Prevent intermediate census tallies from a previous run from being recombined.
+    import mcdc.output as output_module
+
+    if settings.use_census_based_tally:
+        if master:
+            output_module.clear_census_based_tally_files(settings)
+        MPI.COMM_WORLD.Barrier()
+
     # Print headers
     if master:
         print_module.print_banner()
@@ -54,14 +62,7 @@ def run_simulation(simulationPy: Simulation):
     time_simulation_start = MPI.Wtime()
 
     # Run simulation
-    import mcdc.output as output_module
     import mcdc.transport.simulation as simulation_module
-
-    # Prevent intermediate census tallies from a previous run from being recombined.
-    if settings.use_census_based_tally:
-        if master:
-            output_module.clear_census_based_tally_files(settings)
-        MPI.COMM_WORLD.Barrier()
 
     if settings.neutron_eigenvalue_mode:
         simulation_module.eigenvalue_simulation(simulation_container, data)
