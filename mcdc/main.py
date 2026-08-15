@@ -123,7 +123,7 @@ def prepare(simulationPy: Simulation):
     the selected backend, and loads any external source-particle state.
     """
     # ==================================================================================
-    # Generate Numba runtime layers
+    # Prepare problem-dependent runtime state
     # ==================================================================================
 
     from mcdc.code_factory.numba_layers_generator import generate_numba_layers

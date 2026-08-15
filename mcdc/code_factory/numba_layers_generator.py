@@ -99,14 +99,14 @@ polymorphic_bases = [
 ]
 
 # ======================================================================================
-# Numba layer creation
+# Runtime state preparation
 # ======================================================================================
 
 
 def generate_numba_layers(simulation):
-    """Pack a finalized Python model into the shared runtime data layers."""
+    """Pack a finalized Python model into prepared runtime state."""
     # ==================================================================================
-    # Allocate key items for the Numba runtime layers:
+    # Allocate key items for runtime state preparation:
     #   - Python annotations
     #   - Numba structures
     #   - Records
@@ -333,7 +333,7 @@ def generate_numba_layers(simulation):
     structures["simulation"] = new_structure + structures["simulation"]
 
     # ==================================================================================
-    # Build the problem-dependent Numba types
+    # Build the problem-dependent dtypes
     # ==================================================================================
 
     import mcdc.numba_types as type_
@@ -1633,5 +1633,6 @@ def rebuild_numba_support():
     generate_mcdc_access(accessor_targets)
     generate_numba_types(structures, structure_order)
     print(
-        f"Numba support (mcdc_get, mcdc_set, and numba_types.py)\n  is generated in {Path(mcdc.__file__).parent}"
+        "Generated Numba support (numba_types.py, mcdc_get, and mcdc_set)"
+        f"\n  is written to {Path(mcdc.__file__).parent}"
     )

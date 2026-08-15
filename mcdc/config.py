@@ -49,9 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-r",
         "--rebuild",
         action="store_true",
-        help=(
-            "Rebuild generated Numba support " "(for active object-model development)."
-        ),
+        help="Rebuild generated Numba support (for active object model development).",
     )
 
     # GPU execution
