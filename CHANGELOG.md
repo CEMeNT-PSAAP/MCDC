@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as a guide.
 
-## [Unreleased]
+## [0.15.2] - 2026-08-15
 
 ### Fixed
 
@@ -19,12 +19,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 - Generate shared Numba support independently of simulation preparation and create problem-dependent dtypes locally through pure factories, from [@ilhamv]
 - Organize example documentation under the User Guide and contribution documentation under the Developer Guide, from [@ilhamv]
-
-### Deprecated
-
-### Removed
-
-### Security
 
 ## [0.15.1] - 2026-08-12
 
@@ -175,6 +169,7 @@ The pre-refactor implementation remains available in the `cement` branch as a re
 
 - Multi-table distribution table selection sampling from [@melekderman]
 
+[0.15.2]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.2
 [0.15.1]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.1
 [0.15.0]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.0
 [0.14.2]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.2
