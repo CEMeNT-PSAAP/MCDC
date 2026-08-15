@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ### Added
 
+- Add overriding option N_active, from [@ilhamv]
+
 ### Changed
 
 - Show previously published documentation versions in the documentation version switcher, from [@ilhamv]
