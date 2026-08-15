@@ -117,7 +117,11 @@ In MC/DC the simulation functions (in ``mcdc/transport/simulation.py``) can be c
 Caching behavior is controlled via the ``--caching`` and ``--clear_cache`` command-line flags.
 
 To disable caching, omit the ``--caching`` flag (the default).
-Alternatively a developer could delete the ``__pycache__`` directory or other cache directory which is system dependent (`see more about clearing the numba cache <https://numba.readthedocs.io/en/stable/developer/caching.html>`_)
+Python manages its own ``__pycache__`` directories, and MC/DC does not delete
+them during startup. This allows independent batch launches to safely import
+MC/DC from the same installation. If manual cache removal is necessary, ensure
+that no running job is using the affected cache (`see more about clearing the
+Numba cache <https://numba.readthedocs.io/en/stable/developer/caching.html>`_).
 
 
 MC/DC may eventually enable `Numba's ahead-of-time compilation capabilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_.
@@ -141,6 +145,10 @@ Common input-related locations include:
 #. ``mcdc/object_/tally.py`` — tally objects (``Tally``)
 #. ``mcdc/object_/technique.py`` — variance reduction techniques
 #. ``mcdc/config.py`` — command-line argument definitions
+
+Changes to runtime-visible fields in the object model also require rebuilding
+the generated Numba support. Follow :ref:`rebuilding_numba_support` for the
+command, edit-test shortcut, and concurrency constraint.
 
 -------
 Testing

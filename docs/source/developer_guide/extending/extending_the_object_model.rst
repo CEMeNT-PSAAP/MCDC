@@ -321,14 +321,43 @@ For example, the structural part of a mesh subtype follows this pattern:
 No new ``register_object`` branch is needed for a subtype of an already registered family.
 The existing ``isinstance(..., MeshBase)`` or corresponding category check places it in the base collection, while ``sub_type`` and ``sub_ID`` connect it to its concrete packed collection.
 
-Generated Runtime Layers and Accessors
---------------------------------------
+.. _rebuilding_numba_support:
 
-The annotation is the source of truth for generated runtime fields and accessors.
-Do not edit ``mcdc/numba_types.py``, ``mcdc_get``, or ``mcdc_set`` to introduce a field.
-Prepare a representative simulation so ``numba_layers_generator.py`` regenerates those files, then verify the access pattern predicted by the field representation chosen above.
+Rebuilding Numba Support
+------------------------
 
-For example, a variable-length ``Detector.response`` field produces element accessors associated with the ``detector`` label:
+Changes to runtime-visible annotations or object types under ``mcdc/object_``
+require rebuilding the generated Numba support. The annotations are the source
+of truth; do not edit ``mcdc/numba_types.py``, ``mcdc_get``, or ``mcdc_set``
+directly to introduce a field.
+
+Run the rebuild script after changing the object model:
+
+.. code-block:: console
+
+   python mcdc/code_factory/rebuild_numba_support.py
+
+Then verify the access pattern predicted by the field representation chosen
+above, and commit the regenerated files together with the object model change.
+
+During an active ``mcdc/object_`` edit-test cycle, add ``-r`` (or
+``--rebuild``) to the test input-deck command instead. MC/DC then rebuilds the
+generated Numba support during package initialization, after loading the full
+object model and before importing the generated files. Developers who are not
+changing the object model do not need this option.
+
+.. important::
+
+   Within one MPI launch, rank zero performs the rebuild and the other ranks
+   wait. Independent launches do not share that barrier, so do not use ``-r``
+   or ``--rebuild`` from concurrent jobs that share an MC/DC source tree.
+
+Rebuilding refreshes the shared runtime schema. Problem-dependent dtypes and
+prepared runtime state are still created separately for each simulation. See
+:ref:`generated_numba_support` for those lifetimes and the import order.
+
+After rebuilding, a variable-length ``Detector.response`` field should produce
+element accessors associated with the ``detector`` label:
 
 .. code-block:: python
 
@@ -367,7 +396,7 @@ For example, a public ``Detector`` is re-exported from the package and listed by
 Verification Checklist
 ----------------------
 
-An object-model extension should verify all affected layers:
+An object model extension should verify all affected layers:
 
 - Construction accepts valid input and rejects invalid shapes or types.
 - Compilation discovers the object from the intended root.
