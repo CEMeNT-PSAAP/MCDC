@@ -407,5 +407,5 @@ Before claiming Numba-GPU support:
 - GPU results preserve the same physical behavior within appropriate numerical and statistical tolerances.
 - GPU-specific adaptations and limitations are documented.
 
-Use the :doc:`../../contributing/index` for repository commands, continuous-integration coverage, and regression-test options.
-For changes affecting public inputs, follow :doc:`../../contributing/example_validation`.
+Use the :doc:`../contributing/index` for repository commands, continuous-integration coverage, and regression-test options.
+For changes affecting public inputs, follow :doc:`../contributing/example_validation`.

@@ -187,6 +187,59 @@ Packing is performed in two passes:
 
 The structured ``simulation`` dtype can then be finalized because collection sizes, particle-bank sizes, and nested record types are known.
 
+.. _generated_numba_support:
+
+Generated Numba Support and Problem-Dependent Dtypes
+----------------------------------------------------
+
+The derived layout feeds artifacts with three different lifetimes:
+
+Generated Numba support
+   ``mcdc/numba_types.py`` and the modules under ``mcdc/mcdc_get`` and
+   ``mcdc/mcdc_set`` describe the runtime schema developed in the preceding
+   sections. These generated source files are shared by every simulation using
+   that MC/DC source tree. They change with the object model or Numba support
+   generator, not with an input problem.
+
+Problem-dependent dtypes
+   Each call to ``mcdc.main.prepare`` derives collection lengths,
+   particle-bank capacities, and other sizes from one compiled model. Pure
+   factories in ``mcdc.numba_types`` use those sizes to return simulation and
+   particle-bank dtypes local to that preparation. The factories do not
+   install the returned dtypes in shared module globals.
+
+Prepared runtime state
+   ``generate_numba_layers`` uses the problem-dependent dtypes to allocate and
+   pack that simulation's ``simulation`` and ``data`` objects. This state is
+   owned by the prepared simulation and used during transport.
+
+This separation allows independent processes to run differently sized
+problems from the same installation. Each process creates and retains its own
+problem-dependent dtypes, while the generated Numba support remains read-only.
+
+Import and Preparation Order
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Generated Numba support is established at the process level:
+
+#. Importing ``mcdc`` loads the complete object model.
+#. ``mcdc.config`` parses ``-r`` or ``--rebuild`` with the other command-line
+   options, and package initialization calls its MPI-aware rebuild gate. When
+   rebuilding is requested, rank zero regenerates the Numba support and the
+   other ranks in that MPI launch wait for it to finish.
+#. Runtime modules may then import ``numba_types``, ``mcdc_get``, and
+   ``mcdc_set``.
+
+This process-level step does not depend on a :class:`mcdc.Simulation` or its
+compilation. Each simulation is subsequently compiled and prepared using the
+support already established during import. Preparation creates fresh
+problem-dependent dtypes and prepared runtime state for that simulation.
+
+The MPI barrier coordinates ranks within one launch, not independent launches.
+Independent jobs sharing an MC/DC source tree must use previously generated,
+read-only Numba support. See :ref:`rebuilding_numba_support` for the object
+model development workflow and rebuild commands.
+
 .. _simulation_specific_literals:
 
 Static Constants and Simulation-Specific Literals

@@ -1,7 +1,28 @@
+import subprocess
+import sys
+
 import numpy as np
 import pytest
 
 import mcdc.print_ as print_module
+
+
+def test_import_mcdc_does_not_import_generated_numba_support():
+    check_imports = """
+import sys
+import mcdc
+
+generated = [
+    name
+    for name in sys.modules
+    if name == "mcdc.numba_types"
+    or name.startswith("mcdc.mcdc_get")
+    or name.startswith("mcdc.mcdc_set")
+]
+assert not generated, generated
+"""
+
+    subprocess.run([sys.executable, "-c", check_imports], check=True)
 
 
 def test_print_1d_array():

@@ -67,7 +67,8 @@ For example, the following on ``index.rst`` creates a table of contents on the m
   .. toctree::
      user_guide/index
      theory/index
-     examples/index
+     reference/index
+     developer_guide/index
 
 Sphinx will build an html file for all rst files in the source directory and its subdirectories.
 Sphinx will issue a warning if an html file isn't referenced in any toctree because that means that the generated webpage is not reachable through standard navigation.

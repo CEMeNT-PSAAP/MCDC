@@ -13,14 +13,14 @@ The example requires ``MCDC_LIB`` to identify a native-data library containing `
 Full Input
 ----------
 
-.. literalinclude:: ../../../examples/hybrid_multigroup/input.py
+.. literalinclude:: ../../../../examples/hybrid_multigroup/input.py
    :language: python
    :linenos:
 
 Post-processing
 ---------------
 
-.. literalinclude:: ../../../examples/hybrid_multigroup/process-output.py
+.. literalinclude:: ../../../../examples/hybrid_multigroup/process-output.py
    :language: python
    :linenos:
 

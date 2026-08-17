@@ -109,7 +109,7 @@ Step-by-Step Walkthrough
 
 **1. Materials (lines 1–22)**
 
-.. literalinclude:: ../../../examples/moving_pellet/input.py
+.. literalinclude:: ../../../../examples/moving_pellet/input.py
    :language: python
    :lines: 1-22
    :linenos:
@@ -121,7 +121,7 @@ transport.
 
 **2. Surfaces and Moving Geometry (lines 24–30)**
 
-.. literalinclude:: ../../../examples/moving_pellet/input.py
+.. literalinclude:: ../../../../examples/moving_pellet/input.py
    :language: python
    :lines: 24-30
    :linenos:
@@ -134,7 +134,7 @@ a pellet traversing the domain.
 
 **3. Container and Cells (lines 32–50)**
 
-.. literalinclude:: ../../../examples/moving_pellet/input.py
+.. literalinclude:: ../../../../examples/moving_pellet/input.py
    :language: python
    :lines: 32-50
    :linenos:
@@ -145,7 +145,7 @@ and the two planes.  The air fills the complement inside the bounding box.
 
 **4. Source (lines 56–63)**
 
-.. literalinclude:: ../../../examples/moving_pellet/input.py
+.. literalinclude:: ../../../../examples/moving_pellet/input.py
    :language: python
    :lines: 56-63
    :linenos:
@@ -156,7 +156,7 @@ full simulation time :math:`t \in [0, 9]` s.
 
 **5. Tallies, Settings, and Run (lines 69–83)**
 
-.. literalinclude:: ../../../examples/moving_pellet/input.py
+.. literalinclude:: ../../../../examples/moving_pellet/input.py
    :language: python
    :lines: 69-83
    :linenos:
@@ -179,7 +179,7 @@ Click here to view the input file: `examples/moving_pellet/input.py <https://git
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/moving_pellet/input.py
+.. literalinclude:: ../../../../examples/moving_pellet/input.py
   :language: python
   :linenos:
 

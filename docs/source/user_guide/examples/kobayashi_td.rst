@@ -20,7 +20,7 @@ dog-leg benchmark.  The key differences are highlighted below.
 
 **1. Source with a Time Window (line 54–60)**
 
-.. literalinclude:: ../../../examples/kobayashi-TD/input.py
+.. literalinclude:: ../../../../examples/kobayashi-TD/input.py
    :language: python
    :lines: 50-60
    :linenos:
@@ -31,7 +31,7 @@ over a 50 s window rather than instantaneously.
 
 **2. Time-Resolved Tallies (lines 66–69)**
 
-.. literalinclude:: ../../../examples/kobayashi-TD/input.py
+.. literalinclude:: ../../../../examples/kobayashi-TD/input.py
    :language: python
    :lines: 66-69
    :linenos:
@@ -56,7 +56,7 @@ Click here to view the input file: `examples/kobayashi-TD/input.py <https://gith
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/kobayashi-TD/input.py
+.. literalinclude:: ../../../../examples/kobayashi-TD/input.py
    :language: python
    :linenos:
 
