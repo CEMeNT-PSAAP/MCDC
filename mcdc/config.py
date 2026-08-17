@@ -36,6 +36,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Simulation-setting overrides
     parser.add_argument("--N_particle", type=int, help="Number of particles")
     parser.add_argument("--N_batch", type=int, help="Number of batches")
+    parser.add_argument("--N_active", type=int, help="Number of active cycles")
     parser.add_argument("--output", type=str, help="Output file name")
     parser.add_argument("--progress_bar", default=True, action="store_true")
     parser.add_argument("--no-progress_bar", dest="progress_bar", action="store_false")
@@ -133,6 +134,9 @@ def override_settings(simulation) -> bool:
     # These command-line options directly replace public Simulation settings.
     set_setting("N_particle", args.N_particle)
     set_setting("N_batch", args.N_batch)
+    if args.N_active is not None:
+        set_setting("N_active", args.N_active)
+        set_setting("N_cycle", settings.N_inactive + settings.N_active)
     set_setting("output_name", args.output)
     set_setting("use_progress_bar", args.progress_bar)
 
