@@ -84,7 +84,11 @@ Prepare the Release
 #. Review the ``Unreleased`` section of ``CHANGELOG.md``.
    Ensure every user-visible change is included under the correct heading, remove empty headings, and add contributor attribution where appropriate.
    For a patch release, place ``Fixed`` first and confirm that it is non-empty and clearly states the defect that justifies the release.
-#. Finalize the release version and date in ``CHANGELOG.md`` and ``CITATION.cff``, and update the stable entry's display name in ``docs/source/_static/switcher.json`` to the full ``X.Y.Z (stable)`` version while retaining ``stable`` as its version identifier and URL.
+#. Finalize the release version and date in ``CHANGELOG.md`` and ``CITATION.cff``.
+#. Update ``docs/source/_static/switcher.json``:
+   - Change the stable entry's display name to the full ``X.Y.Z (stable)`` version while retaining ``stable`` as its version identifier and URL.
+   - Add the previous stable release as a historical entry, using its Read the Docs tag identifier and URL, and retain the existing historical entries in newest-to-oldest order.
+   - Confirm that every listed historical version is active, built, and reachable on Read the Docs.
 #. Review the release diff for user-facing behavior.
    Confirm that each affected interface or workflow is reflected in the relevant documentation and examples.
    If existing users must change how they use MC/DC, include the necessary deprecation notice or migration guidance.
