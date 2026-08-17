@@ -46,6 +46,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clear_cache", action="store_true")
     parser.add_argument("--caching", action="store_true", default=False)
     parser.add_argument("--no_caching", dest="caching", action="store_false")
+    parser.add_argument(
+        "-r",
+        "--rebuild",
+        action="store_true",
+        help="Rebuild generated Numba support (for active object model development).",
+    )
 
     # GPU execution
     parser.add_argument(
@@ -160,6 +166,21 @@ def override_settings(simulation) -> bool:
     return changed
 
 
+def rebuild_numba_support_if_requested() -> None:
+    """Rebuild generated Numba support during package initialization."""
+    if not args.rebuild:
+        return
+
+    communicator = MPI.COMM_WORLD
+    if communicator.Get_rank() == 0:
+        from mcdc.code_factory.numba_layers_generator import rebuild_numba_support
+
+        rebuild_numba_support()
+
+    if communicator.Get_size() > 1:
+        communicator.Barrier()
+
+
 # ======================================================================================
 # Process-wide initialization
 # ======================================================================================
@@ -169,10 +190,7 @@ def _manage_runtime_caches() -> None:
     """Clear generated-code caches when caching is disabled or reset."""
     should_clear = not caching or clear_cache
     if should_clear and MPI.COMM_WORLD.Get_rank() == 0:
-        cache_directories = (
-            Path(__file__).resolve().parent / "__pycache__",
-            Path.cwd() / "__harmonize_cache__",
-        )
+        cache_directories = (Path.cwd() / "__harmonize_cache__",)
         for cache_directory in cache_directories:
             if cache_directory.exists():
                 shutil.rmtree(cache_directory)

@@ -1,5 +1,7 @@
-import h5py
 import importlib.metadata
+from pathlib import Path
+
+import h5py
 import numpy as np
 
 ####
@@ -228,7 +230,7 @@ def generate_census_based_tally(mcdc, data):
     base_name = mcdc["settings"]["output_name"]
 
     # Create or get the file
-    file_name = f"{base_name}-batch_{idx_batch}-census_{idx_census}.h5"
+    file_name = census_based_tally_file_name(base_name, idx_batch, idx_census)
     file = h5py.File(file_name, "w")
     create_tally_dataset(file, mcdc, data)
     file.close()
@@ -238,6 +240,20 @@ def replace_dataset(file, field, data):
     if field in file:
         del file[field]
     file.create_dataset(field, data=data)
+
+
+def census_based_tally_file_name(base_name, idx_batch, idx_census):
+    """Return the intermediate tally path for one batch and time census."""
+    return Path(f"{base_name}-batch_{idx_batch}-census_{idx_census}.h5")
+
+
+def clear_census_based_tally_files(settings):
+    """Remove intermediate tallies that could otherwise leak across runs."""
+    for idx_batch in range(settings.N_batch):
+        for idx_census in range(settings.N_census):
+            census_based_tally_file_name(
+                settings.output_name, idx_batch, idx_census
+            ).unlink(missing_ok=True)
 
 
 def recombine_tallies(simulationPy, simulation):
@@ -274,7 +290,8 @@ def recombine_tallies(simulationPy, simulation):
             del main_file["tallies"]
         tally_group = main_file.create_group("tallies")
 
-        with h5py.File(f"{base_name}-batch_0-census_0.h5", "r") as reference_file:
+        reference_path = census_based_tally_file_name(base_name, 0, 0)
+        with h5py.File(reference_path, "r") as reference_file:
             for tally in simulationPy.tallies:
                 name = f"tallies/{tally.name}"
                 reference_file.copy(name, tally_group)
@@ -310,7 +327,15 @@ def recombine_tallies(simulationPy, simulation):
                     time_slice = tuple(time_slice)
 
                     for i_batch in range(N_batch):
-                        file_name = f"{base_name}-batch_{i_batch}-census_{i_census}.h5"
+                        file_name = census_based_tally_file_name(
+                            base_name, i_batch, i_census
+                        )
+
+                        # Empty particle banks end a batch before later census files are
+                        # written. Those absent contributions are physically zero.
+                        if not file_name.is_file():
+                            continue
+
                         with h5py.File(file_name, "r") as file:
                             score_data = np.asarray(
                                 file[f"{score_name}/mean"][()]

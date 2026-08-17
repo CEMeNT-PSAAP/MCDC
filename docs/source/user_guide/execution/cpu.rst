@@ -35,7 +35,7 @@ Only the functions used in a specific simulation will be compiled.
 When ``--caching`` is enabled, compiled binaries can be reused by subsequent
 runs of a compatible simulation.
 The cache can be used as an effective ahead-of-time compilation scheme where binaries can be compiled once and shared between machines.
-For more information on caching, see :ref:`contributing/index:Caching` and
+For more information on caching, see :ref:`developer_guide/contributing/index:Caching` and
 `Numba Caching <https://numba.readthedocs.io/en/stable/developer/caching.html>`_.
 
 MC/DC also has the ability to run Numba in a debugging mode.
@@ -47,7 +47,7 @@ This will result in less performant code and longer compile times but will allow
 
 
 For more information on the exact behavior of this option, see
-:ref:`contributing/index:Debugging`.
+:ref:`developer_guide/contributing/index:Debugging`.
 
 Using MPI
 ---------

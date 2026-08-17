@@ -20,7 +20,7 @@ Continue with :doc:`writing_numba_compatible_transport_code` when the extension 
 
 For example, a new runtime field with no transport behavior uses the object-model guide, a numerical change using existing fields starts with the transport-code guide, and a new tally subtype follows both in that order.
 
-Use the :doc:`../../contributing/index` for repository setup, test commands, continuous-integration coverage, and pull-request requirements.
+Use the :doc:`../contributing/index` for repository setup, test commands, continuous-integration coverage, and pull-request requirements.
 
 .. toctree::
    :maxdepth: 1

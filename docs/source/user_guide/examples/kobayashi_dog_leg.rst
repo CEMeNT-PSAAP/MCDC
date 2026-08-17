@@ -96,7 +96,7 @@ This section walks through the input file block by block.
 
 **1. Import and Materials (lines 1–13)**
 
-.. literalinclude:: ../../../examples/kobayashi/input.py
+.. literalinclude:: ../../../../examples/kobayashi/input.py
    :language: python
    :lines: 1-13
    :linenos:
@@ -108,7 +108,7 @@ Two mono-energetic multigroup materials are created:
 
 **2. Surfaces (lines 15–30)**
 
-.. literalinclude:: ../../../examples/kobayashi/input.py
+.. literalinclude:: ../../../../examples/kobayashi/input.py
    :language: python
    :lines: 15-30
    :linenos:
@@ -120,7 +120,7 @@ the quarter-symmetry; vacuum on the outer faces allows leakage.
 
 **3. Cells — CSG Region Definitions (lines 32–44)**
 
-.. literalinclude:: ../../../examples/kobayashi/input.py
+.. literalinclude:: ../../../../examples/kobayashi/input.py
    :language: python
    :lines: 32-44
    :linenos:
@@ -136,7 +136,7 @@ Three cells cover the domain:
 
 **4. Source (lines 50–57)**
 
-.. literalinclude:: ../../../examples/kobayashi/input.py
+.. literalinclude:: ../../../../examples/kobayashi/input.py
    :language: python
    :lines: 50-57
    :linenos:
@@ -147,7 +147,7 @@ An isotropic, uniformly distributed source fills the
 
 **5. Tallies, Settings, Techniques, and Run (lines 63–74)**
 
-.. literalinclude:: ../../../examples/kobayashi/input.py
+.. literalinclude:: ../../../../examples/kobayashi/input.py
    :language: python
    :lines: 63-74
    :linenos:
@@ -171,7 +171,7 @@ Click here to view the input file: `examples/kobayashi/input.py <https://github.
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/kobayashi/input.py
+.. literalinclude:: ../../../../examples/kobayashi/input.py
   :language: python
   :linenos:
 

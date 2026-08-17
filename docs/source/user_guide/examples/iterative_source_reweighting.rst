@@ -18,14 +18,14 @@ about the slab midpoint.
 Full Input
 ----------
 
-.. literalinclude:: ../../../examples/iterative_source_reweighting/input.py
+.. literalinclude:: ../../../../examples/iterative_source_reweighting/input.py
    :language: python
    :linenos:
 
 Post-processing
 ---------------
 
-.. literalinclude:: ../../../examples/iterative_source_reweighting/process-output.py
+.. literalinclude:: ../../../../examples/iterative_source_reweighting/process-output.py
    :language: python
    :linenos:
 
