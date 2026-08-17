@@ -21,5 +21,5 @@ visualize, run, and post-process a complete transport problem.
 After completing these pages:
 
 - Continue through the :doc:`../index` for task-oriented guidance.
-- Browse :doc:`../../examples/index` for complete models.
+- Browse :doc:`../examples/index` for complete models.
 - Consult the :doc:`../../reference/index` for exact API behavior.

@@ -93,7 +93,7 @@ Step-by-Step Walkthrough
 
 **1. Materials (lines 1–15)**
 
-.. literalinclude:: ../../../examples/moving_source/input.py
+.. literalinclude:: ../../../../examples/moving_source/input.py
    :language: python
    :lines: 1-15
    :linenos:
@@ -104,7 +104,7 @@ transport.
 
 **2. Geometry (lines 17–27)**
 
-.. literalinclude:: ../../../examples/moving_source/input.py
+.. literalinclude:: ../../../../examples/moving_source/input.py
    :language: python
    :lines: 17-27
    :linenos:
@@ -114,7 +114,7 @@ A simple box with vacuum boundaries.  One cell fills the entire domain.
 
 **3. Moving Source (lines 33–49)**
 
-.. literalinclude:: ../../../examples/moving_source/input.py
+.. literalinclude:: ../../../../examples/moving_source/input.py
    :language: python
    :lines: 33-49
    :linenos:
@@ -126,7 +126,7 @@ durations.  The source physically translates through the domain over time.
 
 **4. Tallies, Settings, and Run (lines 55–65)**
 
-.. literalinclude:: ../../../examples/moving_source/input.py
+.. literalinclude:: ../../../../examples/moving_source/input.py
    :language: python
    :lines: 55-65
    :linenos:
@@ -149,7 +149,7 @@ Click here to view the input file: `examples/moving_source/input.py <https://git
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/moving_source/input.py
+.. literalinclude:: ../../../../examples/moving_source/input.py
   :language: python
   :linenos:
 

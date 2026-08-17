@@ -45,7 +45,7 @@ Click here to view the input file: `examples/c5g7/transient/input.py <https://gi
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/c5g7/transient/input.py
+.. literalinclude:: ../../../../examples/c5g7/transient/input.py
    :language: python
    :linenos:
 

@@ -77,7 +77,7 @@ Step-by-Step Walkthrough
 
 **1. Import and Materials (lines 1–12)**
 
-.. literalinclude:: ../../../examples/sphere_in_cube/input.py
+.. literalinclude:: ../../../../examples/sphere_in_cube/input.py
    :language: python
    :lines: 1-12
    :linenos:
@@ -89,7 +89,7 @@ scattering material (``pure_s``, :math:`\Sigma_s = 1.0`) for the cube.
 
 **2. Surfaces and CSG Regions (lines 14–26)**
 
-.. literalinclude:: ../../../examples/sphere_in_cube/input.py
+.. literalinclude:: ../../../../examples/sphere_in_cube/input.py
    :language: python
    :lines: 14-26
    :linenos:
@@ -101,7 +101,7 @@ sphere from the cube.
 
 **3. Source (lines 32–39)**
 
-.. literalinclude:: ../../../examples/sphere_in_cube/input.py
+.. literalinclude:: ../../../../examples/sphere_in_cube/input.py
    :language: python
    :lines: 32-39
    :linenos:
@@ -111,7 +111,7 @@ A uniform isotropic source fills the cube over :math:`t \in [0,50]` s.
 
 **4. Cell Tally, Settings, and Run (lines 45–55)**
 
-.. literalinclude:: ../../../examples/sphere_in_cube/input.py
+.. literalinclude:: ../../../../examples/sphere_in_cube/input.py
    :language: python
    :lines: 45-55
    :linenos:
@@ -136,7 +136,7 @@ Click here to view the input file: `examples/sphere_in_cube/input.py <https://gi
 
 The complete input used for this example is embedded below:
 
-.. literalinclude:: ../../../examples/sphere_in_cube/input.py
+.. literalinclude:: ../../../../examples/sphere_in_cube/input.py
   :language: python
   :linenos:
 

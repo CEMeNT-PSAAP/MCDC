@@ -49,13 +49,13 @@ Execution
 Learning by Example
 -------------------
 
-Use the :doc:`../examples/index` to learn from complete, runnable input decks
+Use :doc:`examples/index` to learn from complete, runnable input decks
 that progress from basic models to advanced benchmarks.
 
 .. toctree::
    :maxdepth: 2
 
-   Example Problems <../examples/index>
+   examples/index
 
 Help & Support
 --------------

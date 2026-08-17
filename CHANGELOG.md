@@ -2,9 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as a guide.
+
+## [0.15.2] - 2026-08-15
+
+### Fixed
+
+- Anticipate empty census-based tallies in batch runs for correct tally recombination, from [@ilhamv]
+- Prevent independent runs with different problem sizes from sharing mutable problem-dependent Numba types, and preserve Python-managed `__pycache__` directories during startup, from [@ilhamv]
+
+### Added
+
+- Add `rebuild_numba_support.py` and the `-r`/`--rebuild` developer option for regenerating Numba support (mcdc_get, mcdc_set, numba_types.py) after object model changes, from [@ilhamv]
+
+### Changed
+
+- Generate shared Numba support independently of simulation preparation and create problem-dependent dtypes locally through pure factories, from [@ilhamv]
+- Organize example documentation under the User Guide and contribution documentation under the Developer Guide, from [@ilhamv]
 
 ## [0.15.1] - 2026-08-12
+
+### Fixed
+
+- Prevent unbounded dependency resolution from selecting incompatible releases that break MC/DC by adding explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
 
 ### Added
 
@@ -15,10 +35,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 ### Changed
 
 - Hide flyout in Read the Docs, from [@ilhamv]
-
-### Fixed
-
-- Prevent unbounded dependency resolution from selecting incompatible releases that break MC/DC by adding explicit upper bounds for all build, runtime, documentation, and development dependencies, from [@ilhamv]
 
 ## [0.15.0] - 2026-08-11
 
@@ -46,6 +62,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 
 ## [0.14.2] - 2026-07-15
 
+### Fixed
+
+- Fix 2D-vector setter writes nothing (- instead of =) from [@steps-re]
+- Fix delayed neutrons are never sampled (transport/physics/neutron/native.py, fission()) from [@steps-re]
+- Fix delayed emission time uses β instead of λ (transport/physics/neutron/native.py, fission())from [@steps-re]
+- Fix swapped transverse-basis branches (transport/distribution.py, sample_direction()) from [@steps-re]
+- Fix divide-by-zero for a -z reference (transport/distribution.py, sample_white_direction()) from [@steps-re]
+- Fix tally polar_reference corrupted (object_/tally.py) from [@steps-re]
+
 ### Added
 
 - Add layered documentation philosophy
@@ -60,18 +85,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
   - Combined `object_` and `transport` unit test for more efficient fixture reuse from [@massimolarsen]
   - Replace bare assert np.isclose with proper np.testing.assert_allclose from [@steps-re]
 
-### Fixed
-
-- Fix 2D-vector setter writes nothing (- instead of =) from [@steps-re]
-- Fix delayed neutrons are never sampled (transport/physics/neutron/native.py, fission()) from [@steps-re]
-- Fix delayed emission time uses β instead of λ (transport/physics/neutron/native.py, fission())from [@steps-re]
-- Fix swapped transverse-basis branches (transport/distribution.py, sample_direction()) from [@steps-re]
-- Fix divide-by-zero for a -z reference (transport/distribution.py, sample_white_direction()) from [@steps-re]
-- Fix tally polar_reference corrupted (object_/tally.py) from [@steps-re]
-
 ## [0.14.1] - 2026-07-04
 
-### Changed
+### Fixed
 
 - Documentation and packaging metadata fixes
 
@@ -153,6 +169,7 @@ The pre-refactor implementation remains available in the `cement` branch as a re
 
 - Multi-table distribution table selection sampling from [@melekderman]
 
+[0.15.2]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.2
 [0.15.1]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.1
 [0.15.0]: https://github.com/mcdc-project/mcdc/releases/tag/v0.15.0
 [0.14.2]: https://github.com/mcdc-project/mcdc/releases/tag/v0.14.2

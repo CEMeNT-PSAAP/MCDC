@@ -11,9 +11,9 @@ Start with the setup steps below.
 Use :doc:`continuous_integration` to understand automated checks and :doc:`container_development` when developing in the project container.
 Use :doc:`example_validation` when changing the public API or example problems.
 Read :doc:`pull_requests` before preparing a contribution.
-For software architecture and documentation practices, see the :doc:`../developer_guide/index`.
+For software architecture and documentation practices, see the :doc:`../index`.
 
-For implementation guidance specific to compiled transport functions, see :doc:`../developer_guide/extending/writing_numba_compatible_transport_code`.
+For implementation guidance specific to compiled transport functions, see :doc:`../extending/writing_numba_compatible_transport_code`.
 
 Contributions target the ``dev`` branch.
 Prepare a development checkout with the following steps:
@@ -36,7 +36,7 @@ Development Workflow
    pull_requests
 
 MC/DC documentation is an important part of the project and evolves alongside the codebase.
-The :doc:`../developer_guide/documentation/index` guide describes the documentation philosophy, writing guidelines, and the tools used to build and maintain the documentation.
+The :doc:`../documentation/index` guide describes the documentation philosophy, writing guidelines, and the tools used to build and maintain the documentation.
 
 Please note our `code of conduct <https://github.com/mcdc-project/mcdc/blob/dev/CODE_OF_CONDUCT.md>`_, which we take seriously.
 
@@ -117,7 +117,11 @@ In MC/DC the simulation functions (in ``mcdc/transport/simulation.py``) can be c
 Caching behavior is controlled via the ``--caching`` and ``--clear_cache`` command-line flags.
 
 To disable caching, omit the ``--caching`` flag (the default).
-Alternatively a developer could delete the ``__pycache__`` directory or other cache directory which is system dependent (`see more about clearing the numba cache <https://numba.readthedocs.io/en/stable/developer/caching.html>`_)
+Python manages its own ``__pycache__`` directories, and MC/DC does not delete
+them during startup. This allows independent batch launches to safely import
+MC/DC from the same installation. If manual cache removal is necessary, ensure
+that no running job is using the affected cache (`see more about clearing the
+Numba cache <https://numba.readthedocs.io/en/stable/developer/caching.html>`_).
 
 
 MC/DC may eventually enable `Numba's ahead-of-time compilation capabilities <https://numba.readthedocs.io/en/stable/user/pycc.html>`_.
@@ -128,7 +132,7 @@ However if absolutely required by users numba does allow for some `cache sharing
 Adding a New Input
 ------------------
 
-For architectural guidance on adding a model field, embedded configuration, registered object category, or polymorphic subtype, see :doc:`../developer_guide/extending/extending_the_object_model`.
+For architectural guidance on adding a model field, embedded configuration, registered object category, or polymorphic subtype, see :doc:`../extending/extending_the_object_model`.
 Public model classes and configuration are primarily defined in ``mcdc/object_/``.
 Common input-related locations include:
 
@@ -141,6 +145,10 @@ Common input-related locations include:
 #. ``mcdc/object_/tally.py`` — tally objects (``Tally``)
 #. ``mcdc/object_/technique.py`` — variance reduction techniques
 #. ``mcdc/config.py`` — command-line argument definitions
+
+Changes to runtime-visible fields in the object model also require rebuilding
+the generated Numba support. Follow :ref:`rebuilding_numba_support` for the
+command, edit-test shortcut, and concurrency constraint.
 
 -------
 Testing
@@ -205,4 +213,4 @@ Adding Documentation
 Documentation is a core part of MC/DC.
 Contributions that introduce new features, modify existing behavior, or change developer workflows should update the relevant documentation accordingly.
 
-See the :doc:`../developer_guide/documentation/index` guide for documentation philosophy, writing guidelines, and instructions for contributing to the documentation.
+See the :doc:`../documentation/index` guide for documentation philosophy, writing guidelines, and instructions for contributing to the documentation.

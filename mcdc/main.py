@@ -35,6 +35,14 @@ def run_simulation(simulationPy: Simulation):
     simulation_container, data = prepare(simulationPy)
     simulation = simulation_container[0]
 
+    # Prevent intermediate census tallies from a previous run from being recombined.
+    import mcdc.output as output_module
+
+    if settings.use_census_based_tally:
+        if master:
+            output_module.clear_census_based_tally_files(settings)
+        MPI.COMM_WORLD.Barrier()
+
     # Print headers
     if master:
         print_module.print_banner()
@@ -67,8 +75,6 @@ def run_simulation(simulationPy: Simulation):
     # ==================================================================================
     # Working on the output
     # ==================================================================================
-
-    import mcdc.output as output_module
 
     # TIMER: output
     time_output_start = MPI.Wtime()
@@ -118,7 +124,7 @@ def prepare(simulationPy: Simulation):
     the selected backend, and loads any external source-particle state.
     """
     # ==================================================================================
-    # Generate Numba runtime layers
+    # Prepare problem-dependent runtime state
     # ==================================================================================
 
     from mcdc.code_factory.numba_layers_generator import generate_numba_layers
@@ -128,14 +134,6 @@ def prepare(simulationPy: Simulation):
 
     simulation_container, data = generate_numba_layers(simulationPy)
     simulation = simulation_container[0]
-
-    # Reload mcdc getters and setters
-    import importlib
-    import mcdc.mcdc_get as mcdc_get
-    import mcdc.mcdc_set as mcdc_set
-
-    importlib.reload(mcdc_get)
-    importlib.reload(mcdc_set)
 
     # Pick Python-version RNG if needed
     import mcdc.config as config
