@@ -95,6 +95,10 @@ Prepare the Release
 #. Confirm whether the release changes the supported Python versions.
    If it does, update ``pyproject.toml``, the compatibility workflows, installation documentation, and ``CHANGELOG.md``.
 #. Confirm the required local checks, continuous-integration workflows, and distribution artifact tests pass on the release candidate; resolve any dependency incompatibilities they expose and update ``pyproject.toml`` and ``CHANGELOG.md`` as needed.
+#. Run the applicable `MC/DC-VVP campaign <https://github.com/mcdc-project/mcdc-vvp>`_ with the release candidate and the corresponding MC/DC-VVP version.
+   Process the completed suites and review their convergence, reference, and comparison results for unexpected behavior.
+#. Run ``python prepare_release.py`` in MC/DC-VVP to collect the processed PNG figures and GIF animations into its flat ``release/`` asset directory.
+   Confirm that the prepared assets cover the documented VVP cases and that their names match the links used by the MC/DC documentation.
 
 Integrate the Release
 ^^^^^^^^^^^^^^^^^^^^^
@@ -122,6 +126,9 @@ Publish from Main
    * **Release label:** select **Latest**.
    * **Finish:** click **Publish release** when creating the release, or **Update release** when editing an existing release.
 
+#. Replace the assets attached to the mutable `VVP results release <https://github.com/mcdc-project/mcdc/releases/tag/vvp-results>`_ with the contents of the prepared MC/DC-VVP ``release/`` directory.
+   Update its release notes to identify the MC/DC and MC/DC-VVP versions used for the published campaign.
+#. Confirm that every VVP figure and animation referenced by the documentation is available from the ``vvp-results`` release and renders on its case page.
 #. Confirm that the automatically triggered `Publish Python Package to PyPI <https://github.com/mcdc-project/mcdc/actions/workflows/publish-pypi.yml>`_ and `Check citation metadata <https://github.com/mcdc-project/mcdc/actions/workflows/check_citation.yml>`_ workflows complete successfully, and that the release is available from the `stable Read the Docs site <https://mcdc.readthedocs.io/en/stable/>`_.
 #. Smoke-test the published PyPI package in a clean environment with ``python -m pip install "mcdc==X.Y.Z"``, then run a minimal MC/DC simulation.
 
